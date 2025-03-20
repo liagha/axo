@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+
+use core::fmt;
+
 #[derive(Clone, PartialEq)]
 pub enum Token {
     Float(f64),
@@ -15,31 +19,69 @@ pub enum Token {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operator {
-    Tilde,
-    Equal,
-    Colon,
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Caret,
-    Pipe,
-    Ampersand,
-    Percent,
-    GreaterThan,
-    LessThan,
-    Exclamation,
-    Comma,
-    Dot,
-    DotDot,
-    LessThanOrEqual,
-    GreaterThanOrEqual,
-    EqualEqual,
-    NotEqual,
-    LogicalAnd,
-    LogicalOr,
-    LeftShift,
-    RightShift,
+    Tilde,              // ~
+    Equal,              // =
+    Colon,              // :
+    Plus,               // +
+    Minus,              // -
+    Star,               // *
+    Slash,              // /
+    Caret,              // ^
+    Pipe,               // |
+    Ampersand,          // &
+    Percent,            // %
+    GreaterThan,        // >
+    LessThan,           // <
+    Exclamation,        // !
+    Comma,              // ,
+    Dot,                // .
+    DotDot,             // ..
+    LessThanOrEqual,    // <=
+    GreaterThanOrEqual, // >=
+    EqualEqual,         // ==
+    NotEqual,           // !=
+    LogicalAnd,         // &&
+    LogicalOr,          // ||
+    LeftShift,          // <<
+    RightShift,         // >>
+    PlusEqual,          // +=
+    MinusEqual,         // -=
+    StarEqual,          // *=
+    SlashEqual,         // /=
+    PercentEqual,       // %=
+    CaretEqual,         // ^=
+    AmpersandEqual,     // &=
+    PipeEqual,          // |=
+    LogicalAndEqual,    // &&=
+    LogicalOrEqual,     // ||=
+    QuestionMarkEqual,  // ?=
+    DotDotEqual,        // ..=
+    Arrow,              // ->
+    FatArrow,           // =>
+    At,                 // @
+    Hash,               // #
+    QuestionMark,       // ?
+    Dollar,             // $
+    Backslash,          // \
+    DoubleQuote,        // "
+    SingleQuote,        // '
+    Backtick,           // `
+    Underscore,         // _
+    DoubleColon,        // ::
+    DoubleQuestionMark, // ??
+    DoubleExclamation,  // !!
+    DoubleStar,         // **
+    DoubleSlash,        // //
+    SlashStar,          // /*
+    StarSlash,          // */
+    DoublePercent,      // %%
+    DoubleCaret,        // ^^
+    DoubleTilde,        // ~~
+    DoubleAt,           // @@
+    DoubleHash,         // ##
+    DoubleDollar,       // $$
+    DoubleBackslash,    // \\
+    DoubleUnderscore,   // __
 }
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -59,100 +101,247 @@ pub enum Punctuation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Keyword {
+    Struct,
+    Enum,
+    Impl,
+    Trait,
+    Match,
     If,
     Else,
     For,
     While,
     Fn,
+    In,
     Return,
+    Break,
+    Let,
+    Continue,
 }
 
-use core::str::FromStr;
-use core::fmt;
-
-
-impl FromStr for Operator {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl Operator {
+    pub fn from_str(s: &str) -> Self {
         match s {
-            "~" => Ok(Operator::Tilde),
-            "=" => Ok(Operator::Equal),
-            ":" => Ok(Operator::Colon),
-            "+" => Ok(Operator::Plus),
-            "-" => Ok(Operator::Minus),
-            "*" => Ok(Operator::Star),
-            "/" => Ok(Operator::Slash),
-            "^" => Ok(Operator::Caret),
-            "|" => Ok(Operator::Pipe),
-            "&" => Ok(Operator::Ampersand),
-            "%" => Ok(Operator::Percent),
-            ">" => Ok(Operator::GreaterThan),
-            "<" => Ok(Operator::LessThan),
-            "!" => Ok(Operator::Exclamation),
-            "," => Ok(Operator::Comma),
-            "." => Ok(Operator::Dot),
-            ".." => Ok(Operator::DotDot),
-            "<=" => Ok(Operator::LessThanOrEqual),
-            ">=" => Ok(Operator::GreaterThanOrEqual),
-            "==" => Ok(Operator::EqualEqual),
-            "!=" => Ok(Operator::NotEqual),
-            "&&" => Ok(Operator::LogicalAnd),
-            "||" => Ok(Operator::LogicalOr),
-            "<<" => Ok(Operator::LeftShift),
-            ">>" => Ok(Operator::RightShift),
-            _ => Err(()),
+            "~" => Operator::Tilde,
+            "=" => Operator::Equal,
+            ":" => Operator::Colon,
+            "+" => Operator::Plus,
+            "-" => Operator::Minus,
+            "*" => Operator::Star,
+            "/" => Operator::Slash,
+            "^" => Operator::Caret,
+            "|" => Operator::Pipe,
+            "&" => Operator::Ampersand,
+            "%" => Operator::Percent,
+            ">" => Operator::GreaterThan,
+            "<" => Operator::LessThan,
+            "!" => Operator::Exclamation,
+            "," => Operator::Comma,
+            "." => Operator::Dot,
+            ".." => Operator::DotDot,
+            "<=" => Operator::LessThanOrEqual,
+            ">=" => Operator::GreaterThanOrEqual,
+            "==" => Operator::EqualEqual,
+            "!=" => Operator::NotEqual,
+            "&&" => Operator::LogicalAnd,
+            "||" => Operator::LogicalOr,
+            "<<" => Operator::LeftShift,
+            ">>" => Operator::RightShift,
+            "+=" => Operator::PlusEqual,
+            "-=" => Operator::MinusEqual,
+            "*=" => Operator::StarEqual,
+            "/=" => Operator::SlashEqual,
+            "%=" => Operator::PercentEqual,
+            "?" => Operator::QuestionMark,
+            "..=" => Operator::DotDotEqual,
+            "->" => Operator::Arrow,
+            "=>" => Operator::FatArrow,
+            "@" => Operator::At,
+            "#" => Operator::Hash,
+            "$" => Operator::Dollar,
+            "\\" => Operator::Backslash,
+            "\"" => Operator::DoubleQuote,
+            "'" => Operator::SingleQuote,
+            "`" => Operator::Backtick,
+            "_" => Operator::Underscore,
+            "::" => Operator::DoubleColon,
+            "??" => Operator::DoubleQuestionMark,
+            "!!" => Operator::DoubleExclamation,
+            "**" => Operator::DoubleStar,
+            "//" => Operator::DoubleSlash,
+            "/*" => Operator::SlashStar,
+            "*/" => Operator::StarSlash,
+            "%%" => Operator::DoublePercent,
+            "^^" => Operator::DoubleCaret,
+            "~~" => Operator::DoubleTilde,
+            "@@" => Operator::DoubleAt,
+            "##" => Operator::DoubleHash,
+            "$$" => Operator::DoubleDollar,
+            "\\\\" => Operator::DoubleBackslash,
+            "__" => Operator::DoubleUnderscore,
+            "^=" => Operator::CaretEqual,
+            "&=" => Operator::AmpersandEqual,
+            "|=" => Operator::PipeEqual,
+            "&&=" => Operator::LogicalAndEqual,
+            "||=" => Operator::LogicalOrEqual,
+            "?=" => Operator::QuestionMarkEqual,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_compound(&self) -> bool {
+        matches!(
+            self,
+            Operator::LogicalAndEqual
+                | Operator::LogicalOrEqual
+                | Operator::QuestionMarkEqual
+                | Operator::DotDotEqual
+                | Operator::AmpersandEqual
+                | Operator::PipeEqual
+                | Operator::StarEqual
+                | Operator::SlashEqual
+                | Operator::PercentEqual
+                | Operator::CaretEqual
+                | Operator::PlusEqual
+                | Operator::MinusEqual
+        )
+    }
+
+    pub fn is_compound_token(input: Option<&Token>) -> bool {
+        if let Some(Token::Operator(operator)) = input {
+            operator.is_compound()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_operator(char: char) -> bool {
+        matches!(
+            char,
+            '~' | '=' | ':' | '+' | '-' |
+            '*' | '/' | '^' | '|' | '&' |
+            '%' | '>' | '<' | '!' | ',' |
+            '.' | '@' | '\'' | '?' | '#' |
+            '$' | '\\' | '`' | '_'
+        )
+    }
+
+    pub fn is_factor(&self) -> bool {
+        matches!(
+            self,
+            Operator::Star
+                | Operator::Slash
+                | Operator::Percent
+                | Operator::DotDot
+                | Operator::LogicalAnd
+                | Operator::DoubleStar
+        )
+    }
+
+    pub fn is_term(&self) -> bool {
+        matches!(
+            self,
+            Operator::Plus
+                | Operator::Minus
+                | Operator::LogicalOr
+                | Operator::Pipe
+                | Operator::Caret
+        )
+    }
+
+    pub fn is_expression(&self) -> bool {
+        matches!(
+            self,
+            Operator::EqualEqual
+                | Operator::NotEqual
+                | Operator::GreaterThan
+                | Operator::LessThan
+                | Operator::GreaterThanOrEqual
+                | Operator::LessThanOrEqual
+        )
+    }
+
+    pub fn is_unary(&self) -> bool {
+        matches!(
+            self,
+            Operator::Exclamation | Operator::Minus | Operator::Tilde
+        )
+    }
+}
+
+impl Punctuation {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            " " => Punctuation::Space,
+            "\t" => Punctuation::Tab,
+            "\n" => Punctuation::Newline,
+            "\r" => Punctuation::CarriageReturn,
+            "(" => Punctuation::LeftParen,
+            ")" => Punctuation::RightParen,
+            "[" => Punctuation::LeftBracket,
+            "]" => Punctuation::RightBracket,
+            "{" => Punctuation::LeftBrace,
+            "}" => Punctuation::RightBrace,
+            ";" => Punctuation::Semicolon,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_punctuation(char: char) -> bool {
+        matches!(
+            char,
+            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ';'
+        )
+    }
+}
+
+impl Token {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "true" => Some(Token::Boolean(true)),
+            "false" => Some(Token::Boolean(false)),
+            "struct" => Some(Token::Keyword(Keyword::Struct)),
+            "enum" => Some(Token::Keyword(Keyword::Enum)),
+            "impl" => Some(Token::Keyword(Keyword::Impl)),
+            "trait" => Some(Token::Keyword(Keyword::Trait)),
+            "match" => Some(Token::Keyword(Keyword::Match)),
+            "if" => Some(Token::Keyword(Keyword::If)),
+            "else" => Some(Token::Keyword(Keyword::Else)),
+            "for" => Some(Token::Keyword(Keyword::For)),
+            "while" => Some(Token::Keyword(Keyword::While)),
+            "fn" => Some(Token::Keyword(Keyword::Fn)),
+            "in" => Some(Token::Keyword(Keyword::In)),
+            "return" => Some(Token::Keyword(Keyword::Return)),
+            "let" => Some(Token::Keyword(Keyword::Let)),
+            "continue" => Some(Token::Keyword(Keyword::Continue)),
+            "break" => Some(Token::Keyword(Keyword::Break)),
+            _ => None,
+        }
+    }
+
+    pub fn get_operator(input: Option<&Token>) -> Option<Operator> {
+        if let Some(Token::Operator(operator)) = input {
+            Some(operator.clone())
+        } else {
+            None
         }
     }
 }
 
-impl FromStr for Punctuation {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl Keyword {
+    pub fn from_str(s: &str) -> Self {
         match s {
-            " " => Ok(Punctuation::Space),
-            "\t" => Ok(Punctuation::Tab),
-            "\n" => Ok(Punctuation::Newline),
-            "\r" => Ok(Punctuation::CarriageReturn),
-            "(" => Ok(Punctuation::LeftParen),
-            ")" => Ok(Punctuation::RightParen),
-            "[" => Ok(Punctuation::LeftBracket),
-            "]" => Ok(Punctuation::RightBracket),
-            "{" => Ok(Punctuation::LeftBrace),
-            "}" => Ok(Punctuation::RightBrace),
-            ";" => Ok(Punctuation::Semicolon),
-            _ => Err(()),
-        }
-    }
-}
-
-impl FromStr for Token {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "true" => Ok(Token::Boolean(true)),
-            "false" => Ok(Token::Boolean(false)),
-            "if" => Ok(Token::Keyword(Keyword::If)),
-            "else" => Ok(Token::Keyword(Keyword::Else)),
-            "for" => Ok(Token::Keyword(Keyword::For)),
-            "while" => Ok(Token::Keyword(Keyword::While)),
-            "fn" => Ok(Token::Keyword(Keyword::Fn)),
-            "return" => Ok(Token::Keyword(Keyword::Return)),
-            _ => Err(()),
-        }
-    }
-}
-
-impl FromStr for Keyword {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "if" => Ok(Keyword::If),
-            "else" => Ok(Keyword::Else),
-            "for" => Ok(Keyword::For),
-            "while" => Ok(Keyword::While),
-            "fn" => Ok(Keyword::Fn),
-            "return" => Ok(Keyword::Return),
-            _ => Err(()),
+            "struct" => Keyword::Struct,
+            "enum" => Keyword::Enum,
+            "trait" => Keyword::Trait,
+            "impl" => Keyword::Impl,
+            "match" => Keyword::Match,
+            "if" => Keyword::If,
+            "else" => Keyword::Else,
+            "for" => Keyword::For,
+            "while" => Keyword::While,
+            "fn" => Keyword::Fn,
+            "return" => Keyword::Return,
+            _ => unreachable!(),
         }
     }
 }
@@ -204,6 +393,44 @@ impl fmt::Display for Operator {
             Operator::LogicalOr => "||",
             Operator::LeftShift => "<<",
             Operator::RightShift => ">>",
+            Operator::PlusEqual => "+=",
+            Operator::MinusEqual => "-=",
+            Operator::StarEqual => "*=",
+            Operator::SlashEqual => "/=",
+            Operator::PercentEqual => "%=",
+            Operator::QuestionMark => "?",
+            Operator::DotDotEqual => "..=",
+            Operator::Arrow => "->",
+            Operator::FatArrow => "=>",
+            Operator::At => "@",
+            Operator::Hash => "#",
+            Operator::Dollar => "$",
+            Operator::Backslash => "\\",
+            Operator::DoubleQuote => "\"",
+            Operator::SingleQuote => "'",
+            Operator::Backtick => "`",
+            Operator::Underscore => "_",
+            Operator::DoubleColon => "::",
+            Operator::DoubleQuestionMark => "??",
+            Operator::DoubleExclamation => "!!",
+            Operator::DoubleStar => "**",
+            Operator::DoubleSlash => "//",
+            Operator::SlashStar => "/*",
+            Operator::StarSlash => "*/",
+            Operator::DoublePercent => "%%",
+            Operator::DoubleCaret => "^^",
+            Operator::DoubleTilde => "~~",
+            Operator::DoubleAt => "@@",
+            Operator::DoubleHash => "##",
+            Operator::DoubleDollar => "$$",
+            Operator::DoubleBackslash => "\\\\",
+            Operator::DoubleUnderscore => "__",
+            Operator::CaretEqual => "^=",
+            Operator::AmpersandEqual => "&=",
+            Operator::PipeEqual => "|=",
+            Operator::LogicalAndEqual => "&&=",
+            Operator::LogicalOrEqual => "||=",
+            Operator::QuestionMarkEqual => "?=",
         };
         write!(f, "{}", op_str)
     }
@@ -212,12 +439,21 @@ impl fmt::Display for Operator {
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let keyword_str = match self {
+            Keyword::Struct => "struct",
+            Keyword::Enum => "enum",
+            Keyword::Trait => "trait",
+            Keyword::Impl => "impl",
+            Keyword::Match => "match",
             Keyword::If => "if",
             Keyword::Else => "else",
             Keyword::For => "for",
             Keyword::While => "while",
             Keyword::Fn => "fn",
+            Keyword::In => "in",
             Keyword::Return => "return",
+            Keyword::Break => "break",
+            Keyword::Continue => "continue",
+            Keyword::Let => "let",
         };
         write!(f, "{}", keyword_str)
     }

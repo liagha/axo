@@ -1,4 +1,7 @@
-use std::fmt::Formatter;
+#![allow(dead_code)]
+
+use core::fmt::Formatter;
+use crate::tokens::{Operator, Punctuation, Token};
 
 pub enum LexError {
     InvalidChar(String),
@@ -12,9 +15,13 @@ pub enum LexError {
 }
 
 pub enum ParseError {
-    UnexpectedToken(String),
+    UnexpectedToken(Token, String),
+    ExpectedPunctuation(Punctuation, String),
+    ExpectedOperator(Operator, String),
+    ExpectedSyntax(String),
     InvalidSyntax(String),
     UnexpectedEOF,
+    UnknownStatement,
 }
 
 impl core::fmt::Display for LexError {
@@ -51,14 +58,26 @@ impl core::fmt::Display for LexError {
 impl core::fmt::Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            ParseError::UnexpectedToken(t) => {
-                write!(f, "Unexpected token '{}'", t)
+            ParseError::UnexpectedToken(t, m) => {
+                write!(f, "Unexpected token '{}': '{}'", t, m)
+            }
+            ParseError::ExpectedPunctuation(t, m) => {
+                write!(f, "Expected '{}' => '{}'", t, m)
+            }
+            ParseError::ExpectedOperator(t, m) => {
+                write!(f, "Expected '{}' => '{}'", t, m)
+            }
+            ParseError::ExpectedSyntax(s) => {
+                write!(f, "Expected '{}'", s)
             }
             ParseError::InvalidSyntax(m) => {
                 write!(f, "Invalid Syntax '{}'", m)
             }
             ParseError::UnexpectedEOF => {
-                write!(f, "Unexpected end of file ")
+                write!(f, "Unexpected end of file")
+            }
+            ParseError::UnknownStatement => {
+                write!(f, "Unknown statement")
             }
         }
     }

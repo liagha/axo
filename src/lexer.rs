@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use crate::errors::LexError;
 use crate::tokens::{Token, Operator, Punctuation};
 
@@ -78,7 +77,7 @@ impl Lexer {
                         }
 
                         match Token::from_str(name.as_str())  {
-                            Ok(token) => tokens.push(token),
+                            Some(token) => tokens.push(token),
                             _ => tokens.push(Token::Identifier(name)),
                         }
                     }
@@ -129,10 +128,10 @@ impl Lexer {
                         }
                     }
 
-                    ch if Self::is_operator(ch) => {
+                    ch if Operator::is_operator(ch) => {
                         let mut operator = ch.to_string();
                         while let Some(&next_ch) = chars.peek() {
-                            if Self::is_operator(next_ch) {
+                            if Operator::is_operator(next_ch) {
                                 operator.push(chars.next().unwrap());
                                 column_number += 1;
                             } else {
@@ -140,25 +139,13 @@ impl Lexer {
                             }
                         }
 
-                        match Operator::from_str(&*operator) {
-                            Ok(op) => {
-                                tokens.push(Token::Operator(op));
-                            }
-                            Err(_) => {
-                                return Err(LexError::InvalidOperator(format!("at line {}, column {}", line_number + 1, column_number)))
-                            }
-                        }
+                        let op = Operator::from_str(&operator);
+                        tokens.push(Token::Operator(op));
                     }
 
-                    ch if Self::is_punctuation(ch) => {
-                        match Punctuation::from_str(&*ch.to_string()) {
-                            Ok(punc) => {
-                                tokens.push(Token::Punctuation(punc));
-                            }
-                            Err(_) => {
-                                return Err(LexError::InvalidPunctuation(format!("at line {}, column {}", line_number + 1, column_number)))
-                            }
-                        }
+                    ch if Punctuation::is_punctuation(ch) => {
+                        let punc = Punctuation::from_str(&*ch.to_string());
+                        tokens.push(Token::Punctuation(punc));
                     }
 
                     _ => {
@@ -176,19 +163,6 @@ impl Lexer {
         tokens.push(Token::EOF);
 
         Ok(tokens)
-    }
-
-    fn is_punctuation(char: char) -> bool {
-        matches!(char, ' ' | '\t' | '\n' |
-            '\r' | '(' | ')' | '[' | ']' |
-            '{' | '}' | ';')
-    }
-
-    fn is_operator(char: char) -> bool {
-        matches!(char, '~' | '=' | ':' | '+' |
-        '-' | '*' | '/' | '^' |
-        '|' | '&' | '%' | '>' |
-        '<' | '!' | ',' | '.')
     }
 
     fn lex_number(number: &str, line: usize, column: usize) -> Result<Token, LexError> {
