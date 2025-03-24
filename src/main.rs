@@ -1,14 +1,12 @@
-mod tokens;
-mod lexer;
 mod errors;
 mod cli;
 mod codegen;
 mod parser;
+pub mod lexer;
+use lexer::{Lexer, PunctuationKind, Token, TokenKind};
+use parser::Parser;
 
 use broccli::{xprintln, Color, TextStyle};
-use crate::lexer::Lexer;
-use crate::parser::Parser;
-use crate::tokens::{Punctuation, Token};
 
 fn main() {
     let file_path = "/Users/ali/Projects/axo/test_project/text.axo";
@@ -45,21 +43,21 @@ fn format_tokens(input: &Vec<Token>) -> String {
     let mut result = String::new();
 
     for (i, token) in input.iter().enumerate() {
-        match token.clone() {
-            Token::Punctuation(Punctuation::Newline) => {
+        match token.clone().kind {
+            TokenKind::Punctuation(PunctuationKind::Newline) => {
                 result.push_str(format!("↓{:?}↓", token).term_colorize(Color::Green).as_str());
                 result.push_str("\n");
             }
-            Token::Punctuation(_) => {
+            TokenKind::Punctuation(_) => {
                 result.push_str(format!("{:?}", token).term_colorize(Color::Green).as_str());
             }
-            Token::Operator(_) => {
+            TokenKind::Operator(_) => {
                 result.push_str(format!("{:?}", token).term_colorize(Color::Orange).as_str());
             }
-            Token::Keyword(_) => {
+            TokenKind::Keyword(_) => {
                 result.push_str(format!("{:?}", token).term_colorize(Color::Blue).as_str());
             }
-            Token::EOF => {
+            TokenKind::EOF => {
                 result.push_str(format!("{:?}", token).term_colorize(Color::Red).as_str());
             }
             _ => {
@@ -67,8 +65,10 @@ fn format_tokens(input: &Vec<Token>) -> String {
             }
         }
 
-        if i != input.len() - 1 && token != &Token::Punctuation(Punctuation::Newline) {
-            result.push_str(", ");
+        if i != input.len() - 1 {
+            if !matches!(token, Token { kind: TokenKind::Punctuation(PunctuationKind::Newline), .. }) {
+                result.push_str(", ");
+            }
         }
     }
 

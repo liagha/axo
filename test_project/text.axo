@@ -1,6 +1,7 @@
-x = 42;
+salam = 42;
 y = 3.14;
 z = true;
+w = 1000_000_000;
 
 a = x + y * 2;
 b = (x - y) / 2;
@@ -83,11 +84,6 @@ Test(test(test {
     a: 2
 }));
 
-{
-    salam = 2;
-    bye = 3;
-}
-
 fn add(a, b) a + b;
 
 (a, b, c) = (1,2,3);
@@ -97,3 +93,30 @@ if x > 2 && x >= 4 x = 3; else if x > 4 x + 77; else x + 5;
 while x > 4 x + 3;
 
 for ;i>3;i+=2 x = 4;
+
+x = if x > 0 {
+    5;
+} else {
+    6;
+}
+
+x = y = 5;
+let x : i32 = 3;
+
+3 + 3 * 6;
+
+3;
+
+while 5 > x > 2 x = 5;
+
+{
+    test = 3;
+    x %= 4;
+
+    {
+        fuck *= 5;
+        print("shit");
+    }
+
+    a = 's';
+}

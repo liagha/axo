@@ -1,8 +1,9 @@
 #![allow(dead_code)]
+
 use crate::errors::ParseError;
+use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
 use crate::parser::expression::Expression;
 use crate::parser::statement::{EnumVariant, Statement};
-use crate::tokens::{Operator, Punctuation, Token};
 
 #[derive(Clone)]
 pub enum Expr {
@@ -11,14 +12,14 @@ pub enum Expr {
     Char(char),
     String(String),
     Identifier(String),
-    Binary(Box<Expr>, Operator, Box<Expr>),
-    Unary(Operator, Box<Expr>),
+    Binary(Box<Expr>, OperatorKind, Box<Expr>),
+    Unary(OperatorKind, Box<Expr>),
+    Typed(Box<Expr>, Box<Expr>),
     Array(Vec<Expr>),
     Index(Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     Lambda(Vec<Expr>, Box<Expr>),
-    Assign(Box<Expr>, Box<Expr>),
-    StructInit(Box<Expr>, Vec<(Expr, Expr)>),
+    StructInit(Box<Expr>, Vec<Expr>),
     FieldAccess(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
 }
@@ -26,10 +27,10 @@ pub enum Expr {
 #[derive(Clone)]
 pub enum Stmt {
     Expression(Expr),
-    Assignment(Expr, Expr),
-    Definition(Expr, Option<Expr>),
-    CompoundAssignment(Expr, Operator, Expr),
-    StructDef(Expr, Vec<(Expr, Expr)>),
+    Assignment(Expr, Box<Stmt>),
+    Definition(Expr, Option<Box<Stmt>>),
+    CompoundAssignment(Expr, OperatorKind, Box<Stmt>),
+    StructDef(Expr, Vec<Expr>),
     EnumDef(Expr, Vec<(Expr, Option<EnumVariant>)>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
@@ -58,24 +59,24 @@ impl Parser {
             let token = self.tokens[self.current].clone();
             self.current += 1;
 
-            match &token {
-                Token::Punctuation(Punctuation::Newline) => {
+            match &token.kind {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
                     self.line += 1;
                     self.column = 0;
                     continue;
                 }
-                Token::Operator(Operator::DoubleSlash) => {
+                TokenKind::Operator(OperatorKind::DoubleSlash) => {
                     while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token, Token::Punctuation(Punctuation::Newline)) {
+                        if matches!(next_token.kind, TokenKind::Punctuation(PunctuationKind::Newline)) {
                             break;
                         }
                         self.current += 1;
                     }
                     continue;
                 }
-                Token::Operator(Operator::SlashStar) => {
+                TokenKind::Operator(OperatorKind::SlashStar) => {
                     while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token, Token::Operator(Operator::StarSlash)) {
+                        if matches!(next_token.kind, TokenKind::Operator(OperatorKind::StarSlash)) {
                             self.current += 1;
                             break;
                         }
@@ -94,24 +95,24 @@ impl Parser {
 
     pub fn peek(&mut self) -> Option<&Token> {
         while let Some(token) = self.tokens.get(self.current) {
-            match token {
-                Token::Punctuation(Punctuation::Newline) => {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
                     self.current += 1;
                     self.line += 1;
                     self.column = 0;
                 }
-                Token::Operator(Operator::DoubleSlash) => {
+                TokenKind::Operator(OperatorKind::DoubleSlash) => {
                     while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token, Token::Punctuation(Punctuation::Newline)) {
+                        if matches!(next_token.kind, TokenKind::Punctuation(PunctuationKind::Newline)) {
                             break;
                         }
                         self.current += 1;
                     }
                     self.current += 1;
                 }
-                Token::Operator(Operator::SlashStar) => {
+                TokenKind::Operator(OperatorKind::SlashStar) => {
                     while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token, Token::Operator(Operator::StarSlash)) {
+                        if matches!(next_token.kind, TokenKind::Operator(OperatorKind::StarSlash)) {
                             self.current += 1;
                             break;
                         }
@@ -124,15 +125,15 @@ impl Parser {
         None
     }
 
-    pub fn match_token(&mut self, expected: &Token) -> bool {
+    pub fn match_token(&mut self, expected: &TokenKind) -> bool {
         while let Some(token) = self.peek() {
-            if token == &Token::Punctuation(Punctuation::Newline) {
+            if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
                 self.current += 1;
                 self.line += 1;
                 self.column = 0;
                 continue;
             }
-            if token == expected {
+            if &token.kind == expected {
                 self.advance();
                 return true;
             }
@@ -144,98 +145,94 @@ impl Parser {
     pub fn parse_program(&mut self) -> Result<Vec<Stmt>, ParseError> {
         let mut statements = Vec::new();
         while let Some(token) = self.peek() {
-            if token == &Token::Punctuation(Punctuation::Newline) {
+            if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
                 self.advance();
                 continue;
             }
 
-            if token == &Token::EOF {
+            if token.kind == TokenKind::EOF {
                 break;
             }
 
-            if token == &Token::Punctuation(Punctuation::LeftBrace) {
-                self.advance();
-                statements.push(self.parse_block()?);
-            } else {
-                statements.push(self.parse_statement()?);
-            }
+            statements.push(self.parse_statement()?);
         }
         Ok(statements)
     }
 
     pub fn parse_primary(&mut self) -> Result<Expr, ParseError> {
-        match self.peek() {
-            Some(Token::Punctuation(Punctuation::LeftBracket)) => self.parse_array(),
-            Some(Token::Punctuation(Punctuation::LeftParen)) => self.parse_tuple(),
-            Some(Token::Operator(Operator::Pipe)) => self.parse_lambda(),
-            Some(Token::Identifier(name)) => {
+        let peek = self.peek();
+        let peek_kind = match peek {
+            None => None,
+            Some(token) => Some(token.kind.clone()),
+        };
+
+        match peek_kind {
+            Some(TokenKind::Punctuation(PunctuationKind::LeftBracket)) => self.parse_array(),
+            Some(TokenKind::Punctuation(PunctuationKind::LeftParen)) => self.parse_tuple(),
+            Some(TokenKind::Operator(OperatorKind::Pipe)) => self.parse_lambda(),
+            Some(TokenKind::Identifier(name)) => {
                 let name_clone = name.clone();
                 self.advance();
 
                 let mut expr = Expr::Identifier(name_clone);
 
                 loop {
-                    match self.peek() {
-                        Some(Token::Punctuation(Punctuation::LeftBracket)) => {
+                    let peek = self.peek();
+                    let peek_kind = match peek {
+                        None => None,
+                        Some(token) => Some(token.kind.clone()),
+                    };
+
+                    match peek_kind {
+                        Some(TokenKind::Punctuation(PunctuationKind::LeftBracket)) => {
                             expr = self.parse_index(expr)?;
                         }
-                        Some(Token::Punctuation(Punctuation::LeftParen)) => {
+                        Some(TokenKind::Punctuation(PunctuationKind::LeftParen)) => {
                             expr = self.parse_call(match expr {
                                 Expr::Identifier(ref s) => s.clone(),
                                 _ => return Err(ParseError::InvalidSyntax("Invalid function call".into())),
                             })?;
                         }
-                        Some(Token::Operator(Operator::Dot)) => {
+                        Some(TokenKind::Operator(OperatorKind::Dot)) => {
                             self.advance();
                             let field = self.parse_expression()?;
 
                             expr = Expr::FieldAccess(expr.into(), field.into());
                         }
-                        Some(Token::Punctuation(Punctuation::LeftBrace)) => {
-                            self.advance();
-                            let mut fields = Vec::new();
-
-                            while let Some(Token::Identifier(field_name)) = self.advance() {
-                                if !self.match_token(&Token::Operator(Operator::Colon)) {
-                                    return Err(ParseError::ExpectedOperator(Operator::Colon, "after field name".into()));
-                                }
-
-                                let value = self.parse_expression()?;
-                                fields.push((Expr::Identifier(field_name), value));
-
-                                if !self.match_token(&Token::Operator(Operator::Comma)) {
-                                    break;
-                                }
-                            }
-
-                            if !self.match_token(&Token::Punctuation(Punctuation::RightBrace)) {
-                                return Err(ParseError::ExpectedPunctuation(Punctuation::RightBrace, "after struct fields".into()));
-                            }
-
-                            expr = Expr::StructInit(expr.into(), fields);
+                        Some(TokenKind::Punctuation(PunctuationKind::LeftBrace)) => {
+                            // Call the dedicated method for struct initialization
+                            expr = self.parse_struct_init(expr)?;
                         }
                         _ => break,
                     }
                 }
                 Ok(expr)
             }
-            _ => match self.advance() {
-                Some(Token::Integer(n)) => Ok(Expr::Number(n as f64)),
-                Some(Token::Float(n)) => Ok(Expr::Number(n)),
-                Some(Token::Boolean(b)) => Ok(Expr::Boolean(b)),
-                Some(Token::Char(c)) => Ok(Expr::Char(c)),
-                Some(Token::Str(s)) => Ok(Expr::String(s)),
-                Some(Token::Punctuation(Punctuation::LeftParen)) => {
-                    let expr = self.parse_expression()?;
-                    if self.match_token(&Token::Punctuation(Punctuation::RightParen)) {
-                        Ok(expr)
-                    } else {
-                        Err(ParseError::InvalidSyntax("Expected ')'".into()))
+            _ => {
+                let advance = self.advance();
+                let advance_kind = match advance {
+                    None => None,
+                    Some(token) => Some(token.kind.clone()),
+                };
+
+                match advance_kind {
+                    Some(TokenKind::Integer(n)) => Ok(Expr::Number(n as f64)),
+                    Some(TokenKind::Float(n)) => Ok(Expr::Number(n)),
+                    Some(TokenKind::Boolean(b)) => Ok(Expr::Boolean(b)),
+                    Some(TokenKind::Char(c)) => Ok(Expr::Char(c)),
+                    Some(TokenKind::Str(s)) => Ok(Expr::String(s)),
+                    Some(TokenKind::Punctuation(PunctuationKind::LeftParen)) => {
+                        let expr = self.parse_expression()?;
+                        if self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
+                            Ok(expr)
+                        } else {
+                            Err(ParseError::InvalidSyntax("Expected ')'".into()))
+                        }
                     }
+                    Some(TokenKind::EOF) => Err(ParseError::UnexpectedEOF),
+                    Some(token) => Err(ParseError::UnexpectedToken(token, "".to_string())),
+                    None => Err(ParseError::UnexpectedEOF),
                 }
-                Some(Token::EOF) => Err(ParseError::UnexpectedEOF),
-                Some(token) => Err(ParseError::UnexpectedToken(token, "".to_string())),
-                None => Err(ParseError::UnexpectedEOF),
             },
         }
     }

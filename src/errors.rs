@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use core::fmt::Formatter;
-use crate::tokens::{Operator, Punctuation, Token};
+use crate::lexer::{OperatorKind, PunctuationKind, TokenKind};
 
 pub enum LexError {
     InvalidChar(String),
@@ -12,12 +12,14 @@ pub enum LexError {
     UnClosedString(String),
     InvalidOperator(String),
     InvalidPunctuation(String),
+    StringParseError(String),
+    UnClosedComment(String),
 }
 
 pub enum ParseError {
-    UnexpectedToken(Token, String),
-    ExpectedPunctuation(Punctuation, String),
-    ExpectedOperator(Operator, String),
+    UnexpectedToken(TokenKind, String),
+    ExpectedPunctuation(PunctuationKind, String),
+    ExpectedOperator(OperatorKind, String),
     ExpectedSyntax(String),
     InvalidSyntax(String),
     UnexpectedEOF,
@@ -50,6 +52,12 @@ impl core::fmt::Display for LexError {
             }
             LexError::InvalidPunctuation(e) => {
                 write!(f, "Invalid punctuation: '{}'", e)
+            }
+            LexError::StringParseError(e) => {
+                write!(f, "Failed to parse string value: {}", e)
+            }
+            LexError::UnClosedComment(e) => {
+                write!(f, "Unclosed comment: '{}'", e)
             }
         }
     }
@@ -90,7 +98,7 @@ impl core::fmt::Debug for LexError {
 }
 
 impl core::fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self)
     }
 }

@@ -1,8 +1,9 @@
 use core::fmt;
 use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
+use crate::lexer::{Span, Token};
 use crate::parser::parser::{Expr, Stmt};
-use crate::tokens::{Punctuation, Token};
+use crate::lexer::{PunctuationKind, TokenKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -22,6 +23,9 @@ impl fmt::Debug for Expr {
             Expr::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
             }
+            Expr::Typed(expr, ty) => {
+                write!(f, "Typed({:?} : {:?})", expr, ty)
+            }
             Expr::Binary(first, operator, second) => {
                 write!(f, "Binary({:?} {:?} {:?})", first, operator, second)
             }
@@ -40,9 +44,6 @@ impl fmt::Debug for Expr {
             Expr::Lambda(params, lambda) => {
                 write!(f, "Lambda(|{:?}| {:?})", params, lambda)
             }
-            Expr::Assign(left, right) => {
-                write!(f, "Assign({:?} to {:?})", right, left)
-            }
             Expr::StructInit(name, fields) => {
                 write!(f, "Struct( Name: {:?}, Fields: {:?} )", name, fields)
             }
@@ -59,12 +60,12 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Stmt::Expression(expr) => write!(f, "{:?}", expr),
+            Stmt::Expression(expr) => write!(f, "({:?})", expr),
             Stmt::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
-            Stmt::CompoundAssignment(name, op, expr) => write!(f, "Compound({:?}, {:?}, {:?})", name, op, expr),
+            Stmt::CompoundAssignment(name, op, expr) => write!(f, "Compound | Assignment({:?}, {:?}, {:?})", name, op, expr),
             Stmt::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
             Stmt::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
-            Stmt::Block(stmts) => { write!(f, "Block({:?})", stmts) }
+            Stmt::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
             Stmt::Return(expr) => write!(f, "Return({:?})", expr),
             Stmt::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
             Stmt::Continue => write!(f, "Continue"),
@@ -88,44 +89,63 @@ impl fmt::Debug for Stmt {
     }
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Boolean(b) => write!(f, "{}", b),
-            Token::Float(n) => write!(f, "{}", n),
-            Token::Integer(n) => write!(f, "{}", n),
-            Token::Punctuation(c) => {
-                if c == &Punctuation::Newline {
+            TokenKind::Boolean(b) => write!(f, "{}", b),
+            TokenKind::Float(n) => write!(f, "{}", n),
+            TokenKind::Integer(n) => write!(f, "{}", n),
+            TokenKind::Punctuation(c) => {
+                if c == &PunctuationKind::Newline {
                     return write!(f, "\n")
                 }
 
                 write!(f, "{}", c)
             },
-            Token::Operator(c) => write!(f, "{}", c),
-            Token::Str(str) => write!(f, "{}", str),
-            Token::Identifier(str) => write!(f, "{}", str),
-            Token::Char(char) => write!(f, "'{}'", char),
-            Token::Keyword(keyword) => write!(f, "{}", keyword),
-            Token::Invalid(invalid) => write!(f, "{}", invalid.colorize(Color::Red)),
-            Token::EOF => write!(f, "{}", "End Of File"),
+            TokenKind::Operator(c) => write!(f, "{}", c),
+            TokenKind::Str(str) => write!(f, "{}", str),
+            TokenKind::Identifier(str) => write!(f, "{}", str),
+            TokenKind::Char(char) => write!(f, "'{}'", char),
+            TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
+            TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
+            TokenKind::Invalid(invalid) => write!(f, "{}", invalid.colorize(Color::Red)),
+            TokenKind::EOF => write!(f, "{}", "End Of File"),
+        }
+    }
+}
+
+impl fmt::Debug for TokenKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::Boolean(b) => write!(f, "Boolean({})", b),
+            TokenKind::Float(n) => write!(f, "Float({})", n),
+            TokenKind::Integer(n) => write!(f, "Integer({})", n),
+            TokenKind::Operator(op) => write!(f, "Operator({:?})", op),
+            TokenKind::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
+            TokenKind::Invalid(err) => write!(f, "Invalid({})", err),
+            TokenKind::Identifier(var) => write!(f, "Identifier({})", var),
+            TokenKind::Str(str) => write!(f, "String({})", str),
+            TokenKind::Char(char) => write!(f, "Char('{}')", char),
+            TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
+            TokenKind::EOF => write!(f, "{}", "End Of File"),
+            TokenKind::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
         }
     }
 }
 
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Token::Boolean(b) => write!(f, "Boolean({})", b),
-            Token::Float(n) => write!(f, "Float({})", n),
-            Token::Integer(n) => write!(f, "Integer({})", n),
-            Token::Operator(op) => write!(f, "Operator({:?})", op),
-            Token::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
-            Token::Invalid(err) => write!(f, "Invalid({})", err),
-            Token::Identifier(var) => write!(f, "Identifier({})", var),
-            Token::Str(str) => write!(f, "String({})", str),
-            Token::Char(char) => write!(f, "Char('{}')", char),
-            Token::EOF => write!(f, "{}", "End Of File"),
-            Token::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
+        let Span {
+            start: (start_line, start_column),
+            end: (end_line, end_column)
+        } = self.span;
+
+        if self.kind == TokenKind::EOF {
+            write!(f, "[{:?}]", self.kind)
+        } else if start_line == end_line && start_column == end_column {
+            write!(f, "[{:?} | {}:{}]", self.kind, start_line, start_column )
+        } else {
+            write!(f, "[{:?} | {}:{} : {}:{}]", self.kind, start_line, start_column, end_line, end_column )
         }
     }
 }
