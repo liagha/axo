@@ -1,16 +1,33 @@
 #![allow(dead_code)]
 
-use crate::{
-    errors::ParseError,
-    parser::{Parser, parser::{Expr,Stmt}, expression::Expression},
-};
-use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind, TokenKind, Token};
+use crate::parser::{expression::Expression, Parser};
+use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind, Token, TokenKind};
+use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::parser::expression::Expr;
 
 #[derive(Debug, Clone)]
 pub enum EnumVariant {
     Tuple(Vec<Expr>),
     Struct(Vec<Expr>),
     Discriminant(Expr),
+}
+
+#[derive(Clone)]
+pub enum Stmt {
+    Expression(Expr),
+    Assignment(Expr, Box<Stmt>),
+    Definition(Expr, Option<Box<Stmt>>),
+    CompoundAssignment(Expr, OperatorKind, Box<Stmt>),
+    StructDef(Expr, Vec<Expr>),
+    EnumDef(Expr, Vec<(Expr, Option<EnumVariant>)>),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    While(Expr, Box<Stmt>),
+    Block(Vec<Stmt>),
+    For(Box<Stmt>, Box<Stmt>),
+    Function(Expr, Vec<Expr>, Box<Stmt>),
+    Return(Option<Expr>),
+    Break(Option<Expr>),
+    Continue,
 }
 
 pub trait Statement {
@@ -24,7 +41,6 @@ pub trait Statement {
     fn parse_return_statement(&mut self) -> Result<Stmt, ParseError>;
     fn parse_break_statement(&mut self) -> Result<Stmt, ParseError>;
     fn parse_continue_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_condition(&mut self) -> Result<Expr, ParseError>;
     fn parse_struct_definition(&mut self) -> Result<Stmt, ParseError>;
     fn parse_enum_definition(&mut self) -> Result<Stmt, ParseError>;
 }
@@ -44,7 +60,11 @@ impl Statement for Parser {
                     KeywordKind::Let => self.parse_let_statement(),
                     KeywordKind::Struct => self.parse_struct_definition(),
                     KeywordKind::Enum => self.parse_enum_definition(),
-                    _ => Err(ParseError::UnknownStatement),
+                    KeywordKind::Impl => unimplemented!(),
+                    KeywordKind::Trait => unimplemented!(),
+                    KeywordKind::Match => unimplemented!(),
+                    KeywordKind::Else => unimplemented!(),
+                    KeywordKind::In => unimplemented!(),
                 },
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
                     self.advance();
@@ -97,7 +117,9 @@ impl Statement for Parser {
                 Ok(Stmt::Definition(identifier, Some(Box::new(value_stmt))))
             } else {
                 if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-                    return Err(ParseError::ExpectedPunctuation(PunctuationKind::Semicolon, "after variable declaration".to_string()));
+                    let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::Semicolon), SyntaxPosition::After, SyntaxType::VariableDeclaration);
+
+                    return Err(err);
                 }
 
                 Ok(Stmt::Definition(identifier, None))
@@ -112,19 +134,16 @@ impl Statement for Parser {
 
         while let Some(token) = self.peek() {
             match token.kind {
-                // Skip newlines
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
                     self.advance();
                     continue;
                 }
 
-                // End of block
                 TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     self.advance();
                     return Ok(Stmt::Block(statements));
                 }
 
-                // Parse a regular statement
                 _ => {
                     let stmt = self.parse_statement()?;
                     statements.push(stmt);
@@ -132,7 +151,6 @@ impl Statement for Parser {
             }
         }
 
-        // If we reach here, it means we encountered an unexpected EOF
         Err(ParseError::UnexpectedEOF)
     }
     fn parse_function_declaration(&mut self) -> Result<Stmt, ParseError> {
@@ -142,14 +160,16 @@ impl Statement for Parser {
             if let TokenKind::Identifier(name) = token.kind {
                 name
             } else {
-                return Err(ParseError::ExpectedSyntax("function name".to_string()));
+                return Err(ParseError::ExpectedSyntax(SyntaxType::FunctionName));
             }
         } else {
             return Err(ParseError::UnexpectedEOF);
         };
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftParen)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::LeftParen, "after function name".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftParen), SyntaxPosition::After, SyntaxType::FunctionName);
+
+            return Err(err);
         }
 
         let mut parameters = Vec::new();
@@ -164,7 +184,7 @@ impl Statement for Parser {
                             if let TokenKind::Identifier(param) = token.kind {
                                 parameters.push(Expr::Identifier(param));
                             } else {
-                                return Err(ParseError::ExpectedSyntax("parameter name".to_string()));
+                                return Err(ParseError::ExpectedSyntax(SyntaxType::ParameterName));
                             }
                         } else {
                             return Err(ParseError::UnexpectedEOF);
@@ -172,10 +192,12 @@ impl Statement for Parser {
                     }
 
                     if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                        return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightParen, "after parameters".to_string()));
+                        let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::ParameterName);
+
+                        return Err(err);
                     }
                 } else {
-                    return Err(ParseError::ExpectedSyntax("parameter name".to_string()));
+                    return Err(ParseError::ExpectedSyntax(SyntaxType::ParameterName));
                 }
             } else {
                 return Err(ParseError::UnexpectedEOF);
@@ -194,7 +216,7 @@ impl Statement for Parser {
     fn parse_if_statement(&mut self) -> Result<Stmt, ParseError> {
         self.advance();
 
-        let condition = self.parse_condition()?;
+        let condition = self.parse_expression()?;
 
         let then_branch = if self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftBrace)) {
             Box::new(self.parse_block()?)
@@ -224,7 +246,7 @@ impl Statement for Parser {
     fn parse_while_statement(&mut self) -> Result<Stmt, ParseError> {
         self.advance();
 
-        let condition = self.parse_condition()?;
+        let condition = self.parse_expression()?;
 
         let body = if self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftBrace)) {
             Box::new(self.parse_block()?)
@@ -238,66 +260,7 @@ impl Statement for Parser {
     fn parse_for_statement(&mut self) -> Result<Stmt, ParseError> {
         self.advance();
 
-        let has_paren = self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftParen));
-
-        let initializer = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            None
-        } else {
-            Some(self.parse_statement()?)
-        };
-
-        let condition = if let Some(token) = self.peek() {
-            if token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon) {
-                Expr::Boolean(true)
-            } else {
-                self.parse_expression()?
-            }
-        } else {
-            return Err(ParseError::UnexpectedEOF);
-        };
-
-        if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::Semicolon, "after for condition".to_string()));
-        }
-
-        let increment = if let Some(token) = self.peek() {
-            if (has_paren && token.kind == TokenKind::Punctuation(PunctuationKind::RightParen)) ||
-                (!has_paren && (token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace) ||
-                    token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon))) {
-                None
-            } else {
-                if let Some(peek_token) = self.peek() {
-                    if let TokenKind::Identifier(name) = &peek_token.kind {
-                        let name = name.clone();
-                        self.advance();
-                        if let Some(next_token) = self.peek() {
-                            if next_token.kind == TokenKind::Operator(OperatorKind::PlusEqual) {
-                                self.advance();
-                                let value = self.parse_expression()?;
-                                Some(Stmt::CompoundAssignment(Expr::Identifier(name), OperatorKind::PlusEqual, Stmt::Expression(value).into()))
-                            } else {
-                                self.current -= 1;
-                                Some(Stmt::Expression(self.parse_expression()?))
-                            }
-                        } else {
-                            return Err(ParseError::UnexpectedEOF);
-                        }
-                    } else {
-                        Some(Stmt::Expression(self.parse_expression()?))
-                    }
-                } else {
-                    return Err(ParseError::UnexpectedEOF);
-                }
-            }
-        } else {
-            return Err(ParseError::UnexpectedEOF);
-        };
-
-        if has_paren {
-            if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightParen, "after for clauses".to_string()));
-            }
-        }
+        let clause = self.parse_expression()?;
 
         let body = if self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftBrace)) {
             self.parse_block()?
@@ -305,7 +268,7 @@ impl Statement for Parser {
             self.parse_statement()?
         };
 
-        Ok(Stmt::For(initializer.map(Box::new), condition, increment.map(Box::new), Box::new(body)))
+        Ok(Stmt::For(Box::new(Stmt::Expression(clause)), Box::new(body)))
     }
 
     fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -318,7 +281,9 @@ impl Statement for Parser {
         let value = self.parse_expression()?;
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::Semicolon, "after return value".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::Semicolon), SyntaxPosition::After, SyntaxType::ReturnValue);
+
+            return Err(err);
         }
 
         Ok(Stmt::Return(Some(value)))
@@ -334,7 +299,9 @@ impl Statement for Parser {
         let value = self.parse_expression()?;
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::Semicolon, "after break value".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::Semicolon), SyntaxPosition::After, SyntaxType::BreakValue);
+
+            return Err(err);
         }
 
         Ok(Stmt::Break(Some(value)))
@@ -344,41 +311,31 @@ impl Statement for Parser {
         self.advance();
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::Semicolon, "after 'continue'".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::Semicolon), SyntaxPosition::After, SyntaxType::Continue);
+
+            return Err(err);
         }
 
         Ok(Stmt::Continue)
     }
 
-    fn parse_condition(&mut self) -> Result<Expr, ParseError> {
-        let has_paren = self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftParen));
-
-        let condition = self.parse_expression()?;
-
-        if has_paren {
-            if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightParen, "after condition".to_string()));
-            }
-        }
-
-        Ok(condition)
-    }
-
     fn parse_struct_definition(&mut self) -> Result<Stmt, ParseError> {
-        self.advance(); // Consume the 'struct' keyword
+        self.advance();
 
         let name = if let Some(token) = self.advance() {
             if let TokenKind::Identifier(name) = token.kind {
                 name
             } else {
-                return Err(ParseError::ExpectedSyntax("Expected struct name".to_string()));
+                return Err(ParseError::ExpectedSyntax(SyntaxType::StructName));
             }
         } else {
             return Err(ParseError::UnexpectedEOF);
         };
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftBrace)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::LeftBrace, "Expected '{' after struct name".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftBrace), SyntaxPosition::After, SyntaxType::StructName);
+
+            return Err(err);
         }
 
         let mut fields = Vec::new();
@@ -401,7 +358,9 @@ impl Statement for Parser {
         }
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBrace)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBrace, "Expected '}' after struct fields".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::StructFields);
+
+            return Err(err);
         }
 
         Ok(Stmt::StructDef(Expr::Identifier(name), fields))
@@ -413,14 +372,16 @@ impl Statement for Parser {
             if let TokenKind::Identifier(name) = token.kind {
                 name
             } else {
-                return Err(ParseError::ExpectedSyntax("Expected enum name".to_string()));
+                return Err(ParseError::ExpectedSyntax(SyntaxType::EnumName));
             }
         } else {
             return Err(ParseError::UnexpectedEOF);
         };
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::LeftBrace)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::LeftBrace, "Expected '{' after enum name".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftBrace), SyntaxPosition::After, SyntaxType::EnumName);
+
+            return Err(err);
         }
 
         let mut variants = Vec::new();
@@ -439,7 +400,7 @@ impl Statement for Parser {
                 if let TokenKind::Identifier(name) = token.kind {
                     name
                 } else {
-                    return Err(ParseError::ExpectedSyntax("Expected variant name".to_string()));
+                    return Err(ParseError::ExpectedSyntax(SyntaxType::EnumVariantName));
                 }
             } else {
                 return Err(ParseError::UnexpectedEOF);
@@ -466,21 +427,23 @@ impl Statement for Parser {
                                     if let TokenKind::Identifier(type_name) = token.kind {
                                         fields.push(Expr::Identifier(type_name));
                                     } else {
-                                        return Err(ParseError::ExpectedSyntax("Expected field type".to_string()));
+                                        return Err(ParseError::ExpectedSyntax(SyntaxType::FieldType));
                                     }
                                 } else {
                                     return Err(ParseError::UnexpectedEOF);
                                 }
                             }
                         } else {
-                            return Err(ParseError::ExpectedSyntax("Expected field type".to_string()));
+                            return Err(ParseError::ExpectedSyntax(SyntaxType::FieldType));
                         }
                     } else {
                         return Err(ParseError::UnexpectedEOF);
                     }
 
                     if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                        return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightParen, "Expected ')' after variant fields".to_string()));
+                        let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::EnumVariants);
+
+                        return Err(err);
                     }
                 }
 
@@ -502,8 +465,10 @@ impl Statement for Parser {
                         Some(Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. }) => {
                             break;
                         },
-                        Some(token) => {
-                            return Err(ParseError::UnexpectedToken(token.kind.clone(), "field name or '}'".into()));
+                        Some(_) => {
+                            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::EnumVariants);
+
+                            return Err(err);
                         },
                         None => {
                             return Err(ParseError::UnexpectedEOF);
@@ -512,7 +477,9 @@ impl Statement for Parser {
                 }
 
                 if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBrace)) {
-                    return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBrace, "Expected '}' after struct fields".to_string()));
+                    let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::StructFields);
+
+                    return Err(err);
                 }
 
                 Some(EnumVariant::Struct(fields))
@@ -528,7 +495,9 @@ impl Statement for Parser {
             if !self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
                 if let Some(token) = self.peek() {
                     if token.kind != TokenKind::Punctuation(PunctuationKind::RightBrace) {
-                        return Err(ParseError::ExpectedOperator(OperatorKind::Comma, "Expected ',' after enum variant".to_string()));
+                        let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Comma), SyntaxPosition::After, SyntaxType::EnumVariant);
+
+                        return Err(err);
                     }
                 } else {
                     return Err(ParseError::UnexpectedEOF);
@@ -536,9 +505,10 @@ impl Statement for Parser {
             }
         }
 
-        // Expect closing brace
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBrace)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBrace, "Expected '}' after enum variants".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::EnumVariants);
+
+            return Err(err);
         }
 
         Ok(Stmt::EnumDef(Expr::Identifier(name), variants))

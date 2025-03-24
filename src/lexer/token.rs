@@ -1,5 +1,6 @@
 #![allow(dead_code)]
-use crate::{KeywordKind, OperatorKind, PunctuationKind};
+
+use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind};
 
 #[derive(Clone, PartialEq)]
 pub enum TokenKind {

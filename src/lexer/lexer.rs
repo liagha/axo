@@ -1,4 +1,4 @@
-use crate::errors::LexError;
+use crate::lexer::error::LexError;
 use crate::lexer::{TokenKind, OperatorKind, PunctuationKind};
 
 #[derive(Debug, Clone, PartialEq)]

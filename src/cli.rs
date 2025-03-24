@@ -2,8 +2,8 @@ use core::fmt;
 use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
 use crate::lexer::{Span, Token};
-use crate::parser::parser::{Expr, Stmt};
 use crate::lexer::{PunctuationKind, TokenKind};
+use crate::parser::{Expr, Stmt};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -70,8 +70,8 @@ impl fmt::Debug for Stmt {
             Stmt::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
             Stmt::Continue => write!(f, "Continue"),
             Stmt::Break(expr) => write!(f, "Break({:?})", expr),
-            Stmt::For(init, cond, increment, body) => {
-                write!(f, "For( Init: {:?} | Condition: {:?} | Increment: {:?} | Body: {:?} )", init, cond, increment, body)
+            Stmt::For(clause, body) => {
+                write!(f, "For( Clause: {:?} | Body: {:?} )", clause, body)
             }
             Stmt::Function(name, params, body) => {
                 write!(f, "Function( Name: {:?} | Params: {:?} | Body: {:?} )", name, params, body)

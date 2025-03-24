@@ -1,8 +1,4 @@
 #![allow(dead_code)]
-
-use core::fmt::Formatter;
-use crate::lexer::{OperatorKind, PunctuationKind, TokenKind};
-
 pub enum LexError {
     InvalidChar(String),
     IntParseError(String),
@@ -16,18 +12,8 @@ pub enum LexError {
     UnClosedComment(String),
 }
 
-pub enum ParseError {
-    UnexpectedToken(TokenKind, String),
-    ExpectedPunctuation(PunctuationKind, String),
-    ExpectedOperator(OperatorKind, String),
-    ExpectedSyntax(String),
-    InvalidSyntax(String),
-    UnexpectedEOF,
-    UnknownStatement,
-}
-
 impl core::fmt::Display for LexError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             LexError::InvalidChar(c) => {
                 write!(f, "Invalid character '{}'", c)
@@ -63,45 +49,10 @@ impl core::fmt::Display for LexError {
     }
 }
 
-impl core::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        match self {
-            ParseError::UnexpectedToken(t, m) => {
-                write!(f, "Unexpected token '{}': '{}'", t, m)
-            }
-            ParseError::ExpectedPunctuation(t, m) => {
-                write!(f, "Expected '{}' => '{}'", t, m)
-            }
-            ParseError::ExpectedOperator(t, m) => {
-                write!(f, "Expected '{}' => '{}'", t, m)
-            }
-            ParseError::ExpectedSyntax(s) => {
-                write!(f, "Expected '{}'", s)
-            }
-            ParseError::InvalidSyntax(m) => {
-                write!(f, "Invalid Syntax '{}'", m)
-            }
-            ParseError::UnexpectedEOF => {
-                write!(f, "Unexpected end of file")
-            }
-            ParseError::UnknownStatement => {
-                write!(f, "Unknown statement")
-            }
-        }
-    }
-}
-
 impl core::fmt::Debug for LexError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-impl core::fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
 impl core::error::Error for LexError {}
-impl core::error::Error for ParseError {}

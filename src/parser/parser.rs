@@ -1,46 +1,9 @@
 #![allow(dead_code)]
-
-use crate::errors::ParseError;
 use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
+use crate::parser::{Expr, Stmt};
+use crate::parser::error::ParseError;
 use crate::parser::expression::Expression;
-use crate::parser::statement::{EnumVariant, Statement};
-
-#[derive(Clone)]
-pub enum Expr {
-    Number(f64),
-    Boolean(bool),
-    Char(char),
-    String(String),
-    Identifier(String),
-    Binary(Box<Expr>, OperatorKind, Box<Expr>),
-    Unary(OperatorKind, Box<Expr>),
-    Typed(Box<Expr>, Box<Expr>),
-    Array(Vec<Expr>),
-    Index(Box<Expr>, Box<Expr>),
-    Call(Box<Expr>, Vec<Expr>),
-    Lambda(Vec<Expr>, Box<Expr>),
-    StructInit(Box<Expr>, Vec<Expr>),
-    FieldAccess(Box<Expr>, Box<Expr>),
-    Tuple(Vec<Expr>),
-}
-
-#[derive(Clone)]
-pub enum Stmt {
-    Expression(Expr),
-    Assignment(Expr, Box<Stmt>),
-    Definition(Expr, Option<Box<Stmt>>),
-    CompoundAssignment(Expr, OperatorKind, Box<Stmt>),
-    StructDef(Expr, Vec<Expr>),
-    EnumDef(Expr, Vec<(Expr, Option<EnumVariant>)>),
-    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
-    While(Expr, Box<Stmt>),
-    Block(Vec<Stmt>),
-    For(Option<Box<Stmt>>, Expr, Option<Box<Stmt>>, Box<Stmt>),
-    Function(Expr, Vec<Expr>, Box<Stmt>),
-    Return(Option<Expr>),
-    Break(Option<Expr>),
-    Continue,
-}
+use crate::parser::statement::Statement;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -230,7 +193,7 @@ impl Parser {
                         }
                     }
                     Some(TokenKind::EOF) => Err(ParseError::UnexpectedEOF),
-                    Some(token) => Err(ParseError::UnexpectedToken(token, "".to_string())),
+                    Some(token) => Err(ParseError::InvalidSyntax(format!("{}", token))),
                     None => Err(ParseError::UnexpectedEOF),
                 }
             },

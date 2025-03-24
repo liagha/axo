@@ -1,4 +1,3 @@
-mod errors;
 mod cli;
 mod codegen;
 mod parser;

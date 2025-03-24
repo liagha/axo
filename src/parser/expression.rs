@@ -1,7 +1,25 @@
-use crate::errors::ParseError;
 use crate::parser::Parser;
-use crate::parser::parser::Expr;
 use crate::lexer::{OperatorKind, PunctuationKind, TokenKind, Token};
+use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
+
+#[derive(Clone)]
+pub enum Expr {
+    Number(f64),
+    Boolean(bool),
+    Char(char),
+    String(String),
+    Identifier(String),
+    Binary(Box<Expr>, OperatorKind, Box<Expr>),
+    Unary(OperatorKind, Box<Expr>),
+    Typed(Box<Expr>, Box<Expr>),
+    Array(Vec<Expr>),
+    Index(Box<Expr>, Box<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
+    Lambda(Vec<Expr>, Box<Expr>),
+    StructInit(Box<Expr>, Vec<Expr>),
+    FieldAccess(Box<Expr>, Box<Expr>),
+    Tuple(Vec<Expr>),
+}
 
 pub trait Expression {
     fn parse_factor(&mut self) -> Result<Expr, ParseError>;
@@ -95,7 +113,9 @@ impl Expression for Parser {
         }
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBracket)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBracket, "after array elements".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBracket), SyntaxPosition::After, SyntaxType::ArrayElements);
+
+            return Err(err);
         }
 
         Ok(Expr::Array(elements))
@@ -106,7 +126,9 @@ impl Expression for Parser {
         let index = self.parse_expression()?;
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBracket)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBracket, "after array elements".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBracket), SyntaxPosition::After, SyntaxType::ArrayElements);
+
+            return Err(err);
         }
 
         Ok(Expr::Index(Box::new(left), Box::new(index)))
@@ -128,7 +150,9 @@ impl Expression for Parser {
         }
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightParen, "after function arguments".to_string()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::FunctionCall);
+
+            return Err(err);
         }
 
         Ok(Expr::Call(Expr::Identifier(name).into(), arguments))
@@ -146,15 +170,21 @@ impl Expression for Parser {
                     if let Some(Token { kind: TokenKind::Identifier(name), .. }) = self.advance() {
                         parameters.push(Expr::Identifier(name));
                     } else {
-                        return Err(ParseError::ExpectedSyntax("parameter name".to_string()));
+                        let err = ParseError::ExpectedSyntax(SyntaxType::ParameterName);
+
+                        return Err(err);
                     }
                 }
 
                 if !self.match_token(&TokenKind::Operator(OperatorKind::Pipe)) {
-                    return Err(ParseError::ExpectedOperator(OperatorKind::Pipe, "after lambda parameters".to_string()));
+                    let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Pipe), SyntaxPosition::After, SyntaxType::LambdaParameters);
+
+                    return Err(err);
                 }
             } else {
-                return Err(ParseError::ExpectedSyntax("parameter name or '|'".to_string()));
+                let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Pipe), SyntaxPosition::After, SyntaxType::LambdaParameters);
+
+                return Err(err);
             }
         }
 
@@ -185,20 +215,18 @@ impl Expression for Parser {
                 }
 
                 if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                    return Err(ParseError::ExpectedPunctuation(
-                        PunctuationKind::RightParen,
-                        "after tuple elements".to_string()
-                    ));
+                    let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::TupleElements);
+
+                    return Err(err);
                 }
             }
 
             Ok(Expr::Tuple(elements))
         } else {
             if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                return Err(ParseError::ExpectedPunctuation(
-                    PunctuationKind::RightParen,
-                    "after expression".to_string()
-                ));
+                let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::Expression);
+
+                return Err(err);
             }
 
             Ok(elements.pop().unwrap())
@@ -206,7 +234,7 @@ impl Expression for Parser {
     }
 
     fn parse_struct_init(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
-        self.advance(); // Consume the left brace
+        self.advance();
         let mut fields = Vec::new();
 
         loop {
@@ -226,10 +254,11 @@ impl Expression for Parser {
         }
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBrace)) {
-            return Err(ParseError::ExpectedPunctuation(PunctuationKind::RightBrace, "after struct fields".into()));
+            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::StructFields);
+
+            return Err(err);
         }
 
         Ok(Expr::StructInit(Box::new(struct_name), fields))
     }
-
 }
