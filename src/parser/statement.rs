@@ -64,7 +64,6 @@ impl Statement for Parser {
                     KeywordKind::Trait => unimplemented!(),
                     KeywordKind::Match => unimplemented!(),
                     KeywordKind::Else => unimplemented!(),
-                    KeywordKind::In => unimplemented!(),
                 },
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
                     self.advance();

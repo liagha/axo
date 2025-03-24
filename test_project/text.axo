@@ -67,7 +67,6 @@ struct Test {
     age: i32
 }
 
-let p = Person { name: "Alice", age: 25 };
 let n = p.name;
 
 let test = (2, 3);
@@ -77,12 +76,8 @@ enum Message {
     Move { x: i32, y: i32 },
     Write(String),
     ChangeColor(i32, i32, i32),
-    Priority = 10,
+    Priority = 10
 }
-
-Test(test(test {
-    a: 2
-}));
 
 fn add(a, b) a + b;
 
@@ -125,6 +120,8 @@ while 5 > x > 2 x = 5;
 
 5 + 5 * 5;
 
-for (i > 5) {
+for (i in 5) {
     sum += numbers[i];
 }
+
+let test = Test { x = 3, y = 5 };

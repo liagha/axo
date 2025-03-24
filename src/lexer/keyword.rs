@@ -10,30 +10,10 @@ pub enum KeywordKind {
     For,
     While,
     Fn,
-    In,
     Return,
     Break,
     Let,
     Continue,
-}
-
-impl KeywordKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "struct" => KeywordKind::Struct,
-            "enum" => KeywordKind::Enum,
-            "trait" => KeywordKind::Trait,
-            "impl" => KeywordKind::Impl,
-            "match" => KeywordKind::Match,
-            "if" => KeywordKind::If,
-            "else" => KeywordKind::Else,
-            "for" => KeywordKind::For,
-            "while" => KeywordKind::While,
-            "fn" => KeywordKind::Fn,
-            "return" => KeywordKind::Return,
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl core::fmt::Display for KeywordKind {
@@ -49,7 +29,6 @@ impl core::fmt::Display for KeywordKind {
             KeywordKind::For => "for",
             KeywordKind::While => "while",
             KeywordKind::Fn => "fn",
-            KeywordKind::In => "in",
             KeywordKind::Return => "return",
             KeywordKind::Break => "break",
             KeywordKind::Continue => "continue",

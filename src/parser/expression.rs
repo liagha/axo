@@ -1,4 +1,4 @@
-use crate::parser::Parser;
+use crate::parser::{Parser, Statement, Stmt};
 use crate::lexer::{OperatorKind, PunctuationKind, TokenKind, Token};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 
@@ -16,16 +16,16 @@ pub enum Expr {
     Index(Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     Lambda(Vec<Expr>, Box<Expr>),
-    StructInit(Box<Expr>, Vec<Expr>),
+    StructInit(Box<Expr>, Vec<Stmt>),
     FieldAccess(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
 }
 
 pub trait Expression {
+    fn parse_unary(&mut self) -> Result<Expr, ParseError>;
     fn parse_factor(&mut self) -> Result<Expr, ParseError>;
     fn parse_term(&mut self) -> Result<Expr, ParseError>;
     fn parse_expression(&mut self) -> Result<Expr, ParseError>;
-    fn parse_unary(&mut self) -> Result<Expr, ParseError>;
     fn parse_array(&mut self) -> Result<Expr, ParseError>;
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;
     fn parse_call(&mut self, name: String) -> Result<Expr, ParseError>;
@@ -35,6 +35,18 @@ pub trait Expression {
 }
 
 impl Expression for Parser {
+    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
+        if let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
+            if op.is_unary() {
+                let op = op.clone();
+                self.advance();
+                let expr = self.parse_unary()?;
+                return Ok(Expr::Unary(op, Box::new(expr)));
+            }
+        }
+
+        self.parse_primary()
+    }
     fn parse_factor(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_unary()?;
         while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
@@ -68,7 +80,6 @@ impl Expression for Parser {
         }
         Ok(expr)
     }
-
     fn parse_expression(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_term()?;
 
@@ -84,20 +95,6 @@ impl Expression for Parser {
         }
         Ok(expr)
     }
-
-    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
-        if let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
-            if op.is_unary() {
-                let op = op.clone();
-                self.advance();
-                let expr = self.parse_unary()?;
-                return Ok(Expr::Unary(op, Box::new(expr)));
-            }
-        }
-
-        self.parse_primary()
-    }
-
     fn parse_array(&mut self) -> Result<Expr, ParseError> {
         self.advance();
         let mut elements = Vec::new();
@@ -235,30 +232,26 @@ impl Expression for Parser {
 
     fn parse_struct_init(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
         self.advance();
-        let mut fields = Vec::new();
 
-        loop {
-            match self.peek() {
-                Some(_) => {
-                    let field = self.parse_expression()?;
-                    fields.push(field);
+        let mut statements = Vec::new();
 
-                    if !self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-                        break;
-                    }
-                },
-                None => {
-                    return Err(ParseError::UnexpectedEOF);
+        while let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::RightBrace) => {
+                    self.advance();
+                    return Ok(Expr::StructInit(struct_name.into(), statements));
+                }
+                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                    self.advance();
+                    return Ok(Expr::StructInit(struct_name.into(), statements));
+                }
+                _ => {
+                    let stmt = self.parse_statement()?;
+                    statements.push(stmt);
                 }
             }
         }
 
-        if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBrace)) {
-            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::StructFields);
-
-            return Err(err);
-        }
-
-        Ok(Expr::StructInit(Box::new(struct_name), fields))
+        Err(ParseError::UnexpectedEOF)
     }
 }

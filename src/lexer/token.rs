@@ -33,11 +33,11 @@ impl TokenKind {
             "for" => Some(TokenKind::Keyword(KeywordKind::For)),
             "while" => Some(TokenKind::Keyword(KeywordKind::While)),
             "fn" => Some(TokenKind::Keyword(KeywordKind::Fn)),
-            "in" => Some(TokenKind::Keyword(KeywordKind::In)),
             "return" => Some(TokenKind::Keyword(KeywordKind::Return)),
             "let" => Some(TokenKind::Keyword(KeywordKind::Let)),
             "continue" => Some(TokenKind::Keyword(KeywordKind::Continue)),
             "break" => Some(TokenKind::Keyword(KeywordKind::Break)),
+            "in" => Some(TokenKind::Operator(OperatorKind::In)),
             _ => None,
         }
     }

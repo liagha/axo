@@ -3,6 +3,7 @@ use crate::lexer::TokenKind;
 /// Enum representing various operator kinds in the language
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperatorKind {
+    In,                      // in (used in for-loops and iterators)
     Tilde,                   // ~ (bitwise NOT or unary negation)
     Equal,                   // = (assignment)
     Colon,                   // : (type annotation or key-value separator)
@@ -80,6 +81,7 @@ pub enum OperatorKind {
 impl OperatorKind {
     pub fn from_str(s: &str) -> Self {
         match s {
+            "in" => OperatorKind::In,
             "~" => OperatorKind::Tilde,
             "=" => OperatorKind::Equal,
             ":" => OperatorKind::Colon,
@@ -209,6 +211,7 @@ impl OperatorKind {
                 | OperatorKind::DotDot
                 | OperatorKind::LogicalAnd
                 | OperatorKind::DoubleStar
+                | OperatorKind::In
         )
     }
 
@@ -270,7 +273,7 @@ impl OperatorKind {
 impl core::fmt::Display for OperatorKind {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let op_str = match self {
-            // Use the same exhaustive match as from_str to ensure completeness
+            OperatorKind::In => "in",
             OperatorKind::Tilde => "~",
             OperatorKind::Equal => "=",
             OperatorKind::Colon => ":",
