@@ -15,7 +15,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0, line: 1, column: 1, debug: 0 }
+        Parser { tokens, current: 0, line: 1, column: 1, debug: 5 }
     }
 
     pub fn advance(&mut self) -> Option<Token> {
@@ -160,11 +160,6 @@ impl Parser {
     pub fn parse_program(&mut self) -> Result<Vec<Stmt>, ParseError> {
         let mut statements = Vec::new();
         while let Some(token) = self.peek() {
-            if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
-                self.advance();
-                continue;
-            }
-
             if token.kind == TokenKind::EOF {
                 break;
             }

@@ -1,8 +1,8 @@
 [package]
 name = "axo"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-broccli = { version = "0.0.21" }
+broccli = { version = "0.0.22" }
 # inkwell = { path = "inkwell", version = "0.5.0", features = ["default", "llvm18-0"] }

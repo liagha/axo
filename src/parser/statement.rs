@@ -133,11 +133,6 @@ impl Statement for Parser {
 
         while let Some(token) = self.peek() {
             match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    self.advance();
-                    continue;
-                }
-
                 TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     self.advance();
                     return Ok(Stmt::Block(statements));
@@ -388,11 +383,6 @@ impl Statement for Parser {
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace) {
                 break;
-            }
-
-            if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
-                self.advance();
-                continue;
             }
 
             let variant_name = if let Some(token) = self.advance() {

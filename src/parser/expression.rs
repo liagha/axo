@@ -236,14 +236,12 @@ impl Expression for Parser {
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
+            println!("{:?}", token);
+
             match token.kind {
-                TokenKind::Punctuation(PunctuationKind::RightBrace) => {
-                    self.advance();
-                    return Ok(Expr::StructInit(struct_name.into(), statements));
-                }
                 TokenKind::Punctuation(PunctuationKind::Semicolon) => {
                     self.advance();
-                    return Ok(Expr::StructInit(struct_name.into(), statements));
+                    return Ok(Expr::StructInit(struct_name.into(), statements))
                 }
                 _ => {
                     let stmt = self.parse_statement()?;

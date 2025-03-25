@@ -8,8 +8,11 @@ use parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
 
 fn main() {
-    let file_path = "/Users/ali/Projects/axo/test_project/text.axo";
-    if let Ok(content) = std::fs::read_to_string(file_path) {
+    let mut exec_path = std::env::current_dir().unwrap().to_str().unwrap().to_string();
+    let file_path = "/test_project/text.axo";
+    exec_path.push_str(file_path);
+    xprintln!("Path: {}", exec_path);
+    if let Ok(content) = std::fs::read_to_string(exec_path) {
         xprintln!(
             "File Contents: \n{}" => Color::Blue,
             content.clone() => Color::BrightBlue

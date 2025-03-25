@@ -125,3 +125,4 @@ for (i in 5) {
 }
 
 let test = Test { x = 3, y = 5 };
+let test = Test { x = 3, y = 5 };
