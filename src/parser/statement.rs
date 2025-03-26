@@ -12,41 +12,23 @@ pub enum EnumVariant {
     Discriminant(Expr),
 }
 
-#[derive(Clone)]
-pub enum Stmt {
-    Expression(Expr),
-    Assignment(Expr, Box<Stmt>),
-    Definition(Expr, Option<Box<Stmt>>),
-    CompoundAssignment(Expr, OperatorKind, Box<Stmt>),
-    StructDef(Expr, Vec<Expr>),
-    EnumDef(Expr, Vec<(Expr, Option<EnumVariant>)>),
-    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
-    While(Expr, Box<Stmt>),
-    Block(Vec<Stmt>),
-    For(Box<Stmt>, Box<Stmt>),
-    Function(Expr, Vec<Expr>, Box<Stmt>),
-    Return(Option<Expr>),
-    Break(Option<Expr>),
-    Continue,
-}
-
 pub trait Statement {
-    fn parse_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_let_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_block(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_function_declaration(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_if_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_while_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_for_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_break_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_continue_statement(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_struct_definition(&mut self) -> Result<Stmt, ParseError>;
-    fn parse_enum_definition(&mut self) -> Result<Stmt, ParseError>;
+    fn parse_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_let_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_block(&mut self) -> Result<Expr, ParseError>;
+    fn parse_function_declaration(&mut self) -> Result<Expr, ParseError>;
+    fn parse_if_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_while_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_for_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_return_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_break_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_continue_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_struct_definition(&mut self) -> Result<Expr, ParseError>;
+    fn parse_enum_definition(&mut self) -> Result<Expr, ParseError>;
 }
 
 impl Statement for Parser {
-    fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_statement(&mut self) -> Result<Expr, ParseError> {
         if let Some(token) = self.peek() {
             match &token.kind {
                 TokenKind::Keyword(kw) => match kw {
@@ -78,7 +60,7 @@ impl Statement for Parser {
                             self.advance();
                             let right_stmt = self.parse_statement()?;
 
-                            Ok(Stmt::Assignment(left, Box::new(right_stmt)))
+                            Ok(Expr::Assignment(left.into(), Box::new(right_stmt)))
                         } else if OperatorKind::is_compound_token(&token.kind) {
                             let operator = TokenKind::get_operator(&token.kind).unwrap();
 
@@ -86,11 +68,11 @@ impl Statement for Parser {
 
                             let right_stmt = self.parse_statement()?;
 
-                            Ok(Stmt::CompoundAssignment(left, operator.decompound(), Box::new(right_stmt)))
+                            Ok(Expr::CompoundAssignment(left.into(), operator.decompound(), Box::new(right_stmt)))
                         } else {
                             self.advance();
 
-                            Ok(Stmt::Expression(left))
+                            Ok(left)
                         }
                     } else {
                         Err(ParseError::UnexpectedEOF)
@@ -102,7 +84,7 @@ impl Statement for Parser {
         }
     }
 
-    fn parse_let_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_let_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let identifier = self.parse_expression()?;
@@ -113,7 +95,7 @@ impl Statement for Parser {
 
                 let value_stmt = self.parse_statement()?;
 
-                Ok(Stmt::Definition(identifier, Some(Box::new(value_stmt))))
+                Ok(Expr::Definition(identifier.into(), Some(Box::new(value_stmt))))
             } else {
                 if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
                     let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::Semicolon), SyntaxPosition::After, SyntaxType::VariableDeclaration);
@@ -121,33 +103,33 @@ impl Statement for Parser {
                     return Err(err);
                 }
 
-                Ok(Stmt::Definition(identifier, None))
+                Ok(Expr::Definition(identifier.into(), None))
             }
         } else {
             Err(ParseError::UnexpectedEOF)
         }
     }
 
-    fn parse_block(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_block(&mut self) -> Result<Expr, ParseError> {
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     self.advance();
-                    return Ok(Stmt::Block(statements));
+                    return Ok(Expr::Block(statements));
                 }
 
                 _ => {
                     let stmt = self.parse_statement()?;
-                    statements.push(stmt);
+                    statements.push(stmt.into());
                 }
             }
         }
 
         Err(ParseError::UnexpectedEOF)
     }
-    fn parse_function_declaration(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_function_declaration(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let name = if let Some(token) = self.advance() {
@@ -204,10 +186,10 @@ impl Statement for Parser {
             self.parse_block()?
         };
 
-        Ok(Stmt::Function(Expr::Identifier(name), parameters, Box::new(body)))
+        Ok(Expr::Function(Expr::Identifier(name).into(), parameters, Box::new(body)))
     }
 
-    fn parse_if_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_if_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let condition = self.parse_expression()?;
@@ -234,10 +216,10 @@ impl Statement for Parser {
             None
         };
 
-        Ok(Stmt::If(condition, then_branch, else_branch))
+        Ok(Expr::If(condition.into(), then_branch.into(), else_branch.into()))
     }
 
-    fn parse_while_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_while_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let condition = self.parse_expression()?;
@@ -248,10 +230,10 @@ impl Statement for Parser {
             Box::new(self.parse_statement()?)
         };
 
-        Ok(Stmt::While(condition, body))
+        Ok(Expr::While(condition.into(), body.into()))
     }
 
-    fn parse_for_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_for_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let clause = self.parse_expression()?;
@@ -262,14 +244,14 @@ impl Statement for Parser {
             self.parse_statement()?
         };
 
-        Ok(Stmt::For(Box::new(Stmt::Expression(clause)), Box::new(body)))
+        Ok(Expr::For(clause.into(), Box::new(body)))
     }
 
-    fn parse_return_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_return_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Ok(Stmt::Return(None));
+            return Ok(Expr::Return(None));
         }
 
         let value = self.parse_expression()?;
@@ -280,14 +262,14 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Stmt::Return(Some(value)))
+        Ok(Expr::Return(Some(value.into())))
     }
 
-    fn parse_break_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_break_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-            return Ok(Stmt::Break(None));
+            return Ok(Expr::Break(None));
         }
 
         let value = self.parse_expression()?;
@@ -298,10 +280,10 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Stmt::Break(Some(value)))
+        Ok(Expr::Break(Some(value.into())))
     }
 
-    fn parse_continue_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_continue_statement(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
@@ -310,10 +292,10 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Stmt::Continue)
+        Ok(Expr::Continue)
     }
 
-    fn parse_struct_definition(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_struct_definition(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let name = if let Some(token) = self.advance() {
@@ -339,7 +321,7 @@ impl Statement for Parser {
                 Some(_) => {
                     let field = self.parse_expression()?;
 
-                    fields.push(field);
+                    fields.push(field.into());
 
                     if !self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
                         break;
@@ -357,9 +339,9 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Stmt::StructDef(Expr::Identifier(name), fields))
+        Ok(Expr::StructDef(Expr::Identifier(name).into(), fields))
     }
-    fn parse_enum_definition(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_enum_definition(&mut self) -> Result<Expr, ParseError> {
         self.advance();
 
         let name = if let Some(token) = self.advance() {
@@ -401,7 +383,7 @@ impl Statement for Parser {
                 if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
                     if let Some(token) = self.advance() {
                         if let TokenKind::Identifier(type_name) = token.kind {
-                            fields.push(Expr::Identifier(type_name));
+                            fields.push(Expr::Identifier(type_name).into());
 
                             while self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
                                 if let Some(token) = self.peek() {
@@ -414,7 +396,7 @@ impl Statement for Parser {
 
                                 if let Some(token) = self.advance() {
                                     if let TokenKind::Identifier(type_name) = token.kind {
-                                        fields.push(Expr::Identifier(type_name));
+                                        fields.push(Expr::Identifier(type_name).into());
                                     } else {
                                         return Err(ParseError::ExpectedSyntax(SyntaxType::FieldType));
                                     }
@@ -479,7 +461,7 @@ impl Statement for Parser {
                 None
             };
 
-            variants.push((Expr::Identifier(variant_name), variant_data));
+            variants.push((Expr::Identifier(variant_name).into(), variant_data));
 
             if !self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
                 if let Some(token) = self.peek() {
@@ -500,6 +482,6 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Stmt::EnumDef(Expr::Identifier(name), variants))
+        Ok(Expr::EnumDef(Expr::Identifier(name).into(), variants))
     }
 }

@@ -6,5 +6,5 @@ mod expression;
 mod error;
 
 pub(crate) use parser::Parser;
-pub use statement::{Statement, Stmt};
+pub use statement::{Statement};
 pub use expression::{Expression, Expr};

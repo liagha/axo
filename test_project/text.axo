@@ -124,5 +124,19 @@ for (i in 5) {
     sum += numbers[i];
 }
 
-let test = Test { x = 3, y = 5 };
-let test = Test { x = 3, y = 5 };
+let test = Test { x = 3, y = 5, };
+let test = Test { x = 3, y = 5, };
+
+while x > 0 x = 5;
+
+if x > 4 55 + 4;
+
+if x + y == 4 44;
+
+if x == 3 {
+    x = 4;
+}
+
+let x = if test > 2 { 5; } else { 6; }
+
+!-test

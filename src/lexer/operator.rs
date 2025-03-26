@@ -74,8 +74,9 @@ pub enum OperatorKind {
     SlashDoubleStar,         // /**
     DoubleSlashExclamation,  // //!
     NotTripleEqual,          // !== (strict inequality)
-    DoubleStarEqual,     // **= (exponentiation assignment)
+    DoubleStarEqual,         // **= (exponentiation assignment)
     ModuloExponentiation,    // %%= (custom modulo assignment)
+    Unknown,                 // for when the operator is not detected
 }
 
 impl OperatorKind {
@@ -154,7 +155,7 @@ impl OperatorKind {
             "//!" => OperatorKind::DoubleSlashExclamation,
             "%%=" => OperatorKind::ModuloExponentiation,
             "" => OperatorKind::SlashDoubleStar,
-            _ => unreachable!(),
+            _ => OperatorKind::Unknown,
         }
     }
 }
@@ -346,6 +347,7 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::ModuloExponentiation => "%%=",
             OperatorKind::SlashDoubleStar => "/**",
             OperatorKind::DoubleSlashExclamation => "//!",
+            OperatorKind::Unknown => "????",
         };
         write!(f, "{}", op_str)
     }

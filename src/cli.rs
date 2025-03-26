@@ -3,7 +3,7 @@ use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
 use crate::lexer::{Span, Token};
 use crate::lexer::{PunctuationKind, TokenKind};
-use crate::parser::{Expr, Stmt};
+use crate::parser::{Expr};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -53,33 +53,25 @@ impl fmt::Debug for Expr {
             Expr::Tuple(tuple) => {
                 write!(f, "Tuple({:?})", tuple)
             }
-        }
-    }
-}
-
-impl fmt::Debug for Stmt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Stmt::Expression(expr) => write!(f, "({:?})", expr),
-            Stmt::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
-            Stmt::CompoundAssignment(name, op, expr) => write!(f, "Compound | Assignment({:?}, {:?}, {:?})", name, op, expr),
-            Stmt::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
-            Stmt::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
-            Stmt::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
-            Stmt::Return(expr) => write!(f, "Return({:?})", expr),
-            Stmt::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
-            Stmt::Continue => write!(f, "Continue"),
-            Stmt::Break(expr) => write!(f, "Break({:?})", expr),
-            Stmt::For(clause, body) => {
+            Expr::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
+            Expr::CompoundAssignment(name, op, expr) => write!(f, "Compound | Assignment({:?}, {:?}, {:?})", name, op, expr),
+            Expr::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
+            Expr::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
+            Expr::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
+            Expr::Return(expr) => write!(f, "Return({:?})", expr),
+            Expr::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
+            Expr::Continue => write!(f, "Continue"),
+            Expr::Break(expr) => write!(f, "Break({:?})", expr),
+            Expr::For(clause, body) => {
                 write!(f, "For( Clause: {:?} | Body: {:?} )", clause, body)
             }
-            Stmt::Function(name, params, body) => {
+            Expr::Function(name, params, body) => {
                 write!(f, "Function( Name: {:?} | Params: {:?} | Body: {:?} )", name, params, body)
             }
-            Stmt::StructDef(name, fields) => {
+            Expr::StructDef(name, fields) => {
                 write!(f, "Struct( Name: {:?} | Fields: {:?} )", name, fields)
             }
-            Stmt::EnumDef(name, variants) => {
+            Expr::EnumDef(name, variants) => {
                 let format = variants.iter().map(
                     |(variant, data)| format!("Variant({:?}({:?}))", variant, data)).collect::<Vec<_>>().join(", ");
 

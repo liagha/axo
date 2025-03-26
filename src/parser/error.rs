@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::lexer::TokenKind;
-use crate::parser::{Expr, Stmt};
+use crate::parser::{Expr};
 
 pub enum SyntaxPosition {
     After,
@@ -11,7 +11,6 @@ pub enum SyntaxPosition {
 pub enum SyntaxType {
     Token(TokenKind),
     Expr(Expr),
-    Stmt(Stmt),
     Expression,
     Function,
     FunctionCall,
@@ -92,7 +91,6 @@ impl core::fmt::Display for SyntaxType {
         match self {
             SyntaxType::Token(token) => write!(f, "{}", token),
             SyntaxType::Expr(expr) => write!(f, "{:?}", expr),
-            SyntaxType::Stmt(stmt) => write!(f, "{:?}", stmt),
             SyntaxType::Expression => write!(f, "expression"),
             SyntaxType::Function => write!(f, "function"),
             SyntaxType::FunctionName => write!(f, "function name"),

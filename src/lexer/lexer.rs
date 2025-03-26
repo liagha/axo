@@ -508,11 +508,25 @@ impl Lexer {
                         let end_position = (line_number + 1, column_number);
                         let span = Span { start: start_position, end: end_position };
 
-                        let op = OperatorKind::from_str(&operator);
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(op),
-                            span
-                        });
+                        if OperatorKind::Unknown != OperatorKind::from_str(&operator) {
+                            let op = OperatorKind::from_str(&operator);
+
+                            tokens.push(Token {
+                                kind: TokenKind::Operator(op),
+                                span
+                            });
+                        } else {
+                            for (i, c) in operator.chars().enumerate() {
+                                let single_char_span = Span {
+                                    start: (line_number + 1, start_column + i + 1),
+                                    end: (line_number + 1, start_column + i + 2),
+                                };
+                                tokens.push(Token {
+                                    kind: TokenKind::Operator(OperatorKind::from_str(c.to_string().as_str())),
+                                    span: single_char_span,
+                                });
+                            }
+                        }
                     }
 
                     // Handle punctuation

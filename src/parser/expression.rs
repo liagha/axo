@@ -1,4 +1,5 @@
-use crate::parser::{Parser, Statement, Stmt};
+use crate::parser::{Parser, Statement};
+use crate::parser::statement::EnumVariant;
 use crate::lexer::{OperatorKind, PunctuationKind, TokenKind, Token};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 
@@ -16,9 +17,22 @@ pub enum Expr {
     Index(Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     Lambda(Vec<Expr>, Box<Expr>),
-    StructInit(Box<Expr>, Vec<Stmt>),
+    StructInit(Box<Expr>, Vec<Box<Expr>>),
     FieldAccess(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
+    Assignment(Box<Expr>, Box<Expr>),
+    Definition(Box<Expr>, Option<Box<Expr>>),
+    CompoundAssignment(Box<Expr>, OperatorKind, Box<Expr>),
+    StructDef(Box<Expr>, Vec<Expr>),
+    EnumDef(Box<Expr>, Vec<(Expr, Option<EnumVariant>)>),
+    If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
+    While(Box<Expr>, Box<Expr>),
+    Block(Vec<Expr>),
+    For(Box<Expr>, Box<Expr>),
+    Function(Box<Expr>, Vec<Expr>, Box<Expr>),
+    Return(Option<Box<Expr>>),
+    Break(Option<Box<Expr>>),
+    Continue,
 }
 
 pub trait Expression {
@@ -239,13 +253,17 @@ impl Expression for Parser {
             println!("{:?}", token);
 
             match token.kind {
+                TokenKind::Punctuation(PunctuationKind::RightBrace) |
                 TokenKind::Punctuation(PunctuationKind::Semicolon) => {
                     self.advance();
                     return Ok(Expr::StructInit(struct_name.into(), statements))
                 }
+                TokenKind::Operator(OperatorKind::Comma) => {
+                    self.advance();
+                }
                 _ => {
                     let stmt = self.parse_statement()?;
-                    statements.push(stmt);
+                    statements.push(stmt.into());
                 }
             }
         }

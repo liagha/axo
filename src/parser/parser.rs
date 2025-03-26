@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::parser::{Expr, Stmt};
+use crate::parser::{Expr};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::expression::Expression;
 use crate::parser::statement::Statement;
@@ -15,7 +15,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0, line: 1, column: 1, debug: 5 }
+        Parser { tokens, current: 0, line: 1, column: 1, debug: 0 }
     }
 
     pub fn advance(&mut self) -> Option<Token> {
@@ -157,7 +157,7 @@ impl Parser {
         false
     }
 
-    pub fn parse_program(&mut self) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
         let mut statements = Vec::new();
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::EOF {
