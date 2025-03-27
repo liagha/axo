@@ -5,10 +5,7 @@ use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 
 #[derive(Clone)]
 pub enum Expr {
-    Number(f64),
-    Boolean(bool),
-    Char(char),
-    String(String),
+    Literal(Token),
     Identifier(String),
     Binary(Box<Expr>, OperatorKind, Box<Expr>),
     Unary(OperatorKind, Box<Expr>),
@@ -16,15 +13,14 @@ pub enum Expr {
     Array(Vec<Expr>),
     Index(Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
-    Lambda(Vec<Expr>, Box<Expr>),
+    Closure(Vec<Expr>, Box<Expr>),
     StructInit(Box<Expr>, Vec<Box<Expr>>),
     FieldAccess(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
     Assignment(Box<Expr>, Box<Expr>),
     Definition(Box<Expr>, Option<Box<Expr>>),
-    CompoundAssignment(Box<Expr>, OperatorKind, Box<Expr>),
     StructDef(Box<Expr>, Vec<Expr>),
-    EnumDef(Box<Expr>, Vec<(Expr, Option<EnumVariant>)>),
+    Enum(Box<Expr>, Vec<(Expr, Option<EnumVariant>)>),
     If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     While(Box<Expr>, Box<Expr>),
     Block(Vec<Expr>),
@@ -43,7 +39,7 @@ pub trait Expression {
     fn parse_array(&mut self) -> Result<Expr, ParseError>;
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;
     fn parse_call(&mut self, name: String) -> Result<Expr, ParseError>;
-    fn parse_lambda(&mut self) -> Result<Expr, ParseError>;
+    fn parse_closure(&mut self) -> Result<Expr, ParseError>;
     fn parse_tuple(&mut self) -> Result<Expr, ParseError>;
     fn parse_struct_init(&mut self, struct_name: Expr) -> Result<Expr, ParseError>;
 }
@@ -169,7 +165,7 @@ impl Expression for Parser {
         Ok(Expr::Call(Expr::Identifier(name).into(), arguments))
     }
 
-    fn parse_lambda(&mut self) -> Result<Expr, ParseError> {
+    fn parse_closure(&mut self) -> Result<Expr, ParseError> {
         self.advance();
         let mut parameters = Vec::new();
 
@@ -181,7 +177,7 @@ impl Expression for Parser {
                     if let Some(Token { kind: TokenKind::Identifier(name), .. }) = self.advance() {
                         parameters.push(Expr::Identifier(name));
                     } else {
-                        let err = ParseError::ExpectedSyntax(SyntaxType::ParameterName);
+                        let err = ParseError::ExpectedSyntax(SyntaxType::LambdaParameter);
 
                         return Err(err);
                     }
@@ -201,7 +197,7 @@ impl Expression for Parser {
 
         let body = self.parse_expression()?;
 
-        Ok(Expr::Lambda(parameters, Box::new(body)))
+        Ok(Expr::Closure(parameters, Box::new(body)))
     }
 
     fn parse_tuple(&mut self) -> Result<Expr, ParseError> {
@@ -250,8 +246,6 @@ impl Expression for Parser {
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
-            println!("{:?}", token);
-
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::RightBrace) |
                 TokenKind::Punctuation(PunctuationKind::Semicolon) => {

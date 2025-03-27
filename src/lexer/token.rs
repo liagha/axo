@@ -1,6 +1,13 @@
 #![allow(dead_code)]
 
 use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind};
+use crate::lexer::Span;
+
+#[derive(Clone, PartialEq)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
 
 #[derive(Clone, PartialEq)]
 pub enum TokenKind {

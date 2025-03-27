@@ -1,5 +1,4 @@
 mod cli;
-mod codegen;
 mod parser;
 pub mod lexer;
 use lexer::{Lexer, PunctuationKind, Token, TokenKind};
@@ -20,7 +19,7 @@ fn main() {
 
         xprintln!();
 
-        let lexer = Lexer::new(content);
+        let mut lexer = Lexer::new(content);
 
         match lexer.tokenize() {
             Ok(tokens) => {

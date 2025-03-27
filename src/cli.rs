@@ -8,17 +8,8 @@ use crate::parser::{Expr};
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Number(num) => {
-                write!(f, "Number({:?})", num)
-            }
-            Expr::Boolean(bool) => {
-                write!(f, "Boolean({})", bool)
-            }
-            Expr::Char(char) => {
-                write!(f, "Char({:?})", char)
-            }
-            Expr::String(string) => {
-                write!(f, "String({:?})", string)
+            Expr::Literal(literal) => {
+                write!(f, "{:?}", literal)
             }
             Expr::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
@@ -41,8 +32,8 @@ impl fmt::Debug for Expr {
             Expr::Call(function, params) => {
                 write!(f, "Call({:?}, {:?})", function, params)
             }
-            Expr::Lambda(params, lambda) => {
-                write!(f, "Lambda(|{:?}| {:?})", params, lambda)
+            Expr::Closure(params, lambda) => {
+                write!(f, "Closure(|{:?}| {:?})", params, lambda)
             }
             Expr::StructInit(name, fields) => {
                 write!(f, "Struct( Name: {:?}, Fields: {:?} )", name, fields)
@@ -54,7 +45,6 @@ impl fmt::Debug for Expr {
                 write!(f, "Tuple({:?})", tuple)
             }
             Expr::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
-            Expr::CompoundAssignment(name, op, expr) => write!(f, "Compound | Assignment({:?}, {:?}, {:?})", name, op, expr),
             Expr::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
             Expr::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
             Expr::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
@@ -71,7 +61,7 @@ impl fmt::Debug for Expr {
             Expr::StructDef(name, fields) => {
                 write!(f, "Struct( Name: {:?} | Fields: {:?} )", name, fields)
             }
-            Expr::EnumDef(name, variants) => {
+            Expr::Enum(name, variants) => {
                 let format = variants.iter().map(
                     |(variant, data)| format!("Variant({:?}({:?}))", variant, data)).collect::<Vec<_>>().join(", ");
 

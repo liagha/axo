@@ -139,4 +139,15 @@ if x == 3 {
 
 let x = if test > 2 { 5; } else { 6; }
 
-!-test
+!-test;
+
+5 + !-5 - -!66;
+
+//test comment
+
+/* test block comment */
+
+/* 
+test
+block
+*/

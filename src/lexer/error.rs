@@ -1,37 +1,61 @@
 #![allow(dead_code)]
 pub enum LexError {
-    InvalidChar(String),
-    IntParseError(String),
-    FloatParseError(String),
-    CharParseError(String),
-    UnClosedChar(String),
-    UnClosedString(String),
+    InvalidChar,
+    NumberParse(String),
+    IntParseError(IntParseError),
+    FloatParseError(IntParseError),
+    CharParseError(CharParseError),
+    StringParseError(CharParseError),
+    UnClosedChar,
+    UnClosedString,
+    UnClosedComment,
     InvalidOperator(String),
     InvalidPunctuation(String),
-    StringParseError(String),
-    UnClosedComment(String),
+}
+
+#[derive(Debug)]
+pub enum IntParseError {
+    InvalidRange,
+    InvalidHexadecimal,
+    InvalidOctal,
+    InvalidBinary,
+    InvalidScientificNotation,
+}
+
+#[derive(Debug)]
+pub enum CharParseError {
+    InvalidEscapeSequence,
+    UnClosedEscapeSequence,
+    InvalidCharLiteral,
+    UnClosedCharLiteral,
 }
 
 impl core::fmt::Display for LexError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            LexError::InvalidChar(c) => {
-                write!(f, "Invalid character '{}'", c)
+            LexError::InvalidChar => {
+                write!(f, "Invalid character'")
+            }
+            LexError::NumberParse(e) => {
+                write!(f, "Failed to parse number: {}", e)
             }
             LexError::IntParseError(e) => {
-                write!(f, "Failed to parse int value: {}", e)
+                write!(f, "Failed to parse int value: {:?}", e)
             }
             LexError::FloatParseError(e) => {
-                write!(f, "Failed to parse float value: {}", e)
+                write!(f, "Failed to parse float value: {:?}", e)
             }
             LexError::CharParseError(e) => {
-                write!(f, "Failed to parse char value: {}", e)
+                write!(f, "Failed to parse char value: {:?}", e)
             }
-            LexError::UnClosedChar(e) => {
-                write!(f, "Unclosed character: '{}'", e)
+            LexError::StringParseError(e) => {
+                write!(f, "Failed to parse string value: {:?}", e)
             }
-            LexError::UnClosedString(e) => {
-                write!(f, "Unclosed string: '{}'", e)
+            LexError::UnClosedChar => {
+                write!(f, "Unclosed character")
+            }
+            LexError::UnClosedString => {
+                write!(f, "Unclosed string")
             }
             LexError::InvalidOperator(e) => {
                 write!(f, "Invalid operator: '{}'", e)
@@ -39,11 +63,8 @@ impl core::fmt::Display for LexError {
             LexError::InvalidPunctuation(e) => {
                 write!(f, "Invalid punctuation: '{}'", e)
             }
-            LexError::StringParseError(e) => {
-                write!(f, "Failed to parse string value: {}", e)
-            }
-            LexError::UnClosedComment(e) => {
-                write!(f, "Unclosed comment: '{}'", e)
+            LexError::UnClosedComment => {
+                write!(f, "Unclosed comment")
             }
         }
     }

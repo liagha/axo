@@ -32,28 +32,10 @@ impl Parser {
                     }
                     continue;
                 }
-                TokenKind::Operator(OperatorKind::DoubleSlash) => {
-                    if self.debug >= 1 {
-                        println!("DEBUG (L1): Skipping comment (//): Starting at token {}", self.current - 1);
-                    }
-                    while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token.kind, TokenKind::Punctuation(PunctuationKind::Newline)) {
-                            break;
-                        }
-                        self.current += 1;
-                    }
-                    continue;
-                }
-                TokenKind::Operator(OperatorKind::SlashStar) => {
-                    if self.debug >= 1 {
-                        println!("DEBUG (L1): Skipping multi-line comment (/* */): Starting at token {}", self.current - 1);
-                    }
-                    while let Some(next_token) = self.tokens.get(self.current) {
-                        if matches!(next_token.kind, TokenKind::Operator(OperatorKind::StarSlash)) {
-                            self.current += 1;
-                            break;
-                        }
-                        self.current += 1;
+                TokenKind::Comment(_) => {
+                    self.column += 1;
+                    if self.debug >= 2 {
+                        println!("DEBUG (L2): Skipping comment token.");
                     }
                     continue;
                 }
@@ -87,28 +69,12 @@ impl Parser {
                         println!("DEBUG (L2): Skipping newline token. Line now: {}", line);
                     }
                 }
-                TokenKind::Operator(OperatorKind::DoubleSlash) => {
-                    if self.debug >= 1 {
-                        println!("DEBUG (L1): Skipping comment (//): Starting at token {}", current);
-                    }
-                    while let Some(next_token) = self.tokens.get(current) {
-                        if matches!(next_token.kind, TokenKind::Punctuation(PunctuationKind::Newline)) {
-                            break;
-                        }
-                        current += 1;
-                    }
+                TokenKind::Comment(_) => {
                     current += 1;
-                }
-                TokenKind::Operator(OperatorKind::SlashStar) => {
-                    if self.debug >= 1 {
-                        println!("DEBUG (L1): Skipping multi-line comment (/* */): Starting at token {}", current);
-                    }
-                    while let Some(next_token) = self.tokens.get(current) {
-                        if matches!(next_token.kind, TokenKind::Operator(OperatorKind::StarSlash)) {
-                            current += 1;
-                            break;
-                        }
-                        current += 1;
+                    column += 1;
+
+                    if self.debug >= 2 {
+                        println!("DEBUG (L2): Skipping comment token.");
                     }
                 }
                 _ => {
@@ -170,36 +136,47 @@ impl Parser {
     }
 
     pub fn parse_primary(&mut self) -> Result<Expr, ParseError> {
-        match self.peek().map(|token| token.kind.clone()) {
-            Some(TokenKind::Punctuation(PunctuationKind::LeftBracket)) => self.parse_array(),
-            Some(TokenKind::Punctuation(PunctuationKind::LeftParen)) => self.parse_tuple(),
-            Some(TokenKind::Operator(OperatorKind::Pipe)) => self.parse_lambda(),
-            Some(TokenKind::Identifier(name)) => {
-                self.advance();
-                let mut expr = Expr::Identifier(name.clone());
+        if let Some(token) = self.peek().cloned() {
+            match token.kind.clone() {
+                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
+                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
+                TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
+                TokenKind::Identifier(name) => {
+                    self.advance();
+                    let mut expr = Expr::Identifier(name.clone());
 
-                while let Some(token) = self.peek() {
-                    match &token.kind {
-                        TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
-                        TokenKind::Punctuation(PunctuationKind::LeftParen) => expr = self.parse_call(name.clone())?,
-                        TokenKind::Operator(OperatorKind::Dot) => {
-                            self.advance();
-                            let field = self.parse_expression()?;
-                            expr = Expr::FieldAccess(Box::new(expr), Box::new(field));
+                    while let Some(token) = self.peek() {
+                        match &token.kind {
+                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
+                            TokenKind::Punctuation(PunctuationKind::LeftParen) => expr = self.parse_call(name.clone())?,
+                            TokenKind::Operator(OperatorKind::Dot) => {
+                                self.advance();
+                                let field = self.parse_expression()?;
+                                expr = Expr::FieldAccess(Box::new(expr), Box::new(field));
+                            }
+                            TokenKind::Operator(OperatorKind::DoubleColon) => {
+                                self.advance();
+                                let field = self.parse_expression()?;
+                                expr = Expr::FieldAccess(Box::new(expr), Box::new(field));
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct_init(expr)?,
+                            _ => break,
                         }
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct_init(expr)?,
-                        _ => break,
                     }
+
+                    Ok(expr)
                 }
-                Ok(expr)
+                TokenKind::Str(_) 
+                | TokenKind::Char(_) 
+                | TokenKind::Boolean(_) 
+                | TokenKind::Float(_) 
+                | TokenKind::Integer(_) => { self.advance(); Ok(Expr::Literal(token.clone())) }
+
+                TokenKind::EOF => Err(ParseError::UnexpectedEOF),
+                token => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),
             }
-            Some(TokenKind::Integer(n)) => { self.advance(); Ok(Expr::Number(n as f64)) }
-            Some(TokenKind::Float(n)) => { self.advance(); Ok(Expr::Number(n)) }
-            Some(TokenKind::Boolean(b)) => { self.advance(); Ok(Expr::Boolean(b)) }
-            Some(TokenKind::Char(c)) => { self.advance(); Ok(Expr::Char(c)) }
-            Some(TokenKind::Str(s)) => { self.advance(); Ok(Expr::String(s)) }
-            Some(TokenKind::EOF) | None => Err(ParseError::UnexpectedEOF),
-            Some(token) => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),
+        } else {
+            Err(ParseError::UnexpectedEOF)
         }
     }
 }

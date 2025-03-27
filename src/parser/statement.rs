@@ -68,7 +68,9 @@ impl Statement for Parser {
 
                             let right_stmt = self.parse_statement()?;
 
-                            Ok(Expr::CompoundAssignment(left.into(), operator.decompound(), Box::new(right_stmt)))
+                            let operation = Expr::Binary(left.clone().into(), operator.decompound(), Box::new(right_stmt));
+
+                            Ok(Expr::Assignment(left.into(), operation.into()))
                         } else {
                             self.advance();
 
@@ -482,6 +484,6 @@ impl Statement for Parser {
             return Err(err);
         }
 
-        Ok(Expr::EnumDef(Expr::Identifier(name).into(), variants))
+        Ok(Expr::Enum(Expr::Identifier(name).into(), variants))
     }
 }
