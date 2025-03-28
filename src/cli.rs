@@ -3,69 +3,72 @@ use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
 use crate::lexer::{Span, Token};
 use crate::lexer::{PunctuationKind, TokenKind};
-use crate::parser::{Expr};
+use crate::parser::{Expr, ExprKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
+}
+
+impl fmt::Debug for ExprKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Literal(literal) => {
+            ExprKind::Literal(literal) => {
                 write!(f, "{:?}", literal)
             }
-            Expr::Identifier(identifier) => {
+            ExprKind::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
             }
-            Expr::Typed(expr, ty) => {
+            ExprKind::Typed(expr, ty) => {
                 write!(f, "Typed({:?} : {:?})", expr, ty)
             }
-            Expr::Binary(first, operator, second) => {
+            ExprKind::Binary(first, operator, second) => {
                 write!(f, "Binary({:?} {:?} {:?})", first, operator, second)
             }
-            Expr::Unary(operator, expr) => {
+            ExprKind::Unary(operator, expr) => {
                 write!(f, "Unary({:?} {:?})", operator, expr)
             }
-            Expr::Array(array) => {
+            ExprKind::Array(array) => {
                 write!(f, "Array({:?})", array)
             }
-            Expr::Index(expr, index) => {
+            ExprKind::Index(expr, index) => {
                 write!(f, "Index({:?}, {:?})", index, expr)
             }
-            Expr::Call(function, params) => {
+            ExprKind::Call(function, params) => {
                 write!(f, "Call({:?}, {:?})", function, params)
             }
-            Expr::Closure(params, lambda) => {
+            ExprKind::Closure(params, lambda) => {
                 write!(f, "Closure(|{:?}| {:?})", params, lambda)
             }
-            Expr::StructInit(name, fields) => {
+            ExprKind::StructInit(name, fields) => {
                 write!(f, "Struct( Name: {:?}, Fields: {:?} )", name, fields)
             }
-            Expr::FieldAccess(expr, field) => {
+            ExprKind::FieldAccess(expr, field) => {
                 write!(f, "FieldAccess({:?}, {:?})", expr, field)
             }
-            Expr::Tuple(tuple) => {
+            ExprKind::Tuple(tuple) => {
                 write!(f, "Tuple({:?})", tuple)
             }
-            Expr::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
-            Expr::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
-            Expr::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
-            Expr::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
-            Expr::Return(expr) => write!(f, "Return({:?})", expr),
-            Expr::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
-            Expr::Continue => write!(f, "Continue"),
-            Expr::Break(expr) => write!(f, "Break({:?})", expr),
-            Expr::For(clause, body) => {
+            ExprKind::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
+            ExprKind::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
+            ExprKind::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
+            ExprKind::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
+            ExprKind::Return(expr) => write!(f, "Return({:?})", expr),
+            ExprKind::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
+            ExprKind::Continue => write!(f, "Continue"),
+            ExprKind::Break(expr) => write!(f, "Break({:?})", expr),
+            ExprKind::For(clause, body) => {
                 write!(f, "For( Clause: {:?} | Body: {:?} )", clause, body)
             }
-            Expr::Function(name, params, body) => {
+            ExprKind::Function(name, params, body) => {
                 write!(f, "Function( Name: {:?} | Params: {:?} | Body: {:?} )", name, params, body)
             }
-            Expr::StructDef(name, fields) => {
-                write!(f, "Struct( Name: {:?} | Fields: {:?} )", name, fields)
+            ExprKind::StructDef(name, fields) => {
+                write!(f, "StructDef( Name: {:?} | Fields: {:?} )", name, fields)
             }
-            Expr::Enum(name, variants) => {
-                let format = variants.iter().map(
-                    |(variant, data)| format!("Variant({:?}({:?}))", variant, data)).collect::<Vec<_>>().join(", ");
-
-                write!(f, "Enum( Name: {:?} | Variants: {} )", name, format)
+            ExprKind::Enum(name, variants) => {
+                write!(f, "Enum( Name: {:?} | Variants: {:?} )", name, variants)
             }
         }
     }

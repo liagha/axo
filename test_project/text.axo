@@ -44,7 +44,7 @@ for i + 1 {
     sum += numbers[i];
 }
 
-|x, y| x + y + 3;
+|x, y| x + y + 3
 test[2] = 43;
 x *= 4;
 

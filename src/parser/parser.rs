@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::parser::{Expr};
+use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind, Span};
+use crate::parser::{Expr, ExprKind};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::expression::Expression;
 use crate::parser::statement::Statement;
@@ -92,10 +92,8 @@ impl Parser {
     }
 
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
-        // First, clone the debug level to avoid borrowing issues
         let debug_level = self.debug;
 
-        // Use a local variable for peeking to avoid mutable borrow
         if let Some(token) = self.tokens.get(self.current) {
             if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
                 self.current += 1;
@@ -123,8 +121,26 @@ impl Parser {
         false
     }
 
+    pub fn expect_token(
+        &mut self, 
+        expected: TokenKind, 
+        position: SyntaxPosition, 
+        syntax_type: SyntaxType
+    ) -> Result<Token, ParseError> {
+        if let Some(token) = self.advance() {
+            if token.kind == expected {
+                Ok(token)
+            } else {
+                Err(ParseError::ExpectedToken(expected, position, syntax_type))
+            }
+        } else {
+            Err(ParseError::UnexpectedEOF)
+        }
+    }
+
     pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
         let mut statements = Vec::new();
+
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::EOF {
                 break;
@@ -132,34 +148,41 @@ impl Parser {
 
             statements.push(self.parse_statement()?);
         }
+
         Ok(statements)
     }
 
     pub fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         if let Some(token) = self.peek().cloned() {
-            match token.kind.clone() {
+            let Token { kind, span } = token.clone();
+
+            match kind {
                 TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
                 TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
                 TokenKind::Identifier(name) => {
                     self.advance();
-                    let mut expr = Expr::Identifier(name.clone());
+                    let kind = ExprKind::Identifier(name.clone());
+                    let mut expr = Expr { kind, span };
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
+                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct(expr)?,
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
-                            TokenKind::Punctuation(PunctuationKind::LeftParen) => expr = self.parse_call(name.clone())?,
+                            TokenKind::Punctuation(PunctuationKind::LeftParen) => { 
+                                expr = self.parse_call(expr)?; 
+                                return Ok(expr); 
+                            },
                             TokenKind::Operator(OperatorKind::Dot) => {
-                                self.advance();
                                 let field = self.parse_expression()?;
-                                expr = Expr::FieldAccess(Box::new(expr), Box::new(field));
-                            }
-                            TokenKind::Operator(OperatorKind::DoubleColon) => {
+                                
                                 self.advance();
-                                let field = self.parse_expression()?;
-                                expr = Expr::FieldAccess(Box::new(expr), Box::new(field));
+
+                                let span = Span { start: expr.span.start, end: field.span.end };
+
+                                let kind = ExprKind::FieldAccess(expr.into(), field.into());
+                                expr = Expr { kind, span };
                             }
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct_init(expr)?,
                             _ => break,
                         }
                     }
@@ -170,7 +193,54 @@ impl Parser {
                 | TokenKind::Char(_) 
                 | TokenKind::Boolean(_) 
                 | TokenKind::Float(_) 
-                | TokenKind::Integer(_) => { self.advance(); Ok(Expr::Literal(token.clone())) }
+                | TokenKind::Integer(_) => { 
+                    self.advance();
+
+                    let kind = ExprKind::Literal(token.clone());
+                    let span = token.span;
+
+                    let expr = Expr { kind, span };
+
+                    Ok(expr) 
+                }
+
+                TokenKind::EOF => Err(ParseError::UnexpectedEOF),
+                token => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),
+            }
+        } else {
+            Err(ParseError::UnexpectedEOF)
+        }
+    }
+
+    pub fn parse_single(&mut self) -> Result<Expr, ParseError> {
+        if let Some(token) = self.peek().cloned() {
+            let Token { kind, span } = token.clone();
+
+            match kind {
+                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
+                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
+                TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
+                TokenKind::Identifier(name) => {
+                    self.advance();
+                    let kind = ExprKind::Identifier(name.clone());
+                    let mut expr = Expr { kind, span };
+
+                    Ok(expr)
+                }
+                TokenKind::Str(_) 
+                | TokenKind::Char(_) 
+                | TokenKind::Boolean(_) 
+                | TokenKind::Float(_) 
+                | TokenKind::Integer(_) => { 
+                    self.advance();
+
+                    let kind = ExprKind::Literal(token.clone());
+                    let span = token.span;
+
+                    let expr = Expr { kind, span };
+
+                    Ok(expr) 
+                }
 
                 TokenKind::EOF => Err(ParseError::UnexpectedEOF),
                 token => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),

@@ -2,7 +2,7 @@ use crate::lexer::error::{LexError, IntParseError, CharParseError};
 use crate::lexer::Token;
 use crate::lexer::{TokenKind, OperatorKind, PunctuationKind};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Span {
     pub start: (usize, usize),  // (line, column)
     pub end: (usize, usize),    // (line, column)
@@ -88,8 +88,9 @@ impl Lexer {
                                 end: (self.line, self.column + num_part.len())
                             };
                             tokens.push(Token {
-                                kind: Self::lex_number(num_part, self.line, self.column)?,
-                                span: num_span                            });
+                                kind: Self::lex_number(num_part)?,
+                                span: num_span                     
+                            });
                         }
 
                         let op_span = Span {
@@ -110,7 +111,7 @@ impl Lexer {
                                     end: (self.line, self.column + parts[0].len())
                                 };
                                 tokens.push(Token {
-                                    kind: Self::lex_number(parts[0], self.line, self.column)?,
+                                    kind: Self::lex_number(parts[0])?,
                                     span: first_span
                                 });
                             }
@@ -130,7 +131,7 @@ impl Lexer {
                                     end
                                 };
                                 tokens.push(Token {
-                                    kind: Self::lex_number(parts[1], self.line, self.column + parts[0].len() + 2)?,
+                                    kind: Self::lex_number(parts[1])?,
                                     span: second_span
                                 });
                             }
@@ -139,7 +140,7 @@ impl Lexer {
                         }
                     } else {
                         tokens.push(Token {
-                            kind: Self::lex_number(&number, self.line, self.column)?,
+                            kind: Self::lex_number(&number)?,
                             span
                         });
                     }
@@ -449,7 +450,11 @@ impl Lexer {
                                         closed = true;
                                         comment.pop();
                                         break;
+                                    } else if next_ch == '\n' {
+                                        self.column = 0;
+                                        self.line += 1;
                                     }
+                                    
 
                                     self.column += 1;
                                     comment.push(next_ch);
@@ -575,7 +580,7 @@ impl Lexer {
         Ok(tokens)
     }
 
-    fn lex_number(number: &str, line: usize, column: usize) -> Result<TokenKind, LexError> {
+    fn lex_number(number: &str) -> Result<TokenKind, LexError> {
         if number.len() > 2 {
             match &number[0..2] {
                 "0x" | "0X" => {

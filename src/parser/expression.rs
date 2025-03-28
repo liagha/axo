@@ -1,14 +1,19 @@
 use crate::parser::{Parser, Statement};
-use crate::parser::statement::EnumVariant;
-use crate::lexer::{OperatorKind, PunctuationKind, TokenKind, Token};
+use crate::lexer::{OperatorKind, PunctuationKind, TokenKind, Token, Span};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 
 #[derive(Clone)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+#[derive(Clone)]
+pub enum ExprKind {
     Literal(Token),
     Identifier(String),
-    Binary(Box<Expr>, OperatorKind, Box<Expr>),
-    Unary(OperatorKind, Box<Expr>),
+    Binary(Box<Expr>, Token, Box<Expr>),
+    Unary(Token, Box<Expr>),
     Typed(Box<Expr>, Box<Expr>),
     Array(Vec<Expr>),
     Index(Box<Expr>, Box<Expr>),
@@ -20,7 +25,7 @@ pub enum Expr {
     Assignment(Box<Expr>, Box<Expr>),
     Definition(Box<Expr>, Option<Box<Expr>>),
     StructDef(Box<Expr>, Vec<Expr>),
-    Enum(Box<Expr>, Vec<(Expr, Option<EnumVariant>)>),
+    Enum(Box<Expr>, Vec<Expr>),
     If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     While(Box<Expr>, Box<Expr>),
     Block(Vec<Expr>),
@@ -38,220 +43,295 @@ pub trait Expression {
     fn parse_expression(&mut self) -> Result<Expr, ParseError>;
     fn parse_array(&mut self) -> Result<Expr, ParseError>;
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;
-    fn parse_call(&mut self, name: String) -> Result<Expr, ParseError>;
+    fn parse_call(&mut self, name: Expr) -> Result<Expr, ParseError>;
     fn parse_closure(&mut self) -> Result<Expr, ParseError>;
     fn parse_tuple(&mut self) -> Result<Expr, ParseError>;
-    fn parse_struct_init(&mut self, struct_name: Expr) -> Result<Expr, ParseError>;
+    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError>;
 }
 
 impl Expression for Parser {
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
-        if let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
+        if let Some(Token { kind: TokenKind::Operator(op), span: Span { start, .. } }) = self.peek().cloned() {
             if op.is_unary() {
-                let op = op.clone();
-                self.advance();
-                let expr = self.parse_unary()?;
-                return Ok(Expr::Unary(op, Box::new(expr)));
+                let op = self.advance().unwrap();
+
+                let unary = self.parse_unary()?;
+                let end = unary.span.end;
+
+                let span = Span { start, end };
+
+                let kind = ExprKind::Unary(op, unary.into());
+
+                let expr = Expr { kind, span };
+
+                return Ok(expr);
             }
         }
 
         self.parse_primary()
     }
     fn parse_factor(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.parse_unary()?;
-        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
+        let mut left = self.parse_unary()?;
+
+        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek().cloned() {
             if op.is_factor() {
-                let op = op.clone();
-                self.advance();
+                let op = self.advance().unwrap();
+
                 let right = self.parse_unary()?;
-                expr = Expr::Binary(Box::new(expr), op, Box::new(right));
-            } else if op == &OperatorKind::Colon {
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = Span { start, end };
+
+                let kind = ExprKind::Binary(left.into(), op, right.into());  
+
+                left = Expr { kind, span };
+            } else if op == OperatorKind::Colon {
                 self.advance();
+
                 let right = self.parse_unary()?;
-                expr = Expr::Typed(Box::new(expr), Box::new(right));
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = Span { start, end };
+
+                let kind = ExprKind::Typed(left.into(), right.into());  
+
+                left = Expr { kind, span };
             } else {
                 break;
             }
         }
-        Ok(expr)
+
+        Ok(left)
     }
 
     fn parse_term(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.parse_factor()?;
-        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
+        let mut left = self.parse_factor()?;
+
+        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek().cloned() {
             if op.is_term() {
-                let op = op.clone();
-                self.advance();
+                let op = self.advance().unwrap();
+
                 let right = self.parse_factor()?;
-                expr = Expr::Binary(Box::new(expr), op, Box::new(right));
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = Span { start, end };
+
+                let kind = ExprKind::Binary(left.into(), op, right.into());  
+
+                left = Expr { kind, span };
             } else {
                 break;
             }
         }
-        Ok(expr)
+
+        Ok(left)
     }
+
     fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.parse_term()?;
+        let mut left = self.parse_term()?;
 
-        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek() {
+        while let Some(Token { kind: TokenKind::Operator(op), ..}) = self.peek().cloned() {
             if op.is_expression() {
-                let op = op.clone();
-                self.advance();
+                let op = self.advance().unwrap();
+
                 let right = self.parse_term()?;
-                expr = Expr::Binary(Box::new(expr), op, Box::new(right));
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = Span { start, end };
+
+                let kind = ExprKind::Binary(left.into(), op, right.into());  
+
+                left = Expr { kind, span };
             } else {
                 break;
             }
         }
-        Ok(expr)
-    }
-    fn parse_array(&mut self) -> Result<Expr, ParseError> {
-        self.advance();
-        let mut elements = Vec::new();
 
-        if self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBracket)) {
-            return Ok(Expr::Array(elements));
-        }
-
-        elements.push(self.parse_expression()?);
-
-        while self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-            elements.push(self.parse_expression()?);
-        }
-
-        if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBracket)) {
-            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBracket), SyntaxPosition::After, SyntaxType::ArrayElements);
-
-            return Err(err);
-        }
-
-        Ok(Expr::Array(elements))
+        Ok(left)
     }
 
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError> {
         self.advance();
+
+        let Expr { span: Span { start, .. }, .. } = left;
+
         let index = self.parse_expression()?;
 
-        if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightBracket)) {
+        if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::RightBracket), span: Span { end, ..} }) = self.advance() {
+            let kind = ExprKind::Index(left.into(), index.into());
+            let span = Span { start, end };
+            let expr = Expr { kind, span };
+
+            Ok(expr)
+        } else {
             let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBracket), SyntaxPosition::After, SyntaxType::ArrayElements);
 
-            return Err(err);
+            Err(err)
         }
-
-        Ok(Expr::Index(Box::new(left), Box::new(index)))
     }
 
+    fn parse_array(&mut self) -> Result<Expr, ParseError> {
+        let Token { span: Span { start, .. }, .. } = self.advance().unwrap();
 
-    fn parse_call(&mut self, name: String) -> Result<Expr, ParseError> {
+        let mut elements = Vec::new();
+        
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBracket), span: Span { end, ..} } => {
+                    self.advance();
+
+                    return Ok(Expr {
+                        kind: ExprKind::Array(elements),
+                        span: Span { 
+                            start, 
+                            end 
+                        }
+                    });
+                }
+                Token { kind: TokenKind::Operator(OperatorKind::Comma), .. } => {
+                    self.advance();
+                }
+                _ => {
+                    let expr = self.parse_expression()?;
+                    elements.push(expr.into());
+                }
+            }
+        }
+
+
+        let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightBrace), SyntaxPosition::After, SyntaxType::ArrayElements);
+
+        Err(err)
+
+    }
+
+    fn parse_call(&mut self, name: Expr) -> Result<Expr, ParseError> {
         self.advance();
-        let mut arguments = Vec::new();
 
-        if self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-            return Ok(Expr::Call(Expr::Identifier(name).into(), arguments));
+        let Expr { span: Span { start, .. }, .. } = name;
+
+        let mut parameters = Vec::new();
+        
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightParen), span: Span { end, ..} } => {
+                    self.advance();
+
+                    return Ok(Expr {
+                        kind: ExprKind::Call(name.into(), parameters),
+                        span: Span { 
+                            start, 
+                            end 
+                        }
+                    });
+                }
+                Token { kind: TokenKind::Operator(OperatorKind::Comma), .. } => {
+                    self.advance();
+                }
+                _ => {
+                    let expr = self.parse_expression()?;
+                    parameters.push(expr.into());
+                }
+            }
         }
 
-        arguments.push(self.parse_expression()?);
+        let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::FunctionParameters);
 
-        while self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-            arguments.push(self.parse_expression()?);
-        }
-
-        if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-            let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::FunctionCall);
-
-            return Err(err);
-        }
-
-        Ok(Expr::Call(Expr::Identifier(name).into(), arguments))
+        Err(err)
     }
 
     fn parse_closure(&mut self) -> Result<Expr, ParseError> {
-        self.advance();
+        let Token { span: Span { start, .. }, .. } = self.advance().unwrap();
+
         let mut parameters = Vec::new();
+        
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Operator(OperatorKind::Pipe), span: Span { end, ..} } => {
+                    let body = self.parse_statement()?;
 
-        if !self.match_token(&TokenKind::Operator(OperatorKind::Pipe)) {
-            if let Some(Token { kind: TokenKind::Identifier(name), ..}) = self.advance() {
-                parameters.push(Expr::Identifier(name));
-
-                while self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-                    if let Some(Token { kind: TokenKind::Identifier(name), .. }) = self.advance() {
-                        parameters.push(Expr::Identifier(name));
-                    } else {
-                        let err = ParseError::ExpectedSyntax(SyntaxType::LambdaParameter);
-
-                        return Err(err);
-                    }
+                    return Ok(Expr {
+                        kind: ExprKind::Closure(parameters, body.into()),
+                        span: Span { 
+                            start, 
+                            end 
+                        }
+                    });
                 }
-
-                if !self.match_token(&TokenKind::Operator(OperatorKind::Pipe)) {
-                    let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Pipe), SyntaxPosition::After, SyntaxType::LambdaParameters);
-
-                    return Err(err);
+                Token { kind: TokenKind::Operator(OperatorKind::Comma), .. } => {
+                    self.advance();
                 }
-            } else {
-                let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Pipe), SyntaxPosition::After, SyntaxType::LambdaParameters);
-
-                return Err(err);
+                _ => {
+                    let expr = self.parse_expression()?;
+                    parameters.push(expr.into());
+                }
             }
         }
 
-        let body = self.parse_expression()?;
+        let err = ParseError::ExpectedToken(TokenKind::Operator(OperatorKind::Pipe), SyntaxPosition::After, SyntaxType::ClosureParameters);
 
-        Ok(Expr::Closure(parameters, Box::new(body)))
+        Err(err)
     }
 
     fn parse_tuple(&mut self) -> Result<Expr, ParseError> {
-        self.advance();
-        let mut elements = Vec::new();
+        let Token { span: Span { start, .. }, .. } = self.advance().unwrap();
 
-        if self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-            return Ok(Expr::Tuple(elements));
-        }
+        let mut parameters = Vec::new();
+        
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightParen), span: Span { end, ..} } => {
+                    self.advance();
 
-        elements.push(self.parse_expression()?);
-
-        if self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-            if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                elements.push(self.parse_expression()?);
-
-                while self.match_token(&TokenKind::Operator(OperatorKind::Comma)) {
-                    if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::RightParen), .. }) = self.peek() {
-                        break;
+                    if parameters.len() != 1 { 
+                        return Ok(Expr {
+                            kind: ExprKind::Tuple(parameters),
+                            span: Span { 
+                                start, 
+                                end 
+                            }
+                        });
+                    } else {
+                        return Ok(parameters.pop().unwrap())
                     }
-                    elements.push(self.parse_expression()?);
                 }
-
-                if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                    let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::TupleElements);
-
-                    return Err(err);
+                Token { kind: TokenKind::Operator(OperatorKind::Comma), .. } => {
+                    self.advance();
+                }
+                _ => {
+                    let expr = self.parse_expression()?;
+                    parameters.push(expr.into());
                 }
             }
-
-            Ok(Expr::Tuple(elements))
-        } else {
-            if !self.match_token(&TokenKind::Punctuation(PunctuationKind::RightParen)) {
-                let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::Expression);
-
-                return Err(err);
-            }
-
-            Ok(elements.pop().unwrap())
         }
+
+        let err = ParseError::ExpectedToken(TokenKind::Punctuation(PunctuationKind::RightParen), SyntaxPosition::After, SyntaxType::FunctionParameters);
+
+        Err(err)
     }
 
-    fn parse_struct_init(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
+    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
         self.advance();
+
+        let Expr { span: Span { start, .. }, .. } = struct_name;
 
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::RightBrace) |
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
-                    self.advance();
-                    return Ok(Expr::StructInit(struct_name.into(), statements))
-                }
+                    TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                        let Token { span: Span { end, .. }, .. } = self.advance().unwrap();
+
+                        let kind = ExprKind::StructInit(struct_name.into(), statements);
+                        let expr = Expr { kind, span: Span { start, end} };
+
+                        return Ok(expr)
+                    }
                 TokenKind::Operator(OperatorKind::Comma) => {
                     self.advance();
                 }

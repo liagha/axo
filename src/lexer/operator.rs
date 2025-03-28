@@ -1,4 +1,4 @@
-use crate::lexer::TokenKind;
+use crate::lexer::{Token, TokenKind, Span};
 
 /// Enum representing various operator kinds in the language
 #[derive(Clone, Debug, PartialEq)]
@@ -268,6 +268,32 @@ impl OperatorKind {
             OperatorKind::MinusEqual => OperatorKind::Minus,
             _ => unreachable!(),
         }
+    }
+
+    pub fn decompound_token(token: &Token) -> Token {
+        let Span { start: (sl, sc), end: (el, ec) } = token.span;
+
+        let (operator, span) = if let TokenKind::Operator(op) = &token.kind { 
+            match op {
+                OperatorKind::LogicalAndEqual => (OperatorKind::LogicalAnd, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::LogicalOrEqual => (OperatorKind::LogicalOr, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::QuestionMarkEqual => (OperatorKind::QuestionMark, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::DotDotEqual => (OperatorKind::DotDot, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::AmpersandEqual => (OperatorKind::Ampersand, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::PipeEqual => (OperatorKind::Pipe, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::StarEqual => (OperatorKind::Star, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::SlashEqual => (OperatorKind::Slash, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::PercentEqual => (OperatorKind::Percent, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::CaretEqual => (OperatorKind::Caret, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::PlusEqual => (OperatorKind::Plus, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::MinusEqual => (OperatorKind::Minus, Span { start: (sl, sc), end: (el, ec - 1) }),
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
+        };
+
+        Token { kind: TokenKind::Operator(operator), span }
     }
 }
 

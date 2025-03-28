@@ -1,11 +1,12 @@
 #![allow(dead_code)]
-use crate::lexer::TokenKind;
+use crate::lexer::{TokenKind, Token};
 use crate::parser::{Expr};
 
 pub enum SyntaxPosition {
     After,
     Before,
     Each,
+    As,
 }
 
 pub enum SyntaxType {
@@ -17,9 +18,10 @@ pub enum SyntaxType {
     FunctionName,
     FunctionParameter,
     FunctionParameters,
-    Lambda,
-    LambdaParameter,
-    LambdaParameters,
+    FunctionDeclaration,
+    Closure,
+    ClosureParameter,
+    ClosureParameters,
     Tuple,
     TupleElement,
     TupleElements,
@@ -52,6 +54,8 @@ pub enum SyntaxType {
 
 pub enum ParseError {
     ExpectedToken(TokenKind, SyntaxPosition, SyntaxType),
+    UnexpectedToken(Token, SyntaxPosition, SyntaxType),
+    UnexpectedExpr(Expr, SyntaxPosition, SyntaxType),
     ExpectedSyntax(SyntaxType),
     InvalidSyntax(String),
     UnexpectedEOF,
@@ -62,6 +66,12 @@ impl core::fmt::Display for ParseError {
         match self {
             ParseError::ExpectedToken(token, position, syntax) => {
                 write!(f, "Expected {} {} {}", token, position, syntax)
+            }
+            ParseError::UnexpectedToken(token, position, syntax) => {
+                write!(f, "Unexpected {:?} {} {}", token, position, syntax)
+            }
+            ParseError::UnexpectedExpr(expr, position, syntax) => {
+                write!(f, "Unexpected {:?} {} {}", expr, position, syntax)
             }
             ParseError::ExpectedSyntax(syntax) => {
                 write!(f, "Expected {}", syntax)
@@ -82,6 +92,7 @@ impl core::fmt::Display for SyntaxPosition {
             SyntaxPosition::After => write!(f, "after"),
             SyntaxPosition::Before => write!(f, "before"),
             SyntaxPosition::Each => write!(f, "each"),
+            SyntaxPosition::As => write!(f, "as"),
         }
     }
 }
@@ -96,9 +107,10 @@ impl core::fmt::Display for SyntaxType {
             SyntaxType::FunctionName => write!(f, "function name"),
             SyntaxType::FunctionParameter => write!(f, "function parameter"),
             SyntaxType::FunctionParameters => write!(f, "function parameters"),
-            SyntaxType::Lambda => write!(f, "lambda"),
-            SyntaxType::LambdaParameter => write!(f, "function parameter"),
-            SyntaxType::LambdaParameters => write!(f, "function parameters"),
+            SyntaxType::FunctionDeclaration => write!(f, "function declaration"),
+            SyntaxType::Closure => write!(f, "closure"),
+            SyntaxType::ClosureParameter => write!(f, "closure parameter"),
+            SyntaxType::ClosureParameters => write!(f, "closure parameters"),
             SyntaxType::Tuple => write!(f, "tuple"),
             SyntaxType::TupleElement => write!(f, "tuple element"),
             SyntaxType::TupleElements => write!(f, "tuple elements"),
