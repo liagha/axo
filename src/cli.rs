@@ -7,7 +7,14 @@ use crate::parser::{Expr, ExprKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
+        match self.kind {
+            ExprKind::Literal(_) => {
+                write!(f, "{:?}", self.kind)
+            }
+            _ => {
+                write!(f, "{:?} => {}", self.kind, self.span)
+            }
+        }
     }
 }
 
@@ -120,17 +127,25 @@ impl fmt::Debug for TokenKind {
 
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.kind == TokenKind::EOF {
+            write!(f, "[{:?}]", self.kind)
+        } else {
+            write!(f, "[{:?} | {}]", self.kind, self.span )
+        }
+    }
+}
+
+impl fmt::Display for Span {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Span {
             start: (start_line, start_column),
             end: (end_line, end_column)
-        } = self.span;
+        } = self;
 
-        if self.kind == TokenKind::EOF {
-            write!(f, "[{:?}]", self.kind)
-        } else if start_line == end_line && start_column == end_column {
-            write!(f, "[{:?} | {}:{}]", self.kind, start_line, start_column )
+        if start_line == end_line && start_column == end_column {
+            write!(f, "{}:{}", start_line, start_column )
         } else {
-            write!(f, "[{:?} | {}:{} : {}:{}]", self.kind, start_line, start_column, end_line, end_column )
+            write!(f, "{}:{} : {}:{}", start_line, start_column, end_line, end_column )
         }
     }
 }

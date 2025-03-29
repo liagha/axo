@@ -1,9 +1,9 @@
 #![allow(dead_code)]
-use crate::lexer::{OperatorKind, PunctuationKind, Token, TokenKind, Span};
-use crate::parser::{Expr, ExprKind};
+use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::expression::Expression;
 use crate::parser::statement::Statement;
+use crate::parser::{Expr, ExprKind};
 
 pub struct Parser {
     pub output: Vec<Expr>,
@@ -16,7 +16,14 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { output: Vec::new(), tokens, current: 0, line: 1, column: 1, debug: 0 }
+        Parser {
+            output: Vec::new(),
+            tokens,
+            current: 0,
+            line: 1,
+            column: 1,
+            debug: 0,
+        }
     }
 
     pub fn advance(&mut self) -> Option<Token> {
@@ -29,7 +36,10 @@ impl Parser {
                     self.line += 1;
                     self.column = 0;
                     if self.debug >= 2 {
-                        println!("DEBUG (L2): Skipping newline token. Line now: {}", self.line);
+                        println!(
+                            "DEBUG (L2): Skipping newline token. Line now: {}",
+                            self.line
+                        );
                     }
                     continue;
                 }
@@ -43,7 +53,10 @@ impl Parser {
                 _ => {
                     self.column += 1;
                     if self.debug >= 3 {
-                        println!("DEBUG (L3): Advancing token: {:?} at line {}, column {}", token, self.line, self.column);
+                        println!(
+                            "DEBUG (L3): Advancing token: {:?} at line {}, column {}",
+                            token, self.line, self.column
+                        );
                     }
                     return Some(token);
                 }
@@ -80,7 +93,10 @@ impl Parser {
                 }
                 _ => {
                     if self.debug >= 3 {
-                        println!("DEBUG (L3): Peeking token: {:?} at line {}, column {}", token, line, column);
+                        println!(
+                            "DEBUG (L3): Peeking token: {:?} at line {}, column {}",
+                            token, line, column
+                        );
                     }
                     return Some(token);
                 }
@@ -101,7 +117,10 @@ impl Parser {
                 self.line += 1;
                 self.column = 0;
                 if debug_level >= 2 {
-                    println!("DEBUG (L2): Skipping newline token. Line now: {}", self.line);
+                    println!(
+                        "DEBUG (L2): Skipping newline token. Line now: {}",
+                        self.line
+                    );
                 }
                 return false;
             }
@@ -115,28 +134,14 @@ impl Parser {
             }
 
             if debug_level >= 1 {
-                println!("DEBUG (L1): Token mismatch. Expected: {:?}, Found: {:?}", expected, token);
+                println!(
+                    "DEBUG (L1): Token mismatch. Expected: {:?}, Found: {:?}",
+                    expected, token
+                );
             }
         }
 
         false
-    }
-
-    pub fn expect_token(
-        &mut self, 
-        expected: TokenKind, 
-        position: SyntaxPosition, 
-        syntax_type: SyntaxType
-    ) -> Result<Token, ParseError> {
-        if let Some(token) = self.advance() {
-            if token.kind == expected {
-                Ok(token)
-            } else {
-                Err(ParseError::ExpectedToken(expected, position, syntax_type))
-            }
-        } else {
-            Err(ParseError::UnexpectedEOF)
-        }
     }
 
     pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
@@ -171,21 +176,15 @@ impl Parser {
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct(expr)?,
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
-                            TokenKind::Punctuation(PunctuationKind::LeftParen) => { 
-                                expr = self.parse_call(expr)?; 
-                                return Ok(expr); 
-                            },
-                            TokenKind::Operator(OperatorKind::Dot) => {
-                                let field = self.parse_expression()?;
-                                
-                                self.advance();
-
-                                let span = Span { start: expr.span.start, end: field.span.end };
-
-                                let kind = ExprKind::FieldAccess(expr.into(), field.into());
-                                expr = Expr { kind, span };
+                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
+                                expr = self.parse_struct(expr)?
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
+                                expr = self.parse_index(expr)?
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
+                                expr = self.parse_call(expr)?;
+                                return Ok(expr);
                             }
                             _ => break,
                         }
@@ -193,61 +192,26 @@ impl Parser {
 
                     Ok(expr)
                 }
-                TokenKind::Str(_) 
-                | TokenKind::Char(_) 
-                | TokenKind::Boolean(_) 
-                | TokenKind::Float(_) 
-                | TokenKind::Integer(_) => { 
+                TokenKind::Str(_)
+                | TokenKind::Char(_)
+                | TokenKind::Boolean(_)
+                | TokenKind::Float(_)
+                | TokenKind::Integer(_) => {
                     self.advance();
 
                     let kind = ExprKind::Literal(token.clone());
                     let span = token.span;
 
                     let expr = Expr { kind, span };
-
-                    Ok(expr) 
-                }
-
-                TokenKind::EOF => Err(ParseError::UnexpectedEOF),
-                token => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),
-            }
-        } else {
-            Err(ParseError::UnexpectedEOF)
-        }
-    }
-
-    pub fn parse_single(&mut self) -> Result<Expr, ParseError> {
-        if let Some(token) = self.peek().cloned() {
-            let Token { kind, span } = token.clone();
-
-            match kind {
-                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
-                TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
-                TokenKind::Identifier(name) => {
-                    self.advance();
-                    let kind = ExprKind::Identifier(name.clone());
-                    let mut expr = Expr { kind, span };
 
                     Ok(expr)
                 }
-                TokenKind::Str(_) 
-                | TokenKind::Char(_) 
-                | TokenKind::Boolean(_) 
-                | TokenKind::Float(_) 
-                | TokenKind::Integer(_) => { 
-                    self.advance();
-
-                    let kind = ExprKind::Literal(token.clone());
-                    let span = token.span;
-
-                    let expr = Expr { kind, span };
-
-                    Ok(expr) 
-                }
 
                 TokenKind::EOF => Err(ParseError::UnexpectedEOF),
-                token => Err(ParseError::InvalidSyntax(format!("Unexpected token: {:?}", token))),
+                token => Err(ParseError::InvalidSyntax(format!(
+                    "Unexpected token: {:?}",
+                    token
+                ))),
             }
         } else {
             Err(ParseError::UnexpectedEOF)

@@ -27,14 +27,16 @@ fn main() {
 
                 xprintln!();
 
-                let mut parser = Parser::new(tokens);
+                let mut parser = Parser::new(tokens.clone());
                 match parser.parse_program() {
                     Ok(stmts) => {
                         println!("Parsed AST: {}", format!("{:#?}", stmts).term_colorize(Color::Green));
                     },
-                    Err(err) => { 
-                        println!("{:#?}", parser.output);
-                        xprintln!("Parse error ({}:{}): {}" => Color::Red, parser.line, parser.column, err => Color::Orange);
+                    Err(err) => {
+                        let end_span = tokens[parser.current].span;
+
+                        //println!("{:#?}", parser.output);
+                        xprintln!("Parse error ({}): {}" => Color::Red, end_span, err => Color::Orange);
                     }
                 }
             }

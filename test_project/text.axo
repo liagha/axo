@@ -41,11 +41,10 @@ let numbers = [1, 2, 3, 4, 5];
 let sum = 0;
 
 for i + 1 {
-    sum += numbers[i];
+    let sum = numbers[i];
 }
 
-|x, y| x + y + 3;
-test[2] = 43;
+let test[2] = 43;
 x *= 4;
 
 if x > 10 {
@@ -62,22 +61,16 @@ while x > 2 {
     test = 4;
 }
 
+let test = Test { x = 3, y = 5, };
+
 struct Test {
     name: String,
-    age: i32
+    age: i32,
 }
 
 let n = p.name;
 
 let test = (2, 3);
-
-enum Message {
-    Quit,
-    Move { x: i32, y: i32 },
-    Write(String),
-    ChangeColor(i32, i32, i32),
-    Priority = 10
-}
 
 fn add(a, b) a + b;
 
@@ -125,7 +118,6 @@ for (i in 5) {
 }
 
 let test = Test { x = 3, y = 5, };
-let test = Test { x = 3, y = 5, };
 
 while x > 0 x = 5;
 
@@ -147,7 +139,7 @@ let x = if test > 2 { 5; } else { 6; }
 
 /* test block comment */
 
-/* 
+/*
 test
 block
 */
