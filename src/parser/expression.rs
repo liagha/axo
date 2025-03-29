@@ -162,6 +162,8 @@ impl Expression for Parser {
         let index = self.parse_expression()?;
 
         if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::RightBracket), span: Span { end, ..} }) = self.advance() {
+            self.advance();
+
             let kind = ExprKind::Index(left.into(), index.into());
             let span = Span { start, end };
             let expr = Expr { kind, span };
@@ -252,6 +254,8 @@ impl Expression for Parser {
         while let Some(token) = self.peek().cloned() {
             match token {
                 Token { kind: TokenKind::Operator(OperatorKind::Pipe), span: Span { end, ..} } => {
+                    self.advance();
+
                     let body = self.parse_statement()?;
 
                     return Ok(Expr {

@@ -167,6 +167,7 @@ impl Parser {
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
+                            TokenKind::Punctuation(PunctuationKind::Semicolon) => return Ok(expr),
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct(expr)?,
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
                             TokenKind::Punctuation(PunctuationKind::LeftParen) => { 
