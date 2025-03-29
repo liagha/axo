@@ -32,7 +32,10 @@ fn main() {
                     Ok(stmts) => {
                         println!("Parsed AST: {}", format!("{:#?}", stmts).term_colorize(Color::Green));
                     },
-                    Err(err) => xprintln!("Parse error ({}:{}): {}" => Color::Red, parser.line, parser.column, err => Color::Orange),
+                    Err(err) => { 
+                        println!("{:#?}", parser.output);
+                        xprintln!("Parse error ({}:{}): {}" => Color::Red, parser.line, parser.column, err => Color::Orange);
+                    }
                 }
             }
             Err(e) => xprintln!("Lexing error: {}" => Color::Red, e => Color::Orange),

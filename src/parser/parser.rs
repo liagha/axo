@@ -6,6 +6,7 @@ use crate::parser::expression::Expression;
 use crate::parser::statement::Statement;
 
 pub struct Parser {
+    pub output: Vec<Expr>,
     tokens: Vec<Token>,
     pub current: usize,
     pub line: usize,
@@ -15,7 +16,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0, line: 1, column: 1, debug: 0 }
+        Parser { output: Vec::new(), tokens, current: 0, line: 1, column: 1, debug: 0 }
     }
 
     pub fn advance(&mut self) -> Option<Token> {
@@ -146,7 +147,10 @@ impl Parser {
                 break;
             }
 
-            statements.push(self.parse_statement()?);
+            let stmt = self.parse_statement()?;
+
+            self.output.push(stmt.clone());
+            statements.push(stmt);
         }
 
         Ok(statements)
@@ -167,7 +171,6 @@ impl Parser {
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
-                            TokenKind::Punctuation(PunctuationKind::Semicolon) => return Ok(expr),
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => expr = self.parse_struct(expr)?,
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => expr = self.parse_index(expr)?,
                             TokenKind::Punctuation(PunctuationKind::LeftParen) => { 
