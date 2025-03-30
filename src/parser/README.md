@@ -1,49 +1,76 @@
 # River Flow: The Parsing System
 
 ## Overview
-The River Flow Concept represents the stages of a parsing system, where raw code evolves through structured transformations, optimizations, and execution. Each stage mirrors the natural flow of a river, from its source to the ocean.
+The **River Flow Parsing System** models the process of transforming raw code into an executable form using a natural waterway metaphor. Each stage represents a phase in parsing and compilation, moving from the source (raw code) to the ocean (final execution).
 
 ---
 
 ## Stages of the Parsing System
 
-### 🌊 Source Form (Raw Code)
+### 🌊 **Surface Form (Raw Code)**
 - Represents the initial, unprocessed code.
-- Similar to parsing, where raw input is taken in.
+- Similar to how a river starts from its source, this stage gathers input.
+- At this stage, the program is just a collection of characters with no structure.
 
 #### Components:
-- **Lexer** – Breaks input into tokens.
-- **Parser** – Constructs a syntax tree.
+- **Tokenizer** – Breaks raw input into meaningful symbols (tokens).
+- **Parser** – Organizes tokens into a structured syntax tree.
 
 ---
 
-### 🌊 Stream Form (Structured Flow)
-- The structured version of the code begins to take shape.
-- Type checking is performed to ensure correctness.
+### 🌊 **Stream Form (Structured Flow)**
+- Code gains structure and meaning.
+- Type checking ensures correctness, like a stream gaining direction.
 
 #### Components:
-- **AST Build** – Forms an Abstract Syntax Tree.
-- **Semantic Analysis** – Ensures logical consistency.
+- **Abstract Syntax Tree (AST)** – A tree structure representing the code’s logic.
+- **Type Resolution** – Ensures variables and functions are used correctly.
+- **Macro Expansion** – Expands macros and simplifies expressions.
 
 ---
 
-### 🌊 Current Form (Optimized & Directed Flow)
-- The Intermediate Representation (IR) is refined.
-- Various optimizations are applied.
+### 🌊 **Wave Form (Optimized & Directed Flow)**
+- Code is transformed into an intermediate format for better optimization.
+- Borrow checking and control flow analysis occur here.
 
 #### Components:
-- **IR Transform** – Converts AST into IR.
-- **Optimization Passes** – Improves performance.
+- **Intermediate Representation (IR)** – A simplified version of the code.
+- **Control Flow Graph (CFG)** – Structures the logical flow of the program.
+- **Borrow Checker** – Ensures safe memory usage.
+- **Early Optimizations** – Basic improvements to performance.
 
 ---
 
-### 🌊 Ocean Form (Final Executable Code)
-- The final version, ready for execution.
-- Code is compiled into machine code or executed in a virtual machine.
+### 🌊 **Deep Form (Low-Level Optimized Code)**
+- The program is nearly ready for execution.
+- Further optimizations make it efficient and hardware-friendly.
 
 #### Components:
-- **Machine Code** – Directly executable by hardware.
-- **Virtual Machine** – Interprets and runs bytecode.
+- **Register Allocation** – Assigns variables to processor registers.
+- **Aggressive Optimizations** – Improves execution speed.
+- **Instruction Selection** – Converts code into specific hardware instructions.
+
+---
+
+### 🌊 **Sand Form (Final Executable Code)**
+- The final version of the program, ready to be executed.
+- Code is compiled into machine instructions or interpreted by a virtual machine.
+
+#### Components:
+- **Machine Code** – Executable instructions for hardware.
+- **Virtual Machine Execution** – Runs the program in a controlled environment.
+
+---
+
+## Additional Elements
+
+### 🌊 **Tide Form (Metadata & Debugging Information)**
+- Stores information useful for debugging and profiling.
+- Helps track variables and execution steps.
+
+### 🌊 **Reef Form (Plugins & Macros)**
+- Provides support for extending functionality.
+- Handles custom macros and external plugins.
 
 ---
 
@@ -51,15 +78,15 @@ The River Flow Concept represents the stages of a parsing system, where raw code
 ```mermaid
 flowchart TD
 %% Main Stages
-    SFC["Surface (SFC) => Raw parsed syntax tree => (AST-level)"]
-    STR["Stream (STR) => High-level IR => Typed, scoped, macros expanded"]
-    WIR["Wave (WIR) => Mid-level IR => Control flow, borrow checking"]
-    DIR["Deep (DIR) => Low-level IR => Optimized, near-machine"]
-    ASM["Sand (ASM) => Final output => Assembly/machine code"]
+    SFC["Surface Form (SFC) → Raw syntax tree"]
+    STR["Stream Form (STR) → High-level IR, typed & scoped"]
+    WIR["Wave Form (WIR) → Mid-level IR, control flow"]
+    DIR["Deep Form (DIR) → Low-level IR, optimized"]
+    ASM["Sand Form (ASM) → Final machine code"]
 
 %% Tooling Extensions
-    TID["Tide (TID) => Metadata & debug info"]
-    RFI["Reef (RFI) => Plugins & macros"]
+    TID["Tide Form (TID) → Debug & metadata"]
+    RFI["Reef Form (RFI) → Plugins & macros"]
 
 %% Sub-levels (Expandable)
 subgraph SurfaceDetails[" "]
@@ -99,3 +126,5 @@ classDef tool fill:#b3e5fc,stroke:#0288d1,dashed
 class SFC,STR,WIR,DIR,ASM stage
 class TID,RFI tool
 ```
+
+---
