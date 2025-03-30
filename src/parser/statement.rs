@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::expression::{Expr, ExprKind};

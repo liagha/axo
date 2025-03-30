@@ -33,16 +33,6 @@ impl Declaration for Parser {
 
                 Ok(expr)
             } else {
-                if !self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon)) {
-                    let err = ParseError::ExpectedTokenNotFound(
-                        TokenKind::Punctuation(PunctuationKind::Semicolon),
-                        SyntaxPosition::After,
-                        SyntaxType::VariableDeclaration,
-                    );
-
-                    return Err(err);
-                }
-
                 let span = identifier.span;
                 let kind = ExprKind::Definition(identifier.into(), None);
                 let expr = Expr { kind, span };
@@ -59,6 +49,7 @@ impl Declaration for Parser {
             span: Span { start, .. },
             ..
         } = self.advance().unwrap();
+
         let function = self.parse_primary()?;
 
         match function {

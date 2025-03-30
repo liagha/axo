@@ -251,7 +251,7 @@ impl Primary for Parser {
                                 expr = self.parse_index(expr)?
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftParen) => {
-                                expr = self.parse_call(expr)?;
+                                expr = self.parse_invoke(expr)?;
                                 return Ok(expr);
                             }
                             _ => break,
@@ -302,10 +302,14 @@ impl Primary for Parser {
                 } => {
                     self.advance();
 
-                    return Ok(Expr {
-                        kind: ExprKind::Tuple(parameters),
-                        span: Span { start, end },
-                    });
+                    return if parameters.len() == 1 {
+                        Ok(parameters.pop().unwrap())
+                    } else {
+                        Ok(Expr {
+                            kind: ExprKind::Tuple(parameters),
+                            span: Span { start, end },
+                        })
+                    }
                 }
                 Token {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
@@ -315,7 +319,7 @@ impl Primary for Parser {
                 }
                 _ => {
                     let expr = self.parse_expression()?;
-                    parameters.push(expr.into());
+                    parameters.push(expr);
                 }
             }
         }

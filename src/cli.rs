@@ -7,14 +7,7 @@ use crate::parser::{Expr, ExprKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            ExprKind::Literal(_) => {
-                write!(f, "[{:?}]", self.kind)
-            }
-            _ => {
-                write!(f, "[{:?} | {}]", self.kind, self.span)
-            }
-        }
+        write!(f, "[{:?} | {}]", self.kind, self.span)
     }
 }
 

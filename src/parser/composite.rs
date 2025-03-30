@@ -4,7 +4,7 @@ use crate::parser::{Expr, ExprKind, Parser, Primary};
 
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;
-    fn parse_call(&mut self, name: Expr) -> Result<Expr, ParseError>;
+    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, ParseError>;
     fn parse_closure(&mut self) -> Result<Expr, ParseError>;
     fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError>;
 }
@@ -41,7 +41,7 @@ impl Composite for Parser {
         }
     }
 
-    fn parse_call(&mut self, name: Expr) -> Result<Expr, ParseError> {
+    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, ParseError> {
         let Expr {
             span: Span { start, .. },
             ..
@@ -49,26 +49,31 @@ impl Composite for Parser {
 
         let parameters = self.parse_tuple()?;
 
-        if let Expr {
-            kind: ExprKind::Tuple(parameters),
-            span: Span { end, .. },
-        } = parameters
-        {
-            let kind = ExprKind::Invoke(name.into(), parameters);
-            let expr = Expr {
-                kind,
-                span: Span { start, end },
-            };
+        match parameters {
+            Expr {
+                kind: ExprKind::Tuple(parameters),
+                span: Span { end, .. },
+            } => {
+                let kind = ExprKind::Invoke(name.into(), parameters);
+                let expr = Expr {
+                    kind,
+                    span: Span { start, end },
+                };
 
-            Ok(expr)
-        } else {
-            let err = ParseError::ExpectedTokenNotFound(
-                TokenKind::Punctuation(PunctuationKind::RightParen),
-                SyntaxPosition::After,
-                SyntaxType::FunctionParameters,
-            );
+                Ok(expr)
+            }
+            Expr {
+                span: Span { end, .. },
+                ..
+            } => {
+                let kind = ExprKind::Invoke(name.into(), vec![parameters]);
+                let expr = Expr {
+                    kind,
+                    span: Span { start, end },
+                };
 
-            Err(err)
+                Ok(expr)
+            }
         }
     }
 

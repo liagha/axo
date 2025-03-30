@@ -152,3 +152,7 @@ block
 */
 
 if x > 3 x = 4
+
+fn test x = 4
+
+(5 + 5) * 5
