@@ -51,15 +51,15 @@ The River Flow Concept represents the stages of a parsing system, where raw code
 ```mermaid
 flowchart TD
 %% Main Stages
-    SFC["Surface (SFC)\nRaw parsed syntax tree\n(AST-level)"]
-    STR["Stream (STR)\nHigh-level IR\nTyped, scoped, macros expanded"]
-    WIR["Wave (WIR)\nMid-level IR\nControl flow, borrow checking"]
-    DIR["Deep (DIR)\nLow-level IR\nOptimized, near-machine"]
-    ASM["Sand (ASM)\nFinal output\nAssembly/machine code"]
+    SFC["Surface (SFC) => Raw parsed syntax tree => (AST-level)"]
+    STR["Stream (STR) => High-level IR => Typed, scoped, macros expanded"]
+    WIR["Wave (WIR) => Mid-level IR => Control flow, borrow checking"]
+    DIR["Deep (DIR) => Low-level IR => Optimized, near-machine"]
+    ASM["Sand (ASM) => Final output => Assembly/machine code"]
 
 %% Tooling Extensions
-    TID["Tide (TID)\nMetadata & debug info"]
-    RFI["Reef (RFI)\nPlugins & macros"]
+    TID["Tide (TID) => Metadata & debug info"]
+    RFI["Reef (RFI) => Plugins & macros"]
 
 %% Sub-levels (Expandable)
 subgraph SurfaceDetails[" "]
