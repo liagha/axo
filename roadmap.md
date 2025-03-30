@@ -8,12 +8,12 @@ Axo is a programming language in development, following the **River Flow Parsing
 ## Current Focus (Q2-Q3 2025)
 ```mermaid
 gantt
-title Axo Development Timeline
-dateFormat  YYYY-MM-DD
-section Core Language
-Lexer                     :active, des1, 2025-03-01, 60d
-Stream Parser (Token to Structured Flow AST) : active, des2, 2025-03-20, 30d
-Semantic Analysis         :active, des3, 2025-03-31, 30d
+    title Axo Development Timeline
+    dateFormat  YYYY-MM-DD
+    section Core Language
+        Lexer                     :active, des1, 2025-03-01, 60d
+        Stream Parser (Token to Structured Flow AST) : active, des2, 2025-03-20, 30d
+        Semantic Analysis         :active, des3, 2025-03-31, 30d
 
 Sema
 Type System Specification :         des3, after des1, 30d
