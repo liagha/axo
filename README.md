@@ -1,4 +1,8 @@
-# Axo Programming Language <img src="misc/logo.png" alt="Axo Logo" width="150" style="vertical-align: middle;" />
+# Axo Programming Language
+
+<div style="display: flex; align-items: center; justify-content: center;">
+  <img src="misc/logo.png" alt="Axo Logo" width="150" />
+</div>
 
 ## Overview
 Axo is a programming language named after the **axolotl**, an incredible amphibian known for its **regenerative abilities**, **adaptability**, and **resilience**. Just like its namesake, Axo is designed to be **self-healing, flexible, and highly efficient**.
@@ -19,10 +23,5 @@ The axolotl has unique characteristics that align with Axo’s language design:
 - **Advanced type system** for safe and dynamic coding.
 - **Modular architecture** for scalability.
 - **Concurrency support** for multi-threaded applications.
-
-## Conclusion
-Axo is more than just a programming language—it’s a **resilient**, **adaptive**, and **powerful** tool for developers. Whether you're building low-level systems or high-level applications, Axo gives you the flexibility and reliability of an **axolotl navigating its environment**.
-
----
 
 *Stay tuned for more updates on Axo!* 🚀
