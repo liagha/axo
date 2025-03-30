@@ -1,8 +1,4 @@
-# Axo Programming Language
-
-![Axo Logo](misc/logo.png)
-
-*Axo: Inspired by the Axolotl*
+# Axo Programming Language <img src="misc/logo.png" alt="Axo Logo" width="150" style="vertical-align: middle;" />
 
 ## Overview
 Axo is a programming language named after the **axolotl**, an incredible amphibian known for its **regenerative abilities**, **adaptability**, and **resilience**. Just like its namesake, Axo is designed to be **self-healing, flexible, and highly efficient**.
