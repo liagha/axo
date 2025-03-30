@@ -5,7 +5,7 @@ Axo is a programming language project following the **River Flow Parsing System*
 
 ---
 
-## Current Focus (Q3 2024 - Q2 2025)
+## Current Focus (Q2 2025 - Q1 2026)
 
 ```mermaid
 gantt
@@ -13,16 +13,16 @@ gantt
     dateFormat  YYYY-MM-DD
 
     section Core Language
-        Lexer                     :active, des1, 2025-03-01, 60d
-        Stream Parser (Token to Structured Flow AST) : active, des2, 2025-03-20, 30d
-        Semantic Analysis         :active, des3, 2025-03-31, 30d
+        Lexer                     :active, des1, 2025-03-31, 60d
+        Stream Parser (Token to Structured Flow AST) : active, des2, 2025-05-30, 30d
+        Semantic Analysis         :active, des3, 2025-06-30, 30d
 
     section Type System & Memory
         Type System Specification :         des6, after des1, 30d
         Memory Model              :         des7, after des2, 45d
 
     section Tooling
-        Basic CLI Implementation  :         des4, 2024-08-01, 30d
+        Basic CLI Implementation  :         des4, 2025-04-01, 30d
         VS Code Extension         :         des5, after des4, 45d
 ```
 
@@ -31,7 +31,7 @@ gantt
 ## Core Language Development
 
 ### 🌊 **Surface Form (Raw Code) – Lexer**
-**Timeline:** March 1, 2025 - April 30, 2025  
+**Timeline:** March 31, 2025 - May 30, 2025  
 **Goal:** Implement a robust **Lexer** to convert raw source code into tokens.  
 **Tasks:**
 - Define language syntax and token categories.
@@ -39,7 +39,7 @@ gantt
 - Support error handling for malformed tokens.
 
 ### 🌊 **Stream Form (Structured Flow) – Parser**
-**Timeline:** March 20, 2025 - April 19, 2025  
+**Timeline:** May 30, 2025 - June 30, 2025  
 **Goal:** Develop a **Stream Parser** that builds a structured **AST (Abstract Syntax Tree)** from tokenized input.  
 **Tasks:**
 - Implement recursive descent parsing.
@@ -47,16 +47,16 @@ gantt
 - Lay groundwork for semantic analysis.
 
 ### 🌊 **Wave Form (Optimized & Directed Flow) – Semantic Analysis**
-**Timeline:** March 31, 2025 - April 30, 2025  
-**Goal:** Implement **semantic analysis** to ensure logical consistency.
+**Timeline:** June 30, 2025 - July 30, 2025  
+**Goal:** Implement **semantic analysis** to ensure logical consistency.  
 **Tasks:**
 - Develop a **type checker**.
 - Implement **scope resolution**.
 - Build **early optimization passes**.
 
 ### 🌊 **Deep Form – Type System & Memory Model**
-**Type System Specification:** April 30, 2025 - May 30, 2025  
-**Memory Model Implementation:** May 15, 2025 - June 30, 2025  
+**Type System Specification:** July 30, 2025 - August 30, 2025  
+**Memory Model Implementation:** August 15, 2025 - September 30, 2025  
 **Goal:** Design a strong, safe **type system** and efficient **memory model**.  
 **Tasks:**
 - Define primitive and composite types.
@@ -68,16 +68,16 @@ gantt
 ## Tooling & Ecosystem
 
 ### 🌊 **Basic CLI Implementation**
-**Timeline:** August 1, 2024 - August 31, 2024  
-**Goal:** Develop a **command-line interface (CLI)** for interacting with the compiler.
+**Timeline:** April 1, 2025 - May 1, 2025  
+**Goal:** Develop a **command-line interface (CLI)** for interacting with the compiler.  
 **Tasks:**
 - Implement `axo build`, `axo run`, and `axo check` commands.
 - Provide minimal error reporting.
 - Integrate with core parsing modules.
 
 ### 🌊 **VS Code Extension**
-**Timeline:** September 1, 2024 - October 15, 2024  
-**Goal:** Build a **VS Code extension** for syntax highlighting and basic IDE support.
+**Timeline:** May 1, 2025 - June 15, 2025  
+**Goal:** Build a **VS Code extension** for syntax highlighting and basic IDE support.  
 **Tasks:**
 - Implement syntax highlighting.
 - Add error reporting in the editor.
@@ -87,9 +87,9 @@ gantt
 
 ## Next Steps
 After completing the core parsing and semantic analysis stages, the focus will shift to:
-- 🌊 **Wave Form (Mid-level IR & Borrow Checking)** – Q3 2025
-- 🌊 **Deep Form (Final Optimizations & Code Generation)** – Q4 2025
-- 🌊 **Tooling Improvements (Debugger, LSP, More Editor Support)** – Q1 2026
+- 🌊 **Wave Form (Mid-level IR & Borrow Checking)** – Q4 2025
+- 🌊 **Deep Form (Final Optimizations & Code Generation)** – Q1 2026
+- 🌊 **Tooling Improvements (Debugger, LSP, More Editor Support)** – Q2 2026
 
 This roadmap keeps development structured and ensures Axo flows smoothly from raw code to a high-performance compiled language.
 
