@@ -48,28 +48,16 @@ The River Flow Concept represents the stages of a parsing system, where raw code
 ---
 
 ## Flow Diagram
-```markdown
-Source Form 🌊
-│
-├── Lexer
-│
-├── Parser
-│
-└── Stream Form 🌊 (Type Checking)
-    │
-    ├── AST Build
-    │
-    ├── Semantic Analysis
-    │
-    └── Current Form 🌊 (Optimization & IR)
-        │
-        ├── IR Transform
-        │
-        ├── Optimization Passes
-        │
-        └── Ocean Form 🌊 (Final Code Generation / Execution)
-            │
-            ├── Machine Code
-            ├── Virtual Machine
-```
+flowchart TD
+A[🌊 Source Form\nRaw Code] --> B[Lexer]
+B --> C[Parser]
+C --> D[🌊 Stream Form\nStructured Flow]
+D --> E[AST Build]
+E --> F[Semantic Analysis]
+F --> G[🌊 Current Form\nOptimized & Directed Flow]
+G --> H[IR Transform]
+H --> I[Optimization Passes]
+I --> J[🌊 Ocean Form\nFinal Executable Code]
+J --> K[Machine Code]
+J --> L[Virtual Machine]
 ---
