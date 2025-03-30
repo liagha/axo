@@ -5,23 +5,49 @@
 </div>
 
 ## Overview
-Axo is a programming language named after the **axolotl**, an incredible amphibian known for its **regenerative abilities**, **adaptability**, and **resilience**. Just like its namesake, Axo is designed to be **self-healing, flexible, and highly efficient**.
+Axo is an emerging programming language named after the **axolotl**, an incredible amphibian known for its **regenerative abilities**, **adaptability**, and **resilience**. Inspired by these traits, Axo is being designed as a **self-healing**, **flexible**, and **high-performance** language that learns from the best aspects of Rust, C, and Swift while introducing innovative features of its own.
+
+## Call for Contributors
+We're building a community of passionate developers to help bring Axo to life! If you're interested in:
+- Language design and compiler development
+- Runtime systems and memory management
+- Standard library development
+- Tooling and IDE integration
+- Documentation and community building
+
+We'd love your contribution! Axo is in its early stages, offering a unique opportunity to shape a language from the ground up.
+
+## Vision and Inspiration
+Axo draws inspiration from:
+- **Rust's** memory safety and concurrency model
+- **C's** performance and low-level control
+- **Swift's** clean syntax and modern features
+
+While incorporating these influences, Axo aims to introduce novel approaches to error handling, adaptability, and system resilience.
 
 ## Axolotl-Inspired Features
-The axolotl has unique characteristics that align with Axo’s language design:
+The axolotl's unique characteristics guide Axo's design principles:
 
-- **Regeneration** 🦎 → Axo has **self-healing error handling**, allowing for recovery from crashes.
-- **Adaptability** 🌊 → Axo supports **multiple paradigms**, including functional and procedural programming.
-- **Resilience** 🔥 → Axo is designed to handle high-performance tasks and **graceful degradation**.
-- **Neoteny (Retention of Youthful Traits)** 🍼 → Axo maintains **simplicity** while enabling **advanced features**.
-- **Underwater Survival** 💧 → Axo provides a **robust memory management system**, avoiding memory leaks.
+- **Regeneration** 🦎 → Self-healing error handling and runtime recovery mechanisms
+- **Adaptability** 🌊 → Multi-paradigm support (functional, procedural, OOP)
+- **Resilience** 🔥 → Graceful degradation and fault tolerance
+- **Neoteny** 🍼 → Simple syntax with powerful underlying capabilities
+- **Underwater Survival** 💧 → Robust memory management without garbage collection overhead
 
-## Key Features
-- **Self-healing mechanisms** to recover from runtime errors.
-- **Flexible syntax** supporting multiple programming paradigms.
-- **Efficient memory management** for optimized performance.
-- **Advanced type system** for safe and dynamic coding.
-- **Modular architecture** for scalability.
-- **Concurrency support** for multi-threaded applications.
+## Planned Key Features
+- **Self-correcting runtime** with intelligent error recovery
+- **Flexible type system** combining static and dynamic typing benefits
+- **Memory-safe** without sacrificing performance
+- **Modern toolchain** with built-in package management
+- **First-class concurrency** model inspired by Rust's ownership system
+- **Interoperability** with C, Rust, and Swift ecosystems
 
-*Stay tuned for more updates on Axo!* 🚀
+## Current Status
+Axo is in the design and early implementation phase. See our [Roadmap](roadmap.md) for detailed progress.
+
+## Get Involved
+We welcome developers of all experience levels to join this exciting project.
+
+*Join us in creating the next generation of resilient systems programming!* 🚀
+
+[Contribution Guidelines](CONTRIBUTING.md) | [Roadmap](roadmap.md) | [Discussion Forum](https://github.com/liagha/axo/discussions)
