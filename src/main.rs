@@ -51,23 +51,23 @@ fn format_tokens(input: &Vec<Token>) -> String {
     for (i, token) in input.iter().enumerate() {
         match token.clone().kind {
             TokenKind::Punctuation(PunctuationKind::Newline) => {
-                result.push_str(format!("↓{:?}↓", token).term_colorize(Color::Green).as_str());
+                result.push_str(format!("↓{:?} | {}↓", token, token.span).term_colorize(Color::Green).as_str());
                 result.push_str("\n");
             }
             TokenKind::Punctuation(_) => {
-                result.push_str(format!("{:?}", token).term_colorize(Color::Green).as_str());
+                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Green).as_str());
             }
             TokenKind::Operator(_) => {
-                result.push_str(format!("{:?}", token).term_colorize(Color::Orange).as_str());
+                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Orange).as_str());
             }
             TokenKind::Keyword(_) => {
-                result.push_str(format!("{:?}", token).term_colorize(Color::Blue).as_str());
+                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Blue).as_str());
             }
             TokenKind::EOF => {
-                result.push_str(format!("{:?}", token).term_colorize(Color::Red).as_str());
+                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Red).as_str());
             }
             _ => {
-                result.push_str(format!("{:?}", token).as_str());
+                result.push_str(format!("{:?} | {}", token, token.span).as_str());
             }
         }
 

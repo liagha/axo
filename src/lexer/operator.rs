@@ -18,7 +18,6 @@ pub enum OperatorKind {
     GreaterThan,             // > (greater than comparison)
     LessThan,                // < (less than comparison)
     Exclamation,             // ! (logical NOT)
-    Comma,                   // , (separator)
     Dot,                     // . (member access)
     DotDot,                  // .. (range or spread)
     LessThanOrEqual,         // <= (less than or equal comparison)
@@ -97,7 +96,6 @@ impl OperatorKind {
             ">" => OperatorKind::GreaterThan,
             "<" => OperatorKind::LessThan,
             "!" => OperatorKind::Exclamation,
-            "," => OperatorKind::Comma,
             "." => OperatorKind::Dot,
             ".." => OperatorKind::DotDot,
             "<=" => OperatorKind::LessThanOrEqual,
@@ -196,9 +194,9 @@ impl OperatorKind {
             char,
             '~' | '=' | ':' | '+' | '-' |
             '*' | '/' | '^' | '|' | '&' |
-            '%' | '>' | '<' | '!' | ',' |
-            '.' | '@' | '\'' | '?' | '#' |
-            '$' | '\\' | '`' | '_'
+            '%' | '>' | '<' | '!' | '.' |
+            '@' | '\'' | '?' | '#' | '$' |
+            '\\' | '`' | '_'
         )
     }
 
@@ -246,8 +244,10 @@ impl OperatorKind {
         matches!(
             self,
             OperatorKind::Exclamation
+            | OperatorKind::Plus
             | OperatorKind::Minus
             | OperatorKind::Tilde
+            | OperatorKind::Ampersand
         )
     }
 
@@ -315,7 +315,6 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::GreaterThan => ">",
             OperatorKind::LessThan => "<",
             OperatorKind::Exclamation => "!",
-            OperatorKind::Comma => ",",
             OperatorKind::Dot => ".",
             OperatorKind::DotDot => "..",
             OperatorKind::LessThanOrEqual => "<=",

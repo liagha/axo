@@ -1,28 +1,26 @@
 #![allow(dead_code)]
 use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::expression::Expression;
-use crate::parser::statement::Statement;
-use crate::parser::{Expr, ExprKind};
+use crate::parser::{Expr, ExprKind, Primary};
 
 pub struct Parser {
-    pub output: Vec<Expr>,
     tokens: Vec<Token>,
     pub current: usize,
     pub line: usize,
     pub column: usize,
     pub debug: u8,
+    pub output: Vec<Expr>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser {
-            output: Vec::new(),
             tokens,
             current: 0,
             line: 1,
             column: 1,
             debug: 0,
+            output: Vec::new(),
         }
     }
 
@@ -35,113 +33,222 @@ impl Parser {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
                     self.line += 1;
                     self.column = 0;
-                    if self.debug >= 2 {
-                        println!(
-                            "DEBUG (L2): Skipping newline token. Line now: {}",
-                            self.line
-                        );
-                    }
                     continue;
                 }
                 TokenKind::Comment(_) => {
                     self.column += 1;
-                    if self.debug >= 2 {
-                        println!("DEBUG (L2): Skipping comment token.");
-                    }
+
                     continue;
                 }
                 _ => {
                     self.column += 1;
-                    if self.debug >= 3 {
-                        println!(
-                            "DEBUG (L3): Advancing token: {:?} at line {}, column {}",
-                            token, self.line, self.column
-                        );
-                    }
+
                     return Some(token);
                 }
             }
         }
-        if self.debug >= 2 {
-            println!("DEBUG (L2): No more tokens to advance");
-        }
+
         None
     }
 
     pub fn peek(&self) -> Option<&Token> {
         let mut current = self.current;
-        let mut line = self.line;
-        let mut column = self.column;
 
         while let Some(token) = self.tokens.get(current) {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
                     current += 1;
-                    line += 1;
-                    column = 0;
-                    if self.debug >= 2 {
-                        println!("DEBUG (L2): Skipping newline token. Line now: {}", line);
-                    }
                 }
                 TokenKind::Comment(_) => {
                     current += 1;
-                    column += 1;
-
-                    if self.debug >= 2 {
-                        println!("DEBUG (L2): Skipping comment token.");
-                    }
                 }
                 _ => {
-                    if self.debug >= 3 {
-                        println!(
-                            "DEBUG (L3): Peeking token: {:?} at line {}, column {}",
-                            token, line, column
-                        );
-                    }
                     return Some(token);
                 }
             }
         }
-        if self.debug >= 2 {
-            println!("DEBUG (L2): No more tokens to peek");
-        }
+
         None
     }
 
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
-        let debug_level = self.debug;
-
         if let Some(token) = self.tokens.get(self.current) {
             if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
                 self.current += 1;
                 self.line += 1;
                 self.column = 0;
-                if debug_level >= 2 {
-                    println!(
-                        "DEBUG (L2): Skipping newline token. Line now: {}",
-                        self.line
-                    );
-                }
+
                 return false;
             }
 
             if &token.kind == expected {
-                if debug_level >= 1 {
-                    println!("DEBUG (L1): Matched token: {:?}", token);
-                }
                 self.advance();
-                return true;
-            }
 
-            if debug_level >= 1 {
-                println!(
-                    "DEBUG (L1): Token mismatch. Expected: {:?}, Found: {:?}",
-                    expected, token
-                );
+                return true;
             }
         }
 
         false
+    }
+
+    pub fn peek_is_any(&self, kinds: &[TokenKind]) -> bool {
+        if let Some(token) = self.peek() {
+            kinds.contains(&token.kind)
+        } else {
+            false
+        }
+    }
+
+    pub fn match_any(&mut self, kinds: &[TokenKind]) -> bool {
+        if let Some(token) = self.peek() {
+            if kinds.contains(&token.kind) {
+                self.advance();
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn expect(
+        &mut self,
+        expected: TokenKind,
+        context: SyntaxType,
+    ) -> Result<Token, ParseError> {
+        if let Some(token) = self.advance() {
+            if token.kind == expected {
+                Ok(token)
+            } else {
+                Err(ParseError::ExpectedTokenNotFound(
+                    expected,
+                    SyntaxPosition::Before,
+                    context,
+                ))
+            }
+        } else {
+            Err(ParseError::UnexpectedEndOfFile)
+        }
+    }
+
+    pub fn expect_any(
+        &mut self,
+        expected: &[TokenKind],
+        context: SyntaxType,
+    ) -> Result<Token, ParseError> {
+        if let Some(token) = self.advance() {
+            if expected.contains(&token.kind) {
+                Ok(token)
+            } else {
+                Err(ParseError::ExpectedTokenNotFound(
+                    expected[0].clone(),
+                    SyntaxPosition::Before,
+                    context,
+                ))
+            }
+        } else {
+            Err(ParseError::UnexpectedEndOfFile)
+        }
+    }
+
+    pub fn is_at_end(&self) -> bool {
+        self.current >= self.tokens.len()
+    }
+
+    pub fn current_span(&self) -> Option<Span> {
+        self.peek().map(|t| t.span.clone())
+    }
+
+    pub fn previous_span(&self) -> Option<Span> {
+        if self.current > 0 {
+            self.tokens.get(self.current - 1).map(|t| t.span.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn unexpected_token(&self, token: Token, context: SyntaxType) -> ParseError {
+        ParseError::UnexpectedToken(token, SyntaxPosition::Inside, context)
+    }
+
+    pub fn skip_until(&mut self, delimiters: &[TokenKind]) {
+        while !self.is_at_end() {
+            if let Some(token) = self.peek() {
+                if delimiters.contains(&token.kind) {
+                    break;
+                }
+                self.advance();
+            }
+        }
+    }
+
+    pub fn next_is_punct(&self, punct: PunctuationKind) -> bool {
+        if let Some(token) = self.peek() {
+            if let TokenKind::Punctuation(kind) = &token.kind {
+                return kind == &punct;
+            }
+        }
+        false
+    }
+
+    pub fn next_is_op(&self, op: OperatorKind) -> bool {
+        if let Some(token) = self.peek() {
+            if let TokenKind::Operator(kind) = &token.kind {
+                return kind == &op;
+            }
+        }
+        false
+    }
+
+    pub fn next_is_ident(&self, text: &str) -> bool {
+        if let Some(token) = self.peek() {
+            if let TokenKind::Identifier(ident) = &token.kind {
+                return ident == text;
+            }
+        }
+        false
+    }
+
+    pub fn parse_comma_separated<T, F>(
+        &mut self,
+        parse_fn: F,
+        terminator: TokenKind,
+        context: SyntaxType,
+    ) -> Result<Vec<T>, ParseError>
+    where
+        F: Fn(&mut Self) -> Result<T, ParseError>,
+    {
+        let mut items = Vec::new();
+
+        while !self.is_at_end() && !self.peek_is_any(&[terminator.clone()]) {
+            let item = parse_fn(self)?;
+            items.push(item);
+
+            if self.next_is_punct(PunctuationKind::Comma) {
+                self.advance();
+            } else if !self.peek_is_any(&[terminator.clone()]) {
+                return Err(ParseError::ExpectedSeparator(
+                    TokenKind::Punctuation(PunctuationKind::Comma),
+                    context,
+                ));
+            }
+        }
+
+        Ok(items)
+    }
+
+    pub fn parse_delimited<T, F>(
+        &mut self,
+        opener: TokenKind,
+        closer: TokenKind,
+        parse_fn: F,
+        context: SyntaxType,
+    ) -> Result<T, ParseError>
+    where
+        F: Fn(&mut Self) -> Result<T, ParseError>,
+    {
+        self.expect(opener, context.clone())?;
+        let result = parse_fn(self)?;
+        self.expect(closer, context)?;
+        Ok(result)
     }
 
     pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
@@ -159,62 +266,5 @@ impl Parser {
         }
 
         Ok(statements)
-    }
-
-    pub fn parse_primary(&mut self) -> Result<Expr, ParseError> {
-        if let Some(token) = self.peek().cloned() {
-            let Token { kind, span } = token.clone();
-
-            match kind {
-                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
-                TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
-                TokenKind::Identifier(name) => {
-                    self.advance();
-                    let kind = ExprKind::Identifier(name.clone());
-                    let mut expr = Expr { kind, span };
-
-                    while let Some(token) = self.peek() {
-                        match &token.kind {
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                expr = self.parse_struct(expr)?
-                            }
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
-                                expr = self.parse_index(expr)?
-                            }
-                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
-                                expr = self.parse_call(expr)?;
-                                return Ok(expr);
-                            }
-                            _ => break,
-                        }
-                    }
-
-                    Ok(expr)
-                }
-                TokenKind::Str(_)
-                | TokenKind::Char(_)
-                | TokenKind::Boolean(_)
-                | TokenKind::Float(_)
-                | TokenKind::Integer(_) => {
-                    self.advance();
-
-                    let kind = ExprKind::Literal(token.clone());
-                    let span = token.span;
-
-                    let expr = Expr { kind, span };
-
-                    Ok(expr)
-                }
-
-                TokenKind::EOF => Err(ParseError::UnexpectedEOF),
-                token => Err(ParseError::InvalidSyntax(format!(
-                    "Unexpected token: {:?}",
-                    token
-                ))),
-            }
-        } else {
-            Err(ParseError::UnexpectedEOF)
-        }
     }
 }

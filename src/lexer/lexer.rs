@@ -454,7 +454,6 @@ impl Lexer {
                                         self.column = 0;
                                         self.line += 1;
                                     }
-                                    
 
                                     self.column += 1;
                                     comment.push(next_ch);

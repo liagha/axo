@@ -133,7 +133,14 @@ let x = if test > 2 { 5; } else { 6; }
 
 !-test;
 
-5 + !-5 - -!66;
+enum Test {
+    name: String,
+    age: i32
+}
+
+5 + !-5 - -!66
+
+test(2, 4)
 
 //test comment
 
@@ -143,3 +150,5 @@ let x = if test > 2 { 5; } else { 6; }
 test
 block
 */
+
+if x > 3 x = 4

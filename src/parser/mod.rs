@@ -1,9 +1,16 @@
 #![allow(unused_imports)]
-
-pub(crate) mod parser;
+mod parser;
 mod statement;
 mod expression;
 mod error;
-pub(crate) use parser::Parser;
-pub use statement::{Statement};
-pub use expression::{Expression, Expr, ExprKind};
+mod primary;
+mod composite;
+mod utils;
+mod declaration;
+
+pub use statement::ControlFlow;
+pub use expression::{Expr, ExprKind};
+pub use parser::Parser;
+pub use declaration::Declaration;
+pub use composite::Composite;
+pub use primary::Primary;

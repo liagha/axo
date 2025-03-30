@@ -9,10 +9,10 @@ impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.kind {
             ExprKind::Literal(_) => {
-                write!(f, "{:?}", self.kind)
+                write!(f, "[{:?}]", self.kind)
             }
             _ => {
-                write!(f, "{:?} => {}", self.kind, self.span)
+                write!(f, "[{:?} | {}]", self.kind, self.span)
             }
         }
     }
@@ -21,62 +21,48 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ExprKind::Literal(literal) => {
-                write!(f, "{:?}", literal)
-            }
-            ExprKind::Identifier(identifier) => {
-                write!(f, "Identifier({})", identifier)
-            }
-            ExprKind::Typed(expr, ty) => {
-                write!(f, "Typed({:?} : {:?})", expr, ty)
-            }
+            // Primary Expressions
+            ExprKind::Literal(literal) => write!(f, "{:?}", literal),
+            ExprKind::Identifier(identifier) => write!(f, "Identifier({})", identifier),
             ExprKind::Binary(first, operator, second) => {
                 write!(f, "Binary({:?} {:?} {:?})", first, operator, second)
             }
-            ExprKind::Unary(operator, expr) => {
-                write!(f, "Unary({:?} {:?})", operator, expr)
+            ExprKind::Unary(operator, expr) => write!(f, "Unary({:?} {:?})", operator, expr),
+            ExprKind::Array(array) => write!(f, "Array({:?})", array),
+            ExprKind::Tuple(tuple) => write!(f, "Tuple({:?})", tuple),
+
+            // Composite Expressions
+            ExprKind::Typed(expr, ty) => write!(f, "Typed({:?} : {:?})", expr, ty),
+            ExprKind::Index(expr, index) => write!(f, "Index({:?}, {:?})", index, expr),
+            ExprKind::Invoke(function, params) => write!(f, "Invoke({:?}, {:?})", function, params),
+            ExprKind::Member(expr, field) => write!(f, "FieldAccess({:?}, {:?})", expr, field),
+            ExprKind::Closure(params, lambda) => write!(f, "Closure(|{:?}| {:?})", params, lambda),
+
+            // Control Flow
+            ExprKind::Conditional(cond, then, else_) => {
+                write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_)
             }
-            ExprKind::Array(array) => {
-                write!(f, "Array({:?})", array)
-            }
-            ExprKind::Index(expr, index) => {
-                write!(f, "Index({:?}, {:?})", index, expr)
-            }
-            ExprKind::Call(function, params) => {
-                write!(f, "Call({:?}, {:?})", function, params)
-            }
-            ExprKind::Closure(params, lambda) => {
-                write!(f, "Closure(|{:?}| {:?})", params, lambda)
-            }
-            ExprKind::StructInit(name, fields) => {
-                write!(f, "Struct( Name: {:?}, Fields: {:?} )", name, fields)
-            }
-            ExprKind::FieldAccess(expr, field) => {
-                write!(f, "FieldAccess({:?}, {:?})", expr, field)
-            }
-            ExprKind::Tuple(tuple) => {
-                write!(f, "Tuple({:?})", tuple)
-            }
-            ExprKind::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
-            ExprKind::If(cond, then, else_) => { write!(f, "If( Condition: {:?} | Then: {:?} | Else: {:?} )", cond, then, else_) }
             ExprKind::While(cond, then) => write!(f, "While( Condition: {:?} | Then: {:?} )", cond, then),
-            ExprKind::Block(stmts) => { write!(f, "Block({:#?})", stmts) }
-            ExprKind::Return(expr) => write!(f, "Return({:?})", expr),
+            ExprKind::For(clause, body) => write!(f, "For( Clause: {:?} | Body: {:?} )", clause, body),
+            ExprKind::Block(stmts) => write!(f, "Block({:#?})", stmts),
+
+            // Declarations & Definitions
+            ExprKind::Assignment(name, expr) => write!(f, "Assignment({:?}, {:?})", name, expr),
             ExprKind::Definition(name, expr) => write!(f, "Definition({:?}, {:?})", name, expr),
-            ExprKind::Continue => write!(f, "Continue"),
-            ExprKind::Break(expr) => write!(f, "Break({:?})", expr),
-            ExprKind::For(clause, body) => {
-                write!(f, "For( Clause: {:?} | Body: {:?} )", clause, body)
-            }
+            ExprKind::Struct(name, fields) => write!(f, "Struct( Name: {:?}, Fields: {:?} )", name, fields),
+            ExprKind::StructDef(name, fields) => write!(f, "StructDef( Name: {:?} | Fields: {:?} )", name, fields),
+            ExprKind::Enum(name, variants) => write!(f, "Enum( Name: {:?} | Variants: {:?} )", name, variants),
             ExprKind::Function(name, params, body) => {
                 write!(f, "Function( Name: {:?} | Params: {:?} | Body: {:?} )", name, params, body)
             }
-            ExprKind::StructDef(name, fields) => {
-                write!(f, "StructDef( Name: {:?} | Fields: {:?} )", name, fields)
-            }
-            ExprKind::Enum(name, variants) => {
-                write!(f, "Enum( Name: {:?} | Variants: {:?} )", name, variants)
-            }
+
+            // Flow Control Statements
+            ExprKind::Return(expr) => write!(f, "Return({:?})", expr),
+            ExprKind::Break(expr) => write!(f, "Break({:?})", expr),
+            ExprKind::Continue => write!(f, "Continue"),
+
+            // Patterns
+            ExprKind::Any => write!(f, "Any"),
         }
     }
 }
@@ -128,9 +114,11 @@ impl fmt::Debug for TokenKind {
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.kind == TokenKind::EOF {
-            write!(f, "[{:?}]", self.kind)
+            write!(f, "{:?}", self.kind)
         } else {
-            write!(f, "[{:?} | {}]", self.kind, self.span )
+            write!(f, "{:?}", self.kind)
+
+            //write!(f, "{:?} | {}", self.kind, self.span )
         }
     }
 }
@@ -145,7 +133,7 @@ impl fmt::Display for Span {
         if start_line == end_line && start_column == end_column {
             write!(f, "{}:{}", start_line, start_column )
         } else {
-            write!(f, "{}:{} : {}:{}", start_line, start_column, end_line, end_column )
+            write!(f, "({}:{} : {}:{})", start_line, start_column, end_line, end_column )
         }
     }
 }

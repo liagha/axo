@@ -10,6 +10,7 @@ pub enum PunctuationKind {
     RightBracket,
     LeftBrace,
     RightBrace,
+    Comma,
     Semicolon,
 }
 
@@ -26,6 +27,7 @@ impl PunctuationKind {
             "]" => PunctuationKind::RightBracket,
             "{" => PunctuationKind::LeftBrace,
             "}" => PunctuationKind::RightBrace,
+            "," => PunctuationKind::Comma,
             ";" => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
@@ -43,6 +45,7 @@ impl PunctuationKind {
             ']' => PunctuationKind::RightBracket,
             '{' => PunctuationKind::LeftBrace,
             '}' => PunctuationKind::RightBrace,
+            ',' => PunctuationKind::Comma,
             ';' => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
@@ -51,7 +54,7 @@ impl PunctuationKind {
     pub fn is_punctuation_str(str: &str) -> bool {
         matches!(
             str,
-            " " | "\t" | "\n" | "\r" | "(" | ")" | "[" | "]" | "{" | "}" | ";"
+            " " | "\t" | "\n" | "\r" | "(" | ")" | "[" | "]" | "{" | "}" | "," | ";"
         )
     }
 
@@ -60,7 +63,7 @@ impl PunctuationKind {
 
         matches!(
             char,
-            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ';'
+            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
         )
     }
 }
@@ -78,6 +81,7 @@ impl core::fmt::Display for PunctuationKind {
             PunctuationKind::RightBracket => "]",
             PunctuationKind::LeftBrace => "{",
             PunctuationKind::RightBrace => "}",
+            PunctuationKind::Comma => ",",
             PunctuationKind::Semicolon => ";",
         };
         write!(f, "{}", punct_str)
