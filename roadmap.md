@@ -6,8 +6,12 @@ gantt
     title Axo Development Timeline
     dateFormat  YYYY-MM-DD
     section Core Language
-    Lexer/Parser Design       :active, des1, 2024-07-01, 30d
-    Type System Specification :         des2, after des1, 30d
+    Lexer                     :active, des1, 2025-03-01, 60d
+    Stream Parser (Token to Structured Flow AST) : active, des2, 2025-03-20, 30d
+    Semantic Analysis         :active, des3, 2025-03-31, 30d
+    
+    Sema
+    Type System Specification :         des3, after des1, 30d
     Memory Model              :         des3, after des2, 45d
 
     section Tooling
