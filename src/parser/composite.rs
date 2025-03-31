@@ -26,7 +26,7 @@ impl Composite for Parser {
         }) = self.advance()
         {
             let kind = ExprKind::Index(left.into(), index.into());
-            let span = Span { start, end };
+            let span = self.span(start, end);
             let expr = Expr { kind, span };
 
             Ok(expr)
@@ -57,7 +57,7 @@ impl Composite for Parser {
                 let kind = ExprKind::Invoke(name.into(), parameters);
                 let expr = Expr {
                     kind,
-                    span: Span { start, end },
+                    span: self.span(start, end),
                 };
 
                 Ok(expr)
@@ -69,7 +69,7 @@ impl Composite for Parser {
                 let kind = ExprKind::Invoke(name.into(), vec![parameters]);
                 let expr = Expr {
                     kind,
-                    span: Span { start, end },
+                    span: self.span(start, end),
                 };
 
                 Ok(expr)
@@ -97,7 +97,7 @@ impl Composite for Parser {
 
                     return Ok(Expr {
                         kind: ExprKind::Closure(parameters, body.into()),
-                        span: Span { start, end },
+                        span: self.span(start, end),
                     });
                 }
                 Token {
@@ -146,7 +146,7 @@ impl Composite for Parser {
                     let kind = ExprKind::Struct(struct_name.into(), statements);
                     let expr = Expr {
                         kind,
-                        span: Span { start, end },
+                        span: self.span(start, end),
                     };
 
                     return Ok(expr);

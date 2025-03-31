@@ -26,7 +26,7 @@ impl Primary for Parser {
                 let unary = self.parse_unary()?;
                 let end = unary.span.end;
 
-                let span = Span { start, end };
+                let span = self.span(start, end);
 
                 let kind = ExprKind::Unary(op, unary.into());
 
@@ -53,7 +53,7 @@ impl Primary for Parser {
 
                 let start = left.span.start;
                 let end = right.span.end;
-                let span = Span { start, end };
+                let span = self.span(start, end);
 
                 let kind = ExprKind::Binary(left.into(), op, right.into());
 
@@ -65,7 +65,7 @@ impl Primary for Parser {
 
                 let start = left.span.start;
                 let end = right.span.end;
-                let span = Span { start, end };
+                let span = self.span(start, end);
 
                 let kind = ExprKind::Typed(left.into(), right.into());
 
@@ -75,10 +75,7 @@ impl Primary for Parser {
 
                 let field = self.parse_expression()?;
 
-                let span = Span {
-                    start: left.span.start,
-                    end: field.span.end,
-                };
+                let span = self.span(left.span.start, field.span.end);
 
                 let kind = ExprKind::Member(left.into(), field.into());
                 left = Expr { kind, span };
@@ -104,7 +101,7 @@ impl Primary for Parser {
 
                 let start = left.span.start;
                 let end = right.span.end;
-                let span = Span { start, end };
+                let span = self.span(start, end);
 
                 let kind = ExprKind::Binary(left.into(), op, right.into());
 
@@ -132,7 +129,7 @@ impl Primary for Parser {
 
                 let start = left.span.start;
                 let end = right.span.end;
-                let span = Span { start, end };
+                let span = self.span(start, end);
 
                 let kind = ExprKind::Binary(left.into(), op, right.into());
 
@@ -177,10 +174,7 @@ impl Primary for Parser {
                         let expr = if token.kind == TokenKind::Operator(OperatorKind::Equal) {
                             self.advance();
                             let right = self.parse_statement()?;
-                            let span = Span {
-                                start: left.span.start,
-                                end: right.span.end,
-                            };
+                            let span = self.span(left.span.start, right.span.end);
                             Expr {
                                 kind: ExprKind::Assignment(left.into(), right.into()),
                                 span,
@@ -188,17 +182,14 @@ impl Primary for Parser {
                         } else if OperatorKind::is_compound_token(&token.kind) {
                             self.advance();
                             let right = self.parse_statement()?;
-                            let span = Span {
-                                start: left.span.start,
-                                end: right.span.end,
-                            };
+                            let span = self.span(left.span.start, right.span.end);
                             let operation = Expr {
                                 kind: ExprKind::Binary(
                                     left.clone().into(),
                                     OperatorKind::decompound_token(&token),
                                     right.into(),
                                 ),
-                                span,
+                                span: span.clone(),
                             };
                             Expr {
                                 kind: ExprKind::Assignment(left.into(), operation.into()),
@@ -307,7 +298,7 @@ impl Primary for Parser {
                     } else {
                         Ok(Expr {
                             kind: ExprKind::Tuple(parameters),
-                            span: Span { start, end },
+                            span: self.span(start, end),
                         })
                     }
                 }
@@ -351,7 +342,7 @@ impl Primary for Parser {
 
                     return Ok(Expr {
                         kind: ExprKind::Array(elements),
-                        span: Span { start, end },
+                        span: self.span(start, end),
                     });
                 }
                 Token {

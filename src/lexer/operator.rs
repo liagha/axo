@@ -271,22 +271,24 @@ impl OperatorKind {
     }
 
     pub fn decompound_token(token: &Token) -> Token {
-        let Span { start: (sl, sc), end: (el, ec) } = token.span;
+        let Span { start: (sl, sc), end: (el, ec), file_name, file_path } = token.span.clone();
+
+        let new_span = Span { start: (sl, sc), end: (el, ec - 1), file_name, file_path };
 
         let (operator, span) = if let TokenKind::Operator(op) = &token.kind { 
             match op {
-                OperatorKind::LogicalAndEqual => (OperatorKind::LogicalAnd, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::LogicalOrEqual => (OperatorKind::LogicalOr, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::QuestionMarkEqual => (OperatorKind::QuestionMark, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::DotDotEqual => (OperatorKind::DotDot, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::AmpersandEqual => (OperatorKind::Ampersand, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::PipeEqual => (OperatorKind::Pipe, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::StarEqual => (OperatorKind::Star, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::SlashEqual => (OperatorKind::Slash, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::PercentEqual => (OperatorKind::Percent, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::CaretEqual => (OperatorKind::Caret, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::PlusEqual => (OperatorKind::Plus, Span { start: (sl, sc), end: (el, ec - 1) }),
-                OperatorKind::MinusEqual => (OperatorKind::Minus, Span { start: (sl, sc), end: (el, ec - 1) }),
+                OperatorKind::LogicalAndEqual => (OperatorKind::LogicalAnd, new_span),
+                OperatorKind::LogicalOrEqual => (OperatorKind::LogicalOr, new_span),
+                OperatorKind::QuestionMarkEqual => (OperatorKind::QuestionMark, new_span),
+                OperatorKind::DotDotEqual => (OperatorKind::DotDot, new_span),
+                OperatorKind::AmpersandEqual => (OperatorKind::Ampersand, new_span),
+                OperatorKind::PipeEqual => (OperatorKind::Pipe, new_span),
+                OperatorKind::StarEqual => (OperatorKind::Star, new_span),
+                OperatorKind::SlashEqual => (OperatorKind::Slash, new_span),
+                OperatorKind::PercentEqual => (OperatorKind::Percent, new_span),
+                OperatorKind::CaretEqual => (OperatorKind::Caret, new_span),
+                OperatorKind::PlusEqual => (OperatorKind::Plus, new_span),
+                OperatorKind::MinusEqual => (OperatorKind::Minus, new_span),
                 _ => unreachable!(),
             }
         } else {

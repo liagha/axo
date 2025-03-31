@@ -1,22 +1,25 @@
+use std::path::PathBuf;
 use crate::lexer::error::{LexError, IntParseError, CharParseError};
-use crate::lexer::Token;
+use crate::lexer::{Span, Token};
 use crate::lexer::{TokenKind, OperatorKind, PunctuationKind};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Span {
-    pub start: (usize, usize),  // (line, column)
-    pub end: (usize, usize),    // (line, column)
-}
-
 pub struct Lexer {
+    file_path: PathBuf,
+    file_name: String,
     input: String,
     line: usize,
     column: usize,
 }
 
 impl Lexer {
-    pub fn new(input: String) -> Lexer {
-        Lexer { input, line: 1, column: 0 }
+    pub fn new(input: String, file_path: PathBuf) -> Lexer {
+        let file_name = file_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string();
+
+        Lexer { file_path, file_name, input, line: 1, column: 0 }
     }
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
@@ -35,7 +38,7 @@ impl Lexer {
 
                     let end = (self.line, self.column);
 
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     let token = Token {
                         kind: TokenKind::Punctuation(PunctuationKind::from_char(&ch)),
@@ -68,7 +71,7 @@ impl Lexer {
                     }
 
                     let end = (self.line, self.column);
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     if number == "." {
                         tokens.push(Token {
@@ -84,18 +87,22 @@ impl Lexer {
                         let num_part = number.trim_end_matches("..");
                         if !num_part.is_empty() {
                             let num_span = Span {
-                                start: start,
-                                end: (self.line, self.column + num_part.len())
+                                start,
+                                end: (self.line, self.column + num_part.len()),
+                                file_name: self.file_name.clone(),
+                                file_path: self.file_path.clone(),
                             };
                             tokens.push(Token {
                                 kind: Self::lex_number(num_part)?,
-                                span: num_span                     
+                                span: num_span
                             });
                         }
 
                         let op_span = Span {
                             start: (self.line, self.column + number.len() - 2),
-                            end
+                            end,
+                            file_name: self.file_name.clone(),
+                            file_path: self.file_path.clone(),
                         };
                         tokens.push(Token {
                             kind: TokenKind::Operator(OperatorKind::DotDot),
@@ -108,7 +115,9 @@ impl Lexer {
                             if !parts[0].is_empty() {
                                 let first_span = Span {
                                     start,
-                                    end: (self.line, self.column + parts[0].len())
+                                    end: (self.line, self.column + parts[0].len()),
+                                    file_name: self.file_name.clone(),
+                                    file_path: self.file_path.clone(),
                                 };
                                 tokens.push(Token {
                                     kind: Self::lex_number(parts[0])?,
@@ -118,7 +127,9 @@ impl Lexer {
 
                             let op_span = Span {
                                 start: (self.line, self.column + parts[0].len()),
-                                end: (self.line, self.column + parts[0].len() + 2)
+                                end: (self.line, self.column + parts[0].len() + 2),
+                                file_name: self.file_name.clone(),
+                                file_path: self.file_path.clone(),
                             };
                             tokens.push(Token {
                                 kind: TokenKind::Operator(OperatorKind::DotDot),
@@ -128,7 +139,9 @@ impl Lexer {
                             if !parts[1].is_empty() {
                                 let second_span = Span {
                                     start: (self.line, self.column + parts[0].len() + 2),
-                                    end
+                                    end,
+                                    file_name: self.file_name.clone(),
+                                    file_path: self.file_path.clone(),
                                 };
                                 tokens.push(Token {
                                     kind: Self::lex_number(parts[1])?,
@@ -160,7 +173,7 @@ impl Lexer {
                     }
 
                     let end = (self.line, self.column);
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     match TokenKind::from_str(name.as_str()) {
                         Some(token_kind) => tokens.push(Token { kind: token_kind, span }),
@@ -214,7 +227,7 @@ impl Lexer {
                                 },
                                 'u' => {
                                     if chars.peek() == Some(&'{') {
-                                        chars.next(); 
+                                        chars.next();
                                         self.column += 1;
 
                                         let mut hex = String::new();
@@ -226,7 +239,7 @@ impl Lexer {
                                                     hex.push(chars.next().unwrap());
                                                     self.column += 1;
                                                 } else if next_hex == '}' {
-                                                    chars.next(); 
+                                                    chars.next();
                                                     self.column += 1;
                                                     closed_brace = true;
                                                     break;
@@ -262,7 +275,7 @@ impl Lexer {
                             is_escaped = true;
                         } else if next_ch == '\'' {
                             let end = (self.line, self.column);
-                            let span = Span { start, end };
+                            let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                             if content.chars().count() == 1 {
                                 let ch = content.chars().next().unwrap();
@@ -279,7 +292,7 @@ impl Lexer {
 
                     if !closed {
                         let end = (self.line, self.column);
-                        let span = Span { start, end };
+                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                         tokens.push(Token {
                             kind: TokenKind::Invalid(format!("'{}", content)),
@@ -336,7 +349,7 @@ impl Lexer {
                                 },
                                 'u' => {
                                     if chars.peek() == Some(&'{') {
-                                        chars.next(); 
+                                        chars.next();
                                         self.column += 1;
 
                                         let mut hex = String::new();
@@ -348,7 +361,7 @@ impl Lexer {
                                                     hex.push(chars.next().unwrap());
                                                     self.column += 1;
                                                 } else if next_hex == '}' {
-                                                    chars.next(); 
+                                                    chars.next();
                                                     self.column += 1;
                                                     closed_brace = true;
                                                     break;
@@ -384,7 +397,7 @@ impl Lexer {
                             is_escaped = true;
                         } else if next_ch == '"' {
                             let end = (self.line, self.column);
-                            let span = Span { start, end };
+                            let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                             tokens.push(Token {
                                 kind: TokenKind::Str(content.clone()),
@@ -400,7 +413,7 @@ impl Lexer {
 
                     if !closed {
                         let end = (self.line, self.column);
-                        let span = Span { start, end };
+                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                         tokens.push(Token {
                             kind: TokenKind::Invalid(format!("\"{}\"", content)),
@@ -430,7 +443,7 @@ impl Lexer {
                                 }
 
                                 let end = (self.line, self.column);
-                                let span = Span { start, end };
+                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                                 tokens.push(Token {
                                     kind: TokenKind::Comment(comment),
@@ -462,7 +475,7 @@ impl Lexer {
                                 }
 
                                 let end = (self.line, self.column);
-                                let span = Span { start, end };
+                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                                 if closed {
                                     tokens.push(Token {
@@ -480,7 +493,7 @@ impl Lexer {
                             },
                             _ => {
                                 let end = (self.line, self.column);
-                                let span = Span { start, end };
+                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                                 tokens.push(Token {
                                     kind: TokenKind::Operator(OperatorKind::Slash),
@@ -490,7 +503,7 @@ impl Lexer {
                         }
                     } else {
                         let end = (self.line, self.column);
-                        let span = Span { start, end };
+                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                         tokens.push(Token {
                             kind: TokenKind::Operator(OperatorKind::Slash),
@@ -513,7 +526,7 @@ impl Lexer {
                     }
 
                     let end = (self.line, self.column);
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     if OperatorKind::Unknown != OperatorKind::from_str(&operator) {
                         let op = OperatorKind::from_str(&operator);
@@ -527,6 +540,8 @@ impl Lexer {
                             let single_char_span = Span {
                                 start: (self.line, self.column + i + 1),
                                 end: (self.line, self.column + i + 2),
+                                file_name: self.file_name.clone(),
+                                file_path: self.file_path.clone(),
                             };
                             tokens.push(Token {
                                 kind: TokenKind::Operator(OperatorKind::from_str(c.to_string().as_str())),
@@ -540,7 +555,7 @@ impl Lexer {
                 ch if PunctuationKind::is_punctuation(ch) => {
                     let start = (self.line, self.column);
                     let end = (self.line, self.column);
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     let punc = PunctuationKind::from_char(&ch);
 
@@ -553,7 +568,7 @@ impl Lexer {
                 _ => {
                     let start = (self.line, self.column);
                     let end = (self.line, self.column);
-                    let span = Span { start, end };
+                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
                     tokens.push(Token {
                         kind: TokenKind::Invalid(ch.to_string()),
@@ -569,7 +584,7 @@ impl Lexer {
         let last_line_length = self.input.lines().last().map_or(0, |line| line.len());
         let start = (line_count, last_line_length + 1);
         let end = (line_count, last_line_length + 1);
-        let span = Span { start, end };
+        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
 
         tokens.push(Token {
             kind: TokenKind::EOF,

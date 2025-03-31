@@ -120,7 +120,7 @@ impl fmt::Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Span {
             start: (start_line, start_column),
-            end: (end_line, end_column)
+            end: (end_line, end_column), ..
         } = self;
 
         if start_line == end_line && start_column == end_column {

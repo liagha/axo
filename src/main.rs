@@ -1,6 +1,9 @@
 mod cli;
 mod parser;
 pub mod lexer;
+
+use std::path::PathBuf;
+use std::str::FromStr;
 use lexer::{Lexer, PunctuationKind, Token, TokenKind};
 use parser::Parser;
 
@@ -19,7 +22,7 @@ fn main() {
 
         xprintln!();
 
-        let mut lexer = Lexer::new(content);
+        let mut lexer = Lexer::new(content, PathBuf::from_str(file_path).unwrap());
 
         match lexer.tokenize() {
             Ok(tokens) => {
@@ -27,13 +30,13 @@ fn main() {
 
                 xprintln!();
 
-                let mut parser = Parser::new(tokens.clone());
+                let mut parser = Parser::new(tokens.clone(), PathBuf::from_str(file_path).unwrap());
                 match parser.parse_program() {
                     Ok(stmts) => {
                         println!("Parsed AST: {}", format!("{:#?}", stmts).term_colorize(Color::Green));
                     },
                     Err(err) => {
-                        let end_span = tokens[parser.current].span;
+                        let end_span = tokens[parser.current].span.clone();
 
                         //println!("{:#?}", parser.output);
                         xprintln!("Parse error ({}): {}" => Color::Red, end_span, err => Color::Orange);

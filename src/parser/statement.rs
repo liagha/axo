@@ -33,7 +33,7 @@ impl ControlFlow for Parser {
                     let kind = ExprKind::Block(statements);
                     let expr = Expr {
                         kind,
-                        span: Span { start, end },
+                        span: self.span(start, end),
                     };
 
                     return Ok(expr);
@@ -79,7 +79,7 @@ impl ControlFlow for Parser {
         let kind = ExprKind::Conditional(condition.into(), then_branch.into(), else_branch.into());
         let expr = Expr {
             kind,
-            span: Span { start, end },
+            span: self.span(start, end),
         };
 
         Ok(expr)
@@ -99,7 +99,7 @@ impl ControlFlow for Parser {
         let kind = ExprKind::While(condition.into(), body.into());
         let expr = Expr {
             kind,
-            span: Span { start, end },
+            span: self.span(start, end),
         };
 
         Ok(expr)
@@ -119,7 +119,7 @@ impl ControlFlow for Parser {
         let kind = ExprKind::For(clause.into(), body.into());
         let expr = Expr {
             kind,
-            span: Span { start, end },
+            span: self.span(start, end),
         };
 
         Ok(expr)
@@ -127,7 +127,7 @@ impl ControlFlow for Parser {
 
     fn parse_return_statement(&mut self) -> Result<Expr, ParseError> {
         let Token {
-            span: Span { start, end },
+            span: Span { start, end, .. },
             ..
         } = self.advance().unwrap();
 
@@ -154,7 +154,7 @@ impl ControlFlow for Parser {
         let kind = ExprKind::Return(value);
         let expr = Expr {
             kind,
-            span: Span { start, end },
+            span: self.span(start, end),
         };
 
         Ok(expr)
@@ -162,7 +162,7 @@ impl ControlFlow for Parser {
 
     fn parse_break_statement(&mut self) -> Result<Expr, ParseError> {
         let Token {
-            span: Span { start, end },
+            span: Span { start, end, .. },
             ..
         } = self.advance().unwrap();
 
@@ -189,7 +189,7 @@ impl ControlFlow for Parser {
         let kind = ExprKind::Break(value);
         let expr = Expr {
             kind,
-            span: Span { start, end },
+            span: self.span(start, end),
         };
 
         Ok(expr)
@@ -209,7 +209,7 @@ impl ControlFlow for Parser {
             let kind = ExprKind::Continue;
             let expr = Expr {
                 kind,
-                span: Span { start, end },
+                span: self.span(start, end),
             };
 
             Ok(expr)

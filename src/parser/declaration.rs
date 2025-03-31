@@ -23,17 +23,14 @@ impl Declaration for Parser {
                 self.advance();
 
                 let value = self.parse_statement()?;
-                let span = Span {
-                    start,
-                    end: value.span.end,
-                };
+                let span = self.span(start, value.span.end);
                 let kind = ExprKind::Definition(identifier.into(), Some(value.into()));
 
                 let expr = Expr { kind, span };
 
                 Ok(expr)
             } else {
-                let span = identifier.span;
+                let span = identifier.span.clone();
                 let kind = ExprKind::Definition(identifier.into(), None);
                 let expr = Expr { kind, span };
 
@@ -63,7 +60,7 @@ impl Declaration for Parser {
                 let kind = ExprKind::Function(name.into(), parameters, body.into());
                 let expr = Expr {
                     kind,
-                    span: Span { start, end },
+                    span: self.span(start, end),
                 };
 
                 Ok(expr)
@@ -78,7 +75,7 @@ impl Declaration for Parser {
                 let kind = ExprKind::Function(function.into(), Vec::new(), body.into());
                 let expr = Expr {
                     kind,
-                    span: Span { start, end },
+                    span: self.span(start, end),
                 };
 
                 Ok(expr)
@@ -105,7 +102,7 @@ impl Declaration for Parser {
 
         if let Expr { kind: ExprKind::Struct(name, fields), span: Span { end, .. } } = struct_init {
             let kind = ExprKind::Enum(name, fields);
-            let expr = Expr { kind, span: Span { start, end } };
+            let expr = Expr { kind, span: self.span(start, end) };
 
             Ok(expr)
         } else {
@@ -126,7 +123,7 @@ impl Declaration for Parser {
 
         if let Expr { kind: ExprKind::Struct(name, fields), span: Span { end, .. } } = struct_init {
             let kind = ExprKind::StructDef(name, fields);
-            let expr = Expr { kind, span: Span { start, end } };
+            let expr = Expr { kind, span: self.span(start, end) };
 
             Ok(expr)
         } else {

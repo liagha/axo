@@ -19,6 +19,7 @@ pub enum SyntaxPosition {
 
 #[derive(Debug, Clone)]
 pub enum SyntaxType {
+    // Existing syntax types
     Token(TokenKind),
     Expr(Expr),
     Expression,
@@ -60,6 +61,8 @@ pub enum SyntaxType {
     UnclosedParen,
     UnclosedBracket,
     UnclosedBrace,
+
+    // New syntax types
     If,
     IfCondition,
     ElseClause,

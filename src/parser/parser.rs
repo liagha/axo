@@ -1,9 +1,13 @@
 #![allow(dead_code)]
+
+use std::path::PathBuf;
 use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::{Expr, ExprKind, Primary};
 
 pub struct Parser {
+    pub file_path: PathBuf,
+    pub file_name: String,
     tokens: Vec<Token>,
     pub current: usize,
     pub line: usize,
@@ -13,14 +17,31 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn new(tokens: Vec<Token>, file_path: PathBuf) -> Self {
+        let file_name = file_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string();
+
         Parser {
+            file_path,
+            file_name,
             tokens,
             current: 0,
             line: 1,
             column: 1,
             debug: 0,
             output: Vec::new(),
+        }
+    }
+
+    pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
+        Span {
+            file_path: self.file_path.clone(),
+            file_name: self.file_name.clone(),
+            start,
+            end
         }
     }
 
