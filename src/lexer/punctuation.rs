@@ -59,8 +59,6 @@ impl PunctuationKind {
     }
 
     pub fn is_punctuation(char: char) -> bool {
-        if char == '\n' { return true; }
-
         matches!(
             char,
             ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'

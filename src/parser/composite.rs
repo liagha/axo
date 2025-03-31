@@ -11,7 +11,7 @@ pub trait Composite {
 
 impl Composite for Parser {
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError> {
-        self.advance();
+        self.next();
 
         let Expr {
             span: Span { start, .. },
@@ -23,7 +23,7 @@ impl Composite for Parser {
         if let Some(Token {
             kind: TokenKind::Punctuation(PunctuationKind::RightBracket),
             span: Span { end, .. },
-        }) = self.advance()
+        }) = self.next()
         {
             let kind = ExprKind::Index(left.into(), index.into());
             let span = self.span(start, end);
@@ -81,7 +81,7 @@ impl Composite for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let mut parameters = Vec::new();
 
@@ -91,7 +91,7 @@ impl Composite for Parser {
                     kind: TokenKind::Operator(OperatorKind::Pipe),
                     span: Span { end, .. },
                 } => {
-                    self.advance();
+                    self.next();
 
                     let body = self.parse_primary()?;
 
@@ -104,7 +104,7 @@ impl Composite for Parser {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
                     ..
                 } => {
-                    self.advance();
+                    self.next();
                 }
                 _ => {
                     let expr = self.parse_expression()?;
@@ -123,7 +123,7 @@ impl Composite for Parser {
     }
 
     fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
-        self.advance();
+        self.next();
 
         let Expr {
             span: Span { start, .. },
@@ -135,13 +135,13 @@ impl Composite for Parser {
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Comma) => {
-                    self.advance();
+                    self.next();
                 }
                 TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     let Token {
                         span: Span { end, .. },
                         ..
-                    } = self.advance().unwrap();
+                    } = self.next().unwrap();
 
                     let kind = ExprKind::Struct(struct_name.into(), statements);
                     let expr = Expr {

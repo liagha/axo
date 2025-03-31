@@ -36,14 +36,14 @@ fn main() {
                         println!("Parsed AST: {}", format!("{:#?}", stmts).term_colorize(Color::Green));
                     },
                     Err(err) => {
-                        let end_span = tokens[parser.current].span.clone();
+                        let end_span = tokens[parser.position].span.clone();
 
                         //println!("{:#?}", parser.output);
                         xprintln!("Parse error ({}): {}" => Color::Red, end_span, err => Color::Orange);
                     }
                 }
             }
-            Err(e) => xprintln!("Lexing error: {}" => Color::Red, e => Color::Orange),
+            Err(e) => xprintln!("Lexing error: ({}:{}) {}" => Color::Red, lexer.line, lexer.column, e => Color::Orange),
         }
     }
 }
@@ -65,9 +65,6 @@ fn format_tokens(input: &Vec<Token>) -> String {
             }
             TokenKind::Keyword(_) => {
                 result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Blue).as_str());
-            }
-            TokenKind::EOF => {
-                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Red).as_str());
             }
             _ => {
                 result.push_str(format!("{:?} | {}", token, token.span).as_str());

@@ -1,8 +1,10 @@
-# Axo Programming Language
-
-<div style="display: flex; align-items: center; justify-content: center;">
+<div style="display: flex; justify-content: center; 
+height: 100vh; width: 100vw;">
   <img src="misc/logo.png" alt="Axo Logo" width="150" />
 </div>
+
+
+# Axo Programming Language
 
 ## Overview
 Axo is an emerging programming language named after the **axolotl**, an incredible amphibian known for its **regenerative abilities**, **adaptability**, and **resilience**. Inspired by these traits, Axo is being designed as a **self-healing**, **flexible**, and **high-performance** language that learns from the best aspects of Rust, C, and Swift while introducing innovative features of its own.

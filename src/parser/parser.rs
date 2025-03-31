@@ -6,49 +6,38 @@ use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
 use crate::parser::{Expr, ExprKind, Primary};
 
 pub struct Parser {
-    pub file_path: PathBuf,
-    pub file_name: String,
     tokens: Vec<Token>,
-    pub current: usize,
+    pub file: PathBuf,
+    pub position: usize,
     pub line: usize,
     pub column: usize,
-    pub debug: u8,
-    pub output: Vec<Expr>,
+    pub expressions: Vec<Expr>,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, file_path: PathBuf) -> Self {
-        let file_name = file_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default()
-            .to_string();
-
+    pub fn new(tokens: Vec<Token>, file: PathBuf) -> Self {
         Parser {
-            file_path,
-            file_name,
+            file,
             tokens,
-            current: 0,
+            position: 0,
             line: 1,
             column: 1,
-            debug: 0,
-            output: Vec::new(),
+            expressions: Vec::new(),
         }
     }
 
     pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
         Span {
-            file_path: self.file_path.clone(),
-            file_name: self.file_name.clone(),
+            file: self.file.clone(),
             start,
             end
         }
     }
 
-    pub fn advance(&mut self) -> Option<Token> {
-        while self.current < self.tokens.len() {
-            let token = self.tokens[self.current].clone();
-            self.current += 1;
+    pub fn next(&mut self) -> Option<Token> {
+        while self.position < self.tokens.len() {
+            let token = self.tokens[self.position].clone();
+            self.position += 1;
 
             match &token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
@@ -73,7 +62,7 @@ impl Parser {
     }
 
     pub fn peek(&self) -> Option<&Token> {
-        let mut current = self.current;
+        let mut current = self.position;
 
         while let Some(token) = self.tokens.get(current) {
             match token.kind {
@@ -93,9 +82,9 @@ impl Parser {
     }
 
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
-        if let Some(token) = self.tokens.get(self.current) {
+        if let Some(token) = self.tokens.get(self.position) {
             if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
-                self.current += 1;
+                self.position += 1;
                 self.line += 1;
                 self.column = 0;
 
@@ -103,7 +92,7 @@ impl Parser {
             }
 
             if &token.kind == expected {
-                self.advance();
+                self.next();
 
                 return true;
             }
@@ -123,7 +112,7 @@ impl Parser {
     pub fn match_any(&mut self, kinds: &[TokenKind]) -> bool {
         if let Some(token) = self.peek() {
             if kinds.contains(&token.kind) {
-                self.advance();
+                self.next();
                 return true;
             }
         }
@@ -135,7 +124,7 @@ impl Parser {
         expected: TokenKind,
         context: SyntaxType,
     ) -> Result<Token, ParseError> {
-        if let Some(token) = self.advance() {
+        if let Some(token) = self.next() {
             if token.kind == expected {
                 Ok(token)
             } else {
@@ -155,7 +144,7 @@ impl Parser {
         expected: &[TokenKind],
         context: SyntaxType,
     ) -> Result<Token, ParseError> {
-        if let Some(token) = self.advance() {
+        if let Some(token) = self.next() {
             if expected.contains(&token.kind) {
                 Ok(token)
             } else {
@@ -171,7 +160,7 @@ impl Parser {
     }
 
     pub fn is_at_end(&self) -> bool {
-        self.current >= self.tokens.len()
+        self.position >= self.tokens.len()
     }
 
     pub fn current_span(&self) -> Option<Span> {
@@ -179,8 +168,8 @@ impl Parser {
     }
 
     pub fn previous_span(&self) -> Option<Span> {
-        if self.current > 0 {
-            self.tokens.get(self.current - 1).map(|t| t.span.clone())
+        if self.position > 0 {
+            self.tokens.get(self.position - 1).map(|t| t.span.clone())
         } else {
             None
         }
@@ -196,7 +185,7 @@ impl Parser {
                 if delimiters.contains(&token.kind) {
                     break;
                 }
-                self.advance();
+                self.next();
             }
         }
     }
@@ -244,7 +233,7 @@ impl Parser {
             items.push(item);
 
             if self.next_is_punct(PunctuationKind::Comma) {
-                self.advance();
+                self.next();
             } else if !self.peek_is_any(&[terminator.clone()]) {
                 return Err(ParseError::ExpectedSeparator(
                     TokenKind::Punctuation(PunctuationKind::Comma),
@@ -282,7 +271,7 @@ impl Parser {
 
             let stmt = self.parse_statement()?;
 
-            self.output.push(stmt.clone());
+            self.expressions.push(stmt.clone());
             statements.push(stmt);
         }
 

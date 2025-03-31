@@ -271,9 +271,9 @@ impl OperatorKind {
     }
 
     pub fn decompound_token(token: &Token) -> Token {
-        let Span { start: (sl, sc), end: (el, ec), file_name, file_path } = token.span.clone();
+        let Span { start: (sl, sc), end: (el, ec), file } = token.span.clone();
 
-        let new_span = Span { start: (sl, sc), end: (el, ec - 1), file_name, file_path };
+        let new_span = Span { start: (sl, sc), end: (el, ec - 1), file };
 
         let (operator, span) = if let TokenKind::Operator(op) = &token.kind { 
             match op {

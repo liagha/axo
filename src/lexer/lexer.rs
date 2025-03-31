@@ -1,599 +1,511 @@
-use std::path::PathBuf;
-use crate::lexer::error::{LexError, IntParseError, CharParseError};
+use crate::lexer::error::{CharParseError, IntParseError, LexError};
+use crate::lexer::{OperatorKind, PunctuationKind, TokenKind};
 use crate::lexer::{Span, Token};
-use crate::lexer::{TokenKind, OperatorKind, PunctuationKind};
+use std::path::PathBuf;
 
 pub struct Lexer {
-    file_path: PathBuf,
-    file_name: String,
-    input: String,
-    line: usize,
-    column: usize,
+    file: PathBuf,
+    chars: Vec<char>,
+    position: usize,
+    pub line: usize,
+    pub column: usize,
+    pub tokens: Vec<Token>,
 }
 
 impl Lexer {
-    pub fn new(input: String, file_path: PathBuf) -> Lexer {
-        let file_name = file_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default()
-            .to_string();
+    pub fn new(input: String, file: PathBuf) -> Lexer {
+        let chars: Vec<char> = input.chars().collect();
 
-        Lexer { file_path, file_name, input, line: 1, column: 0 }
+        Lexer {
+            file,
+            chars,
+            position: 0,
+            line: 1,
+            column: 0,
+            tokens: Vec::new(),
+        }
+    }
+
+    fn peek(&self) -> Option<char> {
+        if self.position < self.chars.len() {
+            Some(self.chars[self.position])
+        } else {
+            None
+        }
+    }
+
+    #[allow(dead_code)]
+    fn peek_ahead(&self, n: usize) -> Option<char> {
+        let pos = self.position + n;
+
+        if pos < self.chars.len() {
+            Some(self.chars[pos])
+        } else {
+            None
+        }
+    }
+
+    fn next(&mut self) -> Option<char> {
+        if self.position < self.chars.len() {
+            let ch = self.chars[self.position];
+
+            self.position += 1;
+
+            if ch == '\n' {
+                self.line += 1;
+                self.column = 0;
+            } else {
+                self.column += 1;
+            }
+
+            Some(ch)
+        } else {
+            None
+        }
+    }
+
+    fn create_span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
+        Span {
+            start,
+            end,
+            file: self.file.clone(),
+        }
+    }
+
+    fn push_token(&mut self, kind: TokenKind, span: Span) {
+        self.tokens.push(Token { kind, span });
+    }
+
+    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError> {
+        let error_type = if is_string {
+            |err| LexError::StringParseError(err)
+        } else {
+            |err| LexError::CharParseError(err)
+        };
+
+        if let Some(next_ch) = self.next() {
+            match next_ch {
+                'n' => Ok('\n'),
+                'r' => Ok('\r'),
+                't' => Ok('\t'),
+                '\\' => Ok('\\'),
+                '\'' => Ok('\''),
+                '"' => Ok('"'),
+                '0' => Ok('\0'),
+                'x' => {
+                    let mut hex = String::new();
+                    for _ in 0..2 {
+                        if let Some(next_hex) = self.peek() {
+                            if next_hex.is_digit(16) {
+                                hex.push(self.next().unwrap());
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
+                        if let Some(ch) = std::char::from_u32(hex_value) {
+                            Ok(ch)
+                        } else {
+                            Err(error_type(CharParseError::InvalidEscapeSequence))
+                        }
+                    } else {
+                        Err(error_type(CharParseError::InvalidEscapeSequence))
+                    }
+                }
+                'u' => {
+                    if self.peek() == Some('{') {
+                        self.next();
+
+                        let mut hex = String::new();
+                        let mut closed_brace = false;
+
+                        for _ in 0..6 {
+                            if let Some(next_hex) = self.peek() {
+                                if next_hex.is_digit(16) {
+                                    hex.push(self.next().unwrap());
+                                } else if next_hex == '}' {
+                                    self.next();
+                                    closed_brace = true;
+                                    break;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if !closed_brace {
+                            return Err(error_type(CharParseError::UnClosedEscapeSequence));
+                        }
+
+                        if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
+                            if let Some(ch) = std::char::from_u32(hex_value) {
+                                Ok(ch)
+                            } else {
+                                Err(error_type(CharParseError::InvalidEscapeSequence))
+                            }
+                        } else {
+                            Err(error_type(CharParseError::InvalidEscapeSequence))
+                        }
+                    } else {
+                        Err(error_type(CharParseError::InvalidEscapeSequence))
+                    }
+                }
+                _ => Ok(next_ch),
+            }
+        } else {
+            Err(error_type(CharParseError::InvalidEscapeSequence))
+        }
     }
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
-        let mut chars = self.input.chars().peekable();
-        let mut tokens = Vec::new();
-
-        while let Some(ch) = chars.next() {
-            self.column += 1;
-
+        while let Some(ch) = self.peek() {
             match ch {
-                '\n' => {
-                    let start = (self.line, self.column);
+                ch if ch.is_whitespace() && ch != '\n' => {
+                    self.next();
 
-                    self.line += 1;
-                    self.column = 0;
+                    continue
+                },
 
-                    let end = (self.line, self.column);
+                ch if ch.is_digit(10) || ch == '.' => self.handle_number()?,
 
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                ch if ch.is_alphabetic() || ch == '_' => self.handle_identifier()?,
 
-                    let token = Token {
-                        kind: TokenKind::Punctuation(PunctuationKind::from_char(&ch)),
-                        span
-                    };
+                '\'' => self.handle_character()?,
 
-                    tokens.push(token);
-                }
-
-                ch if ch.is_whitespace() => continue,
-
-                ch if ch.is_digit(10) || ch == '.' => {
-                    let mut number = ch.to_string();
-                    let start = (self.line, self.column);
-
-                    while let Some(&next_ch) = chars.peek() {
-                        if next_ch.is_digit(10) || next_ch == '.' {
-                            let next_digit = chars.next().unwrap();
-
-                            number.push(next_digit);
-
-                            self.column += 1;
-                        } else if next_ch == '_' {
-                            chars.next();
-
-                            self.column += 1;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    let end = (self.line, self.column);
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                    if number == "." {
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(OperatorKind::Dot),
-                            span
-                        });
-                    } else if number == ".." {
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(OperatorKind::DotDot),
-                            span
-                        });
-                    } else if number.ends_with("..") {
-                        let num_part = number.trim_end_matches("..");
-                        if !num_part.is_empty() {
-                            let num_span = Span {
-                                start,
-                                end: (self.line, self.column + num_part.len()),
-                                file_name: self.file_name.clone(),
-                                file_path: self.file_path.clone(),
-                            };
-                            tokens.push(Token {
-                                kind: Self::lex_number(num_part)?,
-                                span: num_span
-                            });
-                        }
-
-                        let op_span = Span {
-                            start: (self.line, self.column + number.len() - 2),
-                            end,
-                            file_name: self.file_name.clone(),
-                            file_path: self.file_path.clone(),
-                        };
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(OperatorKind::DotDot),
-                            span: op_span
-                        });
-                    } else if number.contains("..") {
-                        let parts: Vec<&str> = number.split("..").collect();
-
-                        if parts.len() == 2 {
-                            if !parts[0].is_empty() {
-                                let first_span = Span {
-                                    start,
-                                    end: (self.line, self.column + parts[0].len()),
-                                    file_name: self.file_name.clone(),
-                                    file_path: self.file_path.clone(),
-                                };
-                                tokens.push(Token {
-                                    kind: Self::lex_number(parts[0])?,
-                                    span: first_span
-                                });
-                            }
-
-                            let op_span = Span {
-                                start: (self.line, self.column + parts[0].len()),
-                                end: (self.line, self.column + parts[0].len() + 2),
-                                file_name: self.file_name.clone(),
-                                file_path: self.file_path.clone(),
-                            };
-                            tokens.push(Token {
-                                kind: TokenKind::Operator(OperatorKind::DotDot),
-                                span: op_span
-                            });
-
-                            if !parts[1].is_empty() {
-                                let second_span = Span {
-                                    start: (self.line, self.column + parts[0].len() + 2),
-                                    end,
-                                    file_name: self.file_name.clone(),
-                                    file_path: self.file_path.clone(),
-                                };
-                                tokens.push(Token {
-                                    kind: Self::lex_number(parts[1])?,
-                                    span: second_span
-                                });
-                            }
-                        } else {
-                            return Err(LexError::IntParseError(IntParseError::InvalidRange));
-                        }
-                    } else {
-                        tokens.push(Token {
-                            kind: Self::lex_number(&number)?,
-                            span
-                        });
-                    }
-                }
-
-                ch if ch.is_alphabetic() || ch == '_' => {
-                    let mut name = ch.to_string();
-                    let start = (self.line, self.column);
-
-                    while let Some(&next_ch) = chars.peek() {
-                        if next_ch.is_alphanumeric() || next_ch == '_' {
-                            name.push(chars.next().unwrap());
-                            self.column += 1;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    let end = (self.line, self.column);
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                    match TokenKind::from_str(name.as_str()) {
-                        Some(token_kind) => tokens.push(Token { kind: token_kind, span }),
-                        _ => tokens.push(Token { kind: TokenKind::Identifier(name), span }),
-                    }
-                }
-
-                '\'' => {
-                    let mut content = String::new();
-                    let mut closed = false;
-                    let mut is_escaped = false;
-
-                    let start = (self.line, self.column);
-
-                    while let Some(next_ch) = chars.next() {
-                        self.column += 1;
-
-                        if is_escaped {
-                            match next_ch {
-                                'n' => content.push('\n'),
-                                'r' => content.push('\r'),
-                                't' => content.push('\t'),
-                                '\\' => content.push('\\'),
-                                '\'' => content.push('\''),
-                                '"' => content.push('"'),
-                                '0' => content.push('\0'),
-                                'x' => {
-                                    let mut hex = String::new();
-                                    for _ in 0..2 {
-                                        if let Some(&next_hex) = chars.peek() {
-                                            if next_hex.is_digit(16) {
-                                                hex.push(chars.next().unwrap());
-                                                self.column += 1;
-                                            } else {
-                                                break;
-                                            }
-                                        } else {
-                                            break;
-                                        }
-                                    }
-
-                                    if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                                        if let Some(ch) = std::char::from_u32(hex_value) {
-                                            content.push(ch);
-                                        } else {
-                                            return Err(LexError::CharParseError(CharParseError::InvalidEscapeSequence));
-                                        }
-                                    } else {
-                                        return Err(LexError::CharParseError(CharParseError::InvalidEscapeSequence));
-                                    }
-                                },
-                                'u' => {
-                                    if chars.peek() == Some(&'{') {
-                                        chars.next();
-                                        self.column += 1;
-
-                                        let mut hex = String::new();
-                                        let mut closed_brace = false;
-
-                                        for _ in 0..6 {
-                                            if let Some(&next_hex) = chars.peek() {
-                                                if next_hex.is_digit(16) {
-                                                    hex.push(chars.next().unwrap());
-                                                    self.column += 1;
-                                                } else if next_hex == '}' {
-                                                    chars.next();
-                                                    self.column += 1;
-                                                    closed_brace = true;
-                                                    break;
-                                                } else {
-                                                    break;
-                                                }
-                                            } else {
-                                                break;
-                                            }
-                                        }
-
-                                        if !closed_brace {
-                                            return Err(LexError::CharParseError(CharParseError::UnClosedEscapeSequence));
-                                        }
-
-                                        if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                                            if let Some(ch) = std::char::from_u32(hex_value) {
-                                                content.push(ch);
-                                            } else {
-                                                return Err(LexError::CharParseError(CharParseError::InvalidEscapeSequence));
-                                            }
-                                        } else {
-                                            return Err(LexError::CharParseError(CharParseError::InvalidEscapeSequence));
-                                        }
-                                    } else {
-                                        return Err(LexError::CharParseError(CharParseError::InvalidEscapeSequence));
-                                    }
-                                },
-                                _ => content.push(next_ch),
-                            }
-                            is_escaped = false;
-                        } else if next_ch == '\\' {
-                            is_escaped = true;
-                        } else if next_ch == '\'' {
-                            let end = (self.line, self.column);
-                            let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                            if content.chars().count() == 1 {
-                                let ch = content.chars().next().unwrap();
-                                tokens.push(Token { kind: TokenKind::Char(ch), span });
-                                closed = true;
-                                break;
-                            } else {
-                                return Err(LexError::CharParseError(CharParseError::InvalidCharLiteral));
-                            }
-                        } else {
-                            content.push(next_ch);
-                        }
-                    }
-
-                    if !closed {
-                        let end = (self.line, self.column);
-                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                        tokens.push(Token {
-                            kind: TokenKind::Invalid(format!("'{}", content)),
-                            span
-                        });
-
-                        return Err(LexError::UnClosedChar);
-                    }
-                }
-
-                '"' => {
-                    let mut content = String::new();
-                    let mut closed = false;
-                    let start = (self.line, self.column);
-
-                    let mut is_escaped = false;
-
-                    while let Some(next_ch) = chars.next() {
-                        self.column += 1;
-
-                        if is_escaped {
-                            match next_ch {
-                                'n' => content.push('\n'),
-                                'r' => content.push('\r'),
-                                't' => content.push('\t'),
-                                '\\' => content.push('\\'),
-                                '\'' => content.push('\''),
-                                '"' => content.push('"'),
-                                '0' => content.push('\0'),
-                                'x' => {
-                                    let mut hex = String::new();
-                                    for _ in 0..2 {
-                                        if let Some(&next_hex) = chars.peek() {
-                                            if next_hex.is_digit(16) {
-                                                hex.push(chars.next().unwrap());
-                                                self.column += 1;
-                                            } else {
-                                                break;
-                                            }
-                                        } else {
-                                            break;
-                                        }
-                                    }
-
-                                    if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                                        if let Some(ch) = std::char::from_u32(hex_value) {
-                                            content.push(ch);
-                                        } else {
-                                            return Err(LexError::StringParseError(CharParseError::InvalidEscapeSequence));
-                                        }
-                                    } else {
-                                        return Err(LexError::StringParseError(CharParseError::InvalidEscapeSequence));
-                                    }
-                                },
-                                'u' => {
-                                    if chars.peek() == Some(&'{') {
-                                        chars.next();
-                                        self.column += 1;
-
-                                        let mut hex = String::new();
-                                        let mut closed_brace = false;
-
-                                        for _ in 0..6 {
-                                            if let Some(&next_hex) = chars.peek() {
-                                                if next_hex.is_digit(16) {
-                                                    hex.push(chars.next().unwrap());
-                                                    self.column += 1;
-                                                } else if next_hex == '}' {
-                                                    chars.next();
-                                                    self.column += 1;
-                                                    closed_brace = true;
-                                                    break;
-                                                } else {
-                                                    break;
-                                                }
-                                            } else {
-                                                break;
-                                            }
-                                        }
-
-                                        if !closed_brace {
-                                            return Err(LexError::StringParseError(CharParseError::UnClosedEscapeSequence));
-                                        }
-
-                                        if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                                            if let Some(ch) = std::char::from_u32(hex_value) {
-                                                content.push(ch);
-                                            } else {
-                                                return Err(LexError::StringParseError(CharParseError::InvalidEscapeSequence));
-                                            }
-                                        } else {
-                                            return Err(LexError::StringParseError(CharParseError::InvalidEscapeSequence));
-                                        }
-                                    } else {
-                                        return Err(LexError::StringParseError(CharParseError::InvalidEscapeSequence));
-                                    }
-                                },
-                                _ => content.push(next_ch),
-                            }
-                            is_escaped = false;
-                        } else if next_ch == '\\' {
-                            is_escaped = true;
-                        } else if next_ch == '"' {
-                            let end = (self.line, self.column);
-                            let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                            tokens.push(Token {
-                                kind: TokenKind::Str(content.clone()),
-                                span
-                            });
-
-                            closed = true;
-                            break;
-                        } else {
-                            content.push(next_ch);
-                        }
-                    }
-
-                    if !closed {
-                        let end = (self.line, self.column);
-                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
-
-                        tokens.push(Token {
-                            kind: TokenKind::Invalid(format!("\"{}\"", content)),
-                            span
-                        });
-
-                        return Err(LexError::UnClosedString);
-                    }
-                }
+                '"' => self.handle_string()?,
 
                 '/' => {
+                    self.next();
+
                     let start = (self.line, self.column);
 
-                    if let Some(&next_ch) = chars.peek() {
+                    if let Some(next_ch) = self.peek() {
                         match next_ch {
                             '/' => {
-                                let mut comment = String::new();
-                                chars.next();
-                                self.column += 1;
+                                let mut comment = Vec::new();
+                                self.next();
 
-                                while let Some(&next_ch) = chars.peek() {
-                                    if next_ch == '\n' { break; }
+                                while let Some(next_ch) = self.peek() {
+                                    if next_ch == '\n' {
+                                        break;
+                                    }
 
                                     comment.push(next_ch);
-                                    chars.next();
-                                    self.column += 1;
+                                    self.next();
                                 }
 
                                 let end = (self.line, self.column);
-                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                                let span = self.create_span(start, end);
 
-                                tokens.push(Token {
-                                    kind: TokenKind::Comment(comment),
-                                    span
-                                });
-                            },
+                                let comment_string: String = comment.into_iter().collect();
+                                self.push_token(TokenKind::Comment(comment_string), span);
+                            }
                             '*' => {
-                                let mut comment = String::new();
-                                chars.next();
-                                self.column += 1;
+                                let mut comment = Vec::new();
+                                self.next();
 
                                 let mut closed = false;
                                 let mut last_char = '*';
 
-                                while let Some(next_ch) = chars.next() {
+                                while let Some(next_ch) = self.next() {
                                     if last_char == '*' && next_ch == '/' {
                                         closed = true;
-                                        comment.pop();
+                                        if !comment.is_empty() {
+                                            comment.pop(); // Remove the last '*'
+                                        }
                                         break;
-                                    } else if next_ch == '\n' {
-                                        self.column = 0;
-                                        self.line += 1;
                                     }
 
-                                    self.column += 1;
                                     comment.push(next_ch);
 
                                     last_char = next_ch;
                                 }
 
                                 let end = (self.line, self.column);
-                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                                let span = self.create_span(start, end);
 
+                                let comment_string: String = comment.into_iter().collect();
                                 if closed {
-                                    tokens.push(Token {
-                                        kind: TokenKind::Comment(comment),
-                                        span
-                                    });
+                                    self.push_token(TokenKind::Comment(comment_string), span);
                                 } else {
-                                    tokens.push(Token {
-                                        kind: TokenKind::Invalid(comment),
-                                        span
-                                    });
-
+                                    self.push_token(TokenKind::Invalid(comment_string), span);
                                     return Err(LexError::UnClosedComment);
                                 }
-                            },
+                            }
                             _ => {
                                 let end = (self.line, self.column);
-                                let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                                let span = self.create_span(start, end);
 
-                                tokens.push(Token {
-                                    kind: TokenKind::Operator(OperatorKind::Slash),
-                                    span
-                                });
+                                self.push_token(TokenKind::Operator(OperatorKind::Slash), span);
                             }
                         }
                     } else {
                         let end = (self.line, self.column);
-                        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                        let span = self.create_span(start, end);
 
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(OperatorKind::Slash),
-                            span
-                        });
+                        self.push_token(TokenKind::Operator(OperatorKind::Slash), span);
                     }
                 }
 
                 ch if OperatorKind::is_operator(ch) => {
-                    let mut operator = ch.to_string();
+                    self.next();
+
+                    let mut operator = Vec::new();
+                    operator.push(ch);
                     let start = (self.line, self.column);
 
-                    while let Some(&next_ch) = chars.peek() {
+                    while let Some(next_ch) = self.peek() {
                         if OperatorKind::is_operator(next_ch) {
-                            operator.push(chars.next().unwrap());
-                            self.column += 1;
+                            operator.push(self.next().unwrap());
                         } else {
                             break;
                         }
                     }
 
                     let end = (self.line, self.column);
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                    let span = self.create_span(start, end);
 
-                    if OperatorKind::Unknown != OperatorKind::from_str(&operator) {
-                        let op = OperatorKind::from_str(&operator);
-
-                        tokens.push(Token {
-                            kind: TokenKind::Operator(op),
-                            span
-                        });
+                    let operator_string: String = operator.iter().collect();
+                    if OperatorKind::Unknown != OperatorKind::from_str(&operator_string) {
+                        let op = OperatorKind::from_str(&operator_string);
+                        self.push_token(TokenKind::Operator(op), span);
                     } else {
-                        for (i, c) in operator.chars().enumerate() {
-                            let single_char_span = Span {
-                                start: (self.line, self.column + i + 1),
-                                end: (self.line, self.column + i + 2),
-                                file_name: self.file_name.clone(),
-                                file_path: self.file_path.clone(),
-                            };
-                            tokens.push(Token {
-                                kind: TokenKind::Operator(OperatorKind::from_str(c.to_string().as_str())),
-                                span: single_char_span,
-                            });
+                        for (i, c) in operator.iter().enumerate() {
+                            let single_char_span = self.create_span(
+                                (self.line, self.column + i + 1),
+                                (self.line, self.column + i + 2),
+                            );
+                            self.push_token(
+                                TokenKind::Operator(OperatorKind::from_str(c.to_string().as_str())),
+                                single_char_span,
+                            );
                         }
                     }
                 }
 
-
                 ch if PunctuationKind::is_punctuation(ch) => {
+                    self.next();
+
                     let start = (self.line, self.column);
                     let end = (self.line, self.column);
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                    let span = self.create_span(start, end);
 
-                    let punc = PunctuationKind::from_char(&ch);
-
-                    tokens.push(Token {
-                        kind: TokenKind::Punctuation(punc),
-                        span
-                    });
+                    self.push_token(TokenKind::Punctuation(PunctuationKind::from_char(&ch)), span);
                 }
 
                 _ => {
+                    self.next();
+
                     let start = (self.line, self.column);
                     let end = (self.line, self.column);
-                    let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+                    let span = self.create_span(start, end);
 
-                    tokens.push(Token {
-                        kind: TokenKind::Invalid(ch.to_string()),
-                        span
-                    });
-
+                    self.push_token(TokenKind::Invalid(ch.to_string()), span);
                     return Err(LexError::InvalidChar);
                 }
             }
         }
 
-        let line_count = self.input.lines().count();
-        let last_line_length = self.input.lines().last().map_or(0, |line| line.len());
-        let start = (line_count, last_line_length + 1);
-        let end = (line_count, last_line_length + 1);
-        let span = Span { start, end, file_name: self.file_name.clone(), file_path: self.file_path.clone() };
+        let file_end = (self.line, self.column);
+        let span = self.create_span(file_end, file_end);
 
-        tokens.push(Token {
-            kind: TokenKind::EOF,
-            span
-        });
+        self.push_token(TokenKind::EOF, span);
 
-        Ok(tokens)
+        Ok(self.tokens.clone())
     }
 
+    fn handle_character(&mut self) -> Result<(), LexError> {
+        self.next();
+
+        let mut content = Vec::new();
+        let mut closed = false;
+        let mut is_escaped = false;
+
+        let start = (self.line, self.column);
+
+        while let Some(next_ch) = self.next() {
+            if is_escaped {
+                match self.handle_escape_sequence(false) {
+                    Ok(escaped_char) => content.push(escaped_char),
+                    Err(e) => return Err(e),
+                }
+                is_escaped = false;
+            } else if next_ch == '\\' {
+                is_escaped = true;
+            } else if next_ch == '\'' {
+                let end = (self.line, self.column);
+                let span = self.create_span(start, end);
+
+                if content.len() == 1 {
+                    let ch = content[0];
+                    self.push_token(TokenKind::Char(ch), span);
+                    closed = true;
+                    break;
+                } else {
+                    return Err(LexError::CharParseError(CharParseError::InvalidCharLiteral));
+                }
+            } else {
+                content.push(next_ch);
+            }
+        }
+
+        if !closed {
+            let end = (self.line, self.column);
+            let span = self.create_span(start, end);
+
+            let content_string: String = content.into_iter().collect();
+            self.push_token(TokenKind::Invalid(format!("'{}", content_string)), span);
+
+            return Err(LexError::UnClosedChar);
+        }
+
+        Ok(())
+    }
+
+    fn handle_string(&mut self) -> Result<(), LexError> {
+        self.next();
+
+        let mut content = Vec::new();
+        let mut closed = false;
+        let start = (self.line, self.column);
+
+        let mut is_escaped = false;
+
+        while let Some(next_ch) = self.next() {
+            if is_escaped {
+                match self.handle_escape_sequence(true) {
+                    Ok(escaped_char) => content.push(escaped_char),
+                    Err(e) => return Err(e),
+                }
+                is_escaped = false;
+            } else if next_ch == '\\' {
+                is_escaped = true;
+            } else if next_ch == '"' {
+                let end = (self.line, self.column);
+                let span = self.create_span(start, end);
+
+                let content_string: String = content.clone().into_iter().collect();
+                self.push_token(TokenKind::Str(content_string), span);
+
+                closed = true;
+                break;
+            } else {
+                content.push(next_ch);
+            }
+        }
+
+        if !closed {
+            let end = (self.line, self.column);
+            let span = self.create_span(start, end);
+
+            let content_string: String = content.clone().into_iter().collect();
+
+            self.push_token(TokenKind::Invalid(format!("\"{}\"", content_string)), span);
+
+            return Err(LexError::UnClosedString);
+        }
+
+        Ok(())
+    }
+
+    fn handle_identifier(&mut self) -> Result<(), LexError> {
+        let ch = self.next().unwrap();
+
+        let mut name = ch.to_string();
+        let start = (self.line, self.column);
+
+        while let Some(next_ch) = self.peek() {
+            if next_ch.is_alphanumeric() || next_ch == '_' {
+                name.push(self.next().unwrap());
+            } else {
+                break;
+            }
+        }
+
+        let end = (self.line, self.column);
+        let span = self.create_span(start, end);
+
+        match TokenKind::from_str(name.as_str()) {
+            Some(token_kind) => self.push_token(token_kind, span),
+            _ => self.push_token(TokenKind::Identifier(name), span),
+        }
+
+        Ok(())
+    }
+
+    fn handle_number(&mut self) -> Result<(), LexError> {
+        let ch = self.next().unwrap();
+        let mut number = ch.to_string();
+        let start = (self.line, self.column);
+
+        while let Some(ch) = self.peek() {
+            match ch {
+                ch if ch.is_digit(10) => {
+                    let digit = self.next().unwrap();
+
+                    number.push(digit);
+                }
+                '.' => {
+                    let number_end = (self.line, self.column);
+                    self.next();
+
+                    if let Some(next_ch) = self.peek() {
+                        if next_ch == '.' {
+                            let dot_pos = (self.line, self.column);
+
+                            let kind = Self::lex_number(&number)?;
+                            self.tokens.push(Token {
+                                kind,
+                                span: self.create_span(start, number_end),
+                            });
+
+                            self.next();
+                            let op_end = (self.line, self.column);
+                            self.tokens.push(Token {
+                                kind: TokenKind::Operator(OperatorKind::DotDot),
+                                span: self.create_span(dot_pos, op_end),
+                            });
+
+                            return Ok(());
+                        }
+                    }
+
+                    number.push('.');
+                }
+                '_' => {
+                    self.next();
+                }
+                _ => break,
+            }
+        }
+
+        let number_end = (self.line, self.column);
+        if number == "." {
+            self.tokens.push(Token {
+                kind: TokenKind::Operator(OperatorKind::Dot),
+                span: self.create_span(start, number_end),
+            });
+        } else if number == ".." {
+            self.tokens.push(Token {
+                kind: TokenKind::Operator(OperatorKind::DotDot),
+                span: self.create_span(start, number_end),
+            });
+        } else {
+            let kind = Self::lex_number(&number)?;
+            self.tokens.push(Token {
+                kind,
+                span: self.create_span(start, number_end),
+            });
+        }
+
+        Ok(())
+    }
     fn lex_number(number: &str) -> Result<TokenKind, LexError> {
         if number.len() > 2 {
             match &number[0..2] {
@@ -605,7 +517,7 @@ impl Lexer {
                         }
                     }
                     return Err(LexError::IntParseError(IntParseError::InvalidHexadecimal));
-                },
+                }
                 "0o" | "0O" => {
                     let oct_part = &number[2..];
                     if oct_part.chars().all(|c| c.is_digit(8)) {
@@ -614,7 +526,7 @@ impl Lexer {
                         }
                     }
                     return Err(LexError::IntParseError(IntParseError::InvalidOctal));
-                },
+                }
                 "0b" | "0B" => {
                     let bin_part = &number[2..];
                     if bin_part.chars().all(|c| c.is_digit(2)) {
@@ -623,7 +535,7 @@ impl Lexer {
                         }
                     }
                     return Err(LexError::IntParseError(IntParseError::InvalidBinary));
-                },
+                }
                 _ => {}
             }
         }
@@ -639,9 +551,7 @@ impl Lexer {
                 let base = parts[0];
                 let exponent = parts[1];
 
-                let base_valid = base.is_empty()
-                    || base == "."
-                    || base.parse::<f64>().is_ok();
+                let base_valid = base.is_empty() || base == "." || base.parse::<f64>().is_ok();
 
                 let exponent_valid = exponent.is_empty()
                     || exponent == "+"
@@ -653,8 +563,10 @@ impl Lexer {
                 if base_valid && exponent_valid {
                     return match number.parse::<f64>() {
                         Ok(num) => Ok(TokenKind::Float(num)),
-                        Err(_) => Err(LexError::FloatParseError(IntParseError::InvalidScientificNotation))
-                    }
+                        Err(_) => Err(LexError::FloatParseError(
+                            IntParseError::InvalidScientificNotation,
+                        )),
+                    };
                 }
             }
         }
@@ -662,12 +574,12 @@ impl Lexer {
         if number.contains('.') {
             match number.parse::<f64>() {
                 Ok(num) => Ok(TokenKind::Float(num)),
-                Err(e) => Err(LexError::NumberParse(e.to_string()))
+                Err(e) => Err(LexError::NumberParse(e.to_string())),
             }
         } else {
             match number.parse::<i64>() {
                 Ok(num) => Ok(TokenKind::Integer(num)),
-                Err(e) => Err(LexError::NumberParse(e.to_string()))
+                Err(e) => Err(LexError::NumberParse(e.to_string())),
             }
         }
     }

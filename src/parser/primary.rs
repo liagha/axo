@@ -21,7 +21,7 @@ impl Primary for Parser {
         }) = self.peek().cloned()
         {
             if op.is_unary() {
-                let op = self.advance().unwrap();
+                let op = self.next().unwrap();
 
                 let unary = self.parse_unary()?;
                 let end = unary.span.end;
@@ -47,7 +47,7 @@ impl Primary for Parser {
         }) = self.peek().cloned()
         {
             if op.is_factor() {
-                let op = self.advance().unwrap();
+                let op = self.next().unwrap();
 
                 let right = self.parse_unary()?;
 
@@ -59,7 +59,7 @@ impl Primary for Parser {
 
                 left = Expr { kind, span };
             } else if op == OperatorKind::Colon {
-                self.advance();
+                self.next();
 
                 let right = self.parse_unary()?;
 
@@ -71,7 +71,7 @@ impl Primary for Parser {
 
                 left = Expr { kind, span };
             } else if op == OperatorKind::Dot {
-                self.advance();
+                self.next();
 
                 let field = self.parse_expression()?;
 
@@ -95,7 +95,7 @@ impl Primary for Parser {
         }) = self.peek().cloned()
         {
             if op.is_term() {
-                let op = self.advance().unwrap();
+                let op = self.next().unwrap();
 
                 let right = self.parse_factor()?;
 
@@ -123,7 +123,7 @@ impl Primary for Parser {
         }) = self.peek().cloned()
         {
             if op.is_expression() {
-                let op = self.advance().unwrap();
+                let op = self.next().unwrap();
 
                 let right = self.parse_term()?;
 
@@ -172,7 +172,7 @@ impl Primary for Parser {
 
                     if let Some(token) = self.peek().cloned() {
                         let expr = if token.kind == TokenKind::Operator(OperatorKind::Equal) {
-                            self.advance();
+                            self.next();
                             let right = self.parse_statement()?;
                             let span = self.span(left.span.start, right.span.end);
                             Expr {
@@ -180,7 +180,7 @@ impl Primary for Parser {
                                 span,
                             }
                         } else if OperatorKind::is_compound_token(&token.kind) {
-                            self.advance();
+                            self.next();
                             let right = self.parse_statement()?;
                             let span = self.span(left.span.start, right.span.end);
                             let operation = Expr {
@@ -210,7 +210,7 @@ impl Primary for Parser {
                 ..
             }) = self.peek()
             {
-                self.advance();
+                self.next();
                 return Ok(expr);
             }
 
@@ -229,7 +229,7 @@ impl Primary for Parser {
                 TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
                 TokenKind::Identifier(name) => {
-                    self.advance();
+                    self.next();
                     let kind = ExprKind::Identifier(name.clone());
                     let mut expr = Expr { kind, span };
 
@@ -256,7 +256,7 @@ impl Primary for Parser {
                 | TokenKind::Boolean(_)
                 | TokenKind::Float(_)
                 | TokenKind::Integer(_) => {
-                    self.advance();
+                    self.next();
 
                     let kind = ExprKind::Literal(token.clone());
                     let span = token.span;
@@ -281,7 +281,7 @@ impl Primary for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let mut parameters = Vec::new();
 
@@ -291,7 +291,7 @@ impl Primary for Parser {
                     kind: TokenKind::Punctuation(PunctuationKind::RightParen),
                     span: Span { end, .. },
                 } => {
-                    self.advance();
+                    self.next();
 
                     return if parameters.len() == 1 {
                         Ok(parameters.pop().unwrap())
@@ -306,7 +306,7 @@ impl Primary for Parser {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
                     ..
                 } => {
-                    self.advance();
+                    self.next();
                 }
                 _ => {
                     let expr = self.parse_expression()?;
@@ -328,7 +328,7 @@ impl Primary for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let mut elements = Vec::new();
 
@@ -338,7 +338,7 @@ impl Primary for Parser {
                     kind: TokenKind::Punctuation(PunctuationKind::RightBracket),
                     span: Span { end, .. },
                 } => {
-                    self.advance();
+                    self.next();
 
                     return Ok(Expr {
                         kind: ExprKind::Array(elements),
@@ -349,7 +349,7 @@ impl Primary for Parser {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
                     ..
                 } => {
-                    self.advance();
+                    self.next();
                 }
                 _ => {
                     let expr = self.parse_expression()?;

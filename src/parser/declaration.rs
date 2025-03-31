@@ -14,13 +14,13 @@ impl Declaration for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let identifier = self.parse_expression()?;
 
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Operator(OperatorKind::Equal) {
-                self.advance();
+                self.next();
 
                 let value = self.parse_statement()?;
                 let span = self.span(start, value.span.end);
@@ -45,7 +45,7 @@ impl Declaration for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let function = self.parse_primary()?;
 
@@ -96,7 +96,7 @@ impl Declaration for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let struct_init = self.parse_primary()?;
 
@@ -117,7 +117,7 @@ impl Declaration for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let struct_init = self.parse_primary()?;
 

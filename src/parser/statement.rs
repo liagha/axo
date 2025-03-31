@@ -18,7 +18,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let mut statements = Vec::new();
 
@@ -28,7 +28,7 @@ impl ControlFlow for Parser {
                     let Token {
                         span: Span { end, .. },
                         ..
-                    } = self.advance().unwrap();
+                    } = self.next().unwrap();
 
                     let kind = ExprKind::Block(statements);
                     let expr = Expr {
@@ -39,7 +39,7 @@ impl ControlFlow for Parser {
                     return Ok(expr);
                 }
                 TokenKind::Punctuation(PunctuationKind::Semicolon) => {
-                    self.advance();
+                    self.next();
                 }
                 _ => {
                     let stmt = self.parse_statement()?;
@@ -61,7 +61,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let condition = self.parse_expression()?;
 
@@ -89,7 +89,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let condition = self.parse_expression()?;
 
@@ -109,7 +109,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let clause = self.parse_expression()?;
 
@@ -129,7 +129,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, end, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
         {
@@ -164,7 +164,7 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, end, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
         {
@@ -199,12 +199,12 @@ impl ControlFlow for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = self.advance().unwrap();
+        } = self.next().unwrap();
 
         if let Some(Token {
                         kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
                         span: Span { end, .. },
-                    }) = self.advance()
+                    }) = self.next()
         {
             let kind = ExprKind::Continue;
             let expr = Expr {
