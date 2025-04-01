@@ -1,6 +1,6 @@
-use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::{Expr, ExprKind, Parser, Primary};
+use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::{Expr, ExprKind, Parser, Primary};
 
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;

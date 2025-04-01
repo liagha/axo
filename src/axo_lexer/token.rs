@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind};
-use crate::lexer::Span;
+use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
+use crate::axo_lexer::Span;
 
 #[derive(Clone, PartialEq)]
 pub struct Token {

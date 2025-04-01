@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
 use std::path::PathBuf;
-use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::{Expr, ExprKind, Primary};
+use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::{Expr, ExprKind, Primary};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -203,15 +203,6 @@ impl Parser {
         if let Some(token) = self.peek() {
             if let TokenKind::Operator(kind) = &token.kind {
                 return kind == &op;
-            }
-        }
-        false
-    }
-
-    pub fn next_is_ident(&self, text: &str) -> bool {
-        if let Some(token) = self.peek() {
-            if let TokenKind::Identifier(ident) = &token.kind {
-                return ident == text;
             }
         }
         false

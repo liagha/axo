@@ -1,7 +1,7 @@
-use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::expression::{Expr, ExprKind};
-use crate::parser::{Parser, Primary};
+use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::expression::{Expr, ExprKind};
+use crate::axo_ast::{Parser, Primary};
 
 pub trait ControlFlow {
     fn parse_block(&mut self) -> Result<Expr, ParseError>;

@@ -1,9 +1,9 @@
 use core::fmt;
 use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
-use crate::lexer::{Span, Token};
-use crate::lexer::{PunctuationKind, TokenKind};
-use crate::parser::{Expr, ExprKind};
+use crate::axo_lexer::{Span, Token};
+use crate::axo_lexer::{PunctuationKind, TokenKind};
+use crate::axo_ast::{Expr, ExprKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

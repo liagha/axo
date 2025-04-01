@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::Parser;
+use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::Parser;
 
 #[derive(Clone)]
 pub struct Expr {

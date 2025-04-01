@@ -1,6 +1,6 @@
-use crate::lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
+use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
 
 pub trait Primary {
     fn parse_unary(&mut self) -> Result<Expr, ParseError>;

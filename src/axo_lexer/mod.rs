@@ -5,6 +5,9 @@ mod keyword;
 pub mod lexer;
 pub mod error;
 mod span;
+mod number;
+mod handler;
+
 pub use lexer::Lexer;
 pub use span::Span;
 pub use token::{TokenKind, Token};

@@ -1,12 +1,11 @@
 mod cli;
-mod parser;
-pub mod lexer;
-
+mod axo_ast;
+pub mod axo_lexer;
+use std::time::Instant;
 use std::path::PathBuf;
 use std::str::FromStr;
-use lexer::{Lexer, PunctuationKind, Token, TokenKind};
-use parser::Parser;
-
+use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
+use axo_ast::Parser;
 use broccli::{xprintln, Color, TextStyle};
 
 fn main() {
@@ -14,7 +13,12 @@ fn main() {
     let file_path = "/test_project/text.axo";
     exec_path.push_str(file_path);
     xprintln!("Path: {}", exec_path);
-    if let Ok(content) = std::fs::read_to_string(exec_path) {
+
+    let start = Instant::now();
+    if let Ok(content) = std::fs::read_to_string(&exec_path) {
+        let read_time = start.elapsed();
+        println!("File read took: {:?}", read_time);
+
         xprintln!(
             "File Contents: \n{}" => Color::Blue,
             content.clone() => Color::BrightBlue
@@ -22,30 +26,39 @@ fn main() {
 
         xprintln!();
 
+        let lex_start = Instant::now();
         let mut lexer = Lexer::new(content, PathBuf::from_str(file_path).unwrap());
 
         match lexer.tokenize() {
             Ok(tokens) => {
-                xprintln!("Tokens: \n{}", format_tokens(&tokens));
+                let lex_time = lex_start.elapsed().as_millis();
+                xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
 
                 xprintln!();
 
+                let parse_start = Instant::now();
                 let mut parser = Parser::new(tokens.clone(), PathBuf::from_str(file_path).unwrap());
                 match parser.parse_program() {
                     Ok(stmts) => {
-                        println!("Parsed AST: {}", format!("{:#?}", stmts).term_colorize(Color::Green));
+                        let parse_time = parse_start.elapsed().as_millis();
+                        xprintln!("Parsed AST: {} => took {}ms", format!("{:#?}", stmts).term_colorize(Color::Green), parse_time);
                     },
                     Err(err) => {
                         let end_span = tokens[parser.position].span.clone();
-
-                        //println!("{:#?}", parser.output);
-                        xprintln!("Parse error ({}): {}" => Color::Red, end_span, err => Color::Orange);
+                        let parse_time = parse_start.elapsed().as_millis();
+                        xprintln!("Parse error ({}): {} => took {}ms" => Color::Red, end_span, err => Color::Orange, parse_time);
                     }
                 }
             }
-            Err(e) => xprintln!("Lexing error: ({}:{}) {}" => Color::Red, lexer.line, lexer.column, e => Color::Orange),
+            Err(e) => {
+                let lex_time = lex_start.elapsed().as_millis();
+                xprintln!("Lexing error: ({}:{}) {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
+            }
         }
     }
+
+    let total_time = start.elapsed().as_millis();
+    xprintln!("Total execution time: {}ms" => Color::Green, total_time);
 }
 
 fn format_tokens(input: &Vec<Token>) -> String {

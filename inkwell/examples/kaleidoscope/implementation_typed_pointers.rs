@@ -64,7 +64,7 @@ impl LexError {
 /// `Token` on success, or a `LexError` on failure.
 pub type LexResult = Result<Token, LexError>;
 
-/// Defines a lexer which transforms an input `String` into
+/// Defines a axo_lexer which transforms an input `String` into
 /// a `Token` stream.
 pub struct Lexer<'a> {
     input: &'a str,
@@ -279,7 +279,7 @@ pub struct Function {
     pub is_anon: bool,
 }
 
-/// Represents the `Expr` parser.
+/// Represents the `Expr` axo_ast.
 pub struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
@@ -290,7 +290,7 @@ pub struct Parser<'a> {
 // the result when an EOF is acceptable.
 #[allow(unused_must_use)]
 impl<'a> Parser<'a> {
-    /// Creates a new parser, given an input `str` and a `HashMap` binding
+    /// Creates a new axo_ast, given an input `str` and a `HashMap` binding
     /// an operator and its precedence in binary expressions.
     pub fn new(input: String, op_precedence: &'a mut HashMap<char, i32>) -> Self {
         let mut lexer = Lexer::new(input.as_str());
@@ -303,7 +303,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parses the content of the parser.
+    /// Parses the content of the axo_ast.
     pub fn parse(&mut self) -> Result<Function, &'static str> {
         let result = match self.current()? {
             Def => self.parse_def(),

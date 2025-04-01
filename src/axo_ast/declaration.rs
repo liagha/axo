@@ -1,6 +1,6 @@
-use crate::lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::parser::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::parser::{Expr, ExprKind, Parser, Primary};
+use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
+use crate::axo_ast::{Expr, ExprKind, Parser, Primary};
 
 pub trait Declaration {
     fn parse_let(&mut self) -> Result<Expr, ParseError>;

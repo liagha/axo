@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use crate::lexer::{TokenKind, Token};
-use crate::parser::{Expr};
+use crate::axo_lexer::{TokenKind, Token};
+use crate::axo_ast::{Expr};
 
 pub enum SyntaxPosition {
     After,
@@ -221,7 +221,7 @@ impl core::fmt::Display for ParseError {
                 write!(f, "Invalid syntax pattern: '{}'", m)
             }
             ParseError::UnimplementedFeature => {
-                write!(f, "Unimplemented parser feature")
+                write!(f, "Unimplemented axo_ast feature")
             }
             ParseError::UnexpectedEndOfFile => {
                 write!(f, "Unexpected end of file")

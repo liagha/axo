@@ -437,7 +437,7 @@ impl Target {
             unsafe { LLVMInitializeHexagonAsmPrinter() };
         }
 
-        // Asm parser status unknown
+        // Asm axo_ast status unknown
 
         if config.disassembler {
             let _guard = TARGET_LOCK.write().unwrap_or_else(|e| e.into_inner());
@@ -472,7 +472,7 @@ impl Target {
             unsafe { LLVMInitializeNVPTXAsmPrinter() };
         }
 
-        // Asm parser status unknown
+        // Asm axo_ast status unknown
 
         if config.machine_code {
             let _guard = TARGET_LOCK.write().unwrap_or_else(|e| e.into_inner());
@@ -504,7 +504,7 @@ impl Target {
             unsafe { LLVMInitializeMSP430AsmPrinter() };
         }
 
-        // Asm parser status unknown
+        // Asm axo_ast status unknown
 
         if config.machine_code {
             let _guard = TARGET_LOCK.write().unwrap_or_else(|e| e.into_inner());
@@ -536,7 +536,7 @@ impl Target {
             unsafe { LLVMInitializeXCoreAsmPrinter() };
         }
 
-        // Asm parser status unknown
+        // Asm axo_ast status unknown
 
         if config.disassembler {
             let _guard = TARGET_LOCK.write().unwrap_or_else(|e| e.into_inner());
@@ -647,7 +647,7 @@ impl Target {
             unsafe { LLVMInitializeBPFAsmPrinter() };
         }
 
-        // No asm parser
+        // No asm axo_ast
 
         if config.disassembler {
             use llvm_sys::target::LLVMInitializeBPFDisassembler;
@@ -852,8 +852,8 @@ impl Target {
             let code = unsafe { LLVM_InitializeNativeAsmParser() };
 
             if code == 1 {
-                // REVIEW: Does parser need to go before printer?
-                return Err("Unknown error in initializing native asm parser".into());
+                // REVIEW: Does axo_ast need to go before printer?
+                return Err("Unknown error in initializing native asm axo_ast".into());
             }
         }
 

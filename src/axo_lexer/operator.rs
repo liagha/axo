@@ -1,4 +1,4 @@
-use crate::lexer::{Token, TokenKind, Span};
+use crate::axo_lexer::{Token, TokenKind, Span};
 
 /// Enum representing various operator kinds in the language
 #[derive(Clone, Debug, PartialEq)]
