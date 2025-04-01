@@ -446,7 +446,7 @@ impl Lexer {
 
         while let Some(ch) = self.peek() {
             match ch {
-                ch if ch.is_digit(10) => {
+                ch if ch.is_digit(10) || ch ==  '.' => {
                     let digit = self.next().unwrap();
 
                     number.push(digit);
@@ -486,14 +486,11 @@ impl Lexer {
         }
 
         let number_end = (self.line, self.column);
-        if number == "." {
+        let operator = OperatorKind::from_str(&*number);
+
+        if operator != OperatorKind::Unknown {
             self.tokens.push(Token {
-                kind: TokenKind::Operator(OperatorKind::Dot),
-                span: self.create_span(start, number_end),
-            });
-        } else if number == ".." {
-            self.tokens.push(Token {
-                kind: TokenKind::Operator(OperatorKind::DotDot),
+                kind: TokenKind::Operator(operator),
                 span: self.create_span(start, number_end),
             });
         } else {

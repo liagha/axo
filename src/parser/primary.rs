@@ -16,11 +16,11 @@ pub trait Primary {
 impl Primary for Parser {
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
         if let Some(Token {
-            kind: TokenKind::Operator(op),
-            span: Span { start, .. },
-        }) = self.peek().cloned()
+                        kind: TokenKind::Operator(op),
+                        span: Span { start, .. },
+                    }) = self.peek().cloned()
         {
-            if op.is_unary() {
+            if op.is_prefix() {
                 let op = self.next().unwrap();
 
                 let unary = self.parse_unary()?;
@@ -36,7 +36,25 @@ impl Primary for Parser {
             }
         }
 
-        self.parse_primary()
+        let mut expr = self.parse_primary()?;
+
+        while let Some(Token {
+                           kind: TokenKind::Operator(op),
+                           span: Span { end, .. },
+                       }) = self.peek().cloned()
+        {
+            if op.is_postfix() {
+                let op = self.next().unwrap();
+                let span = self.span(expr.span.start, end);
+
+                let kind = ExprKind::Unary(op, expr.into());
+                expr = Expr { kind, span };
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
     }
     fn parse_factor(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.parse_unary()?;
