@@ -279,7 +279,7 @@ pub struct Function {
     pub is_anon: bool,
 }
 
-/// Represents the `Expr` axo_ast.
+/// Represents the `Expr` axo_parser.
 pub struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
@@ -290,7 +290,7 @@ pub struct Parser<'a> {
 // the result when an EOF is acceptable.
 #[allow(unused_must_use)]
 impl<'a> Parser<'a> {
-    /// Creates a new axo_ast, given an input `str` and a `HashMap` binding
+    /// Creates a new axo_parser, given an input `str` and a `HashMap` binding
     /// an operator and its precedence in binary expressions.
     pub fn new(input: String, op_precedence: &'a mut HashMap<char, i32>) -> Self {
         let mut lexer = Lexer::new(input.as_str());
@@ -303,7 +303,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parses the content of the axo_ast.
+    /// Parses the content of the axo_parser.
     pub fn parse(&mut self) -> Result<Function, &'static str> {
         let result = match self.current()? {
             Def => self.parse_def(),

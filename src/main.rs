@@ -1,59 +1,90 @@
 mod cli;
-mod axo_ast;
+mod axo_parser;
 pub mod axo_lexer;
 use std::time::Instant;
 use std::path::PathBuf;
-use std::str::FromStr;
 use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
-use axo_ast::Parser;
+use axo_parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
 
 fn main() {
-    let mut exec_path = std::env::current_dir().unwrap().to_str().unwrap().to_string();
-    let file_path = "/test_project/text.axo";
-    exec_path.push_str(file_path);
-    xprintln!("Path: {}", exec_path);
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Usage: {} <file.axo>", args[0]);
+        std::process::exit(1);
+    }
+
+    let file_path = &args[1];
+
+    let exec_path = match std::env::current_dir() {
+        Ok(mut path) => {
+            path.push(file_path);
+            path
+        }
+        Err(e) => {
+            eprintln!("Failed to get current directory: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    xprintln!("Path: {}", exec_path.display());
 
     let start = Instant::now();
-    if let Ok(content) = std::fs::read_to_string(&exec_path) {
-        let read_time = start.elapsed();
-        println!("File read took: {:?}", read_time);
 
-        xprintln!(
-            "File Contents: \n{}" => Color::Blue,
-            content.clone() => Color::BrightBlue
-        );
+    match std::fs::read_to_string(&exec_path) {
+        Ok(content) => {
+            let read_time = start.elapsed();
+            println!("File read took: {:?}", read_time);
 
-        xprintln!();
+            xprintln!(
+                "File Contents: \n{}" => Color::Blue,
+                content.clone() => Color::BrightBlue
+            );
 
-        let lex_start = Instant::now();
-        let mut lexer = Lexer::new(content, PathBuf::from_str(file_path).unwrap());
+            xprintln!();
 
-        match lexer.tokenize() {
-            Ok(tokens) => {
-                let lex_time = lex_start.elapsed().as_millis();
-                xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
+            let lex_start = Instant::now();
+            let mut lexer = Lexer::new(content, PathBuf::from(file_path));
 
-                xprintln!();
+            match lexer.tokenize() {
+                Ok(tokens) => {
+                    let lex_time = lex_start.elapsed().as_millis();
+                    xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
 
-                let parse_start = Instant::now();
-                let mut parser = Parser::new(tokens.clone(), PathBuf::from_str(file_path).unwrap());
-                match parser.parse_program() {
-                    Ok(stmts) => {
-                        let parse_time = parse_start.elapsed().as_millis();
-                        xprintln!("Parsed AST: {} => took {}ms", format!("{:#?}", stmts).term_colorize(Color::Green), parse_time);
-                    },
-                    Err(err) => {
-                        let end_span = tokens[parser.position].span.clone();
-                        let parse_time = parse_start.elapsed().as_millis();
-                        xprintln!("Parse error ({}): {} => took {}ms" => Color::Red, end_span, err => Color::Orange, parse_time);
+                    xprintln!();
+
+                    let parse_start = Instant::now();
+                    let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
+                    match parser.parse_program() {
+                        Ok(stmts) => {
+                            let parse_time = parse_start.elapsed().as_millis();
+                            xprintln!("Parsed AST: {} => took {}ms", format!("{:#?}", stmts).term_colorize(Color::Green), parse_time);
+                        },
+                        Err(err) => {
+                            let end_span = tokens[parser.position].span.clone();
+                            let parse_time = parse_start.elapsed().as_millis();
+                            let state = parser.state
+                                .iter()
+                                .map(|s| format!("{:?}", s)) // Convert each element to String if needed
+                                .collect::<Vec<_>>()
+                                .join(" => ");
+
+                            println!("{:#?}", parser.expressions);
+
+                            xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red, end_span, state, err => Color::Orange, parse_time);
+                        }
                     }
                 }
+                Err(e) => {
+                    let lex_time = lex_start.elapsed().as_millis();
+                    xprintln!("Lexing error: {}:{} {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
+                }
             }
-            Err(e) => {
-                let lex_time = lex_start.elapsed().as_millis();
-                xprintln!("Lexing error: ({}:{}) {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
-            }
+        }
+        Err(e) => {
+            eprintln!("Failed to read file: {}", e);
+            std::process::exit(1);
         }
     }
 

@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::axo_ast::Parser;
+use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::Parser;
 
 #[derive(Clone)]
 pub struct Expr {
@@ -44,8 +44,8 @@ pub enum ExprKind {
     // Flow Control Statements
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
-    Continue,
+    Continue(Option<Box<Expr>>),
 
-    // Patterns
-    Any, // _
+    // Others
+    WildCard, // _
 }

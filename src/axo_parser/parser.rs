@@ -2,11 +2,13 @@
 
 use std::path::PathBuf;
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::axo_ast::{Expr, ExprKind, Primary};
+use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::{Expr, ExprKind, Primary};
+use crate::axo_parser::state::{Position, Context};
 
 pub struct Parser {
     tokens: Vec<Token>,
+    pub state: Vec<Context>,
     pub file: PathBuf,
     pub position: usize,
     pub line: usize,
@@ -19,11 +21,30 @@ impl Parser {
         Parser {
             file,
             tokens,
+            state: Vec::new(),
             position: 0,
             line: 1,
             column: 1,
             expressions: Vec::new(),
         }
+    }
+
+    pub fn enter(&mut self, context: Context) {
+        self.state.push(context);
+    }
+
+    pub fn exit(&mut self) {
+        self.state.pop();
+    }
+
+    pub fn switch(&mut self, context: Context) {
+        self.exit();
+
+        self.enter(context);
+    }
+
+    pub(crate) fn current_context(&self) -> Context {
+        self.state.last().cloned().unwrap_or(Context::Default)
     }
 
     pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
@@ -119,64 +140,8 @@ impl Parser {
         false
     }
 
-    pub fn expect(
-        &mut self,
-        expected: TokenKind,
-        context: SyntaxType,
-    ) -> Result<Token, ParseError> {
-        if let Some(token) = self.next() {
-            if token.kind == expected {
-                Ok(token)
-            } else {
-                Err(ParseError::ExpectedTokenNotFound(
-                    expected,
-                    SyntaxPosition::Before,
-                    context,
-                ))
-            }
-        } else {
-            Err(ParseError::UnexpectedEndOfFile)
-        }
-    }
-
-    pub fn expect_any(
-        &mut self,
-        expected: &[TokenKind],
-        context: SyntaxType,
-    ) -> Result<Token, ParseError> {
-        if let Some(token) = self.next() {
-            if expected.contains(&token.kind) {
-                Ok(token)
-            } else {
-                Err(ParseError::ExpectedTokenNotFound(
-                    expected[0].clone(),
-                    SyntaxPosition::Before,
-                    context,
-                ))
-            }
-        } else {
-            Err(ParseError::UnexpectedEndOfFile)
-        }
-    }
-
     pub fn is_at_end(&self) -> bool {
         self.position >= self.tokens.len()
-    }
-
-    pub fn current_span(&self) -> Option<Span> {
-        self.peek().map(|t| t.span.clone())
-    }
-
-    pub fn previous_span(&self) -> Option<Span> {
-        if self.position > 0 {
-            self.tokens.get(self.position - 1).map(|t| t.span.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn unexpected_token(&self, token: Token, context: SyntaxType) -> ParseError {
-        ParseError::UnexpectedToken(token, SyntaxPosition::Inside, context)
     }
 
     pub fn skip_until(&mut self, delimiters: &[TokenKind]) {
@@ -190,74 +155,16 @@ impl Parser {
         }
     }
 
-    pub fn next_is_punct(&self, punct: PunctuationKind) -> bool {
-        if let Some(token) = self.peek() {
-            if let TokenKind::Punctuation(kind) = &token.kind {
-                return kind == &punct;
-            }
-        }
-        false
-    }
-
-    pub fn next_is_op(&self, op: OperatorKind) -> bool {
-        if let Some(token) = self.peek() {
-            if let TokenKind::Operator(kind) = &token.kind {
-                return kind == &op;
-            }
-        }
-        false
-    }
-
-    pub fn parse_comma_separated<T, F>(
-        &mut self,
-        parse_fn: F,
-        terminator: TokenKind,
-        context: SyntaxType,
-    ) -> Result<Vec<T>, ParseError>
-    where
-        F: Fn(&mut Self) -> Result<T, ParseError>,
-    {
-        let mut items = Vec::new();
-
-        while !self.is_at_end() && !self.peek_is_any(&[terminator.clone()]) {
-            let item = parse_fn(self)?;
-            items.push(item);
-
-            if self.next_is_punct(PunctuationKind::Comma) {
-                self.next();
-            } else if !self.peek_is_any(&[terminator.clone()]) {
-                return Err(ParseError::ExpectedSeparator(
-                    TokenKind::Punctuation(PunctuationKind::Comma),
-                    context,
-                ));
-            }
-        }
-
-        Ok(items)
-    }
-
-    pub fn parse_delimited<T, F>(
-        &mut self,
-        opener: TokenKind,
-        closer: TokenKind,
-        parse_fn: F,
-        context: SyntaxType,
-    ) -> Result<T, ParseError>
-    where
-        F: Fn(&mut Self) -> Result<T, ParseError>,
-    {
-        self.expect(opener, context.clone())?;
-        let result = parse_fn(self)?;
-        self.expect(closer, context)?;
-        Ok(result)
-    }
-
     pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
+        self.enter(Context::Program);
+
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::EOF {
                 break;
+            } else if token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon) {
+                self.next();
             }
 
             let stmt = self.parse_statement()?;
@@ -265,6 +172,8 @@ impl Parser {
             self.expressions.push(stmt.clone());
             statements.push(stmt);
         }
+
+        self.exit();
 
         Ok(statements)
     }

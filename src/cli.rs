@@ -3,7 +3,7 @@ use core::fmt::Formatter;
 use broccli::{Color, TextStyle};
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::{PunctuationKind, TokenKind};
-use crate::axo_ast::{Expr, ExprKind};
+use crate::axo_parser::{Expr, ExprKind};
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -52,10 +52,10 @@ impl fmt::Debug for ExprKind {
             // Flow Control Statements
             ExprKind::Return(expr) => write!(f, "Return({:?})", expr),
             ExprKind::Break(expr) => write!(f, "Break({:?})", expr),
-            ExprKind::Continue => write!(f, "Continue"),
+            ExprKind::Continue(expr) => write!(f, "Continue({:?})", expr),
 
             // Patterns
-            ExprKind::Any => write!(f, "Any"),
+            ExprKind::WildCard => write!(f, "WildCard"),
         }
     }
 }

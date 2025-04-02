@@ -1,6 +1,7 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::axo_ast::{Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::{Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::state::{Position, Context};
 
 pub trait Declaration {
     fn parse_let(&mut self) -> Result<Expr, ParseError>;
@@ -16,28 +17,23 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
-        let identifier = self.parse_expression()?;
+        self.enter(Context::Definition);
 
-        if let Some(token) = self.peek() {
-            if token.kind == TokenKind::Operator(OperatorKind::Equal) {
-                self.next();
+        self.enter(Context::DefinitionTarget);
 
-                let value = self.parse_statement()?;
-                let span = self.span(start, value.span.end);
-                let kind = ExprKind::Definition(identifier.into(), Some(value.into()));
+        let expr = self.parse_expression()?;
 
-                let expr = Expr { kind, span };
+        let Expr { kind, span: Span { end, .. } } = expr.clone();
 
-                Ok(expr)
-            } else {
-                let span = identifier.span.clone();
-                let kind = ExprKind::Definition(identifier.into(), None);
-                let expr = Expr { kind, span };
+        let span = self.span(start, end);
 
-                Ok(expr)
+        match kind {
+            ExprKind::Assignment(target, value) => {
+                Ok(Expr { kind: ExprKind::Definition(target, Some(value)), span })
             }
-        } else {
-            Err(ParseError::UnexpectedEndOfFile)
+            _ => {
+                Ok(Expr { kind: ExprKind::Definition(expr.into(), None), span })
+            }
         }
     }
 
@@ -47,6 +43,8 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
+        self.enter(Context::FunctionDeclaration);
+
         let function = self.parse_primary()?;
 
         match function {
@@ -54,6 +52,8 @@ impl Declaration for Parser {
                 kind: ExprKind::Invoke(name, parameters),
                 ..
             } => {
+                self.enter(Context::FunctionBody);
+
                 let body = self.parse_statement()?;
 
                 let end = body.span.end;
@@ -63,12 +63,18 @@ impl Declaration for Parser {
                     span: self.span(start, end),
                 };
 
+                self.exit();
+
+                self.exit();
+
                 Ok(expr)
             }
             Expr {
                 kind: ExprKind::Identifier(_),
                 ..
             } => {
+                self.enter(Context::FunctionBody);
+
                 let body = self.parse_statement()?;
 
                 let end = body.span.end;
@@ -78,13 +84,17 @@ impl Declaration for Parser {
                     span: self.span(start, end),
                 };
 
+                self.exit();
+
+                self.exit();
+
                 Ok(expr)
             }
             expr => {
                 let err = ParseError::UnexpectedExpression(
                     expr,
-                    SyntaxPosition::As,
-                    SyntaxType::FunctionDeclaration,
+                    Position::As,
+                    Context::FunctionDeclaration,
                 );
 
                 Err(err)
@@ -98,16 +108,20 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
+        self.enter(Context::EnumDeclaration);
+
         let struct_init = self.parse_primary()?;
 
         if let Expr { kind: ExprKind::Struct(name, fields), span: Span { end, .. } } = struct_init {
             let kind = ExprKind::Enum(name, fields);
             let expr = Expr { kind, span: self.span(start, end) };
 
+            self.exit();
+
             Ok(expr)
         } else {
             let err = ParseError::MissingSyntaxElement(
-                SyntaxType::Struct,
+                Context::StructDeclaration,
             );
 
             Err(err)
@@ -119,16 +133,20 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
-        let struct_init = self.parse_primary()?;
+        self.enter(Context::StructDeclaration);
+
+        let struct_init = self.parse_statement()?;
 
         if let Expr { kind: ExprKind::Struct(name, fields), span: Span { end, .. } } = struct_init {
             let kind = ExprKind::StructDef(name, fields);
             let expr = Expr { kind, span: self.span(start, end) };
 
+            self.exit();
+
             Ok(expr)
         } else {
             let err = ParseError::MissingSyntaxElement(
-                SyntaxType::Struct,
+                Context::StructDeclaration,
             );
 
             Err(err)

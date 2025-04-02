@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
+use crate::axo_lexer::keyword::KeywordLexer;
 use crate::axo_lexer::Span;
 
 #[derive(Clone, PartialEq)]
@@ -30,21 +31,8 @@ impl TokenKind {
         match s {
             "true" => Some(TokenKind::Boolean(true)),
             "false" => Some(TokenKind::Boolean(false)),
-            "struct" => Some(TokenKind::Keyword(KeywordKind::Struct)),
-            "enum" => Some(TokenKind::Keyword(KeywordKind::Enum)),
-            "impl" => Some(TokenKind::Keyword(KeywordKind::Impl)),
-            "trait" => Some(TokenKind::Keyword(KeywordKind::Trait)),
-            "match" => Some(TokenKind::Keyword(KeywordKind::Match)),
-            "if" => Some(TokenKind::Keyword(KeywordKind::If)),
-            "else" => Some(TokenKind::Keyword(KeywordKind::Else)),
-            "for" => Some(TokenKind::Keyword(KeywordKind::For)),
-            "while" => Some(TokenKind::Keyword(KeywordKind::While)),
-            "fn" => Some(TokenKind::Keyword(KeywordKind::Fn)),
-            "return" => Some(TokenKind::Keyword(KeywordKind::Return)),
-            "let" => Some(TokenKind::Keyword(KeywordKind::Let)),
-            "continue" => Some(TokenKind::Keyword(KeywordKind::Continue)),
-            "break" => Some(TokenKind::Keyword(KeywordKind::Break)),
             "in" => Some(TokenKind::Operator(OperatorKind::In)),
+            s if s.to_keyword() != KeywordKind::Unknown => Some(TokenKind::Keyword(s.to_keyword())),
             _ => None,
         }
     }

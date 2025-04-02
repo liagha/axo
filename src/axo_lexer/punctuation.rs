@@ -14,9 +14,21 @@ pub enum PunctuationKind {
     Semicolon,
 }
 
-impl PunctuationKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
+pub trait PunctuationLexer {
+    fn is_punctuation(&self) -> bool;
+    fn to_punctuation(&self) -> PunctuationKind;
+}
+
+impl PunctuationLexer for str {
+    fn is_punctuation(&self) -> bool {
+        matches!(
+            self,
+            " " | "\t" | "\n" | "\r" | "(" | ")" | "[" | "]" | "{" | "}" | "," | ";"
+        )
+    }
+
+    fn to_punctuation(&self) -> PunctuationKind {
+        match self {
             " " => PunctuationKind::Space,
             "\t" => PunctuationKind::Tab,
             "\n" => PunctuationKind::Newline,
@@ -32,9 +44,18 @@ impl PunctuationKind {
             _ => unreachable!(),
         }
     }
+}
 
-    pub fn from_char(c: &char) -> Self {
-        match c.clone() {
+impl PunctuationLexer for char {
+    fn is_punctuation(&self) -> bool {
+        matches!(
+            self,
+            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
+        )
+    }
+
+    fn to_punctuation(&self) -> PunctuationKind {
+        match self {
             ' ' => PunctuationKind::Space,
             '\t' => PunctuationKind::Tab,
             '\n' => PunctuationKind::Newline,
@@ -49,20 +70,6 @@ impl PunctuationKind {
             ';' => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
-    }
-
-    pub fn is_punctuation_str(str: &str) -> bool {
-        matches!(
-            str,
-            " " | "\t" | "\n" | "\r" | "(" | ")" | "[" | "]" | "{" | "}" | "," | ";"
-        )
-    }
-
-    pub fn is_punctuation(char: char) -> bool {
-        matches!(
-            char,
-            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
-        )
     }
 }
 

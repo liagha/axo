@@ -13,7 +13,11 @@ e = x <= y;
 f = z && (x == 42);
 g = !z || (y != 3.14);
 
-if x > 10 {
+while (5 + x) {
+    x = x + 7;
+}
+
+if (x > 10) {
     x = x - 10;
 } else {
     x = x + 10;
@@ -29,7 +33,7 @@ str = "Hello, world!";
 range = 1..10;
 
 fn fibonacci(n) {
-    if n <= 1 {
+    if (n <= 1) {
         return n;
     }
     return fibonacci(n - 1) + fibonacci(n - 2);
@@ -47,7 +51,7 @@ for i + 1 {
 let test[2] = 43;
 x *= 4;
 
-if x > 10 {
+if (x > 10) {
     x = x - 10;
 } else {
     x = x + 10;
@@ -113,7 +117,7 @@ while 5 > x > 2 x = 5;
 
 5 + 5 * 5;
 
-for (i in 5) {
+for i in 5 {
     sum += numbers[i];
 }
 
@@ -121,15 +125,7 @@ let test = Test { x = 3, y = 5, };
 
 while x > 0 x = 5;
 
-if x > 4 55 + 4;
-
-if x + y == 4 44;
-
-if x == 3 {
-    x = 4;
-}
-
-let x = if test > 2 { 5; } else { 6; }
+let x = if (test > 2) { 5; } else { 6; }
 
 !-test;
 
@@ -170,3 +166,21 @@ i       ++;
 x...
 
 .5
+
+"test"(x: string, y: i32...)
+
+fn test(x, ...) {
+    fn test_inside(y) y + 4
+
+    4.. .6
+}
+
+if (x = Test { test = 4, x = 5 }) {
+    x = 4;
+}
+
+if 4 + x {
+    x - 4;
+}
+
+let "test" { test : ss, x: i32 } = x;

@@ -5,8 +5,8 @@ mod expression;
 mod error;
 mod primary;
 mod composite;
-mod utils;
 mod declaration;
+mod state;
 
 pub use statement::ControlFlow;
 pub use expression::{Expr, ExprKind};

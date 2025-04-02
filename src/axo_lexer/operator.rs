@@ -1,6 +1,5 @@
 use crate::axo_lexer::{Token, TokenKind, Span};
 
-/// Enum representing various operator kinds in the language
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperatorKind {
     // Single character operators (sorted alphabetically)
@@ -34,38 +33,38 @@ pub enum OperatorKind {
 
     // Double character operators (sorted by category and function)
     // Increments and decrements
-    PlusPlus,                // ++ (increment)
-    MinusMinus,              // -- (decrement)
+    DoublePlus,              // ++ (increment)
+    DoubleMinus,             // -- (decrement)
 
     // Basic arithmetic and logic double operators
-    StarStar,                // ** (exponentiation)
-    SlashSlash,              // // (integer division or comment)
-    PercentPercent,          // %% (custom modulo)
-    TildeTilde,              // ~~ (extended bitwise operation)
-    CaretCaret,              // ^^ (custom exponentiation)
+    DoubleStar,              // ** (exponentiation)
+    DoubleSlash,             // // (integer division or comment)
+    DoublePercent,           // %% (custom modulo)
+    DoubleTilde,             // ~~ (extended bitwise operation)
+    DoubleCaret,             // ^^ (custom exponentiation)
 
     // Range operators
-    DotDot,                  // .. (range or spread)
-    DotDotEqual,             // ..= (inclusive range)
-    DotDotDot,               // ... (for showing unlimited sequence)
+    DoubleDot,               // .. (range or spread)
+    RangeInclusive,          // ..= (inclusive range)
+    TripleDot,               // ... (for showing unlimited sequence)
 
     // Comparison operators
-    EqualEqual,              // == (equality comparison)
-    ExclamationEqual,        // != (inequality comparison)
-    LessThanEqual,           // <= (less than or equal comparison)
-    GreaterThanEqual,        // >= (greater than or equal comparison)
-    EqualEqualEqual,         // === (strict equality)
-    ExclamationEqualEqual,   // !== (strict inequality)
+    DoubleEqual,             // == (equality comparison)
+    NotEqual,                // != (inequality comparison)
+    LessThanOrEqual,         // <= (less than or equal comparison)
+    GreaterThanOrEqual,      // >= (greater than or equal comparison)
+    TripleEqual,             // === (strict equality)
+    StrictNotEqual,          // !== (strict inequality)
 
     // Logical operators
-    AmpersandAmpersand,      // && (logical AND)
-    PipePipe,                // || (logical OR)
-    QuestionMarkQuestionMark, // ?? (null coalescing)
-    ExclamationExclamation,  // !! (double negation)
+    DoubleAmpersand,         // && (logical AND)
+    DoublePipe,              // || (logical OR)
+    DoubleQuestionMark,      // ?? (null coalescing)
+    DoubleExclamation,       // !! (double negation)
 
     // Bitwise shift operators
-    LessThanLessThan,        // << (left bitwise shift)
-    GreaterThanGreaterThan,  // >> (right bitwise shift)
+    LeftShift,               // << (left bitwise shift)
+    RightShift,              // >> (right bitwise shift)
 
     // Assignment operators
     ColonEqual,              // := (alternate assignment)
@@ -80,134 +79,47 @@ pub enum OperatorKind {
     CaretEqual,              // ^= (bitwise XOR assignment)
     AmpersandEqual,          // &= (bitwise AND assignment)
     PipeEqual,               // |= (bitwise OR assignment)
-    StarStarEqual,           // **= (exponentiation assignment)
-    PercentPercentEqual,     // %%= (custom modulo assignment)
-    AmpersandAmpersandEqual, // &&= (logical AND assignment)
-    PipePipeEqual,           // ||= (logical OR assignment)
+    DoubleStarEqual,         // **= (exponentiation assignment)
+    DoublePercentEqual,      // %%= (custom modulo assignment)
+    LogicalAndEqual,         // &&= (logical AND assignment)
+    LogicalOrEqual,          // ||= (logical OR assignment)
     QuestionMarkEqual,       // ?= (optional assignment)
 
     // Arrow operators
-    MinusGreaterThan,        // -> (function return type or closure)
-    EqualGreaterThan,        // => (match arm or closure)
+    Arrow,                   // -> (function return type or closure)
+    FatArrow,                // => (match arm or closure)
 
     // Special path/namespace operators
-    ColonColon,              // :: (path separator or associated function)
+    DoubleColon,             // :: (path separator or associated function)
 
     // Comment operators
-    SlashStar,               // /* (block comment start)
-    StarSlash,               // */ (block comment end)
-    SlashSlashSlash,         // /// (documentation comment)
-    SlashStarStar,           // /** (doc comment start)
-    SlashSlashExclamation,   // //! (module doc comment)
+    BlockCommentStart,       // /* (block comment start)
+    BlockCommentEnd,         // */ (block comment end)
+    TripleSlash,             // /// (documentation comment)
+    DocCommentStart,         // /** (doc comment start)
+    ModDocComment,           // //! (module doc comment)
 
     // Special double character operators
-    AtAt,                    // @@ (extended annotation)
-    HashHash,                // ## (token concatenation)
-    DollarDollar,            // $$ (macro expansion)
-    BackslashBackslash,      // \\ (escaped backslash)
-    UnderscoreUnderscore,    // __ (special identifier)
+    DoubleAt,                // @@ (extended annotation)
+    DoubleHash,              // ## (token concatenation)
+    DoubleDollar,            // $$ (macro expansion)
+    DoubleBackslash,         // \\ (escaped backslash)
+    DoubleUnderscore,        // __ (special identifier)
 
     // Unknown operator
     Unknown,                 // for when the operator is not detected
 }
 
-impl OperatorKind {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            // Single character operators
-            "@" => OperatorKind::At,
-            "&" => OperatorKind::Ampersand,
-            "\\" => OperatorKind::Backslash,
-            "^" => OperatorKind::Caret,
-            ":" => OperatorKind::Colon,
-            "$" => OperatorKind::Dollar,
-            "." => OperatorKind::Dot,
-            "\"" => OperatorKind::DoubleQuote,
-            "=" => OperatorKind::Equal,
-            "!" => OperatorKind::Exclamation,
-            ">" => OperatorKind::GreaterThan,
-            "#" => OperatorKind::Hash,
-            "<" => OperatorKind::LessThan,
-            "-" => OperatorKind::Minus,
-            "%" => OperatorKind::Percent,
-            "|" => OperatorKind::Pipe,
-            "+" => OperatorKind::Plus,
-            "?" => OperatorKind::QuestionMark,
-            "'" => OperatorKind::SingleQuote,
-            "/" => OperatorKind::Slash,
-            "*" => OperatorKind::Star,
-            "~" => OperatorKind::Tilde,
-            "_" => OperatorKind::Underscore,
-            "`" => OperatorKind::Backtick,
 
-            // Word operators
-            "in" => OperatorKind::In,
-
-            // Double character operators
-            "++" => OperatorKind::PlusPlus,
-            "--" => OperatorKind::MinusMinus,
-            "**" => OperatorKind::StarStar,
-            "//" => OperatorKind::SlashSlash,
-            "%%" => OperatorKind::PercentPercent,
-            "~~" => OperatorKind::TildeTilde,
-            "^^" => OperatorKind::CaretCaret,
-            ".." => OperatorKind::DotDot,
-            "..=" => OperatorKind::DotDotEqual,
-            "..." => OperatorKind::DotDotDot,
-            "==" => OperatorKind::EqualEqual,
-            "!=" => OperatorKind::ExclamationEqual,
-            "<=" => OperatorKind::LessThanEqual,
-            ">=" => OperatorKind::GreaterThanEqual,
-            "===" => OperatorKind::EqualEqualEqual,
-            "!==" => OperatorKind::ExclamationEqualEqual,
-            "&&" => OperatorKind::AmpersandAmpersand,
-            "||" => OperatorKind::PipePipe,
-            "??" => OperatorKind::QuestionMarkQuestionMark,
-            "!!" => OperatorKind::ExclamationExclamation,
-            "<<" => OperatorKind::LessThanLessThan,
-            ">>" => OperatorKind::GreaterThanGreaterThan,
-            ":=" => OperatorKind::ColonEqual,
-            "=:" => OperatorKind::EqualColon,
-            "+=" => OperatorKind::PlusEqual,
-            "-=" => OperatorKind::MinusEqual,
-            "*=" => OperatorKind::StarEqual,
-            "/=" => OperatorKind::SlashEqual,
-            "%=" => OperatorKind::PercentEqual,
-            "^=" => OperatorKind::CaretEqual,
-            "&=" => OperatorKind::AmpersandEqual,
-            "|=" => OperatorKind::PipeEqual,
-            "**=" => OperatorKind::StarStarEqual,
-            "%%=" => OperatorKind::PercentPercentEqual,
-            "&&=" => OperatorKind::AmpersandAmpersandEqual,
-            "||=" => OperatorKind::PipePipeEqual,
-            "?=" => OperatorKind::QuestionMarkEqual,
-            "->" => OperatorKind::MinusGreaterThan,
-            "=>" => OperatorKind::EqualGreaterThan,
-            "::" => OperatorKind::ColonColon,
-            "/*" => OperatorKind::SlashStar,
-            "*/" => OperatorKind::StarSlash,
-            "///" => OperatorKind::SlashSlashSlash,
-            "/**" => OperatorKind::SlashStarStar,
-            "//!" => OperatorKind::SlashSlashExclamation,
-            "@@" => OperatorKind::AtAt,
-            "##" => OperatorKind::HashHash,
-            "$$" => OperatorKind::DollarDollar,
-            "\\\\" => OperatorKind::BackslashBackslash,
-            "__" => OperatorKind::UnderscoreUnderscore,
-            _ => OperatorKind::Unknown,
-        }
-    }
-}
 
 impl OperatorKind {
-    /// Returns true if the operator is a compound assignment operator
     pub fn is_compound(&self) -> bool {
         matches!(
             self,
-            OperatorKind::AmpersandAmpersandEqual
-                | OperatorKind::PipePipeEqual
+            OperatorKind::LogicalAndEqual
+                | OperatorKind::LogicalOrEqual
                 | OperatorKind::QuestionMarkEqual
-                | OperatorKind::DotDotEqual
+                | OperatorKind::RangeInclusive
                 | OperatorKind::AmpersandEqual
                 | OperatorKind::PipeEqual
                 | OperatorKind::StarEqual
@@ -216,73 +128,47 @@ impl OperatorKind {
                 | OperatorKind::CaretEqual
                 | OperatorKind::PlusEqual
                 | OperatorKind::MinusEqual
-                | OperatorKind::StarStarEqual
-                | OperatorKind::PercentPercentEqual
+                | OperatorKind::DoubleStarEqual
+                | OperatorKind::DoublePercentEqual
         )
     }
 
-    /// Checks if a token is a compound operator
-    pub fn is_compound_token_op(input: Option<&TokenKind>) -> bool {
-        matches!(input, Some(TokenKind::Operator(operator)) if operator.is_compound())
-    }
-
-    /// Checks if a specific token is a compound operator
-    pub fn is_compound_token(input: &TokenKind) -> bool {
-        matches!(input, TokenKind::Operator(operator) if operator.is_compound())
-    }
-
-    /// Checks if a character is a potential operator
-    pub fn is_operator(char: char) -> bool {
-        matches!(
-            char,
-            '~' | '=' | ':' | '+' | '-' |
-            '*' | '/' | '^' | '|' | '&' |
-            '%' | '>' | '<' | '!' | '.' |
-            '@' | '\'' | '?' | '#' | '$' |
-            '\\' | '`' | '_'
-        )
-    }
-
-    /// Checks if the operator is a factor operator
     pub fn is_factor(&self) -> bool {
         matches!(
             self,
             OperatorKind::Star
                 | OperatorKind::Slash
                 | OperatorKind::Percent
-                | OperatorKind::DotDot
-                | OperatorKind::AmpersandAmpersand
-                | OperatorKind::StarStar
+                | OperatorKind::DoubleDot
+                | OperatorKind::DoubleAmpersand
+                | OperatorKind::DoubleStar
                 | OperatorKind::In
         )
     }
 
-    /// Checks if the operator is a term operator
     pub fn is_term(&self) -> bool {
         matches!(
             self,
             OperatorKind::Plus
                 | OperatorKind::Minus
-                | OperatorKind::PipePipe
+                | OperatorKind::DoublePipe
                 | OperatorKind::Pipe
                 | OperatorKind::Caret
         )
     }
 
-    /// Checks if the operator is an expression operator
     pub fn is_expression(&self) -> bool {
         matches!(
             self,
-            OperatorKind::EqualEqual
-                | OperatorKind::ExclamationEqual
+            OperatorKind::DoubleEqual
+                | OperatorKind::NotEqual
                 | OperatorKind::GreaterThan
                 | OperatorKind::LessThan
-                | OperatorKind::GreaterThanEqual
-                | OperatorKind::LessThanEqual
+                | OperatorKind::GreaterThanOrEqual
+                | OperatorKind::LessThanOrEqual
         )
     }
 
-    /// Checks if the operator is a prefix operator
     pub fn is_prefix(&self) -> bool {
         matches!(
             self,
@@ -291,28 +177,26 @@ impl OperatorKind {
             | OperatorKind::Minus
             | OperatorKind::Tilde
             | OperatorKind::Ampersand
-            | OperatorKind::PlusPlus
-            | OperatorKind::MinusMinus
+            | OperatorKind::DoublePlus
+            | OperatorKind::DoubleMinus
         )
     }
 
-    /// Checks if the operator is a postfix operator
     pub fn is_postfix(&self) -> bool {
         matches!(
             self,
-            OperatorKind::DotDotDot
-            | OperatorKind::PlusPlus
-            | OperatorKind::MinusMinus
+            OperatorKind::TripleDot
+            | OperatorKind::DoublePlus
+            | OperatorKind::DoubleMinus
         )
     }
 
-    /// Decompounds a compound assignment operator to its base operator
     pub fn decompound(&self) -> OperatorKind {
         match self {
-            OperatorKind::AmpersandAmpersandEqual => OperatorKind::AmpersandAmpersand,
-            OperatorKind::PipePipeEqual => OperatorKind::PipePipe,
+            OperatorKind::LogicalAndEqual => OperatorKind::DoubleAmpersand,
+            OperatorKind::LogicalOrEqual => OperatorKind::DoublePipe,
             OperatorKind::QuestionMarkEqual => OperatorKind::QuestionMark,
-            OperatorKind::DotDotEqual => OperatorKind::DotDot,
+            OperatorKind::RangeInclusive => OperatorKind::DoubleDot,
             OperatorKind::AmpersandEqual => OperatorKind::Ampersand,
             OperatorKind::PipeEqual => OperatorKind::Pipe,
             OperatorKind::StarEqual => OperatorKind::Star,
@@ -321,9 +205,9 @@ impl OperatorKind {
             OperatorKind::CaretEqual => OperatorKind::Caret,
             OperatorKind::PlusEqual => OperatorKind::Plus,
             OperatorKind::MinusEqual => OperatorKind::Minus,
-            OperatorKind::StarStarEqual => OperatorKind::StarStar,
-            OperatorKind::PercentPercentEqual => OperatorKind::PercentPercent,
-            _ => unreachable!(),
+            OperatorKind::DoubleStarEqual => OperatorKind::DoubleStar,
+            OperatorKind::DoublePercentEqual => OperatorKind::DoublePercent,
+            _ => OperatorKind::Unknown,
         }
     }
 
@@ -334,20 +218,7 @@ impl OperatorKind {
 
         let (operator, span) = if let TokenKind::Operator(op) = &token.kind {
             match op {
-                OperatorKind::AmpersandAmpersandEqual => (OperatorKind::AmpersandAmpersand, new_span),
-                OperatorKind::PipePipeEqual => (OperatorKind::PipePipe, new_span),
-                OperatorKind::QuestionMarkEqual => (OperatorKind::QuestionMark, new_span),
-                OperatorKind::DotDotEqual => (OperatorKind::DotDot, new_span),
-                OperatorKind::AmpersandEqual => (OperatorKind::Ampersand, new_span),
-                OperatorKind::PipeEqual => (OperatorKind::Pipe, new_span),
-                OperatorKind::StarEqual => (OperatorKind::Star, new_span),
-                OperatorKind::SlashEqual => (OperatorKind::Slash, new_span),
-                OperatorKind::PercentEqual => (OperatorKind::Percent, new_span),
-                OperatorKind::CaretEqual => (OperatorKind::Caret, new_span),
-                OperatorKind::PlusEqual => (OperatorKind::Plus, new_span),
-                OperatorKind::MinusEqual => (OperatorKind::Minus, new_span),
-                OperatorKind::StarStarEqual => (OperatorKind::StarStar, new_span),
-                OperatorKind::PercentPercentEqual => (OperatorKind::PercentPercent, new_span),
+                op if op.decompound() != OperatorKind::Unknown => (op.decompound(), new_span),
                 _ => unreachable!(),
             }
         } else {
@@ -386,28 +257,28 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::SingleQuote => "'",
             OperatorKind::Backtick => "`",
             OperatorKind::Underscore => "_",
-            OperatorKind::PlusPlus => "++",
-            OperatorKind::MinusMinus => "--",
-            OperatorKind::StarStar => "**",
-            OperatorKind::SlashSlash => "//",
-            OperatorKind::PercentPercent => "%%",
-            OperatorKind::TildeTilde => "~~",
-            OperatorKind::CaretCaret => "^^",
-            OperatorKind::DotDot => "..",
-            OperatorKind::DotDotEqual => "..=",
-            OperatorKind::DotDotDot => "...",
-            OperatorKind::EqualEqual => "==",
-            OperatorKind::ExclamationEqual => "!=",
-            OperatorKind::LessThanEqual => "<=",
-            OperatorKind::GreaterThanEqual => ">=",
-            OperatorKind::EqualEqualEqual => "===",
-            OperatorKind::ExclamationEqualEqual => "!==",
-            OperatorKind::AmpersandAmpersand => "&&",
-            OperatorKind::PipePipe => "||",
-            OperatorKind::QuestionMarkQuestionMark => "??",
-            OperatorKind::ExclamationExclamation => "!!",
-            OperatorKind::LessThanLessThan => "<<",
-            OperatorKind::GreaterThanGreaterThan => ">>",
+            OperatorKind::DoublePlus => "++",
+            OperatorKind::DoubleMinus => "--",
+            OperatorKind::DoubleStar => "**",
+            OperatorKind::DoubleSlash => "//",
+            OperatorKind::DoublePercent => "%%",
+            OperatorKind::DoubleTilde => "~~",
+            OperatorKind::DoubleCaret => "^^",
+            OperatorKind::DoubleDot => "..",
+            OperatorKind::RangeInclusive => "..=",
+            OperatorKind::TripleDot => "...",
+            OperatorKind::DoubleEqual => "==",
+            OperatorKind::NotEqual => "!=",
+            OperatorKind::LessThanOrEqual => "<=",
+            OperatorKind::GreaterThanOrEqual => ">=",
+            OperatorKind::TripleEqual => "===",
+            OperatorKind::StrictNotEqual => "!==",
+            OperatorKind::DoubleAmpersand => "&&",
+            OperatorKind::DoublePipe => "||",
+            OperatorKind::DoubleQuestionMark => "??",
+            OperatorKind::DoubleExclamation => "!!",
+            OperatorKind::LeftShift => "<<",
+            OperatorKind::RightShift => ">>",
             OperatorKind::ColonEqual => ":=",
             OperatorKind::EqualColon => "=:",
             OperatorKind::PlusEqual => "+=",
@@ -418,26 +289,172 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::CaretEqual => "^=",
             OperatorKind::AmpersandEqual => "&=",
             OperatorKind::PipeEqual => "|=",
-            OperatorKind::StarStarEqual => "**=",
-            OperatorKind::PercentPercentEqual => "%%=",
-            OperatorKind::AmpersandAmpersandEqual => "&&=",
-            OperatorKind::PipePipeEqual => "||=",
+            OperatorKind::DoubleStarEqual => "**=",
+            OperatorKind::DoublePercentEqual => "%%=",
+            OperatorKind::LogicalAndEqual => "&&=",
+            OperatorKind::LogicalOrEqual => "||=",
             OperatorKind::QuestionMarkEqual => "?=",
-            OperatorKind::MinusGreaterThan => "->",
-            OperatorKind::EqualGreaterThan => "=>",
-            OperatorKind::ColonColon => "::",
-            OperatorKind::SlashStar => "/*",
-            OperatorKind::StarSlash => "*/",
-            OperatorKind::SlashSlashSlash => "///",
-            OperatorKind::SlashStarStar => "/**",
-            OperatorKind::SlashSlashExclamation => "//!",
-            OperatorKind::AtAt => "@@",
-            OperatorKind::HashHash => "##",
-            OperatorKind::DollarDollar => "$$",
-            OperatorKind::BackslashBackslash => "\\\\",
-            OperatorKind::UnderscoreUnderscore => "__",
+            OperatorKind::Arrow => "->",
+            OperatorKind::FatArrow => "=>",
+            OperatorKind::DoubleColon => "::",
+            OperatorKind::BlockCommentStart => "/*",
+            OperatorKind::BlockCommentEnd => "*/",
+            OperatorKind::TripleSlash => "///",
+            OperatorKind::DocCommentStart => "/**",
+            OperatorKind::ModDocComment => "//!",
+            OperatorKind::DoubleAt => "@@",
+            OperatorKind::DoubleHash => "##",
+            OperatorKind::DoubleDollar => "$$",
+            OperatorKind::DoubleBackslash => "\\\\",
+            OperatorKind::DoubleUnderscore => "__",
             OperatorKind::Unknown => "????",
         };
         write!(f, "{}", op_str)
+    }
+}
+
+pub trait OperatorLexer {
+    fn is_operator(&self) -> bool;
+    fn to_operator(&self) -> OperatorKind;
+}
+
+impl OperatorLexer for char {
+    fn is_operator(&self) -> bool {
+        matches!(
+            self,
+            '~' | '=' | ':' | '+' | '-' |
+            '*' | '/' | '^' | '|' | '&' |
+            '%' | '>' | '<' | '!' | '.' |
+            '@' | '\'' | '?' | '#' | '$' |
+            '\\' | '`' | '_'
+        )
+    }
+
+    fn to_operator(&self) -> OperatorKind {
+        match self {
+            '@' => OperatorKind::At,
+            '&' => OperatorKind::Ampersand,
+            '\\' => OperatorKind::Backslash,
+            '^' => OperatorKind::Caret,
+            ':' => OperatorKind::Colon,
+            '$' => OperatorKind::Dollar,
+            '.' => OperatorKind::Dot,
+            '"' => OperatorKind::DoubleQuote,
+            '=' => OperatorKind::Equal,
+            '!' => OperatorKind::Exclamation,
+            '>' => OperatorKind::GreaterThan,
+            '#' => OperatorKind::Hash,
+            '<' => OperatorKind::LessThan,
+            '-' => OperatorKind::Minus,
+            '%' => OperatorKind::Percent,
+            '|' => OperatorKind::Pipe,
+            '+' => OperatorKind::Plus,
+            '?' => OperatorKind::QuestionMark,
+            '\'' => OperatorKind::SingleQuote,
+            '/' => OperatorKind::Slash,
+            '*' => OperatorKind::Star,
+            '~' => OperatorKind::Tilde,
+            '_' => OperatorKind::Underscore,
+            '`' => OperatorKind::Backtick,
+            _ => OperatorKind::Unknown,
+        }
+    }
+}
+
+impl OperatorLexer for str {
+    fn is_operator(&self) -> bool {
+        matches!(
+            self.as_ref(),
+            "~" | "=" | ":" | "+" | "-" |
+            "*" | "/" | "^" | "|" | "&" |
+            "%" | ">" | "<" | "!" | "." |
+            "@" | "\"" | "?" | "#" | "$" |
+            "\\" | "`" | "_"
+        )
+    }
+    fn to_operator(&self) -> OperatorKind {
+        match self.as_ref() {
+            // Single character operators
+            "@" => OperatorKind::At,
+            "&" => OperatorKind::Ampersand,
+            "\\" => OperatorKind::Backslash,
+            "^" => OperatorKind::Caret,
+            ":" => OperatorKind::Colon,
+            "$" => OperatorKind::Dollar,
+            "." => OperatorKind::Dot,
+            "\"" => OperatorKind::DoubleQuote,
+            "=" => OperatorKind::Equal,
+            "!" => OperatorKind::Exclamation,
+            ">" => OperatorKind::GreaterThan,
+            "#" => OperatorKind::Hash,
+            "<" => OperatorKind::LessThan,
+            "-" => OperatorKind::Minus,
+            "%" => OperatorKind::Percent,
+            "|" => OperatorKind::Pipe,
+            "+" => OperatorKind::Plus,
+            "?" => OperatorKind::QuestionMark,
+            "'" => OperatorKind::SingleQuote,
+            "/" => OperatorKind::Slash,
+            "*" => OperatorKind::Star,
+            "~" => OperatorKind::Tilde,
+            "_" => OperatorKind::Underscore,
+            "`" => OperatorKind::Backtick,
+
+            // Word operators
+            "in" => OperatorKind::In,
+
+            // Double character operators
+            "++" => OperatorKind::DoublePlus,
+            "--" => OperatorKind::DoubleMinus,
+            "**" => OperatorKind::DoubleStar,
+            "//" => OperatorKind::DoubleSlash,
+            "%%" => OperatorKind::DoublePercent,
+            "~~" => OperatorKind::DoubleTilde,
+            "^^" => OperatorKind::DoubleCaret,
+            ".." => OperatorKind::DoubleDot,
+            "..=" => OperatorKind::RangeInclusive,
+            "..." => OperatorKind::TripleDot,
+            "==" => OperatorKind::DoubleEqual,
+            "!=" => OperatorKind::NotEqual,
+            "<=" => OperatorKind::LessThanOrEqual,
+            ">=" => OperatorKind::GreaterThanOrEqual,
+            "===" => OperatorKind::TripleEqual,
+            "!==" => OperatorKind::StrictNotEqual,
+            "&&" => OperatorKind::DoubleAmpersand,
+            "||" => OperatorKind::DoublePipe,
+            "??" => OperatorKind::DoubleQuestionMark,
+            "!!" => OperatorKind::DoubleExclamation,
+            "<<" => OperatorKind::LeftShift,
+            ">>" => OperatorKind::RightShift,
+            ":=" => OperatorKind::ColonEqual,
+            "=:" => OperatorKind::EqualColon,
+            "+=" => OperatorKind::PlusEqual,
+            "-=" => OperatorKind::MinusEqual,
+            "*=" => OperatorKind::StarEqual,
+            "/=" => OperatorKind::SlashEqual,
+            "%=" => OperatorKind::PercentEqual,
+            "^=" => OperatorKind::CaretEqual,
+            "&=" => OperatorKind::AmpersandEqual,
+            "|=" => OperatorKind::PipeEqual,
+            "**=" => OperatorKind::DoubleStarEqual,
+            "%%=" => OperatorKind::DoublePercentEqual,
+            "&&=" => OperatorKind::LogicalAndEqual,
+            "||=" => OperatorKind::LogicalOrEqual,
+            "?=" => OperatorKind::QuestionMarkEqual,
+            "->" => OperatorKind::Arrow,
+            "=>" => OperatorKind::FatArrow,
+            "::" => OperatorKind::DoubleColon,
+            "/*" => OperatorKind::BlockCommentStart,
+            "*/" => OperatorKind::BlockCommentEnd,
+            "///" => OperatorKind::TripleSlash,
+            "/**" => OperatorKind::DocCommentStart,
+            "//!" => OperatorKind::ModDocComment,
+            "@@" => OperatorKind::DoubleAt,
+            "##" => OperatorKind::DoubleHash,
+            "$$" => OperatorKind::DoubleDollar,
+            "\\\\" => OperatorKind::DoubleBackslash,
+            "__" => OperatorKind::DoubleUnderscore,
+            _ => OperatorKind::Unknown,
+        }
     }
 }

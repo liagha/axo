@@ -7,6 +7,8 @@ pub mod error;
 mod span;
 mod number;
 mod handler;
+mod symbol;
+mod literal;
 
 pub use lexer::Lexer;
 pub use span::Span;

@@ -1,6 +1,7 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_ast::error::{ParseError, SyntaxPosition, SyntaxType};
-use crate::axo_ast::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
+use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
+use crate::axo_parser::state::{Position, Context};
 
 pub trait Primary {
     fn parse_unary(&mut self) -> Result<Expr, ParseError>;
@@ -64,41 +65,44 @@ impl Primary for Parser {
             ..
         }) = self.peek().cloned()
         {
-            if op.is_factor() {
-                let op = self.next().unwrap();
+            match op {
+                op if op.is_factor() => {
+                    let op = self.next().unwrap();
 
-                let right = self.parse_unary()?;
+                    let right = self.parse_unary()?;
 
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
+                    let start = left.span.start;
+                    let end = right.span.end;
+                    let span = self.span(start, end);
 
-                let kind = ExprKind::Binary(left.into(), op, right.into());
+                    let kind = ExprKind::Binary(left.into(), op, right.into());
 
-                left = Expr { kind, span };
-            } else if op == OperatorKind::Colon {
-                self.next();
+                    left = Expr { kind, span };
+                }
+                OperatorKind::Colon => {
+                    self.next();
 
-                let right = self.parse_unary()?;
+                    let right = self.parse_unary()?;
 
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
+                    let start = left.span.start;
+                    let end = right.span.end;
+                    let span = self.span(start, end);
 
-                let kind = ExprKind::Typed(left.into(), right.into());
+                    let kind = ExprKind::Typed(left.into(), right.into());
 
-                left = Expr { kind, span };
-            } else if op == OperatorKind::Dot {
-                self.next();
+                    left = Expr { kind, span };
+                }
+                OperatorKind::Dot => {
+                    self.next();
 
-                let field = self.parse_expression()?;
+                    let field = self.parse_expression()?;
 
-                let span = self.span(left.span.start, field.span.end);
+                    let span = self.span(left.span.start, field.span.end);
 
-                let kind = ExprKind::Member(left.into(), field.into());
-                left = Expr { kind, span };
-            } else {
-                break;
+                    let kind = ExprKind::Member(left.into(), field.into());
+                    left = Expr { kind, span };
+                }
+                _ => break,
             }
         }
 
@@ -112,20 +116,59 @@ impl Primary for Parser {
             ..
         }) = self.peek().cloned()
         {
-            if op.is_term() {
-                let op = self.next().unwrap();
+            match op {
+                OperatorKind::ColonEqual => {
+                    self.next();
+                    let right = self.parse_statement()?;
+                    let span = self.span(left.span.start, right.span.end);
 
-                let right = self.parse_factor()?;
+                    left = Expr {
+                        kind: ExprKind::Definition(left.into(), Some(right.into())),
+                        span,
+                    };
+                }
+                OperatorKind::Equal => {
+                    self.next();
+                    let right = self.parse_statement()?;
+                    let span = self.span(left.span.start, right.span.end);
 
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
+                    left = Expr {
+                        kind: ExprKind::Assignment(left.into(), right.into()),
+                        span,
+                    };
+                }
+                ref operator if operator.is_compound() => {
+                    let token = self.next().unwrap();
+                    let right = self.parse_statement()?;
+                    let span = self.span(left.span.start, right.span.end);
+                    let operation = Expr {
+                        kind: ExprKind::Binary(
+                            left.clone().into(),
+                            OperatorKind::decompound_token(&token),
+                            right.into(),
+                        ),
+                        span: span.clone(),
+                    };
 
-                let kind = ExprKind::Binary(left.into(), op, right.into());
+                    left = Expr {
+                        kind: ExprKind::Assignment(left.into(), operation.into()),
+                        span,
+                    };
+                }
+                op if op.is_term() => {
+                    let op = self.next().unwrap();
 
-                left = Expr { kind, span };
-            } else {
-                break;
+                    let right = self.parse_factor()?;
+
+                    let start = left.span.start;
+                    let end = right.span.end;
+                    let span = self.span(start, end);
+
+                    let kind = ExprKind::Binary(left.into(), op, right.into());
+
+                    left = Expr { kind, span };
+                }
+                _ => break,
             }
         }
 
@@ -161,10 +204,14 @@ impl Primary for Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Expr, ParseError> {
-        if let Some(token) = self.peek().cloned() {
-            let expr = match &token.kind {
+        self.enter(Context::Statement);
+
+        let result = if let Some(token) = self.peek().cloned() {
+            let Token { kind, .. } = token.clone();
+
+            let expr = match kind {
                 TokenKind::Keyword(kw) => {
-                    let expr = match kw {
+                    match kw {
                         KeywordKind::If => self.parse_if_statement(),
                         KeywordKind::While => self.parse_while_statement(),
                         KeywordKind::For => self.parse_for_statement(),
@@ -175,48 +222,22 @@ impl Primary for Parser {
                         KeywordKind::Let => self.parse_let(),
                         KeywordKind::Struct => self.parse_struct_definition(),
                         KeywordKind::Enum => self.parse_enum(),
-                        KeywordKind::Impl
-                        | KeywordKind::Trait
-                        | KeywordKind::Match
-                        | KeywordKind::Else => {
-                            return Err(ParseError::UnimplementedFeature);
+                        _ => {
+                            println!("{}", kw);
+                            Err(ParseError::UnimplementedFeature)
                         }
-                    }?;
-                    expr
+                    }?
                 }
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_block()?,
+
                 _ => {
                     let left = self.parse_expression()?;
 
                     if let Some(token) = self.peek().cloned() {
-                        let expr = if token.kind == TokenKind::Operator(OperatorKind::Equal) {
-                            self.next();
-                            let right = self.parse_statement()?;
-                            let span = self.span(left.span.start, right.span.end);
-                            Expr {
-                                kind: ExprKind::Assignment(left.into(), right.into()),
-                                span,
-                            }
-                        } else if OperatorKind::is_compound_token(&token.kind) {
-                            self.next();
-                            let right = self.parse_statement()?;
-                            let span = self.span(left.span.start, right.span.end);
-                            let operation = Expr {
-                                kind: ExprKind::Binary(
-                                    left.clone().into(),
-                                    OperatorKind::decompound_token(&token),
-                                    right.into(),
-                                ),
-                                span: span.clone(),
-                            };
-                            Expr {
-                                kind: ExprKind::Assignment(left.into(), operation.into()),
-                                span,
-                            }
-                        } else {
-                            left
-                        };
-                        expr
+                        match token.kind {
+
+                            _ => left,
+                        }
                     } else {
                         return Err(ParseError::UnexpectedEndOfFile);
                     }
@@ -224,18 +245,22 @@ impl Primary for Parser {
             };
 
             if let Some(Token {
-                kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
-                ..
-            }) = self.peek()
+                            kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
+                            ..
+                        }) = self.peek()
             {
                 self.next();
-                return Ok(expr);
+                Ok(expr)
+            } else {
+                Ok(expr)
             }
-
-            Ok(expr)
         } else {
             Err(ParseError::UnexpectedEndOfFile)
-        }
+        };
+
+        self.exit();
+
+        result
     }
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
@@ -243,6 +268,24 @@ impl Primary for Parser {
             let Token { kind, span } = token.clone();
 
             match kind {
+                TokenKind::Keyword(kw) => {
+                    match kw {
+                        KeywordKind::If => self.parse_if_statement(),
+                        KeywordKind::While => self.parse_while_statement(),
+                        KeywordKind::For => self.parse_for_statement(),
+                        KeywordKind::Fn => self.parse_function(),
+                        KeywordKind::Return => self.parse_return_statement(),
+                        KeywordKind::Break => self.parse_break_statement(),
+                        KeywordKind::Continue => self.parse_continue_statement(),
+                        KeywordKind::Let => self.parse_let(),
+                        KeywordKind::Struct => self.parse_struct_definition(),
+                        KeywordKind::Enum => self.parse_enum(),
+                        _ => {
+                            println!("{}", kw);
+                            Err(ParseError::UnimplementedFeature)
+                        }
+                    }
+                }
                 TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
                 TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
@@ -254,10 +297,15 @@ impl Primary for Parser {
                     while let Some(token) = self.peek() {
                         match &token.kind {
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                expr = self.parse_struct(expr)?
+                                if self.current_context() != Context::Clause {
+                                    expr = self.parse_struct(expr)?;
+                                } else {
+                                    break;
+                                }
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
-                                expr = self.parse_index(expr)?
+
+                                expr = self.parse_index(expr)?;
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftParen) => {
                                 expr = self.parse_invoke(expr)?;
@@ -273,13 +321,30 @@ impl Primary for Parser {
                 | TokenKind::Char(_)
                 | TokenKind::Boolean(_)
                 | TokenKind::Float(_)
-                | TokenKind::Integer(_) => {
+                | TokenKind::Integer(_)
+                | TokenKind::Operator(_) => {
                     self.next();
-
                     let kind = ExprKind::Literal(token.clone());
-                    let span = token.span;
+                    let mut expr = Expr { kind, span };
 
-                    let expr = Expr { kind, span };
+                    while let Some(token) = self.peek() {
+                        match &token.kind {
+                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
+                                if self.current_context() != Context::Clause {
+                                    expr = self.parse_struct(expr)?;
+                                } else {
+                                    break;
+                                }
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
+                                expr = self.parse_index(expr)?
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
+                                expr = self.parse_invoke(expr)?;
+                            }
+                            _ => break,
+                        }
+                    }
 
                     Ok(expr)
                 }
@@ -335,8 +400,8 @@ impl Primary for Parser {
 
         let err = ParseError::ExpectedTokenNotFound(
             TokenKind::Punctuation(PunctuationKind::RightParen),
-            SyntaxPosition::After,
-            SyntaxType::TupleElements,
+            Position::After,
+            Context::TupleElements,
         );
 
         Err(err)
@@ -378,8 +443,8 @@ impl Primary for Parser {
 
         let err = ParseError::ExpectedTokenNotFound(
             TokenKind::Punctuation(PunctuationKind::RightBrace),
-            SyntaxPosition::After,
-            SyntaxType::ArrayElements,
+            Position::After,
+            Context::ArrayElements,
         );
 
         Err(err)

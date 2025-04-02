@@ -1,9 +1,13 @@
 use crate::axo_lexer::error::LexError;
-use crate::axo_lexer::{OperatorKind, PunctuationKind, TokenKind};
+use crate::axo_lexer::TokenKind;
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
 use crate::axo_lexer::handler::Handler;
+use crate::axo_lexer::literal::LiteralLexer;
+use crate::axo_lexer::operator::OperatorLexer;
+use crate::axo_lexer::punctuation::PunctuationLexer;
+use crate::axo_lexer::symbol::SymbolLexer;
 
 pub struct Lexer {
     file: PathBuf,
@@ -106,9 +110,9 @@ impl Lexer {
 
                 '/' => self.handle_comment()?,
 
-                ch if OperatorKind::is_operator(ch) => self.handle_operator()?,
+                ch if ch.is_operator() => self.handle_operator()?,
 
-                ch if PunctuationKind::is_punctuation(ch) => self.handle_punctuation(),
+                ch if ch.is_punctuation() => self.handle_punctuation(),
 
                 _ => {
                     self.next();
