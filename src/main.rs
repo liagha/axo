@@ -64,13 +64,7 @@ fn main() {
                         Err(err) => {
                             let end_span = tokens[parser.position].span.clone();
                             let parse_time = parse_start.elapsed().as_millis();
-                            let state = parser.state
-                                .iter()
-                                .map(|s| format!("{:?}", s)) // Convert each element to String if needed
-                                .collect::<Vec<_>>()
-                                .join(" => ");
-
-                            println!("{:#?}", parser.expressions);
+                            let state = parser.state.pop().unwrap().describe_chain();
 
                             xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red, end_span, state, err => Color::Orange, parse_time);
                         }

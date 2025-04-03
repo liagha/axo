@@ -1,29 +1,35 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::{Expr, ExprKind, Parser, Primary};
-use crate::axo_parser::state::{Position, Context};
+use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Composite {
-    fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError>;
-    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, ParseError>;
-    fn parse_closure(&mut self) -> Result<Expr, ParseError>;
-    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError>;
+    fn parse_index(&mut self, left: Expr) -> Result<Expr, Error>;
+    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error>;
+    fn parse_closure(&mut self) -> Result<Expr, Error>;
+    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error>;
 }
 
 impl Composite for Parser {
-    fn parse_index(&mut self, left: Expr) -> Result<Expr, ParseError> {
-        self.enter(Context::Index);
+    fn parse_index(&mut self, left: Expr) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Index, None);
 
-        self.next();
+        let bracket = self.next().unwrap();
 
         let Expr {
             span: Span { start, .. },
             ..
         } = left;
 
-        self.enter(Context::IndexValue);
+        self.push_context(ContextKind::Index, Some(SyntaxRole::Value));
 
         let index = self.parse_expression()?;
+
+        self.pop_context();
+
+        self.pop_context();
+
+        let err_end = index.span.end;
 
         let result = if let Some(Token {
             kind: TokenKind::Punctuation(PunctuationKind::RightBracket),
@@ -34,35 +40,31 @@ impl Composite for Parser {
             let span = self.span(start, end);
             let expr = Expr { kind, span };
 
-            self.exit();
-
             Ok(expr)
         } else {
-            let err = ParseError::ExpectedTokenNotFound(
-                TokenKind::Punctuation(PunctuationKind::RightBracket),
-                Position::After,
-                Context::ArrayElements,
-            );
-
-            Err(err)
+            let err_span = self.span(start, err_end);
+            
+            Err(Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
         };
-
-        self.exit();
 
         result
     }
 
-    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, ParseError> {
-        self.enter(Context::Invoke);
+    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Call, None);
 
         let Expr {
             span: Span { start, .. },
             ..
         } = name;
 
-        self.enter(Context::InvokeParameters);
+        self.push_context(ContextKind::Call, Some(SyntaxRole::Parameter));
 
         let parameters = self.parse_tuple()?;
+
+        self.pop_context();
+
+        self.pop_context();
 
         let result = match parameters {
             Expr {
@@ -91,24 +93,24 @@ impl Composite for Parser {
             }
         };
 
-        self.exit();
-
-        self.exit();
-
         result
     }
 
-    fn parse_closure(&mut self) -> Result<Expr, ParseError> {
-        self.enter(Context::Closure);
+    fn parse_closure(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Closure, None);
 
+        let pipe = self.next().unwrap();
+        
         let Token {
             span: Span { start, .. },
             ..
-        } = self.next().unwrap();
+        } = pipe;
 
-        self.enter(Context::ClosureParameters);
+        self.push_context(ContextKind::Closure, Some(SyntaxRole::Parameter));
 
         let mut parameters = Vec::new();
+        
+        let mut err_end = start;
 
         while let Some(token) = self.peek().cloned() {
             match token {
@@ -118,13 +120,15 @@ impl Composite for Parser {
                 } => {
                     self.next();
 
-                    self.enter(Context::ClosureBody);
+                    self.push_context(ContextKind::Closure, Some(SyntaxRole::Body));
+
+                    self.pop_context();
+
+                    self.pop_context();
+
+                    self.pop_context();
 
                     let body = self.parse_statement()?;
-
-                    self.exit();
-
-                    self.exit();
 
                     return Ok(Expr {
                         kind: ExprKind::Closure(parameters, body.into()),
@@ -133,8 +137,10 @@ impl Composite for Parser {
                 }
                 Token {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    ..
+                    span: Span { end, .. }
                 } => {
+                    err_end = end;
+                    
                     self.next();
                 }
                 _ => {
@@ -144,39 +150,38 @@ impl Composite for Parser {
             }
         }
 
-        let err = ParseError::ExpectedTokenNotFound(
-            TokenKind::Operator(OperatorKind::Pipe),
-            Position::After,
-            Context::ClosureParameters,
-        );
-
-        Err(err)
+        Err(Error::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
     }
 
-    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, ParseError> {
-        self.enter(Context::Struct);
+    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Struct, None);
 
-        self.next();
+        let brace = self.next().unwrap();
+        
+        let Token { span: Span { start: err_start, .. }, .. } = brace;
 
         let Expr {
             span: Span { start, .. },
             ..
         } = struct_name;
 
-        self.enter(Context::StructFields);
+        self.push_context(ContextKind::Struct, Some(SyntaxRole::Field));
 
         let mut fields = Vec::new();
+        
+        let mut err_end = err_start;
 
-        while let Some(token) = self.peek() {
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Comma) => {
-                    self.next();
-                }
-                TokenKind::Punctuation(PunctuationKind::RightBrace) => {
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
                     let Token {
                         span: Span { end, .. },
                         ..
                     } = self.next().unwrap();
+
+                    self.pop_context();
+
+                    self.pop_context();
 
                     let kind = ExprKind::Struct(struct_name.into(), fields);
                     let expr = Expr {
@@ -184,11 +189,12 @@ impl Composite for Parser {
                         span: self.span(start, end),
                     };
 
-                    self.exit();
-
-                    self.exit();
-
                     return Ok(expr);
+                }
+                Token { kind: TokenKind::Punctuation(PunctuationKind::Comma), span: Span { end, .. } } => {
+                    err_end = end;
+                    
+                    self.next();
                 }
                 _ => {
                     let stmt = self.parse_statement()?;
@@ -198,12 +204,6 @@ impl Composite for Parser {
             }
         }
 
-        let err = ParseError::ExpectedTokenNotFound(
-            TokenKind::Punctuation(PunctuationKind::RightBrace),
-            Position::After,
-            Context::StructFields,
-        );
-
-        Err(err)
+        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(err_start, err_end)))
     }
 }

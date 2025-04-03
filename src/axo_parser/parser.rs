@@ -2,9 +2,9 @@
 
 use std::path::PathBuf;
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::error::{Error};
 use crate::axo_parser::{Expr, ExprKind, Primary};
-use crate::axo_parser::state::{Position, Context};
+use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -29,28 +29,65 @@ impl Parser {
         }
     }
 
-    pub fn enter(&mut self, context: Context) {
+    pub fn push_context(&mut self, kind: ContextKind, role: Option<SyntaxRole>) -> &mut Self {
+        let span = self.full_span();
+        let mut context = Context {
+            kind,
+            role,
+            span,
+            parent: None,
+        };
+
+        if let Some(parent_context) = self.state.last().cloned() {
+            context.parent = Some(Box::new(parent_context));
+        }
+
         self.state.push(context);
+        self
     }
 
-    pub fn exit(&mut self) {
-        self.state.pop();
+    pub fn pop_context(&mut self) -> Option<Context> {
+        self.state.pop()
     }
 
-    pub fn switch(&mut self, context: Context) {
-        self.exit();
-
-        self.enter(context);
+    pub fn current_context(&self) -> Option<&Context> {
+        self.state.last()
     }
 
-    pub(crate) fn current_context(&self) -> Context {
-        self.state.last().cloned().unwrap_or(Context::Default)
+    pub fn in_context(&self, kind: ContextKind) -> bool {
+        if let Some(context) = self.current_context() {
+            context.kind == kind
+        } else {
+            false
+        }
+    }
+
+    pub fn in_role(&self, role: Option<SyntaxRole>) -> bool {
+        if let Some(context) = self.current_context() {
+            context.role == role
+        } else {
+            false
+        }
     }
 
     pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
         Span {
             file: self.file.clone(),
             start,
+            end,
+        }
+    }
+
+    pub fn full_span(&self) -> Span {
+        let end = if let Some(end) = self.tokens.last() {
+            end.span.end
+        } else {
+            (1,1)
+        };
+
+        Span {
+            file: self.file.clone(),
+            start: (1,1),
             end
         }
     }
@@ -155,8 +192,8 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self) -> Result<Vec<Expr>, ParseError> {
-        self.enter(Context::Program);
+    pub fn parse_program(&mut self) -> Result<Vec<Expr>, Error> {
+        self.push_context(ContextKind::Program, None);
 
         let mut statements = Vec::new();
 
@@ -173,7 +210,7 @@ impl Parser {
             statements.push(stmt);
         }
 
-        self.exit();
+        self.pop_context();
 
         Ok(statements)
     }

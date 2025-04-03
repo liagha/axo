@@ -56,6 +56,8 @@ impl fmt::Debug for ExprKind {
 
             // Patterns
             ExprKind::WildCard => write!(f, "WildCard"),
+            ExprKind::Bind(key, value) => write!(f, "Bind({:?}, {:?})", key, value),
+            ExprKind::Path(expr, sub) => write!(f,"Path({:?}, {:?})", expr, sub),
         }
     }
 }

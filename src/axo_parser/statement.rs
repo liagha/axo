@@ -1,37 +1,43 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::expression::{Expr, ExprKind};
 use crate::axo_parser::{Parser, Primary};
-use crate::axo_parser::state::{Position, Context};
+use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait ControlFlow {
-    fn parse_block(&mut self) -> Result<Expr, ParseError>;
-    fn parse_if_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_while_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_for_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_return_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_break_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_continue_statement(&mut self) -> Result<Expr, ParseError>;
+    fn parse_block(&mut self) -> Result<Expr, Error>;
+    fn parse_if_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_while_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_for_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_return_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_break_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_continue_statement(&mut self) -> Result<Expr, Error>;
 }
 
 impl ControlFlow for Parser {
-    fn parse_block(&mut self) -> Result<Expr, ParseError> {
+    fn parse_block(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Block, Some(SyntaxRole::Body));
+
+        let brace = self.next().unwrap();
+
         let Token {
             span: Span { start, .. },
             ..
-        } = self.next().unwrap();
-
-        self.enter(Context::Block);
+        } = brace;
 
         let mut statements = Vec::new();
 
-        while let Some(token) = self.peek() {
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::RightBrace) => {
+        let mut err_end = start;
+
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
                     let Token {
                         span: Span { end, .. },
                         ..
                     } = self.next().unwrap();
+
+                    self.pop_context();
 
                     let kind = ExprKind::Block(statements);
                     let expr = Expr {
@@ -39,11 +45,11 @@ impl ControlFlow for Parser {
                         span: self.span(start, end),
                     };
 
-                    self.exit();
-
                     return Ok(expr);
                 }
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), span: Span { end, .. } } => {
+                    err_end = end;
+
                     self.next();
                 }
                 _ => {
@@ -53,49 +59,39 @@ impl ControlFlow for Parser {
             }
         }
 
-        let err = ParseError::ExpectedTokenNotFound(
-            TokenKind::Punctuation(PunctuationKind::RightBrace),
-            Position::After,
-            Context::Block,
-        );
-
-        Err(err)
+        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
     }
 
-    fn parse_if_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_if_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::If, Some(SyntaxRole::Condition));
+
         let Token {
             span: Span { start, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::Conditional);
-
-        self.enter(Context::Clause);
-
         let condition = self.parse_expression()?;
 
-        self.exit();
+        self.pop_context();
 
-        self.enter(Context::ConditionalThen);
+        self.push_context(ContextKind::If, Some(SyntaxRole::Then));
 
         let then_branch = self.parse_statement()?;
 
-        self.exit();
-
-        self.enter(Context::ConditionalElse);
+        self.pop_context();
 
         let (else_branch, end) = if self.match_token(&TokenKind::Keyword(KeywordKind::Else)) {
+            self.push_context(ContextKind::If, Some(SyntaxRole::Else));
+
             let expr = self.parse_statement()?;
             let end = expr.span.end;
+
+            self.pop_context();
 
             (Some(expr.into()), end)
         } else {
             (None, then_branch.span.end)
         };
-
-        self.exit();
-
-        self.exit();
 
         let kind = ExprKind::Conditional(condition.into(), then_branch.into(), else_branch.into());
         let expr = Expr {
@@ -106,27 +102,23 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_while_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_while_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::While, Some(SyntaxRole::Condition));
+
         let Token {
             span: Span { start, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::While);
-
-        self.enter(Context::Clause);
-
         let condition = self.parse_expression()?;
 
-        self.exit();
+        self.pop_context();
 
-        self.enter(Context::WhileBody);
+        self.push_context(ContextKind::While, Some(SyntaxRole::Body));
 
         let body = self.parse_statement()?;
 
-        self.exit();
-
-        self.exit();
+        self.pop_context();
 
         let end = body.span.end;
         let kind = ExprKind::While(condition.into(), body.into());
@@ -138,27 +130,23 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_for_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_for_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::For, Some(SyntaxRole::Clause));
+
         let Token {
             span: Span { start, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::For);
-
-        self.enter(Context::Clause);
-
         let clause = self.parse_expression()?;
 
-        self.exit();
+        self.pop_context();
 
-        self.enter(Context::ForBody);
+        self.push_context(ContextKind::For, Some(SyntaxRole::Body));
 
         let body = self.parse_statement()?;
 
-        self.exit();
-
-        self.exit();
+        self.pop_context();
 
         let end = body.span.end;
         let kind = ExprKind::For(clause.into(), body.into());
@@ -170,29 +158,29 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_return_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_return_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Return, None);
+
         let Token {
             span: Span { start, end, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::Return);
-
-        self.enter(Context::ReturnValue);
-
         let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
         {
             (None, end)
         } else {
+            self.push_context(ContextKind::Return, Some(SyntaxRole::Value));
+
             let expr = self.parse_expression()?;
             let end = expr.span.end;
+
+            self.pop_context();
 
             (Some(expr.into()), end)
         };
 
-        self.exit();
-
-        self.exit();
+        self.pop_context();
 
         let kind = ExprKind::Return(value);
         let expr = Expr {
@@ -203,29 +191,29 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_break_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_break_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Break, None);
+
         let Token {
             span: Span { start, end, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::Break);
-
-        self.enter(Context::BreakValue);
-
         let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
         {
             (None, end)
         } else {
+            self.push_context(ContextKind::Break, Some(SyntaxRole::Value));
+
             let expr = self.parse_expression()?;
             let end = expr.span.end;
+
+            self.pop_context();
 
             (Some(expr.into()), end)
         };
 
-        self.exit();
-
-        self.exit();
+        self.pop_context();
 
         let kind = ExprKind::Break(value);
         let expr = Expr {
@@ -236,29 +224,29 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_continue_statement(&mut self) -> Result<Expr, ParseError> {
+    fn parse_continue_statement(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Continue, None);
+
         let Token {
             span: Span { start, end, .. },
             ..
         } = self.next().unwrap();
 
-        self.enter(Context::Continue);
-
-        self.enter(Context::ContinueValue);
-
         let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
         {
             (None, end)
         } else {
+            self.push_context(ContextKind::Continue, Some(SyntaxRole::Value));
+
             let expr = self.parse_expression()?;
             let end = expr.span.end;
+
+            self.pop_context();
 
             (Some(expr.into()), end)
         };
 
-        self.exit();
-
-        self.exit();
+        self.pop_context();
 
         let kind = ExprKind::Continue(value);
         let expr = Expr {

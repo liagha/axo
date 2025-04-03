@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::axo_lexer::TokenKind;
+use crate::axo_lexer::{Span, TokenKind};
 use crate::axo_parser::Expr;
 
 #[derive(Debug, Clone)]
@@ -24,86 +24,139 @@ pub enum Position {
     Adjacent,
 }
 
-#[derive(Debug, Clone, PartialEq, Ord, PartialOrd, Eq)]
-pub enum Context {
-    Default,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SyntaxRole {
+    Target,
+    Value,
+    Name,
+    Type,
+    Body,
+    Then,
+    Else,
+    Clause,
+    Condition,
+    Pattern,
+    Parameter,
+    Element,
+    Field,
+    Variant,
+
+    Initialization,
+    Assignment,
+    Declaration,
+    Definition,
+    Implementation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ContextKind {
+    // Top-level contexts
     Program,
+    Module,
+
+    // Statement contexts
     Statement,
     Expression,
+    Block,
+
+    // Expression-related contexts
     Binary,
     Unary,
+    Literal,
+    Identifier,
+    Path,
 
-    Definition,
-    DefinitionTarget,
-    DefinitionValue,
-
-    Assignment,
-    AssignmentTarget,
-    AssignmentValue,
-
-    Clause,
-
-    Conditional,
-    ConditionalThen,
-    ConditionalElse,
-
-    While,
-    WhileBody,
-
-    For,
-    ForBody,
-
-    Match,
-    MatchValue,
-    MatchPatterns,
-
-    Struct,
-    StructName,
-    StructFields,
-    StructDeclaration,
-
-    Enum,
-    EnumName,
-    EnumVariants,
-    EnumDeclaration,
-
-    Tuple,
-    TupleElements,
-
-    Array,
-    ArrayElements,
-
-    Closure,
-    ClosureParameters,
-    ClosureBody,
-
-    Invoke,
-    InvokeParameters,
-
-    Index,
-    IndexValue,
-
+    // Declaration/definition contexts
     Function,
-    FunctionName,
-    FunctionParameters,
-    FunctionBody,
-    FunctionDeclaration,
+    Variable,
+    Constant,
+    Type,
+    Struct,
+    Enum,
+    Trait,
+    Implementation,
 
+    // Control flow contexts
+    If,
+    Else,
+    Match,
+    While,
+    For,
+    Loop,
+
+    // Expression constructs
+    Tuple,
+    Array,
+    Call,
+    Index,
+    MemberAccess,
+    Closure,
+
+    // Special statements
     Return,
-    ReturnValue,
-
     Break,
-    BreakValue,
-
     Continue,
-    ContinueValue,
 
+    // Other specialized contexts
     Macro,
-    MacroName,
-    MacroParameters,
-    MacroBody,
+    Attribute,
+    Generic,
+    Lifetime,
 
-    Block,
+    // Error recovery context
+    ErrorRecovery,
+}
+
+#[derive(Debug, Clone)]
+pub struct Context {
+    pub kind: ContextKind,
+    pub role: Option<SyntaxRole>,
+    pub span: Span,
+    pub parent: Option<Box<Context>>,
+}
+
+impl Context {
+    pub fn new(kind: ContextKind, span: Span) -> Self {
+        Self {
+            kind,
+            role: None,
+            span,
+            parent: None,
+        }
+    }
+
+    pub fn with_role(kind: ContextKind, role: SyntaxRole, span: Span) -> Self {
+        Self {
+            kind,
+            role: Some(role),
+            span,
+            parent: None,
+        }
+    }
+
+    pub fn with_parent(mut self, parent: Context) -> Self {
+        self.parent = Some(Box::new(parent));
+        self
+    }
+
+    /// Build a context chain description for error messages
+    pub fn describe_chain(&self) -> String {
+        let mut descriptions = Vec::new();
+
+        let mut current = Some(self);
+        while let Some(ctx) = current {
+            let mut desc = format!("{:?}", ctx.kind);
+
+            if let Some(role) = &ctx.role {
+                desc = format!("{} ({:?})", desc, role);
+            }
+
+            descriptions.push(desc);
+            current = ctx.parent.as_ref().map(|p| p.as_ref());
+        }
+
+        descriptions.join(" → ")
+    }
 }
 
 impl core::fmt::Display for Position {

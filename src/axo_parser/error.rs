@@ -1,233 +1,170 @@
 #![allow(dead_code)]
 
-use crate::axo_lexer::{TokenKind, Token};
+use std::fmt::Formatter;
+use std::fs::read_to_string;
+use broccli::{Color, TextStyle};
+use crate::axo_lexer::{TokenKind, Token, Span, PunctuationKind};
 use crate::axo_parser::{Expr};
-use crate::axo_parser::state::{Position, Context};
+use crate::axo_parser::state::{Position, Context, ContextKind};
 
-pub enum ParseError {
-    // Renamed for clarity
-    ExpectedTokenNotFound(TokenKind, Position, Context),
-    UnexpectedToken(Token, Position, Context),
-    UnexpectedExpression(Expr, Position, Context),
-    MissingSyntaxElement(Context),
-    InvalidSyntaxPattern(String),
-    UnimplementedFeature,
-    UnexpectedEndOfFile,
-
-    // New error types
-    MismatchedDelimiter(TokenKind, TokenKind),
-    UnclosedDelimiter(TokenKind, usize, usize), // token, line, column
-    EmptyConstruct(Context),
-    ConflictingSyntax(Context, Context),
-    AmbiguousSyntax(String),
-    ExpectedSeparator(TokenKind, Context),
-    MissingSemicolon(usize, usize), // line, column
-    ExtraSemicolon(usize, usize),   // line, column
-    InvalidEscapeSequence(String, usize, usize), // sequence, line, column
-    UnterminatedString(usize, usize), // line, column
-    UnterminatedCharLiteral(usize, usize), // line, column
-    EmptyCharLiteral(usize, usize), // line, column
-    MultipleCharsInCharLiteral(usize, usize), // line, column
-    InvalidIntegerLiteral(String, usize, usize), // value, line, column
-    InvalidFloatLiteral(String, usize, usize), // value, line, column
-    OverflowInLiteral(String, usize, usize), // value, line, column
-    InvalidOperatorInContext(TokenKind, Context),
-    UnexpectedKeyword(TokenKind, Position, Context),
-    MisplacedKeyword(TokenKind, Position, Context),
-    RedundantTokens(Vec<Token>),
-    InvalidStartOfExpression(Token),
-    InvalidStartOfStatement(Token),
-    NestedBlockInExpressionContext,
-    ExpectedIdentifier(Position, Context),
-    ReservedIdentifier(String),
-    DuplicatePatternBinding(String), // name
-    PatternMatchingError(String),
-    InvalidRangeBounds,
-    IncompleteExpression(Context),
-    DisallowedExpression(Context, Position, Context), // expr, position, context
-    ExpressionWithoutEffect,
-    InvalidPrefix(TokenKind, Context),
-    InvalidPostfix(TokenKind, Context),
-    InconsistentIndentation(usize, usize, usize), // expected, found, line
-    LonelyElseClause,
-    MissingArmDelimiter,
-    ExpectedPathSeparator,
-    ExpectedParameterList,
-    ParameterWithoutType,
-    IncompletePatternMatch,
-    EmptyBlockInNonBlockContext,
-    MacroInvocationError(String),
-    SyntaxDepthExceeded(usize), // max depth
-    InvalidSyntaxRecovery,
+#[derive(Debug)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub span: Span,
+    pub context: Option<Context>,
+    pub help: Option<String>,
 }
 
-impl core::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+pub enum ErrorKind {
+    ElseWithoutConditional,
+    UnclosedDelimiter(Token),
+    UnimplementedToken(TokenKind),
+    UnexpectedToken(TokenKind),
+    InvalidSyntaxPattern(String),
+    ExpectedSyntax(ContextKind),
+    UnexpectedEndOfFile,
+}
+
+impl Error {
+    pub fn new(kind: ErrorKind, span: Span) -> Self {
+        Self {
+            kind,
+            span,
+            context: None,
+            help: None,
+        }
+    }
+
+    pub fn with_context(mut self, context: Context) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    pub fn with_help(mut self, help: impl Into<String>) -> Self {
+        self.help = Some(help.into());
+        self
+    }
+
+    pub fn format(&self, source_code: &str) -> String {
+        let lines: Vec<&str> = source_code.lines().collect();
+        let mut result = String::new();
+
+        result.push_str(&format!("error: {}\n", self.kind.to_string().colorize(Color::Red).bold()));
+
+        let (line_start, column_start) = self.span.start;
+        let (line_end, column_end) = self.span.end;
+
+        result.push_str(&format!(" --> {}:{}:{}\n",
+                                 self.span.file.display(),
+                                 line_start,
+                                 column_start
+        ).colorize(Color::Blue));
+
+        if let Some(ctx) = &self.context {
+            result.push_str(&format!(" note: {}\n", ctx.describe_chain().colorize(Color::Blue)));
+        }
+
+        // Calculate maximum line number width safely
+        let max_line_number = line_end.max(line_end).max(1); // Ensure at least 1
+        let line_number_width = max_line_number.to_string().len();
+
+        // Calculate bounds safely
+        let start_line = line_start.saturating_sub(3).max(1);
+        let end_line = (line_end + 3).min(lines.len()).max(1);
+
+        for line_idx in start_line..=end_line {
+            let line_content_idx = line_idx.saturating_sub(1);
+            if line_content_idx >= lines.len() { break; }
+
+            let line_content = lines[line_content_idx];
+            let line_num_str = if line_content.is_empty() {
+                " ".repeat(line_number_width)
+            } else {
+                line_idx.to_string()
+            };
+
+            result.push_str(&format!("{:>width$} | {}\n",
+                                     line_num_str.colorize(Color::Blue),
+                                     line_content,
+                                     width = line_number_width
+            ));
+
+            if line_idx >= line_start && line_idx <= line_end {
+                let line_length = line_content.chars().count();
+                let start_col = if line_idx == line_start {
+                    column_start.saturating_sub(1).min(line_length)
+                } else { 0 };
+                let end_col = if line_idx == line_end {
+                    column_end.saturating_sub(1).min(line_length)
+                } else { line_length };
+
+                let caret_count = if start_col <= end_col {
+                    end_col.saturating_sub(start_col) + 1
+                } else {
+                    1
+                };
+
+                let underline = format!("{:width$}{}",
+                                        "",
+                                        "^".repeat(caret_count),
+                                        width = start_col
+                );
+
+                result.push_str(&format!("{:>width$} | {}\n",
+                                         " ".repeat(line_number_width),
+                                         underline.colorize(Color::Red).bold(),
+                                         width = line_number_width
+                ));
+            }
+        }
+
+        if let Some(help) = &self.help {
+            result.push_str(&format!("help: {}\n", help.colorize(Color::Green)));
+        }
+
+        result
+    }
+}
+
+impl core::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            // Updated existing error formatters
-            ParseError::ExpectedTokenNotFound(token, position, syntax) => {
-                write!(f, "Expected {} {} {}", token, position, syntax)
+            ErrorKind::ElseWithoutConditional => {
+                write!(f, "Cant have an else without conditional")
             }
-            ParseError::UnexpectedToken(token, position, syntax) => {
-                write!(f, "Unexpected token {:?} {} {}", token, position, syntax)
-            }
-            ParseError::UnexpectedExpression(expr, position, syntax) => {
-                write!(f, "Unexpected expression {:?} {} {}", expr, position, syntax)
-            }
-            ParseError::MissingSyntaxElement(syntax) => {
-                write!(f, "Missing {}", syntax)
-            }
-            ParseError::InvalidSyntaxPattern(m) => {
+            ErrorKind::InvalidSyntaxPattern(m) => {
                 write!(f, "Invalid syntax pattern: '{}'", m)
             }
-            ParseError::UnimplementedFeature => {
-                write!(f, "Unimplemented axo_parser feature")
-            }
-            ParseError::UnexpectedEndOfFile => {
+            ErrorKind::UnexpectedEndOfFile => {
                 write!(f, "Unexpected end of file")
             }
-
-            // Formatters for new error types
-            ParseError::MismatchedDelimiter(opening, closing) => {
-                write!(f, "Mismatched delimiter: expected closing '{}' to match opening '{}'", closing, opening)
+            ErrorKind::UnclosedDelimiter(delimiter) => {
+                write!(f, "Unclosed delimiter '{:?}'", delimiter)
             }
-            ParseError::UnclosedDelimiter(token, line, col) => {
-                write!(f, "Unclosed delimiter '{}' at line {}, column {}", token, line, col)
+            ErrorKind::UnimplementedToken(token) => {
+                write!(f, "Unimplemented token '{}'", token)
             }
-            ParseError::EmptyConstruct(syntax) => {
-                write!(f, "Empty {} is not allowed in this context", syntax)
+            ErrorKind::UnexpectedToken(token) => {
+                write!(f, "Unexpected token '{}'", token)
             }
-            ParseError::ConflictingSyntax(syntax1, syntax2) => {
-                write!(f, "Conflicting syntax: {} conflicts with {}", syntax1, syntax2)
-            }
-            ParseError::AmbiguousSyntax(desc) => {
-                write!(f, "Ambiguous syntax: {}", desc)
-            }
-            ParseError::ExpectedSeparator(token, syntax) => {
-                write!(f, "Expected separator '{}' in {}", token, syntax)
-            }
-            ParseError::MissingSemicolon(line, col) => {
-                write!(f, "Missing semicolon at line {}, column {}", line, col)
-            }
-            ParseError::ExtraSemicolon(line, col) => {
-                write!(f, "Unnecessary semicolon at line {}, column {}", line, col)
-            }
-            ParseError::InvalidEscapeSequence(seq, line, col) => {
-                write!(f, "Invalid escape sequence '{}' at line {}, column {}", seq, line, col)
-            }
-            ParseError::UnterminatedString(line, col) => {
-                write!(f, "Unterminated string literal starting at line {}, column {}", line, col)
-            }
-            ParseError::UnterminatedCharLiteral(line, col) => {
-                write!(f, "Unterminated character literal starting at line {}, column {}", line, col)
-            }
-            ParseError::EmptyCharLiteral(line, col) => {
-                write!(f, "Empty character literal at line {}, column {}", line, col)
-            }
-            ParseError::MultipleCharsInCharLiteral(line, col) => {
-                write!(f, "Multiple characters in character literal at line {}, column {}", line, col)
-            }
-            ParseError::InvalidIntegerLiteral(val, line, col) => {
-                write!(f, "Invalid integer literal '{}' at line {}, column {}", val, line, col)
-            }
-            ParseError::InvalidFloatLiteral(val, line, col) => {
-                write!(f, "Invalid float literal '{}' at line {}, column {}", val, line, col)
-            }
-            ParseError::OverflowInLiteral(val, line, col) => {
-                write!(f, "Numeric literal '{}' overflows its type at line {}, column {}", val, line, col)
-            }
-            ParseError::InvalidOperatorInContext(op, context) => {
-                write!(f, "Invalid operator '{}' in {} context", op, context)
-            }
-            ParseError::UnexpectedKeyword(keyword, position, syntax) => {
-                write!(f, "Unexpected keyword '{}' {} {}", keyword, position, syntax)
-            }
-            ParseError::MisplacedKeyword(keyword, position, syntax) => {
-                write!(f, "Misplaced keyword '{}' {} {}", keyword, position, syntax)
-            }
-            ParseError::RedundantTokens(tokens) => {
-                write!(f, "Redundant tokens: {:?}", tokens)
-            }
-            ParseError::InvalidStartOfExpression(token) => {
-                write!(f, "Invalid start of expression: {:?}", token)
-            }
-            ParseError::InvalidStartOfStatement(token) => {
-                write!(f, "Invalid start of statement: {:?}", token)
-            }
-            ParseError::NestedBlockInExpressionContext => {
-                write!(f, "Unexpected nested block in expression context")
-            }
-            ParseError::ExpectedIdentifier(position, syntax) => {
-                write!(f, "Expected identifier {} {}", position, syntax)
-            }
-            ParseError::ReservedIdentifier(name) => {
-                write!(f, "Reserved identifier '{}' cannot be used here", name)
-            }
-            ParseError::DuplicatePatternBinding(name) => {
-                write!(f, "Duplicate binding '{}' in pattern", name)
-            }
-            ParseError::PatternMatchingError(desc) => {
-                write!(f, "Pattern matching error: {}", desc)
-            }
-            ParseError::InvalidRangeBounds => {
-                write!(f, "Invalid range bounds")
-            }
-            ParseError::IncompleteExpression(syntax) => {
-                write!(f, "Incomplete {} expression", syntax)
-            }
-            ParseError::DisallowedExpression(expr, position, context) => {
-                write!(f, "{:?} not allowed {} {}", expr, position, context)
-            }
-            ParseError::ExpressionWithoutEffect => {
-                write!(f, "Expression without effect")
-            }
-            ParseError::InvalidPrefix(token, syntax) => {
-                write!(f, "Invalid prefix '{}' for {}", token, syntax)
-            }
-            ParseError::InvalidPostfix(token, syntax) => {
-                write!(f, "Invalid postfix '{}' for {}", token, syntax)
-            }
-            ParseError::InconsistentIndentation(expected, found, line) => {
-                write!(f, "Inconsistent indentation at line {}: expected {}, found {}", line, expected, found)
-            }
-            ParseError::LonelyElseClause => {
-                write!(f, "Else clause without preceding if statement")
-            }
-            ParseError::MissingArmDelimiter => {
-                write!(f, "Missing delimiter between match arms")
-            }
-            ParseError::ExpectedPathSeparator => {
-                write!(f, "Expected path separator '::'")
-            }
-            ParseError::ExpectedParameterList => {
-                write!(f, "Expected parameter list")
-            }
-            ParseError::ParameterWithoutType => {
-                write!(f, "Parameter missing type annotation")
-            }
-            ParseError::IncompletePatternMatch => {
-                write!(f, "Incomplete pattern match")
-            }
-            ParseError::EmptyBlockInNonBlockContext => {
-                write!(f, "Empty block in non-block context")
-            }
-            ParseError::MacroInvocationError(desc) => {
-                write!(f, "Macro invocation error: {}", desc)
-            }
-            ParseError::SyntaxDepthExceeded(depth) => {
-                write!(f, "Maximum syntax nesting depth exceeded ({})", depth)
-            }
-            ParseError::InvalidSyntaxRecovery => {
-                write!(f, "Failed to recover from previous syntax errors")
+            ErrorKind::ExpectedSyntax(kind) => {
+                write!(f, "Expected syntax '{:?}' but didn't get it", kind)
             }
         }
     }
 }
 
-impl core::fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl core::fmt::Debug for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
-impl core::error::Error for ParseError {}
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let file = read_to_string(self.span.file.clone()).unwrap();
+        write!(f, "{}", self.format(file.as_str()))
+    }
+}
+
+impl core::error::Error for ErrorKind {}

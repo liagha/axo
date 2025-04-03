@@ -1,21 +1,53 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{ParseError};
+use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
-use crate::axo_parser::state::{Position, Context};
+use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Primary {
-    fn parse_unary(&mut self) -> Result<Expr, ParseError>;
-    fn parse_factor(&mut self) -> Result<Expr, ParseError>;
-    fn parse_term(&mut self) -> Result<Expr, ParseError>;
-    fn parse_expression(&mut self) -> Result<Expr, ParseError>;
-    fn parse_statement(&mut self) -> Result<Expr, ParseError>;
-    fn parse_primary(&mut self) -> Result<Expr, ParseError>;
-    fn parse_tuple(&mut self) -> Result<Expr, ParseError>;
-    fn parse_array(&mut self) -> Result<Expr, ParseError>;
+    fn parse_token(&mut self) -> Expr;
+    fn parse_unary(&mut self) -> Result<Expr, Error>;
+    fn parse_factor(&mut self) -> Result<Expr, Error>;
+    fn parse_term(&mut self) -> Result<Expr, Error>;
+    fn parse_expression(&mut self) -> Result<Expr, Error>;
+    fn parse_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_primary(&mut self) -> Result<Expr, Error>;
+    fn parse_tuple(&mut self) -> Result<Expr, Error>;
+    fn parse_array(&mut self) -> Result<Expr, Error>;
 }
 
 impl Primary for Parser {
-    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_token(&mut self) -> Expr {
+        let token = self.next().unwrap();
+        let Token { kind, span } = token.clone();
+
+        let expr = match kind {
+            TokenKind::Identifier(ident) => {
+                Expr {
+                    kind: ExprKind::Identifier(ident),
+                    span,
+                }
+            }
+            TokenKind::Float(_)
+            | TokenKind::Integer(_)
+            | TokenKind::Boolean(_)
+            | TokenKind::Str(_)
+            | TokenKind::Operator(_)
+            | TokenKind::Char(_)
+            | TokenKind::Punctuation(_)
+            | TokenKind::Keyword(_)
+            | TokenKind::Comment(_)
+            | TokenKind::Invalid(_)
+            | TokenKind::EOF => {
+                Expr {
+                    kind: ExprKind::Literal(token),
+                    span,
+                }
+            }
+        };
+
+        expr
+    }
+    fn parse_unary(&mut self) -> Result<Expr, Error> {
         if let Some(Token {
                         kind: TokenKind::Operator(op),
                         span: Span { start, .. },
@@ -57,13 +89,14 @@ impl Primary for Parser {
 
         Ok(expr)
     }
-    fn parse_factor(&mut self) -> Result<Expr, ParseError> {
+
+    fn parse_factor(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_unary()?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
         {
             match op {
                 op if op.is_factor() => {
@@ -77,30 +110,7 @@ impl Primary for Parser {
 
                     let kind = ExprKind::Binary(left.into(), op, right.into());
 
-                    left = Expr { kind, span };
-                }
-                OperatorKind::Colon => {
-                    self.next();
-
-                    let right = self.parse_unary()?;
-
-                    let start = left.span.start;
-                    let end = right.span.end;
-                    let span = self.span(start, end);
-
-                    let kind = ExprKind::Typed(left.into(), right.into());
-
-                    left = Expr { kind, span };
-                }
-                OperatorKind::Dot => {
-                    self.next();
-
-                    let field = self.parse_expression()?;
-
-                    let span = self.span(left.span.start, field.span.end);
-
-                    let kind = ExprKind::Member(left.into(), field.into());
-                    left = Expr { kind, span };
+                    left = Expr { kind, span }.transform();
                 }
                 _ => break,
             }
@@ -108,53 +118,15 @@ impl Primary for Parser {
 
         Ok(left)
     }
-    fn parse_term(&mut self) -> Result<Expr, ParseError> {
+    fn parse_term(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_factor()?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
         {
             match op {
-                OperatorKind::ColonEqual => {
-                    self.next();
-                    let right = self.parse_statement()?;
-                    let span = self.span(left.span.start, right.span.end);
-
-                    left = Expr {
-                        kind: ExprKind::Definition(left.into(), Some(right.into())),
-                        span,
-                    };
-                }
-                OperatorKind::Equal => {
-                    self.next();
-                    let right = self.parse_statement()?;
-                    let span = self.span(left.span.start, right.span.end);
-
-                    left = Expr {
-                        kind: ExprKind::Assignment(left.into(), right.into()),
-                        span,
-                    };
-                }
-                ref operator if operator.is_compound() => {
-                    let token = self.next().unwrap();
-                    let right = self.parse_statement()?;
-                    let span = self.span(left.span.start, right.span.end);
-                    let operation = Expr {
-                        kind: ExprKind::Binary(
-                            left.clone().into(),
-                            OperatorKind::decompound_token(&token),
-                            right.into(),
-                        ),
-                        span: span.clone(),
-                    };
-
-                    left = Expr {
-                        kind: ExprKind::Assignment(left.into(), operation.into()),
-                        span,
-                    };
-                }
                 op if op.is_term() => {
                     let op = self.next().unwrap();
 
@@ -166,7 +138,7 @@ impl Primary for Parser {
 
                     let kind = ExprKind::Binary(left.into(), op, right.into());
 
-                    left = Expr { kind, span };
+                    left = Expr { kind, span }.transform();
                 }
                 _ => break,
             }
@@ -175,13 +147,13 @@ impl Primary for Parser {
         Ok(left)
     }
 
-    fn parse_expression(&mut self) -> Result<Expr, ParseError> {
+    fn parse_expression(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_term()?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
         {
             if op.is_expression() {
                 let op = self.next().unwrap();
@@ -194,7 +166,7 @@ impl Primary for Parser {
 
                 let kind = ExprKind::Binary(left.into(), op, right.into());
 
-                left = Expr { kind, span };
+                left = Expr { kind, span }.transform();
             } else {
                 break;
             }
@@ -203,16 +175,15 @@ impl Primary for Parser {
         Ok(left)
     }
 
-    fn parse_statement(&mut self) -> Result<Expr, ParseError> {
-        self.enter(Context::Statement);
-
+    fn parse_statement(&mut self) -> Result<Expr, Error> {
         let result = if let Some(token) = self.peek().cloned() {
-            let Token { kind, .. } = token.clone();
+            let Token { kind, span } = token.clone();
 
             let expr = match kind {
-                TokenKind::Keyword(kw) => {
+                TokenKind::Keyword(ref kw) => {
                     match kw {
                         KeywordKind::If => self.parse_if_statement(),
+                        KeywordKind::Else => Err(Error::new(ErrorKind::ElseWithoutConditional, span)),
                         KeywordKind::While => self.parse_while_statement(),
                         KeywordKind::For => self.parse_for_statement(),
                         KeywordKind::Fn => self.parse_function(),
@@ -223,8 +194,7 @@ impl Primary for Parser {
                         KeywordKind::Struct => self.parse_struct_definition(),
                         KeywordKind::Enum => self.parse_enum(),
                         _ => {
-                            println!("{}", kw);
-                            Err(ParseError::UnimplementedFeature)
+                            Err(Error::new(ErrorKind::UnimplementedToken(kind), span))
                         }
                     }?
                 }
@@ -233,14 +203,7 @@ impl Primary for Parser {
                 _ => {
                     let left = self.parse_expression()?;
 
-                    if let Some(token) = self.peek().cloned() {
-                        match token.kind {
-
-                            _ => left,
-                        }
-                    } else {
-                        return Err(ParseError::UnexpectedEndOfFile);
-                    }
+                    left
                 }
             };
 
@@ -255,22 +218,21 @@ impl Primary for Parser {
                 Ok(expr)
             }
         } else {
-            Err(ParseError::UnexpectedEndOfFile)
+            Err(Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         };
-
-        self.exit();
 
         result
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_primary(&mut self) -> Result<Expr, Error> {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
 
             match kind {
-                TokenKind::Keyword(kw) => {
+                TokenKind::Keyword(ref kw) => {
                     match kw {
                         KeywordKind::If => self.parse_if_statement(),
+                        KeywordKind::Else => Err(Error::new(ErrorKind::ElseWithoutConditional, span)),
                         KeywordKind::While => self.parse_while_statement(),
                         KeywordKind::For => self.parse_for_statement(),
                         KeywordKind::Fn => self.parse_function(),
@@ -281,57 +243,29 @@ impl Primary for Parser {
                         KeywordKind::Struct => self.parse_struct_definition(),
                         KeywordKind::Enum => self.parse_enum(),
                         _ => {
-                            println!("{}", kw);
-                            Err(ParseError::UnimplementedFeature)
+                            Err(Error::new(ErrorKind::UnimplementedToken(kind), span))
                         }
                     }
                 }
+                TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_block(),
                 TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_array(),
                 TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_tuple(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
-                TokenKind::Identifier(name) => {
-                    self.next();
-                    let kind = ExprKind::Identifier(name.clone());
-                    let mut expr = Expr { kind, span };
-
-                    while let Some(token) = self.peek() {
-                        match &token.kind {
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                if self.current_context() != Context::Clause {
-                                    expr = self.parse_struct(expr)?;
-                                } else {
-                                    break;
-                                }
-                            }
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
-
-                                expr = self.parse_index(expr)?;
-                            }
-                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
-                                expr = self.parse_invoke(expr)?;
-                                return Ok(expr);
-                            }
-                            _ => break,
-                        }
-                    }
-
-                    Ok(expr)
-                }
-                TokenKind::Str(_)
+                TokenKind::Identifier(_)
+                | TokenKind::Str(_)
                 | TokenKind::Char(_)
                 | TokenKind::Boolean(_)
                 | TokenKind::Float(_)
                 | TokenKind::Integer(_)
                 | TokenKind::Operator(_) => {
-                    self.next();
-                    let kind = ExprKind::Literal(token.clone());
-                    let mut expr = Expr { kind, span };
+                    let mut expr = self.parse_token();
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                if self.current_context() != Context::Clause {
-                                    expr = self.parse_struct(expr)?;
+                                if !self.in_role(Some(SyntaxRole::Clause)) &&
+                                    !self.in_role(Some(SyntaxRole::Condition)) {
+                                    expr = self.parse_struct(expr.clone())?;
                                 } else {
                                     break;
                                 }
@@ -349,24 +283,27 @@ impl Primary for Parser {
                     Ok(expr)
                 }
 
-                TokenKind::EOF => Err(ParseError::UnexpectedEndOfFile),
-                token => Err(ParseError::InvalidSyntaxPattern(format!(
-                    "Unexpected token: {:?}",
-                    token
-                ))),
+                TokenKind::EOF => Err(Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span())),
+                kind => Err(Error::new(ErrorKind::UnexpectedToken(kind), span)),
             }
         } else {
-            Err(ParseError::UnexpectedEndOfFile)
+            Err(Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         }
     }
 
-    fn parse_tuple(&mut self) -> Result<Expr, ParseError> {
+    fn parse_tuple(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Tuple, Some(SyntaxRole::Parameter));
+
+        let parenthesis = self.next().unwrap();
+
         let Token {
             span: Span { start, .. },
             ..
-        } = self.next().unwrap();
+        } = parenthesis;
 
         let mut parameters = Vec::new();
+
+        let mut err_end = (0usize, 0usize);
 
         while let Some(token) = self.peek().cloned() {
             match token {
@@ -375,6 +312,8 @@ impl Primary for Parser {
                     span: Span { end, .. },
                 } => {
                     self.next();
+
+                    self.pop_context();
 
                     return if parameters.len() == 1 {
                         Ok(parameters.pop().unwrap())
@@ -387,8 +326,10 @@ impl Primary for Parser {
                 }
                 Token {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    ..
+                    span: Span { end, .. }
                 } => {
+                    err_end = end;
+
                     self.next();
                 }
                 _ => {
@@ -398,22 +339,24 @@ impl Primary for Parser {
             }
         }
 
-        let err = ParseError::ExpectedTokenNotFound(
-            TokenKind::Punctuation(PunctuationKind::RightParen),
-            Position::After,
-            Context::TupleElements,
-        );
+        let err_span = self.span(start, err_end);
 
-        Err(err)
+        Err(Error::new(ErrorKind::UnclosedDelimiter(parenthesis), err_span))
     }
 
-    fn parse_array(&mut self) -> Result<Expr, ParseError> {
+    fn parse_array(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Array, Some(SyntaxRole::Element));
+
+        let bracket = self.next().unwrap();
+
         let Token {
             span: Span { start, .. },
             ..
-        } = self.next().unwrap();
+        } = bracket;
 
         let mut elements = Vec::new();
+
+        let mut err_end = start;
 
         while let Some(token) = self.peek().cloned() {
             match token {
@@ -423,30 +366,34 @@ impl Primary for Parser {
                 } => {
                     self.next();
 
-                    return Ok(Expr {
-                        kind: ExprKind::Array(elements),
-                        span: self.span(start, end),
-                    });
+                    self.pop_context();
+
+                    return if elements.len() == 1 {
+                        Ok(elements.pop().unwrap())
+                    } else {
+                        Ok(Expr {
+                            kind: ExprKind::Array(elements),
+                            span: self.span(start, end),
+                        })
+                    }
                 }
                 Token {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    ..
+                    span: Span { end, .. }
                 } => {
+                    err_end = end;
+
                     self.next();
                 }
                 _ => {
                     let expr = self.parse_expression()?;
-                    elements.push(expr.into());
+                    elements.push(expr);
                 }
             }
         }
 
-        let err = ParseError::ExpectedTokenNotFound(
-            TokenKind::Punctuation(PunctuationKind::RightBrace),
-            Position::After,
-            Context::ArrayElements,
-        );
+        let err_span = self.span(start, err_end);
 
-        Err(err)
+        Err(Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
     }
 }

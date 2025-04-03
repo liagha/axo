@@ -1,5 +1,3 @@
-use crate::axo_lexer::{Token, TokenKind, Span};
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperatorKind {
     // Single character operators (sorted alphabetically)
@@ -87,17 +85,26 @@ pub enum OperatorKind {
 
     // Arrow operators
     Arrow,                   // -> (function return type or closure)
-    FatArrow,                // => (match arm or closure)
+    LeftArrow,               // <- (left direction arrow)
+    LeftFatArrow,            // <= (left fat arrow)
+    PipeRight,               // |> (pipe forward operator)
+    PipeLeft,                // <| (pipe backward operator)
+    AngleRight,              // ~> (tilde forward arrow)
+    AngleLeft,               // <~ (tilde backward arrow)
+    DoubleArrow,             // --> (double right arrow)
+    DoubleLeftArrow,         // <-- (double left arrow)
+    DoubleFatArrow,          // ==> (double fat right arrow)
+    DoubleFatLeftArrow,      // <== (double fat left arrow)
 
     // Special path/namespace operators
     DoubleColon,             // :: (path separator or associated function)
 
     // Comment operators
-    BlockCommentStart,       // /* (block comment start)
-    BlockCommentEnd,         // */ (block comment end)
+    SlashStart,              // /* (block comment start)
+    StarSlash,               // */ (block comment end)
     TripleSlash,             // /// (documentation comment)
-    DocCommentStart,         // /** (doc comment start)
-    ModDocComment,           // //! (module doc comment)
+    SlashDoubleStart,        // /** (doc comment start)
+    DoubleSlashExclamation,  // //! (module doc comment)
 
     // Special double character operators
     DoubleAt,                // @@ (extended annotation)
@@ -147,6 +154,7 @@ impl OperatorKind {
     }
 
     pub fn is_term(&self) -> bool {
+        self.is_arrow() || self.is_left_arrow() ||
         matches!(
             self,
             OperatorKind::Plus
@@ -154,18 +162,49 @@ impl OperatorKind {
                 | OperatorKind::DoublePipe
                 | OperatorKind::Pipe
                 | OperatorKind::Caret
+
+                | OperatorKind::Colon
+                | OperatorKind::Dot
+                | OperatorKind::DoubleColon
+
         )
     }
 
     pub fn is_expression(&self) -> bool {
-        matches!(
+        self.is_compound() ||
+            matches!(
             self,
-            OperatorKind::DoubleEqual
+            OperatorKind::Equal
+                | OperatorKind::ColonEqual
+                | OperatorKind::DoubleEqual
                 | OperatorKind::NotEqual
                 | OperatorKind::GreaterThan
                 | OperatorKind::LessThan
                 | OperatorKind::GreaterThanOrEqual
                 | OperatorKind::LessThanOrEqual
+        )
+    }
+
+    pub fn is_arrow(&self) -> bool {
+        matches!(
+            self,
+            OperatorKind::Arrow
+                | OperatorKind::PipeRight
+                | OperatorKind::AngleRight
+                | OperatorKind::DoubleArrow
+                | OperatorKind::DoubleFatArrow
+        )
+    }
+
+    pub fn is_left_arrow(&self) -> bool {
+        matches!(
+            self,
+            OperatorKind::DoubleLeftArrow
+                | OperatorKind::AngleLeft
+                | OperatorKind::PipeLeft
+                | OperatorKind::LeftArrow
+                | OperatorKind::LeftFatArrow
+                | OperatorKind::DoubleFatLeftArrow
         )
     }
 
@@ -209,23 +248,6 @@ impl OperatorKind {
             OperatorKind::DoublePercentEqual => OperatorKind::DoublePercent,
             _ => OperatorKind::Unknown,
         }
-    }
-
-    pub fn decompound_token(token: &Token) -> Token {
-        let Span { start: (sl, sc), end: (el, ec), file } = token.span.clone();
-
-        let new_span = Span { start: (sl, sc), end: (el, ec - 1), file };
-
-        let (operator, span) = if let TokenKind::Operator(op) = &token.kind {
-            match op {
-                op if op.decompound() != OperatorKind::Unknown => (op.decompound(), new_span),
-                _ => unreachable!(),
-            }
-        } else {
-            unreachable!()
-        };
-
-        Token { kind: TokenKind::Operator(operator), span }
     }
 }
 
@@ -295,13 +317,22 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::LogicalOrEqual => "||=",
             OperatorKind::QuestionMarkEqual => "?=",
             OperatorKind::Arrow => "->",
-            OperatorKind::FatArrow => "=>",
+            OperatorKind::LeftArrow => "<-",
+            OperatorKind::LeftFatArrow => "<=",
+            OperatorKind::PipeRight => "|>",
+            OperatorKind::PipeLeft => "<|",
+            OperatorKind::AngleRight => "~>",
+            OperatorKind::AngleLeft => "<~",
+            OperatorKind::DoubleArrow => "-->",
+            OperatorKind::DoubleLeftArrow => "<--",
+            OperatorKind::DoubleFatArrow => "==>",
+            OperatorKind::DoubleFatLeftArrow => "<==",
             OperatorKind::DoubleColon => "::",
-            OperatorKind::BlockCommentStart => "/*",
-            OperatorKind::BlockCommentEnd => "*/",
+            OperatorKind::SlashStart => "/*",
+            OperatorKind::StarSlash => "*/",
             OperatorKind::TripleSlash => "///",
-            OperatorKind::DocCommentStart => "/**",
-            OperatorKind::ModDocComment => "//!",
+            OperatorKind::SlashDoubleStart => "/**",
+            OperatorKind::DoubleSlashExclamation => "//!",
             OperatorKind::DoubleAt => "@@",
             OperatorKind::DoubleHash => "##",
             OperatorKind::DoubleDollar => "$$",
@@ -442,13 +473,21 @@ impl OperatorLexer for str {
             "||=" => OperatorKind::LogicalOrEqual,
             "?=" => OperatorKind::QuestionMarkEqual,
             "->" => OperatorKind::Arrow,
-            "=>" => OperatorKind::FatArrow,
+            "<-" => OperatorKind::LeftArrow,
+            "|>" => OperatorKind::PipeRight,
+            "<|" => OperatorKind::PipeLeft,
+            "~>" => OperatorKind::AngleRight,
+            "<~" => OperatorKind::AngleLeft,
+            "-->" => OperatorKind::DoubleArrow,
+            "<--" => OperatorKind::DoubleLeftArrow,
+            "==>" => OperatorKind::DoubleFatArrow,
+            "<==" => OperatorKind::DoubleFatLeftArrow,
             "::" => OperatorKind::DoubleColon,
-            "/*" => OperatorKind::BlockCommentStart,
-            "*/" => OperatorKind::BlockCommentEnd,
+            "/*" => OperatorKind::SlashStart,
+            "*/" => OperatorKind::StarSlash,
             "///" => OperatorKind::TripleSlash,
-            "/**" => OperatorKind::DocCommentStart,
-            "//!" => OperatorKind::ModDocComment,
+            "/**" => OperatorKind::SlashDoubleStart,
+            "//!" => OperatorKind::DoubleSlashExclamation,
             "@@" => OperatorKind::DoubleAt,
             "##" => OperatorKind::DoubleHash,
             "$$" => OperatorKind::DoubleDollar,
