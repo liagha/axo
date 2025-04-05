@@ -146,7 +146,7 @@ block
 
 if x > 3 x = 4
 
-fn test x = 4
+fn test x = 4;
 
 (5 + 5) * 5
 
@@ -202,3 +202,7 @@ if x = test[3] {
 index[test[4]] {
     x: 5
 }
+
+test::444
+
+fn test[3] x = 5

@@ -2,6 +2,7 @@ use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, 
 use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
 use crate::axo_parser::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
+use crate::axo_parser::expression::Expression;
 
 pub trait Primary {
     fn parse_atom(&mut self) -> Expr;
@@ -10,8 +11,6 @@ pub trait Primary {
     fn parse_unary(&mut self, primary: fn(&mut Parser) -> Result<Expr, Error>) -> Result<Expr, Error>;
     fn parse_factor(&mut self, primary: fn(&mut Parser) -> Result<Expr, Error>) -> Result<Expr, Error>;
     fn parse_term(&mut self, primary: fn(&mut Parser) -> Result<Expr, Error>) -> Result<Expr, Error>;
-    fn parse_basic(&mut self) -> Result<Expr, Error>;
-    fn parse_complex(&mut self) -> Result<Expr, Error>;
     fn parse_statement(&mut self) -> Result<Expr, Error>;
     fn parse_array(&mut self) -> Result<Expr, Error>;
     fn parse_tuple(&mut self) -> Result<Expr, Error>;
@@ -45,7 +44,7 @@ impl Primary for Parser {
 
         expr
     }
-    //Higher level than primary
+
     fn parse_leaf(&mut self) -> Result<Expr, Error> {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
@@ -98,7 +97,6 @@ impl Primary for Parser {
         }
     }
 
-    //Parsing main parts of expression
     fn parse_primary(&mut self) -> Result<Expr, Error> {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
@@ -234,62 +232,6 @@ impl Primary for Parser {
                     left = Expr { kind, span }.transform();
                 }
                 _ => break,
-            }
-        }
-
-        Ok(left)
-    }
-
-    fn parse_basic(&mut self) -> Result<Expr, Error> {
-        let mut left = self.parse_term(Parser::parse_primary)?;
-
-        while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
-        {
-            if op.is_expression() {
-                let op = self.next().unwrap();
-
-                let right = self.parse_term(Parser::parse_primary)?;
-
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
-
-                let kind = ExprKind::Binary(left.into(), op, right.into());
-
-                left = Expr { kind, span }.transform();
-            } else {
-                break;
-            }
-        }
-
-        Ok(left)
-    }
-
-    fn parse_complex(&mut self) -> Result<Expr, Error> {
-        let mut left = self.parse_term(Parser::parse_leaf)?;
-
-        while let Some(Token {
-                           kind: TokenKind::Operator(op),
-                           ..
-                       }) = self.peek().cloned()
-        {
-            if op.is_expression() {
-                let op = self.next().unwrap();
-
-                let right = self.parse_term(Parser::parse_leaf)?;
-
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
-
-                let kind = ExprKind::Binary(left.into(), op, right.into());
-
-                left = Expr { kind, span }.transform();
-            } else {
-                break;
             }
         }
 

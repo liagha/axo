@@ -1,6 +1,7 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::{Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Declaration {

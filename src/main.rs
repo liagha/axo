@@ -7,19 +7,21 @@ use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
 use axo_parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
 
+struct Config {
+    file_path: String,
+    verbose: bool,
+    show_tokens: bool,
+    show_ast: bool,
+    build_only: bool,
+    time_report: bool,
+}
+
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: {} <file.axo>", args[0]);
-        std::process::exit(1);
-    }
-
-    let file_path = &args[1];
+    let config = parse_args();
 
     let exec_path = match std::env::current_dir() {
         Ok(mut path) => {
-            path.push(file_path);
+            path.push(&config.file_path);
             path
         }
         Err(e) => {
@@ -28,91 +30,209 @@ fn main() {
         }
     };
 
-    xprintln!("Path: {}", exec_path.display());
+    if config.verbose {
+        xprintln!("Path: {}", exec_path.display());
+    }
 
     let start = Instant::now();
+    process_file(&exec_path, &config);
 
-    match std::fs::read_to_string(&exec_path) {
-        Ok(content) => {
-            let read_time = start.elapsed();
-            println!("File read took: {:?}", read_time);
+    if config.time_report {
+        let total_time = start.elapsed().as_millis();
+        xprintln!("Total execution time: {}ms" => Color::Green, total_time);
+    }
+}
 
-            xprintln!(
-                "File Contents: \n{}" => Color::Blue,
-                content.clone() => Color::BrightBlue
-            );
+fn parse_args() -> Config {
+    let args: Vec<String> = std::env::args().collect();
+    let mut config = Config {
+        file_path: String::new(),
+        verbose: false,
+        show_tokens: false,
+        show_ast: false,
+        build_only: false,
+        time_report: false,
+    };
 
-            xprintln!();
-
-            let lex_start = Instant::now();
-            let mut lexer = Lexer::new(content, PathBuf::from(file_path));
-
-            match lexer.tokenize() {
-                Ok(tokens) => {
-                    let lex_time = lex_start.elapsed().as_millis();
-                    xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
-
-                    xprintln!();
-
-                    let parse_start = Instant::now();
-                    let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
-                    match parser.parse_program() {
-                        Ok(stmts) => {
-                            let parse_time = parse_start.elapsed().as_millis();
-                            xprintln!("Parsed AST: {} => took {}ms", format!("{:#?}", stmts).term_colorize(Color::Green), parse_time);
-                        },
-                        Err(err) => {
-                            let end_span = tokens[parser.position].span.clone();
-                            let parse_time = parse_start.elapsed().as_millis();
-                            let state = parser.state.pop().unwrap().describe_chain();
-
-                            xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red, end_span, state, err => Color::Orange, parse_time);
-                        }
-                    }
-                }
-                Err(e) => {
-                    let lex_time = lex_start.elapsed().as_millis();
-                    xprintln!("Lexing error: {}:{} {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "verbose" | "-v" => config.verbose = true,
+            "tokens" | "-t" => config.show_tokens = true,
+            "ast" | "-a" => config.show_ast = true,
+            "build" | "-b" => config.build_only = true,
+            "--time" => config.time_report = true,
+            "--help" | "-h" => {
+                print_usage(&args[0]);
+                std::process::exit(0);
+            }
+            _ => {
+                if args[i].starts_with("-") {
+                    eprintln!("Unknown option: {}", args[i]);
+                    print_usage(&args[0]);
+                    std::process::exit(1);
+                } else {
+                    config.file_path = args[i].clone();
                 }
             }
+        }
+        i += 1;
+    }
+
+    if config.file_path.is_empty() {
+        eprintln!("No input file specified");
+        print_usage(&args[0]);
+        std::process::exit(1);
+    }
+
+    config
+}
+
+fn print_usage(program: &str) {
+    println!("Usage: {} [OPTIONS] <file.axo>", program);
+    println!("Options:");
+    println!("  -v, --verbose     Enable verbose output");
+    println!("  -t, --tokens      Show lexer tokens");
+    println!("  -a, --ast         Show parsed AST");
+    println!("  -b, --build       Build only (parse AST without further processing)");
+    println!("  --time            Show execution time reports");
+    println!("  -h, --help        Show this help message");
+}
+
+fn process_file(file_path: &PathBuf, config: &Config) {
+    let start = Instant::now();
+
+    match std::fs::read_to_string(file_path) {
+        Ok(content) => {
+            if config.verbose {
+                let read_time = start.elapsed();
+                println!("File read took: {:?}", read_time);
+
+                xprintln!(
+                    "File Contents: \n{}" => Color::Blue,
+                    content.clone() => Color::BrightBlue
+                );
+                xprintln!();
+            }
+
+            lex_and_parse(content, &config.file_path, config);
         }
         Err(e) => {
             eprintln!("Failed to read file: {}", e);
             std::process::exit(1);
         }
     }
+}
 
-    let total_time = start.elapsed().as_millis();
-    xprintln!("Total execution time: {}ms" => Color::Green, total_time);
+fn lex_and_parse(content: String, file_path: &str, config: &Config) {
+    let lex_start = Instant::now();
+    let mut lexer = Lexer::new(content, PathBuf::from(file_path));
+
+    match lexer.tokenize() {
+        Ok(tokens) => {
+            let lex_time = lex_start.elapsed().as_millis();
+
+            if config.show_tokens || config.verbose {
+                xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
+                xprintln!();
+            } else if config.time_report {
+                xprintln!("Lexing completed in {}ms", lex_time);
+            }
+
+            if !config.build_only {
+                parse_tokens(tokens, file_path, config);
+            } else {
+                // Just parse the AST for build-only mode
+                let parse_start = Instant::now();
+                let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
+                match parser.parse_program() {
+                    Ok(_) => {
+                        let parse_time = parse_start.elapsed().as_millis();
+                        if config.time_report {
+                            xprintln!("AST parsed successfully in {}ms" => Color::Green, parse_time);
+                        }
+                    },
+                    Err(err) => {
+                        let end_span = tokens[parser.position].span.clone();
+                        let parse_time = parse_start.elapsed().as_millis();
+                        let state = parser.state.pop().unwrap().describe_chain();
+
+                        xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red, end_span, state, err => Color::Orange, parse_time);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            let lex_time = lex_start.elapsed().as_millis();
+            xprintln!("Lexing error: {}:{} {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
+    let parse_start = Instant::now();
+    let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
+
+    match parser.parse_program() {
+        Ok(stmts) => {
+            let parse_time = parse_start.elapsed().as_millis();
+
+            if config.show_ast || config.verbose {
+                xprintln!("Parsed AST: {} => took {}ms",
+                    format!("{:#?}", stmts).term_colorize(Color::Green),
+                    parse_time
+                );
+
+                // Uncomment if you want to display expressions as strings
+                // let exprs: String = stmts.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
+                // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));
+            } else if config.time_report {
+                xprintln!("Parsing completed in {}ms", parse_time);
+            }
+
+            // Here you can add the next step of processing if needed
+        },
+        Err(err) => {
+            let end_span = tokens[parser.position].span.clone();
+            let parse_time = parse_start.elapsed().as_millis();
+            let state = parser.state.pop().unwrap().describe_chain();
+
+            xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red,
+                end_span, state, err => Color::Orange, parse_time
+            );
+            std::process::exit(1);
+        }
+    }
 }
 
 fn format_tokens(input: &Vec<Token>) -> String {
     let mut result = String::new();
 
     for (i, token) in input.iter().enumerate() {
-        match token.clone().kind {
+        let token_str = match token.clone().kind {
             TokenKind::Punctuation(PunctuationKind::Newline) => {
-                result.push_str(format!("↓{:?} | {}↓", token, token.span).term_colorize(Color::Green).as_str());
-                result.push_str("\n");
+                format!("↓{:?} | {}↓", token, token.span).term_colorize(Color::Green).to_string() + "\n"
             }
             TokenKind::Punctuation(_) => {
-                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Green).as_str());
+                format!("{:?} | {}", token, token.span).term_colorize(Color::Green).to_string()
             }
             TokenKind::Operator(_) => {
-                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Orange).as_str());
+                format!("{:?} | {}", token, token.span).term_colorize(Color::Orange).to_string()
             }
             TokenKind::Keyword(_) => {
-                result.push_str(format!("{:?} | {}", token, token.span).term_colorize(Color::Blue).as_str());
+                format!("{:?} | {}", token, token.span).term_colorize(Color::Blue).to_string()
             }
             _ => {
-                result.push_str(format!("{:?} | {}", token, token.span).as_str());
+                format!("{:?} | {}", token, token.span).to_string()
             }
-        }
+        };
 
-        if i != input.len() - 1 {
-            if !matches!(token, Token { kind: TokenKind::Punctuation(PunctuationKind::Newline), .. }) {
-                result.push_str(", ");
-            }
+        result.push_str(&token_str);
+
+        if i != input.len() - 1 && !matches!(token, Token { kind: TokenKind::Punctuation(PunctuationKind::Newline), .. }) {
+            result.push_str(", ");
         }
     }
 

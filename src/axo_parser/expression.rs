@@ -2,15 +2,15 @@
 
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error};
-use crate::axo_parser::Parser;
+use crate::axo_parser::{Parser, Primary};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ExprKind {
     // Primary Expressions
     Literal(Token),
@@ -120,9 +120,64 @@ impl Expr {
 }
 
 pub trait Expression {
-
+    fn parse_basic(&mut self) -> Result<Expr, Error>;
+    fn parse_complex(&mut self) -> Result<Expr, Error>;
 }
 
 impl Expression for Parser {
+    fn parse_basic(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_term(Parser::parse_primary)?;
 
+        while let Some(Token {
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
+        {
+            if op.is_expression() {
+                let op = self.next().unwrap();
+
+                let right = self.parse_term(Parser::parse_primary)?;
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = self.span(start, end);
+
+                let kind = ExprKind::Binary(left.into(), op, right.into());
+
+                left = Expr { kind, span }.transform();
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    fn parse_complex(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_term(Parser::parse_leaf)?;
+
+        while let Some(Token {
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
+        {
+            if op.is_expression() {
+                let op = self.next().unwrap();
+
+                let right = self.parse_term(Parser::parse_leaf)?;
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = self.span(start, end);
+
+                let kind = ExprKind::Binary(left.into(), op, right.into());
+
+                left = Expr { kind, span }.transform();
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
 }
