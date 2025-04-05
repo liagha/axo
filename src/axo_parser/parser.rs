@@ -139,6 +139,26 @@ impl Parser {
         None
     }
 
+    pub fn peek_ahead(&self, forward: usize) -> Option<&Token> {
+        let mut current = self.position + forward;
+
+        while let Some(token) = self.tokens.get(current) {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
+                    current += 1;
+                }
+                TokenKind::Comment(_) => {
+                    current += 1;
+                }
+                _ => {
+                    return Some(token);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
         if let Some(token) = self.tokens.get(self.position) {
             if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {

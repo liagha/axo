@@ -6,12 +6,12 @@ use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait ControlFlow {
     fn parse_block(&mut self) -> Result<Expr, Error>;
-    fn parse_if_statement(&mut self) -> Result<Expr, Error>;
-    fn parse_while_statement(&mut self) -> Result<Expr, Error>;
-    fn parse_for_statement(&mut self) -> Result<Expr, Error>;
-    fn parse_return_statement(&mut self) -> Result<Expr, Error>;
-    fn parse_break_statement(&mut self) -> Result<Expr, Error>;
-    fn parse_continue_statement(&mut self) -> Result<Expr, Error>;
+    fn parse_conditional(&mut self) -> Result<Expr, Error>;
+    fn parse_while(&mut self) -> Result<Expr, Error>;
+    fn parse_for(&mut self) -> Result<Expr, Error>;
+    fn parse_return(&mut self) -> Result<Expr, Error>;
+    fn parse_break(&mut self) -> Result<Expr, Error>;
+    fn parse_continue(&mut self) -> Result<Expr, Error>;
 }
 
 impl ControlFlow for Parser {
@@ -62,7 +62,7 @@ impl ControlFlow for Parser {
         Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
     }
 
-    fn parse_if_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_conditional(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::If, Some(SyntaxRole::Condition));
 
         let Token {
@@ -70,7 +70,7 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let condition = self.parse_expression()?;
+        let condition = self.parse_basic()?;
 
         self.pop_context();
 
@@ -102,7 +102,7 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_while_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_while(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::While, Some(SyntaxRole::Condition));
 
         let Token {
@@ -110,13 +110,13 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let condition = self.parse_expression()?;
+        let condition = self.parse_basic()?;
 
         self.pop_context();
 
         self.push_context(ContextKind::While, Some(SyntaxRole::Body));
 
-        let body = self.parse_statement()?;
+        let body = self.parse_basic()?;
 
         self.pop_context();
 
@@ -130,7 +130,7 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_for_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_for(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::For, Some(SyntaxRole::Clause));
 
         let Token {
@@ -138,7 +138,7 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let clause = self.parse_expression()?;
+        let clause = self.parse_basic()?;
 
         self.pop_context();
 
@@ -158,7 +158,7 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_return_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_return(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Return, None);
 
         let Token {
@@ -172,7 +172,7 @@ impl ControlFlow for Parser {
         } else {
             self.push_context(ContextKind::Return, Some(SyntaxRole::Value));
 
-            let expr = self.parse_expression()?;
+            let expr = self.parse_complex()?;
             let end = expr.span.end;
 
             self.pop_context();
@@ -191,7 +191,7 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_break_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_break(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Break, None);
 
         let Token {
@@ -205,7 +205,7 @@ impl ControlFlow for Parser {
         } else {
             self.push_context(ContextKind::Break, Some(SyntaxRole::Value));
 
-            let expr = self.parse_expression()?;
+            let expr = self.parse_complex()?;
             let end = expr.span.end;
 
             self.pop_context();
@@ -224,7 +224,7 @@ impl ControlFlow for Parser {
         Ok(expr)
     }
 
-    fn parse_continue_statement(&mut self) -> Result<Expr, Error> {
+    fn parse_continue(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Continue, None);
 
         let Token {
@@ -238,7 +238,7 @@ impl ControlFlow for Parser {
         } else {
             self.push_context(ContextKind::Continue, Some(SyntaxRole::Value));
 
-            let expr = self.parse_expression()?;
+            let expr = self.parse_complex()?;
             let end = expr.span.end;
 
             self.pop_context();

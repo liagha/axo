@@ -19,7 +19,7 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
-        let expr = self.parse_expression()?;
+        let expr = self.parse_complex()?;
 
         let Expr { kind, span: Span { end, .. } } = expr.clone();
 
@@ -45,7 +45,7 @@ impl Declaration for Parser {
             ..
         } = self.next().unwrap();
 
-        let function = self.parse_statement()?;
+        let function = self.parse_basic()?;
 
         self.pop_context();
 

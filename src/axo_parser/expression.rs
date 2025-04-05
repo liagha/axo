@@ -118,3 +118,11 @@ impl Expr {
         }
     }
 }
+
+pub trait Expression {
+
+}
+
+impl Expression for Parser {
+
+}

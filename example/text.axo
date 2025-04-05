@@ -96,7 +96,6 @@ let x : i32 = 3;
 3;
 
 while 5 > x > 2 x = 5;
-else
 {
     test = 3;
     x %= 4;
@@ -184,10 +183,22 @@ if x > test {
 
 "StringStruct" { x }
 
-if (Test5 { x } ) {
+if (Test5 { x }) {
 }
 
 x -> y
 y -> x;
 
 (x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}

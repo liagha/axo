@@ -23,7 +23,7 @@ impl Composite for Parser {
 
         self.push_context(ContextKind::Index, Some(SyntaxRole::Value));
 
-        let index = self.parse_expression()?;
+        let index = self.parse_complex()?;
 
         self.pop_context();
 
@@ -144,7 +144,7 @@ impl Composite for Parser {
                     self.next();
                 }
                 _ => {
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_complex()?;
                     parameters.push(expr.into());
                 }
             }
