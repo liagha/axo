@@ -5,13 +5,64 @@ use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Declaration {
+    fn parse_impl(&mut self) -> Result<Expr, Error>;
+    fn parse_trait(&mut self) -> Result<Expr, Error>;
     fn parse_let(&mut self) -> Result<Expr, Error>;
     fn parse_function(&mut self) -> Result<Expr, Error>;
+    fn parse_macro(&mut self) -> Result<Expr, Error>;
     fn parse_enum(&mut self) -> Result<Expr, Error>;
     fn parse_struct_definition(&mut self) -> Result<Expr, Error>;
 }
 
 impl Declaration for Parser {
+    fn parse_impl(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Implementation, Some(SyntaxRole::Declaration));
+
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let implementation = self.parse_basic()?;
+
+        self.pop_context();
+
+        let body = self.parse_statement()?;
+
+        let end = body.span.end;
+        let kind = ExprKind::Implement(implementation.into(), body.into());
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
+
+        Ok(expr)
+    }
+
+    fn parse_trait(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Trait, Some(SyntaxRole::Declaration));
+
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let trait_ = self.parse_basic()?;
+
+        self.pop_context();
+
+        let body = self.parse_statement()?;
+
+        let end = body.span.end;
+        let kind = ExprKind::Trait(trait_.into(), body.into());
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
+
+        Ok(expr)
+    }
+
     fn parse_let(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Variable, Some(SyntaxRole::Declaration));
 
@@ -71,6 +122,49 @@ impl Declaration for Parser {
 
                 let end = body.span.end;
                 let kind = ExprKind::Function(function.into(), Vec::new(), body.into());
+                let expr = Expr {
+                    kind,
+                    span: self.span(start, end),
+                };
+
+                Ok(expr)
+            }
+        }
+    }
+
+    fn parse_macro(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Macro, Some(SyntaxRole::Declaration));
+
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let macro_ = self.parse_basic()?;
+
+        self.pop_context();
+
+        match macro_ {
+            Expr {
+                kind: ExprKind::Invoke(name, parameters),
+                ..
+            } => {
+                let body = self.parse_statement()?;
+
+                let end = body.span.end;
+                let kind = ExprKind::Macro(name.into(), parameters, body.into());
+                let expr = Expr {
+                    kind,
+                    span: self.span(start, end),
+                };
+
+                Ok(expr)
+            }
+            _ => {
+                let body = self.parse_statement()?;
+
+                let end = body.span.end;
+                let kind = ExprKind::Macro(macro_.into(), Vec::new(), body.into());
                 let expr = Expr {
                     kind,
                     span: self.span(start, end),

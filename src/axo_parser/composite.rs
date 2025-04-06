@@ -7,8 +7,8 @@ use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Result<Expr, Error>;
     fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error>;
-    fn parse_closure(&mut self) -> Result<Expr, Error>;
     fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error>;
+    fn parse_closure(&mut self) -> Result<Expr, Error>;
 }
 
 impl Composite for Parser {
@@ -97,11 +97,65 @@ impl Composite for Parser {
         result
     }
 
+    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Struct, None);
+
+        let brace = self.next().unwrap();
+
+        let Token { span: Span { start: err_start, .. }, .. } = brace;
+
+        let Expr {
+            span: Span { start, .. },
+            ..
+        } = struct_name;
+
+        self.push_context(ContextKind::Struct, Some(SyntaxRole::Field));
+
+        let mut fields = Vec::new();
+
+        let mut err_end = err_start;
+
+        while let Some(token) = self.peek().cloned() {
+            match token {
+                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
+                    let Token {
+                        span: Span { end, .. },
+                        ..
+                    } = self.next().unwrap();
+
+                    self.pop_context();
+
+                    self.pop_context();
+
+                    let kind = ExprKind::Struct(struct_name.into(), fields);
+                    let expr = Expr {
+                        kind,
+                        span: self.span(start, end),
+                    };
+
+                    return Ok(expr);
+                }
+                Token { kind: TokenKind::Punctuation(PunctuationKind::Comma), span: Span { end, .. } } => {
+                    err_end = end;
+
+                    self.next();
+                }
+                _ => {
+                    let stmt = self.parse_statement()?;
+
+                    fields.push(stmt);
+                }
+            }
+        }
+
+        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(err_start, err_end)))
+    }
+
     fn parse_closure(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Closure, None);
 
         let pipe = self.next().unwrap();
-        
+
         let Token {
             span: Span { start, .. },
             ..
@@ -110,7 +164,7 @@ impl Composite for Parser {
         self.push_context(ContextKind::Closure, Some(SyntaxRole::Parameter));
 
         let mut parameters = Vec::new();
-        
+
         let mut err_end = start;
 
         while let Some(token) = self.peek().cloned() {
@@ -141,7 +195,7 @@ impl Composite for Parser {
                     span: Span { end, .. }
                 } => {
                     err_end = end;
-                    
+
                     self.next();
                 }
                 _ => {
@@ -152,59 +206,5 @@ impl Composite for Parser {
         }
 
         Err(Error::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
-    }
-
-    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error> {
-        self.push_context(ContextKind::Struct, None);
-
-        let brace = self.next().unwrap();
-        
-        let Token { span: Span { start: err_start, .. }, .. } = brace;
-
-        let Expr {
-            span: Span { start, .. },
-            ..
-        } = struct_name;
-
-        self.push_context(ContextKind::Struct, Some(SyntaxRole::Field));
-
-        let mut fields = Vec::new();
-        
-        let mut err_end = err_start;
-
-        while let Some(token) = self.peek().cloned() {
-            match token {
-                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
-                    let Token {
-                        span: Span { end, .. },
-                        ..
-                    } = self.next().unwrap();
-
-                    self.pop_context();
-
-                    self.pop_context();
-
-                    let kind = ExprKind::Struct(struct_name.into(), fields);
-                    let expr = Expr {
-                        kind,
-                        span: self.span(start, end),
-                    };
-
-                    return Ok(expr);
-                }
-                Token { kind: TokenKind::Punctuation(PunctuationKind::Comma), span: Span { end, .. } } => {
-                    err_end = end;
-                    
-                    self.next();
-                }
-                _ => {
-                    let stmt = self.parse_statement()?;
-
-                    fields.push(stmt);
-                }
-            }
-        }
-
-        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(err_start, err_end)))
     }
 }

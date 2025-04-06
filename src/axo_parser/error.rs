@@ -17,6 +17,7 @@ pub struct Error {
 
 pub enum ErrorKind {
     ElseWithoutConditional,
+    MissingSeparator(TokenKind),
     UnclosedDelimiter(Token),
     UnimplementedToken(TokenKind),
     UnexpectedToken(TokenKind),
@@ -45,27 +46,29 @@ impl Error {
         self
     }
 
-    pub fn format(&self, source_code: &str) -> String {
+    pub fn format(&self) -> (String, String) {
+        let source_code = read_to_string(self.span.file.clone()).unwrap();
         let lines: Vec<&str> = source_code.lines().collect();
-        let mut result = String::new();
+        let mut messages = String::new();
+        let mut details = String::new();
 
-        result.push_str(&format!("error: {}\n", self.kind.to_string().colorize(Color::Red).bold()));
+        messages.push_str(&format!("error: {}", self.kind.to_string().colorize(Color::Red).bold()));
 
         let (line_start, column_start) = self.span.start;
         let (line_end, column_end) = self.span.end;
 
-        result.push_str(&format!(" --> {}:{}:{}\n",
-                                 self.span.file.display(),
-                                 line_start,
-                                 column_start
+        details.push_str(&format!(" --> {}:{}:{}\n",
+                                  self.span.file.display(),
+                                  line_start,
+                                  column_start
         ).colorize(Color::Blue));
 
         if let Some(ctx) = &self.context {
-            result.push_str(&format!(" note: {}\n", ctx.describe_chain().colorize(Color::Blue)));
+            messages.push_str(&format!(" note: {}\n", ctx.describe_chain().colorize(Color::Blue)));
         }
 
         // Calculate maximum line number width safely
-        let max_line_number = line_end.max(line_end).max(1); // Ensure at least 1
+        let max_line_number = line_end.max(line_start).max(1); // Ensure at least 1
         let line_number_width = max_line_number.to_string().len();
 
         // Calculate bounds safely
@@ -83,10 +86,10 @@ impl Error {
                 line_idx.to_string()
             };
 
-            result.push_str(&format!("{:>width$} | {}\n",
-                                     line_num_str.colorize(Color::Blue),
-                                     line_content,
-                                     width = line_number_width
+            details.push_str(&format!("{:>width$} | {}\n",
+                                      line_num_str.colorize(Color::Blue),
+                                      line_content,
+                                      width = line_number_width
             ));
 
             if line_idx >= line_start && line_idx <= line_end {
@@ -110,19 +113,19 @@ impl Error {
                                         width = start_col
                 );
 
-                result.push_str(&format!("{:>width$} | {}\n",
-                                         " ".repeat(line_number_width),
-                                         underline.colorize(Color::Red).bold(),
-                                         width = line_number_width
+                details.push_str(&format!("{:>width$} | {}\n",
+                                          " ".repeat(line_number_width),
+                                          underline.colorize(Color::Red).bold(),
+                                          width = line_number_width
                 ));
             }
         }
 
         if let Some(help) = &self.help {
-            result.push_str(&format!("help: {}\n", help.colorize(Color::Green)));
+            messages.push_str(&format!("help: {}\n", help.colorize(Color::Green)));
         }
 
-        result
+        (messages, details)
     }
 }
 
@@ -131,6 +134,9 @@ impl core::fmt::Display for ErrorKind {
         match self {
             ErrorKind::ElseWithoutConditional => {
                 write!(f, "Cant have an else without conditional")
+            }
+            ErrorKind::MissingSeparator(kind) => {
+                write!(f, "expected separator {}", kind)
             }
             ErrorKind::InvalidSyntaxPattern(m) => {
                 write!(f, "Invalid syntax pattern: '{}'", m)
@@ -157,13 +163,6 @@ impl core::fmt::Display for ErrorKind {
 impl core::fmt::Debug for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self)
-    }
-}
-
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let file = read_to_string(self.span.file.clone()).unwrap();
-        write!(f, "{}", self.format(file.as_str()))
     }
 }
 

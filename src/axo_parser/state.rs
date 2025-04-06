@@ -139,23 +139,91 @@ impl Context {
         self
     }
 
-    /// Build a context chain description for error messages
     pub fn describe_chain(&self) -> String {
         let mut descriptions = Vec::new();
-
         let mut current = Some(self);
+
         while let Some(ctx) = current {
-            let mut desc = format!("{:?}", ctx.kind);
+            let kind_desc = match ctx.kind {
+                ContextKind::Program => "program",
+                ContextKind::Module => "module",
+                ContextKind::Statement => "statement",
+                ContextKind::Expression => "expression",
+                ContextKind::Block => "block",
+                ContextKind::Binary => "binary operation",
+                ContextKind::Unary => "unary operation",
+                ContextKind::Literal => "literal",
+                ContextKind::Identifier => "identifier",
+                ContextKind::Path => "path",
+                ContextKind::Function => "function",
+                ContextKind::Variable => "variable",
+                ContextKind::Constant => "constant",
+                ContextKind::Type => "type",
+                ContextKind::Struct => "struct",
+                ContextKind::Enum => "enum",
+                ContextKind::Trait => "trait",
+                ContextKind::Implementation => "implementation",
+                ContextKind::If => "if statement",
+                ContextKind::Else => "else clause",
+                ContextKind::Match => "match expression",
+                ContextKind::While => "while loop",
+                ContextKind::For => "for loop",
+                ContextKind::Loop => "loop",
+                ContextKind::Tuple => "tuple",
+                ContextKind::Array => "array",
+                ContextKind::Call => "function call",
+                ContextKind::Index => "index access",
+                ContextKind::MemberAccess => "member access",
+                ContextKind::Closure => "closure",
+                ContextKind::Return => "return statement",
+                ContextKind::Break => "break statement",
+                ContextKind::Continue => "continue statement",
+                ContextKind::Macro => "macro",
+                ContextKind::Attribute => "attribute",
+                ContextKind::Generic => "generic",
+                ContextKind::Lifetime => "lifetime",
+                ContextKind::ErrorRecovery => "error recovery",
+            };
 
-            if let Some(role) = &ctx.role {
-                desc = format!("{} ({:?})", desc, role);
-            }
+            let role_desc = ctx.role.as_ref().map(|role| match role {
+                SyntaxRole::Target => "target",
+                SyntaxRole::Value => "value",
+                SyntaxRole::Name => "name",
+                SyntaxRole::Type => "type",
+                SyntaxRole::Body => "body",
+                SyntaxRole::Then => "then branch",
+                SyntaxRole::Else => "else branch",
+                SyntaxRole::Clause => "clause",
+                SyntaxRole::Condition => "condition",
+                SyntaxRole::Pattern => "pattern",
+                SyntaxRole::Parameter => "parameter",
+                SyntaxRole::Element => "element",
+                SyntaxRole::Field => "field",
+                SyntaxRole::Variant => "variant",
+                SyntaxRole::Initialization => "initialization",
+                SyntaxRole::Assignment => "assignment",
+                SyntaxRole::Declaration => "declaration",
+                SyntaxRole::Definition => "definition",
+                SyntaxRole::Implementation => "implementation",
+            });
 
-            descriptions.push(desc);
+            let full_desc = if let Some(role) = role_desc {
+                format!("{} in {}", role, kind_desc)
+            } else {
+                kind_desc.to_string()
+            };
+
+            descriptions.push(full_desc);
             current = ctx.parent.as_ref().map(|p| p.as_ref());
         }
 
-        descriptions.join(" → ")
+        if descriptions.len() > 1 {
+            // For multiple contexts, show the chain of contexts
+            descriptions.join(" within ")
+        } else {
+            // For single context, just return the description
+            descriptions.pop().unwrap_or_else(|| "unknown context".to_string())
+        }
     }
 }
 

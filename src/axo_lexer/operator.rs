@@ -86,7 +86,7 @@ pub enum OperatorKind {
     // Arrow operators
     Arrow,                   // -> (function return type or closure)
     LeftArrow,               // <- (left direction arrow)
-    LeftFatArrow,            // <= (left fat arrow)
+    FatArrow,                // => (fat arrow)
     PipeRight,               // |> (pipe forward operator)
     PipeLeft,                // <| (pipe backward operator)
     AngleRight,              // ~> (tilde forward arrow)
@@ -189,6 +189,7 @@ impl OperatorKind {
         matches!(
             self,
             OperatorKind::Arrow
+                | OperatorKind::FatArrow
                 | OperatorKind::PipeRight
                 | OperatorKind::AngleRight
                 | OperatorKind::DoubleArrow
@@ -203,7 +204,6 @@ impl OperatorKind {
                 | OperatorKind::AngleLeft
                 | OperatorKind::PipeLeft
                 | OperatorKind::LeftArrow
-                | OperatorKind::LeftFatArrow
                 | OperatorKind::DoubleFatLeftArrow
         )
     }
@@ -318,7 +318,7 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::QuestionMarkEqual => "?=",
             OperatorKind::Arrow => "->",
             OperatorKind::LeftArrow => "<-",
-            OperatorKind::LeftFatArrow => "<=",
+            OperatorKind::FatArrow => "=>",
             OperatorKind::PipeRight => "|>",
             OperatorKind::PipeLeft => "<|",
             OperatorKind::AngleRight => "~>",
@@ -473,6 +473,7 @@ impl OperatorLexer for str {
             "||=" => OperatorKind::LogicalOrEqual,
             "?=" => OperatorKind::QuestionMarkEqual,
             "->" => OperatorKind::Arrow,
+            "=>" => OperatorKind::FatArrow,
             "<-" => OperatorKind::LeftArrow,
             "|>" => OperatorKind::PipeRight,
             "<|" => OperatorKind::PipeLeft,

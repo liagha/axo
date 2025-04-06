@@ -153,11 +153,14 @@ fn lex_and_parse(content: String, file_path: &str, config: &Config) {
                         }
                     },
                     Err(err) => {
-                        let end_span = tokens[parser.position].span.clone();
                         let parse_time = parse_start.elapsed().as_millis();
+                        let (msg, details) = err.format();
                         let state = parser.state.pop().unwrap().describe_chain();
 
-                        xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red, end_span, state, err => Color::Orange, parse_time);
+                        xprintln!("{} => {} \n {} => took {}ms" => Color::Red,
+                            msg => Color::Orange, state => Color::Crimson, details, parse_time
+                        );
+
                         std::process::exit(1);
                     }
                 }
@@ -195,12 +198,12 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
             // Here you can add the next step of processing if needed
         },
         Err(err) => {
-            let end_span = tokens[parser.position].span.clone();
             let parse_time = parse_start.elapsed().as_millis();
+            let (msg, details) = err.format();
             let state = parser.state.pop().unwrap().describe_chain();
 
-            xprintln!("Parse error {}: error while parsing {}: {} => took {}ms" => Color::Red,
-                end_span, state, err => Color::Orange, parse_time
+            xprintln!("{} => {} \n {} => took {}ms" => Color::Red,
+                msg => Color::Orange, state => Color::Crimson, details, parse_time
             );
             std::process::exit(1);
         }

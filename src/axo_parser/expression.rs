@@ -30,6 +30,7 @@ pub enum ExprKind {
     Closure(Vec<Expr>, Box<Expr>),
 
     // Control Flow
+    Match(Box<Expr>, Box<Expr>),
     Conditional(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     While(Box<Expr>, Box<Expr>),
     For(Box<Expr>, Box<Expr>),
@@ -38,10 +39,13 @@ pub enum ExprKind {
     // Declarations & Definitions
     Assignment(Box<Expr>, Box<Expr>),
     Definition(Box<Expr>, Option<Box<Expr>>),
+    Implement(Box<Expr>, Box<Expr>),
+    Trait(Box<Expr>, Box<Expr>),
     Struct(Box<Expr>, Vec<Expr>),
     StructDef(Box<Expr>, Vec<Expr>),
     Enum(Box<Expr>, Vec<Expr>),
     Function(Box<Expr>, Vec<Expr>, Box<Expr>),
+    Macro(Box<Expr>, Vec<Expr>, Box<Expr>),
 
     // Flow Control Statements
     Return(Option<Box<Expr>>),

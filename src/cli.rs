@@ -45,6 +45,7 @@ impl fmt::Display for ExprKind {
                 write!(f, "|{}| {}", params_str.join(", "), body)
             }
 
+            ExprKind::Match(clause, body) => write!(f, "match {} \n{}\n", clause, body),
             ExprKind::Conditional(cond, then, else_opt) => {
                 write!(f, "if {} {}\n", cond, then)?;
                 if let Some(else_expr) = else_opt {
@@ -71,6 +72,12 @@ impl fmt::Display for ExprKind {
                 }
                 Ok(())
             }
+            ExprKind::Implement(name, body) => {
+                write!(f, "impl {} \n{}\n", name, body)
+            }
+            ExprKind::Trait(name, body) => {
+                write!(f, "trait {} \n{}\n", name, body)
+            }
             ExprKind::Struct(name, fields) => {
                 let fields_str: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
                 write!(f, "{} {{ {} }}", name, fields_str.join(", "))
@@ -86,6 +93,10 @@ impl fmt::Display for ExprKind {
             ExprKind::Function(name, params, body) => {
                 let params_str: Vec<String> = params.iter().map(|p| p.to_string()).collect();
                 write!(f, "fn {}({}) {}\n", name, params_str.join(", "), body)
+            }
+            ExprKind::Macro(name, params, body) => {
+                let params_str: Vec<String> = params.iter().map(|p| p.to_string()).collect();
+                write!(f, "macro {}({}) {}\n", name, params_str.join(", "), body)
             }
 
             ExprKind::Return(expr_opt) => {
@@ -135,6 +146,7 @@ impl fmt::Debug for ExprKind {
             ExprKind::Member(expr, field) => write!(f, "Member({:?}.{:?})", expr, field),
             ExprKind::Closure(params, body) => write!(f, "Closure(|{:?}| {:?})", params, body),
 
+            ExprKind::Match(clause, body) => write!(f, "Match({:?} => {:?})", clause, body),
             ExprKind::Conditional(cond, then, else_opt) => {
                 write!(f, "Conditional({:?} ? {:?}", cond, then)?;
                 if let Some(else_expr) = else_opt {
@@ -148,11 +160,16 @@ impl fmt::Debug for ExprKind {
 
             ExprKind::Assignment(lhs, rhs) => write!(f, "Assignment({:?} = {:?})", lhs, rhs),
             ExprKind::Definition(name, value) => write!(f, "Definition({:?} = {:?})", name, value),
+            ExprKind::Implement(name, body) => write!(f, "Implement({:?} : {:?})", name, body),
+            ExprKind::Trait(name, body) => write!(f, "Trait({:?} with {:?})", name, body),
             ExprKind::Struct(name, fields) => write!(f, "Struct({:?} with {:?})", name, fields),
             ExprKind::StructDef(name, fields) => write!(f, "StructDef({:?} with {:?})", name, fields),
             ExprKind::Enum(name, variants) => write!(f, "Enum({:?} with {:?})", name, variants),
             ExprKind::Function(name, params, body) => {
                 write!(f, "Function({:?}({:?}) => {:?})", name, params, body)
+            }
+            ExprKind::Macro(name, params, body) => {
+                write!(f, "Macro({:?}({:?}) => {:?})", name, params, body)
             }
 
             ExprKind::Return(expr) => {

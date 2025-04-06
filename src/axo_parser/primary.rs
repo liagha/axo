@@ -56,12 +56,16 @@ impl Primary for Parser {
                     KeywordKind::While => self.parse_while(),
                     KeywordKind::For => self.parse_for(),
                     KeywordKind::Fn => self.parse_function(),
+                    KeywordKind::Macro => self.parse_macro(),
                     KeywordKind::Return => self.parse_return(),
                     KeywordKind::Break => self.parse_break(),
                     KeywordKind::Continue => self.parse_continue(),
                     KeywordKind::Let => self.parse_let(),
                     KeywordKind::Struct => self.parse_struct_definition(),
                     KeywordKind::Enum => self.parse_enum(),
+                    KeywordKind::Impl => self.parse_impl(),
+                    KeywordKind::Trait => self.parse_trait(),
+                    KeywordKind::Match => self.parse_match(),
                     _ => Err(Error::new(ErrorKind::UnimplementedToken(kind), span)),
                 },
                 TokenKind::Identifier(_)
@@ -93,6 +97,7 @@ impl Primary for Parser {
                 _ => self.parse_primary()
             }
         } else {
+            println!("1");
             Err(Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         }
     }
@@ -139,9 +144,9 @@ impl Primary for Parser {
     }
     fn parse_unary(&mut self, primary: fn(&mut Parser) -> Result<Expr, Error> ) -> Result<Expr, Error> {
         if let Some(Token {
-            kind: TokenKind::Operator(op),
-            span: Span { start, .. },
-        }) = self.peek().cloned()
+                        kind: TokenKind::Operator(op),
+                        span: Span { start, .. },
+                    }) = self.peek().cloned()
         {
             if op.is_prefix() {
                 let op = self.next().unwrap();
@@ -162,9 +167,9 @@ impl Primary for Parser {
         let mut expr = primary(self)?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            span: Span { end, .. },
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           span: Span { end, .. },
+                       }) = self.peek().cloned()
         {
             if op.is_postfix() {
                 let op = self.next().unwrap();
@@ -184,9 +189,9 @@ impl Primary for Parser {
         let mut left = self.parse_unary(primary)?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
         {
             match op {
                 op if op.is_factor() => {
@@ -213,9 +218,9 @@ impl Primary for Parser {
         let mut left = self.parse_factor(primary)?;
 
         while let Some(Token {
-            kind: TokenKind::Operator(op),
-            ..
-        }) = self.peek().cloned()
+                           kind: TokenKind::Operator(op),
+                           ..
+                       }) = self.peek().cloned()
         {
             match op {
                 op if op.is_term() => {
@@ -243,9 +248,9 @@ impl Primary for Parser {
             let expr = self.parse_complex()?;
 
             if let Some(Token {
-                kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
-                ..
-            }) = self.peek()
+                            kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
+                            ..
+                        }) = self.peek()
             {
                 self.next();
                 Ok(expr)

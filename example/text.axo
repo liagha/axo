@@ -206,3 +206,10 @@ index[test[4]] {
 test::444
 
 fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
