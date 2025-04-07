@@ -38,7 +38,11 @@ impl core::fmt::Debug for ItemKind {
 
 impl core::fmt::Debug for Expr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?} | [{}]", self.kind, self.span)
+        if f.alternate() {
+            write!(f, "{:?} | [{}]", self.kind, self.span)
+        } else {
+            write!(f, "{:?}", self.kind)
+        }
     }
 }
 

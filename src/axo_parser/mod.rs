@@ -8,6 +8,7 @@ mod composite;
 mod state;
 mod item;
 mod fmt;
+mod delimiter;
 
 pub use statement::ControlFlow;
 pub use expression::{Expr, ExprKind};

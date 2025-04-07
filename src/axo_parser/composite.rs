@@ -1,6 +1,7 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::{ControlFlow, Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
@@ -61,7 +62,7 @@ impl Composite for Parser {
 
         self.push_context(ContextKind::Call, Some(SyntaxRole::Parameter));
 
-        let parameters = self.parse_tuple()?;
+        let parameters = self.parse_parenthesized()?;
 
         self.pop_context();
 

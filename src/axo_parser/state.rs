@@ -92,6 +92,11 @@ pub enum ContextKind {
     MemberAccess,
     Closure,
 
+    // Delimiters
+    Braced,
+    Bracketed,
+    Parenthesized,
+
     // Special statements
     Use,
     Return,
@@ -176,6 +181,9 @@ impl Context {
                 ContextKind::Index => "index access",
                 ContextKind::MemberAccess => "member access",
                 ContextKind::Closure => "closure",
+                ContextKind::Braced => "braced",
+                ContextKind::Bracketed => "bracketed",
+                ContextKind::Parenthesized => "parenthesized",
                 ContextKind::Use => "use",
                 ContextKind::Return => "return statement",
                 ContextKind::Break => "break statement",

@@ -1,5 +1,5 @@
 use test::x::t;
-let xxxxxx = 5;
+
 salam = 42;
 y = 3.14;
 z = true;
@@ -220,3 +220,7 @@ x += 3;
 async test x {
     print(x)
 }
+
+3 + 4 > 3 + 5
+
+x : 4 = 5

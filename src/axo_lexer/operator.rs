@@ -117,69 +117,66 @@ pub enum OperatorKind {
 
 
 impl OperatorKind {
-    pub fn is_compound(&self) -> bool {
-        matches!(
-            self,
-            OperatorKind::LogicalAndEqual
-                | OperatorKind::LogicalOrEqual
-                | OperatorKind::QuestionMarkEqual
-                | OperatorKind::RangeInclusive
-                | OperatorKind::AmpersandEqual
-                | OperatorKind::PipeEqual
-                | OperatorKind::StarEqual
-                | OperatorKind::SlashEqual
-                | OperatorKind::PercentEqual
-                | OperatorKind::CaretEqual
-                | OperatorKind::PlusEqual
-                | OperatorKind::MinusEqual
-                | OperatorKind::DoubleStarEqual
-                | OperatorKind::DoublePercentEqual
-        )
-    }
+    pub fn precedence(&self) -> u8 {
+        match self {
+            // Path and member access (highest precedence)
+            OperatorKind::Dot | OperatorKind::DoubleColon => 10,
 
-    pub fn is_factor(&self) -> bool {
-        matches!(
-            self,
-            OperatorKind::Star
-                | OperatorKind::Slash
-                | OperatorKind::Percent
-                | OperatorKind::DoubleDot
-                | OperatorKind::DoubleAmpersand
-                | OperatorKind::DoubleStar
-                | OperatorKind::In
-        )
-    }
+            // Type annotation
+            OperatorKind::Colon => 9,
 
-    pub fn is_term(&self) -> bool {
-        self.is_arrow() || self.is_left_arrow() ||
-        matches!(
-            self,
-            OperatorKind::Plus
-                | OperatorKind::Minus
-                | OperatorKind::DoublePipe
-                | OperatorKind::Pipe
-                | OperatorKind::Caret
+            // Exponentiation (right-associative)
+            OperatorKind::DoubleStar | OperatorKind::DoubleCaret => 7,
 
-                | OperatorKind::Colon
-                | OperatorKind::Dot
-                | OperatorKind::DoubleColon
+            // Multiplicative
+            OperatorKind::Star | OperatorKind::Slash | OperatorKind::Percent |
+            OperatorKind::DoubleSlash | OperatorKind::DoublePercent => 6,
 
-        )
-    }
+            // Additive
+            OperatorKind::Plus | OperatorKind::Minus => 5,
 
-    pub fn is_expression(&self) -> bool {
-        self.is_compound() ||
-            matches!(
-            self,
-            OperatorKind::Equal
-                | OperatorKind::ColonEqual
-                | OperatorKind::DoubleEqual
-                | OperatorKind::NotEqual
-                | OperatorKind::GreaterThan
-                | OperatorKind::LessThan
-                | OperatorKind::GreaterThanOrEqual
-                | OperatorKind::LessThanOrEqual
-        )
+            // Range
+            OperatorKind::DoubleDot | OperatorKind::RangeInclusive | OperatorKind::TripleDot => 4,
+
+            // Relational
+            OperatorKind::LessThan | OperatorKind::LessThanOrEqual |
+            OperatorKind::GreaterThan | OperatorKind::GreaterThanOrEqual => 3,
+
+            // Equality
+            OperatorKind::DoubleEqual | OperatorKind::NotEqual |
+            OperatorKind::TripleEqual | OperatorKind::StrictNotEqual => 2,
+
+            // Bitwise AND/XOR/OR (all same precedence)
+            OperatorKind::Ampersand | OperatorKind::Caret | OperatorKind::Pipe => 1,
+
+            // Logical AND/OR
+            OperatorKind::DoubleAmpersand => 1,
+            OperatorKind::DoublePipe => 0,
+
+            // Null coalescing
+            OperatorKind::DoubleQuestionMark => 0,
+
+            // Assignment (lowest precedence)
+            OperatorKind::In | OperatorKind::Equal | OperatorKind::ColonEqual | OperatorKind::EqualColon |
+            OperatorKind::PlusEqual | OperatorKind::MinusEqual |
+            OperatorKind::StarEqual | OperatorKind::SlashEqual |
+            OperatorKind::PercentEqual | OperatorKind::CaretEqual |
+            OperatorKind::AmpersandEqual | OperatorKind::PipeEqual |
+            OperatorKind::DoubleStarEqual | OperatorKind::DoublePercentEqual |
+            OperatorKind::LogicalAndEqual | OperatorKind::LogicalOrEqual |
+            OperatorKind::QuestionMarkEqual => 0,
+
+            // Arrows (typically low precedence)
+            OperatorKind::Arrow | OperatorKind::LeftArrow |
+            OperatorKind::FatArrow | OperatorKind::PipeRight |
+            OperatorKind::PipeLeft | OperatorKind::AngleRight |
+            OperatorKind::AngleLeft | OperatorKind::DoubleArrow |
+            OperatorKind::DoubleLeftArrow | OperatorKind::DoubleFatArrow |
+            OperatorKind::DoubleFatLeftArrow => 0,
+
+            // All other operators that don't participate in expressions
+            _ => 0,
+        }
     }
 
     pub fn is_arrow(&self) -> bool {

@@ -123,58 +123,10 @@ pub trait Expression {
 
 impl Expression for Parser {
     fn parse_basic(&mut self) -> Result<Expr, Error> {
-        let mut left = self.parse_term(Parser::parse_primary)?;
-
-        while let Some(Token {
-                           kind: TokenKind::Operator(op),
-                           ..
-                       }) = self.peek().cloned()
-        {
-            if op.is_expression() {
-                let op = self.next().unwrap();
-
-                let right = self.parse_term(Parser::parse_primary)?;
-
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
-
-                let kind = ExprKind::Binary(left.into(), op, right.into());
-
-                left = Expr { kind, span }.transform();
-            } else {
-                break;
-            }
-        }
-
-        Ok(left)
+        self.parse_binary(Parser::parse_primary, 0)
     }
 
     fn parse_complex(&mut self) -> Result<Expr, Error> {
-        let mut left = self.parse_term(Parser::parse_leaf)?;
-
-        while let Some(Token {
-                           kind: TokenKind::Operator(op),
-                           ..
-                       }) = self.peek().cloned()
-        {
-            if op.is_expression() {
-                let op = self.next().unwrap();
-
-                let right = self.parse_term(Parser::parse_leaf)?;
-
-                let start = left.span.start;
-                let end = right.span.end;
-                let span = self.span(start, end);
-
-                let kind = ExprKind::Binary(left.into(), op, right.into());
-
-                left = Expr { kind, span }.transform();
-            } else {
-                break;
-            }
-        }
-
-        Ok(left)
+        self.parse_binary(Parser::parse_leaf, 0)
     }
 }

@@ -7,7 +7,7 @@ use crate::axo_lexer::{TokenKind, Token, Span, PunctuationKind};
 use crate::axo_parser::{Expr};
 use crate::axo_parser::state::{Position, Context, ContextKind};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Error {
     pub kind: ErrorKind,
     pub span: Span,
@@ -15,6 +15,7 @@ pub struct Error {
     pub help: Option<String>,
 }
 
+#[derive(Clone)]
 pub enum ErrorKind {
     ElseWithoutConditional,
     MissingSeparator(TokenKind),

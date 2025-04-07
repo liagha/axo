@@ -31,6 +31,10 @@ impl Parser {
         }
     }
 
+    pub fn error(&mut self, error: &Error) {
+        self.errors.push(error.clone())
+    }
+
     pub fn push_context(&mut self, kind: ContextKind, role: Option<SyntaxRole>) -> &mut Self {
         let span = self.full_span();
         let mut context = Context {
