@@ -1,8 +1,9 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
-use crate::axo_parser::{Composite, ControlFlow, Declaration, Expr, ExprKind, Parser};
+use crate::axo_parser::{Composite, ControlFlow, Expr, ExprKind, Parser};
 use crate::axo_parser::expression::Expression;
+use crate::axo_parser::item::Item;
 
 pub trait Primary {
     fn parse_atom(&mut self) -> Expr;
@@ -57,11 +58,12 @@ impl Primary for Parser {
                     KeywordKind::For => self.parse_for(),
                     KeywordKind::Fn => self.parse_function(),
                     KeywordKind::Macro => self.parse_macro(),
+                    KeywordKind::Use => self.parse_use(),
                     KeywordKind::Return => self.parse_return(),
                     KeywordKind::Break => self.parse_break(),
                     KeywordKind::Continue => self.parse_continue(),
                     KeywordKind::Let => self.parse_let(),
-                    KeywordKind::Struct => self.parse_struct_definition(),
+                    KeywordKind::Struct => self.parse_struct(),
                     KeywordKind::Enum => self.parse_enum(),
                     KeywordKind::Impl => self.parse_impl(),
                     KeywordKind::Trait => self.parse_trait(),
@@ -80,7 +82,7 @@ impl Primary for Parser {
                     while let Some(token) = self.peek() {
                         match &token.kind {
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                expr = self.parse_struct(expr.clone())?;
+                                expr = self.parse_structure(expr.clone())?;
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
                                 expr = self.parse_index(expr)?

@@ -9,6 +9,7 @@ mod number;
 mod handler;
 mod symbol;
 mod literal;
+mod fmt;
 
 pub use lexer::Lexer;
 pub use span::Span;

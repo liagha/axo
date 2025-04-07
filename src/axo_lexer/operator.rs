@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OperatorKind {
     // Single character operators (sorted alphabetically)
     At,                      // @ (annotation or pattern binding)
@@ -112,9 +112,6 @@ pub enum OperatorKind {
     DoubleDollar,            // $$ (macro expansion)
     DoubleBackslash,         // \\ (escaped backslash)
     DoubleUnderscore,        // __ (special identifier)
-
-    // Unknown operator
-    Unknown,                 // for when the operator is not detected
 }
 
 
@@ -230,23 +227,23 @@ impl OperatorKind {
         )
     }
 
-    pub fn decompound(&self) -> OperatorKind {
+    pub fn decompound(&self) -> Option<OperatorKind> {
         match self {
-            OperatorKind::LogicalAndEqual => OperatorKind::DoubleAmpersand,
-            OperatorKind::LogicalOrEqual => OperatorKind::DoublePipe,
-            OperatorKind::QuestionMarkEqual => OperatorKind::QuestionMark,
-            OperatorKind::RangeInclusive => OperatorKind::DoubleDot,
-            OperatorKind::AmpersandEqual => OperatorKind::Ampersand,
-            OperatorKind::PipeEqual => OperatorKind::Pipe,
-            OperatorKind::StarEqual => OperatorKind::Star,
-            OperatorKind::SlashEqual => OperatorKind::Slash,
-            OperatorKind::PercentEqual => OperatorKind::Percent,
-            OperatorKind::CaretEqual => OperatorKind::Caret,
-            OperatorKind::PlusEqual => OperatorKind::Plus,
-            OperatorKind::MinusEqual => OperatorKind::Minus,
-            OperatorKind::DoubleStarEqual => OperatorKind::DoubleStar,
-            OperatorKind::DoublePercentEqual => OperatorKind::DoublePercent,
-            _ => OperatorKind::Unknown,
+            OperatorKind::LogicalAndEqual => Some(OperatorKind::DoubleAmpersand),
+            OperatorKind::LogicalOrEqual => Some(OperatorKind::DoublePipe),
+            OperatorKind::QuestionMarkEqual => Some(OperatorKind::QuestionMark),
+            OperatorKind::RangeInclusive => Some(OperatorKind::DoubleDot),
+            OperatorKind::AmpersandEqual => Some(OperatorKind::Ampersand),
+            OperatorKind::PipeEqual => Some(OperatorKind::Pipe),
+            OperatorKind::StarEqual => Some(OperatorKind::Star),
+            OperatorKind::SlashEqual => Some(OperatorKind::Slash),
+            OperatorKind::PercentEqual => Some(OperatorKind::Percent),
+            OperatorKind::CaretEqual => Some(OperatorKind::Caret),
+            OperatorKind::PlusEqual => Some(OperatorKind::Plus),
+            OperatorKind::MinusEqual => Some(OperatorKind::Minus),
+            OperatorKind::DoubleStarEqual => Some(OperatorKind::DoubleStar),
+            OperatorKind::DoublePercentEqual => Some(OperatorKind::DoublePercent),
+            _ => None,
         }
     }
 }
@@ -338,7 +335,6 @@ impl core::fmt::Display for OperatorKind {
             OperatorKind::DoubleDollar => "$$",
             OperatorKind::DoubleBackslash => "\\\\",
             OperatorKind::DoubleUnderscore => "__",
-            OperatorKind::Unknown => "????",
         };
         write!(f, "{}", op_str)
     }
@@ -346,7 +342,7 @@ impl core::fmt::Display for OperatorKind {
 
 pub trait OperatorLexer {
     fn is_operator(&self) -> bool;
-    fn to_operator(&self) -> OperatorKind;
+    fn to_operator(&self) -> Option<OperatorKind>;
 }
 
 impl OperatorLexer for char {
@@ -361,33 +357,33 @@ impl OperatorLexer for char {
         )
     }
 
-    fn to_operator(&self) -> OperatorKind {
+    fn to_operator(&self) -> Option<OperatorKind> {
         match self {
-            '@' => OperatorKind::At,
-            '&' => OperatorKind::Ampersand,
-            '\\' => OperatorKind::Backslash,
-            '^' => OperatorKind::Caret,
-            ':' => OperatorKind::Colon,
-            '$' => OperatorKind::Dollar,
-            '.' => OperatorKind::Dot,
-            '"' => OperatorKind::DoubleQuote,
-            '=' => OperatorKind::Equal,
-            '!' => OperatorKind::Exclamation,
-            '>' => OperatorKind::GreaterThan,
-            '#' => OperatorKind::Hash,
-            '<' => OperatorKind::LessThan,
-            '-' => OperatorKind::Minus,
-            '%' => OperatorKind::Percent,
-            '|' => OperatorKind::Pipe,
-            '+' => OperatorKind::Plus,
-            '?' => OperatorKind::QuestionMark,
-            '\'' => OperatorKind::SingleQuote,
-            '/' => OperatorKind::Slash,
-            '*' => OperatorKind::Star,
-            '~' => OperatorKind::Tilde,
-            '_' => OperatorKind::Underscore,
-            '`' => OperatorKind::Backtick,
-            _ => OperatorKind::Unknown,
+            '@' => Some(OperatorKind::At),
+            '&' => Some(OperatorKind::Ampersand),
+            '\\' => Some(OperatorKind::Backslash),
+            '^' => Some(OperatorKind::Caret),
+            ':' => Some(OperatorKind::Colon),
+            '$' => Some(OperatorKind::Dollar),
+            '.' => Some(OperatorKind::Dot),
+            '"' => Some(OperatorKind::DoubleQuote),
+            '=' => Some(OperatorKind::Equal),
+            '!' => Some(OperatorKind::Exclamation),
+            '>' => Some(OperatorKind::GreaterThan),
+            '#' => Some(OperatorKind::Hash),
+            '<' => Some(OperatorKind::LessThan),
+            '-' => Some(OperatorKind::Minus),
+            '%' => Some(OperatorKind::Percent),
+            '|' => Some(OperatorKind::Pipe),
+            '+' => Some(OperatorKind::Plus),
+            '?' => Some(OperatorKind::QuestionMark),
+            '\'' => Some(OperatorKind::SingleQuote),
+            '/' => Some(OperatorKind::Slash),
+            '*' => Some(OperatorKind::Star),
+            '~' => Some(OperatorKind::Tilde),
+            '_' => Some(OperatorKind::Underscore),
+            '`' => Some(OperatorKind::Backtick),
+            _ => None,
         }
     }
 }
@@ -403,98 +399,98 @@ impl OperatorLexer for str {
             "\\" | "`" | "_"
         )
     }
-    fn to_operator(&self) -> OperatorKind {
+    fn to_operator(&self) -> Option<OperatorKind> {
         match self.as_ref() {
             // Single character operators
-            "@" => OperatorKind::At,
-            "&" => OperatorKind::Ampersand,
-            "\\" => OperatorKind::Backslash,
-            "^" => OperatorKind::Caret,
-            ":" => OperatorKind::Colon,
-            "$" => OperatorKind::Dollar,
-            "." => OperatorKind::Dot,
-            "\"" => OperatorKind::DoubleQuote,
-            "=" => OperatorKind::Equal,
-            "!" => OperatorKind::Exclamation,
-            ">" => OperatorKind::GreaterThan,
-            "#" => OperatorKind::Hash,
-            "<" => OperatorKind::LessThan,
-            "-" => OperatorKind::Minus,
-            "%" => OperatorKind::Percent,
-            "|" => OperatorKind::Pipe,
-            "+" => OperatorKind::Plus,
-            "?" => OperatorKind::QuestionMark,
-            "'" => OperatorKind::SingleQuote,
-            "/" => OperatorKind::Slash,
-            "*" => OperatorKind::Star,
-            "~" => OperatorKind::Tilde,
-            "_" => OperatorKind::Underscore,
-            "`" => OperatorKind::Backtick,
+            "@" => Some(OperatorKind::At),
+            "&" => Some(OperatorKind::Ampersand),
+            "\\" => Some(OperatorKind::Backslash),
+            "^" => Some(OperatorKind::Caret),
+            ":" => Some(OperatorKind::Colon),
+            "$" => Some(OperatorKind::Dollar),
+            "." => Some(OperatorKind::Dot),
+            "\"" => Some(OperatorKind::DoubleQuote),
+            "=" => Some(OperatorKind::Equal),
+            "!" => Some(OperatorKind::Exclamation),
+            ">" => Some(OperatorKind::GreaterThan),
+            "#" => Some(OperatorKind::Hash),
+            "<" => Some(OperatorKind::LessThan),
+            "-" => Some(OperatorKind::Minus),
+            "%" => Some(OperatorKind::Percent),
+            "|" => Some(OperatorKind::Pipe),
+            "+" => Some(OperatorKind::Plus),
+            "?" => Some(OperatorKind::QuestionMark),
+            "'" => Some(OperatorKind::SingleQuote),
+            "/" => Some(OperatorKind::Slash),
+            "*" => Some(OperatorKind::Star),
+            "~" => Some(OperatorKind::Tilde),
+            "_" => Some(OperatorKind::Underscore),
+            "`" => Some(OperatorKind::Backtick),
 
             // Word operators
-            "in" => OperatorKind::In,
+            "in" => Some(OperatorKind::In),
 
             // Double character operators
-            "++" => OperatorKind::DoublePlus,
-            "--" => OperatorKind::DoubleMinus,
-            "**" => OperatorKind::DoubleStar,
-            "//" => OperatorKind::DoubleSlash,
-            "%%" => OperatorKind::DoublePercent,
-            "~~" => OperatorKind::DoubleTilde,
-            "^^" => OperatorKind::DoubleCaret,
-            ".." => OperatorKind::DoubleDot,
-            "..=" => OperatorKind::RangeInclusive,
-            "..." => OperatorKind::TripleDot,
-            "==" => OperatorKind::DoubleEqual,
-            "!=" => OperatorKind::NotEqual,
-            "<=" => OperatorKind::LessThanOrEqual,
-            ">=" => OperatorKind::GreaterThanOrEqual,
-            "===" => OperatorKind::TripleEqual,
-            "!==" => OperatorKind::StrictNotEqual,
-            "&&" => OperatorKind::DoubleAmpersand,
-            "||" => OperatorKind::DoublePipe,
-            "??" => OperatorKind::DoubleQuestionMark,
-            "!!" => OperatorKind::DoubleExclamation,
-            "<<" => OperatorKind::LeftShift,
-            ">>" => OperatorKind::RightShift,
-            ":=" => OperatorKind::ColonEqual,
-            "=:" => OperatorKind::EqualColon,
-            "+=" => OperatorKind::PlusEqual,
-            "-=" => OperatorKind::MinusEqual,
-            "*=" => OperatorKind::StarEqual,
-            "/=" => OperatorKind::SlashEqual,
-            "%=" => OperatorKind::PercentEqual,
-            "^=" => OperatorKind::CaretEqual,
-            "&=" => OperatorKind::AmpersandEqual,
-            "|=" => OperatorKind::PipeEqual,
-            "**=" => OperatorKind::DoubleStarEqual,
-            "%%=" => OperatorKind::DoublePercentEqual,
-            "&&=" => OperatorKind::LogicalAndEqual,
-            "||=" => OperatorKind::LogicalOrEqual,
-            "?=" => OperatorKind::QuestionMarkEqual,
-            "->" => OperatorKind::Arrow,
-            "=>" => OperatorKind::FatArrow,
-            "<-" => OperatorKind::LeftArrow,
-            "|>" => OperatorKind::PipeRight,
-            "<|" => OperatorKind::PipeLeft,
-            "~>" => OperatorKind::AngleRight,
-            "<~" => OperatorKind::AngleLeft,
-            "-->" => OperatorKind::DoubleArrow,
-            "<--" => OperatorKind::DoubleLeftArrow,
-            "==>" => OperatorKind::DoubleFatArrow,
-            "<==" => OperatorKind::DoubleFatLeftArrow,
-            "::" => OperatorKind::DoubleColon,
-            "/*" => OperatorKind::SlashStart,
-            "*/" => OperatorKind::StarSlash,
-            "///" => OperatorKind::TripleSlash,
-            "/**" => OperatorKind::SlashDoubleStart,
-            "//!" => OperatorKind::DoubleSlashExclamation,
-            "@@" => OperatorKind::DoubleAt,
-            "##" => OperatorKind::DoubleHash,
-            "$$" => OperatorKind::DoubleDollar,
-            "\\\\" => OperatorKind::DoubleBackslash,
-            "__" => OperatorKind::DoubleUnderscore,
-            _ => OperatorKind::Unknown,
+            "++" => Some(OperatorKind::DoublePlus),
+            "--" => Some(OperatorKind::DoubleMinus),
+            "**" => Some(OperatorKind::DoubleStar),
+            "//" => Some(OperatorKind::DoubleSlash),
+            "%%" => Some(OperatorKind::DoublePercent),
+            "~~" => Some(OperatorKind::DoubleTilde),
+            "^^" => Some(OperatorKind::DoubleCaret),
+            ".." => Some(OperatorKind::DoubleDot),
+            "..=" => Some(OperatorKind::RangeInclusive),
+            "..." => Some(OperatorKind::TripleDot),
+            "==" => Some(OperatorKind::DoubleEqual),
+            "!=" => Some(OperatorKind::NotEqual),
+            "<=" => Some(OperatorKind::LessThanOrEqual),
+            ">=" => Some(OperatorKind::GreaterThanOrEqual),
+            "===" => Some(OperatorKind::TripleEqual),
+            "!==" => Some(OperatorKind::StrictNotEqual),
+            "&&" => Some(OperatorKind::DoubleAmpersand),
+            "||" => Some(OperatorKind::DoublePipe),
+            "??" => Some(OperatorKind::DoubleQuestionMark),
+            "!!" => Some(OperatorKind::DoubleExclamation),
+            "<<" => Some(OperatorKind::LeftShift),
+            ">>" => Some(OperatorKind::RightShift),
+            ":=" => Some(OperatorKind::ColonEqual),
+            "=:" => Some(OperatorKind::EqualColon),
+            "+=" => Some(OperatorKind::PlusEqual),
+            "-=" => Some(OperatorKind::MinusEqual),
+            "*=" => Some(OperatorKind::StarEqual),
+            "/=" => Some(OperatorKind::SlashEqual),
+            "%=" => Some(OperatorKind::PercentEqual),
+            "^=" => Some(OperatorKind::CaretEqual),
+            "&=" => Some(OperatorKind::AmpersandEqual),
+            "|=" => Some(OperatorKind::PipeEqual),
+            "**=" => Some(OperatorKind::DoubleStarEqual),
+            "%%=" => Some(OperatorKind::DoublePercentEqual),
+            "&&=" => Some(OperatorKind::LogicalAndEqual),
+            "||=" => Some(OperatorKind::LogicalOrEqual),
+            "?=" => Some(OperatorKind::QuestionMarkEqual),
+            "->" => Some(OperatorKind::Arrow),
+            "=>" => Some(OperatorKind::FatArrow),
+            "<-" => Some(OperatorKind::LeftArrow),
+            "|>" => Some(OperatorKind::PipeRight),
+            "<|" => Some(OperatorKind::PipeLeft),
+            "~>" => Some(OperatorKind::AngleRight),
+            "<~" => Some(OperatorKind::AngleLeft),
+            "-->" => Some(OperatorKind::DoubleArrow),
+            "<--" => Some(OperatorKind::DoubleLeftArrow),
+            "==>" => Some(OperatorKind::DoubleFatArrow),
+            "<==" => Some(OperatorKind::DoubleFatLeftArrow),
+            "::" => Some(OperatorKind::DoubleColon),
+            "/*" => Some(OperatorKind::SlashStart),
+            "*/" => Some(OperatorKind::StarSlash),
+            "///" => Some(OperatorKind::TripleSlash),
+            "/**" => Some(OperatorKind::SlashDoubleStart),
+            "//!" => Some(OperatorKind::DoubleSlashExclamation),
+            "@@" => Some(OperatorKind::DoubleAt),
+            "##" => Some(OperatorKind::DoubleHash),
+            "$$" => Some(OperatorKind::DoubleDollar),
+            "\\\\" => Some(OperatorKind::DoubleBackslash),
+            "__" => Some(OperatorKind::DoubleUnderscore),
+            _ => None,
         }
     }
 }

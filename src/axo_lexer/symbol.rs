@@ -1,16 +1,16 @@
-use crate::axo_lexer::error::{CharParseError, LexError};
+use crate::axo_lexer::error::{CharParseError, Error, ErrorKind};
 use crate::axo_lexer::operator::OperatorLexer;
-use crate::axo_lexer::{Lexer, OperatorKind, TokenKind};
+use crate::axo_lexer::{Lexer, TokenKind};
 use crate::axo_lexer::punctuation::PunctuationLexer;
 
 pub trait SymbolLexer {
-    fn handle_operator(&mut self) -> Result<(), LexError>;
+    fn handle_operator(&mut self) -> Result<(), Error>;
     fn handle_punctuation(&mut self);
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError>;
+    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, Error>;
 }
 
 impl SymbolLexer for Lexer {
-    fn handle_operator(&mut self) -> Result<(), LexError> {
+    fn handle_operator(&mut self) -> Result<(), Error> {
         let mut operator = Vec::new();
 
         let ch = self.next().unwrap();
@@ -30,9 +30,7 @@ impl SymbolLexer for Lexer {
         let end = (self.line, self.column);
         let span = self.create_span(start, end);
 
-        let operator_string: String = operator.iter().collect();
-        if OperatorKind::Unknown != operator_string.to_operator() {
-            let op = operator_string.to_operator();
+        if let Some(op) = operator.iter().collect::<String>().to_operator() {
             self.push_token(TokenKind::Operator(op), span);
         } else {
             for (i, c) in operator.iter().enumerate() {
@@ -40,10 +38,13 @@ impl SymbolLexer for Lexer {
                     (self.line, self.column + i + 1),
                     (self.line, self.column + i + 2),
                 );
-                self.push_token(
-                    TokenKind::Operator(c.to_operator()),
-                    single_char_span,
-                );
+
+                if let Some(op) = c.to_operator() {
+                    self.push_token(
+                        TokenKind::Operator(op),
+                        single_char_span,
+                    );
+                }
             }
         }
 
@@ -60,11 +61,13 @@ impl SymbolLexer for Lexer {
         self.push_token(TokenKind::Punctuation(ch.to_punctuation()), span);
     }
 
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError> {
+    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, Error> {
+        let start = (self.line, self.column);
+
         let error_type = if is_string {
-            |err| LexError::StringParseError(err)
+            |err| ErrorKind::StringParseError(err)
         } else {
-            |err| LexError::CharParseError(err)
+            |err| ErrorKind::CharParseError(err)
         };
 
         if let Some(next_ch) = self.next() {
@@ -90,14 +93,16 @@ impl SymbolLexer for Lexer {
                         }
                     }
 
+                    let end = (self.line, self.column);
+
                     if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
                         if let Some(ch) = std::char::from_u32(hex_value) {
                             Ok(ch)
                         } else {
-                            Err(error_type(CharParseError::InvalidEscapeSequence))
+                            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                         }
                     } else {
-                        Err(error_type(CharParseError::InvalidEscapeSequence))
+                        Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                     }
                 }
                 'u' => {
@@ -123,27 +128,33 @@ impl SymbolLexer for Lexer {
                             }
                         }
 
+                        let end = (self.line, self.column);
+
                         if !closed_brace {
-                            return Err(error_type(CharParseError::UnClosedEscapeSequence));
+                            return Err(Error::new(error_type(CharParseError::UnClosedEscapeSequence), self.create_span(start, end)));
                         }
 
                         if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
                             if let Some(ch) = std::char::from_u32(hex_value) {
                                 Ok(ch)
                             } else {
-                                Err(error_type(CharParseError::InvalidEscapeSequence))
+                                Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                             }
                         } else {
-                            Err(error_type(CharParseError::InvalidEscapeSequence))
+                            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                         }
                     } else {
-                        Err(error_type(CharParseError::InvalidEscapeSequence))
+                        let end = (self.line, self.column);
+
+                        Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                     }
                 }
                 _ => Ok(next_ch),
             }
         } else {
-            Err(error_type(CharParseError::InvalidEscapeSequence))
+            let end = (self.line, self.column);
+
+            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
         }
     }
 }

@@ -14,6 +14,7 @@ pub struct Parser {
     pub line: usize,
     pub column: usize,
     pub expressions: Vec<Expr>,
+    pub errors: Vec<Error>,
 }
 
 impl Parser {
@@ -26,6 +27,7 @@ impl Parser {
             line: 1,
             column: 1,
             expressions: Vec::new(),
+            errors: Vec::new(),
         }
     }
 

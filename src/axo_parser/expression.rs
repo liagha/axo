@@ -3,14 +3,15 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error};
 use crate::axo_parser::{Parser, Primary};
+use crate::axo_parser::item::ItemKind;
 
-#[derive(Clone, PartialEq)]
+#[derive(Hash, Eq, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ExprKind {
     // Primary Expressions
     Literal(Token),
@@ -19,6 +20,7 @@ pub enum ExprKind {
     Unary(Token, Box<Expr>),
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
+    Struct(Box<Expr>, Box<Expr>),
 
     // Composite Expressions
     Bind(Box<Expr>, Box<Expr>),
@@ -37,23 +39,14 @@ pub enum ExprKind {
     Block(Vec<Expr>),
 
     // Declarations & Definitions
+    Item(ItemKind),
     Assignment(Box<Expr>, Box<Expr>),
     Definition(Box<Expr>, Option<Box<Expr>>),
-    Implement(Box<Expr>, Box<Expr>),
-    Trait(Box<Expr>, Box<Expr>),
-    Struct(Box<Expr>, Vec<Expr>),
-    StructDef(Box<Expr>, Vec<Expr>),
-    Enum(Box<Expr>, Vec<Expr>),
-    Function(Box<Expr>, Vec<Expr>, Box<Expr>),
-    Macro(Box<Expr>, Vec<Expr>, Box<Expr>),
 
     // Flow Control Statements
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue(Option<Box<Expr>>),
-
-    // Others
-    WildCard, // _
 }
 
 impl Expr {
@@ -89,8 +82,8 @@ impl Expr {
                         Expr { kind, span }
                     }
                     op => {
-                        if op.is_compound() {
-                            let operator = Token { kind: TokenKind::Operator(OperatorKind::decompound(&op)), span: span.clone() };
+                        if let Some(op) = op.decompound() {
+                            let operator = Token { kind: TokenKind::Operator(op), span: span.clone() };
 
                             let operation = Expr {
                                 kind: ExprKind::Binary(

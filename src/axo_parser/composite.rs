@@ -1,13 +1,13 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error, ErrorKind};
-use crate::axo_parser::{Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::{ControlFlow, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Result<Expr, Error>;
     fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error>;
-    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error>;
+    fn parse_structure(&mut self, struct_name: Expr) -> Result<Expr, Error>;
     fn parse_closure(&mut self) -> Result<Expr, Error>;
 }
 
@@ -97,12 +97,8 @@ impl Composite for Parser {
         result
     }
 
-    fn parse_struct(&mut self, struct_name: Expr) -> Result<Expr, Error> {
+    fn parse_structure(&mut self, struct_name: Expr) -> Result<Expr, Error> {
         self.push_context(ContextKind::Struct, None);
-
-        let brace = self.next().unwrap();
-
-        let Token { span: Span { start: err_start, .. }, .. } = brace;
 
         let Expr {
             span: Span { start, .. },
@@ -111,44 +107,32 @@ impl Composite for Parser {
 
         self.push_context(ContextKind::Struct, Some(SyntaxRole::Field));
 
-        let mut fields = Vec::new();
+        let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
+            let (exprs, span) = self.parse_delimited(
+                ContextKind::Match,
+                Some(SyntaxRole::Body),
+                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                TokenKind::Punctuation(PunctuationKind::RightBrace),
+                TokenKind::Punctuation(PunctuationKind::Comma),
+                true,
+                Parser::parse_complex
+            )?;
 
-        let mut err_end = err_start;
+            Expr { kind: ExprKind::Block(exprs), span }
+        } else {
+            self.parse_complex()?
+        };
 
-        while let Some(token) = self.peek().cloned() {
-            match token {
-                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
-                    let Token {
-                        span: Span { end, .. },
-                        ..
-                    } = self.next().unwrap();
+        let end = body.span.end;
 
-                    self.pop_context();
+        let kind = ExprKind::Struct(struct_name.into(), body.into());
 
-                    self.pop_context();
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
 
-                    let kind = ExprKind::Struct(struct_name.into(), fields);
-                    let expr = Expr {
-                        kind,
-                        span: self.span(start, end),
-                    };
-
-                    return Ok(expr);
-                }
-                Token { kind: TokenKind::Punctuation(PunctuationKind::Comma), span: Span { end, .. } } => {
-                    err_end = end;
-
-                    self.next();
-                }
-                _ => {
-                    let stmt = self.parse_statement()?;
-
-                    fields.push(stmt);
-                }
-            }
-        }
-
-        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(err_start, err_end)))
+        Ok(expr)
     }
 
     fn parse_closure(&mut self) -> Result<Expr, Error> {

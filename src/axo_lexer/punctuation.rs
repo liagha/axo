@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Copy, Eq, Hash)]
 pub enum PunctuationKind {
     Space,
     Tab,

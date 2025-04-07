@@ -93,6 +93,7 @@ pub enum ContextKind {
     Closure,
 
     // Special statements
+    Use,
     Return,
     Break,
     Continue,
@@ -175,6 +176,7 @@ impl Context {
                 ContextKind::Index => "index access",
                 ContextKind::MemberAccess => "member access",
                 ContextKind::Closure => "closure",
+                ContextKind::Use => "use",
                 ContextKind::Return => "return statement",
                 ContextKind::Break => "break statement",
                 ContextKind::Continue => "continue statement",

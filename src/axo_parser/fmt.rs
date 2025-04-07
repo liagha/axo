@@ -1,24 +1,55 @@
-use core::fmt;
-use core::fmt::Formatter;
-use broccli::{Color, TextStyle};
-use crate::axo_lexer::{Span, Token};
-use crate::axo_lexer::{PunctuationKind, TokenKind};
-use crate::axo_parser::{Expr, ExprKind};
+use crate::axo_parser::{Expr, ExprKind, ItemKind};
 
-impl fmt::Debug for Expr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for ItemKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ItemKind::Use(expr) => write!(f, "use {}", expr),
+            ItemKind::Implement(expr, body) => write!(f, "impl ({}) {}", expr, body),
+            ItemKind::Trait(name, body) => write!(f, "trait ({}) {}", name, body),
+            ItemKind::Struct(name, body) => write!(f, "struct ({}) {}", name, body),
+            ItemKind::Enum(name, body) => write!(f, "enum ({}) {}", name, body),
+            ItemKind::Macro(name, params, body) => {
+                let params = params.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
+
+                write!(f, "macro {}({}) {}", name, params, body)
+            },
+            ItemKind::Function(name, params, body) => {
+                let params = params.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
+
+                write!(f, "fn {}({}) {}", name, params, body)
+            },
+        }
+    }
+}
+
+impl core::fmt::Debug for ItemKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
+            ItemKind::Implement(expr, body) => write!(f, "Implement({:?} => {:?})", expr, body),
+            ItemKind::Trait(name, body) => write!(f, "Trait({:?} {:?})", name, body),
+            ItemKind::Struct(name, body) => write!(f, "Struct({:?} | {:?})", name, body),
+            ItemKind::Enum(name, body) => write!(f, "Enum({:?} | {:?})", name, body),
+            ItemKind::Macro(name, params, body) => write!(f, "Macro({:?}({:?}) {:?})", name, params, body),
+            ItemKind::Function(name, params, body) => write!(f, "Function({:?}({:?}) {:?})", name, params, body),
+        }
+    }
+}
+
+impl core::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?} | [{}]", self.kind, self.span)
     }
 }
 
-impl fmt::Display for Expr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for Expr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.kind)
     }
 }
 
-impl fmt::Display for ExprKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for ExprKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ExprKind::Literal(token) => write!(f, "{}", token),
             ExprKind::Identifier(ident) => write!(f, "{}", ident),
@@ -45,7 +76,7 @@ impl fmt::Display for ExprKind {
                 write!(f, "|{}| {}", params_str.join(", "), body)
             }
 
-            ExprKind::Match(clause, body) => write!(f, "match {} \n{}\n", clause, body),
+            ExprKind::Match(clause, body) => write!(f, "match {} {}\n", clause, body),
             ExprKind::Conditional(cond, then, else_opt) => {
                 write!(f, "if {} {}\n", cond, then)?;
                 if let Some(else_expr) = else_opt {
@@ -53,8 +84,8 @@ impl fmt::Display for ExprKind {
                 }
                 Ok(())
             }
-            ExprKind::While(cond, body) => write!(f, "while {} \n{}\n", cond, body),
-            ExprKind::For(clause, body) => write!(f, "for {} \n{}\n", clause, body),
+            ExprKind::While(cond, body) => write!(f, "while {} {}\n", cond, body),
+            ExprKind::For(clause, body) => write!(f, "for {} {}\n", clause, body),
             ExprKind::Block(stmts) => {
                 if stmts.is_empty() {
                     write!(f, "{{}}")
@@ -72,32 +103,11 @@ impl fmt::Display for ExprKind {
                 }
                 Ok(())
             }
-            ExprKind::Implement(name, body) => {
-                write!(f, "impl {} \n{}\n", name, body)
-            }
-            ExprKind::Trait(name, body) => {
-                write!(f, "trait {} \n{}\n", name, body)
-            }
             ExprKind::Struct(name, fields) => {
-                let fields_str: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
-                write!(f, "{} {{ {} }}", name, fields_str.join(", "))
+                write!(f, "{} {}", name, fields)
             }
-            ExprKind::StructDef(name, fields) => {
-                let fields_str: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
-                write!(f, "struct {} {{\n{}\n}}", name, fields_str.join("\n"))
-            }
-            ExprKind::Enum(name, variants) => {
-                let variants_str: Vec<String> = variants.iter().map(|v| v.to_string()).collect();
-                write!(f, "enum {} {{\n{}\n}}", name, variants_str.join("\n"))
-            }
-            ExprKind::Function(name, params, body) => {
-                let params_str: Vec<String> = params.iter().map(|p| p.to_string()).collect();
-                write!(f, "fn {}({}) {}\n", name, params_str.join(", "), body)
-            }
-            ExprKind::Macro(name, params, body) => {
-                let params_str: Vec<String> = params.iter().map(|p| p.to_string()).collect();
-                write!(f, "macro {}({}) {}\n", name, params_str.join(", "), body)
-            }
+
+            ExprKind::Item(item) => write!(f, "{}", item),
 
             ExprKind::Return(expr_opt) => {
                 write!(f, "return")?;
@@ -121,15 +131,14 @@ impl fmt::Display for ExprKind {
                 Ok(())
             }
 
-            ExprKind::WildCard => write!(f, "_"),
             ExprKind::Bind(key, value) => write!(f, "{} => {}", key, value),
             ExprKind::Path(lhs, rhs) => write!(f, "{}::{}", lhs, rhs),
         }
     }
 }
 
-impl fmt::Debug for ExprKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for ExprKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ExprKind::Literal(literal) => write!(f, "{:?}", literal),
             ExprKind::Identifier(identifier) => write!(f, "Identifier({})", identifier),
@@ -160,18 +169,9 @@ impl fmt::Debug for ExprKind {
 
             ExprKind::Assignment(lhs, rhs) => write!(f, "Assignment({:?} = {:?})", lhs, rhs),
             ExprKind::Definition(name, value) => write!(f, "Definition({:?} = {:?})", name, value),
-            ExprKind::Implement(name, body) => write!(f, "Implement({:?} : {:?})", name, body),
-            ExprKind::Trait(name, body) => write!(f, "Trait({:?} with {:?})", name, body),
             ExprKind::Struct(name, fields) => write!(f, "Struct({:?} with {:?})", name, fields),
-            ExprKind::StructDef(name, fields) => write!(f, "StructDef({:?} with {:?})", name, fields),
-            ExprKind::Enum(name, variants) => write!(f, "Enum({:?} with {:?})", name, variants),
-            ExprKind::Function(name, params, body) => {
-                write!(f, "Function({:?}({:?}) => {:?})", name, params, body)
-            }
-            ExprKind::Macro(name, params, body) => {
-                write!(f, "Macro({:?}({:?}) => {:?})", name, params, body)
-            }
 
+            ExprKind::Item(item) => write!(f, "+ {:?}", item),
             ExprKind::Return(expr) => {
                 write!(f, "Return")?;
                 if expr.is_some() {
@@ -194,7 +194,6 @@ impl fmt::Debug for ExprKind {
                 Ok(())
             }
 
-            ExprKind::WildCard => write!(f, "WildCard"),
             ExprKind::Bind(key, value) => write!(f, "Bind({:?} => {:?})", key, value),
             ExprKind::Path(lhs, rhs) => write!(f, "Path({:?}::{:?})", lhs, rhs),
         }
@@ -207,82 +206,4 @@ fn indent(expr: &Expr) -> String {
         .map(|line| format!("    {}", line))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-impl fmt::Display for TokenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            TokenKind::Boolean(b) => write!(f, "{}", b),
-            TokenKind::Float(n) => write!(f, "{}", n),
-            TokenKind::Integer(n) => write!(f, "{}", n),
-            TokenKind::Punctuation(c) => {
-                if c == &PunctuationKind::Newline {
-                    return write!(f, "\n")
-                }
-                write!(f, "{}", c)
-            },
-            TokenKind::Operator(c) => write!(f, "{}", c),
-            TokenKind::Str(str) => write!(f, "{}", str),
-            TokenKind::Identifier(str) => write!(f, "{}", str),
-            TokenKind::Char(char) => write!(f, "'{}'", char),
-            TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
-            TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::Invalid(invalid) => write!(f, "{}", invalid.colorize(Color::Red)),
-            TokenKind::EOF => write!(f, "{}", "End Of File"),
-        }
-    }
-}
-
-impl fmt::Debug for TokenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            TokenKind::Boolean(b) => write!(f, "Boolean({})", b),
-            TokenKind::Float(n) => write!(f, "Float({})", n),
-            TokenKind::Integer(n) => write!(f, "Integer({})", n),
-            TokenKind::Operator(op) => write!(f, "Operator({:?})", op),
-            TokenKind::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
-            TokenKind::Invalid(err) => write!(f, "Invalid({})", err),
-            TokenKind::Identifier(var) => write!(f, "Identifier({})", var),
-            TokenKind::Str(str) => write!(f, "String({})", str),
-            TokenKind::Char(char) => write!(f, "Char('{}')", char),
-            TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::EOF => write!(f, "EOF"),
-            TokenKind::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
-        }
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.kind != TokenKind::EOF {
-            write!(f, "{}", self.kind)
-        } else {
-            write!(f, "")
-        }
-    }
-}
-
-impl fmt::Debug for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.kind == TokenKind::EOF {
-            write!(f, "EOF")
-        } else {
-            write!(f, "{:?}", self.kind)
-        }
-    }
-}
-
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Span {
-            start: (start_line, start_column),
-            end: (end_line, end_column), ..
-        } = self;
-
-        if start_line == end_line && start_column == end_column {
-            write!(f, "{}:{}", start_line, start_column)
-        } else {
-            write!(f, "{}:{}-{}:{}", start_line, start_column, end_line, end_column)
-        }
-    }
 }

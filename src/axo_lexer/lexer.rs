@@ -1,4 +1,4 @@
-use crate::axo_lexer::error::LexError;
+use crate::axo_lexer::error::{Error, ErrorKind};
 use crate::axo_lexer::TokenKind;
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
@@ -81,7 +81,7 @@ impl Lexer {
         self.tokens.push(Token { kind, span });
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, Error> {
         while let Some(ch) = self.peek() {
             match ch {
                 ch if ch.is_whitespace() && ch != '\n' => {
@@ -121,8 +121,9 @@ impl Lexer {
                     let end = (self.line, self.column);
                     let span = self.create_span(start, end);
 
-                    self.push_token(TokenKind::Invalid(ch.to_string()), span);
-                    return Err(LexError::InvalidChar);
+                    self.push_token(TokenKind::Invalid(ch.to_string()), span.clone());
+
+                    return Err(Error::new(ErrorKind::InvalidChar, span));
                 }
             }
         }

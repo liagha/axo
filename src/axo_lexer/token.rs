@@ -3,16 +3,17 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
 use crate::axo_lexer::keyword::KeywordLexer;
 use crate::axo_lexer::Span;
+use crate::float::F64;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TokenKind {
-    Float(f64),
+    Float(F64),
     Integer(i64),
     Boolean(bool),
     Str(String),
@@ -32,8 +33,13 @@ impl TokenKind {
             "true" => Some(TokenKind::Boolean(true)),
             "false" => Some(TokenKind::Boolean(false)),
             "in" => Some(TokenKind::Operator(OperatorKind::In)),
-            s if s.to_keyword() != KeywordKind::Unknown => Some(TokenKind::Keyword(s.to_keyword())),
-            _ => None,
+            s => {
+                if let Some(kw) = s.to_keyword() {
+                    Some(TokenKind::Keyword(kw))
+                } else {
+                    None
+                }
+            },
         }
     }
 

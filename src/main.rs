@@ -1,6 +1,8 @@
-mod cli;
 mod axo_parser;
 pub mod axo_lexer;
+mod axo_semantic;
+mod float;
+
 use std::time::Instant;
 use std::path::PathBuf;
 use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
@@ -12,7 +14,6 @@ struct Config {
     verbose: bool,
     show_tokens: bool,
     show_ast: bool,
-    build_only: bool,
     time_report: bool,
 }
 
@@ -50,7 +51,6 @@ fn parse_args() -> Config {
         verbose: false,
         show_tokens: false,
         show_ast: false,
-        build_only: false,
         time_report: false,
     };
 
@@ -60,7 +60,6 @@ fn parse_args() -> Config {
             "verbose" | "-v" => config.verbose = true,
             "tokens" | "-t" => config.show_tokens = true,
             "ast" | "-a" => config.show_ast = true,
-            "build" | "-b" => config.build_only = true,
             "--time" => config.time_report = true,
             "--help" | "-h" => {
                 print_usage(&args[0]);
@@ -100,6 +99,8 @@ fn print_usage(program: &str) {
 }
 
 fn process_file(file_path: &PathBuf, config: &Config) {
+    println!("{}", format!("--> file://{}", file_path.display()).term_colorize(Color::Blue));
+
     let start = Instant::now();
 
     match std::fs::read_to_string(file_path) {
@@ -139,36 +140,16 @@ fn lex_and_parse(content: String, file_path: &str, config: &Config) {
                 xprintln!("Lexing completed in {}ms", lex_time);
             }
 
-            if !config.build_only {
-                parse_tokens(tokens, file_path, config);
-            } else {
-                // Just parse the AST for build-only mode
-                let parse_start = Instant::now();
-                let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
-                match parser.parse_program() {
-                    Ok(_) => {
-                        let parse_time = parse_start.elapsed().as_millis();
-                        if config.time_report {
-                            xprintln!("AST parsed successfully in {}ms" => Color::Green, parse_time);
-                        }
-                    },
-                    Err(err) => {
-                        let parse_time = parse_start.elapsed().as_millis();
-                        let (msg, details) = err.format();
-                        let state = parser.state.pop().unwrap().describe_chain();
+            parse_tokens(tokens, file_path, config);
+        }
+        Err(err) => {
+            let parse_time = lex_start.elapsed().as_millis();
+            let (msg, details) = err.format();
 
-                        xprintln!("{} => {} \n {} => took {}ms" => Color::Red,
-                            msg => Color::Orange, state => Color::Crimson, details, parse_time
+            xprintln!("{} \n {} => took {}ms" => Color::Red,
+                            msg => Color::Orange, details, parse_time
                         );
 
-                        std::process::exit(1);
-                    }
-                }
-            }
-        }
-        Err(e) => {
-            let lex_time = lex_start.elapsed().as_millis();
-            xprintln!("Lexing error: {}:{} {} => took {}ms" => Color::Red, lexer.line, lexer.column, e => Color::Orange, lex_time);
             std::process::exit(1);
         }
     }
@@ -183,19 +164,17 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
             let parse_time = parse_start.elapsed().as_millis();
 
             if config.show_ast || config.verbose {
-                xprintln!("Parsed AST: {} => took {}ms",
+                xprintln!(
                     format!("{:#?}", stmts).term_colorize(Color::Green),
-                    parse_time
                 );
 
-                // Uncomment if you want to display expressions as strings
                 // let exprs: String = stmts.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
                 // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));
             } else if config.time_report {
                 xprintln!("Parsing completed in {}ms", parse_time);
             }
 
-            // Here you can add the next step of processing if needed
+
         },
         Err(err) => {
             let parse_time = parse_start.elapsed().as_millis();

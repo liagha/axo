@@ -1,5 +1,6 @@
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum KeywordKind {
+    Use,
     Const,
     Extern,
     Macro,
@@ -17,34 +18,34 @@ pub enum KeywordKind {
     Break,
     Let,
     Continue,
-    Unknown,
 }
 
 pub trait KeywordLexer {
-    fn to_keyword(&self) -> KeywordKind;
+    fn to_keyword(&self) -> Option<KeywordKind>;
 }
 
 impl<T> KeywordLexer for T where T: AsRef<str> {
-    fn to_keyword(&self) -> KeywordKind {
+    fn to_keyword(&self) -> Option<KeywordKind> {
         match self.as_ref() {
-            "const" => KeywordKind::Const,
-            "extern" => KeywordKind::Extern,
-            "macro" => KeywordKind::Macro,
-            "break" => KeywordKind::Break,
-            "continue" => KeywordKind::Continue,
-            "else" => KeywordKind::Else,
-            "enum" => KeywordKind::Enum,
-            "fn" => KeywordKind::Fn,
-            "for" => KeywordKind::For,
-            "if" => KeywordKind::If,
-            "impl" => KeywordKind::Impl,
-            "let" => KeywordKind::Let,
-            "match" => KeywordKind::Match,
-            "return" => KeywordKind::Return,
-            "struct" => KeywordKind::Struct,
-            "trait" => KeywordKind::Trait,
-            "while" => KeywordKind::While,
-            _ => KeywordKind::Unknown,
+            "use" => Some(KeywordKind::Use),
+            "const" => Some(KeywordKind::Const),
+            "extern" => Some(KeywordKind::Extern),
+            "macro" => Some(KeywordKind::Macro),
+            "break" => Some(KeywordKind::Break),
+            "continue" => Some(KeywordKind::Continue),
+            "else" => Some(KeywordKind::Else),
+            "enum" => Some(KeywordKind::Enum),
+            "fn" => Some(KeywordKind::Fn),
+            "for" => Some(KeywordKind::For),
+            "if" => Some(KeywordKind::If),
+            "impl" => Some(KeywordKind::Impl),
+            "let" => Some(KeywordKind::Let),
+            "match" => Some(KeywordKind::Match),
+            "return" => Some(KeywordKind::Return),
+            "struct" => Some(KeywordKind::Struct),
+            "trait" => Some(KeywordKind::Trait),
+            "while" => Some(KeywordKind::While),
+            _ => None,
         }
     }
 }
@@ -52,6 +53,7 @@ impl<T> KeywordLexer for T where T: AsRef<str> {
 impl core::fmt::Display for KeywordKind {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let keyword_str = match self {
+            KeywordKind::Use => "use",
             KeywordKind::Const => "const",
             KeywordKind::Extern => "extern",
             KeywordKind::Macro => "macro",
@@ -69,7 +71,6 @@ impl core::fmt::Display for KeywordKind {
             KeywordKind::Struct => "struct",
             KeywordKind::Trait => "trait",
             KeywordKind::While => "while",
-            KeywordKind::Unknown => "????",
         };
         write!(f, "{}", keyword_str)
     }

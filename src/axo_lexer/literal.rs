@@ -1,104 +1,123 @@
-use crate::axo_lexer::error::{CharParseError, LexError};
+use crate::axo_lexer::error::{CharParseError, Error, ErrorKind};
 use crate::axo_lexer::{Lexer, TokenKind};
 use crate::axo_lexer::symbol::SymbolLexer;
 
 pub trait LiteralLexer {
-    fn handle_character(&mut self) -> Result<(), LexError>;
-    fn handle_string(&mut self) -> Result<(), LexError>;
+    fn handle_character(&mut self) -> Result<(), Error>;
+    fn handle_string(&mut self) -> Result<(), Error>;
 }
 
 impl LiteralLexer for Lexer {
-    fn handle_character(&mut self) -> Result<(), LexError> {
-        self.next();
+    fn handle_character(&mut self) -> Result<(), Error> {
+        self.next(); // Consume opening quote
 
+        let start = (self.line, self.column);
         let mut content = Vec::new();
         let mut closed = false;
         let mut is_escaped = false;
 
-        let start = (self.line, self.column);
-
-        while let Some(next_ch) = self.next() {
-            if is_escaped {
-                match self.handle_escape_sequence(false) {
-                    Ok(escaped_char) => content.push(escaped_char),
-                    Err(e) => return Err(e),
-                }
-                is_escaped = false;
-            } else if next_ch == '\\' {
-                is_escaped = true;
-            } else if next_ch == '\'' {
-                let end = (self.line, self.column);
-                let span = self.create_span(start, end);
-
-                if content.len() == 1 {
-                    let ch = content[0];
-                    self.push_token(TokenKind::Char(ch), span);
-                    closed = true;
-                    break;
-                } else {
-                    return Err(LexError::CharParseError(CharParseError::InvalidCharLiteral));
-                }
-            } else {
-                content.push(next_ch);
-            }
-        }
-
-        if !closed {
-            let end = (self.line, self.column);
-            let span = self.create_span(start, end);
-
-            let content_string: String = content.into_iter().collect();
-            self.push_token(TokenKind::Invalid(format!("'{}", content_string)), span);
-
-            return Err(LexError::UnClosedChar);
-        }
-
-        Ok(())
-    }
-
-    fn handle_string(&mut self) -> Result<(), LexError> {
-        self.next();
-
-        let mut content = Vec::new();
-        let mut closed = false;
-        let start = (self.line, self.column);
-
-        let mut is_escaped = false;
-
-        while let Some(next_ch) = self.next() {
-            if is_escaped {
-                match self.handle_escape_sequence(true) {
-                    Ok(escaped_char) => content.push(escaped_char),
-                    Err(e) => return Err(e),
-                }
-                is_escaped = false;
-            } else if next_ch == '\\' {
-                is_escaped = true;
-            } else if next_ch == '"' {
-                let end = (self.line, self.column);
-                let span = self.create_span(start, end);
-
-                let content_string: String = content.clone().into_iter().collect();
-                self.push_token(TokenKind::Str(content_string), span);
-
+        while let Some(next_ch) = self.peek() {
+            if next_ch == '\'' && !is_escaped {
+                self.next(); // Consume closing quote
                 closed = true;
                 break;
+            }
+
+            self.next(); // Consume character
+
+            if is_escaped {
+                let escape_start = (self.line, self.column);
+                match self.handle_escape_sequence(false) {
+                    Ok(escaped_char) => content.push(escaped_char),
+                    Err(Error { kind, .. }) => {
+                        let escape_end = (self.line, self.column);
+                        let escape_span = self.create_span(escape_start, escape_end);
+                        return Err(Error::new(kind, escape_span));
+                    }
+                }
+                is_escaped = false;
+            } else if next_ch == '\\' {
+                is_escaped = true;
             } else {
                 content.push(next_ch);
             }
         }
 
+        let end = (self.line, self.column);
+        let span = self.create_span(start, end);
+
         if !closed {
-            let end = (self.line, self.column);
-            let span = self.create_span(start, end);
-
-            let content_string: String = content.clone().into_iter().collect();
-
-            self.push_token(TokenKind::Invalid(format!("\"{}\"", content_string)), span);
-
-            return Err(LexError::UnClosedString);
+            let content_string: String = content.into_iter().collect();
+            self.push_token(TokenKind::Invalid(format!("'{}", content_string)), span.clone());
+            return Err(Error::new(ErrorKind::UnClosedChar, span));
         }
 
+        // Validate character literal
+        match content.len() {
+            0 => {
+                self.push_token(TokenKind::Invalid("''".to_string()), span.clone());
+                Err(Error::new(ErrorKind::CharParseError(CharParseError::EmptyCharLiteral), span))
+            }
+            1 => {
+                let ch = content[0];
+                self.push_token(TokenKind::Char(ch), span);
+                Ok(())
+            }
+            _ => {
+                let content_string: String = content.into_iter().collect();
+                let formatted = format!("'{}'", content_string);
+                self.push_token(TokenKind::Invalid(formatted), span.clone());
+                Err(Error::new(ErrorKind::CharParseError(CharParseError::InvalidCharLiteral), span))
+            }
+        }
+    }
+
+    fn handle_string(&mut self) -> Result<(), Error> {
+        self.next(); // Consume opening quote
+
+        let start = (self.line, self.column);
+        let mut content = Vec::new();
+        let mut closed = false;
+        let mut is_escaped = false;
+
+        while let Some(next_ch) = self.peek() {
+            if next_ch == '"' && !is_escaped {
+                self.next(); // Consume closing quote
+                closed = true;
+                break;
+            }
+
+            self.next(); // Consume character
+
+            if is_escaped {
+                let escape_start = (self.line, self.column);
+                match self.handle_escape_sequence(true) {
+                    Ok(escaped_char) => content.push(escaped_char),
+                    Err(Error { kind, .. }) => {
+                        let escape_end = (self.line, self.column);
+                        let escape_span = self.create_span(escape_start, escape_end);
+                        return Err(Error::new(kind, escape_span));
+                    }
+                }
+                is_escaped = false;
+            } else if next_ch == '\\' {
+                is_escaped = true;
+            } else {
+                content.push(next_ch);
+            }
+        }
+
+        let end = (self.line, self.column);
+        let span = self.create_span(start, end);
+
+        if !closed {
+            let content_string: String = content.into_iter().collect();
+            self.push_token(TokenKind::Invalid(format!("\"{}\"", content_string)), span.clone());
+            return Err(Error::new(ErrorKind::UnClosedString, span));
+        }
+
+        let content_string: String = content.into_iter().collect();
+        self.push_token(TokenKind::Str(content_string), span);
         Ok(())
     }
 }

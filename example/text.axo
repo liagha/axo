@@ -1,3 +1,5 @@
+use test::x::t;
+let xxxxxx = 5;
 salam = 42;
 y = 3.14;
 z = true;
@@ -6,7 +8,6 @@ w = 1000_000_000;
 a = x + y * 2;
 b = (x - y) / 2;
 c = x % 5;
-
 d = x > y;
 e = x <= y;
 
@@ -212,4 +213,10 @@ macro test x = 4
 match x {
     x -> 5,
     y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
 }

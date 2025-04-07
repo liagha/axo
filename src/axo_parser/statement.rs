@@ -2,7 +2,7 @@ use std::cmp::PartialEq;
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::{Error, ErrorKind};
 use crate::axo_parser::expression::{Expr, ExprKind, Expression};
-use crate::axo_parser::{Parser, Primary};
+use crate::axo_parser::{ItemKind, Parser, Primary};
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait ControlFlow {
@@ -18,6 +18,7 @@ pub trait ControlFlow {
     ) -> Result<(Vec<Expr>, Span), Error>
     where
         F: FnMut(&mut Parser) -> Result<Expr, Error>;
+    fn parse_let(&mut self) -> Result<Expr, Error>;
     fn parse_block(&mut self) -> Result<Expr, Error>;
     fn parse_match(&mut self) -> Result<Expr, Error>;
     fn parse_conditional(&mut self) -> Result<Expr, Error>;
@@ -98,6 +99,33 @@ impl ControlFlow for Parser {
             self.span(start, err_end),
         ))
     }
+
+    fn parse_let(&mut self) -> Result<Expr, Error> {
+        self.push_context(ContextKind::Variable, Some(SyntaxRole::Declaration));
+
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let expr = self.parse_complex()?;
+
+        let Expr { kind, span: Span { end, .. } } = expr.clone();
+
+        let span = self.span(start, end);
+
+        self.pop_context();
+
+        match kind {
+            ExprKind::Assignment(target, value) => {
+                Ok(Expr { kind: ExprKind::Definition(target, Some(value)), span })
+            }
+            _ => {
+                Ok(Expr { kind: ExprKind::Definition(expr.into(), None), span })
+            }
+        }
+    }
+
     fn parse_block(&mut self) -> Result<Expr, Error> {
         let brace = self.next().unwrap();
 
@@ -274,6 +302,7 @@ impl ControlFlow for Parser {
 
         Ok(expr)
     }
+
 
     fn parse_return(&mut self) -> Result<Expr, Error> {
         self.push_context(ContextKind::Return, None);
