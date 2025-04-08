@@ -3,7 +3,7 @@ use crate::axo_lexer::TokenKind;
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
-use unic_ucd_common::{is_alphabetic, is_numeric, is_white_space};
+use crate::axo_symbol::unicode::{is_alphabetic, is_numeric, is_white_space};
 use crate::axo_lexer::handler::Handler;
 use crate::axo_lexer::literal::LiteralLexer;
 use crate::axo_lexer::operator::OperatorLexer;

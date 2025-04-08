@@ -2,6 +2,7 @@ mod axo_parser;
 pub mod axo_lexer;
 mod axo_semantic;
 mod axo_data;
+mod axo_symbol;
 
 use std::time::Instant;
 use std::path::PathBuf;
