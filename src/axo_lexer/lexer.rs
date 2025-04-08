@@ -3,6 +3,7 @@ use crate::axo_lexer::TokenKind;
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
+use unic_ucd_common::{is_alphabetic, is_numeric, is_white_space};
 use crate::axo_lexer::handler::Handler;
 use crate::axo_lexer::literal::LiteralLexer;
 use crate::axo_lexer::operator::OperatorLexer;
@@ -84,15 +85,15 @@ impl Lexer {
     pub fn tokenize(&mut self) -> Result<Vec<Token>, Error> {
         while let Some(ch) = self.peek() {
             match ch {
-                ch if ch.is_whitespace() && ch != '\n' => {
+                ch if is_white_space(ch) && ch != '\n' => {
                     self.next();
 
                     continue
                 },
 
-                ch if ch.is_digit(10) => self.handle_number()?,
+                ch if is_numeric(ch) => self.handle_number()?,
 
-                ch if ch.is_alphabetic() || ch == '_' => self.handle_identifier()?,
+                ch if is_alphabetic(ch) || ch == '_' => self.handle_identifier()?,
 
                 '.' => {
                     if let Some(ch) = self.peek_ahead(1) {
@@ -120,8 +121,6 @@ impl Lexer {
                     let start = (self.line, self.column);
                     let end = (self.line, self.column);
                     let span = self.create_span(start, end);
-
-                    self.push_token(TokenKind::Invalid(ch.to_string()), span.clone());
 
                     return Err(Error::new(ErrorKind::InvalidChar, span));
                 }

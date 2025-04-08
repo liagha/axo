@@ -73,7 +73,7 @@ impl NumberLexer for Lexer {
                 "0x" | "0X" => {
                     let hex_part = &number[2..];
                     if hex_part.chars().all(|c| c.is_digit(16)) {
-                        if let Ok(num) = i64::from_str_radix(hex_part, 16) {
+                        if let Ok(num) = i128::from_str_radix(hex_part, 16) {
                             return Ok(TokenKind::Integer(num));
                         }
                     }
@@ -82,7 +82,7 @@ impl NumberLexer for Lexer {
                 "0o" | "0O" => {
                     let oct_part = &number[2..];
                     if oct_part.chars().all(|c| c.is_digit(8)) {
-                        if let Ok(num) = i64::from_str_radix(oct_part, 8) {
+                        if let Ok(num) = i128::from_str_radix(oct_part, 8) {
                             return Ok(TokenKind::Integer(num));
                         }
                     }
@@ -91,7 +91,7 @@ impl NumberLexer for Lexer {
                 "0b" | "0B" => {
                     let bin_part = &number[2..];
                     if bin_part.chars().all(|c| c.is_digit(2)) {
-                        if let Ok(num) = i64::from_str_radix(bin_part, 2) {
+                        if let Ok(num) = i128::from_str_radix(bin_part, 2) {
                             return Ok(TokenKind::Integer(num));
                         }
                     }
@@ -139,7 +139,7 @@ impl NumberLexer for Lexer {
                 Err(e) => Err(Error::new(ErrorKind::NumberParse(e.to_string()), span)),
             }
         } else {
-            match number.parse::<i64>() {
+            match number.parse::<i128>() {
                 Ok(num) => Ok(TokenKind::Integer(num)),
                 Err(e) => Err(Error::new(ErrorKind::NumberParse(e.to_string()), span)),
             }

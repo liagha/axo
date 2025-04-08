@@ -1,6 +1,5 @@
 use core::fmt;
 use core::fmt::Formatter;
-use broccli::{Color, TextStyle};
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::{PunctuationKind, TokenKind};
 
@@ -22,7 +21,6 @@ impl fmt::Display for TokenKind {
             TokenKind::Char(char) => write!(f, "'{}'", char),
             TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::Invalid(invalid) => write!(f, "{}", invalid.colorize(Color::Red)),
             TokenKind::EOF => write!(f, "{}", "End Of File"),
         }
     }
@@ -36,7 +34,6 @@ impl fmt::Debug for TokenKind {
             TokenKind::Integer(n) => write!(f, "Integer({})", n),
             TokenKind::Operator(op) => write!(f, "Operator({:?})", op),
             TokenKind::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
-            TokenKind::Invalid(err) => write!(f, "Invalid({})", err),
             TokenKind::Identifier(var) => write!(f, "Identifier({})", var),
             TokenKind::Str(str) => write!(f, "String({})", str),
             TokenKind::Char(char) => write!(f, "Char('{}')", char),

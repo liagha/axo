@@ -1,13 +1,14 @@
 mod axo_parser;
 pub mod axo_lexer;
 mod axo_semantic;
-mod float;
+mod axo_data;
 
 use std::time::Instant;
 use std::path::PathBuf;
 use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
 use axo_parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
+use crate::axo_semantic::Validator;
 
 struct Config {
     file_path: String,
@@ -174,7 +175,14 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
                 xprintln!("Parsing completed in {}ms", parse_time);
             }
 
+            let mut validator = Validator::new();
 
+            validator.validate(stmts);
+
+            if validator.has_errors() {
+                let errors = validator.get_errors().iter().map(|err| format!("{:?}", err)).collect::<Vec<_>>().join("\n");
+                println!("{}", errors);
+            }
         },
         Err(err) => {
             let parse_time = parse_start.elapsed().as_millis();

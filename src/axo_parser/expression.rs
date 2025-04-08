@@ -11,7 +11,7 @@ pub struct Expr {
     pub span: Span,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Hash, Eq, Clone, PartialEq)]
 pub enum ExprKind {
     // Primary Expressions
     Literal(Token),

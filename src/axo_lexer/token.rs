@@ -3,7 +3,7 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
 use crate::axo_lexer::keyword::KeywordLexer;
 use crate::axo_lexer::Span;
-use crate::float::F64;
+use crate::axo_data::float::FloatLiteral;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Token {
@@ -13,8 +13,8 @@ pub struct Token {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TokenKind {
-    Float(F64),
-    Integer(i64),
+    Float(FloatLiteral),
+    Integer(i128),
     Boolean(bool),
     Str(String),
     Char(char),
@@ -23,7 +23,6 @@ pub enum TokenKind {
     Punctuation(PunctuationKind),
     Keyword(KeywordKind),
     Comment(String),
-    Invalid(String),
     EOF,
 }
 

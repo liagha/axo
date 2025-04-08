@@ -47,15 +47,12 @@ impl LiteralLexer for Lexer {
         let span = self.create_span(start, end);
 
         if !closed {
-            let content_string: String = content.into_iter().collect();
-            self.push_token(TokenKind::Invalid(format!("'{}", content_string)), span.clone());
             return Err(Error::new(ErrorKind::UnClosedChar, span));
         }
 
         // Validate character literal
         match content.len() {
             0 => {
-                self.push_token(TokenKind::Invalid("''".to_string()), span.clone());
                 Err(Error::new(ErrorKind::CharParseError(CharParseError::EmptyCharLiteral), span))
             }
             1 => {
@@ -64,9 +61,6 @@ impl LiteralLexer for Lexer {
                 Ok(())
             }
             _ => {
-                let content_string: String = content.into_iter().collect();
-                let formatted = format!("'{}'", content_string);
-                self.push_token(TokenKind::Invalid(formatted), span.clone());
                 Err(Error::new(ErrorKind::CharParseError(CharParseError::InvalidCharLiteral), span))
             }
         }
@@ -111,8 +105,6 @@ impl LiteralLexer for Lexer {
         let span = self.create_span(start, end);
 
         if !closed {
-            let content_string: String = content.into_iter().collect();
-            self.push_token(TokenKind::Invalid(format!("\"{}\"", content_string)), span.clone());
             return Err(Error::new(ErrorKind::UnClosedString, span));
         }
 

@@ -34,7 +34,6 @@ impl Primary for Parser {
             | TokenKind::Punctuation(_)
             | TokenKind::Keyword(_)
             | TokenKind::Comment(_)
-            | TokenKind::Invalid(_)
             | TokenKind::EOF => Expr {
                 kind: ExprKind::Literal(token),
                 span,
