@@ -3,6 +3,7 @@ pub mod axo_lexer;
 mod axo_semantic;
 mod axo_data;
 mod axo_symbol;
+pub use axo_symbol::*;
 
 use std::time::Instant;
 use std::path::PathBuf;

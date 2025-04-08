@@ -4,6 +4,7 @@
 //! applications to provide an optimized implementation.
 
 use crate::char_property;
+use crate::chars;
 
 char_property! {
     /// Represents Unicode characters with `General_Category = Cc`.

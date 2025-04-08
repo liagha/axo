@@ -1,7 +1,5 @@
 use crate::axo_symbol::unicode::TotalCharProperty;
 use crate::char_property;
-use crate::chars;
-use crate::axo_symbol::CharRange;
 
 char_property! {
     pub enum GeneralCategory {
@@ -208,6 +206,8 @@ impl Default for GeneralCategory {
 
 mod data {
     use crate::axo_symbol::unicode::tables::CharDataTable;
+    use crate::chars;
+    use crate::unicode::category::category::abbr_names::*;
 
     pub const GENERAL_CATEGORY_TABLE: CharDataTable<super::GeneralCategory> =
         include!("tables/general_category.rsv");
@@ -274,6 +274,7 @@ impl GeneralCategory {
 mod tests {
     use super::GeneralCategory as GC;
     use core::char;
+    use crate::EnumeratedCharProperty;
 
     #[test]
     fn test_ascii() {

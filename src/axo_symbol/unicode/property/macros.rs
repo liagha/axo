@@ -117,10 +117,6 @@ macro_rules! char_property {
         }
 
         $(#[$long_mod_meta])*
-        #[allow(bad_style)]
-        pub mod $long_mod {
-            $( pub use super::$prop_name::$variant_name as $variant_long; )*
-        }
 
         char_property! {
             __impl FromStr for $prop_name;
@@ -274,7 +270,7 @@ macro_rules! char_property {
     };
 
     ( __impl Display for $prop_name:ident by $trait:ident ) => {
-        impl $crate::__fmt::Display for $prop_name {
+        impl $crate::axo_symbol::__fmt::Display for $prop_name {
             fn fmt(&self, f: &mut $crate::__fmt::Formatter) -> $crate::__fmt::Result {
                 $crate::$trait::human_name(self).fmt(f)
             }
