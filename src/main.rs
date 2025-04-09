@@ -2,15 +2,17 @@ mod axo_parser;
 pub mod axo_lexer;
 mod axo_semantic;
 mod axo_data;
-mod axo_symbol;
-pub use axo_symbol::*;
+mod axo_rune;
+mod axo_errors;
+
+pub use axo_rune::*;
 
 use std::time::Instant;
 use std::path::PathBuf;
 use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
 use axo_parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
-use crate::axo_semantic::Validator;
+use crate::axo_semantic::{Validator};
 
 struct Config {
     file_path: String,
@@ -179,7 +181,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
 
             let mut validator = Validator::new();
 
-            validator.validate(stmts);
+            validator.validate(stmts.clone());
 
             if validator.has_errors() {
                 let errors = validator.get_errors().iter().map(|err| format!("{:?}", err)).collect::<Vec<_>>().join("\n");

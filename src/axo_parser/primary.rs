@@ -1,7 +1,7 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{Error, ErrorKind};
+use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
-use crate::axo_parser::{Composite, ControlFlow, Expr, ExprKind, Parser};
+use crate::axo_parser::{Composite, ControlFlow, Error, Expr, ExprKind, Parser};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::item::Item;

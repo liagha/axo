@@ -1,9 +1,9 @@
-use crate::axo_lexer::error::{Error, ErrorKind};
-use crate::axo_lexer::TokenKind;
+use crate::axo_lexer::error::ErrorKind;
+use crate::axo_lexer::{Error, TokenKind};
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
-use crate::axo_symbol::unicode::{is_alphabetic, is_numeric, is_white_space};
+use crate::axo_rune::unicode::{is_alphabetic, is_numeric, is_white_space};
 use crate::axo_lexer::handler::Handler;
 use crate::axo_lexer::literal::LiteralLexer;
 use crate::axo_lexer::operator::OperatorLexer;

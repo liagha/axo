@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{Error};
-use crate::axo_parser::{Expr, ExprKind, Primary};
+use crate::axo_parser::{Error, Expr, ExprKind, Primary};
+use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub struct Parser {

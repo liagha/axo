@@ -1,5 +1,5 @@
-use crate::axo_lexer::error::{IntParseError, ErrorKind, Error};
-use crate::axo_lexer::{Lexer, Token, TokenKind, Span};
+use crate::axo_lexer::error::{IntParseError, ErrorKind};
+use crate::axo_lexer::{Lexer, Token, TokenKind, Span, Error};
 use lexical_core::parse;
 
 pub trait NumberLexer {

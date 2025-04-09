@@ -1,5 +1,5 @@
-use crate::axo_lexer::error::{CharParseError, Error, ErrorKind};
-use crate::axo_lexer::{Lexer, TokenKind};
+use crate::axo_lexer::error::{CharParseError, ErrorKind};
+use crate::axo_lexer::{Error, Lexer, TokenKind};
 use crate::axo_lexer::symbol::SymbolLexer;
 
 pub trait LiteralLexer {

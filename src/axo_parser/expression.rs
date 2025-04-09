@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::error::{Error};
-use crate::axo_parser::{Parser, Primary};
+use crate::axo_parser::{Error, Parser, Primary};
 use crate::axo_parser::item::ItemKind;
 
 #[derive(Hash, Eq, Clone, PartialEq)]
@@ -50,6 +49,13 @@ pub enum ExprKind {
 }
 
 impl Expr {
+    pub fn dummy() -> Expr {
+        Expr {
+            kind: ExprKind::Tuple(Vec::new()),
+            span: Span::zero(),
+        }
+    }
+
     pub fn transform(&self) -> Expr {
         let Expr { kind, span } = self.clone();
 
