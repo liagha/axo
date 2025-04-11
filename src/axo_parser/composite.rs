@@ -6,14 +6,14 @@ use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub trait Composite {
-    fn parse_index(&mut self, left: Expr) -> Result<Expr, Error>;
-    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error>;
-    fn parse_structure(&mut self, struct_name: Expr) -> Result<Expr, Error>;
-    fn parse_closure(&mut self) -> Result<Expr, Error>;
+    fn parse_index(&mut self, left: Expr) -> Expr;
+    fn parse_invoke(&mut self, name: Expr) -> Expr;
+    fn parse_structure(&mut self, struct_name: Expr) -> Expr;
+    fn parse_closure(&mut self) -> Expr;
 }
 
 impl Composite for Parser {
-    fn parse_index(&mut self, left: Expr) -> Result<Expr, Error> {
+    fn parse_index(&mut self, left: Expr) -> Expr {
         self.push_context(ContextKind::Index, None);
 
         let bracket = self.next().unwrap();
@@ -25,7 +25,7 @@ impl Composite for Parser {
 
         self.push_context(ContextKind::Index, Some(SyntaxRole::Value));
 
-        let index = self.parse_complex()?;
+        let index = self.parse_complex();
 
         self.pop_context();
 
@@ -38,21 +38,25 @@ impl Composite for Parser {
             span: Span { end, .. },
         }) = self.next()
         {
-            let kind = ExprKind::Index(left.into(), index.into());
+            let kind = ExprKind::Index {
+                expr: left.into(),
+                index: index.into()
+            };
+
             let span = self.span(start, end);
             let expr = Expr { kind, span };
 
-            Ok(expr)
+            expr
         } else {
             let err_span = self.span(start, err_end);
             
-            Err(Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
+            self.error(&Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
         };
 
         result
     }
 
-    fn parse_invoke(&mut self, name: Expr) -> Result<Expr, Error> {
+    fn parse_invoke(&mut self, name: Expr) -> Expr {
         self.push_context(ContextKind::Call, None);
 
         let Expr {
@@ -62,7 +66,7 @@ impl Composite for Parser {
 
         self.push_context(ContextKind::Call, Some(SyntaxRole::Parameter));
 
-        let parameters = self.parse_parenthesized()?;
+        let parameters = self.parse_parenthesized();
 
         self.pop_context();
 
@@ -73,32 +77,40 @@ impl Composite for Parser {
                 kind: ExprKind::Tuple(parameters),
                 span: Span { end, .. },
             } => {
-                let kind = ExprKind::Invoke(name.into(), parameters);
+                let kind = ExprKind::Invoke {
+                    target: name.into(),
+                    parameters
+                };
+
                 let expr = Expr {
                     kind,
                     span: self.span(start, end),
                 };
 
-                Ok(expr)
+                expr
             }
             Expr {
                 span: Span { end, .. },
                 ..
             } => {
-                let kind = ExprKind::Invoke(name.into(), vec![parameters]);
+                let kind = ExprKind::Invoke {
+                    target: name.into(),
+                    parameters: vec![parameters],
+                };
+
                 let expr = Expr {
                     kind,
                     span: self.span(start, end),
                 };
 
-                Ok(expr)
+                expr
             }
         };
 
         result
     }
 
-    fn parse_structure(&mut self, struct_name: Expr) -> Result<Expr, Error> {
+    fn parse_structure(&mut self, struct_name: Expr) -> Expr {
         self.push_context(ContextKind::Struct, None);
 
         let Expr {
@@ -117,26 +129,29 @@ impl Composite for Parser {
                 TokenKind::Punctuation(PunctuationKind::Comma),
                 true,
                 Parser::parse_complex
-            )?;
+            );
 
             Expr { kind: ExprKind::Block(exprs), span }
         } else {
-            self.parse_complex()?
+            self.parse_complex()
         };
 
         let end = body.span.end;
 
-        let kind = ExprKind::Struct(struct_name.into(), body.into());
+        let kind = ExprKind::Struct {
+            name: struct_name.into(),
+            body: body.into()
+        };
 
         let expr = Expr {
             kind,
             span: self.span(start, end),
         };
 
-        Ok(expr)
+        expr
     }
 
-    fn parse_closure(&mut self) -> Result<Expr, Error> {
+    fn parse_closure(&mut self) -> Expr {
         self.push_context(ContextKind::Closure, None);
 
         let pipe = self.next().unwrap();
@@ -168,12 +183,15 @@ impl Composite for Parser {
 
                     self.pop_context();
 
-                    let body = self.parse_statement()?;
+                    let body = self.parse_statement();
 
-                    return Ok(Expr {
-                        kind: ExprKind::Closure(parameters, body.into()),
+                    return Expr {
+                        kind: ExprKind::Closure {
+                            parameters,
+                            body: body.into()
+                        },
                         span: self.span(start, end),
-                    });
+                    };
                 }
                 Token {
                     kind: TokenKind::Punctuation(PunctuationKind::Comma),
@@ -184,12 +202,12 @@ impl Composite for Parser {
                     self.next();
                 }
                 _ => {
-                    let expr = self.parse_complex()?;
+                    let expr = self.parse_complex();
                     parameters.push(expr.into());
                 }
             }
         }
 
-        Err(Error::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
+        self.error(&Error::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
     }
 }

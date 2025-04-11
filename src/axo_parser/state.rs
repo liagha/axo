@@ -24,7 +24,7 @@ pub enum Position {
     Adjacent,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxRole {
     Target,
     Value,
@@ -48,7 +48,7 @@ pub enum SyntaxRole {
     Implementation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContextKind {
     // Top-level contexts
     Program,
@@ -113,7 +113,7 @@ pub enum ContextKind {
     ErrorRecovery,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Context {
     pub kind: ContextKind,
     pub role: Option<SyntaxRole>,
@@ -141,7 +141,7 @@ impl Context {
     }
 
     pub fn with_parent(mut self, parent: Context) -> Self {
-        self.parent = Some(Box::new(parent));
+        self.parent = Some(parent.into());
         self
     }
 

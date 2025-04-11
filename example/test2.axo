@@ -1,4 +1,9 @@
-salam = 42;
-y = 3.14;
-z = true;
-w = 1000_000_000;
+let a_really_Cool = 5
+let x : 3 = 5;
+a_really_Cool
+
+fn test(x: int, y: string) {
+    x + 3
+
+    y
+}

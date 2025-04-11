@@ -1,8 +1,9 @@
-mod syntactic;
-mod resolver;
+#![allow(unused_imports)]
 
-pub use syntactic::Validator;
+mod resolver;
+mod syntactic;
+mod checker;
+
+pub use resolver::*;
 
 pub use crate::axo_errors::Error as AxoError;
-
-pub type SyntacticError = AxoError<syntactic::ErrorKind>;

@@ -15,37 +15,91 @@ pub enum ExprKind {
     // Primary Expressions
     Literal(Token),
     Identifier(String),
-    Binary(Box<Expr>, Token, Box<Expr>),
-    Unary(Token, Box<Expr>),
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
-    Struct(Box<Expr>, Box<Expr>),
+
+    Binary {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>
+    },
+    Unary {
+        operator: Token,
+        operand: Box<Expr>,
+    },
+    Struct {
+        name: Box<Expr>,
+        body: Box<Expr>
+    },
 
     // Composite Expressions
-    Bind(Box<Expr>, Box<Expr>),
-    Typed(Box<Expr>, Box<Expr>),
-    Index(Box<Expr>, Box<Expr>),
-    Invoke(Box<Expr>, Vec<Expr>),
-    Path(Box<Expr>, Box<Expr>),
-    Member(Box<Expr>, Box<Expr>),
-    Closure(Vec<Expr>, Box<Expr>),
+    Bind {
+        key: Box<Expr>,
+        value: Box<Expr>
+    },
+    Typed {
+        expr: Box<Expr>,
+        ty: Box<Expr>
+    },
+    Index {
+        expr: Box<Expr>,
+        index: Box<Expr>
+    },
+    Invoke {
+        target: Box<Expr>,
+        parameters: Vec<Expr>
+    },
+    Path {
+        left: Box<Expr>,
+        right: Box<Expr>
+    },
+    Member {
+        object: Box<Expr>,
+        member: Box<Expr>
+    },
+
+    Closure {
+        parameters: Vec<Expr>,
+        body: Box<Expr>
+    },
 
     // Control Flow
-    Match(Box<Expr>, Box<Expr>),
-    Conditional(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
-    While(Box<Expr>, Box<Expr>),
-    For(Box<Expr>, Box<Expr>),
     Block(Vec<Expr>),
+    Match {
+        target: Box<Expr>,
+        body: Box<Expr>
+    },
+    Conditional {
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Option<Box<Expr>>,
+    },
+    While {
+        condition: Box<Expr>,
+        body: Box<Expr>
+    },
+    For {
+        clause: Box<Expr>,
+        body: Box<Expr>
+    },
 
     // Declarations & Definitions
     Item(ItemKind),
-    Assignment(Box<Expr>, Box<Expr>),
-    Definition(Box<Expr>, Option<Box<Expr>>),
+    Assignment {
+        target: Box<Expr>,
+        value: Box<Expr>
+    },
+    Definition {
+        target: Box<Expr>,
+        value: Option<Box<Expr>>
+    },
 
     // Flow Control Statements
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue(Option<Box<Expr>>),
+
+    Error(Error),
 }
 
 impl Expr {
@@ -56,34 +110,50 @@ impl Expr {
         }
     }
 
+    pub fn empty(span: Span) -> Expr {
+        Expr {
+            kind: ExprKind::Tuple(Vec::new()),
+            span,
+        }
+    }
+
     pub fn transform(&self) -> Expr {
         let Expr { kind, span } = self.clone();
 
         match kind {
-            ExprKind::Binary(left, Token { kind: TokenKind::Operator(op), .. }, right) => {
+            ExprKind::Binary { left, operator: Token { kind: TokenKind::Operator(op), .. }, right} => {
                 match op {
                     OperatorKind::Dot => {
-                        let kind = ExprKind::Member(left.clone(), right.clone());
+                        let kind = ExprKind::Member { object: left.clone(), member: right.clone() };
 
                         Expr { kind, span }
                     }
                     OperatorKind::Colon => {
-                        let kind = ExprKind::Typed(left.clone(), right.clone());
+                        let kind = ExprKind::Typed {
+                            expr: left.clone(),
+                            ty: right.clone()
+                        };
 
                         Expr { kind, span }
                     }
                     OperatorKind::Equal => {
-                        let kind = ExprKind::Assignment(left.clone(), right.clone());
+                        let kind = ExprKind::Assignment {
+                            target: left.clone(),
+                            value: right.clone()
+                        };
 
                         Expr { kind, span }
                     }
                     OperatorKind::ColonEqual => {
-                        let kind = ExprKind::Definition(left.clone(), Some(right.clone()));
+                        let kind = ExprKind::Definition {
+                            target: left.clone(),
+                            value: Some(right.clone())
+                        };
 
                         Expr { kind, span }
                     }
                     OperatorKind::DoubleColon => {
-                        let kind = ExprKind::Path(left.clone(), right.clone());
+                        let kind = ExprKind::Path { left: left.clone(), right: right.clone() };
 
                         Expr { kind, span }
                     }
@@ -92,23 +162,33 @@ impl Expr {
                             let operator = Token { kind: TokenKind::Operator(op), span: span.clone() };
 
                             let operation = Expr {
-                                kind: ExprKind::Binary(
-                                    left.clone().into(),
+                                kind: ExprKind::Binary {
+                                    left: left.clone().into(),
                                     operator,
-                                    right.into(),
-                                ),
+                                    right: right.into(),
+                                },
+
                                 span: span.clone(),
                             };
 
-                            let kind = ExprKind::Assignment(left.into(), operation.into());
+                            let kind = ExprKind::Assignment {
+                                target: left.into(),
+                                value: operation.into()
+                            };
 
                             Expr { kind, span }
                         } else if op.is_arrow() {
-                            let kind = ExprKind::Bind(left.clone(), right.clone());
+                            let kind = ExprKind::Bind {
+                                key: left.clone(),
+                                value: right.clone(),
+                            };
 
                             Expr { kind, span }
                         } else if op.is_left_arrow() {
-                            let kind = ExprKind::Bind(right.clone(), left.clone());
+                            let kind = ExprKind::Bind {
+                                key: right.clone(),
+                                value: left.clone()
+                            };
 
                             Expr { kind, span }
                         } else {
@@ -123,16 +203,16 @@ impl Expr {
 }
 
 pub trait Expression {
-    fn parse_basic(&mut self) -> Result<Expr, Error>;
-    fn parse_complex(&mut self) -> Result<Expr, Error>;
+    fn parse_basic(&mut self) -> Expr;
+    fn parse_complex(&mut self) -> Expr;
 }
 
 impl Expression for Parser {
-    fn parse_basic(&mut self) -> Result<Expr, Error> {
+    fn parse_basic(&mut self) -> Expr {
         self.parse_binary(Parser::parse_primary, 0)
     }
 
-    fn parse_complex(&mut self) -> Result<Expr, Error> {
+    fn parse_complex(&mut self) -> Expr {
         self.parse_binary(Parser::parse_leaf, 0)
     }
 }

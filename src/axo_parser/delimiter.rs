@@ -14,12 +14,12 @@ pub trait Delimiter {
         separator: TokenKind,
         forced_separator: bool,
         item_parser: F,
-    ) -> Result<(Vec<Expr>, Span), Error>
+    ) -> (Vec<Expr>, Span)
     where
-        F: FnMut(&mut Parser) -> Result<Expr, Error>;
-    fn parse_braced(&mut self) -> Result<Expr, Error>;
-    fn parse_bracketed(&mut self) -> Result<Expr, Error>;
-    fn parse_parenthesized(&mut self) -> Result<Expr, Error>;
+        F: FnMut(&mut Parser) -> Expr;
+    fn parse_braced(&mut self) -> Expr;
+    fn parse_bracketed(&mut self) -> Expr;
+    fn parse_parenthesized(&mut self) -> Expr;
 }
 
 impl Delimiter for Parser {
@@ -32,9 +32,9 @@ impl Delimiter for Parser {
         separator: TokenKind,
         forced_separator: bool,
         mut item_parser: F,
-    ) -> Result<(Vec<Expr>, Span), Error>
+    ) -> (Vec<Expr>, Span)
     where
-        F: FnMut(&mut Parser) -> Result<Expr, Error>
+        F: FnMut(&mut Parser) -> Expr
     {
         self.push_context(context_kind, syntax_role);
 
@@ -52,14 +52,14 @@ impl Delimiter for Parser {
 
                     self.pop_context();
 
-                    return Ok((items, self.span(start, end)));
+                    return (items, self.span(start, end));
                 }
                 kind if kind == separator => {
                     err_end = token.span.end;
                     self.next();
                 }
                 _ => {
-                    let item = item_parser(self)?;
+                    let item = item_parser(self);
                     let Expr { span: Span { start: item_start, .. }, .. } = item;
 
                     items.push(item.clone());
@@ -74,10 +74,13 @@ impl Delimiter for Parser {
                                 self.next();
                             } else if peek.kind != close_kind {
                                 self.next();
-                                return Err(Error::new(
+
+                                self.error(&Error::new(
                                     ErrorKind::MissingSeparator(separator),
                                     self.span(item_start, err_end),
-                                ))
+                                ));
+
+                                return (items, self.span(start, err_end));
                             }
                         } else {
 
@@ -87,12 +90,14 @@ impl Delimiter for Parser {
             }
         }
 
-        Err(Error::new(
+        self.error(&Error::new(
             ErrorKind::UnclosedDelimiter(open_token),
             self.span(start, err_end),
-        ))
+        ));
+
+        (items, self.span(start, err_end))
     }
-    fn parse_braced(&mut self) -> Result<Expr, Error> {
+    fn parse_braced(&mut self) -> Expr {
         let brace = self.next().unwrap();
 
         let Token {
@@ -118,7 +123,7 @@ impl Delimiter for Parser {
                         span: self.span(start, end),
                     };
 
-                    return Ok(expr);
+                    return expr;
                 }
                 Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), span: Span { end, .. } } => {
                     err_end = end;
@@ -126,16 +131,16 @@ impl Delimiter for Parser {
                     self.next();
                 }
                 _ => {
-                    let stmt = self.parse_statement()?;
+                    let stmt = self.parse_statement();
                     statements.push(stmt.into());
                 }
             }
         }
 
-        Err(Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
+        self.error(&Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
     }
 
-    fn parse_bracketed(&mut self) -> Result<Expr, Error> {
+    fn parse_bracketed(&mut self) -> Expr {
         self.push_context(ContextKind::Bracketed, None);
 
         let bracket = self.next().unwrap();
@@ -160,12 +165,12 @@ impl Delimiter for Parser {
                     self.pop_context();
 
                     return if elements.len() == 1 {
-                        Ok(elements.pop().unwrap())
+                        elements.pop().unwrap()
                     } else {
-                        Ok(Expr {
+                        Expr {
                             kind: ExprKind::Array(elements),
                             span: self.span(start, end),
-                        })
+                        }
                     };
                 }
                 Token {
@@ -177,7 +182,7 @@ impl Delimiter for Parser {
                     self.next();
                 }
                 _ => {
-                    let expr = self.parse_complex()?;
+                    let expr = self.parse_complex();
                     elements.push(expr);
                 }
             }
@@ -185,10 +190,10 @@ impl Delimiter for Parser {
 
         let err_span = self.span(start, err_end);
 
-        Err(Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
+        self.error(&Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
     }
 
-    fn parse_parenthesized(&mut self) -> Result<Expr, Error> {
+    fn parse_parenthesized(&mut self) -> Expr {
         self.push_context(ContextKind::Parenthesized, None);
 
         let parenthesis = self.next().unwrap();
@@ -213,12 +218,12 @@ impl Delimiter for Parser {
                     self.pop_context();
 
                     return if parameters.len() == 1 {
-                        Ok(parameters.pop().unwrap())
+                        parameters.pop().unwrap()
                     } else {
-                        Ok(Expr {
+                        Expr {
                             kind: ExprKind::Tuple(parameters),
                             span: self.span(start, end),
-                        })
+                        }
                     };
                 }
                 Token {
@@ -230,7 +235,7 @@ impl Delimiter for Parser {
                     self.next();
                 }
                 _ => {
-                    let expr = self.parse_complex()?;
+                    let expr = self.parse_complex();
                     parameters.push(expr);
                 }
             }
@@ -238,7 +243,7 @@ impl Delimiter for Parser {
 
         let err_span = self.span(start, err_end);
 
-        Err(Error::new(
+        self.error(&Error::new(
             ErrorKind::UnclosedDelimiter(parenthesis),
             err_span,
         ))

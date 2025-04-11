@@ -7,8 +7,9 @@ use crate::axo_lexer::{TokenKind, Token, Span, PunctuationKind};
 use crate::axo_parser::{Expr};
 use crate::axo_parser::state::{Position, Context, ContextKind};
 
-#[derive(Clone)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
+    NotProvided,
     ElseWithoutConditional,
     MissingSeparator(TokenKind),
     UnclosedDelimiter(Token),
@@ -23,8 +24,9 @@ pub enum ErrorKind {
 impl core::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
+            ErrorKind::NotProvided => write!(f, "not provided"),
             ErrorKind::ElseWithoutConditional => {
-                write!(f, "Cant have an else without conditional")
+                write!(f, "can't have an else without conditional")
             }
             ErrorKind::MissingSeparator(kind) => {
                 write!(f, "expected separator {}", kind)

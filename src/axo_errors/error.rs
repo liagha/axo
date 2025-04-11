@@ -3,7 +3,7 @@ use broccli::{Color, TextStyle};
 use crate::axo_lexer::Span;
 use crate::axo_parser::Context;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Error<T> where T: core::fmt::Display {
     pub kind: T,
     pub span: Span,

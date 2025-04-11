@@ -14,7 +14,7 @@ pub struct Parser {
     pub line: usize,
     pub column: usize,
     pub expressions: Vec<Expr>,
-    pub errors: Vec<Error>,
+    pub errors: Vec<(Error, Context)>,
 }
 
 impl Parser {
@@ -31,8 +31,31 @@ impl Parser {
         }
     }
 
-    pub fn error(&mut self, error: &Error) {
-        self.errors.push(error.clone())
+    pub fn error(&mut self, error: &Error) -> Expr {
+        if let Some(state) = self.state.last().cloned() {
+            self.errors.push((error.clone(), state));
+
+            let current = (self.line, self.column);
+
+            Expr {
+                kind: ExprKind::Error(error.clone()),
+                span: self.span(current, current),
+            }
+        } else {
+            self.errors.push((error.clone(), Context {
+                kind: ContextKind::Program,
+                role: None,
+                span: self.full_span(),
+                parent: None,
+            }));
+
+            let current = (self.line, self.column);
+
+            Expr {
+                kind: ExprKind::Error(error.clone()),
+                span: self.span(current, current),
+            }
+        }
     }
 
     pub fn push_context(&mut self, kind: ContextKind, role: Option<SyntaxRole>) -> &mut Self {
@@ -45,7 +68,7 @@ impl Parser {
         };
 
         if let Some(parent_context) = self.state.last().cloned() {
-            context.parent = Some(Box::new(parent_context));
+            context.parent = Some(parent_context.into());
         }
 
         self.state.push(context);
@@ -218,7 +241,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self) -> Result<Vec<Expr>, Error> {
+    pub fn parse_program(&mut self) -> Vec<Expr> {
         self.push_context(ContextKind::Program, None);
 
         let mut statements = Vec::new();
@@ -230,7 +253,7 @@ impl Parser {
                 self.next();
             }
 
-            let stmt = self.parse_statement()?;
+            let stmt = self.parse_statement();
 
             self.expressions.push(stmt.clone());
             statements.push(stmt);
@@ -238,6 +261,6 @@ impl Parser {
 
         self.pop_context();
 
-        Ok(statements)
+        statements
     }
 }

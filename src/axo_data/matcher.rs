@@ -27,7 +27,7 @@ pub struct SmartMatcher {
     // Weights for different similarity components
     pub prefix_weight: f64,
     pub suffix_weight: f64,
-    pub common_subseq_weight: f64,
+    pub common_weight: f64,
     pub edit_dist_weight: f64,
     pub keyboard_dist_weight: f64,
 
@@ -43,7 +43,7 @@ impl Default for SmartMatcher {
         SmartMatcher {
             prefix_weight: 0.3,
             suffix_weight: 0.2,
-            common_subseq_weight: 0.2,
+            common_weight: 0.2,
             edit_dist_weight: 0.2,
             keyboard_dist_weight: 0.1,
             threshold: 0.4,
@@ -64,7 +64,7 @@ impl SmartMatcher {
         SmartMatcher {
             prefix_weight,
             suffix_weight,
-            common_subseq_weight,
+            common_weight: common_subseq_weight,
             edit_dist_weight,
             keyboard_dist_weight,
             threshold,
@@ -302,7 +302,7 @@ impl SmartMatcher {
         let combined_score =
             self.prefix_weight * prefix_score +
                 self.suffix_weight * suffix_score +
-                self.common_subseq_weight * lcs_score +
+                self.common_weight * lcs_score +
                 self.edit_dist_weight * edit_dist_score +
                 self.keyboard_dist_weight * keyboard_score;
 

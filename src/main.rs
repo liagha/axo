@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
 use axo_parser::Parser;
 use broccli::{xprintln, Color, TextStyle};
-use crate::axo_semantic::{Validator};
+use crate::axo_semantic::Resolver;
 
 struct Config {
     file_path: String,
@@ -104,7 +104,7 @@ fn print_usage(program: &str) {
 }
 
 fn process_file(file_path: &PathBuf, config: &Config) {
-    println!("{}", format!("--> file://{}", file_path.display()).term_colorize(Color::Blue));
+    println!("{}\n", format!("compiling file://{}...", file_path.display()).term_colorize(Color::Blue));
 
     let start = Instant::now();
 
@@ -164,39 +164,40 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
     let parse_start = Instant::now();
     let mut parser = Parser::new(tokens.clone(), PathBuf::from(file_path));
 
-    match parser.parse_program() {
-        Ok(stmts) => {
-            let parse_time = parse_start.elapsed().as_millis();
+    let expressions = parser.parse_program();
 
-            if config.show_ast || config.verbose {
-                xprintln!(
-                    format!("{:#?}", stmts).term_colorize(Color::Green),
+    if parser.errors.is_empty() {
+        let parse_time = parse_start.elapsed().as_millis();
+
+        if config.show_ast || config.verbose {
+            xprintln!(
+                    format!("{:#?}", expressions).term_colorize(Color::Green),
                 );
 
-                // let exprs: String = stmts.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
-                // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));
-            } else if config.time_report {
-                xprintln!("Parsing completed in {}ms", parse_time);
+            let mut resolver = Resolver::new();
+
+            if let Err(errs) = resolver.resolve(expressions) {
+                println!("resolve errors: {:?}", errs)
+            } else {
+                println!("resolver: {:?}", resolver)
             }
 
-            let mut validator = Validator::new();
 
-            validator.validate(stmts.clone());
-
-            if validator.has_errors() {
-                let errors = validator.get_errors().iter().map(|err| format!("{:?}", err)).collect::<Vec<_>>().join("\n");
-                println!("{}", errors);
-            }
-        },
-        Err(err) => {
-            let parse_time = parse_start.elapsed().as_millis();
+            // let exprs: String = expressions.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
+            // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));
+        } else if config.time_report {
+            xprintln!("Parsing completed in {}ms", parse_time);
+        }
+    }
+    else {
+        for (err, context) in parser.errors {
             let (msg, details) = err.format();
-            let state = parser.state.pop().unwrap().describe_chain();
 
-            xprintln!("{} => {} \n {} => took {}ms" => Color::Red,
-                msg => Color::Orange, state => Color::Crimson, details, parse_time
-            );
-            std::process::exit(1);
+            let state = context.describe_chain();
+
+            xprintln!("{} => {} \n {} \n" => Color::Red,
+                    msg => Color::Orange, state => Color::Crimson, details
+                );
         }
     }
 }
