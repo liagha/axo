@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::{Error, Expr, ExprKind, Primary};
+use crate::axo_parser::{ParseError, Expr, ExprKind, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
@@ -14,7 +14,7 @@ pub struct Parser {
     pub line: usize,
     pub column: usize,
     pub expressions: Vec<Expr>,
-    pub errors: Vec<(Error, Context)>,
+    pub errors: Vec<(ParseError, Context)>,
 }
 
 impl Parser {
@@ -31,7 +31,7 @@ impl Parser {
         }
     }
 
-    pub fn error(&mut self, error: &Error) -> Expr {
+    pub fn error(&mut self, error: &ParseError) -> Expr {
         if let Some(state) = self.state.last().cloned() {
             self.errors.push((error.clone(), state));
 

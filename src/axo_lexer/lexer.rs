@@ -1,5 +1,5 @@
 use crate::axo_lexer::error::ErrorKind;
-use crate::axo_lexer::{Error, TokenKind};
+use crate::axo_lexer::{LexError, TokenKind};
 use crate::axo_lexer::{Span, Token};
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
@@ -82,7 +82,7 @@ impl Lexer {
         self.tokens.push(Token { kind, span });
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, Error> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
         while let Some(ch) = self.peek() {
             match ch {
                 ch if is_white_space(ch) && ch != '\n' => {
@@ -107,7 +107,7 @@ impl Lexer {
 
                 '\'' => self.handle_character()?,
 
-                '"' => self.handle_string()?,
+                '"' | '`' => self.handle_string()?,
 
                 '/' => self.handle_comment()?,
 
@@ -122,7 +122,7 @@ impl Lexer {
                     let end = (self.line, self.column);
                     let span = self.create_span(start, end);
 
-                    return Err(Error::new(ErrorKind::InvalidChar, span));
+                    return Err(LexError::new(ErrorKind::InvalidChar, span));
                 }
             }
         }

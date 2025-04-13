@@ -1,5 +1,5 @@
 use crate::axo_lexer::{Span, Token};
-use crate::axo_parser::{Error, Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{ContextKind, SyntaxRole};
@@ -272,7 +272,7 @@ impl Item for Parser {
 
             expr
         } else {
-            self.error(&Error::new(ErrorKind::ExpectedSyntax(ContextKind::Enum), self.span(start, end)))
+            self.error(&ParseError::new(ErrorKind::ExpectedSyntax(ContextKind::Enum), self.span(start, end)))
         }
     }
 
@@ -305,7 +305,7 @@ impl Item for Parser {
 
             expr
         } else {
-            self.error(&Error::new(ErrorKind::ExpectedSyntax(ContextKind::Struct), self.span(start, end)))
+            self.error(&ParseError::new(ErrorKind::ExpectedSyntax(ContextKind::Struct), self.span(start, end)))
         }
     }
 }

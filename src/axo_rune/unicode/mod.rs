@@ -6,4 +6,4 @@ mod range;
 pub use property::*;
 pub use common::*;
 pub use range::*;
-pub use category::*;
+use category::*;

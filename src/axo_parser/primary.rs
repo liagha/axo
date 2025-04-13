@@ -1,7 +1,7 @@
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
-use crate::axo_parser::{Composite, ControlFlow, Error, Expr, ExprKind, Parser};
+use crate::axo_parser::{Composite, ControlFlow, ParseError, Expr, ExprKind, Parser};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::item::Item;
@@ -50,6 +50,7 @@ impl Primary for Parser {
             match kind {
                 TokenKind::Keyword(ref kw) => match kw {
                     KeywordKind::If => self.parse_conditional(),
+                    KeywordKind::Loop => self.parse_loop(),
                     KeywordKind::While => self.parse_while(),
                     KeywordKind::For => self.parse_for(),
                     KeywordKind::Fn => self.parse_function(),
@@ -67,12 +68,12 @@ impl Primary for Parser {
                     KeywordKind::Else => {
                         self.next();
 
-                        self.error(&Error::new(ErrorKind::ElseWithoutConditional, span))
+                        self.error(&ParseError::new(ErrorKind::ElseWithoutConditional, span))
                     },
                     _ => {
                         self.next();
 
-                        self.error(&Error::new(ErrorKind::UnimplementedToken(kind), span))
+                        self.error(&ParseError::new(ErrorKind::UnimplementedToken(kind), span))
                     },
                 },
                 TokenKind::Identifier(_)
@@ -104,7 +105,7 @@ impl Primary for Parser {
                 _ => self.parse_primary()
             }
         } else {
-            self.error(&Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         }
     }
 
@@ -142,14 +143,14 @@ impl Primary for Parser {
                 }
 
                 TokenKind::EOF => {
-                    self.error(&Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+                    self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
                 },
                 kind => {
-                    self.error(&Error::new(ErrorKind::UnexpectedToken(kind), span))
+                    self.error(&ParseError::new(ErrorKind::UnexpectedToken(kind), span))
                 },
             }
         } else {
-            self.error(&Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         }
     }
     fn parse_unary(&mut self, primary: fn(&mut Parser) -> Expr ) -> Expr {
@@ -247,7 +248,7 @@ impl Primary for Parser {
                 expr
             }
         } else {
-            self.error(&Error::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         };
 
         result

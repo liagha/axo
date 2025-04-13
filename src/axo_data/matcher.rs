@@ -23,7 +23,7 @@ pub enum MatchType {
     NotFound,           // No match found above threshold
 }
 
-pub struct SmartMatcher {
+pub struct Matcher {
     // Weights for different similarity components
     pub prefix_weight: f64,
     pub suffix_weight: f64,
@@ -38,9 +38,9 @@ pub struct SmartMatcher {
     keyboard_layout: Option<HashMap<char, Vec<char>>>,
 }
 
-impl Default for SmartMatcher {
+impl Default for Matcher {
     fn default() -> Self {
-        SmartMatcher {
+        Matcher {
             prefix_weight: 0.3,
             suffix_weight: 0.2,
             common_weight: 0.2,
@@ -52,7 +52,7 @@ impl Default for SmartMatcher {
     }
 }
 
-impl SmartMatcher {
+impl Matcher {
     pub fn new(
         prefix_weight: f64,
         suffix_weight: f64,
@@ -61,7 +61,7 @@ impl SmartMatcher {
         keyboard_dist_weight: f64,
         threshold: f64,
     ) -> Self {
-        SmartMatcher {
+        Matcher {
             prefix_weight,
             suffix_weight,
             common_weight: common_subseq_weight,
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_exact_match() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec!["test_variable".to_string(), "other_var".to_string()];
 
         let result = matcher.find_best_match("test_variable", &candidates).unwrap();
@@ -638,7 +638,7 @@ mod tests {
 
     #[test]
     fn test_case_insensitive_match() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec!["TestVariable".to_string(), "other_var".to_string()];
 
         let result = matcher.find_best_match("testvariable", &candidates).unwrap();
@@ -648,7 +648,7 @@ mod tests {
 
     #[test]
     fn test_split_on_separators() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
 
         let result = matcher.split_on_separators("user_name");
         assert_eq!(result, vec!["user", "name"]);
@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn test_acronym_match() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec!["http_server".to_string(), "html_parser".to_string()];
 
         let result = matcher.find_best_match("hs", &candidates).unwrap();
@@ -672,7 +672,7 @@ mod tests {
 
     #[test]
     fn test_typo_detection() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec!["username".to_string(), "user_id".to_string()];
 
         // 'n' is adjacent to 'm' on QWERTY keyboard
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_transposition() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec!["algorithm".to_string(), "logarithm".to_string()];
 
         // Swap 'a' and 'l' characters
@@ -693,7 +693,7 @@ mod tests {
 
     #[test]
     fn test_token_similarity() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
 
         let tokens1 = vec!["user", "account", "id"];
         let tokens2 = vec!["user", "profile", "id"];
@@ -704,7 +704,7 @@ mod tests {
 
     #[test]
     fn test_empty_candidates() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates: Vec<String> = vec![];
 
         let result = matcher.find_best_match("test", &candidates);
@@ -713,7 +713,7 @@ mod tests {
 
     #[test]
     fn test_sort_by_score() {
-        let matcher = SmartMatcher::default();
+        let matcher = Matcher::default();
         let candidates = vec![
             "user_name".to_string(),
             "user_id".to_string(),

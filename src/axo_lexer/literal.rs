@@ -1,14 +1,14 @@
 use crate::axo_lexer::error::{CharParseError, ErrorKind};
-use crate::axo_lexer::{Error, Lexer, TokenKind};
+use crate::axo_lexer::{LexError, Lexer, TokenKind};
 use crate::axo_lexer::symbol::SymbolLexer;
 
 pub trait LiteralLexer {
-    fn handle_character(&mut self) -> Result<(), Error>;
-    fn handle_string(&mut self) -> Result<(), Error>;
+    fn handle_character(&mut self) -> Result<(), LexError>;
+    fn handle_string(&mut self) -> Result<(), LexError>;
 }
 
 impl LiteralLexer for Lexer {
-    fn handle_character(&mut self) -> Result<(), Error> {
+    fn handle_character(&mut self) -> Result<(), LexError> {
         self.next(); // Consume opening quote
 
         let start = (self.line, self.column);
@@ -29,10 +29,10 @@ impl LiteralLexer for Lexer {
                 let escape_start = (self.line, self.column);
                 match self.handle_escape_sequence(false) {
                     Ok(escaped_char) => content.push(escaped_char),
-                    Err(Error { kind, .. }) => {
+                    Err(LexError { kind, .. }) => {
                         let escape_end = (self.line, self.column);
                         let escape_span = self.create_span(escape_start, escape_end);
-                        return Err(Error::new(kind, escape_span));
+                        return Err(LexError::new(kind, escape_span));
                     }
                 }
                 is_escaped = false;
@@ -47,13 +47,13 @@ impl LiteralLexer for Lexer {
         let span = self.create_span(start, end);
 
         if !closed {
-            return Err(Error::new(ErrorKind::UnClosedChar, span));
+            return Err(LexError::new(ErrorKind::UnClosedChar, span));
         }
 
         // Validate character literal
         match content.len() {
             0 => {
-                Err(Error::new(ErrorKind::CharParseError(CharParseError::EmptyCharLiteral), span))
+                Err(LexError::new(ErrorKind::CharParseError(CharParseError::EmptyCharLiteral), span))
             }
             1 => {
                 let ch = content[0];
@@ -61,21 +61,28 @@ impl LiteralLexer for Lexer {
                 Ok(())
             }
             _ => {
-                Err(Error::new(ErrorKind::CharParseError(CharParseError::InvalidCharLiteral), span))
+                Err(LexError::new(ErrorKind::CharParseError(CharParseError::InvalidCharLiteral), span))
             }
         }
     }
 
-    fn handle_string(&mut self) -> Result<(), Error> {
-        self.next(); // Consume opening quote
-
+    fn handle_string(&mut self) -> Result<(), LexError> {
+        let quote_char = self.next().unwrap(); // Consume opening quote
         let start = (self.line, self.column);
         let mut content = Vec::new();
         let mut closed = false;
         let mut is_escaped = false;
+        let is_multiline = quote_char == '`';
 
         while let Some(next_ch) = self.peek() {
-            if next_ch == '"' && !is_escaped {
+            // Check for newlines in non-multiline strings
+            if !is_multiline && (next_ch == '\n' || next_ch == '\r') && !is_escaped {
+                let end = (self.line, self.column);
+                let span = self.create_span(start, end);
+                return Err(LexError::new(ErrorKind::UnClosedString, span));
+            }
+
+            if next_ch == quote_char && !is_escaped {
                 self.next(); // Consume closing quote
                 closed = true;
                 break;
@@ -85,16 +92,16 @@ impl LiteralLexer for Lexer {
 
             if is_escaped {
                 let escape_start = (self.line, self.column);
-                match self.handle_escape_sequence(true) {
+                match self.handle_escape_sequence(!is_multiline) {
                     Ok(escaped_char) => content.push(escaped_char),
-                    Err(Error { kind, .. }) => {
+                    Err(LexError { kind, .. }) => {
                         let escape_end = (self.line, self.column);
                         let escape_span = self.create_span(escape_start, escape_end);
-                        return Err(Error::new(kind, escape_span));
+                        return Err(LexError::new(kind, escape_span));
                     }
                 }
                 is_escaped = false;
-            } else if next_ch == '\\' {
+            } else if next_ch == '\\' && !is_multiline {
                 is_escaped = true;
             } else {
                 content.push(next_ch);
@@ -105,11 +112,17 @@ impl LiteralLexer for Lexer {
         let span = self.create_span(start, end);
 
         if !closed {
-            return Err(Error::new(ErrorKind::UnClosedString, span));
+            return Err(LexError::new(
+                ErrorKind::UnClosedString,
+                span,
+            ));
         }
 
         let content_string: String = content.into_iter().collect();
-        self.push_token(TokenKind::Str(content_string), span);
+        self.push_token(
+            TokenKind::Str(content_string),
+            span,
+        );
         Ok(())
     }
 }

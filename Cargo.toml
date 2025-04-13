@@ -6,5 +6,4 @@ edition = "2021"
 [dependencies]
 broccli = { version = "0.0.22" }
 lexical-core = { path = "src/axo_rune/numeral/core" }
-
-# inkwell = { path = "inkwell", version = "0.5.0", features = ["default", "llvm18-0"] }
+inkwell = { path = "inkwell", version = "0.5.0", features = ["default", "llvm18-0"] }

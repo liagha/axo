@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::{Error, Parser, Primary};
+use crate::axo_parser::{ParseError, Parser, Primary};
 use crate::axo_parser::item::ItemKind;
 
 #[derive(Hash, Eq, Clone, PartialEq)]
@@ -37,9 +37,9 @@ pub enum ExprKind {
         key: Box<Expr>,
         value: Box<Expr>
     },
-    Typed {
-        expr: Box<Expr>,
-        ty: Box<Expr>
+    Labeled {
+        label: Box<Expr>,
+        expr: Box<Expr>
     },
     Index {
         expr: Box<Expr>,
@@ -74,6 +74,9 @@ pub enum ExprKind {
         then_branch: Box<Expr>,
         else_branch: Option<Box<Expr>>,
     },
+    Loop {
+        body: Box<Expr>,
+    },
     While {
         condition: Box<Expr>,
         body: Box<Expr>
@@ -99,7 +102,7 @@ pub enum ExprKind {
     Break(Option<Box<Expr>>),
     Continue(Option<Box<Expr>>),
 
-    Error(Error),
+    Error(ParseError),
 }
 
 impl Expr {
@@ -129,9 +132,9 @@ impl Expr {
                         Expr { kind, span }
                     }
                     OperatorKind::Colon => {
-                        let kind = ExprKind::Typed {
-                            expr: left.clone(),
-                            ty: right.clone()
+                        let kind = ExprKind::Labeled {
+                            label: left.clone(),
+                            expr: right.clone()
                         };
 
                         Expr { kind, span }

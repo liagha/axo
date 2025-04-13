@@ -3,7 +3,7 @@ use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, 
 use crate::axo_errors::Error as AxoError;
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::{Expr, ExprKind, Expression};
-use crate::axo_parser::{Error, ItemKind, Parser, Primary};
+use crate::axo_parser::{ParseError, ItemKind, Parser, Primary};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
@@ -11,6 +11,7 @@ pub trait ControlFlow {
     fn parse_let(&mut self) -> Expr;
     fn parse_match(&mut self) -> Expr;
     fn parse_conditional(&mut self) -> Expr;
+    fn parse_loop(&mut self) -> Expr;
     fn parse_while(&mut self) -> Expr;
     fn parse_for(&mut self) -> Expr;
     fn parse_return(&mut self) -> Expr;
@@ -130,6 +131,30 @@ impl ControlFlow for Parser {
             then_branch: then_branch.into(),
             else_branch: else_branch.into()
         };
+
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
+
+        expr
+    }
+
+    fn parse_loop(&mut self) -> Expr {
+        self.push_context(ContextKind::Loop, Some(SyntaxRole::Body));
+
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let body = self.parse_statement();
+
+        self.pop_context();
+
+        let end = body.span.end;
+
+        let kind = ExprKind::Loop { body: body.into() };
 
         let expr = Expr {
             kind,

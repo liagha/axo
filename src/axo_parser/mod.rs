@@ -10,14 +10,19 @@ mod item;
 mod fmt;
 mod delimiter;
 
-pub type Error = AxoError<ErrorKind>;
+pub use  {
+    statement::ControlFlow,
+    expression::{Expr, ExprKind},
+    item::ItemKind,
+    parser::Parser,
+    composite::Composite,
+    primary::Primary,
+    state::*,
+};
 
-pub use crate::axo_errors::Error as AxoError;
-pub use statement::ControlFlow;
-pub use expression::{Expr, ExprKind};
-pub use item::ItemKind;
-pub use parser::Parser;
-pub use composite::Composite;
-pub use primary::Primary;
-pub use state::*;
-use crate::axo_parser::error::ErrorKind;
+use crate::{
+    axo_errors::Error,
+    axo_parser::error::ErrorKind,
+};
+
+pub type ParseError = Error<ErrorKind>;

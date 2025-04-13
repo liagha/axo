@@ -1,9 +1,6 @@
-let a_really_Cool = 5
-let x : 3 = 5;
-a_really_Cool
+let test = 4
+let teft = 6
 
-fn test(x: int, y: string) {
-    x + 3
+let variable_test = 4;
 
-    y
-}
+varia

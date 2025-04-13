@@ -1,13 +1,13 @@
 use crate::axo_lexer::error::ErrorKind;
-use crate::axo_lexer::{Error, Lexer, OperatorKind, TokenKind};
+use crate::axo_lexer::{LexError, Lexer, OperatorKind, TokenKind};
 
 pub trait Handler {
-    fn handle_identifier(&mut self) -> Result<(), Error>;
-    fn handle_comment(&mut self) -> Result<(), Error>;
+    fn handle_identifier(&mut self) -> Result<(), LexError>;
+    fn handle_comment(&mut self) -> Result<(), LexError>;
 }
 
 impl Handler for Lexer {
-    fn handle_identifier(&mut self) -> Result<(), Error> {
+    fn handle_identifier(&mut self) -> Result<(), LexError> {
         let ch = self.next().unwrap();
 
         let mut name = ch.to_string();
@@ -32,7 +32,7 @@ impl Handler for Lexer {
         Ok(())
     }
 
-    fn handle_comment(&mut self) -> Result<(), Error> {
+    fn handle_comment(&mut self) -> Result<(), LexError> {
         self.next();
 
         let start = (self.line, self.column);
@@ -87,7 +87,7 @@ impl Handler for Lexer {
                     if closed {
                         self.push_token(TokenKind::Comment(comment_string), span);
                     } else {
-                        return Err(Error::new(ErrorKind::UnClosedComment, span));
+                        return Err(LexError::new(ErrorKind::UnClosedComment, span));
                     }
                 }
                 _ => {

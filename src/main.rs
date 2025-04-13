@@ -4,6 +4,7 @@ mod axo_semantic;
 mod axo_data;
 mod axo_rune;
 mod axo_errors;
+mod axo_codegen;
 
 pub use axo_rune::*;
 
@@ -174,14 +175,23 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
                     format!("{:#?}", expressions).term_colorize(Color::Green),
                 );
 
+            println!();
+
             let mut resolver = Resolver::new();
 
-            if let Err(errs) = resolver.resolve(expressions) {
-                println!("resolve errors: {:?}", errs)
-            } else {
-                println!("resolver: {:?}", resolver)
-            }
+            resolver.resolve(expressions);
 
+            if !resolver.errors.is_empty() {
+                for err in resolver.errors {
+                    let (msg, details) = err.format();
+
+                    xprintln!("{} \n {}" => Color::Red,
+                            msg => Color::Orange, details
+                        );
+                }
+            } else {
+                println!("{:#?}", resolver.symbols())
+            }
 
             // let exprs: String = expressions.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
             // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));

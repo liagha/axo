@@ -1,14 +1,14 @@
 use crate::axo_lexer::error::{IntParseError, ErrorKind};
-use crate::axo_lexer::{Lexer, Token, TokenKind, Span, Error};
+use crate::axo_lexer::{Lexer, Token, TokenKind, Span, LexError};
 use lexical_core::parse;
 
 pub trait NumberLexer {
-    fn handle_number(&mut self) -> Result<(), Error>;
-    fn lex_number(&self, number: &str, span: Span) -> Result<TokenKind, Error>;
+    fn handle_number(&mut self) -> Result<(), LexError>;
+    fn lex_number(&self, number: &str, span: Span) -> Result<TokenKind, LexError>;
 }
 
 impl NumberLexer for Lexer {
-    fn handle_number(&mut self) -> Result<(), Error> {
+    fn handle_number(&mut self) -> Result<(), LexError> {
         let first = self.next().unwrap();
 
         let mut number = first.to_string();
@@ -118,14 +118,14 @@ impl NumberLexer for Lexer {
             },
             Err(mut err) => {
                 if err.span.start == (0, 0) && err.span.end == (0, 0) {
-                    err = Error::new(err.kind, span);
+                    err = LexError::new(err.kind, span);
                 }
                 Err(err)
             }
         }
     }
 
-    fn lex_number(&self, number: &str, span: Span) -> Result<TokenKind, Error> {
+    fn lex_number(&self, number: &str, span: Span) -> Result<TokenKind, LexError> {
         if number.len() > 2 {
             match &number[0..2] {
                 "0x" | "0X" => {
@@ -137,7 +137,7 @@ impl NumberLexer for Lexer {
                             Err(_) => {}
                         }
                     }
-                    return Err(Error::new(ErrorKind::IntParseError(IntParseError::InvalidHexadecimal), span));
+                    return Err(LexError::new(ErrorKind::IntParseError(IntParseError::InvalidHexadecimal), span));
                 }
                 "0o" | "0O" => {
                     let oct_part = &number[2..];
@@ -148,7 +148,7 @@ impl NumberLexer for Lexer {
                             Err(_) => {}
                         }
                     }
-                    return Err(Error::new(ErrorKind::IntParseError(IntParseError::InvalidOctal), span));
+                    return Err(LexError::new(ErrorKind::IntParseError(IntParseError::InvalidOctal), span));
                 }
                 "0b" | "0B" => {
                     let bin_part = &number[2..];
@@ -159,7 +159,7 @@ impl NumberLexer for Lexer {
                             Err(_) => {}
                         }
                     }
-                    return Err(Error::new(ErrorKind::IntParseError(IntParseError::InvalidBinary), span));
+                    return Err(LexError::new(ErrorKind::IntParseError(IntParseError::InvalidBinary), span));
                 }
                 _ => {}
             }
@@ -189,7 +189,7 @@ impl NumberLexer for Lexer {
                 if base_valid && exponent_valid {
                     return match parse::<f64>(number.as_bytes()) {
                         Ok(num) => Ok(TokenKind::Float(num.into())),
-                        Err(_) => Err(Error::new(
+                        Err(_) => Err(LexError::new(
                             ErrorKind::FloatParseError(IntParseError::InvalidScientificNotation),
                             span
                         )),
@@ -201,12 +201,12 @@ impl NumberLexer for Lexer {
         if number.contains('.') {
             match parse::<f64>(number.as_bytes()) {
                 Ok(num) => Ok(TokenKind::Float(num.into())),
-                Err(e) => Err(Error::new(ErrorKind::NumberParse(e.to_string()), span)),
+                Err(e) => Err(LexError::new(ErrorKind::NumberParse(e.to_string()), span)),
             }
         } else {
             match parse::<i128>(number.as_bytes()) {
                 Ok(num) => Ok(TokenKind::Integer(num)),
-                Err(e) => Err(Error::new(ErrorKind::NumberParse(e.to_string()), span)),
+                Err(e) => Err(LexError::new(ErrorKind::NumberParse(e.to_string()), span)),
             }
         }
     }

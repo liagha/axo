@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::axo_rune::unicode::TotalCharProperty;
 use crate::char_property;
 

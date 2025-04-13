@@ -70,7 +70,7 @@ impl core::fmt::Display for ExprKind {
             ExprKind::Binary { left, operator, right } => write!(f, "({} {} {})", left, operator, right),
             ExprKind::Unary { operator, operand: expr } => write!(f, "({}{})", operator, expr),
 
-            ExprKind::Typed { expr, ty } => write!(f, "{}: {}", expr, ty),
+            ExprKind::Labeled { label: expr, expr: ty } => write!(f, "{}: {}", expr, ty),
             ExprKind::Index { expr, index } => write!(f, "{}[{}]", expr, index),
             ExprKind::Invoke { target, parameters } => {
                 let args_str: Vec<String> = parameters.iter().map(|e| e.to_string()).collect();
@@ -101,6 +101,7 @@ impl core::fmt::Display for ExprKind {
 
                 Ok(())
             }
+            ExprKind::Loop { body } => write!(f, "loop {}", body),
             ExprKind::While { condition, body: then } => write!(f, "while {} {}\n", condition, then),
             ExprKind::For { clause, body} => write!(f, "for {} {}\n", clause, body),
 
@@ -168,7 +169,7 @@ impl core::fmt::Debug for ExprKind {
             }
             ExprKind::Unary { operator, operand: expr } => write!(f, "Unary({:?} {:?})", operator, expr),
 
-            ExprKind::Typed { expr, ty } => write!(f, "Typed({:?}: {:?})", expr, ty),
+            ExprKind::Labeled { label: expr, expr: ty } => write!(f, "Typed({:?}: {:?})", expr, ty),
             ExprKind::Index { expr, index } => write!(f, "Index({:?}[{:?}])", expr, index),
             ExprKind::Invoke { target, parameters } => write!(f, "Invoke({:?}({:?}))", target, parameters),
             ExprKind::Member { object, member} => write!(f, "Member({:?}.{:?})", object, member),
@@ -182,6 +183,7 @@ impl core::fmt::Debug for ExprKind {
                 }
                 write!(f, ")")
             }
+            ExprKind::Loop { body } => write!(f, "Loop({:?})", body),
             ExprKind::While { condition, body: then } => write!(f, "While({:?} do {:?})", condition, then),
             ExprKind::For { clause, body } => write!(f, "For({:?} in {:?})", clause, body),
             ExprKind::Block(stmts) => write!(f, "Block({:#?})", stmts),

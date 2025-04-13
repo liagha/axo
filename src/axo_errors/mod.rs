@@ -1,3 +1,4 @@
 mod error;
-
-pub use error::Error;
+mod hint;
+pub use hint::*;
+pub use error::*;

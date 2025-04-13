@@ -1,6 +1,6 @@
 use crate::axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::{ControlFlow, Error, Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::{ControlFlow, ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
@@ -50,7 +50,7 @@ impl Composite for Parser {
         } else {
             let err_span = self.span(start, err_end);
             
-            self.error(&Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
+            self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
         };
 
         result
@@ -208,6 +208,6 @@ impl Composite for Parser {
             }
         }
 
-        self.error(&Error::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
+        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
     }
 }

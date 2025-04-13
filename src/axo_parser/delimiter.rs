@@ -1,5 +1,5 @@
 use crate::axo_lexer::{PunctuationKind, Span, Token, TokenKind};
-use crate::axo_parser::{Error, Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{ContextKind, SyntaxRole};
@@ -75,7 +75,7 @@ impl Delimiter for Parser {
                             } else if peek.kind != close_kind {
                                 self.next();
 
-                                self.error(&Error::new(
+                                self.error(&ParseError::new(
                                     ErrorKind::MissingSeparator(separator),
                                     self.span(item_start, err_end),
                                 ));
@@ -90,7 +90,7 @@ impl Delimiter for Parser {
             }
         }
 
-        self.error(&Error::new(
+        self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(open_token),
             self.span(start, err_end),
         ));
@@ -137,7 +137,7 @@ impl Delimiter for Parser {
             }
         }
 
-        self.error(&Error::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
+        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
     }
 
     fn parse_bracketed(&mut self) -> Expr {
@@ -190,7 +190,7 @@ impl Delimiter for Parser {
 
         let err_span = self.span(start, err_end);
 
-        self.error(&Error::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
+        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
     }
 
     fn parse_parenthesized(&mut self) -> Expr {
@@ -243,7 +243,7 @@ impl Delimiter for Parser {
 
         let err_span = self.span(start, err_end);
 
-        self.error(&Error::new(
+        self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(parenthesis),
             err_span,
         ))

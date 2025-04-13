@@ -1,16 +1,16 @@
 use crate::axo_lexer::error::{CharParseError, ErrorKind};
 use crate::axo_lexer::operator::OperatorLexer;
-use crate::axo_lexer::{Error, Lexer, TokenKind};
+use crate::axo_lexer::{LexError, Lexer, TokenKind};
 use crate::axo_lexer::punctuation::PunctuationLexer;
 
 pub trait SymbolLexer {
-    fn handle_operator(&mut self) -> Result<(), Error>;
+    fn handle_operator(&mut self) -> Result<(), LexError>;
     fn handle_punctuation(&mut self);
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, Error>;
+    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError>;
 }
 
 impl SymbolLexer for Lexer {
-    fn handle_operator(&mut self) -> Result<(), Error> {
+    fn handle_operator(&mut self) -> Result<(), LexError> {
         let mut operator = Vec::new();
 
         let ch = self.next().unwrap();
@@ -61,7 +61,7 @@ impl SymbolLexer for Lexer {
         self.push_token(TokenKind::Punctuation(ch.to_punctuation()), span);
     }
 
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, Error> {
+    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError> {
         let start = (self.line, self.column);
 
         let error_type = if is_string {
@@ -99,10 +99,10 @@ impl SymbolLexer for Lexer {
                         if let Some(ch) = std::char::from_u32(hex_value) {
                             Ok(ch)
                         } else {
-                            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+                            Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                         }
                     } else {
-                        Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+                        Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                     }
                 }
                 'u' => {
@@ -131,22 +131,22 @@ impl SymbolLexer for Lexer {
                         let end = (self.line, self.column);
 
                         if !closed_brace {
-                            return Err(Error::new(error_type(CharParseError::UnClosedEscapeSequence), self.create_span(start, end)));
+                            return Err(LexError::new(error_type(CharParseError::UnClosedEscapeSequence), self.create_span(start, end)));
                         }
 
                         if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
                             if let Some(ch) = std::char::from_u32(hex_value) {
                                 Ok(ch)
                             } else {
-                                Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+                                Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                             }
                         } else {
-                            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+                            Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                         }
                     } else {
                         let end = (self.line, self.column);
 
-                        Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+                        Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                     }
                 }
                 _ => Ok(next_ch),
@@ -154,7 +154,7 @@ impl SymbolLexer for Lexer {
         } else {
             let end = (self.line, self.column);
 
-            Err(Error::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
+            Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
         }
     }
 }

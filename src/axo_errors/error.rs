@@ -1,5 +1,6 @@
 use std::fs::read_to_string;
 use broccli::{Color, TextStyle};
+use crate::axo_errors::hint::Hint;
 use crate::axo_lexer::Span;
 use crate::axo_parser::Context;
 
@@ -9,6 +10,7 @@ pub struct Error<T> where T: core::fmt::Display {
     pub span: Span,
     pub context: Option<Context>,
     pub help: Option<String>,
+    pub hints: Vec<Hint<String>>,
 }
 
 impl<T: core::fmt::Display> core::fmt::Display for Error<T> {
@@ -26,6 +28,7 @@ impl<T: core::fmt::Display> Error<T> {
             span,
             context: None,
             help: None,
+            hints: vec![],
         }
     }
 
@@ -60,11 +63,9 @@ impl<T: core::fmt::Display> Error<T> {
             messages.push_str(&format!(" note: {}\n", ctx.describe_chain().colorize(Color::Blue)));
         }
 
-        // Calculate maximum line number width safely
-        let max_line_number = line_end.max(line_start).max(1); // Ensure at least 1
+        let max_line_number = line_end.max(line_start).max(1);
         let line_number_width = max_line_number.to_string().len();
 
-        // Calculate bounds safely
         let start_line = line_start.saturating_sub(3).max(1);
         let end_line = (line_end + 3).min(lines.len()).max(1);
 
@@ -116,6 +117,136 @@ impl<T: core::fmt::Display> Error<T> {
 
         if let Some(help) = &self.help {
             messages.push_str(&format!("help: {}\n", help.colorize(Color::Green)));
+        }
+
+        for hint in &self.hints {
+            details.push_str(&format!("\n{}{}\n", "hint: ".colorize(Color::Blue), hint.message.to_string().bold()));
+
+            use crate::axo_errors::hint::Action::*;
+
+            for action in &hint.action {
+                match action {
+                    Add(text, span) => {
+                        let (line_idx, col_idx) = span.start;
+                        if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
+                            let mut rendered = String::new();
+                            let (before, after) = line.split_at(col_idx.saturating_sub(1));
+                            rendered.push_str(before);
+                            rendered.push_str(&text.colorize(Color::Green).bold().to_string());
+                            rendered.push_str(after);
+
+                            details.push_str(&format!(
+                                "{:>width$} | {}\n",
+                                line_idx.to_string().colorize(Color::Blue),
+                                rendered,
+                                width = line_number_width
+                            ));
+
+                            details.push_str(&format!(
+                                "{:>width$} | {:>col$}{} {}\n",
+                                "",
+                                "",
+                                "^".colorize(Color::Green).bold(),
+                                format!("insert `{}`", text).colorize(Color::Green),
+                                width = line_number_width,
+                                col = col_idx.saturating_sub(1),
+                            ));
+                        }
+                    }
+
+                    Remove(span) => {
+                        let (line_idx, col_start) = span.start;
+                        let col_end = span.end.1;
+                        if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
+                            let before = &line[..col_start.saturating_sub(1)];
+                            let target = &line[col_start.saturating_sub(1)..col_end.saturating_sub(1)];
+                            let after = &line[col_end.saturating_sub(1)..];
+
+                            let mut rendered = String::new();
+                            rendered.push_str(before);
+                            rendered.push_str(&target.colorize(Color::Red).bold().to_string());
+                            rendered.push_str(after);
+
+                            details.push_str(&format!(
+                                "{:>width$} | {}\n",
+                                line_idx.to_string().colorize(Color::Blue),
+                                rendered,
+                                width = line_number_width
+                            ));
+
+                            details.push_str(&format!(
+                                "{:>width$} | {:>col$}{} {}\n",
+                                "",
+                                "",
+                                "^".repeat(target.len()).colorize(Color::Red).bold(),
+                                "remove this".colorize(Color::Red),
+                                width = line_number_width,
+                                col = col_start.saturating_sub(1),
+                            ));
+                        }
+                    }
+
+                    Replace(text, span) => {
+                        let (line_idx, col_start) = span.start;
+                        let col_end = span.end.1;
+                        if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
+                            let before = &line[..col_start.saturating_sub(2)];
+                            let after = &line[col_end.saturating_sub(0)..];
+
+                            let mut rendered = String::new();
+                            rendered.push_str(before);
+                            rendered.push_str(&text.colorize(Color::Blue).bold().to_string());
+                            rendered.push_str(after);
+
+                            details.push_str(&format!(
+                                "{:>width$} | {}\n",
+                                line_idx.to_string().colorize(Color::Blue),
+                                rendered,
+                                width = line_number_width
+                            ));
+
+                            details.push_str(&format!(
+                                "{:>width$} | {:>col$}{} {}\n",
+                                "",
+                                "",
+                                "^".repeat(text.len().max(1)).colorize(Color::Blue).bold(),
+                                format!("replace with `{}`", text).colorize(Color::Blue),
+                                width = line_number_width,
+                                col = col_start.saturating_sub(1),
+                            ));
+                        }
+                    }
+
+                    _ => {
+                        let (line_num, content, prefix, color) = match action {
+                            AddLine(text, line) => (*line, text, "+", Color::Green),
+                            RemoveLine(line) => (*line, &"<line removed>".to_string(), "-", Color::Red),
+                            ReplaceLine(text, line) => (*line, text, "~", Color::Blue),
+                            _ => continue,
+                        };
+
+                        details.push_str(&format!(
+                            "{:>width$} | {}\n",
+                            line_num.to_string().colorize(Color::Blue),
+                            content.colorize(color).bold(),
+                            width = line_number_width
+                        ));
+
+                        details.push_str(&format!(
+                            "{:>width$} | {} {}\n",
+                            "",
+                            prefix.colorize(color).bold(),
+                            match prefix {
+                                "+" => "added line",
+                                "-" => "removed line",
+                                "~" => "replaced line",
+                                _ => "",
+                            }.colorize(color),
+                            width = line_number_width
+                        ));
+                    }
+                }
+            }
         }
 
         (messages, details)
