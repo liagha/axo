@@ -36,19 +36,28 @@ impl ControlFlow for Parser {
 
         self.pop_context();
 
-        match kind {
+        let item = match kind {
             ExprKind::Assignment { target, value } => {
-                Expr { kind: ExprKind::Definition {
+                ItemKind::Variable {
                     target,
-                    value: Some(value)
-                }, span }
+                    value: Some(value),
+                    ty: None,
+                    mutable: false,
+                }
             }
             _ => {
-                Expr { kind: ExprKind::Definition {
+                ItemKind::Variable {
                     target: expr.into(),
-                    value: None
-                }, span }
+                    value: None,
+                    ty: None,
+                    mutable: false,
+                }
             }
+        };
+
+        Expr {
+            kind: ExprKind::Item(item),
+            span,
         }
     }
 

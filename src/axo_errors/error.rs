@@ -5,15 +5,15 @@ use crate::axo_lexer::Span;
 use crate::axo_parser::Context;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Error<T> where T: core::fmt::Display {
-    pub kind: T,
+pub struct Error<K, N = String, H = String> where K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display {
+    pub kind: K,
     pub span: Span,
     pub context: Option<Context>,
-    pub help: Option<String>,
-    pub hints: Vec<Hint<String>>,
+    pub note: Option<N>,
+    pub hints: Vec<Hint<H>>,
 }
 
-impl<T: core::fmt::Display> core::fmt::Display for Error<T> {
+impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display > core::fmt::Display for Error<K, N, H> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let (msg, details) = self.format();
 
@@ -21,13 +21,13 @@ impl<T: core::fmt::Display> core::fmt::Display for Error<T> {
     }
 }
 
-impl<T: core::fmt::Display> Error<T> {
-    pub fn new(kind: T, span: Span) -> Self {
+impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<K, N, H> {
+    pub fn new(kind: K, span: Span) -> Self {
         Self {
             kind,
             span,
             context: None,
-            help: None,
+            note: None,
             hints: vec![],
         }
     }
@@ -37,8 +37,8 @@ impl<T: core::fmt::Display> Error<T> {
         self
     }
 
-    pub fn with_help(mut self, help: impl Into<String>) -> Self {
-        self.help = Some(help.into());
+    pub fn with_help(mut self, note: impl Into<N>) -> Self {
+        self.note = Some(note.into());
         self
     }
 
@@ -48,7 +48,7 @@ impl<T: core::fmt::Display> Error<T> {
         let mut messages = String::new();
         let mut details = String::new();
 
-        messages.push_str(&format!("error: {}", self.kind.to_string().colorize(Color::Red).bold()));
+        messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
         let (line_start, column_start) = self.span.start;
         let (line_end, column_end) = self.span.end;
@@ -115,8 +115,8 @@ impl<T: core::fmt::Display> Error<T> {
             }
         }
 
-        if let Some(help) = &self.help {
-            messages.push_str(&format!("help: {}\n", help.colorize(Color::Green)));
+        if let Some(note) = &self.note {
+            messages.push_str(&format!("note: {}\n", note.to_string().colorize(Color::Green)));
         }
 
         for hint in &self.hints {

@@ -4,11 +4,35 @@ use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{ContextKind, SyntaxRole};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
+pub struct Item {
+    pub kind: ItemKind,
+    pub span: Span,
+}
+
+#[derive(Clone)]
 pub enum ItemKind {
     Use(Box<Expr>),
-    Implement(Box<Expr>, Box<Expr>),
-    Trait(Box<Expr>, Box<Expr>),
+    Expression(Box<Expr>),
+    Implement {
+        expr: Box<Expr>,
+        body: Box<Expr>
+    },
+    Trait {
+        name: Box<Expr>,
+        body: Box<Expr>
+    },
+    Variable {
+        target: Box<Expr>,
+        value: Option<Box<Expr>>,
+        ty: Option<Box<Expr>>,
+        mutable: bool,
+    },
+    Field {
+        name: Box<Expr>,
+        value: Option<Box<Expr>>,
+        ty: Option<Box<Expr>>,
+    },
     Struct {
         name: Box<Expr>,
         body: Box<Expr>
@@ -27,9 +51,10 @@ pub enum ItemKind {
         parameters: Vec<Expr>,
         body: Box<Expr>
     },
+    Unit,
 }
 
-pub trait Item {
+pub trait ItemParser {
     fn parse_use(&mut self) -> Expr;
     fn parse_impl(&mut self) -> Expr;
     fn parse_trait(&mut self) -> Expr;
@@ -39,7 +64,7 @@ pub trait Item {
     fn parse_struct(&mut self) -> Expr;
 }
 
-impl Item for Parser {
+impl ItemParser for Parser {
     fn parse_use(&mut self) -> Expr {
         self.push_context(ContextKind::Use, None);
 
@@ -87,7 +112,7 @@ impl Item for Parser {
 
         let end = body.span.end;
 
-        let item = ItemKind::Implement(implementation.into(), body.into());
+        let item = ItemKind::Implement { expr: implementation.into(), body: body.into() };
         let kind = ExprKind::Item(item);
 
         let expr = Expr {
@@ -114,7 +139,11 @@ impl Item for Parser {
 
         let end = body.span.end;
 
-        let item = ItemKind::Trait(trait_.into(), body.into());
+        let item = ItemKind::Trait {
+            name: trait_.into(),
+            body: body.into()
+        };
+
         let kind = ExprKind::Item(item);
 
         let expr = Expr {

@@ -4,7 +4,7 @@ use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
 use crate::axo_parser::{Composite, ControlFlow, ParseError, Expr, ExprKind, Parser};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
-use crate::axo_parser::item::Item;
+use crate::axo_parser::item::ItemParser;
 
 pub trait Primary {
     fn parse_atom(&mut self) -> Expr;

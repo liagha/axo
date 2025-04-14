@@ -1,21 +1,20 @@
 use crate::axo_lexer::Span;
-use crate::axo_parser::{Expr, ExprKind};
+use crate::axo_parser::{Expr, ExprKind, Item};
 use crate::axo_semantic::error::ErrorKind;
-use crate::axo_semantic::resolver::symbol::Symbol;
 use crate::axo_semantic::resolver::scope::Scope;
 use crate::axo_semantic::Resolver;
 
 pub trait ControlFlowResolver {
-    fn resolve_block(&mut self, exprs: Vec<Expr>, span: Span) -> Symbol;
-    fn resolve_conditional(&mut self, condition: Expr, then_block: Expr, else_block: Option<Expr>, span: Span) -> Symbol;
-    fn resolve_while(&mut self, condition: Expr, body: Expr, span: Span) -> Symbol;
-    fn resolve_for(&mut self, iterator: Expr, body: Expr, span: Span) -> Symbol;
-    fn resolve_match(&mut self, target: Expr, cases: Expr, span: Span) -> Symbol;
-    fn resolve_closure(&mut self, params: Vec<Expr>, body: Expr, span: Span) -> Symbol;
+    fn resolve_block(&mut self, exprs: Vec<Expr>, span: Span) -> Item;
+    fn resolve_conditional(&mut self, condition: Expr, then_block: Expr, else_block: Option<Expr>, span: Span) -> Item;
+    fn resolve_while(&mut self, condition: Expr, body: Expr, span: Span) -> Item;
+    fn resolve_for(&mut self, iterator: Expr, body: Expr, span: Span) -> Item;
+    fn resolve_match(&mut self, target: Expr, cases: Expr, span: Span) -> Item;
+    fn resolve_closure(&mut self, params: Vec<Expr>, body: Expr, span: Span) -> Item;
 }
 
 impl ControlFlowResolver for Resolver {
-    fn resolve_block(&mut self, exprs: Vec<Expr>, span: Span) -> Symbol {
+    fn resolve_block(&mut self, exprs: Vec<Expr>, span: Span) -> Item {
         self.with_new_scope(|resolver| {
             resolver.resolve_exprs(&exprs);
         });
@@ -29,7 +28,7 @@ impl ControlFlowResolver for Resolver {
         then_branch: Expr,
         else_branch: Option<Expr>,
         span: Span,
-    ) -> Symbol {
+    ) -> Item {
         self.resolve_expr(condition.clone());
         self.resolve_expr(then_branch.clone());
 
@@ -50,7 +49,7 @@ impl ControlFlowResolver for Resolver {
         )
     }
 
-    fn resolve_while(&mut self, condition: Expr, body: Expr, span: Span) -> Symbol {
+    fn resolve_while(&mut self, condition: Expr, body: Expr, span: Span) -> Item {
         self.resolve_expr(condition.clone());
         self.resolve_expr(body.clone());
 
@@ -63,7 +62,7 @@ impl ControlFlowResolver for Resolver {
         )
     }
 
-    fn resolve_for(&mut self, clause: Expr, body: Expr, span: Span) -> Symbol {
+    fn resolve_for(&mut self, clause: Expr, body: Expr, span: Span) -> Item {
         self.resolve_expr(clause.clone());
         self.resolve_expr(body.clone());
 
@@ -76,7 +75,7 @@ impl ControlFlowResolver for Resolver {
         )
     }
 
-    fn resolve_match(&mut self, target: Expr, body: Expr, span: Span) -> Symbol {
+    fn resolve_match(&mut self, target: Expr, body: Expr, span: Span) -> Item {
         self.resolve_expr(target.clone());
 
         match &body.kind {
@@ -99,7 +98,7 @@ impl ControlFlowResolver for Resolver {
         )
     }
 
-    fn resolve_closure(&mut self, parameters: Vec<Expr>, body: Expr, span: Span) -> Symbol {
+    fn resolve_closure(&mut self, parameters: Vec<Expr>, body: Expr, span: Span) -> Item {
         self.with_new_scope(|resolver| {
             resolver.resolve_params(&parameters);
 

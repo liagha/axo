@@ -15,15 +15,14 @@ use crate::{
     axo_parser::{Expr, ExprKind, ItemKind},
     axo_semantic::{
         error::ErrorKind,
-        item::ItemResolver,
         scope::Scope,
         statement::ControlFlowResolver,
-        symbol::{Symbol, SymbolKind},
     },
 };
 
 use std::collections::{HashMap, HashSet};
 use crate::axo_errors::{Action, Hint};
+use crate::axo_parser::Item;
 use crate::axo_semantic::expression::Expression;
 use crate::axo_semantic::resolver::matcher::SymbolMatcher;
 
@@ -43,7 +42,16 @@ impl Resolver {
         }
     }
 
-    pub fn symbols(&self) -> HashSet<Symbol> {
+    pub fn create_expr_symbol(&self, kind: ExprKind, span: Span) -> Item {
+        let kind = ItemKind::Expression(Expr { kind, span: span.clone() }.into());
+
+        Item {
+            kind,
+            span
+        }
+    }
+
+    pub fn symbols(&self) -> HashSet<Item> {
         let mut set = HashSet::new();
 
         let mut current_scope = self.scope.clone();
@@ -58,11 +66,11 @@ impl Resolver {
         set
     }
 
-    pub fn insert(&mut self, symbol: Symbol) {
+    pub fn insert(&mut self, symbol: Item) {
         self.scope.symbols.insert(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Symbol) -> Symbol {
+    pub fn lookup(&mut self, target: &Item) -> Item {
         if let Some(symbol) = self.scope.lookup(target) {
             return symbol;
         }
@@ -75,14 +83,14 @@ impl Resolver {
 
         let matcher = SymbolMatcher::default();
 
-        let candidates: Vec<Symbol> = self.scope.symbols.iter().cloned().collect();
+        let candidates: Vec<Item> = self.scope.symbols.iter().cloned().collect();
 
         let suggestion = matcher
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
-            let found = if let SymbolKind::Variable { name, .. } = suggestion.symbol.kind {
-                name.to_string()
+            let found = if let ItemKind::Variable { target, .. } = suggestion.symbol.kind {
+                target.to_string()
             } else {
                 suggestion.symbol.to_string()
             };
@@ -91,7 +99,7 @@ impl Resolver {
                 kind: ErrorKind::UndefinedSymbol(target.to_string(), None),
                 span: target.span.clone(),
                 context: None,
-                help: None,
+                note: None,
                 hints: vec![
                     Hint {
                         message: format!("replace `{}` with `{}` | similarity: {:?}", target, found, suggestion.match_type),
@@ -104,8 +112,8 @@ impl Resolver {
 
             self.errors.push(err.clone());
 
-            Symbol {
-                kind: SymbolKind::Error(err),
+            Item {
+                kind: ItemKind::Unit,
                 span: target.span.clone(),
             }
         } else {
@@ -113,39 +121,39 @@ impl Resolver {
         }
     }
 
-    pub fn error(&mut self, error: ErrorKind, span: Span) -> Symbol {
+    pub fn error(&mut self, error: ErrorKind, span: Span) -> Item {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
             context: None,
-            help: None,
+            note: None,
             hints: vec![],
         };
 
         self.errors.push(error.clone());
 
-        let kind = SymbolKind::Error(error);
+        let kind = ItemKind::Unit;
 
-        Symbol {
+        Item {
             kind,
             span
         }
     }
 
-    pub fn error_with_help(&mut self, error: ErrorKind, help: String, span: Span) -> Symbol {
+    pub fn error_with_help(&mut self, error: ErrorKind, help: String, span: Span) -> Item {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
             context: None,
-            help: Some(help),
+            note: Some(help),
             hints: vec![],
         };
 
         self.errors.push(error.clone());
 
-        let kind = SymbolKind::Error(error);
+        let kind = ItemKind::Unit;
 
-        Symbol {
+        Item {
             kind,
             span
         }
@@ -173,7 +181,7 @@ impl Resolver {
         result
     }
 
-    pub fn resolve_exprs(&mut self, exprs: &[Expr]) -> Vec<Symbol> {
+    pub fn resolve_exprs(&mut self, exprs: &[Expr]) -> Vec<Item> {
         let mut results = Vec::new();
 
         for expr in exprs {
@@ -183,29 +191,20 @@ impl Resolver {
         results
     }
 
-    pub fn create_expr_symbol(&self, kind: ExprKind, span: Span) -> Symbol {
-        let kind = SymbolKind::Expression(Expr { kind, span: span.clone() });
-
-        Symbol {
-            kind,
-            span
-        }
-    }
-
     pub fn resolve_params(&mut self, parameters: &[Expr]) {
         for param in parameters {
             let Expr { kind, span } = param.clone();
 
             match &kind {
                 ExprKind::Identifier(_) => {
-                    let kind = SymbolKind::Variable {
-                        name: param.clone(),
+                    let kind = ItemKind::Variable {
+                        target: param.clone().into(),
                         value: None,
                         mutable: false,
                         ty: None,
                     };
 
-                    let symbol = Symbol {
+                    let symbol = Item {
                         kind,
                         span
                     };
@@ -214,14 +213,14 @@ impl Resolver {
                 },
                 ExprKind::Labeled { label: expr, expr: ty } => {
                     if let ExprKind::Identifier(_) = expr.kind {
-                        let kind = SymbolKind::Variable {
-                            name: *expr.clone(),
+                        let kind = ItemKind::Variable {
+                            target: expr.clone(),
                             value: None,
                             mutable: false,
                             ty: Some(ty.clone()),
                         };
 
-                        let symbol = Symbol {
+                        let symbol = Item {
                             kind,
                             span
                         };
@@ -238,17 +237,21 @@ impl Resolver {
         }
     }
 
-    pub fn resolve_expr(&mut self, expr: Expr) -> Symbol {
+    pub fn resolve_expr(&mut self, expr: Expr) -> Item {
         let Expr { kind, span } = expr.clone();
 
         match kind {
             ExprKind::Item(item) => {
-                self.resolve_item(item, span)
+                let item = Item {
+                    kind: item,
+                    span
+                };
+
+                self.insert(item.clone());
+
+                item
             },
 
-            ExprKind::Definition { target, value } => {
-                self.resolve_definition(span, *target, value)
-            },
             ExprKind::Assignment { target, value} => {
                 self.resolve_assignment(*target, *value, span)
             },
@@ -269,9 +272,9 @@ impl Resolver {
                 self.resolve_match(*target, *body, span)
             },
 
-            ExprKind::Identifier(name) => {
-                let variable = Symbol {
-                    kind: SymbolKind::Variable { name: expr, value: None, mutable: false, ty: None },
+            ExprKind::Identifier(_) => {
+                let variable = Item {
+                    kind: ItemKind::Variable { target: expr.into(), value: None, mutable: false, ty: None },
                     span,
                 };
 
@@ -281,12 +284,12 @@ impl Resolver {
                 self.resolve_expr(*left.clone());
                 self.resolve_expr(*right.clone());
 
-                let kind = SymbolKind::Expression(Expr {
+                let kind = ItemKind::Expression(Expr {
                     kind: ExprKind::Binary { left, operator, right },
                     span: span.clone(),
-                });
+                }.into());
 
-                Symbol {
+                Item {
                     kind,
                     span
                 }
@@ -294,12 +297,12 @@ impl Resolver {
             ExprKind::Unary { operator, operand } => {
                 self.resolve_expr(*operand.clone());
 
-                let kind = SymbolKind::Expression(Expr {
+                let kind = ItemKind::Expression(Expr {
                     kind: ExprKind::Unary { operator, operand },
                     span: span.clone(),
-                });
+                }.into());
 
-                Symbol {
+                Item {
                     kind,
                     span
                 }
@@ -318,12 +321,10 @@ impl Resolver {
                 self.resolve_struct(*name, *body)
             },
 
-            ExprKind::Error(err) => self.error(ErrorKind::Other(format!("Parser error: {:?}", err)), span),
-
             _ => {
-                let kind = SymbolKind::Expression(expr);
+                let kind = ItemKind::Expression(expr.into());
 
-                Symbol {
+                Item {
                     kind,
                     span
                 }

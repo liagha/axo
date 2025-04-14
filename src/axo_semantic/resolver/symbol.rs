@@ -1,187 +1,126 @@
 use std::collections::HashSet;
 use core::hash::{Hash, Hasher};
 use crate::axo_lexer::Span;
-use crate::axo_parser::{Expr, ExprKind};
+use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
 use crate::axo_semantic::ResolveError;
 
-#[derive(Clone, Debug)]
-pub struct Symbol {
-    pub kind: SymbolKind,
-    pub span: Span,
-}
-
-#[derive(Clone, Debug)]
-pub enum SymbolKind {
-    Expression(Expr),
-    Field {
-        name: Expr,
-        field_type: Option<Expr>,
-        default: Option<Expr>,
-    },
-    Variable {
-        name: Expr,
-        value: Option<Expr>,
-        mutable: bool,
-        ty: Option<Box<Expr>>,
-    },
-    Struct {
-        name: Expr,
-        fields: Vec<Symbol>,
-    },
-    Enum {
-        name: Expr,
-        variants: Vec<Symbol>,
-    },
-    Function {
-        name: Expr,
-        parameters: Vec<Expr>,
-        body: Expr,
-        return_type: Option<Box<Expr>>,
-    },
-    Macro {
-        name: Expr,
-        parameters: Vec<Expr>,
-        body: Expr,
-    },
-    Trait {
-        name: Expr,
-        body: Expr,
-        generic_params: Vec<Expr>,
-    },
-    Impl {
-        trait_: Option<Box<Symbol>>,
-        target: Expr,
-        body: Expr,
-    },
-    Error(ResolveError),
-}
-
-impl PartialEq for Symbol {
+impl PartialEq for Item {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind && self.span == other.span
     }
 }
 
-impl Eq for Symbol {}
+impl Eq for Item {}
 
-impl Hash for Symbol {
+impl Hash for Item {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.span.hash(state);
         self.kind.hash(state);
     }
 }
 
-impl Eq for SymbolKind {}
+impl Eq for ItemKind {}
 
-impl PartialEq for SymbolKind {
+impl PartialEq for ItemKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (SymbolKind::Expression(a), SymbolKind::Expression(b)) => a == b,
-
-            (SymbolKind::Field { name: n1, .. }, SymbolKind::Field { name: n2, .. }) =>
+            (ItemKind::Field { name: n1, .. }, ItemKind::Field { name: n2, .. }) =>
                 n1 == n2,
 
-            (SymbolKind::Variable { name: n1, .. }, SymbolKind::Variable { name: n2, .. }) =>
+            (ItemKind::Variable { target: n1, .. }, ItemKind::Variable { target: n2, .. }) =>
                 n1 == n2,
 
-            (SymbolKind::Struct { name: n1, .. }, SymbolKind::Struct { name: n2, .. }) =>
+            (ItemKind::Struct { name: n1, .. }, ItemKind::Struct { name: n2, .. }) =>
                 n1 == n2,
 
-            (SymbolKind::Enum { name: n1, .. }, SymbolKind::Enum { name: n2, .. }) =>
+            (ItemKind::Enum { name: n1, .. }, ItemKind::Enum { name: n2, .. }) =>
                 n1 == n2,
 
-            (SymbolKind::Function { name: n1, parameters: p1, .. },
-                SymbolKind::Function { name: n2, parameters: p2, .. }) =>
+            (ItemKind::Function { name: n1, parameters: p1, .. },
+                ItemKind::Function { name: n2, parameters: p2, .. }) =>
                 n1 == n2 && p1 == p2,
 
-            (SymbolKind::Macro { name: n1, parameters: p1, .. },
-                SymbolKind::Macro { name: n2, parameters: p2, .. }) =>
+            (ItemKind::Macro { name: n1, parameters: p1, .. },
+                ItemKind::Macro { name: n2, parameters: p2, .. }) =>
                 n1 == n2 && p1 == p2,
 
-            (SymbolKind::Trait { name: n1, .. }, SymbolKind::Trait { name: n2, .. }) =>
+            (ItemKind::Trait { name: n1, .. }, ItemKind::Trait { name: n2, .. }) =>
                 n1 == n2,
 
-            (SymbolKind::Impl { trait_: t1, target: tg1, .. },
-                SymbolKind::Impl { trait_: t2, target: tg2, .. }) =>
-                match (t1, t2) {
-                    (Some(t1), Some(t2)) => t1 == t2 && tg1 == tg2,
-                    (None, None) => tg1 == tg2,
-                    _ => false,
-                },
-
+            (ItemKind::Implement { expr: t1, body: tg1, .. },
+                ItemKind::Implement { expr: t2, body: tg2, .. }) => tg1 == tg2,
             _ => false,
         }
     }
 }
 
-impl Hash for SymbolKind {
+impl Hash for ItemKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            SymbolKind::Expression(expr) => {
-                0.hash(state);
-                expr.hash(state);
-            },
-            SymbolKind::Field { name, .. } => {
+            ItemKind::Expression(expr) => expr.hash(state),
+            ItemKind::Field { name, .. } => {
                 1.hash(state);
                 name.hash(state);
             },
-            SymbolKind::Variable { name, .. } => {
+            ItemKind::Variable { target, .. } => {
                 3.hash(state);
-                name.hash(state);
+                target.hash(state);
             },
-            SymbolKind::Struct { name, .. } => {
+            ItemKind::Struct { name, .. } => {
                 4.hash(state);
                 name.hash(state);
             },
-            SymbolKind::Enum { name, .. } => {
+            ItemKind::Enum { name, .. } => {
                 5.hash(state);
                 name.hash(state);
             },
-            SymbolKind::Function { name, parameters, .. } => {
+            ItemKind::Function { name, parameters, .. } => {
                 6.hash(state);
                 name.hash(state);
                 parameters.hash(state);
             },
-            SymbolKind::Macro { name, parameters, .. } => {
+            ItemKind::Macro { name, parameters, .. } => {
                 7.hash(state);
                 name.hash(state);
                 parameters.hash(state);
             },
-            SymbolKind::Trait { name, .. } => {
+            ItemKind::Trait { name, .. } => {
                 8.hash(state);
                 name.hash(state);
             },
-            SymbolKind::Impl { trait_, target, .. } => {
+            ItemKind::Implement { expr, body } => {
                 9.hash(state);
-                if let Some(t) = trait_ {
-                    t.hash(state);
-                }
-                target.hash(state);
+                expr.hash(state);
+                body.hash(state);
             },
-            SymbolKind::Error(_) => {
+            ItemKind::Use(expr) => {
                 10.hash(state);
-            },
+
+                expr.hash(state);
+            }
+            ItemKind::Unit => {
+                11.hash(state);
+            }
         }
     }
 }
 
-impl Symbol {
+impl Item {
     pub fn get_name(&self) -> Option<String> {
         self.kind.get_name()
     }
 }
 
-impl SymbolKind {
+impl ItemKind {
     pub fn get_name(&self) -> Option<String> {
         match self {
-            SymbolKind::Expression(_) => None,
-            SymbolKind::Field { name, .. } => Some(name.to_string()),
-            SymbolKind::Variable { name, .. } => Some(name.to_string()),
-            SymbolKind::Struct { name, .. } => Some(name.to_string()),
-            SymbolKind::Enum { name, .. } => Some(name.to_string()),
-            SymbolKind::Function { name, .. } => Some(name.to_string()),
-            SymbolKind::Macro { name, .. } => Some(name.to_string()),
-            SymbolKind::Trait { name, .. } => Some(name.to_string()),
+            ItemKind::Field { name, .. } => Some(name.to_string()),
+            ItemKind::Variable { target, .. } => Some(target.to_string()),
+            ItemKind::Struct { name, .. } => Some(name.to_string()),
+            ItemKind::Enum { name, .. } => Some(name.to_string()),
+            ItemKind::Function { name, .. } => Some(name.to_string()),
+            ItemKind::Macro { name, .. } => Some(name.to_string()),
+            ItemKind::Trait { name, .. } => Some(name.to_string()),
             _ => None,
         }
     }

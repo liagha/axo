@@ -92,10 +92,6 @@ pub enum ExprKind {
         target: Box<Expr>,
         value: Box<Expr>
     },
-    Definition {
-        target: Box<Expr>,
-        value: Option<Box<Expr>>
-    },
 
     // Flow Control Statements
     Return(Option<Box<Expr>>),
@@ -148,10 +144,14 @@ impl Expr {
                         Expr { kind, span }
                     }
                     OperatorKind::ColonEqual => {
-                        let kind = ExprKind::Definition {
+                        let item = ItemKind::Variable {
                             target: left.clone(),
-                            value: Some(right.clone())
+                            value: Some(right.clone()),
+                            ty: None,
+                            mutable: false,
                         };
+
+                        let kind = ExprKind::Item(item);
 
                         Expr { kind, span }
                     }

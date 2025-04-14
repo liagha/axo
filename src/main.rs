@@ -1,3 +1,5 @@
+extern crate core;
+
 mod axo_parser;
 pub mod axo_lexer;
 mod axo_semantic;
@@ -105,7 +107,7 @@ fn print_usage(program: &str) {
 }
 
 fn process_file(file_path: &PathBuf, config: &Config) {
-    println!("{}\n", format!("compiling file://{}...", file_path.display()).term_colorize(Color::Blue));
+    println!("{} {}\n", "\tCompiling".term_colorize(Color::Blue), file_path.display());
 
     let start = Instant::now();
 

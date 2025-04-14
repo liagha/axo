@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use core::cmp::{max, min};
 use crate::axo_data::{MatchType, Matcher};
-use crate::axo_parser::{Expr, ExprKind};
-use crate::axo_semantic::symbol::{Symbol, SymbolKind};
+use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
 
 #[derive(Debug)]
 pub struct SymbolMatchInfo {
     pub score: f64,            // Overall similarity score (0.0 to 1.0)
-    pub symbol: Symbol,        // The matched symbol
+    pub symbol: Item,        // The matched symbol
     pub match_type: MatchType, // Type of match found
 }
 
@@ -73,17 +72,16 @@ impl SymbolMatcher {
     }
 
     // Extract the name from a symbol based on its kind
-    fn symbol_name(&self, symbol: &Symbol) -> Option<String> {
+    fn symbol_name(&self, symbol: &Item) -> Option<String> {
         match &symbol.kind {
-            SymbolKind::Expression(expr) => self.expr_name(expr),
-            SymbolKind::Field { name, .. } => self.expr_name(name),
-            SymbolKind::Variable { name, .. } => self.expr_name(name),
-            SymbolKind::Struct { name, .. } => self.expr_name(name),
-            SymbolKind::Enum { name, .. } => self.expr_name(name),
-            SymbolKind::Function { name, .. } => self.expr_name(name),
-            SymbolKind::Macro { name, .. } => self.expr_name(name),
-            SymbolKind::Trait { name, .. } => self.expr_name(name),
-            SymbolKind::Impl { target, .. } => self.expr_name(target),
+            ItemKind::Field { name, .. } => self.expr_name(name),
+            ItemKind::Variable { target, .. } => self.expr_name(target),
+            ItemKind::Struct { name, .. } => self.expr_name(name),
+            ItemKind::Enum { name, .. } => self.expr_name(name),
+            ItemKind::Function { name, .. } => self.expr_name(name),
+            ItemKind::Macro { name, .. } => self.expr_name(name),
+            ItemKind::Trait { name, .. } => self.expr_name(name),
+            ItemKind::Implement { expr, .. } => self.expr_name(expr),
             _ => None,
         }
     }
@@ -107,7 +105,7 @@ impl SymbolMatcher {
     }
 
     // Find the best match for a query symbol from a list of candidates
-    pub fn find_best_match<'a>(&self, query: &Symbol, candidates: &'a [Symbol]) -> Option<SymbolMatchInfo> {
+    pub fn find_best_match<'a>(&self, query: &Item, candidates: &'a [Item]) -> Option<SymbolMatchInfo> {
         if candidates.is_empty() {
             return None;
         }
@@ -142,7 +140,7 @@ impl SymbolMatcher {
     }
 
     // Find all matches above a certain threshold, sorted by score
-    pub fn find_all_matches(&self, query: &Symbol, candidates: &[Symbol], limit: usize) -> Vec<SymbolMatchInfo> {
+    pub fn find_all_matches(&self, query: &Item, candidates: &[Item], limit: usize) -> Vec<SymbolMatchInfo> {
         let mut matches = Vec::new();
 
         let query_name = match self.symbol_name(query) {
@@ -180,7 +178,7 @@ impl SymbolMatcher {
 
     // Additional symbol-specific matching functions can be added here
     // For example, matching based on symbol kind or type information
-    pub fn find_similar_kind(&self, query: &Symbol, candidates: &[Symbol]) -> Vec<SymbolMatchInfo> {
+    pub fn find_similar_kind(&self, query: &Item, candidates: &[Item]) -> Vec<SymbolMatchInfo> {
         let mut matches = Vec::new();
 
         let query_name = match self.symbol_name(query) {

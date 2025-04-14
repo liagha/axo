@@ -1,11 +1,22 @@
 use crate::axo_parser::{Expr, ExprKind, ItemKind};
+use crate::axo_parser::item::Item;
 
 impl core::fmt::Display for ItemKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ItemKind::Expression(expr) => write!(f, "{}", expr),
             ItemKind::Use(expr) => write!(f, "use {}", expr),
-            ItemKind::Implement(expr, body) => write!(f, "impl ({}) {}", expr, body),
-            ItemKind::Trait(name, body) => write!(f, "trait ({}) {}", name, body),
+            ItemKind::Implement { expr, body} => write!(f, "impl ({}) {}", expr, body),
+            ItemKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
+            ItemKind::Variable { target, value, .. } => {
+                write!(f, "let {}", target)?;
+
+                if let Some(value) = value {
+                    write!(f, " = {}", value)?;
+                }
+
+                Ok(())
+            },
             ItemKind::Struct { name, body} => write!(f, "struct ({}) {}", name, body),
             ItemKind::Enum { name, body} => write!(f, "enum ({}) {}", name, body),
             ItemKind::Macro { name, parameters, body} => {
@@ -18,6 +29,20 @@ impl core::fmt::Display for ItemKind {
 
                 write!(f, "fn {}({}) {}", name, params, body)
             },
+            ItemKind::Field { name, value, ty } => {
+                write!(f, "{}", name)?;
+
+                if let Some(ty) = ty {
+                    write!(f, " : {}", ty)?;
+                }
+
+                if let Some(value) = value {
+                    write!(f, " = {}", value)
+                } else {
+                    write!(f, "")
+                }
+            },
+            ItemKind::Unit => write!(f, "()")
         }
     }
 }
@@ -25,13 +50,17 @@ impl core::fmt::Display for ItemKind {
 impl core::fmt::Debug for ItemKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ItemKind::Expression(expr) => write!(f, "{:?}", expr),
             ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
-            ItemKind::Implement(expr, body) => write!(f, "Implement({:?} => {:?})", expr, body),
-            ItemKind::Trait(name, body) => write!(f, "Trait({:?} {:?})", name, body),
+            ItemKind::Implement { expr, body } => write!(f, "Implement({:?} => {:?})", expr, body),
+            ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
+            ItemKind::Variable { target, value, .. } => write!(f, "Variable({:?} = {:?})", target, value),
             ItemKind::Struct { name, body } => write!(f, "Struct({:?} | {:?})", name, body),
             ItemKind::Enum { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
             ItemKind::Macro { name, parameters, body } => write!(f, "Macro({:?}({:?}) {:?})", name, parameters, body),
             ItemKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
+            ItemKind::Field { name, value, ty } => write!(f, "Field({:?} : {:?} = {:?})", name, ty, value),
+            ItemKind::Unit => write!(f, "()")
         }
     }
 }
@@ -47,6 +76,18 @@ impl core::fmt::Debug for Expr {
 }
 
 impl core::fmt::Display for Expr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
+
+impl core::fmt::Debug for Item {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
+}
+
+impl core::fmt::Display for Item {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.kind)
     }
@@ -107,15 +148,6 @@ impl core::fmt::Display for ExprKind {
 
             ExprKind::Item(item) => write!(f, "{}", item),
             ExprKind::Assignment { target, value} => write!(f, "{} = {}", target, value),
-            ExprKind::Definition { target, value } => {
-                write!(f, "let {}", target)?;
-
-                if let Some(value) = value {
-                    write!(f, " = {}", value)?;
-                }
-
-                Ok(())
-            }
             ExprKind::Struct { name, body } => {
                 write!(f, "{} {}", name, body)
             }
@@ -189,7 +221,6 @@ impl core::fmt::Debug for ExprKind {
             ExprKind::Block(stmts) => write!(f, "Block({:#?})", stmts),
 
             ExprKind::Assignment { target, value } => write!(f, "Assignment({:?} = {:?})", target, value),
-            ExprKind::Definition { target, value } => write!(f, "Definition({:?} = {:?})", target, value),
             ExprKind::Struct { name, body } => write!(f, "Struct({:?} with {:?})", name, body),
 
             ExprKind::Item(item) => write!(f, "+ {:?}", item),

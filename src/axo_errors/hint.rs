@@ -2,8 +2,8 @@ use core::fmt::Display;
 use crate::axo_lexer::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Hint<T: Display> {
-    pub message: T,
+pub struct Hint<M: Display> {
+    pub message: M,
     pub action: Vec<Action>,
 }
 

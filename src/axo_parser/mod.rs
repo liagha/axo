@@ -13,7 +13,7 @@ mod delimiter;
 pub use  {
     statement::ControlFlow,
     expression::{Expr, ExprKind},
-    item::ItemKind,
+    item::{Item, ItemKind},
     parser::Parser,
     composite::Composite,
     primary::Primary,
