@@ -191,7 +191,7 @@ impl<'a: 'b, 'b, const __: u128> DigitsIterator<'a, 'b, __> {
         // have at least count elements. We do static checking on the bounds for this.
         unsafe {
             let byte: Bytes<'_, __> = Bytes::from_parts(slc, self.cursor());
-            self.set_cursor(end);
+            unsafe { self.set_cursor(end) };
             Some(byte)
         }
     }
