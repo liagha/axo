@@ -1,12 +1,14 @@
+#![feature(box_patterns)]
 extern crate core;
 
-mod axo_parser;
 pub mod axo_lexer;
+mod axo_parser;
 mod axo_semantic;
 mod axo_data;
 mod axo_rune;
 mod axo_errors;
 mod axo_codegen;
+mod axo_span;
 
 pub use axo_rune::*;
 
@@ -202,14 +204,8 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
         }
     }
     else {
-        for (err, context) in parser.errors {
-            let (msg, details) = err.format();
-
-            let state = context.describe_chain();
-
-            xprintln!("{} => {} \n {} \n" => Color::Red,
-                    msg => Color::Orange, state => Color::Crimson, details
-                );
+        for err in parser.errors {
+            println!("{}", err);
         }
     }
 }

@@ -9,22 +9,23 @@ mod matcher;
 mod fmt;
 
 use crate::{
-    axo_data::Matcher,
-    axo_errors::Error,
+    axo_data::matcher::Matcher,
+    axo_errors::{Error, Hint, Action},
     axo_lexer::Span,
-    axo_parser::{Expr, ExprKind, ItemKind},
+    axo_parser::{
+        Expr, ExprKind,
+        Item, ItemKind,
+    },
     axo_semantic::{
         error::ErrorKind,
+        expression::Expression,
+        resolver::matcher::SymbolMatcher,
         scope::Scope,
         statement::ControlFlowResolver,
     },
 };
 
-use std::collections::{HashMap, HashSet};
-use crate::axo_errors::{Action, Hint};
-use crate::axo_parser::Item;
-use crate::axo_semantic::expression::Expression;
-use crate::axo_semantic::resolver::matcher::SymbolMatcher;
+use hashbrown::{HashMap, HashSet};
 
 pub type ResolveError = Error<ErrorKind>;
 
@@ -89,8 +90,14 @@ impl Resolver {
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
-            let found = if let ItemKind::Variable { target, .. } = suggestion.symbol.kind {
+            let target_name = if let Some(name) = target.get_name() {
+                name.to_string()
+            } else {
                 target.to_string()
+            };
+
+            let found = if let Some(name) = suggestion.symbol.get_name() {
+                name.to_string()
             } else {
                 suggestion.symbol.to_string()
             };
@@ -102,7 +109,7 @@ impl Resolver {
                 note: None,
                 hints: vec![
                     Hint {
-                        message: format!("replace `{}` with `{}` | similarity: {:?}", target, found, suggestion.match_type),
+                        message: format!("replace `{}` with `{}` | similarity: {:?}", target_name, found, suggestion.match_type),
                         action: vec![
                             Action::Replace(found, target.span.clone()),
                         ],
@@ -127,25 +134,6 @@ impl Resolver {
             span: span.clone(),
             context: None,
             note: None,
-            hints: vec![],
-        };
-
-        self.errors.push(error.clone());
-
-        let kind = ItemKind::Unit;
-
-        Item {
-            kind,
-            span
-        }
-    }
-
-    pub fn error_with_help(&mut self, error: ErrorKind, help: String, span: Span) -> Item {
-        let error = ResolveError {
-            kind: error,
-            span: span.clone(),
-            context: None,
-            note: Some(help),
             hints: vec![],
         };
 
@@ -317,8 +305,8 @@ impl Resolver {
             ExprKind::Closure { parameters, body} => {
                 self.resolve_closure(parameters, *body, span)
             },
-            ExprKind::Struct { name, body } => {
-                self.resolve_struct(*name, *body)
+            ExprKind::Constructor { name, body } => {
+                self.resolve_constructor(*name, body)
             },
 
             _ => {

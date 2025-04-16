@@ -17,7 +17,11 @@ impl core::fmt::Display for ItemKind {
 
                 Ok(())
             },
-            ItemKind::Struct { name, body} => write!(f, "struct ({}) {}", name, body),
+            ItemKind::Struct { name, fields} => {
+                let fields = fields.iter().map(|field| field.to_string()).collect::<Vec<_>>().join(", ");
+
+                write!(f, "struct ({}) {}", name, fields)
+            },
             ItemKind::Enum { name, body} => write!(f, "enum ({}) {}", name, body),
             ItemKind::Macro { name, parameters, body} => {
                 let params = parameters.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
@@ -50,12 +54,12 @@ impl core::fmt::Display for ItemKind {
 impl core::fmt::Debug for ItemKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ItemKind::Expression(expr) => write!(f, "{:?}", expr),
+            ItemKind::Expression(expr) => write!(f, "~{:?}~", expr),
             ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
             ItemKind::Implement { expr, body } => write!(f, "Implement({:?} => {:?})", expr, body),
             ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
             ItemKind::Variable { target, value, .. } => write!(f, "Variable({:?} = {:?})", target, value),
-            ItemKind::Struct { name, body } => write!(f, "Struct({:?} | {:?})", name, body),
+            ItemKind::Struct { name, fields } => write!(f, "Struct({:?} | {:?})", name, fields),
             ItemKind::Enum { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
             ItemKind::Macro { name, parameters, body } => write!(f, "Macro({:?}({:?}) {:?})", name, parameters, body),
             ItemKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
@@ -148,7 +152,7 @@ impl core::fmt::Display for ExprKind {
 
             ExprKind::Item(item) => write!(f, "{}", item),
             ExprKind::Assignment { target, value} => write!(f, "{} = {}", target, value),
-            ExprKind::Struct { name, body } => {
+            ExprKind::Constructor { name, body } => {
                 write!(f, "{} {}", name, body)
             }
 
@@ -181,7 +185,7 @@ impl core::fmt::Display for ExprKind {
             }
 
             ExprKind::Bind { key, value } => write!(f, "{} => {}", key, value),
-            ExprKind::Path { left, right } => write!(f, "{}::{}", left, right),
+            ExprKind::Path { tree } => write!(f, "{}", tree),
 
             ExprKind::Error(e) => write!(f, "error: {}", e)
         }
@@ -221,7 +225,7 @@ impl core::fmt::Debug for ExprKind {
             ExprKind::Block(stmts) => write!(f, "Block({:#?})", stmts),
 
             ExprKind::Assignment { target, value } => write!(f, "Assignment({:?} = {:?})", target, value),
-            ExprKind::Struct { name, body } => write!(f, "Struct({:?} with {:?})", name, body),
+            ExprKind::Constructor { name, body } => write!(f, "Constructor({:?} with {:?})", name, body),
 
             ExprKind::Item(item) => write!(f, "+ {:?}", item),
             ExprKind::Return(expr) => {
@@ -247,7 +251,7 @@ impl core::fmt::Debug for ExprKind {
             }
 
             ExprKind::Bind { key, value } => write!(f, "Bind({:?} => {:?})", key, value),
-            ExprKind::Path { left, right } => write!(f, "Path({:?}::{:?})", left, right),
+            ExprKind::Path { tree } => write!(f, "Path({:?})", tree),
 
             ExprKind::Error(e) => write!(f, "Error({:?})", e)
         }

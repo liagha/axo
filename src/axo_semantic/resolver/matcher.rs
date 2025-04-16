@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use core::cmp::{max, min};
-use crate::axo_data::{MatchType, Matcher};
+use crate::axo_data::matcher::{MatchType, Matcher};
 use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
 
 #[derive(Debug)]
@@ -90,11 +90,6 @@ impl SymbolMatcher {
     fn expr_name(&self, expr: &Expr) -> Option<String> {
         match &expr.kind {
             ExprKind::Identifier(name) => Some(name.clone()),
-            ExprKind::Path { left, right } => {
-                let left_name = self.expr_name(left)?;
-                let right_name = self.expr_name(right)?;
-                Some(format!("{}::{}", left_name, right_name))
-            },
             ExprKind::Member { object, member } => {
                 let obj_name = self.expr_name(object)?;
                 let mem_name = self.expr_name(member)?;

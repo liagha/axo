@@ -18,14 +18,6 @@ impl Span {
         }
     }
 
-    pub fn zero() -> Self {
-        Self {
-            file: PathBuf::default(),
-            start: (0, 0),
-            end: (0, 0),
-        }
-    }
-
     fn extract_span(&self) -> String {
         let (start_line, start_column) = self.start;
         let (end_line, end_column) = self.end;

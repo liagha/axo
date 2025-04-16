@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use core::cmp::{max, min};
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 // Structure to hold similarity metrics and matching information
 #[derive(Debug)]

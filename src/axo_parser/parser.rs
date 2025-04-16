@@ -8,13 +8,12 @@ use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 
 pub struct Parser {
     tokens: Vec<Token>,
-    pub state: Vec<Context>,
     pub file: PathBuf,
     pub position: usize,
     pub line: usize,
     pub column: usize,
     pub expressions: Vec<Expr>,
-    pub errors: Vec<(ParseError, Context)>,
+    pub errors: Vec<ParseError>,
 }
 
 impl Parser {
@@ -22,7 +21,6 @@ impl Parser {
         Parser {
             file,
             tokens,
-            state: Vec::new(),
             position: 0,
             line: 1,
             column: 1,
@@ -32,70 +30,13 @@ impl Parser {
     }
 
     pub fn error(&mut self, error: &ParseError) -> Expr {
-        if let Some(state) = self.state.last().cloned() {
-            self.errors.push((error.clone(), state));
+        self.errors.push(error.clone());
 
-            let current = (self.line, self.column);
+        let current = (self.line, self.column);
 
-            Expr {
-                kind: ExprKind::Error(error.clone()),
-                span: self.span(current, current),
-            }
-        } else {
-            self.errors.push((error.clone(), Context {
-                kind: ContextKind::Program,
-                role: None,
-                span: self.full_span(),
-                parent: None,
-            }));
-
-            let current = (self.line, self.column);
-
-            Expr {
-                kind: ExprKind::Error(error.clone()),
-                span: self.span(current, current),
-            }
-        }
-    }
-
-    pub fn push_context(&mut self, kind: ContextKind, role: Option<SyntaxRole>) -> &mut Self {
-        let span = self.full_span();
-        let mut context = Context {
-            kind,
-            role,
-            span,
-            parent: None,
-        };
-
-        if let Some(parent_context) = self.state.last().cloned() {
-            context.parent = Some(parent_context.into());
-        }
-
-        self.state.push(context);
-        self
-    }
-
-    pub fn pop_context(&mut self) -> Option<Context> {
-        self.state.pop()
-    }
-
-    pub fn current_context(&self) -> Option<&Context> {
-        self.state.last()
-    }
-
-    pub fn in_context(&self, kind: ContextKind) -> bool {
-        if let Some(context) = self.current_context() {
-            context.kind == kind
-        } else {
-            false
-        }
-    }
-
-    pub fn in_role(&self, role: Option<SyntaxRole>) -> bool {
-        if let Some(context) = self.current_context() {
-            context.role == role
-        } else {
-            false
+        Expr {
+            kind: ExprKind::Error(error.clone()),
+            span: self.span(current, current),
         }
     }
 
@@ -242,8 +183,6 @@ impl Parser {
     }
 
     pub fn parse_program(&mut self) -> Vec<Expr> {
-        self.push_context(ContextKind::Program, None);
-
         let mut statements = Vec::new();
 
         while let Some(token) = self.peek() {
@@ -258,8 +197,6 @@ impl Parser {
             self.expressions.push(stmt.clone());
             statements.push(stmt);
         }
-
-        self.pop_context();
 
         statements
     }

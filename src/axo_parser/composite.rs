@@ -8,14 +8,12 @@ use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Expr;
     fn parse_invoke(&mut self, name: Expr) -> Expr;
-    fn parse_structure(&mut self, struct_name: Expr) -> Expr;
+    fn parse_constructor(&mut self, struct_name: Expr) -> Expr;
     fn parse_closure(&mut self) -> Expr;
 }
 
 impl Composite for Parser {
     fn parse_index(&mut self, left: Expr) -> Expr {
-        self.push_context(ContextKind::Index, None);
-
         let bracket = self.next().unwrap();
 
         let Expr {
@@ -23,13 +21,7 @@ impl Composite for Parser {
             ..
         } = left;
 
-        self.push_context(ContextKind::Index, Some(SyntaxRole::Value));
-
         let index = self.parse_complex();
-
-        self.pop_context();
-
-        self.pop_context();
 
         let err_end = index.span.end;
 
@@ -57,20 +49,12 @@ impl Composite for Parser {
     }
 
     fn parse_invoke(&mut self, name: Expr) -> Expr {
-        self.push_context(ContextKind::Call, None);
-
         let Expr {
             span: Span { start, .. },
             ..
         } = name;
 
-        self.push_context(ContextKind::Call, Some(SyntaxRole::Parameter));
-
         let parameters = self.parse_parenthesized();
-
-        self.pop_context();
-
-        self.pop_context();
 
         let result = match parameters {
             Expr {
@@ -110,20 +94,14 @@ impl Composite for Parser {
         result
     }
 
-    fn parse_structure(&mut self, struct_name: Expr) -> Expr {
-        self.push_context(ContextKind::Struct, None);
-
+    fn parse_constructor(&mut self, struct_name: Expr) -> Expr {
         let Expr {
             span: Span { start, .. },
             ..
         } = struct_name;
 
-        self.push_context(ContextKind::Struct, Some(SyntaxRole::Field));
-
         let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
             let (exprs, span) = self.parse_delimited(
-                ContextKind::Match,
-                Some(SyntaxRole::Body),
                 TokenKind::Punctuation(PunctuationKind::LeftBrace),
                 TokenKind::Punctuation(PunctuationKind::RightBrace),
                 TokenKind::Punctuation(PunctuationKind::Comma),
@@ -138,7 +116,7 @@ impl Composite for Parser {
 
         let end = body.span.end;
 
-        let kind = ExprKind::Struct {
+        let kind = ExprKind::Constructor {
             name: struct_name.into(),
             body: body.into()
         };
@@ -152,16 +130,12 @@ impl Composite for Parser {
     }
 
     fn parse_closure(&mut self) -> Expr {
-        self.push_context(ContextKind::Closure, None);
-
         let pipe = self.next().unwrap();
 
         let Token {
             span: Span { start, .. },
             ..
         } = pipe;
-
-        self.push_context(ContextKind::Closure, Some(SyntaxRole::Parameter));
 
         let mut parameters = Vec::new();
 
@@ -174,14 +148,6 @@ impl Composite for Parser {
                     span: Span { end, .. },
                 } => {
                     self.next();
-
-                    self.push_context(ContextKind::Closure, Some(SyntaxRole::Body));
-
-                    self.pop_context();
-
-                    self.pop_context();
-
-                    self.pop_context();
 
                     let body = self.parse_statement();
 

@@ -9,8 +9,7 @@ use crate::axo_parser::state::{Position, Context, ContextKind};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
-    NotProvided,
-    ElseWithoutConditional,
+    DanglingElse,
     MissingSeparator(TokenKind),
     UnclosedDelimiter(Token),
     UnimplementedToken(TokenKind),
@@ -24,30 +23,29 @@ pub enum ErrorKind {
 impl core::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            ErrorKind::NotProvided => write!(f, "not provided"),
-            ErrorKind::ElseWithoutConditional => {
+            ErrorKind::DanglingElse => {
                 write!(f, "can't have an else without conditional")
             }
             ErrorKind::MissingSeparator(kind) => {
                 write!(f, "expected separator {}", kind)
             }
             ErrorKind::InvalidSyntaxPattern(m) => {
-                write!(f, "Invalid syntax pattern: '{}'", m)
+                write!(f, "invalid syntax pattern: '{}'", m)
             }
             ErrorKind::UnexpectedEndOfFile => {
-                write!(f, "Unexpected end of file")
+                write!(f, "unexpected end of file")
             }
             ErrorKind::UnclosedDelimiter(delimiter) => {
-                write!(f, "Unclosed delimiter '{:?}'", delimiter)
+                write!(f, "unclosed delimiter '{:?}'", delimiter)
             }
             ErrorKind::UnimplementedToken(token) => {
-                write!(f, "Unimplemented token '{}'", token)
+                write!(f, "unimplemented token '{}'", token)
             }
             ErrorKind::UnexpectedToken(token) => {
-                write!(f, "Unexpected token '{}'", token)
+                write!(f, "unexpected token '{}'", token)
             }
             ErrorKind::ExpectedSyntax(kind) => {
-                write!(f, "Expected syntax '{:?}' but didn't get it", kind)
+                write!(f, "expected syntax '{:?}' but didn't get it", kind)
             }
         }
     }

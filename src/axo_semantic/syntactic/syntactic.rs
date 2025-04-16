@@ -12,7 +12,7 @@ impl Validator {
     pub fn new() -> Self {
         Self { errors: vec![] }
     }
-    pub fn validate(&mut self, program: Vec<Expr>) {
+    pub fn validate(&mut self, _program: Vec<Expr>) {
 
     }
 

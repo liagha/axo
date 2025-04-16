@@ -10,8 +10,9 @@ pub trait Expression {
         span: Span,
     ) -> Item;
     fn resolve_invoke(&mut self, target: Expr, parameters: Vec<Expr>) -> Item;
+    fn resolve_constructor(&mut self, name: Expr, fields: Box<Expr>) -> Item;
     fn resolve_member(&mut self, target: Expr, member: Expr) -> Item;
-    fn resolve_struct(&mut self, name: Expr, body: Expr) -> Item;
+    fn resolve_struct(&mut self, name: Expr, fields: Vec<Item>) -> Item;
 }
 
 impl Expression for Resolver {
@@ -33,11 +34,14 @@ impl Expression for Resolver {
     fn resolve_invoke(&mut self, target: Expr, parameters: Vec<Expr>) -> Item {
         let symbol = Item {
             kind: ItemKind::Function {
-                name: target.into(),
+                name: target.clone().into(),
                 parameters,
-                body: Expr::dummy().into(),
+                body: Expr {
+                    kind: ExprKind::Block(Vec::new()),
+                    span: target.span.clone(),
+                }.into(),
             },
-            span: Span::zero()
+            span: target.span,
         };
 
         let found = self.lookup(&symbol);
@@ -45,15 +49,49 @@ impl Expression for Resolver {
         found
     }
 
-    fn resolve_member(&mut self, target: Expr, member: Expr) -> Item {
+    fn resolve_constructor(&mut self, name: Expr, body: Box<Expr>) -> Item {
+        let fields = match *body {
+            Expr { kind: ExprKind::Block(fields), .. } => {
+                fields.iter().map(
+                    |field| Item {
+                        kind: ItemKind::Expression(field.clone().into()),
+                        span: field.span.clone()
+                    }
+                ).collect::<Vec<_>>()
+            },
+
+            _ => {
+                let field = Item {
+                    kind: ItemKind::Expression(body.clone().into()),
+                    span: body.span.clone()
+                };
+
+                vec![field]
+            },
+        };
+
+        let symbol = Item {
+            kind: ItemKind::Struct {
+                name: name.clone().into(),
+                fields
+            },
+            span: name.span,
+        };
+
+        let found = self.lookup(&symbol);
+
+        found
+    }
+
+    fn resolve_member(&mut self, target: Expr, _member: Expr) -> Item {
         let symbol = Item {
             kind: ItemKind::Variable {
-                target: target.into(),
+                target: target.clone().into(),
                 value: None,
                 mutable: false,
                 ty: None,
             },
-            span: Span::zero()
+            span: target.span,
         };
 
         let found = self.lookup(&symbol);
@@ -61,13 +99,13 @@ impl Expression for Resolver {
         found
     }
 
-    fn resolve_struct(&mut self, name: Expr, body: Expr) -> Item {
+    fn resolve_struct(&mut self, name: Expr, fields: Vec<Item>) -> Item {
         let symbol = Item {
             kind: ItemKind::Struct {
-                name: name.into(),
-                body: body.into()
+                name: name.clone().into(),
+                fields
             },
-            span: Span::zero()
+            span: name.span,
         };
 
         let found = self.lookup(&symbol);

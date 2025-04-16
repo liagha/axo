@@ -1,5 +1,6 @@
-use crate::axo_lexer::{Span, Token};
+use crate::axo_lexer::{PunctuationKind, Span, Token, TokenKind};
 use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
+use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{ContextKind, SyntaxRole};
@@ -35,7 +36,7 @@ pub enum ItemKind {
     },
     Struct {
         name: Box<Expr>,
-        body: Box<Expr>
+        fields: Vec<Item>
     },
     Enum {
         name: Box<Expr>,
@@ -55,6 +56,7 @@ pub enum ItemKind {
 }
 
 pub trait ItemParser {
+    fn parse_field(&mut self) -> Item;
     fn parse_use(&mut self) -> Expr;
     fn parse_impl(&mut self) -> Expr;
     fn parse_trait(&mut self) -> Expr;
@@ -65,26 +67,72 @@ pub trait ItemParser {
 }
 
 impl ItemParser for Parser {
-    fn parse_use(&mut self) -> Expr {
-        self.push_context(ContextKind::Use, None);
+    fn parse_field(&mut self) -> Item {
+        let Expr { kind, span } = self.parse_statement();
 
+        match kind {
+            ExprKind::Assignment {
+                target: box Expr {
+                    kind: ExprKind::Labeled { label, expr }, ..
+                },
+                value
+            } => {
+                let kind = ItemKind::Field { name: label, value: Some(value), ty: Some(expr) };
+
+                Item {
+                    kind,
+                    span,
+                }
+            }
+
+            ExprKind::Assignment {
+                target,
+                value
+            } => {
+                let kind = ItemKind::Field { name: target.into(), value: Some(value), ty: None };
+
+                Item {
+                    kind,
+                    span,
+                }
+            }
+
+            ExprKind::Labeled {
+                label, expr
+            } => {
+                let kind = ItemKind::Field { name: label, value: None, ty: Some(expr) };
+                Item {
+                    kind,
+                    span,
+                }
+            }
+
+            _ => {
+                let expr = Expr {
+                    kind,
+                    span: span.clone(),
+                };
+
+                Item {
+                    kind: ItemKind::Field { name: expr.into(), value: None, ty: None },
+                    span,
+                }
+            }
+        }
+    }
+
+    fn parse_use(&mut self) -> Expr {
         let Token {
             span: Span { start, .. },
             ..
         } = self.next().unwrap();
 
         let (value, end) = {
-            self.push_context(ContextKind::Use, Some(SyntaxRole::Value));
-
             let expr = self.parse_complex();
             let end = expr.span.end;
 
-            self.pop_context();
-
             (expr.into(), end)
         };
-
-        self.pop_context();
 
         let item = ItemKind::Use(value);
         let kind = ExprKind::Item(item);
@@ -97,8 +145,6 @@ impl ItemParser for Parser {
         expr
     }
     fn parse_impl(&mut self) -> Expr {
-        self.push_context(ContextKind::Implementation, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
@@ -106,7 +152,7 @@ impl ItemParser for Parser {
 
         let implementation = self.parse_basic();
 
-        self.pop_context();
+        
 
         let body = self.parse_statement();
 
@@ -124,8 +170,6 @@ impl ItemParser for Parser {
     }
 
     fn parse_trait(&mut self) -> Expr {
-        self.push_context(ContextKind::Trait, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
@@ -133,7 +177,7 @@ impl ItemParser for Parser {
 
         let trait_ = self.parse_basic();
 
-        self.pop_context();
+        
 
         let body = self.parse_statement();
 
@@ -155,8 +199,6 @@ impl ItemParser for Parser {
     }
 
     fn parse_function(&mut self) -> Expr {
-        self.push_context(ContextKind::Function, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
@@ -164,7 +206,7 @@ impl ItemParser for Parser {
 
         let function = self.parse_basic();
 
-        self.pop_context();
+        
 
         match function {
             Expr {
@@ -214,8 +256,6 @@ impl ItemParser for Parser {
     }
 
     fn parse_macro(&mut self) -> Expr {
-        self.push_context(ContextKind::Macro, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
@@ -223,7 +263,7 @@ impl ItemParser for Parser {
 
         let macro_ = self.parse_basic();
 
-        self.pop_context();
+        
 
         match macro_ {
             Expr {
@@ -273,8 +313,6 @@ impl ItemParser for Parser {
     }
 
     fn parse_enum(&mut self) -> Expr {
-        self.push_context(ContextKind::Enum, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
@@ -282,11 +320,11 @@ impl ItemParser for Parser {
 
         let struct_init = self.parse_statement();
 
-        self.pop_context();
+        
 
         let Expr { kind, span: Span { end, .. } } = struct_init;
 
-        if let ExprKind::Struct { name, body } = kind {
+        if let ExprKind::Constructor { name, body } = kind {
             let item = ItemKind::Enum {
                 name: name.into(),
                 body: body.into()
@@ -306,35 +344,35 @@ impl ItemParser for Parser {
     }
 
     fn parse_struct(&mut self) -> Expr {
-        self.push_context(ContextKind::Struct, Some(SyntaxRole::Declaration));
-
         let Token {
             span: Span { start, .. },
             ..
         } = self.next().unwrap();
 
-        let struct_init = self.parse_statement();
+        let name = self.parse_atom();
 
-        self.pop_context();
+        let (fields, span) = self.parse_delimited(
+              TokenKind::Punctuation(PunctuationKind::LeftBrace),
+              TokenKind::Punctuation(PunctuationKind::RightBrace),
+              TokenKind::Punctuation(PunctuationKind::Comma),
+              true,
+              Parser::parse_field
+        );
 
-        let Expr { kind, span: Span { end, .. } } = struct_init;
+        let end = span.end;
 
-        if let ExprKind::Struct { name, body } = kind {
-            let item = ItemKind::Struct {
-                name: name.into(),
-                body: body.into()
-            };
+        let item = ItemKind::Struct {
+            name: name.into(),
+            fields
+        };
 
-            let kind = ExprKind::Item(item);
+        let kind = ExprKind::Item(item);
 
-            let expr = Expr {
-                kind,
-                span: self.span(start, end),
-            };
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
 
-            expr
-        } else {
-            self.error(&ParseError::new(ErrorKind::ExpectedSyntax(ContextKind::Struct), self.span(start, end)))
-        }
+        expr
     }
 }

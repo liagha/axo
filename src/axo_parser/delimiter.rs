@@ -3,41 +3,38 @@ use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::state::{ContextKind, SyntaxRole};
+use crate::axo_span::Spanned;
 
 pub trait Delimiter {
-    fn parse_delimited<F>(
+    fn parse_delimited<F, R>(
         &mut self,
-        context_kind: ContextKind,
-        syntax_role: Option<SyntaxRole>,
         _open_kind: TokenKind,
         close_kind: TokenKind,
         separator: TokenKind,
         forced_separator: bool,
         item_parser: F,
-    ) -> (Vec<Expr>, Span)
+    ) -> (Vec<R>, Span)
     where
-        F: FnMut(&mut Parser) -> Expr;
+        R: Spanned + Clone,
+        F: FnMut(&mut Parser) -> R;
     fn parse_braced(&mut self) -> Expr;
     fn parse_bracketed(&mut self) -> Expr;
     fn parse_parenthesized(&mut self) -> Expr;
 }
 
 impl Delimiter for Parser {
-    fn parse_delimited<F>(
+    fn parse_delimited<F, R>(
         &mut self,
-        context_kind: ContextKind,
-        syntax_role: Option<SyntaxRole>,
         _open_kind: TokenKind,
         close_kind: TokenKind,
         separator: TokenKind,
         forced_separator: bool,
         mut item_parser: F,
-    ) -> (Vec<Expr>, Span)
+    ) -> (Vec<R>, Span)
     where
-        F: FnMut(&mut Parser) -> Expr
+        R: Spanned + Clone,
+        F: FnMut(&mut Parser) -> R
     {
-        self.push_context(context_kind, syntax_role);
-
         let open_token = self.next().unwrap();
         let Span { start, .. } = open_token.span;
 
@@ -50,7 +47,7 @@ impl Delimiter for Parser {
                     let close_token = self.next().unwrap();
                     let Span { end, .. } = close_token.span;
 
-                    self.pop_context();
+                    
 
                     return (items, self.span(start, end));
                 }
@@ -60,11 +57,11 @@ impl Delimiter for Parser {
                 }
                 _ => {
                     let item = item_parser(self);
-                    let Expr { span: Span { start: item_start, .. }, .. } = item;
+                    let item_start = item.span().start;
 
                     items.push(item.clone());
 
-                    err_end = item.span.end;
+                    err_end = item.span().end;
 
                     if forced_separator {
                         if let Some(peek) = self.peek() {
@@ -141,8 +138,6 @@ impl Delimiter for Parser {
     }
 
     fn parse_bracketed(&mut self) -> Expr {
-        self.push_context(ContextKind::Bracketed, None);
-
         let bracket = self.next().unwrap();
 
         let Token {
@@ -162,7 +157,7 @@ impl Delimiter for Parser {
                 } => {
                     self.next();
 
-                    self.pop_context();
+                    
 
                     return if elements.len() == 1 {
                         elements.pop().unwrap()
@@ -194,8 +189,6 @@ impl Delimiter for Parser {
     }
 
     fn parse_parenthesized(&mut self) -> Expr {
-        self.push_context(ContextKind::Parenthesized, None);
-
         let parenthesis = self.next().unwrap();
 
         let Token {
@@ -215,7 +208,7 @@ impl Delimiter for Parser {
                 } => {
                     self.next();
 
-                    self.pop_context();
+                    
 
                     return if parameters.len() == 1 {
                         parameters.pop().unwrap()

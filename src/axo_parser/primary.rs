@@ -68,7 +68,7 @@ impl Primary for Parser {
                     KeywordKind::Else => {
                         self.next();
 
-                        self.error(&ParseError::new(ErrorKind::ElseWithoutConditional, span))
+                        self.error(&ParseError::new(ErrorKind::DanglingElse, span))
                     },
                     _ => {
                         self.next();
@@ -88,7 +88,7 @@ impl Primary for Parser {
                     while let Some(token) = self.peek() {
                         match &token.kind {
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                expr = self.parse_structure(expr.clone());
+                                expr = self.parse_constructor(expr.clone());
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
                                 expr = self.parse_index(expr)

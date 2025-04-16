@@ -2,7 +2,7 @@
 
 pub enum ErrorKind {
     InvalidChar,
-    NumberParse(String),
+    NumberParse(crate::axo_rune::ParseNumberError),
     IntParseError(IntParseError),
     FloatParseError(IntParseError),
     CharParseError(CharParseError),

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use hashbrown::HashSet;
 use core::hash::{Hash, Hasher};
 use crate::axo_lexer::Span;
 use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
@@ -48,7 +48,8 @@ impl PartialEq for ItemKind {
                 n1 == n2,
 
             (ItemKind::Implement { expr: t1, body: tg1, .. },
-                ItemKind::Implement { expr: t2, body: tg2, .. }) => tg1 == tg2,
+                ItemKind::Implement { expr: t2, body: tg2, .. }) => t1 == t2 && tg1 == tg2,
+
             _ => false,
         }
     }
