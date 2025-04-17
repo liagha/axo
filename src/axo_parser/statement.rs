@@ -1,11 +1,11 @@
 use std::cmp::PartialEq;
-use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Token, TokenKind};
 use crate::axo_errors::Error as AxoError;
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::{Expr, ExprKind, Expression};
 use crate::axo_parser::{ParseError, ItemKind, Parser, Primary};
 use crate::axo_parser::delimiter::Delimiter;
-use crate::axo_parser::state::{Position, Context, ContextKind, SyntaxRole};
+use crate::axo_span::Span;
 
 pub trait ControlFlow {
     fn parse_let(&mut self) -> Expr;

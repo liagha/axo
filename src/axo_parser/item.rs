@@ -1,9 +1,9 @@
-use crate::axo_lexer::{PunctuationKind, Span, Token, TokenKind};
+use crate::axo_lexer::{PunctuationKind, Token, TokenKind};
 use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
-use crate::axo_parser::state::{ContextKind, SyntaxRole};
+use crate::axo_span::Span;
 
 #[derive(Clone)]
 pub struct Item {
@@ -34,7 +34,7 @@ pub enum ItemKind {
         value: Option<Box<Expr>>,
         ty: Option<Box<Expr>>,
     },
-    Struct {
+    Structure {
         name: Box<Expr>,
         fields: Vec<Item>
     },
@@ -72,24 +72,16 @@ impl ItemParser for Parser {
 
         match kind {
             ExprKind::Assignment {
-                target: box Expr {
-                    kind: ExprKind::Labeled { label, expr }, ..
-                },
-                value
-            } => {
-                let kind = ItemKind::Field { name: label, value: Some(value), ty: Some(expr) };
-
-                Item {
-                    kind,
-                    span,
-                }
-            }
-
-            ExprKind::Assignment {
                 target,
                 value
             } => {
-                let kind = ItemKind::Field { name: target.into(), value: Some(value), ty: None };
+                let kind = if let Expr {
+                    kind: ExprKind::Labeled { label, expr }, ..
+                } = *target {
+                    ItemKind::Field { name: label, value: Some(value), ty: Some(expr) }
+                } else {
+                    ItemKind::Field { name: target.into(), value: Some(value), ty: None }
+                };
 
                 Item {
                     kind,
@@ -177,8 +169,6 @@ impl ItemParser for Parser {
 
         let trait_ = self.parse_basic();
 
-        
-
         let body = self.parse_statement();
 
         let end = body.span.end;
@@ -205,8 +195,6 @@ impl ItemParser for Parser {
         } = self.next().unwrap();
 
         let function = self.parse_basic();
-
-        
 
         match function {
             Expr {
@@ -313,34 +301,40 @@ impl ItemParser for Parser {
     }
 
     fn parse_enum(&mut self) -> Expr {
-        let Token {
+        let enum_name = self.parse_basic();
+
+        let Expr {
             span: Span { start, .. },
             ..
-        } = self.next().unwrap();
+        } = enum_name;
 
-        let struct_init = self.parse_statement();
+        let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
+            let (exprs, span) = self.parse_delimited(
+                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                TokenKind::Punctuation(PunctuationKind::RightBrace),
+                TokenKind::Punctuation(PunctuationKind::Comma),
+                true,
+                Parser::parse_complex
+            );
 
-        
-
-        let Expr { kind, span: Span { end, .. } } = struct_init;
-
-        if let ExprKind::Constructor { name, body } = kind {
-            let item = ItemKind::Enum {
-                name: name.into(),
-                body: body.into()
-            };
-
-            let kind = ExprKind::Item(item);
-
-            let expr = Expr {
-                kind,
-                span: self.span(start, end),
-            };
-
-            expr
+            Expr { kind: ExprKind::Block(exprs), span }
         } else {
-            self.error(&ParseError::new(ErrorKind::ExpectedSyntax(ContextKind::Enum), self.span(start, end)))
-        }
+            self.parse_complex()
+        };
+
+        let end = body.span.end;
+
+        let kind = ExprKind::Constructor {
+            name: enum_name.into(),
+            body: body.into()
+        };
+
+        let expr = Expr {
+            kind,
+            span: self.span(start, end),
+        };
+
+        expr
     }
 
     fn parse_struct(&mut self) -> Expr {
@@ -361,7 +355,7 @@ impl ItemParser for Parser {
 
         let end = span.end;
 
-        let item = ItemKind::Struct {
+        let item = ItemKind::Structure {
             name: name.into(),
             fields
         };

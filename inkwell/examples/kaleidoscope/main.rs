@@ -9,7 +9,7 @@
 //!     Lexer,
 //!     Parser,
 //!     Compiler.
-//! - `main.rs`:
+//! - `lib`:
 //!     Program.
 //!
 //! Both the `Parser` and the `Compiler` may fail, in which case they would return

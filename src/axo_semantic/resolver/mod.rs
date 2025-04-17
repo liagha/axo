@@ -2,7 +2,6 @@
 pub mod symbol;
 pub mod error;
 pub mod expression;
-pub mod item;
 pub mod scope;
 pub mod statement;
 mod matcher;
@@ -11,7 +10,7 @@ mod fmt;
 use crate::{
     axo_data::matcher::Matcher,
     axo_errors::{Error, Hint, Action},
-    axo_lexer::Span,
+    axo_span::Span,
     axo_parser::{
         Expr, ExprKind,
         Item, ItemKind,
@@ -90,22 +89,13 @@ impl Resolver {
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
-            let target_name = if let Some(name) = target.get_name() {
-                name.to_string()
-            } else {
-                target.to_string()
-            };
+            let target_name = target.get_name();
 
-            let found = if let Some(name) = suggestion.symbol.get_name() {
-                name.to_string()
-            } else {
-                suggestion.symbol.to_string()
-            };
+            let found = suggestion.symbol.get_name();
 
             let err = ResolveError {
-                kind: ErrorKind::UndefinedSymbol(target.to_string(), None),
+                kind: ErrorKind::UndefinedSymbol(target_name.to_string(), None),
                 span: target.span.clone(),
-                context: None,
                 note: None,
                 hints: vec![
                     Hint {
@@ -124,7 +114,7 @@ impl Resolver {
                 span: target.span.clone(),
             }
         } else {
-            self.error(ErrorKind::UndefinedSymbol(target.to_string(), None), target.span.clone())
+            self.error(ErrorKind::UndefinedSymbol(target.get_name(), None), target.span.clone())
         }
     }
 
@@ -132,7 +122,6 @@ impl Resolver {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
-            context: None,
             note: None,
             hints: vec![],
         };

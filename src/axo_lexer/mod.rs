@@ -23,6 +23,4 @@ use crate::{
     axo_lexer::error::ErrorKind,
 };
 
-pub use crate::axo_span::span::Span;
-
 pub type LexError = Error<ErrorKind>;

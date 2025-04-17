@@ -27,7 +27,7 @@ impl LiteralLexer for Lexer {
 
             if is_escaped {
                 let escape_start = (self.line, self.column);
-                match self.handle_escape_sequence(false) {
+                match self.handle_escape(false) {
                     Ok(escaped_char) => content.push(escaped_char),
                     Err(LexError { kind, .. }) => {
                         let escape_end = (self.line, self.column);
@@ -47,7 +47,7 @@ impl LiteralLexer for Lexer {
         let span = self.create_span(start, end);
 
         if !closed {
-            return Err(LexError::new(ErrorKind::UnClosedChar, span));
+            return Err(LexError::new(ErrorKind::UnterminatedChar, span));
         }
 
         // Validate character literal
@@ -75,24 +75,11 @@ impl LiteralLexer for Lexer {
         let is_multiline = quote_char == '`';
 
         while let Some(next_ch) = self.peek() {
-            // Check for newlines in non-multiline strings
-            if !is_multiline && (next_ch == '\n' || next_ch == '\r') && !is_escaped {
-                let end = (self.line, self.column);
-                let span = self.create_span(start, end);
-                return Err(LexError::new(ErrorKind::UnClosedString, span));
-            }
-
-            if next_ch == quote_char && !is_escaped {
-                self.next(); // Consume closing quote
-                closed = true;
-                break;
-            }
-
-            self.next(); // Consume character
+            self.next();
 
             if is_escaped {
                 let escape_start = (self.line, self.column);
-                match self.handle_escape_sequence(!is_multiline) {
+                match self.handle_escape(!is_multiline) {
                     Ok(escaped_char) => content.push(escaped_char),
                     Err(LexError { kind, .. }) => {
                         let escape_end = (self.line, self.column);
@@ -106,6 +93,18 @@ impl LiteralLexer for Lexer {
             } else {
                 content.push(next_ch);
             }
+
+            if next_ch == quote_char && !is_escaped {
+                self.next();
+                closed = true;
+                break;
+            }
+
+            if !is_multiline && (next_ch == '\n' || next_ch == '\r') && !is_escaped {
+                let end = (self.line, self.column);
+                let span = self.create_span(start, end);
+                return Err(LexError::new(ErrorKind::UnterminatedDoubleQuoteString, span));
+            }
         }
 
         let end = (self.line, self.column);
@@ -113,7 +112,7 @@ impl LiteralLexer for Lexer {
 
         if !closed {
             return Err(LexError::new(
-                ErrorKind::UnClosedString,
+                ErrorKind::UnterminatedBackTickString,
                 span,
             ));
         }

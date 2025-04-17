@@ -1,6 +1,6 @@
-use crate::axo_lexer::Span;
 use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
 use crate::axo_semantic::Resolver;
+use crate::axo_span::Span;
 
 pub trait Expression {
     fn resolve_assignment(
@@ -71,7 +71,7 @@ impl Expression for Resolver {
         };
 
         let symbol = Item {
-            kind: ItemKind::Struct {
+            kind: ItemKind::Structure {
                 name: name.clone().into(),
                 fields
             },
@@ -101,7 +101,7 @@ impl Expression for Resolver {
 
     fn resolve_struct(&mut self, name: Expr, fields: Vec<Item>) -> Item {
         let symbol = Item {
-            kind: ItemKind::Struct {
+            kind: ItemKind::Structure {
                 name: name.clone().into(),
                 fields
             },

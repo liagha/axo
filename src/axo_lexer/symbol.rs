@@ -4,13 +4,13 @@ use crate::axo_lexer::{LexError, Lexer, TokenKind};
 use crate::axo_lexer::punctuation::PunctuationLexer;
 
 pub trait SymbolLexer {
-    fn handle_operator(&mut self) -> Result<(), LexError>;
+    fn handle_operator(&mut self);
     fn handle_punctuation(&mut self);
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError>;
+    fn handle_escape(&mut self, is_string: bool) -> Result<char, LexError>;
 }
 
 impl SymbolLexer for Lexer {
-    fn handle_operator(&mut self) -> Result<(), LexError> {
+    fn handle_operator(&mut self) {
         let mut operator = Vec::new();
 
         let ch = self.next().unwrap();
@@ -30,25 +30,9 @@ impl SymbolLexer for Lexer {
         let end = (self.line, self.column);
         let span = self.create_span(start, end);
 
-        if let Some(op) = operator.iter().collect::<String>().to_operator() {
-            self.push_token(TokenKind::Operator(op), span);
-        } else {
-            for (i, c) in operator.iter().enumerate() {
-                let single_char_span = self.create_span(
-                    (self.line, self.column + i + 1),
-                    (self.line, self.column + i + 2),
-                );
+        let operator = operator.iter().collect::<String>().to_operator();
 
-                if let Some(op) = c.to_operator() {
-                    self.push_token(
-                        TokenKind::Operator(op),
-                        single_char_span,
-                    );
-                }
-            }
-        }
-
-        Ok(())
+        self.push_token(TokenKind::Operator(operator), span);
     }
 
     fn handle_punctuation(&mut self) {
@@ -61,7 +45,7 @@ impl SymbolLexer for Lexer {
         self.push_token(TokenKind::Punctuation(ch.to_punctuation()), span);
     }
 
-    fn handle_escape_sequence(&mut self, is_string: bool) -> Result<char, LexError> {
+    fn handle_escape(&mut self, is_string: bool) -> Result<char, LexError> {
         let start = (self.line, self.column);
 
         let error_type = if is_string {
@@ -77,7 +61,7 @@ impl SymbolLexer for Lexer {
                 't' => Ok('\t'),
                 '\\' => Ok('\\'),
                 '\'' => Ok('\''),
-                '"' => Ok('"'),
+                '"' => Ok('\"'),
                 '0' => Ok('\0'),
                 'x' => {
                     let mut hex = String::new();
@@ -131,7 +115,7 @@ impl SymbolLexer for Lexer {
                         let end = (self.line, self.column);
 
                         if !closed_brace {
-                            return Err(LexError::new(error_type(CharParseError::UnClosedEscapeSequence), self.create_span(start, end)));
+                            return Err(LexError::new(error_type(CharParseError::UnterminatedEscapeSequence), self.create_span(start, end)));
                         }
 
                         if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {

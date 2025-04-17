@@ -1,4 +1,4 @@
-//! Having a main.rs in a directory w/ mods will force tests to be built in a single binary
+//! Having a lib in a directory w/ mods will force tests to be built in a single binary
 
 #[macro_use]
 extern crate inkwell_internals;

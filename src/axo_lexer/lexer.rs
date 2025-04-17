@@ -1,6 +1,6 @@
 use crate::axo_lexer::error::ErrorKind;
 use crate::axo_lexer::{LexError, TokenKind};
-use crate::axo_lexer::{Span, Token};
+use crate::axo_lexer::Token;
 use crate::axo_lexer::number::NumberLexer;
 use std::path::PathBuf;
 use crate::axo_rune::unicode::{is_alphabetic, is_numeric, is_white_space};
@@ -9,6 +9,7 @@ use crate::axo_lexer::literal::LiteralLexer;
 use crate::axo_lexer::operator::OperatorLexer;
 use crate::axo_lexer::punctuation::PunctuationLexer;
 use crate::axo_lexer::symbol::SymbolLexer;
+use crate::axo_span::Span;
 
 pub struct Lexer {
     file: PathBuf,
@@ -100,7 +101,7 @@ impl Lexer {
                         if ch.is_digit(10) {
                             self.handle_number()?;
                         } else {
-                            self.handle_operator()?;
+                            self.handle_operator();
                         }
                     }
                 },
@@ -111,7 +112,7 @@ impl Lexer {
 
                 '/' => self.handle_comment()?,
 
-                ch if ch.is_operator() => self.handle_operator()?,
+                ch if ch.is_operator() => self.handle_operator(),
 
                 ch if ch.is_punctuation() => self.handle_punctuation(),
 

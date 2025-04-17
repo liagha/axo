@@ -1,6 +1,17 @@
+use test::Test::ssss;
+
 let test = 4
 let teft = 6
 
 let variable_test = 4;
 
-varia
+struct Test { x: i8, 4 }
+
+Test {
+}
+
+332 --> 22
+
+"\""
+
+10e10

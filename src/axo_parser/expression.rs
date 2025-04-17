@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
 use crate::{
-    axo_lexer::{OperatorKind, PunctuationKind, Span, Token, TokenKind},
+    axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
     axo_parser::{item::ItemKind, ParseError, Parser, Primary},
     axo_data::tree::Tree,
+    axo_span::Span,
 };
 use crate::axo_data::tree::Node;
 
@@ -20,8 +21,8 @@ pub enum ExprKind {
     Identifier(String),
 
     // Composite
-    Array(Vec<Expr>),
-    Tuple(Vec<Expr>),
+    Collection(Vec<Expr>),
+    Group(Vec<Expr>),
     Constructor {
         name: Box<Expr>,
         body: Box<Expr>
@@ -38,7 +39,7 @@ pub enum ExprKind {
         operand: Box<Expr>,
     },
 
-    // Composite Expressions
+    // Access Expressions
     Bind {
         key: Box<Expr>,
         value: Box<Expr>
@@ -109,23 +110,25 @@ pub enum ExprKind {
 impl Expr {
     pub fn empty(span: Span) -> Expr {
         Expr {
-            kind: ExprKind::Tuple(Vec::new()),
+            kind: ExprKind::Group(Vec::new()),
             span,
         }
     }
 
     pub fn transform(&self) -> Expr {
+        use OperatorKind::*;
+
         let Expr { kind, span } = self.clone();
 
         match kind {
             ExprKind::Binary { left, operator: Token { kind: TokenKind::Operator(op), .. }, right} => {
-                match op {
-                    OperatorKind::Dot => {
+                match op.as_slice() {
+                    [Dot] => {
                         let kind = ExprKind::Member { object: left.clone(), member: right.clone() };
 
                         Expr { kind, span }
                     }
-                    OperatorKind::Colon => {
+                    [Colon] => {
                         let kind = ExprKind::Labeled {
                             label: left.clone(),
                             expr: right.clone()
@@ -133,7 +136,7 @@ impl Expr {
 
                         Expr { kind, span }
                     }
-                    OperatorKind::Equal => {
+                    [Equal] => {
                         let kind = ExprKind::Assignment {
                             target: left.clone(),
                             value: right.clone()
@@ -141,7 +144,7 @@ impl Expr {
 
                         Expr { kind, span }
                     }
-                    OperatorKind::ColonEqual => {
+                    [Colon, Equal] => {
                         let item = ItemKind::Variable {
                             target: left.clone(),
                             value: Some(right.clone()),
@@ -153,27 +156,19 @@ impl Expr {
 
                         Expr { kind, span }
                     }
-                    OperatorKind::DoubleColon => {
-                        // Create a tree for the path
-                        // If left is already a Path with a tree, extend it by adding right as a child
-                        // Otherwise, create a new tree with left as the root and right as a child
+                    [Colon, Colon] => {
                         let kind = match &left.kind {
                             ExprKind::Path { tree } => {
-                                // Clone the existing tree and add the right expression as a new node
                                 let mut new_tree = tree.clone();
 
-                                // Find the rightmost leaf node to add the new path segment
                                 if let Some(root) = new_tree.root_mut() {
-                                    // Simple implementation: add as a child to the first node with no children
-                                    // This could be enhanced to be more sophisticated based on actual requirements
                                     let mut current = root;
+
                                     while current.has_children() {
-                                        // Navigate to the last child
                                         let last_idx = current.child_count() - 1;
                                         current = current.get_child_mut(last_idx).unwrap();
                                     }
 
-                                    // Add the right expression as a new node
                                     current.add_value(right.as_ref().clone().into());
                                 }
 
@@ -193,6 +188,8 @@ impl Expr {
                         Expr { kind, span }
                     }
                     op => {
+                        let op = Composite(op.into());
+
                         if let Some(op) = op.decompound() {
                             let operator = Token { kind: TokenKind::Operator(op), span: span.clone() };
 

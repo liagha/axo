@@ -17,7 +17,7 @@ impl core::fmt::Display for ItemKind {
 
                 Ok(())
             },
-            ItemKind::Struct { name, fields} => {
+            ItemKind::Structure { name, fields} => {
                 let fields = fields.iter().map(|field| field.to_string()).collect::<Vec<_>>().join(", ");
 
                 write!(f, "struct ({}) {}", name, fields)
@@ -59,7 +59,7 @@ impl core::fmt::Debug for ItemKind {
             ItemKind::Implement { expr, body } => write!(f, "Implement({:?} => {:?})", expr, body),
             ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
             ItemKind::Variable { target, value, .. } => write!(f, "Variable({:?} = {:?})", target, value),
-            ItemKind::Struct { name, fields } => write!(f, "Struct({:?} | {:?})", name, fields),
+            ItemKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
             ItemKind::Enum { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
             ItemKind::Macro { name, parameters, body } => write!(f, "Macro({:?}({:?}) {:?})", name, parameters, body),
             ItemKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
@@ -103,11 +103,11 @@ impl core::fmt::Display for ExprKind {
             ExprKind::Literal(token) => write!(f, "{}", token),
             ExprKind::Identifier(ident) => write!(f, "{}", ident),
 
-            ExprKind::Array(elements) => {
+            ExprKind::Collection(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
                 write!(f, "[{}]", elems.join(", "))
             }
-            ExprKind::Tuple(elements) => {
+            ExprKind::Group(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
                 write!(f, "({})", elems.join(", "))
             }
@@ -197,8 +197,8 @@ impl core::fmt::Debug for ExprKind {
         match self {
             ExprKind::Literal(literal) => write!(f, "{:?}", literal),
             ExprKind::Identifier(identifier) => write!(f, "Identifier({})", identifier),
-            ExprKind::Array(elems) => write!(f, "Array({:?})", elems),
-            ExprKind::Tuple(elems) => write!(f, "Tuple({:?})", elems),
+            ExprKind::Collection(elems) => write!(f, "Array({:?})", elems),
+            ExprKind::Group(elems) => write!(f, "Tuple({:?})", elems),
 
             ExprKind::Binary { left, operator, right } => {
                 write!(f, "Binary({:?} {:?} {:?})", left, operator, right)

@@ -2,8 +2,8 @@
 
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
 use crate::axo_lexer::keyword::KeywordLexer;
-use crate::axo_lexer::Span;
 use crate::axo_data::float::FloatLiteral;
+use crate::axo_span::Span;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Token {

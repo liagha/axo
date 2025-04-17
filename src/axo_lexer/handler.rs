@@ -87,7 +87,7 @@ impl Handler for Lexer {
                     if closed {
                         self.push_token(TokenKind::Comment(comment_string), span);
                     } else {
-                        return Err(LexError::new(ErrorKind::UnClosedComment, span));
+                        return Err(LexError::new(ErrorKind::UnterminatedCommentBlock, span));
                     }
                 }
                 _ => {

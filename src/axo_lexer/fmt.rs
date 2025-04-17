@@ -1,6 +1,6 @@
 use core::fmt;
 use core::fmt::Formatter;
-use crate::axo_lexer::{Span, Token};
+use crate::axo_lexer::Token;
 use crate::axo_lexer::{PunctuationKind, TokenKind};
 
 impl fmt::Display for TokenKind {
@@ -64,17 +64,3 @@ impl fmt::Debug for Token {
     }
 }
 
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Span {
-            start: (start_line, start_column),
-            end: (end_line, end_column), ..
-        } = self;
-
-        if start_line == end_line && start_column == end_column {
-            write!(f, "{}:{}", start_line, start_column)
-        } else {
-            write!(f, "{}:{}-{}:{}", start_line, start_column, end_line, end_column)
-        }
-    }
-}

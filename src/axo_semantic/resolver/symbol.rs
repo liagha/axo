@@ -1,6 +1,5 @@
 use hashbrown::HashSet;
 use core::hash::{Hash, Hasher};
-use crate::axo_lexer::Span;
 use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
 use crate::axo_semantic::ResolveError;
 
@@ -30,7 +29,7 @@ impl PartialEq for ItemKind {
             (ItemKind::Variable { target: n1, .. }, ItemKind::Variable { target: n2, .. }) =>
                 n1 == n2,
 
-            (ItemKind::Struct { name: n1, .. }, ItemKind::Struct { name: n2, .. }) =>
+            (ItemKind::Structure { name: n1, .. }, ItemKind::Structure { name: n2, .. }) =>
                 n1 == n2,
 
             (ItemKind::Enum { name: n1, .. }, ItemKind::Enum { name: n2, .. }) =>
@@ -67,7 +66,7 @@ impl Hash for ItemKind {
                 3.hash(state);
                 target.hash(state);
             },
-            ItemKind::Struct { name, .. } => {
+            ItemKind::Structure { name, .. } => {
                 4.hash(state);
                 name.hash(state);
             },
@@ -107,22 +106,25 @@ impl Hash for ItemKind {
 }
 
 impl Item {
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> String {
         self.kind.get_name()
     }
 }
 
 impl ItemKind {
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> String {
         match self {
-            ItemKind::Field { name, .. } => Some(name.to_string()),
-            ItemKind::Variable { target, .. } => Some(target.to_string()),
-            ItemKind::Struct { name, .. } => Some(name.to_string()),
-            ItemKind::Enum { name, .. } => Some(name.to_string()),
-            ItemKind::Function { name, .. } => Some(name.to_string()),
-            ItemKind::Macro { name, .. } => Some(name.to_string()),
-            ItemKind::Trait { name, .. } => Some(name.to_string()),
-            _ => None,
+            ItemKind::Field { name, .. } => name.to_string(),
+            ItemKind::Variable { target, .. } => target.to_string(),
+            ItemKind::Structure { name, .. } => name.to_string(),
+            ItemKind::Enum { name, .. } => name.to_string(),
+            ItemKind::Function { name, .. } => name.to_string(),
+            ItemKind::Macro { name, .. } => name.to_string(),
+            ItemKind::Trait { name, .. } => name.to_string(),
+            ItemKind::Use(name) => name.to_string(),
+            ItemKind::Expression(expr) => expr.to_string(),
+            ItemKind::Implement { expr, .. } => expr.to_string(),
+            ItemKind::Unit => "()".to_string(),
         }
     }
 }

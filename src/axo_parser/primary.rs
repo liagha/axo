@@ -1,10 +1,10 @@
-use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Span, Token, TokenKind};
+use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Token, TokenKind};
 use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::state::{Context, ContextKind, Position, SyntaxRole};
 use crate::axo_parser::{Composite, ControlFlow, ParseError, Expr, ExprKind, Parser};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::expression::Expression;
 use crate::axo_parser::item::ItemParser;
+use crate::axo_span::Span;
 
 pub trait Primary {
     fn parse_atom(&mut self) -> Expr;
@@ -115,8 +115,8 @@ impl Primary for Parser {
 
             match kind {
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_braced(),
-                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_bracketed(),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(),
+                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_collection(),
+                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_group(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
                 TokenKind::Identifier(_)
                 | TokenKind::Str(_)
@@ -209,25 +209,31 @@ impl Primary for Parser {
         while let Some(Token { kind: TokenKind::Operator(op), .. }) = self.peek().cloned() {
             let precedence = op.precedence();
 
-            if precedence < min_precedence {
+            if let Some(precedence) = precedence {
+                if precedence < min_precedence {
+                    break;
+                }
+
+                let operator = self.next().unwrap();
+
+                let right = self.parse_binary(primary, precedence + 1);
+
+                let start = left.span.start;
+                let end = right.span.end;
+                let span = self.span(start, end);
+
+                let kind = ExprKind::Binary {
+                    left: left.into(),
+                    operator,
+                    right: right.into()
+                };
+
+                left = Expr { kind, span };
+
+                left = left.transform();
+            } else {
                 break;
             }
-
-            let operator = self.next().unwrap();
-
-            let right = self.parse_binary(primary, precedence + 1);
-
-            let start = left.span.start;
-            let end = right.span.end;
-            let span = self.span(start, end);
-
-            let kind = ExprKind::Binary {
-                left: left.into(),
-                operator,
-                right: right.into()
-            };
-
-            left = Expr { kind, span }.transform();
         }
 
         left

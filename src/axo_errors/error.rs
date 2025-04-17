@@ -1,14 +1,12 @@
 use std::fs::read_to_string;
 use broccli::{Color, TextStyle};
 use crate::axo_errors::hint::Hint;
-use crate::axo_lexer::Span;
-use crate::axo_parser::Context;
+use crate::axo_span::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Error<K, N = String, H = String> where K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display {
     pub kind: K,
     pub span: Span,
-    pub context: Option<Context>,
     pub note: Option<N>,
     pub hints: Vec<Hint<H>>,
 }
@@ -26,15 +24,9 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
         Self {
             kind,
             span,
-            context: None,
             note: None,
             hints: vec![],
         }
-    }
-
-    pub fn with_context(mut self, context: Context) -> Self {
-        self.context = Some(context);
-        self
     }
 
     pub fn with_help(mut self, note: impl Into<N>) -> Self {
@@ -58,10 +50,6 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
                                   line_start,
                                   column_start
         ).colorize(Color::Blue));
-
-        if let Some(ctx) = &self.context {
-            messages.push_str(&format!(" note: {}\n", ctx.describe_chain().colorize(Color::Blue)));
-        }
 
         let max_line_number = line_end.max(line_start).max(1);
         let line_number_width = max_line_number.to_string().len();

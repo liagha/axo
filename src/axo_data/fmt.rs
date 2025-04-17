@@ -47,7 +47,11 @@ impl<T: Display> Display for Tree<T> {
 // Implement Debug if T is Debug
 impl<T: Debug> Debug for Tree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "Tree({:?})", self.root)
+        if let Some(root) = &self.root {
+            write!(f, "Tree({:?})", root)
+        } else {
+            write!(f, "")
+        }
     }
 }
 

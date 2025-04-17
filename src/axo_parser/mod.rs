@@ -5,7 +5,6 @@ mod expression;
 mod error;
 mod primary;
 mod composite;
-mod state;
 mod item;
 mod fmt;
 mod delimiter;
@@ -17,7 +16,6 @@ pub use  {
     parser::Parser,
     composite::Composite,
     primary::Primary,
-    state::*,
 };
 
 use crate::{

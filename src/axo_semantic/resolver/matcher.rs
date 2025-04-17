@@ -76,7 +76,7 @@ impl SymbolMatcher {
         match &symbol.kind {
             ItemKind::Field { name, .. } => self.expr_name(name),
             ItemKind::Variable { target, .. } => self.expr_name(target),
-            ItemKind::Struct { name, .. } => self.expr_name(name),
+            ItemKind::Structure { name, .. } => self.expr_name(name),
             ItemKind::Enum { name, .. } => self.expr_name(name),
             ItemKind::Function { name, .. } => self.expr_name(name),
             ItemKind::Macro { name, .. } => self.expr_name(name),

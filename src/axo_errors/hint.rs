@@ -1,5 +1,5 @@
 use core::fmt::Display;
-use crate::axo_lexer::Span;
+use crate::axo_span::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Hint<M: Display> {

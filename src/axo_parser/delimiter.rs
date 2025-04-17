@@ -1,9 +1,8 @@
-use crate::axo_lexer::{PunctuationKind, Span, Token, TokenKind};
+use crate::axo_lexer::{PunctuationKind, Token, TokenKind};
 use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
-use crate::axo_parser::state::{ContextKind, SyntaxRole};
-use crate::axo_span::Spanned;
+use crate::axo_span::{Span, Spanned};
 
 pub trait Delimiter {
     fn parse_delimited<F, R>(
@@ -18,8 +17,8 @@ pub trait Delimiter {
         R: Spanned + Clone,
         F: FnMut(&mut Parser) -> R;
     fn parse_braced(&mut self) -> Expr;
-    fn parse_bracketed(&mut self) -> Expr;
-    fn parse_parenthesized(&mut self) -> Expr;
+    fn parse_collection(&mut self) -> Expr;
+    fn parse_group(&mut self) -> Expr;
 }
 
 impl Delimiter for Parser {
@@ -137,108 +136,61 @@ impl Delimiter for Parser {
         self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
     }
 
-    fn parse_bracketed(&mut self) -> Expr {
-        let bracket = self.next().unwrap();
-
-        let Token {
-            span: Span { start, .. },
-            ..
-        } = bracket;
-
-        let mut elements = Vec::new();
-
-        let mut err_end = start;
-
-        while let Some(token) = self.peek().cloned() {
-            match token {
-                Token {
-                    kind: TokenKind::Punctuation(PunctuationKind::RightBracket),
-                    span: Span { end, .. },
-                } => {
-                    self.next();
-
-                    
-
-                    return if elements.len() == 1 {
-                        elements.pop().unwrap()
-                    } else {
-                        Expr {
-                            kind: ExprKind::Array(elements),
-                            span: self.span(start, end),
-                        }
-                    };
-                }
-                Token {
-                    kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    span: Span { end, .. },
-                } => {
-                    err_end = end;
-
-                    self.next();
-                }
-                _ => {
-                    let expr = self.parse_complex();
-                    elements.push(expr);
-                }
+    fn parse_collection(&mut self) -> Expr {
+        if let Some(token) = self.peek() {
+            if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBracket) {
+                return self.error(&ParseError::new(
+                    ErrorKind::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
+                    token.span.clone(),
+                ));
             }
         }
 
-        let err_span = self.span(start, err_end);
+        let (elements, span) = self.parse_delimited(
+            TokenKind::Punctuation(PunctuationKind::LeftBracket),
+            TokenKind::Punctuation(PunctuationKind::RightBracket),
+            TokenKind::Punctuation(PunctuationKind::Comma),
+            false,
+            |parser| parser.parse_complex(),
+        );
 
-        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
+        // Return a single element if there's only one, otherwise return a collection
+        if elements.len() == 1 {
+            elements.into_iter().next().unwrap()
+        } else {
+            Expr {
+                kind: ExprKind::Collection(elements),
+                span,
+            }
+        }
     }
 
-    fn parse_parenthesized(&mut self) -> Expr {
-        let parenthesis = self.next().unwrap();
-
-        let Token {
-            span: Span { start, .. },
-            ..
-        } = parenthesis;
-
-        let mut parameters = Vec::new();
-
-        let mut err_end = (0usize, 0usize);
-
-        while let Some(token) = self.peek().cloned() {
-            match token {
-                Token {
-                    kind: TokenKind::Punctuation(PunctuationKind::RightParen),
-                    span: Span { end, .. },
-                } => {
-                    self.next();
-
-                    
-
-                    return if parameters.len() == 1 {
-                        parameters.pop().unwrap()
-                    } else {
-                        Expr {
-                            kind: ExprKind::Tuple(parameters),
-                            span: self.span(start, end),
-                        }
-                    };
-                }
-                Token {
-                    kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    span: Span { end, .. },
-                } => {
-                    err_end = end;
-
-                    self.next();
-                }
-                _ => {
-                    let expr = self.parse_complex();
-                    parameters.push(expr);
-                }
+    fn parse_group(&mut self) -> Expr {
+        if let Some(token) = self.peek() {
+            if token.kind != TokenKind::Punctuation(PunctuationKind::LeftParen) {
+                return self.error(&ParseError::new(
+                    ErrorKind::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftParen)),
+                    token.span.clone(),
+                ));
             }
         }
 
-        let err_span = self.span(start, err_end);
+        let (parameters, span) = self.parse_delimited(
+            TokenKind::Punctuation(PunctuationKind::LeftParen),
+            TokenKind::Punctuation(PunctuationKind::RightParen),
+            TokenKind::Punctuation(PunctuationKind::Comma),
+            false,
+            |parser| parser.parse_complex(),
+        );
 
-        self.error(&ParseError::new(
-            ErrorKind::UnclosedDelimiter(parenthesis),
-            err_span,
-        ))
+        // Return a single parameter if there's only one, otherwise return a group
+        if parameters.len() == 1 {
+            parameters.into_iter().next().unwrap()
+        } else {
+            Expr {
+                kind: ExprKind::Group(parameters),
+                span,
+            }
+        }
     }
 }

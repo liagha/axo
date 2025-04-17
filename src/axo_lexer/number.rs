@@ -1,6 +1,7 @@
 use crate::parser;
 use crate::axo_lexer::error::ErrorKind;
-use crate::axo_lexer::{Lexer, Token, TokenKind, Span, LexError};
+use crate::axo_lexer::{Lexer, Token, TokenKind, LexError};
+use crate::axo_span::Span;
 
 pub trait NumberLexer {
     fn handle_number(&mut self) -> Result<(), LexError>;

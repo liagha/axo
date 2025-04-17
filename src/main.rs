@@ -1,6 +1,3 @@
-#![feature(box_patterns)]
-extern crate core;
-
 pub mod axo_lexer;
 mod axo_parser;
 mod axo_semantic;
@@ -141,28 +138,33 @@ fn lex_and_parse(content: String, file_path: &str, config: &Config) {
 
     match lexer.tokenize() {
         Ok(tokens) => {
-            let lex_time = lex_start.elapsed().as_millis();
+            let lex_time = lex_start.elapsed().as_secs_f32();
 
             if config.show_tokens || config.verbose {
-                xprintln!("Tokens: \n{} => took {}ms", format_tokens(&tokens), lex_time);
+                xprintln!("Tokens: \n{}", format_tokens(&tokens));
                 xprintln!();
             } else if config.time_report {
-                xprintln!("Lexing completed in {}ms", lex_time);
+                xprintln!("Lexing completed in {} seconds", lex_time);
             }
+
+            println!("Compilation took: {} seconds", lex_start.elapsed().as_secs_f32());
 
             parse_tokens(tokens, file_path, config);
         }
         Err(err) => {
-            let parse_time = lex_start.elapsed().as_millis();
+            let parse_time = lex_start.elapsed().as_secs_f32();
             let (msg, details) = err.format();
 
-            xprintln!("{} \n {} => took {}ms" => Color::Red,
+            xprintln!("{} \n {} => took {} seconds" => Color::Red,
                             msg => Color::Orange, details, parse_time
                         );
+
+            println!("Compilation took: {} seconds", lex_start.elapsed().as_secs_f32());
 
             std::process::exit(1);
         }
     }
+
 }
 
 fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
@@ -172,7 +174,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
     let expressions = parser.parse_program();
 
     if parser.errors.is_empty() {
-        let parse_time = parse_start.elapsed().as_millis();
+        let parse_time = parse_start.elapsed().as_secs_f32();
 
         if config.show_ast || config.verbose {
             xprintln!(
@@ -200,7 +202,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
             // let exprs: String = expressions.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
             // xprintln!("Expressions: {}", format!("{}", exprs).term_colorize(Color::Green));
         } else if config.time_report {
-            xprintln!("Parsing completed in {}ms", parse_time);
+            xprintln!("Parsing completed in {} seconds", parse_time);
         }
     }
     else {
