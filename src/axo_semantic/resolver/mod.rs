@@ -1,11 +1,10 @@
 
 pub mod symbol;
 pub mod error;
-pub mod expression;
 pub mod scope;
 pub mod statement;
-mod matcher;
 mod fmt;
+mod matcher;
 
 use crate::{
     axo_data::matcher::Matcher,
@@ -17,14 +16,14 @@ use crate::{
     },
     axo_semantic::{
         error::ErrorKind,
-        expression::Expression,
-        resolver::matcher::SymbolMatcher,
         scope::Scope,
         statement::ControlFlowResolver,
     },
 };
 
 use hashbrown::{HashMap, HashSet};
+use crate::axo_data::matcher::{AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric, ExactMatchMetric, KeyboardProximityMetric, PrefixMetric, SubstringMetric, SuffixMetric, TokenSimilarityMetric};
+use crate::axo_semantic::resolver::matcher::Labeled;
 
 pub type ResolveError = Error<ErrorKind>;
 
@@ -70,7 +69,21 @@ impl Resolver {
         self.scope.symbols.insert(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Item) -> Item {
+    pub fn symbol_matcher() -> Matcher<Expr, Item> {
+        Matcher::<Expr, Item>::new()
+            .with_metric(ExactMatchMetric, 1.0)
+            .with_metric(CaseInsensitiveMetric, 0.9)
+            .with_metric(TokenSimilarityMetric::default(), 0.8)
+            .with_metric(EditDistanceMetric, 0.7)
+            .with_metric(PrefixMetric, 0.6)
+            .with_metric(SubstringMetric, 0.5)
+            .with_metric(SuffixMetric, 0.4)
+            .with_metric(KeyboardProximityMetric::default(), 0.3)
+            .with_metric(AcronymMetric::default(), 0.2)
+            .with_threshold(0.4)
+    }
+
+    pub fn lookup(&mut self, target: &Expr) -> Item {
         if let Some(symbol) = self.scope.lookup(target) {
             return symbol;
         }
@@ -81,7 +94,7 @@ impl Resolver {
             }
         }
 
-        let matcher = SymbolMatcher::default();
+        let matcher = Resolver::symbol_matcher();
 
         let candidates: Vec<Item> = self.scope.symbols.iter().cloned().collect();
 
@@ -89,9 +102,9 @@ impl Resolver {
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
-            let target_name = target.get_name();
+            let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
 
-            let found = suggestion.symbol.get_name();
+            let found = suggestion.value.get_name();
 
             let err = ResolveError {
                 kind: ErrorKind::UndefinedSymbol(target_name.to_string(), None),
@@ -114,7 +127,9 @@ impl Resolver {
                 span: target.span.clone(),
             }
         } else {
-            self.error(ErrorKind::UndefinedSymbol(target.get_name(), None), target.span.clone())
+            let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
+
+            self.error(ErrorKind::UndefinedSymbol(target_name, None), target.span.clone())
         }
     }
 
@@ -230,7 +245,7 @@ impl Resolver {
             },
 
             ExprKind::Assignment { target, value} => {
-                self.resolve_assignment(*target, *value, span)
+                self.lookup(&*target)
             },
 
             ExprKind::Block(block_exprs) => {
@@ -249,14 +264,6 @@ impl Resolver {
                 self.resolve_match(*target, *body, span)
             },
 
-            ExprKind::Identifier(_) => {
-                let variable = Item {
-                    kind: ItemKind::Variable { target: expr.into(), value: None, mutable: false, ty: None },
-                    span,
-                };
-
-                self.lookup(&variable)
-            },
             ExprKind::Binary { left, operator, right } => {
                 self.resolve_expr(*left.clone());
                 self.resolve_expr(*right.clone());
@@ -285,17 +292,12 @@ impl Resolver {
                 }
             },
 
-            ExprKind::Invoke { target, parameters } => {
-                self.resolve_invoke(*target, parameters)
-            },
-            ExprKind::Member { object, member} => {
-                self.resolve_member(*object, *member)
-            },
-            ExprKind::Closure { parameters, body} => {
-                self.resolve_closure(parameters, *body, span)
-            },
-            ExprKind::Constructor { name, body } => {
-                self.resolve_constructor(*name, body)
+            ExprKind::Invoke { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Closure { .. }
+            | ExprKind::Constructor { .. }
+            | ExprKind::Identifier(_) => {
+                self.lookup(&expr)
             },
 
             _ => {

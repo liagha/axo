@@ -1,6 +1,7 @@
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum KeywordKind {
     Use,
+    Var,
     Const,
     Extern,
     Macro,
@@ -17,7 +18,6 @@ pub enum KeywordKind {
     Fn,
     Return,
     Break,
-    Let,
     Continue,
 }
 
@@ -41,7 +41,7 @@ impl<T> KeywordLexer for T where T: AsRef<str> {
             "if" => Some(KeywordKind::If),
             "loop" => Some(KeywordKind::Loop),
             "impl" => Some(KeywordKind::Impl),
-            "let" => Some(KeywordKind::Let),
+            "var" => Some(KeywordKind::Var),
             "match" => Some(KeywordKind::Match),
             "return" => Some(KeywordKind::Return),
             "struct" => Some(KeywordKind::Struct),
@@ -68,7 +68,7 @@ impl core::fmt::Display for KeywordKind {
             KeywordKind::If => "if",
             KeywordKind::Loop => "loop",
             KeywordKind::Impl => "impl",
-            KeywordKind::Let => "let",
+            KeywordKind::Var => "var",
             KeywordKind::Match => "match",
             KeywordKind::Return => "return",
             KeywordKind::Struct => "struct",

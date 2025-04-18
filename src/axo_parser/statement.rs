@@ -8,7 +8,6 @@ use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_span::Span;
 
 pub trait ControlFlow {
-    fn parse_let(&mut self) -> Expr;
     fn parse_match(&mut self) -> Expr;
     fn parse_conditional(&mut self) -> Expr;
     fn parse_loop(&mut self) -> Expr;
@@ -20,43 +19,6 @@ pub trait ControlFlow {
 }
 
 impl ControlFlow for Parser {
-    fn parse_let(&mut self) -> Expr {
-        let Token {
-            span: Span { start, .. },
-            ..
-        } = self.next().unwrap();
-
-        let expr = self.parse_complex();
-
-        let Expr { kind, span: Span { end, .. } } = expr.clone();
-
-        let span = self.span(start, end);
-
-        let item = match kind {
-            ExprKind::Assignment { target, value } => {
-                ItemKind::Variable {
-                    target,
-                    value: Some(value),
-                    ty: None,
-                    mutable: false,
-                }
-            }
-            _ => {
-                ItemKind::Variable {
-                    target: expr.into(),
-                    value: None,
-                    ty: None,
-                    mutable: false,
-                }
-            }
-        };
-
-        Expr {
-            kind: ExprKind::Item(item),
-            span,
-        }
-    }
-
     fn parse_match(&mut self) -> Expr {
         let Token {
             span: Span { start, .. },

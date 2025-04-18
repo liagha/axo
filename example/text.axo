@@ -42,14 +42,14 @@ fn fibonacci(n) {
 
 print(result);
 
-let numbers = [1, 2, 3, 4, 5];
-let sum = 0;
+var numbers = [1, 2, 3, 4, 5];
+var sum = 0;
 
 for i + 1 {
-    let sum = numbers[i];
+    var sum = numbers[i];
 }
 
-let test[2] = 43;
+var test[2] = 43;
 x *= 4;
 
 if (x > 10) {
@@ -66,16 +66,16 @@ while x > 2 {
     test = 4;
 }
 
-let test = Test { x = 3, y = 5, };
+var test = Test { x = 3, y = 5, };
 
 struct Test {
     name: String,
     age: i32,
 }
 
-let n = p.name;
+var n = p.name;
 
-let test = (2, 3);
+var test = (2, 3);
 
 fn add(a, b) a + b;
 
@@ -89,7 +89,7 @@ x = if x > 0 {
     6;
 }
 
-let x : i32 = 3;
+var x : i32 = 3;
 
 3 + 3 * 6;
 
@@ -118,11 +118,11 @@ for i in 5 {
     sum += numbers[i];
 }
 
-let test = Test { x = 3, y = 5, };
+var test = Test { x = 3, y = 5, };
 
 while x > 0 x = 5;
 
-let x = if (test > 2) { 5; } else { 6; }
+var x = if (test > 2) { 5; } else { 6; }
 
 !-test;
 
@@ -176,7 +176,7 @@ if 4 + x {
     x - 4;
 }
 
-let "test" { test : ss, x: i32 } = x;
+var "test" { test : ss, x: i32 } = x;
 
 if x > test {
 }

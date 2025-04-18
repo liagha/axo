@@ -58,12 +58,37 @@ impl core::fmt::Debug for ItemKind {
             ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
             ItemKind::Implement { expr, body } => write!(f, "Implement({:?} => {:?})", expr, body),
             ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
-            ItemKind::Variable { target, value, .. } => write!(f, "Variable({:?} = {:?})", target, value),
+            ItemKind::Variable { target, value, mutable, ty } => {
+                let kind = if *mutable { "Variable" } else { "Constant" };
+                write!(f, "{}({:?}", kind, target)?;
+
+                if let Some(ty) = ty {
+                    write!(f, " : {:?}", ty)?;
+                }
+
+                if let Some(value) = value {
+                    write!(f, " = {:?}", value)?;
+                }
+
+                write!(f, ")")
+            },
             ItemKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
             ItemKind::Enum { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
             ItemKind::Macro { name, parameters, body } => write!(f, "Macro({:?}({:?}) {:?})", name, parameters, body),
             ItemKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
-            ItemKind::Field { name, value, ty } => write!(f, "Field({:?} : {:?} = {:?})", name, ty, value),
+            ItemKind::Field { name, value, ty } => {
+                write!(f, "Field({:?}", name)?;
+
+                if let Some(ty) = ty {
+                    write!(f, " : {:?}", ty)?;
+                }
+
+                if let Some(value) = value {
+                    write!(f, " = {:?}", value)?;
+                }
+
+                write!(f, ")")
+            },
             ItemKind::Unit => write!(f, "()")
         }
     }
@@ -105,11 +130,18 @@ impl core::fmt::Display for ExprKind {
 
             ExprKind::Collection(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
+
                 write!(f, "[{}]", elems.join(", "))
             }
             ExprKind::Group(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
+
                 write!(f, "({})", elems.join(", "))
+            }
+            ExprKind::Bundle(elements) => {
+                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
+
+                write!(f, "{{{}}}", elems.join(", "))
             }
 
             ExprKind::Binary { left, operator, right } => write!(f, "({} {} {})", left, operator, right),
@@ -195,58 +227,104 @@ impl core::fmt::Display for ExprKind {
 impl core::fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ExprKind::Literal(literal) => write!(f, "{:?}", literal),
-            ExprKind::Identifier(identifier) => write!(f, "Identifier({})", identifier),
-            ExprKind::Collection(elems) => write!(f, "Array({:?})", elems),
-            ExprKind::Group(elems) => write!(f, "Tuple({:?})", elems),
+            ExprKind::Literal(literal) => {
+                write!(f, "{:?}", literal)
+            },
+            ExprKind::Identifier(identifier) => {
+                write!(f, "Identifier({})", identifier)
+            },
+            ExprKind::Collection(elements) => {
+                write!(f, "Collection({:?})", elements)
+            },
+            ExprKind::Group(elements) => {
+                write!(f, "Group({:?})", elements)
+            },
+            ExprKind::Bundle(elements) => {
+                write!(f, "Bundle({:?})", elements)
+            }
 
             ExprKind::Binary { left, operator, right } => {
                 write!(f, "Binary({:?} {:?} {:?})", left, operator, right)
             }
-            ExprKind::Unary { operator, operand: expr } => write!(f, "Unary({:?} {:?})", operator, expr),
+            ExprKind::Unary { operator, operand: expr } => {
+                write!(f, "Unary({:?} {:?})", operator, expr)
+            },
 
-            ExprKind::Labeled { label: expr, expr: ty } => write!(f, "Typed({:?}: {:?})", expr, ty),
-            ExprKind::Index { expr, index } => write!(f, "Index({:?}[{:?}])", expr, index),
-            ExprKind::Invoke { target, parameters } => write!(f, "Invoke({:?}({:?}))", target, parameters),
-            ExprKind::Member { object, member} => write!(f, "Member({:?}.{:?})", object, member),
-            ExprKind::Closure { parameters, body } => write!(f, "Closure(|{:?}| {:?})", parameters, body),
+            ExprKind::Labeled { label: expr, expr: ty } => {
+                write!(f, "Labeled({:?}: {:?})", expr, ty)
+            },
+            ExprKind::Index { expr, index } => {
+                write!(f, "Index({:?}[{:?}])", expr, index)
+            },
+            ExprKind::Invoke { target, parameters } => {
+                write!(f, "Invoke({:?}({:?}))", target, parameters)
+            },
+            ExprKind::Member { object, member} => {
+                write!(f, "Member({:?}.{:?})", object, member)
+            },
+            ExprKind::Closure { parameters, body } => {
+                write!(f, "Closure(|{:?}| {:?})", parameters, body)
+            },
 
-            ExprKind::Match { target, body } => write!(f, "Match({:?} => {:?})", target, body),
+            ExprKind::Match { target, body } => {
+                write!(f, "Match({:?} => {:?})", target, body)
+            },
             ExprKind::Conditional { condition, then_branch, else_branch } => {
-                write!(f, "Conditional({:?} ? {:?}", condition, then_branch)?;
+                write!(f, "Conditional({:?} | Then: {:?}", condition, then_branch)?;
+
                 if let Some(else_expr) = else_branch {
-                    write!(f, " : {:?}", else_expr)?;
+                    write!(f, " | Else: {:?}", else_expr)?;
                 }
+
                 write!(f, ")")
             }
-            ExprKind::Loop { body } => write!(f, "Loop({:?})", body),
-            ExprKind::While { condition, body: then } => write!(f, "While({:?} do {:?})", condition, then),
-            ExprKind::For { clause, body } => write!(f, "For({:?} in {:?})", clause, body),
-            ExprKind::Block(stmts) => write!(f, "Block({:#?})", stmts),
+            ExprKind::Loop { body } => {
+                write!(f, "Loop({:?})", body)
+            },
+            ExprKind::While { condition, body: then } => {
+                write!(f, "While({:?} do {:?})", condition, then)
+            },
+            ExprKind::For { clause, body } => {
+                write!(f, "For({:?} in {:?})", clause, body)
+            },
+            ExprKind::Block(stmts) => {
+                write!(f, "Block({:#?})", stmts)
+            },
 
-            ExprKind::Assignment { target, value } => write!(f, "Assignment({:?} = {:?})", target, value),
-            ExprKind::Constructor { name, body } => write!(f, "Constructor({:?} with {:?})", name, body),
+            ExprKind::Assignment { target, value } => {
+                write!(f, "Assignment({:?} = {:?})", target, value)
+            },
+            ExprKind::Constructor { name, body } => {
+                write!(f, "Constructor({:?} | {:?})", name, body)
+            },
 
             ExprKind::Item(item) => write!(f, "+ {:?}", item),
+
             ExprKind::Return(expr) => {
                 write!(f, "Return")?;
+
                 if let Some(expr) = expr {
                     write!(f, "({:?})", expr)?;
                 }
+
                 Ok(())
             }
             ExprKind::Break(expr) => {
                 write!(f, "Break")?;
+
                 if let Some(expr) = expr {
                     write!(f, "({:?})", expr)?;
                 }
+
                 Ok(())
             }
             ExprKind::Continue(expr) => {
                 write!(f, "Continue")?;
+
                 if let Some(expr) = expr {
                     write!(f, "({:?})", expr)?;
                 }
+
                 Ok(())
             }
 

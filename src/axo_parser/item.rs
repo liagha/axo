@@ -1,4 +1,4 @@
-use crate::axo_lexer::{PunctuationKind, Token, TokenKind};
+use crate::axo_lexer::{KeywordKind, PunctuationKind, Token, TokenKind};
 use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::delimiter::Delimiter;
 use crate::axo_parser::error::ErrorKind;
@@ -58,6 +58,7 @@ pub enum ItemKind {
 pub trait ItemParser {
     fn parse_field(&mut self) -> Item;
     fn parse_use(&mut self) -> Expr;
+    fn parse_variable(&mut self) -> Expr;
     fn parse_impl(&mut self) -> Expr;
     fn parse_trait(&mut self) -> Expr;
     fn parse_function(&mut self) -> Expr;
@@ -136,6 +137,55 @@ impl ItemParser for Parser {
 
         expr
     }
+
+    fn parse_variable(&mut self) -> Expr {
+        let Token {
+            kind: def_kind,
+            span: Span { start, .. },
+        } = self.next().unwrap();
+
+        let mutable = def_kind == TokenKind::Keyword(KeywordKind::Var);
+
+        let expr = self.parse_complex();
+
+        let Expr { kind, span: Span { end, .. } } = expr.clone();
+
+        let span = self.span(start, end);
+
+        let item = match kind {
+            ExprKind::Assignment { target, value } => {
+                if let Expr { kind: ExprKind::Labeled { label, expr }, .. } = *target {
+                    ItemKind::Variable {
+                        target: label,
+                        value: Some(value),
+                        ty: Some(expr),
+                        mutable,
+                    }
+                } else {
+                    ItemKind::Variable {
+                        target,
+                        value: Some(value),
+                        ty: None,
+                        mutable,
+                    }
+                }
+            }
+            _ => {
+                ItemKind::Variable {
+                    target: expr.into(),
+                    value: None,
+                    ty: None,
+                    mutable,
+                }
+            }
+        };
+
+        Expr {
+            kind: ExprKind::Item(item),
+            span,
+        }
+    }
+
     fn parse_impl(&mut self) -> Expr {
         let Token {
             span: Span { start, .. },

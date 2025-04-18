@@ -1,7 +1,3 @@
-#![allow(dead_code)]
-
-use std::fmt::Formatter;
-use std::fs::read_to_string;
 use broccli::{Color, TextStyle};
 use crate::axo_lexer::{TokenKind, Token, PunctuationKind};
 use crate::axo_parser::{Expr};
@@ -11,16 +7,19 @@ pub enum ErrorKind {
     DanglingElse,
     ExpectedToken(TokenKind),
     MissingSeparator(TokenKind),
+    InconsistentSeparators,
     UnclosedDelimiter(Token),
+    UnterminatedGroup,
+    UnterminatedCollection,
+    UnterminatedBlock,
     UnimplementedToken(TokenKind),
     UnexpectedToken(TokenKind),
-    InvalidSyntaxPattern(String),
     UnexpectedEndOfFile,
 }
 
 
 impl core::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ErrorKind::ExpectedToken(expected) => {
                 write!(f, "expected token {:?}", expected)
@@ -31,14 +30,23 @@ impl core::fmt::Display for ErrorKind {
             ErrorKind::MissingSeparator(kind) => {
                 write!(f, "expected separator {}", kind)
             }
-            ErrorKind::InvalidSyntaxPattern(m) => {
-                write!(f, "invalid syntax pattern: '{}'", m)
+            ErrorKind::InconsistentSeparators => {
+                write!(f, "inconsistent separators")
             }
             ErrorKind::UnexpectedEndOfFile => {
                 write!(f, "unexpected end of file")
             }
             ErrorKind::UnclosedDelimiter(delimiter) => {
                 write!(f, "unclosed delimiter '{:?}'", delimiter)
+            }
+            ErrorKind::UnterminatedGroup => {
+                write!(f, "unterminated group")
+            }
+            ErrorKind::UnterminatedCollection => {
+                write!(f, "unterminated collection")
+            }
+            ErrorKind::UnterminatedBlock => {
+                write!(f, "unterminated block")
             }
             ErrorKind::UnimplementedToken(token) => {
                 write!(f, "unimplemented token '{}'", token)
@@ -51,7 +59,7 @@ impl core::fmt::Display for ErrorKind {
 }
 
 impl core::fmt::Debug for ErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self)
     }
 }

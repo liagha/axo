@@ -49,6 +49,7 @@ impl Primary for Parser {
 
             match kind {
                 TokenKind::Keyword(ref kw) => match kw {
+                    KeywordKind::Var | KeywordKind::Const => self.parse_variable(),
                     KeywordKind::If => self.parse_conditional(),
                     KeywordKind::Loop => self.parse_loop(),
                     KeywordKind::While => self.parse_while(),
@@ -59,7 +60,6 @@ impl Primary for Parser {
                     KeywordKind::Return => self.parse_return(),
                     KeywordKind::Break => self.parse_break(),
                     KeywordKind::Continue => self.parse_continue(),
-                    KeywordKind::Let => self.parse_let(),
                     KeywordKind::Struct => self.parse_struct(),
                     KeywordKind::Enum => self.parse_enum(),
                     KeywordKind::Impl => self.parse_impl(),

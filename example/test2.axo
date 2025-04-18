@@ -1,11 +1,14 @@
 use test::Test::ssss;
 
-let test = 4
-let teft = 6
+var test = 4
+var teft = 6
 
-let variable_test = 4;
+var variable_test = 4;
+const test = 5;
+const test : string = 5;
 
-struct Test { x: i8, 4 }
+
+var Test = 4;
 
 Test {
 }
@@ -14,4 +17,6 @@ Test {
 
 "\""
 
-10e10
+10e10;
+
+{ 3,test }

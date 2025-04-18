@@ -1,7 +1,7 @@
 use crate::axo_lexer::{PunctuationKind, Token, TokenKind};
-use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::expression::Expression;
+use crate::axo_parser::{Expr, ExprKind, ParseError, Parser, Primary};
 use crate::axo_span::{Span, Spanned};
 
 pub trait Delimiter {
@@ -32,7 +32,7 @@ impl Delimiter for Parser {
     ) -> (Vec<R>, Span)
     where
         R: Spanned + Clone,
-        F: FnMut(&mut Parser) -> R
+        F: FnMut(&mut Parser) -> R,
     {
         let open_token = self.next().unwrap();
         let Span { start, .. } = open_token.span;
@@ -45,8 +45,6 @@ impl Delimiter for Parser {
                 kind if kind == close_kind => {
                     let close_token = self.next().unwrap();
                     let Span { end, .. } = close_token.span;
-
-                    
 
                     return (items, self.span(start, end));
                 }
@@ -66,7 +64,6 @@ impl Delimiter for Parser {
                         if let Some(peek) = self.peek() {
                             if peek.kind == separator {
                                 err_end = token.span.end;
-
                                 self.next();
                             } else if peek.kind != close_kind {
                                 self.next();
@@ -78,8 +75,6 @@ impl Delimiter for Parser {
 
                                 return (items, self.span(start, err_end));
                             }
-                        } else {
-
                         }
                     }
                 }
@@ -93,47 +88,107 @@ impl Delimiter for Parser {
 
         (items, self.span(start, err_end))
     }
-    fn parse_braced(&mut self) -> Expr {
-        let brace = self.next().unwrap();
 
+    fn parse_braced(&mut self) -> Expr {
+        if let Some(token) = self.peek() {
+            if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBrace) {
+                return self.error(&ParseError::new(
+                    ErrorKind::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
+                    token.span.clone(),
+                ));
+            }
+        }
+
+        let brace = self.next().unwrap();
         let Token {
             span: Span { start, .. },
             ..
         } = brace;
 
-        let mut statements = Vec::new();
-
+        let mut items = Vec::new();
         let mut err_end = start;
+        let mut separator_type: Option<TokenKind> = None;
+        let mut has_inconsistent_separators = false;
+        let mut inconsistent_separator_span = None;
 
         while let Some(token) = self.peek().cloned() {
-            match token {
-                Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. } => {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     let Token {
                         span: Span { end, .. },
                         ..
                     } = self.next().unwrap();
 
-                    let kind = ExprKind::Block(statements);
-                    let expr = Expr {
+                    if has_inconsistent_separators {
+                        let error_span = self.span(start, end);
+                        return self.error(&ParseError::new(
+                            ErrorKind::InconsistentSeparators,
+                            inconsistent_separator_span.unwrap_or(error_span),
+                        ));
+                    }
+
+                    let kind = match separator_type {
+                        Some(TokenKind::Punctuation(PunctuationKind::Comma)) | None => {
+                            ExprKind::Bundle(items)
+                        }
+                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)) => {
+                            ExprKind::Block(items)
+                        }
+                        _ => unreachable!(), // This shouldn't happen with our current token types
+                    };
+
+                    return Expr {
                         kind,
                         span: self.span(start, end),
                     };
-
-                    return expr;
                 }
-                Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), span: Span { end, .. } } => {
-                    err_end = end;
+                TokenKind::Punctuation(PunctuationKind::Comma) => {
+                    if let Some(TokenKind::Punctuation(PunctuationKind::Semicolon)) = separator_type
+                    {
+                        // Mark as inconsistent but continue parsing
+                        has_inconsistent_separators = true;
+                        if inconsistent_separator_span.is_none() {
+                            inconsistent_separator_span = Some(token.span.clone());
+                        }
+                    }
 
+                    separator_type = Some(TokenKind::Punctuation(PunctuationKind::Comma));
+                    err_end = token.span.end;
+                    self.next();
+                }
+                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                    // Check for inconsistent separators
+                    if let Some(TokenKind::Punctuation(PunctuationKind::Comma)) = separator_type {
+                        // Mark as inconsistent but continue parsing
+                        has_inconsistent_separators = true;
+                        if inconsistent_separator_span.is_none() {
+                            inconsistent_separator_span = Some(token.span.clone());
+                        }
+                    }
+                    separator_type = Some(TokenKind::Punctuation(PunctuationKind::Semicolon));
+                    err_end = token.span.end;
                     self.next();
                 }
                 _ => {
-                    let stmt = self.parse_statement();
-                    statements.push(stmt.into());
+                    // Parse an expression or statement depending on the separator type
+                    let item =
+                        if separator_type == Some(TokenKind::Punctuation(PunctuationKind::Comma)) {
+                            self.parse_complex() // For bundles, parse expressions
+                        } else {
+                            self.parse_statement().into() // For blocks, parse statements
+                        };
+
+                    err_end = item.span().end;
+                    items.push(item);
                 }
             }
         }
 
-        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(brace), self.span(start, err_end)))
+        // If we get here, we have an unclosed delimiter
+        self.error(&ParseError::new(
+            ErrorKind::UnclosedDelimiter(brace),
+            self.span(start, err_end),
+        ))
     }
 
     fn parse_collection(&mut self) -> Expr {

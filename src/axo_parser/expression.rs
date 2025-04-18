@@ -17,24 +17,25 @@ pub struct Expr {
 #[derive(Hash, Eq, Clone, PartialEq)]
 pub enum ExprKind {
     // Primary Expressions
-    Literal(Token),
-    Identifier(String),
+    Literal(Token),        // Strings, Characters, Floats and Integers
+    Identifier(String),    // Identifiers for functions, structs, etc
 
     // Composite
-    Collection(Vec<Expr>),
-    Group(Vec<Expr>),
-    Constructor {
+    Group(Vec<Expr>),      // (exprs, ...)
+    Collection(Vec<Expr>), // [exprs, ...]
+    Bundle(Vec<Expr>),     // { exprs, ... }
+    Constructor {          // $Name { fields, ... }
         name: Box<Expr>,
         body: Box<Expr>
     },
 
     // Operations
-    Binary {
+    Binary {               // First_Expr | Operator | Second_Expr
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>
     },
-    Unary {
+    Unary {                // Prefix or Suffix, Before or After an Expr
         operator: Token,
         operand: Box<Expr>,
     },
