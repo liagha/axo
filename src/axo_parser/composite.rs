@@ -1,9 +1,19 @@
-use crate::axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::{ControlFlow, ParseError, Expr, ExprKind, Parser, Primary};
-use crate::axo_parser::delimiter::Delimiter;
-use crate::axo_parser::expression::Expression;
-use crate::axo_span::Span;
+use {
+    crate::{
+        axo_lexer::{
+            OperatorKind, PunctuationKind,
+            Token, TokenKind
+        },
+        axo_parser::{
+            error::ErrorKind,
+            delimiter::Delimiter,
+            expression::Expression,
+            ParseError, Expr, ExprKind,
+            Parser, Primary, ControlFlow,
+        },
+        axo_span::Span,
+    },
+};
 
 pub trait Composite {
     fn parse_index(&mut self, left: Expr) -> Expr;

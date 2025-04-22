@@ -1,5 +1,5 @@
 [package]
-name = "hashbrown"
+name = "axo_hash"
 version = "0.15.1"
 description = "A Rust port of Google's SwissTable hash map"
 license = "MIT"

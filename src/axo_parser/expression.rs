@@ -1,23 +1,25 @@
 #![allow(dead_code)]
 
-use crate::{
-    axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
-    axo_parser::{item::ItemKind, ParseError, Parser, Primary},
-    axo_data::tree::Tree,
-    axo_span::Span,
+use {
+    crate::{
+        axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
+        axo_parser::{item::ItemKind, ParseError, Parser, Primary},
+        axo_data::tree::Tree,
+        axo_span::Span,
+        axo_data::tree::Node
+    },
 };
-use crate::axo_data::tree::Node;
 
-#[derive(Hash, Eq, Clone, PartialEq)]
+#[derive(Eq, Clone)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
 }
 
-#[derive(Hash, Eq, Clone, PartialEq)]
+#[derive(Eq, Clone)]
 pub enum ExprKind {
     // Primary Expressions
-    Literal(Token),        // Strings, Characters, Floats and Integers
+    Literal(TokenKind),        // Strings, Characters, Floats and Integers
     Identifier(String),    // Identifiers for functions, structs, etc
 
     // Composite

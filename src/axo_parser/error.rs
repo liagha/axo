@@ -1,6 +1,14 @@
-use broccli::{Color, TextStyle};
-use crate::axo_lexer::{TokenKind, Token, PunctuationKind};
-use crate::axo_parser::{Expr};
+use {
+    broccli::{
+        Color, TextStyle
+    },
+    crate::{
+        axo_lexer::{
+            TokenKind, Token, PunctuationKind
+        },
+        axo_parser::Expr,
+    }
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {

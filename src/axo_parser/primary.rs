@@ -1,10 +1,21 @@
-use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::{Composite, ControlFlow, ParseError, Expr, ExprKind, Parser};
-use crate::axo_parser::delimiter::Delimiter;
-use crate::axo_parser::expression::Expression;
-use crate::axo_parser::item::ItemParser;
-use crate::axo_span::Span;
+use {
+    crate::{
+        axo_lexer::{
+            Token, TokenKind,
+            KeywordKind, OperatorKind, PunctuationKind,
+        },
+        axo_parser::{
+            delimiter::Delimiter,
+            expression::Expression,
+            item::ItemParser,
+            error::ErrorKind,
+            Expr, ExprKind,
+            ParseError, Parser,
+            Composite, ControlFlow
+        },
+        axo_span::Span,
+    }
+};
 
 pub trait Primary {
     fn parse_atom(&mut self) -> Expr;
@@ -34,9 +45,13 @@ impl Primary for Parser {
             | TokenKind::Punctuation(_)
             | TokenKind::Keyword(_)
             | TokenKind::Comment(_)
-            | TokenKind::EOF => Expr {
-                kind: ExprKind::Literal(token),
-                span,
+            | TokenKind::EOF => {
+                let Token { kind, span } = token;
+
+                Expr {
+                    kind: ExprKind::Literal(kind),
+                    span,
+                }
             },
         };
 

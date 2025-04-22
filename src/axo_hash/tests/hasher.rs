@@ -20,7 +20,7 @@ fn check<S: BuildHasher + Default>() {
     assert!(!set.contains(&i32::MAX));
 }
 
-/// Use hashbrown's default hasher.
+/// Use axo_hash's default hasher.
 #[test]
 fn default() {
     check::<hashbrown::DefaultHashBuilder>();

@@ -1,17 +1,30 @@
-use crate::axo_lexer::{KeywordKind, PunctuationKind, Token, TokenKind};
-use crate::axo_parser::{ParseError, Expr, ExprKind, Parser, Primary};
-use crate::axo_parser::delimiter::Delimiter;
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::expression::Expression;
-use crate::axo_span::Span;
+use {
+    core::hash::{
+        Hash, Hasher
+    },
+    crate::{
+        axo_lexer::{
+            Token, TokenKind,
+            KeywordKind, PunctuationKind,
+        },
+        axo_parser::{
+            delimiter::Delimiter,
+            expression::Expression,
+            error::ErrorKind,
+            Expr, ExprKind,
+            ParseError, Parser, Primary
+        },
+        axo_span::Span,
+    }
+};
 
-#[derive(Clone)]
+#[derive(Eq, Clone)]
 pub struct Item {
     pub kind: ItemKind,
     pub span: Span,
 }
 
-#[derive(Clone)]
+#[derive(Eq, Clone)]
 pub enum ItemKind {
     Use(Box<Expr>),
     Expression(Box<Expr>),

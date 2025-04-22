@@ -25,8 +25,8 @@ use {
 /// (provided by the [`IntoParallelRefIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`par_iter`]: /hashbrown/struct.HashMap.html#method.par_iter
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_iter`]: /axo_hash/struct.HashMap.html#method.par_iter
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 /// [`IntoParallelRefIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelRefIterator.html
 pub struct ParIter<'a, K, V> {
     inner: RawParIter<(K, V)>,
@@ -75,8 +75,8 @@ impl<K: fmt::Debug + Eq + Hash, V: fmt::Debug> fmt::Debug for ParIter<'_, K, V> 
 /// This iterator is created by the [`par_keys`] method on [`HashMap`].
 /// See its documentation for more.
 ///
-/// [`par_keys`]: /hashbrown/struct.HashMap.html#method.par_keys
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_keys`]: /axo_hash/struct.HashMap.html#method.par_keys
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 pub struct ParKeys<'a, K, V> {
     inner: RawParIter<(K, V)>,
     marker: PhantomData<(&'a K, &'a V)>,
@@ -118,8 +118,8 @@ impl<K: fmt::Debug + Eq + Hash, V> fmt::Debug for ParKeys<'_, K, V> {
 /// This iterator is created by the [`par_values`] method on [`HashMap`].
 /// See its documentation for more.
 ///
-/// [`par_values`]: /hashbrown/struct.HashMap.html#method.par_values
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_values`]: /axo_hash/struct.HashMap.html#method.par_values
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 pub struct ParValues<'a, K, V> {
     inner: RawParIter<(K, V)>,
     marker: PhantomData<(&'a K, &'a V)>,
@@ -162,8 +162,8 @@ impl<K: Eq + Hash, V: fmt::Debug> fmt::Debug for ParValues<'_, K, V> {
 /// (provided by the [`IntoParallelRefMutIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`par_iter_mut`]: /hashbrown/struct.HashMap.html#method.par_iter_mut
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_iter_mut`]: /axo_hash/struct.HashMap.html#method.par_iter_mut
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 /// [`IntoParallelRefMutIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelRefMutIterator.html
 pub struct ParIterMut<'a, K, V> {
     inner: RawParIter<(K, V)>,
@@ -202,8 +202,8 @@ impl<K: fmt::Debug + Eq + Hash, V: fmt::Debug> fmt::Debug for ParIterMut<'_, K, 
 /// This iterator is created by the [`par_values_mut`] method on [`HashMap`].
 /// See its documentation for more.
 ///
-/// [`par_values_mut`]: /hashbrown/struct.HashMap.html#method.par_values_mut
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_values_mut`]: /axo_hash/struct.HashMap.html#method.par_values_mut
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 pub struct ParValuesMut<'a, K, V> {
     inner: RawParIter<(K, V)>,
     marker: PhantomData<(&'a K, &'a mut V)>,
@@ -239,8 +239,8 @@ impl<K: Eq + Hash, V: fmt::Debug> fmt::Debug for ParValuesMut<'_, K, V> {
 /// (provided by the [`IntoParallelIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`into_par_iter`]: /hashbrown/struct.HashMap.html#method.into_par_iter
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`into_par_iter`]: /axo_hash/struct.HashMap.html#method.into_par_iter
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 /// [`IntoParallelIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelIterator.html
 pub struct IntoParIter<K, V, A: Allocator = Global> {
     inner: RawIntoParIter<(K, V), A>,
@@ -273,8 +273,8 @@ impl<K: fmt::Debug + Eq + Hash, V: fmt::Debug, A: Allocator> fmt::Debug for Into
 /// This iterator is created by the [`par_drain`] method on [`HashMap`].
 /// See its documentation for more.
 ///
-/// [`par_drain`]: /hashbrown/struct.HashMap.html#method.par_drain
-/// [`HashMap`]: /hashbrown/struct.HashMap.html
+/// [`par_drain`]: /axo_hash/struct.HashMap.html#method.par_drain
+/// [`HashMap`]: /axo_hash/struct.HashMap.html
 pub struct ParDrain<'a, K, V, A: Allocator = Global> {
     inner: RawParDrain<'a, (K, V), A>,
 }

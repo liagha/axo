@@ -1,8 +1,19 @@
-use crate::axo_lexer::{PunctuationKind, Token, TokenKind};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::expression::Expression;
-use crate::axo_parser::{Expr, ExprKind, ParseError, Parser, Primary};
-use crate::axo_span::{Span, Spanned};
+use {
+    crate::{
+        axo_lexer::{
+            PunctuationKind, Token, TokenKind
+        },
+        axo_parser::{
+            error::ErrorKind,
+            expression::Expression,
+            Expr, ExprKind,
+            ParseError, Parser, Primary,
+        },
+        axo_span::{
+            Span, Spanned
+        }
+    }
+};
 
 pub trait Delimiter {
     fn parse_delimited<F, R>(

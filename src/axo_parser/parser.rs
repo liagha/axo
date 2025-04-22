@@ -1,10 +1,21 @@
 #![allow(dead_code)]
 
-use std::path::PathBuf;
-use crate::axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::axo_parser::{ParseError, Expr, ExprKind, Primary};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_span::Span;
+use {
+    std::path::PathBuf,
+
+    crate::{
+        axo_lexer::{
+            Token, TokenKind,
+            OperatorKind, PunctuationKind
+        },
+        axo_parser::{
+            error::ErrorKind,
+            Expr, ExprKind,
+            ParseError, Primary,
+        },
+        axo_span::Span,
+    }
+};
 
 pub struct Parser {
     tokens: Vec<Token>,

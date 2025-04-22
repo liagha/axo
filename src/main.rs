@@ -1,4 +1,4 @@
-pub mod axo_lexer;
+mod axo_lexer;
 mod axo_parser;
 mod axo_semantic;
 mod axo_data;
@@ -6,15 +6,28 @@ mod axo_rune;
 mod axo_errors;
 mod axo_codegen;
 mod axo_span;
+mod axo_matcher;
 
-pub use axo_rune::*;
+pub use {
+    axo_rune::*,
+    axo_semantic::Resolver,
+    //axo_span::Span,
+    axo_parser::{
+        Parser,
+    //    Expr, ExprKind,
+    //    Item, ItemKind
+    },
+    axo_lexer::{
+        Lexer, Token, TokenKind, PunctuationKind,
+    },
 
-use std::time::Instant;
-use std::path::PathBuf;
-use axo_lexer::{Lexer, PunctuationKind, Token, TokenKind};
-use axo_parser::Parser;
-use broccli::{xprintln, Color, TextStyle};
-use crate::axo_semantic::Resolver;
+    broccli::{xprintln, Color, TextStyle},
+
+    std::{
+        time::Instant,
+        path::PathBuf,
+    }
+};
 
 struct Config {
     file_path: String,
@@ -196,7 +209,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
                         );
                 }
             } else {
-                println!("{:#?}", resolver.symbols())
+                println!("Symbols:\n{:#?}", resolver.symbols())
             }
 
             // let exprs: String = expressions.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");

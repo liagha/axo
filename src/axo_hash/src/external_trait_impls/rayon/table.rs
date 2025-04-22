@@ -14,8 +14,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 /// (provided by the [`IntoParallelRefIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`par_iter`]: /hashbrown/struct.HashTable.html#method.par_iter
-/// [`HashTable`]: /hashbrown/struct.HashTable.html
+/// [`par_iter`]: /axo_hash/struct.HashTable.html#method.par_iter
+/// [`HashTable`]: /axo_hash/struct.HashTable.html
 /// [`IntoParallelRefIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelRefIterator.html
 pub struct ParIter<'a, T> {
     inner: RawParIter<T>,
@@ -59,8 +59,8 @@ impl<T: fmt::Debug> fmt::Debug for ParIter<'_, T> {
 /// (provided by the [`IntoParallelRefMutIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`par_iter_mut`]: /hashbrown/struct.HashTable.html#method.par_iter_mut
-/// [`HashTable`]: /hashbrown/struct.HashTable.html
+/// [`par_iter_mut`]: /axo_hash/struct.HashTable.html#method.par_iter_mut
+/// [`HashTable`]: /axo_hash/struct.HashTable.html
 /// [`IntoParallelRefMutIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelRefMutIterator.html
 pub struct ParIterMut<'a, T> {
     inner: RawParIter<T>,
@@ -97,8 +97,8 @@ impl<T: fmt::Debug> fmt::Debug for ParIterMut<'_, T> {
 /// (provided by the [`IntoParallelIterator`] trait).
 /// See its documentation for more.
 ///
-/// [`into_par_iter`]: /hashbrown/struct.HashTable.html#method.into_par_iter
-/// [`HashTable`]: /hashbrown/struct.HashTable.html
+/// [`into_par_iter`]: /axo_hash/struct.HashTable.html#method.into_par_iter
+/// [`HashTable`]: /axo_hash/struct.HashTable.html
 /// [`IntoParallelIterator`]: https://docs.rs/rayon/1.0/rayon/iter/trait.IntoParallelIterator.html
 pub struct IntoParIter<T, A: Allocator = Global> {
     inner: RawIntoParIter<T, A>,
@@ -131,8 +131,8 @@ impl<T: fmt::Debug, A: Allocator> fmt::Debug for IntoParIter<T, A> {
 /// This iterator is created by the [`par_drain`] method on [`HashTable`].
 /// See its documentation for more.
 ///
-/// [`par_drain`]: /hashbrown/struct.HashTable.html#method.par_drain
-/// [`HashTable`]: /hashbrown/struct.HashTable.html
+/// [`par_drain`]: /axo_hash/struct.HashTable.html#method.par_drain
+/// [`HashTable`]: /axo_hash/struct.HashTable.html
 pub struct ParDrain<'a, T, A: Allocator = Global> {
     inner: RawParDrain<'a, T, A>,
 }

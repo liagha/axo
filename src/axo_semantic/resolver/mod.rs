@@ -7,22 +7,31 @@ mod fmt;
 mod matcher;
 
 use crate::{
-    axo_data::matcher::Matcher,
-    axo_errors::{Error, Hint, Action},
-    axo_span::Span,
+    axo_matcher::{
+        Matcher,
+        AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
+        ExactMatchMetric, KeyboardProximityMetric, PrefixMetric,
+        SubstringMetric, SuffixMetric, TokenSimilarityMetric,
+        MatchType::Exact,
+    },
+
     axo_parser::{
         Expr, ExprKind,
         Item, ItemKind,
     },
+
     axo_semantic::{
         error::ErrorKind,
         scope::Scope,
         statement::ControlFlowResolver,
+        resolver::matcher::{symbol_matcher}
     },
+
+    axo_errors::{Error, Hint, Action},
+    axo_span::Span,
 };
 
-use hashbrown::{HashMap, HashSet};
-use crate::axo_data::matcher::{AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric, ExactMatchMetric, KeyboardProximityMetric, PrefixMetric, SubstringMetric, SuffixMetric, TokenSimilarityMetric};
+use axo_hash::{HashMap, HashSet};
 use crate::axo_semantic::resolver::matcher::Labeled;
 
 pub type ResolveError = Error<ErrorKind>;
@@ -66,45 +75,32 @@ impl Resolver {
     }
 
     pub fn insert(&mut self, symbol: Item) {
-        self.scope.symbols.insert(symbol);
-    }
+        if self.symbols().contains(&symbol) {
+            self.scope.symbols.insert(symbol);
+        } else {
+            self.scope.symbols.remove(&symbol);
 
-    pub fn symbol_matcher() -> Matcher<Expr, Item> {
-        Matcher::<Expr, Item>::new()
-            .with_metric(ExactMatchMetric, 1.0)
-            .with_metric(CaseInsensitiveMetric, 0.9)
-            .with_metric(TokenSimilarityMetric::default(), 0.8)
-            .with_metric(EditDistanceMetric, 0.7)
-            .with_metric(PrefixMetric, 0.6)
-            .with_metric(SubstringMetric, 0.5)
-            .with_metric(SuffixMetric, 0.4)
-            .with_metric(KeyboardProximityMetric::default(), 0.3)
-            .with_metric(AcronymMetric::default(), 0.2)
-            .with_threshold(0.4)
+            self.scope.symbols.insert(symbol);
+        }
     }
 
     pub fn lookup(&mut self, target: &Expr) -> Item {
-        if let Some(symbol) = self.scope.lookup(target) {
-            return symbol;
-        }
+        let matcher = symbol_matcher();
 
-        if let Some(parent) = &self.scope.parent {
-            if let Some(symbol) = parent.lookup(target) {
-                return symbol;
-            }
-        }
-
-        let matcher = Resolver::symbol_matcher();
-
-        let candidates: Vec<Item> = self.scope.symbols.iter().cloned().collect();
+        let candidates: Vec<Item> = self.scope.symbols().iter().cloned().collect();
 
         let suggestion = matcher
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
+            println!("{:?}", suggestion);
             let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
 
-            let found = suggestion.value.get_name();
+            let found = suggestion.value.name().map(|name| name.to_string()).unwrap_or(target.to_string());
+
+            if suggestion.match_type == Exact || suggestion.score == 1.0 {
+                return suggestion.value
+            }
 
             let err = ResolveError {
                 kind: ErrorKind::UndefinedSymbol(target_name.to_string(), None),
@@ -112,7 +108,7 @@ impl Resolver {
                 note: None,
                 hints: vec![
                     Hint {
-                        message: format!("replace `{}` with `{}` | similarity: {:?}", target_name, found, suggestion.match_type),
+                        message: format!("replace `{}` with `{}` | similarity: ({:?} | {:?})", target_name, found, suggestion.match_type, suggestion.score),
                         action: vec![
                             Action::Replace(found, target.span.clone()),
                         ],
@@ -244,7 +240,7 @@ impl Resolver {
                 item
             },
 
-            ExprKind::Assignment { target, value} => {
+            ExprKind::Assignment { target, .. } => {
                 self.lookup(&*target)
             },
 

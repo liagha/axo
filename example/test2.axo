@@ -1,22 +1,8 @@
-use test::Test::ssss;
+const test = 44
+const test = 4
 
-var test = 4
-var teft = 6
-
-var variable_test = 4;
-const test = 5;
-const test : string = 5;
-
-
-var Test = 4;
-
-Test {
+fn test() {
+    test = 3
 }
 
-332 --> 22
-
-"\""
-
-10e10;
-
-{ 3,test }
+test()

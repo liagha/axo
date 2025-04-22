@@ -1,10 +1,11 @@
-use std::cmp::{max, min};
-use hashbrown::HashMap;
-use crate::axo_data::matcher::{create_qwerty_layout, damerau_levenshtein_distance, MatchType, SimilarityMetric, SuffixMetric};
+use core::cmp::{max, min};
+use axo_hash::HashMap;
+use crate::axo_matcher::{create_qwerty_layout, damerau_levenshtein_distance, AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric, ExactMatchMetric, KeyboardProximityMetric, MatchType, Matcher, PrefixMetric, SimilarityMetric, SubstringMetric, SuffixMetric, TokenSimilarityMetric};
 use crate::axo_lexer::{Token, TokenKind};
 use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
+use crate::axo_semantic::scope::Scope;
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::CaseInsensitiveMetric {
+impl SimilarityMetric<Token, Token> for CaseInsensitiveMetric {
     fn calculate(&self, query: &Token, candidate: &Token) -> f64 {
         if query.to_string().to_lowercase() == candidate.to_string().to_lowercase() { 0.95 } else { 0.0 }
     }
@@ -14,7 +15,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::CaseInsensitiv
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::PrefixMetric {
+impl SimilarityMetric<Token, Token> for PrefixMetric {
     fn calculate(&self, query: &Token, candidate: &Token) -> f64 {
         let query_lower = query.to_string().to_lowercase();
         let candidate_lower = candidate.to_string().to_lowercase();
@@ -42,7 +43,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::PrefixMetric {
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::SubstringMetric {
+impl SimilarityMetric<Token, Token> for SubstringMetric {
     fn calculate(&self, query: &Token, candidate: &Token) -> f64 {
         let query_lower = query.to_string().to_lowercase();
         let candidate_lower = candidate.to_string().to_lowercase();
@@ -61,7 +62,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::SubstringMetri
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::EditDistanceMetric {
+impl SimilarityMetric<Token, Token> for EditDistanceMetric {
     fn calculate(&self, s1: &Token, s2: &Token) -> f64 {
         let distance = damerau_levenshtein_distance(&*s1.to_string(), &*s2.to_string());
         let max_len = max(s1.to_string().len(), s2.to_string().len());
@@ -78,7 +79,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::EditDistanceMe
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::TokenSimilarityMetric {
+impl SimilarityMetric<Token, Token> for TokenSimilarityMetric {
     fn calculate(&self, s1: &Token, s2: &Token) -> f64 {
         let s1_lower = s1.to_string().to_lowercase();
         let s2_lower = s2.to_string().to_lowercase();
@@ -94,7 +95,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::TokenSimilarit
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::AcronymMetric {
+impl SimilarityMetric<Token, Token> for AcronymMetric {
     fn calculate(&self, query: &Token, candidate: &Token) -> f64 {
         if query.to_string().len() > self.max_acronym_length {
             return 0.0;
@@ -134,7 +135,7 @@ impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::AcronymMetric 
     }
 }
 
-impl SimilarityMetric<Token, Token> for crate::axo_data::matcher::KeyboardProximityMetric {
+impl SimilarityMetric<Token, Token> for KeyboardProximityMetric {
     fn calculate(&self, s1: &Token, s2: &Token) -> f64 {
         let s1_lower = s1.to_string().to_lowercase();
         let s2_lower = s2.to_string().to_lowercase();
@@ -238,7 +239,7 @@ impl Labeled<Token> for Expr {
         let Expr { kind, span } = self.clone();
 
         match kind {
-            ExprKind::Literal(literal) => Some(literal),
+            ExprKind::Literal(literal) => Some(Token { kind: literal, span }),
             ExprKind::Identifier(identifier) => Some(Token {
                 kind: TokenKind::Identifier(identifier),
                 span,
@@ -278,7 +279,7 @@ impl Labeled<Token> for ItemKind {
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::CaseInsensitiveMetric {
+impl SimilarityMetric<Expr, Item> for CaseInsensitiveMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -297,7 +298,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::CaseInsensitiveM
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::PrefixMetric {
+impl SimilarityMetric<Expr, Item> for PrefixMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -330,7 +331,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::PrefixMetric {
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::SubstringMetric {
+impl SimilarityMetric<Expr, Item> for SubstringMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -354,7 +355,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::SubstringMetric 
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::EditDistanceMetric {
+impl SimilarityMetric<Expr, Item> for EditDistanceMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -376,7 +377,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::EditDistanceMetr
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::TokenSimilarityMetric {
+impl SimilarityMetric<Expr, Item> for TokenSimilarityMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -397,7 +398,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::TokenSimilarityM
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::AcronymMetric {
+impl SimilarityMetric<Expr, Item> for AcronymMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -442,7 +443,7 @@ impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::AcronymMetric {
     }
 }
 
-impl SimilarityMetric<Expr, Item> for crate::axo_data::matcher::KeyboardProximityMetric {
+impl SimilarityMetric<Expr, Item> for KeyboardProximityMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
@@ -531,21 +532,295 @@ impl SimilarityMetric<Expr, Item> for SuffixMetric {
     }
 }
 
+pub struct SymbolTypeMetric;
+
+pub struct ParameterCountMetric;
+
+impl SimilarityMetric<Expr, Item> for ParameterCountMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        match (&query.kind, &candidate.kind) {
+            (ExprKind::Invoke { parameters, .. }, ItemKind::Function { parameters: func_params, .. }) => {
+                let query_param_count = parameters.len();
+                let candidate_param_count = func_params.len();
+
+                if query_param_count == candidate_param_count {
+                    0.9
+                } else if (query_param_count as isize - candidate_param_count as isize).abs() <= 2 {
+                    // Allow up to 2 parameters difference
+                    0.7 - 0.1 * (query_param_count as isize - candidate_param_count as isize).abs() as f64
+                } else {
+                    0.0
+                }
+            },
+            (ExprKind::Invoke { parameters, .. }, ItemKind::Macro { parameters: macro_params, .. }) => {
+                let query_param_count = parameters.len();
+                let candidate_param_count = macro_params.len();
+
+                if query_param_count == candidate_param_count {
+                    0.9
+                } else if (query_param_count as isize - candidate_param_count as isize).abs() <= 2 {
+                    0.7 - 0.1 * (query_param_count as isize - candidate_param_count as isize).abs() as f64
+                } else {
+                    0.0
+                }
+            },
+            (ExprKind::Constructor { body, .. }, ItemKind::Structure { fields, .. }) => {
+                if let ExprKind::Bundle(exprs) = &body.kind {
+                    let constructor_field_count = exprs.len();
+                    let struct_field_count = fields.len();
+
+                    if constructor_field_count == struct_field_count {
+                        0.9
+                    } else if constructor_field_count < struct_field_count {
+                        0.8 * (constructor_field_count as f64 / struct_field_count as f64)
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            },
+            _ => 0.0,
+        }
+    }
+
+    fn name(&self) -> &str {
+        "ParameterCount"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        let score = self.calculate(query, candidate);
+        if score > 0.0 {
+            Some(MatchType::Similar("ParameterCount".to_string()))
+        } else {
+            None
+        }
+    }
+}
+
+pub struct ContextualRelevanceMetric {
+    pub context_weight: f64,
+}
+
+impl Default for ContextualRelevanceMetric {
+    fn default() -> Self {
+        Self {
+            context_weight: 0.85,
+        }
+    }
+}
+
+impl SimilarityMetric<Expr, Item> for ContextualRelevanceMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        match &query.kind {
+            ExprKind::Identifier(_) => {
+                match &candidate.kind {
+                    ItemKind::Variable { .. } => self.context_weight,
+                    ItemKind::Function { .. } => self.context_weight - 0.1,
+                    ItemKind::Structure { .. } => self.context_weight - 0.2,
+                    ItemKind::Enum { .. } => self.context_weight - 0.2,
+                    _ => 0.0,
+                }
+            },
+            ExprKind::Invoke { .. } => {
+                match &candidate.kind {
+                    ItemKind::Function { .. } => self.context_weight,
+                    ItemKind::Macro { .. } => self.context_weight - 0.1,
+                    _ => 0.0,
+                }
+            },
+            ExprKind::Constructor { .. } => {
+                match &candidate.kind {
+                    ItemKind::Structure { .. } => self.context_weight,
+                    ItemKind::Enum { .. } => self.context_weight - 0.1,
+                    _ => 0.0,
+                }
+            },
+            _ => 0.0,
+        }
+    }
+
+    fn name(&self) -> &str {
+        "ContextualRelevance"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        let score = self.calculate(query, candidate);
+        if score > 0.0 {
+            Some(MatchType::Similar("ContextualRelevance".to_string()))
+        } else {
+            None
+        }
+    }
+}
+
+// New metric: Scope Proximity
+pub struct ScopeProximityMetric;
+
+impl SimilarityMetric<Expr, Item> for ScopeProximityMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        match (query.name(), candidate.name()) {
+            (Some(_), Some(_)) => 0.65, // Simplified: assume candidate is in a nearby scope
+            _ => 0.0,
+        }
+    }
+
+    fn name(&self) -> &str {
+        "ScopeProximity"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        let score = self.calculate(query, candidate);
+        if score > 0.0 {
+            Some(MatchType::Similar("ScopeProximity".to_string()))
+        } else {
+            None
+        }
+    }
+}
+
+// New metric: Partial Identifier Match
+pub struct PartialIdentifierMetric {
+    min_length: usize,
+}
+
+impl Default for PartialIdentifierMetric {
+    fn default() -> Self {
+        PartialIdentifierMetric {
+            min_length: 3,
+        }
+    }
+}
+
+impl SimilarityMetric<Expr, Item> for PartialIdentifierMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        match (&query.kind, &candidate.kind) {
+            (ExprKind::Identifier(query_ident), _) => {
+                if query_ident.len() < self.min_length {
+                    return 0.0;
+                }
+                match candidate.name() {
+                    Some(candidate_token) => {
+                        let query_lower = query_ident.to_lowercase();
+                        let candidate_lower = candidate_token.to_string().to_lowercase();
+                        if candidate_lower.contains(&query_lower) || query_lower.contains(&candidate_lower) {
+                            0.75 * (query_lower.len() as f64 / candidate_lower.len() as f64).min(1.0)
+                        } else {
+                            0.0
+                        }
+                    }
+                    None => 0.0,
+                }
+            }
+            _ => 0.0,
+        }
+    }
+
+    fn name(&self) -> &str {
+        "PartialIdentifier"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        let score = self.calculate(query, candidate);
+        if score > 0.0 {
+            Some(MatchType::Similar("PartialIdentifier".to_string()))
+        } else {
+            None
+        }
+    }
+}
+
+// First, let's improve the PartialEq implementation to be more specific
 impl PartialEq<Item> for Expr {
     fn eq(&self, other: &Item) -> bool {
-        let Expr { kind: expr_kind, span: expr_span} = self.clone();
-        let Item { kind: item_kind, span: item_span} = other.clone();
+        match (&self.kind, &other.kind) {
+            // For invoke, only match with functions or macros
+            (ExprKind::Invoke { target, parameters }, ItemKind::Function { name, parameters: func_params, .. }) => {
+                target.name() == name.name() && parameters.len() == func_params.len()
+            },
+            (ExprKind::Invoke { target, parameters }, ItemKind::Macro { name, parameters: macro_params, .. }) => {
+                target.name() == name.name() && parameters.len() == macro_params.len()
+            },
 
-        match (expr_kind, item_kind) {
+            // Identifiers can match with variables/constants
             (ExprKind::Identifier(ident), ItemKind::Variable { target, .. }) => {
-                if let Expr { kind: ExprKind::Identifier(target), .. } = *target {
-                    ident == target
+                if let Expr { kind: ExprKind::Identifier(target_ident), .. } = *target.clone() {
+                    ident == &target_ident
                 } else {
                     false
                 }
-            }
+            },
 
+            // Constructor expressions should match structures/enums
+            (ExprKind::Constructor { name: expr_name, .. }, ItemKind::Structure { name: struct_name, .. }) => {
+                expr_name.name() == struct_name.name()
+            },
+            (ExprKind::Constructor { name: expr_name, .. }, ItemKind::Enum { name: enum_name, .. }) => {
+                expr_name.name() == enum_name.name()
+            },
+
+            // All other cases are not exact matches
             _ => false,
         }
     }
+}
+
+impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        match (&query.kind, &candidate.kind) {
+            // Invoke should strongly prefer functions/macros
+            (ExprKind::Invoke { .. }, ItemKind::Function { .. }) => 0.98,
+            (ExprKind::Invoke { .. }, ItemKind::Macro { .. }) => 0.95,
+            // Invoke NEVER matches variables/constants - this is critical
+            (ExprKind::Invoke { .. }, ItemKind::Variable { .. }) => 0.0,
+
+            // Identifier alone could be multiple things, prefer this order:
+            (ExprKind::Identifier(_), ItemKind::Variable { .. }) => 0.95,
+            (ExprKind::Identifier(_), ItemKind::Function { .. }) => 0.9,
+            (ExprKind::Identifier(_), ItemKind::Macro { .. }) => 0.85,
+            (ExprKind::Identifier(_), ItemKind::Structure { .. }) => 0.8,
+            (ExprKind::Identifier(_), ItemKind::Enum { .. }) => 0.75,
+
+            // Other specific matches
+            (ExprKind::Constructor { .. }, ItemKind::Structure { .. }) => 0.95,
+            (ExprKind::Constructor { .. }, ItemKind::Enum { .. }) => 0.9,
+
+            // Default case
+            _ => 0.0,
+        }
+    }
+
+    fn name(&self) -> &str {
+        "SymbolType"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        let score = self.calculate(query, candidate);
+        if score > 0.0 {
+            Some(MatchType::Similar("SymbolType".to_string()))
+        } else {
+            None
+        }
+    }
+}
+
+// Create a combined matcher with properly balanced weights
+pub fn symbol_matcher() -> Matcher<Expr, Item> {
+    Matcher::<Expr, Item>::new()
+        // Type compatibility is the most important factor for code correctness
+        .with_metric(ExactMatchMetric, 1.0)
+        .with_metric(SymbolTypeMetric, 0.95)
+        // Only consider parameter count for function/macro invocations and constructors
+        .with_metric(ParameterCountMetric, 0.9)
+        .with_metric(ContextualRelevanceMetric::default(), 0.85)
+        // The following are secondary fuzzy matching criteria
+        .with_metric(CaseInsensitiveMetric, 0.8)
+        .with_metric(TokenSimilarityMetric::default(), 0.75)
+        .with_metric(PrefixMetric, 0.7)
+        .with_metric(SubstringMetric, 0.65)
+        .with_metric(SuffixMetric, 0.6)
+        .with_metric(EditDistanceMetric, 0.55)
+        .with_metric(AcronymMetric::default(), 0.5)
+        .with_metric(KeyboardProximityMetric::default(), 0.45)
+        .with_threshold(0.6)
 }

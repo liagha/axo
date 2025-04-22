@@ -1,8 +1,18 @@
-use crate::axo_parser::{Expr, ExprKind, ItemKind};
-use crate::axo_parser::item::Item;
+use {
+    crate::{
+        axo_parser::{
+            item::Item,
+            Expr, ExprKind, ItemKind
+        }
+    },
+    core::fmt::{
+        Debug, Display,
+        Formatter, Result
+    }
+};
 
-impl core::fmt::Display for ItemKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for ItemKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ItemKind::Expression(expr) => write!(f, "{}", expr),
             ItemKind::Use(expr) => write!(f, "use {}", expr),
@@ -51,8 +61,8 @@ impl core::fmt::Display for ItemKind {
     }
 }
 
-impl core::fmt::Debug for ItemKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for ItemKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ItemKind::Expression(expr) => write!(f, "~{:?}~", expr),
             ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
@@ -94,8 +104,8 @@ impl core::fmt::Debug for ItemKind {
     }
 }
 
-impl core::fmt::Debug for Expr {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
             write!(f, "{:?} | [{}]", self.kind, self.span)
         } else {
@@ -104,26 +114,26 @@ impl core::fmt::Debug for Expr {
     }
 }
 
-impl core::fmt::Display for Expr {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.kind)
     }
 }
 
-impl core::fmt::Debug for Item {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for Item {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
-impl core::fmt::Display for Item {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for Item {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.kind)
     }
 }
 
-impl core::fmt::Display for ExprKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for ExprKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ExprKind::Literal(token) => write!(f, "{}", token),
             ExprKind::Identifier(ident) => write!(f, "{}", ident),
@@ -224,8 +234,8 @@ impl core::fmt::Display for ExprKind {
     }
 }
 
-impl core::fmt::Debug for ExprKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for ExprKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ExprKind::Literal(literal) => {
                 write!(f, "{:?}", literal)
