@@ -1,8 +1,14 @@
-use crate::axo_parser::{Expr, ExprKind, Item};
-use crate::axo_semantic::error::ErrorKind;
-use crate::axo_semantic::resolver::scope::Scope;
-use crate::axo_semantic::Resolver;
-use crate::axo_span::Span;
+use {
+    crate::{
+        axo_parser::{
+            Expr, ExprKind, Item
+        },
+        axo_resolver::{
+            ErrorKind, Resolver,
+        },
+        axo_span::Span,
+    }
+};
 
 pub trait ControlFlowResolver {
     fn resolve_block(&mut self, exprs: Vec<Expr>, span: Span) -> Item;

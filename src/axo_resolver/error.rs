@@ -1,6 +1,3 @@
-use core::fmt;
-use crate::axo_parser::ExprKind;
-
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
     ImmutableAssign(String),
@@ -21,8 +18,8 @@ pub enum ErrorKind {
     Other(String),
 }
 
-impl fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             ErrorKind::ImmutableAssign(name) =>
                 write!(f, "Cannot assign to immutable variable `{}`", name),

@@ -1,8 +1,5 @@
 use axo_hash::HashSet;
-use crate::axo_matcher::{MatchType, Matcher};
-use crate::axo_parser::{Expr, Item};
-use crate::axo_semantic::Resolver;
-use crate::axo_semantic::resolver::matcher::symbol_matcher;
+use crate::axo_parser::Item;
 
 #[derive(Clone, Debug)]
 pub struct Scope {

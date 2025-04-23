@@ -1,5 +1,4 @@
 
-pub mod symbol;
 pub mod error;
 pub mod scope;
 pub mod statement;
@@ -7,32 +6,23 @@ mod fmt;
 mod matcher;
 
 use crate::{
-    axo_matcher::{
-        Matcher,
-        AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
-        ExactMatchMetric, KeyboardProximityMetric, PrefixMetric,
-        SubstringMetric, SuffixMetric, TokenSimilarityMetric,
-        MatchType::Exact,
-    },
-
+    axo_errors::{Action, Error, Hint},
+    axo_matcher::MatchType::Exact,
     axo_parser::{
         Expr, ExprKind,
         Item, ItemKind,
     },
-
-    axo_semantic::{
+    axo_resolver::{
         error::ErrorKind,
         scope::Scope,
-        statement::ControlFlowResolver,
-        resolver::matcher::{symbol_matcher}
+        statement::ControlFlowResolver
     },
-
-    axo_errors::{Error, Hint, Action},
     axo_span::Span,
 };
 
-use axo_hash::{HashMap, HashSet};
-use crate::axo_semantic::resolver::matcher::Labeled;
+use axo_hash::HashSet;
+use crate::axo_resolver::matcher::Labeled;
+use crate::axo_resolver::matcher::symbol_matcher;
 
 pub type ResolveError = Error<ErrorKind>;
 
@@ -89,17 +79,49 @@ impl Resolver {
 
         let candidates: Vec<Item> = self.scope.symbols().iter().cloned().collect();
 
+        /*
+        for candidate in candidates.clone() {
+            let result = matcher.analyze_match(&target, &candidate);
+
+            println!("Match result for '{}' against '{}':", result.query, result.candidate);
+            println!("Overall score: {:.2}", result.overall_score);
+            println!("Match type: {:?}", result.match_type);
+            println!("Is match: {}", result.is_match);
+
+            for score in &result.metric_scores {
+                println!("  {}: {:.2} (weight: {:.1}, contribution: {:.2})",
+                         score.name, score.raw_score, score.weight, score.weighted_contribution);
+            }
+        }
+
+        println!("\nMetric breakdown:");
+        */
+
+
         let suggestion = matcher
             .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
-            println!("{:?}", suggestion);
+            {
+                println!("Detailed Match Result:");
+
+                for candidate in candidates {
+                    let m = matcher.analyze(target, &candidate);
+
+                    println!("  {:?}: score {}", m.candidate, m.score);
+                }
+
+                println!();
+            }
+
+            println!("Best Match: {:?} | Score: {}\n", suggestion.candidate, suggestion.score);
+
             let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
 
-            let found = suggestion.value.name().map(|name| name.to_string()).unwrap_or(target.to_string());
+            let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(target.to_string());
 
             if suggestion.match_type == Exact || suggestion.score == 1.0 {
-                return suggestion.value
+                return suggestion.candidate
             }
 
             let err = ResolveError {

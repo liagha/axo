@@ -1,6 +1,6 @@
 mod axo_lexer;
 mod axo_parser;
-mod axo_semantic;
+mod axo_resolver;
 mod axo_data;
 mod axo_rune;
 mod axo_errors;
@@ -9,25 +9,23 @@ mod axo_span;
 mod axo_matcher;
 
 pub use {
-    axo_rune::*,
-    axo_semantic::Resolver,
-    //axo_span::Span,
+    axo_lexer::{
+        Lexer, PunctuationKind, Token, TokenKind,
+    },
     axo_parser::{
         Parser,
-    //    Expr, ExprKind,
-    //    Item, ItemKind
+        //    Expr, ExprKind,
+        //    Item, ItemKind
     },
-    axo_lexer::{
-        Lexer, Token, TokenKind, PunctuationKind,
-    },
-
+    //axo_span::Span,
+    axo_rune::*,
     broccli::{xprintln, Color, TextStyle},
-
     std::{
-        time::Instant,
         path::PathBuf,
+        time::Instant,
     }
 };
+use crate::axo_resolver::Resolver;
 
 struct Config {
     file_path: String,

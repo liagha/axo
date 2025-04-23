@@ -5,4 +5,14 @@ fn test() {
     test = 3
 }
 
-test()
+fn test(x) {
+    ppp
+}
+
+fn test(x, y) pp
+
+test(x)
+
+test
+
+test(x,y,z)

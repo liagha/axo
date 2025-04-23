@@ -1,12 +1,14 @@
-pub mod matcher;
-pub mod types;
 mod common;
+mod matcher;
+mod types;
 mod utils;
-mod string;
-mod numeric;
-
-pub use matcher::Matcher;
-pub use common::SimilarityMetric;
+mod custom;
+mod composite;
+mod metrics;
+mod presets;
 pub use types::*;
-pub use string::*;
 pub use utils::*;
+pub use metrics::*;
+pub use common::*;
+pub use matcher::*;
+pub use composite::*;

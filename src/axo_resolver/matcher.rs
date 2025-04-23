@@ -1,16 +1,31 @@
-use core::cmp::{max, min};
-use axo_hash::HashMap;
-use crate::axo_matcher::{create_qwerty_layout, damerau_levenshtein_distance, AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric, ExactMatchMetric, KeyboardProximityMetric, MatchType, Matcher, PrefixMetric, SimilarityMetric, SubstringMetric, SuffixMetric, TokenSimilarityMetric};
-use crate::axo_lexer::{Token, TokenKind};
-use crate::axo_parser::{Expr, ExprKind, Item, ItemKind};
-use crate::axo_semantic::scope::Scope;
+use {
+    core::cmp::{
+        max, min
+    },
+    crate::{
+        axo_matcher::{
+            damerau_levenshtein_distance,
+            AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
+            ExactMatchMetric, KeyboardProximityMetric, MatchType, Matcher,
+            MatcherBuilder, PrefixMetric, SimilarityMetric, SubstringMetric,
+            SuffixMetric, TokenSimilarityMetric
+        },
+        axo_lexer::{
+            Token, TokenKind
+        },
+        axo_parser::{
+            Expr, ExprKind,
+            Item, ItemKind,
+        },
+    }
+};
 
 impl SimilarityMetric<Token, Token> for CaseInsensitiveMetric {
     fn calculate(&self, query: &Token, candidate: &Token) -> f64 {
         if query.to_string().to_lowercase() == candidate.to_string().to_lowercase() { 0.95 } else { 0.0 }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "CaseInsensitive"
     }
 }
@@ -29,7 +44,7 @@ impl SimilarityMetric<Token, Token> for PrefixMetric {
         0.0
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Prefix"
     }
 
@@ -57,7 +72,7 @@ impl SimilarityMetric<Token, Token> for SubstringMetric {
         0.0
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Substring"
     }
 }
@@ -74,7 +89,7 @@ impl SimilarityMetric<Token, Token> for EditDistanceMetric {
         1.0 - (distance as f64 / max_len as f64)
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "EditDistance"
     }
 }
@@ -90,7 +105,7 @@ impl SimilarityMetric<Token, Token> for TokenSimilarityMetric {
         self.token_similarity(&s1_tokens, &s2_tokens)
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "TokenSimilarity"
     }
 }
@@ -121,7 +136,7 @@ impl SimilarityMetric<Token, Token> for AcronymMetric {
         0.0
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Acronym"
     }
 
@@ -181,7 +196,7 @@ impl SimilarityMetric<Token, Token> for KeyboardProximityMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "KeyboardProximity"
     }
 }
@@ -197,7 +212,7 @@ impl SimilarityMetric<Token, Token> for TokenKindMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "TokenKind"
     }
 }
@@ -216,7 +231,7 @@ impl SimilarityMetric<Token, Token> for SuffixMetric {
         0.0
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Suffix"
     }
 
@@ -293,7 +308,7 @@ impl SimilarityMetric<Expr, Item> for CaseInsensitiveMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "CaseInsensitive"
     }
 }
@@ -317,7 +332,7 @@ impl SimilarityMetric<Expr, Item> for PrefixMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Prefix"
     }
 
@@ -350,51 +365,8 @@ impl SimilarityMetric<Expr, Item> for SubstringMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Substring"
-    }
-}
-
-impl SimilarityMetric<Expr, Item> for EditDistanceMetric {
-    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
-        match (query.name(), candidate.name()) {
-            (Some(query_token), Some(candidate_token)) => {
-                let distance = damerau_levenshtein_distance(&query_token.to_string(), &candidate_token.to_string());
-                let max_len = max(query_token.to_string().len(), candidate_token.to_string().len());
-
-                if max_len == 0 {
-                    return 1.0;
-                }
-
-                1.0 - (distance as f64 / max_len as f64)
-            }
-            _ => 0.0,
-        }
-    }
-
-    fn name(&self) -> &str {
-        "EditDistance"
-    }
-}
-
-impl SimilarityMetric<Expr, Item> for TokenSimilarityMetric {
-    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
-        match (query.name(), candidate.name()) {
-            (Some(query_token), Some(candidate_token)) => {
-                let s1_lower = query_token.to_string().to_lowercase();
-                let s2_lower = candidate_token.to_string().to_lowercase();
-
-                let s1_tokens = self.split_on_separators(&s1_lower);
-                let s2_tokens = self.split_on_separators(&s2_lower);
-
-                self.token_similarity(&s1_tokens, &s2_tokens)
-            }
-            _ => 0.0,
-        }
-    }
-
-    fn name(&self) -> &str {
-        "TokenSimilarity"
     }
 }
 
@@ -429,7 +401,7 @@ impl SimilarityMetric<Expr, Item> for AcronymMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Acronym"
     }
 
@@ -494,7 +466,7 @@ impl SimilarityMetric<Expr, Item> for KeyboardProximityMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "KeyboardProximity"
     }
 }
@@ -518,7 +490,7 @@ impl SimilarityMetric<Expr, Item> for SuffixMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "Suffix"
     }
 
@@ -584,7 +556,7 @@ impl SimilarityMetric<Expr, Item> for ParameterCountMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "ParameterCount"
     }
 
@@ -640,7 +612,7 @@ impl SimilarityMetric<Expr, Item> for ContextualRelevanceMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "ContextualRelevance"
     }
 
@@ -665,7 +637,7 @@ impl SimilarityMetric<Expr, Item> for ScopeProximityMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "ScopeProximity"
     }
 
@@ -716,7 +688,7 @@ impl SimilarityMetric<Expr, Item> for PartialIdentifierMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "PartialIdentifier"
     }
 
@@ -730,7 +702,6 @@ impl SimilarityMetric<Expr, Item> for PartialIdentifierMetric {
     }
 }
 
-// First, let's improve the PartialEq implementation to be more specific
 impl PartialEq<Item> for Expr {
     fn eq(&self, other: &Item) -> bool {
         match (&self.kind, &other.kind) {
@@ -742,7 +713,8 @@ impl PartialEq<Item> for Expr {
                 target.name() == name.name() && parameters.len() == macro_params.len()
             },
 
-            // Identifiers can match with variables/constants
+            // Identifiers can match with variables/constants BUT NOT if the expression is an Invoke
+            // This is key - we never want to match Invoke expressions with non-callable items
             (ExprKind::Identifier(ident), ItemKind::Variable { target, .. }) => {
                 if let Expr { kind: ExprKind::Identifier(target_ident), .. } = *target.clone() {
                     ident == &target_ident
@@ -765,6 +737,30 @@ impl PartialEq<Item> for Expr {
     }
 }
 
+// Improve the ExactMatchMetric to respect the type of expression
+impl SimilarityMetric<Expr, Item> for ExactMatchMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        if query == candidate {
+            0.70
+        } else {
+            0.0
+        }
+    }
+
+    fn id(&self) -> &str {
+        "ExactMatch"
+    }
+
+    fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
+        if self.calculate(query, candidate) > 0.0 {
+            Some(MatchType::Exact)
+        } else {
+            None
+        }
+    }
+}
+
+// Strengthen the negative signal in SymbolTypeMetric for mismatched types
 impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
     fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
         match (&query.kind, &candidate.kind) {
@@ -772,7 +768,7 @@ impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
             (ExprKind::Invoke { .. }, ItemKind::Function { .. }) => 0.98,
             (ExprKind::Invoke { .. }, ItemKind::Macro { .. }) => 0.95,
             // Invoke NEVER matches variables/constants - this is critical
-            (ExprKind::Invoke { .. }, ItemKind::Variable { .. }) => 0.0,
+            (ExprKind::Invoke { .. }, ItemKind::Variable { .. }) => 0.0, // Use negative score to actively discourage this match
 
             // Identifier alone could be multiple things, prefer this order:
             (ExprKind::Identifier(_), ItemKind::Variable { .. }) => 0.95,
@@ -790,7 +786,7 @@ impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "SymbolType"
     }
 
@@ -804,23 +800,80 @@ impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
     }
 }
 
-// Create a combined matcher with properly balanced weights
+// Enhance TokenSimilarityMetric to also respect the type of expression
+impl SimilarityMetric<Expr, Item> for TokenSimilarityMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        // First check for specific invalid type combinations
+        match (&query.kind, &candidate.kind) {
+            (ExprKind::Invoke { .. }, ItemKind::Variable { .. }) => return 0.0,
+            (ExprKind::Invoke { .. }, ItemKind::Function { .. } | ItemKind::Macro { .. }) => {},
+            (ExprKind::Identifier(_), _) => {},
+            (ExprKind::Constructor { .. }, ItemKind::Structure { .. } | ItemKind::Enum { .. }) => {},
+            _ => return 0.0,
+        }
+
+        match (query.name(), candidate.name()) {
+            (Some(query_token), Some(candidate_token)) => {
+                let s1_lower = query_token.to_string().to_lowercase();
+                let s2_lower = candidate_token.to_string().to_lowercase();
+
+                let s1_tokens = self.split_on_separators(&s1_lower);
+                let s2_tokens = self.split_on_separators(&s2_lower);
+
+                self.token_similarity(&s1_tokens, &s2_tokens)
+            }
+            _ => 0.0,
+        }
+    }
+
+    fn id(&self) -> &str {
+        "TokenSimilarity"
+    }
+}
+
+// Fix the EditDistanceMetric to respect expression types
+impl SimilarityMetric<Expr, Item> for EditDistanceMetric {
+    fn calculate(&self, query: &Expr, candidate: &Item) -> f64 {
+        // First check for specific invalid type combinations
+        match (&query.kind, &candidate.kind) {
+            (ExprKind::Invoke { .. }, ItemKind::Variable { .. }) => return 0.0,
+            _ => {},
+        }
+
+        match (query.name(), candidate.name()) {
+            (Some(query_token), Some(candidate_token)) => {
+                let distance = damerau_levenshtein_distance(&query_token.to_string(), &candidate_token.to_string());
+                let max_len = max(query_token.to_string().len(), candidate_token.to_string().len());
+
+                if max_len == 0 {
+                    return 1.0;
+                }
+
+                1.0 - (distance as f64 / max_len as f64)
+            }
+            _ => 0.0,
+        }
+    }
+
+    fn id(&self) -> &str {
+        "EditDistance"
+    }
+}
+
 pub fn symbol_matcher() -> Matcher<Expr, Item> {
-    Matcher::<Expr, Item>::new()
-        // Type compatibility is the most important factor for code correctness
-        .with_metric(ExactMatchMetric, 1.0)
-        .with_metric(SymbolTypeMetric, 0.95)
-        // Only consider parameter count for function/macro invocations and constructors
-        .with_metric(ParameterCountMetric, 0.9)
-        .with_metric(ContextualRelevanceMetric::default(), 0.85)
-        // The following are secondary fuzzy matching criteria
-        .with_metric(CaseInsensitiveMetric, 0.8)
-        .with_metric(TokenSimilarityMetric::default(), 0.75)
-        .with_metric(PrefixMetric, 0.7)
-        .with_metric(SubstringMetric, 0.65)
-        .with_metric(SuffixMetric, 0.6)
-        .with_metric(EditDistanceMetric, 0.55)
-        .with_metric(AcronymMetric::default(), 0.5)
-        .with_metric(KeyboardProximityMetric::default(), 0.45)
-        .with_threshold(0.6)
+    MatcherBuilder::<Expr, Item>::new()
+        .metric(ExactMatchMetric, 1.0)
+        .metric(SymbolTypeMetric, 1.0)
+        .metric(ParameterCountMetric, 0.9)
+        .metric(ContextualRelevanceMetric::default(), 0.85)
+        .metric(CaseInsensitiveMetric, 0.5)
+        .metric(TokenSimilarityMetric::default(), 0.4)
+        .metric(PrefixMetric, 0.5)
+        .metric(SubstringMetric, 0.5)
+        .metric(SuffixMetric, 0.5)
+        .metric(EditDistanceMetric, 0.5)
+        .metric(AcronymMetric::default(), 0.45)
+        .metric(KeyboardProximityMetric::default(), 0.4)
+        .threshold(0.6)
+        .build()
 }

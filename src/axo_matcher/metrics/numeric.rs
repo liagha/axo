@@ -27,7 +27,7 @@ where
         (-normalized_diff).exp()
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "NumericProximity"
     }
 }
@@ -70,7 +70,7 @@ where
         1.0 - (actual_distance / max_distance).min(1.0)
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "RangeProximity"
     }
 }
@@ -100,7 +100,7 @@ where
         smaller / larger
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "PercentageProximity"
     }
 }
@@ -131,7 +131,7 @@ where
         (-self.decay_factor * difference).exp()
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "ExponentialDecay"
     }
 }
@@ -166,7 +166,7 @@ where
         }
     }
 
-    fn name(&self) -> &str {
+    fn id(&self) -> &str {
         "ThresholdProximity"
     }
 }
