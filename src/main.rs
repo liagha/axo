@@ -6,7 +6,6 @@ mod axo_rune;
 mod axo_errors;
 mod axo_codegen;
 mod axo_span;
-mod axo_matcher;
 
 pub use {
     axo_lexer::{
@@ -14,10 +13,7 @@ pub use {
     },
     axo_parser::{
         Parser,
-        //    Expr, ExprKind,
-        //    Item, ItemKind
     },
-    //axo_span::Span,
     axo_rune::*,
     broccli::{xprintln, Color, TextStyle},
     std::{

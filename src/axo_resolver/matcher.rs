@@ -2,14 +2,14 @@ use {
     core::cmp::{
         max, min
     },
+    matchete::{
+        damerau_levenshtein_distance,
+        AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
+        ExactMatchMetric, KeyboardProximityMetric, MatchType, Matcher,
+        MatcherBuilder, PrefixMetric, SimilarityMetric, SubstringMetric,
+        SuffixMetric, TokenSimilarityMetric
+    },
     crate::{
-        axo_matcher::{
-            damerau_levenshtein_distance,
-            AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
-            ExactMatchMetric, KeyboardProximityMetric, MatchType, Matcher,
-            MatcherBuilder, PrefixMetric, SimilarityMetric, SubstringMetric,
-            SuffixMetric, TokenSimilarityMetric
-        },
         axo_lexer::{
             Token, TokenKind
         },
@@ -25,9 +25,6 @@ impl SimilarityMetric<Token, Token> for CaseInsensitiveMetric {
         if query.to_string().to_lowercase() == candidate.to_string().to_lowercase() { 0.95 } else { 0.0 }
     }
 
-    fn id(&self) -> &str {
-        "CaseInsensitive"
-    }
 }
 
 impl SimilarityMetric<Token, Token> for PrefixMetric {
@@ -44,9 +41,6 @@ impl SimilarityMetric<Token, Token> for PrefixMetric {
         0.0
     }
 
-    fn id(&self) -> &str {
-        "Prefix"
-    }
 
     fn match_type(&self, query: &Token, candidate: &Token) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -72,9 +66,6 @@ impl SimilarityMetric<Token, Token> for SubstringMetric {
         0.0
     }
 
-    fn id(&self) -> &str {
-        "Substring"
-    }
 }
 
 impl SimilarityMetric<Token, Token> for EditDistanceMetric {
@@ -89,9 +80,6 @@ impl SimilarityMetric<Token, Token> for EditDistanceMetric {
         1.0 - (distance as f64 / max_len as f64)
     }
 
-    fn id(&self) -> &str {
-        "EditDistance"
-    }
 }
 
 impl SimilarityMetric<Token, Token> for TokenSimilarityMetric {
@@ -105,9 +93,6 @@ impl SimilarityMetric<Token, Token> for TokenSimilarityMetric {
         self.token_similarity(&s1_tokens, &s2_tokens)
     }
 
-    fn id(&self) -> &str {
-        "TokenSimilarity"
-    }
 }
 
 impl SimilarityMetric<Token, Token> for AcronymMetric {
@@ -136,9 +121,6 @@ impl SimilarityMetric<Token, Token> for AcronymMetric {
         0.0
     }
 
-    fn id(&self) -> &str {
-        "Acronym"
-    }
 
     fn match_type(&self, query: &Token, candidate: &Token) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -196,11 +178,9 @@ impl SimilarityMetric<Token, Token> for KeyboardProximityMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "KeyboardProximity"
-    }
 }
 
+#[derive(Debug)]
 pub struct TokenKindMetric;
 
 impl SimilarityMetric<Token, Token> for TokenKindMetric {
@@ -212,9 +192,6 @@ impl SimilarityMetric<Token, Token> for TokenKindMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "TokenKind"
-    }
 }
 
 impl SimilarityMetric<Token, Token> for SuffixMetric {
@@ -231,9 +208,6 @@ impl SimilarityMetric<Token, Token> for SuffixMetric {
         0.0
     }
 
-    fn id(&self) -> &str {
-        "Suffix"
-    }
 
     fn match_type(&self, query: &Token, candidate: &Token) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -308,9 +282,6 @@ impl SimilarityMetric<Expr, Item> for CaseInsensitiveMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "CaseInsensitive"
-    }
 }
 
 impl SimilarityMetric<Expr, Item> for PrefixMetric {
@@ -332,9 +303,6 @@ impl SimilarityMetric<Expr, Item> for PrefixMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "Prefix"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -365,9 +333,6 @@ impl SimilarityMetric<Expr, Item> for SubstringMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "Substring"
-    }
 }
 
 impl SimilarityMetric<Expr, Item> for AcronymMetric {
@@ -401,9 +366,6 @@ impl SimilarityMetric<Expr, Item> for AcronymMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "Acronym"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -466,9 +428,6 @@ impl SimilarityMetric<Expr, Item> for KeyboardProximityMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "KeyboardProximity"
-    }
 }
 
 impl SimilarityMetric<Expr, Item> for SuffixMetric {
@@ -490,9 +449,6 @@ impl SimilarityMetric<Expr, Item> for SuffixMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "Suffix"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -504,8 +460,10 @@ impl SimilarityMetric<Expr, Item> for SuffixMetric {
     }
 }
 
+#[derive(Debug)]
 pub struct SymbolTypeMetric;
 
+#[derive(Debug)]
 pub struct ParameterCountMetric;
 
 impl SimilarityMetric<Expr, Item> for ParameterCountMetric {
@@ -556,9 +514,6 @@ impl SimilarityMetric<Expr, Item> for ParameterCountMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "ParameterCount"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -570,6 +525,7 @@ impl SimilarityMetric<Expr, Item> for ParameterCountMetric {
     }
 }
 
+#[derive(Debug)]
 pub struct ContextualRelevanceMetric {
     pub context_weight: f64,
 }
@@ -612,9 +568,6 @@ impl SimilarityMetric<Expr, Item> for ContextualRelevanceMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "ContextualRelevance"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -626,7 +579,7 @@ impl SimilarityMetric<Expr, Item> for ContextualRelevanceMetric {
     }
 }
 
-// New metric: Scope Proximity
+#[derive(Debug)]
 pub struct ScopeProximityMetric;
 
 impl SimilarityMetric<Expr, Item> for ScopeProximityMetric {
@@ -637,9 +590,6 @@ impl SimilarityMetric<Expr, Item> for ScopeProximityMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "ScopeProximity"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -651,7 +601,7 @@ impl SimilarityMetric<Expr, Item> for ScopeProximityMetric {
     }
 }
 
-// New metric: Partial Identifier Match
+#[derive(Debug)]
 pub struct PartialIdentifierMetric {
     min_length: usize,
 }
@@ -688,9 +638,6 @@ impl SimilarityMetric<Expr, Item> for PartialIdentifierMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "PartialIdentifier"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -747,9 +694,6 @@ impl SimilarityMetric<Expr, Item> for ExactMatchMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "ExactMatch"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         if self.calculate(query, candidate) > 0.0 {
@@ -786,9 +730,6 @@ impl SimilarityMetric<Expr, Item> for SymbolTypeMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "SymbolType"
-    }
 
     fn match_type(&self, query: &Expr, candidate: &Item) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
@@ -826,9 +767,6 @@ impl SimilarityMetric<Expr, Item> for TokenSimilarityMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "TokenSimilarity"
-    }
 }
 
 // Fix the EditDistanceMetric to respect expression types
@@ -855,9 +793,6 @@ impl SimilarityMetric<Expr, Item> for EditDistanceMetric {
         }
     }
 
-    fn id(&self) -> &str {
-        "EditDistance"
-    }
 }
 
 pub fn symbol_matcher() -> Matcher<Expr, Item> {
