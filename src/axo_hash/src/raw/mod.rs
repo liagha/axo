@@ -4278,7 +4278,7 @@ mod test_map {
         use ::alloc::vec::Vec;
         use allocator_api2::alloc::{AllocError, Allocator, Global};
         use core::sync::atomic::{AtomicI8, Ordering};
-        use std::thread;
+        use core::thread;
 
         struct MyAllocInner {
             drop_count: Arc<AtomicI8>,
@@ -4297,7 +4297,7 @@ mod test_map {
         }
 
         unsafe impl Allocator for MyAlloc {
-            fn allocate(&self, layout: Layout) -> std::result::Result<NonNull<[u8]>, AllocError> {
+            fn allocate(&self, layout: Layout) -> core::result::Result<NonNull<[u8]>, AllocError> {
                 let g = Global;
                 g.allocate(layout)
             }

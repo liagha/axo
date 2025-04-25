@@ -1,7 +1,15 @@
-use core::fmt;
-use core::fmt::Formatter;
-use crate::axo_lexer::Token;
-use crate::axo_lexer::{PunctuationKind, TokenKind};
+use {
+    core::{
+        fmt,
+        fmt::Formatter,
+    },
+    crate::{
+        axo_lexer::{
+            Token, TokenKind,
+            PunctuationKind,
+        }
+    }
+};
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -21,7 +29,6 @@ impl fmt::Display for TokenKind {
             TokenKind::Char(char) => write!(f, "'{}'", char),
             TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::EOF => write!(f, "{}", "End Of File"),
         }
     }
 }
@@ -38,7 +45,6 @@ impl fmt::Debug for TokenKind {
             TokenKind::Str(str) => write!(f, "String({})", str),
             TokenKind::Char(char) => write!(f, "Char('{}')", char),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::EOF => write!(f, "EOF"),
             TokenKind::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
         }
     }
@@ -46,21 +52,13 @@ impl fmt::Debug for TokenKind {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.kind != TokenKind::EOF {
-            write!(f, "{}", self.kind)
-        } else {
-            write!(f, "")
-        }
+        write!(f, "{}", self.kind)
     }
 }
 
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.kind == TokenKind::EOF {
-            write!(f, "EOF")
-        } else {
-            write!(f, "{:?}", self.kind)
-        }
+        write!(f, "{:?}", self.kind)
     }
 }
 

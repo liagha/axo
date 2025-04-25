@@ -1,6 +1,14 @@
-use crate::axo_lexer::error::{CharParseError, ErrorKind};
-use crate::axo_lexer::{LexError, Lexer, TokenKind};
-use crate::axo_lexer::symbol::SymbolLexer;
+use {
+    crate::{
+        axo_lexer::{
+            LexError, Lexer, TokenKind,
+            symbol::SymbolLexer,
+            error::{
+                CharParseError, ErrorKind
+            },
+        }
+    }
+};
 
 pub trait LiteralLexer {
     fn handle_character(&mut self) -> Result<(), LexError>;

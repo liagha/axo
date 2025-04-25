@@ -24,22 +24,19 @@ pub trait Composite {
 
 impl Composite for Parser {
     fn parse_index(&mut self, left: Expr) -> Expr {
-        let bracket = self.next().unwrap();
+        let index = self.parse_complex();
 
         let Expr {
             span: Span { start, .. },
             ..
         } = left;
 
-        let index = self.parse_complex();
-
-        let err_end = index.span.end;
-
-        let result = if let Some(Token {
-            kind: TokenKind::Punctuation(PunctuationKind::RightBracket),
+        let Expr {
             span: Span { end, .. },
-        }) = self.next()
-        {
+            ..
+        } = index;
+
+        let result = {
             let kind = ExprKind::Index {
                 expr: left.into(),
                 index: index.into()
@@ -49,10 +46,6 @@ impl Composite for Parser {
             let expr = Expr { kind, span };
 
             expr
-        } else {
-            let err_span = self.span(start, err_end);
-            
-            self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(bracket), err_span))
         };
 
         result
@@ -64,7 +57,7 @@ impl Composite for Parser {
             ..
         } = name;
 
-        let parameters = self.parse_group();
+        let parameters = self.parse_parenthesized();
 
         let result = match parameters {
             Expr {
@@ -110,19 +103,7 @@ impl Composite for Parser {
             ..
         } = struct_name;
 
-        let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
-            let (exprs, span) = self.parse_delimited(
-                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                TokenKind::Punctuation(PunctuationKind::RightBrace),
-                TokenKind::Punctuation(PunctuationKind::Comma),
-                true,
-                Parser::parse_complex
-            );
-
-            Expr { kind: ExprKind::Block(exprs), span }
-        } else {
-            self.parse_complex()
-        };
+        let body = self.parse_complex();
 
         let end = body.span.end;
 

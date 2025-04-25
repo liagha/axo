@@ -1,6 +1,6 @@
-
 pub mod error;
 pub mod scope;
+pub mod validation;
 mod matcher;
 mod resolver;
 
@@ -8,7 +8,6 @@ use {
     crate::{
         axo_errors::Error,
         axo_resolver::{
-            matcher::Labeled,
             error::ErrorKind,
         },
     },

@@ -1,15 +1,28 @@
-use crate::axo_lexer::error::ErrorKind;
-use crate::axo_lexer::{LexError, TokenKind};
-use crate::axo_lexer::Token;
-use crate::axo_lexer::number::NumberLexer;
-use std::path::PathBuf;
-use crate::axo_rune::unicode::{is_alphabetic, is_numeric, is_white_space};
-use crate::axo_lexer::handler::Handler;
-use crate::axo_lexer::literal::LiteralLexer;
-use crate::axo_lexer::operator::OperatorLexer;
-use crate::axo_lexer::punctuation::PunctuationLexer;
-use crate::axo_lexer::symbol::SymbolLexer;
-use crate::axo_span::Span;
+use {
+    std::path::PathBuf,
+
+    crate::{
+        axo_lexer::{
+            Token,
+            number::NumberLexer,
+            handler::Handler,
+            literal::LiteralLexer,
+            operator::OperatorLexer,
+            punctuation::PunctuationLexer,
+            symbol::SymbolLexer,
+            error::ErrorKind,
+            LexError, TokenKind,
+        },
+
+        axo_rune::{
+            unicode::{
+                is_alphabetic, is_numeric, is_white_space,
+            },
+        },
+
+        axo_span::Span,
+    }
+};
 
 pub struct Lexer {
     file: PathBuf,
@@ -127,11 +140,6 @@ impl Lexer {
                 }
             }
         }
-
-        let file_end = (self.line, self.column);
-        let span = self.create_span(file_end, file_end);
-
-        self.push_token(TokenKind::EOF, span);
 
         Ok(self.tokens.clone())
     }

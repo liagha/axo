@@ -1,19 +1,26 @@
 use {
-    axo_hash::HashSet,
     matchete::MatchType,
 
     crate::{
-        axo_errors::{Action, Hint},
-        axo_parser::{Expr, ExprKind, Item, ItemKind},
-        axo_resolver::error::ErrorKind,
-        axo_resolver::matcher::symbol_matcher,
-        axo_resolver::ResolveError,
-        axo_resolver::scope::Scope,
-        axo_resolver::Labeled,
+        axo_errors::{
+            Action, Hint
+        },
+        axo_parser::{
+            Expr, ExprKind,
+            Item, ItemKind
+        },
+        axo_resolver::{
+            ResolveError,
+            error::ErrorKind,
+            matcher::{symbol_matcher, Labeled},
+            scope::Scope,
+        },
         axo_span::Span,
     },
 };
+use crate::{Token, TokenKind};
 
+/// Resolver handles symbol resolution throughout the program
 #[derive(Debug)]
 pub struct Resolver {
     pub scope: Scope,
@@ -21,6 +28,7 @@ pub struct Resolver {
 }
 
 impl Resolver {
+    /// Create a new Resolver with an empty root scope
     pub fn new() -> Self {
         Self {
             scope: Scope::new(),
@@ -28,117 +36,111 @@ impl Resolver {
         }
     }
 
-    pub fn create_expr_symbol(&self, kind: ExprKind, span: Span) -> Item {
-        let kind = ItemKind::Expression(Expr { kind, span: span.clone() }.into());
+    /// Create a new scope that inherits from the current scope
+    pub fn push_scope(&mut self) {
+        let parent_scope = core::mem::replace(&mut self.scope, Scope::new());
+        self.scope.set_parent(parent_scope);
+    }
 
-        Item {
-            kind,
-            span
+    /// Pop the current scope and move back to parent scope
+    pub fn pop_scope(&mut self) {
+        if let Some(parent) = self.scope.take_parent() {
+            self.scope = parent;
         }
     }
 
-    pub fn symbols(&self) -> HashSet<Item> {
-        let mut set = HashSet::new();
-
-        let mut current_scope = self.scope.clone();
-
-        while let Some(scope) = &current_scope.parent {
-            set.extend(scope.symbols.clone());
-            current_scope = *scope.clone();
-        }
-
-        set.extend(current_scope.symbols);
-
-        set
-    }
-
+    /// Insert a symbol into the current scope
     pub fn insert(&mut self, symbol: Item) {
-        if self.symbols().contains(&symbol) {
-            self.scope.symbols.insert(symbol);
-        } else {
-            self.scope.symbols.remove(&symbol);
-
-            self.scope.symbols.insert(symbol);
-        }
+        self.scope.insert(symbol);
     }
 
+    /// Look up a symbol across all visible scopes and validate the result
     pub fn lookup(&mut self, target: &Expr) -> Item {
-        let matcher = symbol_matcher();
-
-        let candidates: Vec<Item> = self.scope.symbols().iter().cloned().collect();
-
-        /*
-        for candidate in candidates.clone() {
-            let result = matcher.analyze_match(&target, &candidate);
-
-            println!("Match result for '{}' against '{}':", result.query, result.candidate);
-            println!("Overall score: {:.2}", result.overall_score);
-            println!("Match type: {:?}", result.match_type);
-            println!("Is match: {}", result.is_match);
-
-            for score in &result.metric_scores {
-                println!("  {}: {:.2} (weight: {:.1}, contribution: {:.2})",
-                         score.name, score.raw_score, score.weight, score.weighted_contribution);
+        let target_name = match target.name() {
+            Some(name) => name,
+            None => {
+                self.error(
+                    ErrorKind::UndefinedSymbol(
+                        Token::new(TokenKind::Identifier("unnamed".to_string()), target.span.clone()),
+                        None
+                    ),
+                    target.span.clone(),
+                );
+                return Item {
+                    kind: ItemKind::Unit,
+                    span: target.span.clone(),
+                };
             }
+        };
+
+        let matcher = symbol_matcher();
+        let candidates: Vec<Item> = self.scope.all_symbols().iter().cloned().collect();
+
+        let suggestion = matcher.find_best_match(target, &*candidates);
+
+        for candidate in candidates.clone() {
+            println!("all results: \n\tcandidate: {candidate} => score: {:?}", matcher.analyze(target, &candidate).score);
         }
-
-        println!("\nMetric breakdown:");
-        */
-
-
-        let suggestion = matcher
-            .find_best_match(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
+            let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(suggestion.candidate.to_string());
+
             {
-                println!("Detailed Match Result:");
-
-                for candidate in candidates {
-                    let m = matcher.analyze(target, &candidate);
-
+                println!("Looked Up {:?} in {}", target, target.span);
+                for candidate in candidates.iter() {
+                    let m = matcher.analyze(target, candidate);
                     println!("  {:?}: score {}", m.candidate, m.score);
                 }
-
                 println!();
             }
 
             println!("Best Match: {:?} | Score: {}\n", suggestion.candidate, suggestion.score);
 
-            let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
+            self.validate(target, &suggestion.candidate);
 
-            let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(target.to_string());
-
-            if suggestion.match_type == MatchType::Exact || suggestion.score == 1.0 {
-                return suggestion.candidate
+            // If we have an exact match or high confidence, return it
+            if suggestion.match_type == MatchType::Exact || suggestion.score >= 0.99 {
+                return suggestion.candidate;
             }
 
-            let err = ResolveError {
-                kind: ErrorKind::UndefinedSymbol(target_name.to_string(), None),
-                span: target.span.clone(),
-                note: None,
-                hints: vec![
-                    Hint {
-                        message: format!("replace `{}` with `{}` | similarity: ({:?} | {:?})", target_name, found, suggestion.match_type, suggestion.score),
-                        action: vec![
-                            Action::Replace(found, target.span.clone()),
-                        ],
-                    }
-                ],
-            };
+            // If we have a close match, suggest it as a correction
+            if suggestion.score > 0.7 {
+                let err = ResolveError {
+                    kind: ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                    span: target_name.span,
+                    note: None,
+                    hints: vec![
+                        Hint {
+                            message: format!("replace with `{}` | similarity: ({:?} | {:.2})",
+                                             found, suggestion.match_type, suggestion.score),
+                            action: vec![
+                                Action::Replace(found, target.span.clone()),
+                            ],
+                        }
+                    ],
+                };
 
-            self.errors.push(err.clone());
-
-            Item {
-                kind: ItemKind::Unit,
-                span: target.span.clone(),
+                self.errors.push(err);
+            } else {
+                self.error(
+                    ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                    target_name.span,
+                );
             }
         } else {
-            let target_name = target.name().map(|name| name.to_string()).unwrap_or(target.to_string());
+            self.error(
+                ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                target_name.span,
+            );
+        }
 
-            self.error(ErrorKind::UndefinedSymbol(target_name, None), target.span.clone())
+        Item {
+            kind: ItemKind::Unit,
+            span: target.span.clone(),
         }
     }
 
+    /// Add a general error
     pub fn error(&mut self, error: ErrorKind, span: Span) -> Item {
         let error = ResolveError {
             kind: error,
@@ -147,96 +149,24 @@ impl Resolver {
             hints: vec![],
         };
 
-        self.errors.push(error.clone());
-
-        let kind = ItemKind::Unit;
+        self.errors.push(error);
 
         Item {
-            kind,
+            kind: ItemKind::Unit,
             span
         }
     }
 
+    /// Resolve a list of expressions
     pub fn resolve(&mut self, exprs: Vec<Expr>) {
         for expr in exprs {
-            self.resolve_expr(expr);
+            self.resolve_expr(expr.into());
         }
     }
 
-    pub fn with_new_scope<F, T>(&mut self, f: F) -> T
-    where
-        F: FnOnce(&mut Self) -> T,
-    {
-        let current_scope = self.scope.clone();
-        let old_scope = std::mem::replace(
-            &mut self.scope,
-            Scope::with_parent(current_scope.clone()),
-        );
-
-        let result = f(self);
-
-        self.scope = old_scope;
-        result
-    }
-
-    pub fn resolve_exprs(&mut self, exprs: &[Expr]) -> Vec<Item> {
-        let mut results = Vec::new();
-
-        for expr in exprs {
-            results.push(self.resolve_expr(expr.clone()));
-        }
-
-        results
-    }
-
-    pub fn resolve_params(&mut self, parameters: &[Expr]) {
-        for param in parameters {
-            let Expr { kind, span } = param.clone();
-
-            match &kind {
-                ExprKind::Identifier(_) => {
-                    let kind = ItemKind::Variable {
-                        target: param.clone().into(),
-                        value: None,
-                        mutable: false,
-                        ty: None,
-                    };
-
-                    let symbol = Item {
-                        kind,
-                        span
-                    };
-
-                    self.insert(symbol);
-                },
-                ExprKind::Labeled { label: expr, expr: ty } => {
-                    if let ExprKind::Identifier(_) = expr.kind {
-                        let kind = ItemKind::Variable {
-                            target: expr.clone(),
-                            value: None,
-                            mutable: false,
-                            ty: Some(ty.clone()),
-                        };
-
-                        let symbol = Item {
-                            kind,
-                            span
-                        };
-
-                        self.insert(symbol);
-                    }
-                },
-                _ => {
-                    self.error(ErrorKind::InvalidExpression(
-                        "Expected identifier or typed identifier for parameter".to_string(),
-                    ), span);
-                },
-            }
-        }
-    }
-
-    pub fn resolve_expr(&mut self, expr: Expr) -> Item {
-        let Expr { kind, span } = expr.clone();
+    /// Resolve a single expression
+    pub fn resolve_expr(&mut self, expr: Box<Expr>) -> Item {
+        let Expr { kind, span } = *expr.clone();
 
         match kind {
             ExprKind::Item(item) => {
@@ -246,56 +176,151 @@ impl Resolver {
                 };
 
                 self.insert(item.clone());
-
                 item
             },
 
             ExprKind::Assignment { target, .. } => {
-                self.lookup(&*target)
+                self.lookup(&target)
             },
 
-            ExprKind::Binary { left, operator, right } => {
-                self.resolve_expr(*left.clone());
-                self.resolve_expr(*right.clone());
-
-                let kind = ItemKind::Expression(Expr {
-                    kind: ExprKind::Binary { left, operator, right },
-                    span: span.clone(),
-                }.into());
+            ExprKind::Block(body) => {
+                self.push_scope();
+                self.resolve(body);
+                self.pop_scope();
 
                 Item {
-                    kind,
+                    kind: ItemKind::Expression(expr.into()),
                     span
                 }
             },
 
-            ExprKind::Unary { operator, operand } => {
-                self.resolve_expr(*operand.clone());
-
-                let kind = ItemKind::Expression(Expr {
-                    kind: ExprKind::Unary { operator, operand },
-                    span: span.clone(),
-                }.into());
-
-                Item {
-                    kind,
-                    span
-                }
-            },
-
-            ExprKind::Invoke { .. }
-            | ExprKind::Member { .. }
-            | ExprKind::Closure { .. }
-            | ExprKind::Constructor { .. }
-            | ExprKind::Identifier(_) => {
+            ExprKind::Literal(_) | ExprKind::Identifier(_) => {
                 self.lookup(&expr)
             },
 
-            _ => {
-                let kind = ItemKind::Expression(expr.into());
+            ExprKind::Constructor { .. } | ExprKind::Invoke { .. } | ExprKind::Index { .. } => {
+                self.lookup(&expr)
+            },
+
+            ExprKind::Group(elements) | ExprKind::Collection(elements) | ExprKind::Bundle(elements) => {
+                for element in elements {
+                    self.resolve_expr(element.into());
+                }
 
                 Item {
-                    kind,
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Binary { left, right, .. } => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Unary { operand, .. } => {
+                self.resolve_expr(operand)
+            },
+
+            ExprKind::Bind { key, value } => {
+                self.resolve_expr(key);
+                self.resolve_expr(value);
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Labeled { label, expr: value } => {
+                self.resolve_expr(label);
+                self.resolve_expr(value);
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
+                self.resolve_expr(condition);
+
+                self.push_scope();
+                self.resolve_expr(then_branch);
+                self.pop_scope();
+
+                if let Some(else_branch) = else_branch {
+                    self.push_scope();
+                    self.resolve_expr(else_branch);
+                    self.pop_scope();
+                }
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Match { target: clause, body } => {
+                self.resolve_expr(clause);
+
+                self.push_scope();
+                self.resolve_expr(body);
+                self.pop_scope();
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Loop { condition, body } => {
+                if let Some(condition) = condition {
+                    self.resolve_expr(condition);
+                }
+
+                self.push_scope();
+                self.resolve_expr(body);
+                self.pop_scope();
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Iterate { clause, body } => {
+                self.resolve_expr(clause);
+
+                self.push_scope();
+                self.resolve_expr(body);
+                self.pop_scope();
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            ExprKind::Return(value) | ExprKind::Break(value) | ExprKind::Continue(value) => {
+                if let Some(value) = value {
+                    self.resolve_expr(value);
+                }
+
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
+                    span
+                }
+            },
+
+            _ => {
+                Item {
+                    kind: ItemKind::Expression(expr.into()),
                     span
                 }
             }

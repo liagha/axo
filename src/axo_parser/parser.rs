@@ -17,6 +17,7 @@ use {
     }
 };
 
+#[derive(Clone)]
 pub struct Parser {
     tokens: Vec<Token>,
     pub file: PathBuf,
@@ -120,6 +121,12 @@ impl Parser {
         None
     }
 
+    pub fn peek_with<R>(&self, handler: fn(&Parser) -> R) -> R {
+        let parser = self.clone();
+
+        handler(&parser)
+    }
+
     pub fn peek_ahead(&self, forward: usize) -> Option<&Token> {
         let mut current = self.position + forward;
 
@@ -194,21 +201,60 @@ impl Parser {
     }
 
     pub fn parse_program(&mut self) -> Vec<Expr> {
-        let mut statements = Vec::new();
+        let brace = self.next().unwrap();
 
-        while let Some(token) = self.peek() {
-            if token.kind == TokenKind::EOF {
-                break;
-            } else if token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon) {
-                self.next();
+        let Token {
+            span: Span { start: _start, .. },
+            ..
+        } = brace;
+
+        let mut items = Vec::new();
+        let mut separator = Option::<PunctuationKind>::None;
+
+        while let Some(Token { kind, span }) = self.peek().cloned() {
+            match kind {
+                TokenKind::Punctuation(PunctuationKind::Comma) => {
+                    self.next();
+
+                    if let Some(separator) = separator {
+                        if separator != PunctuationKind::Comma {
+                            self.error(&ParseError::new(
+                                ErrorKind::InconsistentSeparators,
+                                span,
+                            ));
+                        }
+                    } else {
+                        separator = Some(PunctuationKind::Comma);
+                    }
+                }
+                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                    self.next();
+
+                    if let Some(separator) = separator {
+                        if separator != PunctuationKind::Semicolon {
+                            self.error(&ParseError::new(
+                                ErrorKind::InconsistentSeparators,
+                                span,
+                            ));
+                        }
+                    } else {
+                        separator = Some(PunctuationKind::Semicolon);
+                    }
+                }
+                _ => {
+                    let expr = self.parse_statement();
+
+                    items.push(expr.clone());
+
+                    self.expressions.push(expr);
+                }
             }
-
-            let stmt = self.parse_statement();
-
-            self.expressions.push(stmt.clone());
-            statements.push(stmt);
         }
 
-        statements
+        if separator == Some(PunctuationKind::Semicolon) {
+            items
+        } else {
+            items
+        }
     }
 }

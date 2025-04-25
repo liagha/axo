@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use hashbrown::{HashMap, HashSet};
+use axo_hash::{HashMap, HashSet};
 use rayon::iter::{
     IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelExtend,
     ParallelIterator,

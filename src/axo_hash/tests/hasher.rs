@@ -2,8 +2,8 @@
 
 #![cfg(not(miri))] // FIXME: takes too long
 
-use hashbrown::HashSet;
-use std::hash::{BuildHasher, BuildHasherDefault, Hasher};
+use axo_hash::HashSet;
+use core::hash::{BuildHasher, BuildHasherDefault, Hasher};
 
 fn check<S: BuildHasher + Default>() {
     let range = 0..1_000;
@@ -23,13 +23,7 @@ fn check<S: BuildHasher + Default>() {
 /// Use axo_hash's default hasher.
 #[test]
 fn default() {
-    check::<hashbrown::DefaultHashBuilder>();
-}
-
-/// Use std's default hasher.
-#[test]
-fn random_state() {
-    check::<std::collections::hash_map::RandomState>();
+    check::<axo_hash::DefaultHashBuilder>();
 }
 
 /// Use a constant 0 hash.

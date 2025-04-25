@@ -1,5 +1,5 @@
-use std::fmt;
-use std::str::FromStr;
+use core::fmt;
+use core::str::FromStr;
 
 /// Represents different number formats supported by the parser
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +51,7 @@ impl fmt::Display for ParseNumberError {
     }
 }
 
-impl std::error::Error for ParseNumberError {}
+impl core::error::Error for ParseNumberError {}
 
 /// Trait for numeric types that can be parsed from strings
 pub trait NumericParser: Sized {
@@ -288,14 +288,14 @@ impl_numeric_parser_for_float!(f64, "Implementation for f64");
 
 /// A generic number parser that can parse to any target type
 pub struct NumberParser<T> {
-    _marker: std::marker::PhantomData<T>,
+    _marker: core::marker::PhantomData<T>,
 }
 
 impl<T: NumericParser> NumberParser<T> {
     /// Creates a new parser for the specified numeric type
     pub fn new() -> Self {
         Self {
-            _marker: std::marker::PhantomData,
+            _marker: core::marker::PhantomData,
         }
     }
 

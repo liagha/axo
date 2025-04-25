@@ -31,10 +31,6 @@ pub type DefaultHashBuilder = foldhash::fast::RandomState;
 #[cfg(not(feature = "default-hasher"))]
 pub enum DefaultHashBuilder {}
 
-#[cfg(test)]
-#[macro_use]
-extern crate std;
-
 #[cfg_attr(test, macro_use)]
 extern crate alloc;
 

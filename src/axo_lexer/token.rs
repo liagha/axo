@@ -23,7 +23,12 @@ pub enum TokenKind {
     Punctuation(PunctuationKind),
     Keyword(KeywordKind),
     Comment(String),
-    EOF,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, span }
+    }
 }
 
 impl TokenKind {

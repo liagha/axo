@@ -2,6 +2,7 @@ use crate::axo_lexer::error::{CharParseError, ErrorKind};
 use crate::axo_lexer::operator::OperatorLexer;
 use crate::axo_lexer::{LexError, Lexer, TokenKind};
 use crate::axo_lexer::punctuation::PunctuationLexer;
+extern crate alloc;
 
 pub trait SymbolLexer {
     fn handle_operator(&mut self);
@@ -80,7 +81,7 @@ impl SymbolLexer for Lexer {
                     let end = (self.line, self.column);
 
                     if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                        if let Some(ch) = std::char::from_u32(hex_value) {
+                        if let Some(ch) = core::char::from_u32(hex_value) {
                             Ok(ch)
                         } else {
                             Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
@@ -119,7 +120,7 @@ impl SymbolLexer for Lexer {
                         }
 
                         if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                            if let Some(ch) = std::char::from_u32(hex_value) {
+                            if let Some(ch) = core::char::from_u32(hex_value) {
                                 Ok(ch)
                             } else {
                                 Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))

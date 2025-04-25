@@ -20,141 +20,145 @@ impl Hash for ExprKind {
         match self {
             // Primary Expressions
             ExprKind::Literal(token_kind) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 token_kind.hash(state);
             }
             ExprKind::Identifier(name) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 name.hash(state);
             }
 
             // Composite
             ExprKind::Group(exprs) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
+                exprs.hash(state);
+            }
+            ExprKind::Sequence(exprs) => {
+                core::mem::discriminant(self).hash(state);
                 exprs.hash(state);
             }
             ExprKind::Collection(exprs) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
+                exprs.hash(state);
+            }
+            ExprKind::Series(exprs) => {
+                core::mem::discriminant(self).hash(state);
                 exprs.hash(state);
             }
             ExprKind::Bundle(exprs) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 exprs.hash(state);
             }
             ExprKind::Constructor { name, body } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
 
             // Operations
             ExprKind::Binary { left, operator, right } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 left.hash(state);
                 operator.kind.hash(state); // Only hash the kind of the token, not its span
                 right.hash(state);
             }
             ExprKind::Unary { operator, operand } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 operator.kind.hash(state); // Only hash the kind of the token, not its span
                 operand.hash(state);
             }
 
             // Access Expressions
             ExprKind::Bind { key, value } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 key.hash(state);
                 value.hash(state);
             }
             ExprKind::Labeled { label, expr } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 label.hash(state);
                 expr.hash(state);
             }
             ExprKind::Index { expr, index } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 expr.hash(state);
                 index.hash(state);
             }
             ExprKind::Invoke { target, parameters } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 target.hash(state);
                 parameters.hash(state);
             }
             ExprKind::Path { tree } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 tree.hash(state);
             }
             ExprKind::Member { object, member } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 object.hash(state);
                 member.hash(state);
             }
 
             ExprKind::Closure { parameters, body } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 parameters.hash(state);
                 body.hash(state);
             }
 
             // Control Flow
             ExprKind::Block(exprs) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 exprs.hash(state);
             }
             ExprKind::Match { target, body } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 target.hash(state);
                 body.hash(state);
             }
-            ExprKind::Conditional { condition, then_branch, else_branch } => {
-                std::mem::discriminant(self).hash(state);
+            ExprKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
+                core::mem::discriminant(self).hash(state);
                 condition.hash(state);
                 then_branch.hash(state);
                 else_branch.hash(state);
             }
-            ExprKind::Loop { body } => {
-                std::mem::discriminant(self).hash(state);
-                body.hash(state);
-            }
-            ExprKind::While { condition, body } => {
-                std::mem::discriminant(self).hash(state);
+            ExprKind::Loop { condition, body } => {
+                core::mem::discriminant(self).hash(state);
                 condition.hash(state);
                 body.hash(state);
             }
-            ExprKind::For { clause, body } => {
-                std::mem::discriminant(self).hash(state);
+            ExprKind::Iterate { clause, body } => {
+                core::mem::discriminant(self).hash(state);
                 clause.hash(state);
                 body.hash(state);
             }
 
             // Declarations & Definitions
             ExprKind::Item(item_kind) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 item_kind.hash(state);
             }
             ExprKind::Assignment { target, value } => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 target.hash(state);
                 value.hash(state);
             }
 
             // Flow Control Statements
             ExprKind::Return(expr_opt) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
             ExprKind::Break(expr_opt) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
             ExprKind::Continue(expr_opt) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
 
             ExprKind::Error(_) => {
-                std::mem::discriminant(self).hash(state);
+                core::mem::discriminant(self).hash(state);
                 // Note: You'll need to implement Hash for ParseError if it doesn't already implement it
                 // error.hash(state);
             }
@@ -216,15 +220,14 @@ impl PartialEq for ExprKind {
             (ExprKind::Block(a), ExprKind::Block(b)) => a == b,
             (ExprKind::Match { target: a_target, body: a_body },
                 ExprKind::Match { target: b_target, body: b_body }) => a_target == b_target && a_body == b_body,
-            (ExprKind::Conditional { condition: a_cond, then_branch: a_then, else_branch: a_else },
-                ExprKind::Conditional { condition: b_cond, then_branch: b_then, else_branch: b_else }) => {
+            (ExprKind::Conditional { condition: a_cond, then: a_then, alternate: a_else },
+                ExprKind::Conditional { condition: b_cond, then: b_then, alternate: b_else }) => {
                 a_cond == b_cond && a_then == b_then && a_else == b_else
             },
-            (ExprKind::Loop { body: a_body }, ExprKind::Loop { body: b_body }) => a_body == b_body,
-            (ExprKind::While { condition: a_cond, body: a_body },
-                ExprKind::While { condition: b_cond, body: b_body }) => a_cond == b_cond && a_body == b_body,
-            (ExprKind::For { clause: a_clause, body: a_body },
-                ExprKind::For { clause: b_clause, body: b_body }) => a_clause == b_clause && a_body == b_body,
+            (ExprKind::Loop { condition: a_cond, body: a_body },
+                ExprKind::Loop { condition: b_cond, body: b_body }) => a_cond == b_cond && a_body == b_body,
+            (ExprKind::Iterate { clause: a_clause, body: a_body },
+                ExprKind::Iterate { clause: b_clause, body: b_body }) => a_clause == b_clause && a_body == b_body,
 
             // Declarations & Definitions
             (ExprKind::Item(a), ExprKind::Item(b)) => a == b,

@@ -39,19 +39,7 @@ impl ControlFlow for Parser {
 
         let target = self.parse_basic();
 
-        let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
-            let (exprs, span) = self.parse_delimited(
-                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                TokenKind::Punctuation(PunctuationKind::RightBrace),
-                TokenKind::Punctuation(PunctuationKind::Comma),
-                true,
-                Parser::parse_complex
-            );
-
-            Expr { kind: ExprKind::Block(exprs), span }
-        } else {
-            self.parse_complex()
-        };
+        let body = self.parse_complex();
 
         let end = body.span.end;
 
@@ -89,8 +77,8 @@ impl ControlFlow for Parser {
 
         let kind = ExprKind::Conditional {
             condition: condition.into(),
-            then_branch: then_branch.into(),
-            else_branch: else_branch.into()
+            then: then_branch.into(),
+            alternate: else_branch.into()
         };
 
         let expr = Expr {
@@ -111,7 +99,7 @@ impl ControlFlow for Parser {
 
         let end = body.span.end;
 
-        let kind = ExprKind::Loop { body: body.into() };
+        let kind = ExprKind::Loop { condition: None, body: body.into() };
 
         let expr = Expr {
             kind,
@@ -133,8 +121,8 @@ impl ControlFlow for Parser {
 
         let end = body.span.end;
 
-        let kind = ExprKind::While {
-            condition: condition.into(),
+        let kind = ExprKind::Loop {
+            condition: Some(condition.into()),
             body: body.into()
         };
 
@@ -158,7 +146,7 @@ impl ControlFlow for Parser {
 
         let end = body.span.end;
 
-        let kind = ExprKind::For {
+        let kind = ExprKind::Iterate {
             clause: clause.into(),
             body: body.into()
         };

@@ -18,96 +18,97 @@ pub struct Expr {
 
 #[derive(Eq, Clone)]
 pub enum ExprKind {
-    // Primary Expressions
-    Literal(TokenKind),        // Strings, Characters, Floats and Integers
-    Identifier(String),    // Identifiers for functions, structs, etc
+    // Primitives
+    Literal(TokenKind),        // Basic values (string, char, number, etc.)
+    Identifier(String),        // Named reference
+    Error(ParseError),         // Error representation
 
-    // Composite
-    Group(Vec<Expr>),      // (exprs, ...)
-    Collection(Vec<Expr>), // [exprs, ...]
-    Bundle(Vec<Expr>),     // { exprs, ... }
-    Constructor {          // $Name { fields, ... }
-        name: Box<Expr>,
-        body: Box<Expr>
-    },
+    // Groupings
+    Group(Vec<Expr>),          // Comma-separated in parentheses: (a, b)
+    Sequence(Vec<Expr>),       // Semicolon-separated in parentheses: (a; b)
+    Collection(Vec<Expr>),     // Comma-separated in brackets: [a, b]
+    Series(Vec<Expr>),         // Semicolon-separated in brackets: [a; b]
+    Bundle(Vec<Expr>),         // Comma-separated in braces: {a, b}
+    Block(Vec<Expr>),          // Semicolon-separated in braces: {a; b}
 
     // Operations
-    Binary {               // First_Expr | Operator | Second_Expr
+    Binary {                   // Expression op Expression
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>
     },
-    Unary {                // Prefix or Suffix, Before or After an Expr
+    Unary {                    // op Expression or Expression op
         operator: Token,
         operand: Box<Expr>,
     },
 
-    // Access Expressions
-    Bind {
+    // Associations
+    Bind {                     // Connects key to value
         key: Box<Expr>,
         value: Box<Expr>
     },
-    Labeled {
+    Labeled {                  // Names an expression
         label: Box<Expr>,
         expr: Box<Expr>
     },
-    Index {
-        expr: Box<Expr>,
-        index: Box<Expr>
+    Constructor {              // Creates named structure
+        name: Box<Expr>,
+        body: Box<Expr>
     },
-    Invoke {
-        target: Box<Expr>,
-        parameters: Vec<Expr>
-    },
-    Path {
-        tree: Tree<Box<Expr>>,
-    },
-    Member {
+
+    // Access
+    Member {                   // Access object property
         object: Box<Expr>,
         member: Box<Expr>
     },
+    Index {                    // Access by position
+        expr: Box<Expr>,
+        index: Box<Expr>
+    },
+    Path {                     // Namespace traversal
+        tree: Tree<Box<Expr>>,
+    },
 
-    Closure {
+    // Functions
+    Invoke {                   // Function call
+        target: Box<Expr>,
+        parameters: Vec<Expr>
+    },
+    Closure {                  // Anonymous function
         parameters: Vec<Expr>,
         body: Box<Expr>
     },
 
-    // Control Flow
-    Block(Vec<Expr>),
-    Match {
-        target: Box<Expr>,
-        body: Box<Expr>
-    },
-    Conditional {
+    // Control structures
+    Conditional {              // Branching logic
         condition: Box<Expr>,
-        then_branch: Box<Expr>,
-        else_branch: Option<Box<Expr>>,
+        then: Box<Expr>,
+        alternate: Option<Box<Expr>>,
     },
-    Loop {
+    Loop {                     // loop
+        condition: Option<Box<Expr>>,
         body: Box<Expr>,
     },
-    While {
-        condition: Box<Expr>,
-        body: Box<Expr>
-    },
-    For {
+    Iterate {                      // Iterative loop
         clause: Box<Expr>,
         body: Box<Expr>
     },
+    Match {                    // Pattern matching
+        target: Box<Expr>,
+        body: Box<Expr>
+    },
 
-    // Declarations & Definitions
-    Item(ItemKind),
-    Assignment {
+    // Declarations
+    Item(ItemKind),            // Module-level definition
+    Assignment {               // Value binding
         target: Box<Expr>,
         value: Box<Expr>
     },
 
-    // Flow Control Statements
-    Return(Option<Box<Expr>>),
-    Break(Option<Box<Expr>>),
-    Continue(Option<Box<Expr>>),
-
-    Error(ParseError),
+    // Control flow
+    Return(Option<Box<Expr>>), // Exit function with value
+    Break(Option<Box<Expr>>),  // Exit loop with value
+    Continue(Option<Box<Expr>>), // Skip to next iteration with value
 }
 
 impl Expr {

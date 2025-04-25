@@ -1,7 +1,7 @@
-use std::hash::{Hash, Hasher};
-use std::cmp::Ordering;
-use std::ops::{Add, Sub, Mul, Div, Neg, Rem};
-use std::fmt;
+use core::hash::{Hash, Hasher};
+use core::cmp::Ordering;
+use core::ops::{Add, Sub, Mul, Div, Neg, Rem};
+use core::fmt;
 
 #[derive(Debug, Copy, Clone)]
 pub struct FloatLiteral(pub f64);

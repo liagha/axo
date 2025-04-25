@@ -1,7 +1,7 @@
-use hashbrown::Equivalent;
-use hashbrown::HashMap;
+use axo_hash::Equivalent;
+use axo_hash::HashMap;
 
-use std::hash::Hash;
+use core::hash::Hash;
 
 #[derive(Debug, Hash)]
 pub struct Pair<A, B>(pub A, pub B);

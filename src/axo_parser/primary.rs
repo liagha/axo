@@ -44,8 +44,7 @@ impl Primary for Parser {
             | TokenKind::Char(_)
             | TokenKind::Punctuation(_)
             | TokenKind::Keyword(_)
-            | TokenKind::Comment(_)
-            | TokenKind::EOF => {
+            | TokenKind::Comment(_) => {
                 let Token { kind, span } = token;
 
                 Expr {
@@ -103,7 +102,7 @@ impl Primary for Parser {
                     while let Some(token) = self.peek() {
                         match &token.kind {
                             TokenKind::Punctuation(PunctuationKind::LeftBrace) => {
-                                expr = self.parse_constructor(expr.clone());
+                                expr = self.parse_constructor(expr);
                             }
                             TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
                                 expr = self.parse_index(expr)
@@ -130,8 +129,8 @@ impl Primary for Parser {
 
             match kind {
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_braced(),
-                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_collection(),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_group(),
+                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_bracketed(),
+                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
                 TokenKind::Identifier(_)
                 | TokenKind::Str(_)
@@ -157,10 +156,8 @@ impl Primary for Parser {
                     expr
                 }
 
-                TokenKind::EOF => {
-                    self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
-                },
                 kind => {
+                    self.next();
                     self.error(&ParseError::new(ErrorKind::UnexpectedToken(kind), span))
                 },
             }
@@ -258,16 +255,7 @@ impl Primary for Parser {
         let result = if let Some(_token) = self.peek().cloned() {
             let expr = self.parse_complex();
 
-            if let Some(Token {
-                            kind: TokenKind::Punctuation(PunctuationKind::Semicolon),
-                            ..
-                        }) = self.peek()
-            {
-                self.next();
-                expr
-            } else {
-                expr
-            }
+            expr
         } else {
             self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         };

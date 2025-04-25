@@ -1,4 +1,8 @@
-use crate::ParseNumberError;
+use {
+    crate::{
+        axo_rune::numeral::ParseNumberError,
+    },
+};
 
 pub enum ErrorKind {
     InvalidChar,

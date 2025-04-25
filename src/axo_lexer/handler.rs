@@ -1,5 +1,11 @@
-use crate::axo_lexer::error::ErrorKind;
-use crate::axo_lexer::{LexError, Lexer, OperatorKind, TokenKind};
+use {
+    crate::{
+        axo_lexer::{
+            error::ErrorKind,
+            LexError, Lexer, OperatorKind, TokenKind,
+        }
+    }
+};
 
 pub trait Handler {
     fn handle_identifier(&mut self) -> Result<(), LexError>;

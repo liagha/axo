@@ -143,10 +143,20 @@ impl Display for ExprKind {
 
                 write!(f, "[{}]", elems.join(", "))
             }
+            ExprKind::Series(elements) => {
+                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
+
+                write!(f, "[{}]", elems.join("; "))
+            }
             ExprKind::Group(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
 
                 write!(f, "({})", elems.join(", "))
+            }
+            ExprKind::Sequence(elements) => {
+                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
+
+                write!(f, "({})", elems.join("; "))
             }
             ExprKind::Bundle(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
@@ -179,7 +189,7 @@ impl Display for ExprKind {
                 }
             }
             ExprKind::Match { target, body } => write!(f, "match {} {}\n", target, body),
-            ExprKind::Conditional { condition, then_branch, else_branch} => {
+            ExprKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
                 write!(f, "if {} {}\n", condition, then_branch)?;
 
                 if let Some(else_expr) = else_branch {
@@ -188,9 +198,14 @@ impl Display for ExprKind {
 
                 Ok(())
             }
-            ExprKind::Loop { body } => write!(f, "loop {}", body),
-            ExprKind::While { condition, body: then } => write!(f, "while {} {}\n", condition, then),
-            ExprKind::For { clause, body} => write!(f, "for {} {}\n", clause, body),
+            ExprKind::Loop { condition, body } => {
+                if let Some(condition) = condition {
+                    write!(f, "while {} {}\n", condition, body)
+                } else {
+                    write!(f, "loop {}", body)
+                }
+            },
+            ExprKind::Iterate { clause, body} => write!(f, "for {} {}\n", clause, body),
 
             ExprKind::Item(item) => write!(f, "{}", item),
             ExprKind::Assignment { target, value} => write!(f, "{} = {}", target, value),
@@ -243,12 +258,18 @@ impl Debug for ExprKind {
             ExprKind::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
             },
+            ExprKind::Series(elements) => {
+                write!(f, "Series({:?})", elements)
+            }
             ExprKind::Collection(elements) => {
                 write!(f, "Collection({:?})", elements)
             },
             ExprKind::Group(elements) => {
                 write!(f, "Group({:?})", elements)
             },
+            ExprKind::Sequence(elements) => {
+                write!(f, "Sequence({:?})", elements)
+            }
             ExprKind::Bundle(elements) => {
                 write!(f, "Bundle({:?})", elements)
             }
@@ -279,7 +300,7 @@ impl Debug for ExprKind {
             ExprKind::Match { target, body } => {
                 write!(f, "Match({:?} => {:?})", target, body)
             },
-            ExprKind::Conditional { condition, then_branch, else_branch } => {
+            ExprKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
                 write!(f, "Conditional({:?} | Then: {:?}", condition, then_branch)?;
 
                 if let Some(else_expr) = else_branch {
@@ -288,13 +309,14 @@ impl Debug for ExprKind {
 
                 write!(f, ")")
             }
-            ExprKind::Loop { body } => {
-                write!(f, "Loop({:?})", body)
+            ExprKind::Loop { condition, body } => {
+                if let Some(condition) = condition {
+                    write!(f, "While({:?} | {:?})", condition, body)
+                } else {
+                    write!(f, "Loop({:?})", body)
+                }
             },
-            ExprKind::While { condition, body: then } => {
-                write!(f, "While({:?} do {:?})", condition, then)
-            },
-            ExprKind::For { clause, body } => {
+            ExprKind::Iterate { clause, body } => {
                 write!(f, "For({:?} in {:?})", clause, body)
             },
             ExprKind::Block(stmts) => {

@@ -371,19 +371,7 @@ impl ItemParser for Parser {
             ..
         } = enum_name;
 
-        let body = if let Some(Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. }) = self.peek() {
-            let (exprs, span) = self.parse_delimited(
-                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                TokenKind::Punctuation(PunctuationKind::RightBrace),
-                TokenKind::Punctuation(PunctuationKind::Comma),
-                true,
-                Parser::parse_complex
-            );
-
-            Expr { kind: ExprKind::Block(exprs), span }
-        } else {
-            self.parse_complex()
-        };
+        let body = self.parse_complex();
 
         let end = body.span.end;
 
