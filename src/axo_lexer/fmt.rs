@@ -24,9 +24,9 @@ impl fmt::Display for TokenKind {
                 write!(f, "{}", c)
             },
             TokenKind::Operator(c) => write!(f, "{}", c),
-            TokenKind::Str(str) => write!(f, "{}", str),
+            TokenKind::String(str) => write!(f, "{}", str),
             TokenKind::Identifier(str) => write!(f, "{}", str),
-            TokenKind::Char(char) => write!(f, "'{}'", char),
+            TokenKind::Character(char) => write!(f, "'{}'", char),
             TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
         }
@@ -42,8 +42,8 @@ impl fmt::Debug for TokenKind {
             TokenKind::Operator(op) => write!(f, "Operator({:?})", op),
             TokenKind::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
             TokenKind::Identifier(var) => write!(f, "Identifier({})", var),
-            TokenKind::Str(str) => write!(f, "String({})", str),
-            TokenKind::Char(char) => write!(f, "Char('{}')", char),
+            TokenKind::String(str) => write!(f, "String({})", str),
+            TokenKind::Character(char) => write!(f, "Char('{}')", char),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
             TokenKind::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
         }

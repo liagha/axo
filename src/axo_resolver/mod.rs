@@ -1,8 +1,8 @@
-pub mod error;
 pub mod scope;
 pub mod validation;
 mod matcher;
 mod resolver;
+mod error;
 
 use {
     crate::{

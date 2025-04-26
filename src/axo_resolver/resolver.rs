@@ -6,7 +6,7 @@ use {
             Action, Hint
         },
         axo_parser::{
-            Expr, ExprKind,
+            Element, ElementKind,
             Item, ItemKind
         },
         axo_resolver::{
@@ -55,7 +55,7 @@ impl Resolver {
     }
 
     /// Look up a symbol across all visible scopes and validate the result
-    pub fn lookup(&mut self, target: &Expr) -> Item {
+    pub fn lookup(&mut self, target: &Element) -> Item {
         let target_name = match target.name() {
             Some(name) => name,
             None => {
@@ -104,7 +104,8 @@ impl Resolver {
             }
 
             // If we have a close match, suggest it as a correction
-            if suggestion.score > 0.7 {
+            if suggestion.score > 0.0 {
+                dbg!();
                 let err = ResolveError {
                     kind: ErrorKind::UndefinedSymbol(target_name.clone(), None),
                     span: target_name.span,
@@ -122,6 +123,7 @@ impl Resolver {
 
                 self.errors.push(err);
             } else {
+                dbg!();
                 self.error(
                     ErrorKind::UndefinedSymbol(target_name.clone(), None),
                     target_name.span,
@@ -158,96 +160,70 @@ impl Resolver {
     }
 
     /// Resolve a list of expressions
-    pub fn resolve(&mut self, exprs: Vec<Expr>) {
+    pub fn resolve(&mut self, exprs: Vec<Element>) {
         for expr in exprs {
             self.resolve_expr(expr.into());
         }
     }
 
     /// Resolve a single expression
-    pub fn resolve_expr(&mut self, expr: Box<Expr>) -> Item {
-        let Expr { kind, span } = *expr.clone();
+    pub fn resolve_expr(&mut self, expr: Box<Element>) {
+        let Element { kind, span } = *expr.clone();
 
         match kind {
-            ExprKind::Item(item) => {
+            ElementKind::Item(item) => {
                 let item = Item {
                     kind: item,
                     span
                 };
 
                 self.insert(item.clone());
-                item
             },
 
-            ExprKind::Assignment { target, .. } => {
-                self.lookup(&target)
+            ElementKind::Assignment { target, .. } => {
+                self.lookup(&target);
             },
 
-            ExprKind::Block(body) => {
+            ElementKind::Scope(body) => {
                 self.push_scope();
                 self.resolve(body);
                 self.pop_scope();
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Literal(_) | ExprKind::Identifier(_) => {
-                self.lookup(&expr)
+            ElementKind::Literal(_) | ElementKind::Identifier(_) => {
+                self.lookup(&expr);
             },
 
-            ExprKind::Constructor { .. } | ExprKind::Invoke { .. } | ExprKind::Index { .. } => {
-                self.lookup(&expr)
+            ElementKind::Constructor { .. } | ElementKind::Invoke { .. } | ElementKind::Index { .. } => {
+                self.lookup(&expr);
             },
 
-            ExprKind::Group(elements) | ExprKind::Collection(elements) | ExprKind::Bundle(elements) => {
+            ElementKind::Group(elements) | ElementKind::Collection(elements) | ElementKind::Bundle(elements) => {
                 for element in elements {
                     self.resolve_expr(element.into());
                 }
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Binary { left, right, .. } => {
+            ElementKind::Binary { left, right, .. } => {
                 self.resolve_expr(left);
                 self.resolve_expr(right);
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Unary { operand, .. } => {
+            ElementKind::Unary { operand, .. } => {
                 self.resolve_expr(operand)
             },
 
-            ExprKind::Bind { key, value } => {
+            ElementKind::Bind { key, value } => {
                 self.resolve_expr(key);
                 self.resolve_expr(value);
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Labeled { label, expr: value } => {
+            ElementKind::Labeled { label, element: value } => {
                 self.resolve_expr(label);
                 self.resolve_expr(value);
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
+            ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
                 self.resolve_expr(condition);
 
                 self.push_scope();
@@ -259,27 +235,17 @@ impl Resolver {
                     self.resolve_expr(else_branch);
                     self.pop_scope();
                 }
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Match { target: clause, body } => {
+            ElementKind::Match { target: clause, body } => {
                 self.resolve_expr(clause);
 
                 self.push_scope();
                 self.resolve_expr(body);
                 self.pop_scope();
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Loop { condition, body } => {
+            ElementKind::Loop { condition, body } => {
                 if let Some(condition) = condition {
                     self.resolve_expr(condition);
                 }
@@ -287,42 +253,23 @@ impl Resolver {
                 self.push_scope();
                 self.resolve_expr(body);
                 self.pop_scope();
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Iterate { clause, body } => {
+            ElementKind::Iterate { clause, body } => {
                 self.resolve_expr(clause);
 
                 self.push_scope();
                 self.resolve_expr(body);
                 self.pop_scope();
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             },
 
-            ExprKind::Return(value) | ExprKind::Break(value) | ExprKind::Continue(value) => {
+            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Skip(value) => {
                 if let Some(value) = value {
                     self.resolve_expr(value);
-                }
-
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
                 }
             },
 
             _ => {
-                Item {
-                    kind: ItemKind::Expression(expr.into()),
-                    span
-                }
             }
         }
     }

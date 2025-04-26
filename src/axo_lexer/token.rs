@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
 use crate::axo_lexer::keyword::KeywordLexer;
 use crate::axo_data::float::FloatLiteral;
@@ -16,8 +14,8 @@ pub enum TokenKind {
     Float(FloatLiteral),
     Integer(i128),
     Boolean(bool),
-    Str(String),
-    Char(char),
+    String(String),
+    Character(char),
     Operator(OperatorKind),
     Identifier(String),
     Punctuation(PunctuationKind),
@@ -44,22 +42,6 @@ impl TokenKind {
                     None
                 }
             },
-        }
-    }
-
-    pub fn get_operator_opt(input: Option<&TokenKind>) -> Option<OperatorKind> {
-        if let Some(TokenKind::Operator(operator)) = input {
-            Some(operator.clone())
-        } else {
-            None
-        }
-    }
-
-    pub fn get_operator(input: &TokenKind) -> Option<OperatorKind> {
-        if let TokenKind::Operator(operator) = input {
-            Some(operator.clone())
-        } else {
-            None
         }
     }
 }

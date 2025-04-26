@@ -10,12 +10,13 @@ use {
         },
         axo_parser::{
             error::ErrorKind,
-            Expr, ExprKind,
+            Element, ElementKind,
             ParseError, Primary,
         },
         axo_span::Span,
     }
 };
+use crate::axo_parser::expression::Expression;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -24,7 +25,7 @@ pub struct Parser {
     pub position: usize,
     pub line: usize,
     pub column: usize,
-    pub expressions: Vec<Expr>,
+    pub expressions: Vec<Element>,
     pub errors: Vec<ParseError>,
 }
 
@@ -41,13 +42,13 @@ impl Parser {
         }
     }
 
-    pub fn error(&mut self, error: &ParseError) -> Expr {
+    pub fn error(&mut self, error: &ParseError) -> Element {
         self.errors.push(error.clone());
 
         let current = (self.line, self.column);
 
-        Expr {
-            kind: ExprKind::Error(error.clone()),
+        Element {
+            kind: ElementKind::Error(error.clone()),
             span: self.span(current, current),
         }
     }
@@ -200,13 +201,8 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self) -> Vec<Expr> {
-        let brace = self.next().unwrap();
-
-        let Token {
-            span: Span { start: _start, .. },
-            ..
-        } = brace;
+    pub fn parse_program(&mut self) -> Vec<Element> {
+        // let start = (0, 0);
 
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
@@ -242,7 +238,7 @@ impl Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_statement();
+                    let expr = self.parse_complex();
 
                     items.push(expr.clone());
 

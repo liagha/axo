@@ -11,7 +11,7 @@ use {
             delimiter::Delimiter,
             expression::Expression,
             error::ErrorKind,
-            Expr, ExprKind,
+            Element, ElementKind,
             ParseError, Parser, Primary
         },
         axo_span::Span,
@@ -26,71 +26,70 @@ pub struct Item {
 
 #[derive(Eq, Clone)]
 pub enum ItemKind {
-    Use(Box<Expr>),
-    Expression(Box<Expr>),
+    Use(Box<Element>),
     Implement {
-        expr: Box<Expr>,
-        body: Box<Expr>
+        expr: Box<Element>,
+        body: Box<Element>
     },
     Trait {
-        name: Box<Expr>,
-        body: Box<Expr>
+        name: Box<Element>,
+        body: Box<Element>
     },
     Variable {
-        target: Box<Expr>,
-        value: Option<Box<Expr>>,
-        ty: Option<Box<Expr>>,
+        target: Box<Element>,
+        value: Option<Box<Element>>,
+        ty: Option<Box<Element>>,
         mutable: bool,
     },
     Field {
-        name: Box<Expr>,
-        value: Option<Box<Expr>>,
-        ty: Option<Box<Expr>>,
+        name: Box<Element>,
+        value: Option<Box<Element>>,
+        ty: Option<Box<Element>>,
     },
     Structure {
-        name: Box<Expr>,
+        name: Box<Element>,
         fields: Vec<Item>
     },
     Enum {
-        name: Box<Expr>,
-        body: Box<Expr>,
+        name: Box<Element>,
+        body: Box<Element>,
     },
     Macro {
-        name: Box<Expr>,
-        parameters: Vec<Expr>,
-        body: Box<Expr>
+        name: Box<Element>,
+        parameters: Vec<Element>,
+        body: Box<Element>
     },
     Function {
-        name: Box<Expr>,
-        parameters: Vec<Expr>,
-        body: Box<Expr>
+        name: Box<Element>,
+        parameters: Vec<Element>,
+        body: Box<Element>
     },
     Unit,
 }
 
 pub trait ItemParser {
     fn parse_field(&mut self) -> Item;
-    fn parse_use(&mut self) -> Expr;
-    fn parse_variable(&mut self) -> Expr;
-    fn parse_impl(&mut self) -> Expr;
-    fn parse_trait(&mut self) -> Expr;
-    fn parse_function(&mut self) -> Expr;
-    fn parse_macro(&mut self) -> Expr;
-    fn parse_enum(&mut self) -> Expr;
-    fn parse_struct(&mut self) -> Expr;
+    fn parse_use(&mut self) -> Element;
+    fn parse_variable(&mut self) -> Element;
+    fn parse_impl(&mut self) -> Element;
+    fn parse_trait(&mut self) -> Element;
+    fn parse_function(&mut self) -> Element;
+    fn parse_macro(&mut self) -> Element;
+    fn parse_enum(&mut self) -> Element;
+    fn parse_struct(&mut self) -> Element;
 }
 
 impl ItemParser for Parser {
     fn parse_field(&mut self) -> Item {
-        let Expr { kind, span } = self.parse_statement();
+        let Element { kind, span } = self.parse_complex();
 
         match kind {
-            ExprKind::Assignment {
+            ElementKind::Assignment {
                 target,
                 value
             } => {
-                let kind = if let Expr {
-                    kind: ExprKind::Labeled { label, expr }, ..
+                let kind = if let Element {
+                    kind: ElementKind::Labeled { label, element: expr }, ..
                 } = *target {
                     ItemKind::Field { name: label, value: Some(value), ty: Some(expr) }
                 } else {
@@ -103,8 +102,8 @@ impl ItemParser for Parser {
                 }
             }
 
-            ExprKind::Labeled {
-                label, expr
+            ElementKind::Labeled {
+                label, element: expr
             } => {
                 let kind = ItemKind::Field { name: label, value: None, ty: Some(expr) };
                 Item {
@@ -114,7 +113,7 @@ impl ItemParser for Parser {
             }
 
             _ => {
-                let expr = Expr {
+                let expr = Element {
                     kind,
                     span: span.clone(),
                 };
@@ -127,7 +126,7 @@ impl ItemParser for Parser {
         }
     }
 
-    fn parse_use(&mut self) -> Expr {
+    fn parse_use(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -141,9 +140,9 @@ impl ItemParser for Parser {
         };
 
         let item = ItemKind::Use(value);
-        let kind = ExprKind::Item(item);
+        let kind = ElementKind::Item(item);
 
-        let expr = Expr {
+        let expr = Element {
             kind,
             span: self.span(start, end),
         };
@@ -151,7 +150,7 @@ impl ItemParser for Parser {
         expr
     }
 
-    fn parse_variable(&mut self) -> Expr {
+    fn parse_variable(&mut self) -> Element {
         let Token {
             kind: def_kind,
             span: Span { start, .. },
@@ -161,13 +160,13 @@ impl ItemParser for Parser {
 
         let expr = self.parse_complex();
 
-        let Expr { kind, span: Span { end, .. } } = expr.clone();
+        let Element { kind, span: Span { end, .. } } = expr.clone();
 
         let span = self.span(start, end);
 
         let item = match kind {
-            ExprKind::Assignment { target, value } => {
-                if let Expr { kind: ExprKind::Labeled { label, expr }, .. } = *target {
+            ElementKind::Assignment { target, value } => {
+                if let Element { kind: ElementKind::Labeled { label, element: expr }, .. } = *target {
                     ItemKind::Variable {
                         target: label,
                         value: Some(value),
@@ -193,13 +192,13 @@ impl ItemParser for Parser {
             }
         };
 
-        Expr {
-            kind: ExprKind::Item(item),
+        Element {
+            kind: ElementKind::Item(item),
             span,
         }
     }
 
-    fn parse_impl(&mut self) -> Expr {
+    fn parse_impl(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -209,14 +208,14 @@ impl ItemParser for Parser {
 
         
 
-        let body = self.parse_statement();
+        let body = self.parse_complex();
 
         let end = body.span.end;
 
         let item = ItemKind::Implement { expr: implementation.into(), body: body.into() };
-        let kind = ExprKind::Item(item);
+        let kind = ElementKind::Item(item);
 
-        let expr = Expr {
+        let expr = Element {
             kind,
             span: self.span(start, end),
         };
@@ -224,7 +223,7 @@ impl ItemParser for Parser {
         expr
     }
 
-    fn parse_trait(&mut self) -> Expr {
+    fn parse_trait(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -232,7 +231,7 @@ impl ItemParser for Parser {
 
         let trait_ = self.parse_basic();
 
-        let body = self.parse_statement();
+        let body = self.parse_complex();
 
         let end = body.span.end;
 
@@ -241,9 +240,9 @@ impl ItemParser for Parser {
             body: body.into()
         };
 
-        let kind = ExprKind::Item(item);
+        let kind = ElementKind::Item(item);
 
-        let expr = Expr {
+        let expr = Element {
             kind,
             span: self.span(start, end),
         };
@@ -251,7 +250,7 @@ impl ItemParser for Parser {
         expr
     }
 
-    fn parse_function(&mut self) -> Expr {
+    fn parse_function(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -260,11 +259,11 @@ impl ItemParser for Parser {
         let function = self.parse_basic();
 
         match function {
-            Expr {
-                kind: ExprKind::Invoke { target, parameters },
+            Element {
+                kind: ElementKind::Invoke { target, parameters },
                 ..
             } => {
-                let body = self.parse_statement();
+                let body = self.parse_complex();
 
                 let end = body.span.end;
 
@@ -274,9 +273,9 @@ impl ItemParser for Parser {
                     body: body.into()
                 };
 
-                let kind = ExprKind::Item(item);
+                let kind = ElementKind::Item(item);
 
-                let expr = Expr {
+                let expr = Element {
                     kind,
                     span: self.span(start, end),
                 };
@@ -284,7 +283,7 @@ impl ItemParser for Parser {
                 expr
             }
             _ => {
-                let body = self.parse_statement();
+                let body = self.parse_complex();
 
                 let end = body.span.end;
 
@@ -294,9 +293,9 @@ impl ItemParser for Parser {
                     body: body.into()
                 };
 
-                let kind = ExprKind::Item(item);
+                let kind = ElementKind::Item(item);
 
-                let expr = Expr {
+                let expr = Element {
                     kind,
                     span: self.span(start, end),
                 };
@@ -306,7 +305,7 @@ impl ItemParser for Parser {
         }
     }
 
-    fn parse_macro(&mut self) -> Expr {
+    fn parse_macro(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -314,14 +313,12 @@ impl ItemParser for Parser {
 
         let macro_ = self.parse_basic();
 
-        
-
         match macro_ {
-            Expr {
-                kind: ExprKind::Invoke { target, parameters},
+            Element {
+                kind: ElementKind::Invoke { target, parameters},
                 ..
             } => {
-                let body = self.parse_statement();
+                let body = self.parse_complex();
 
                 let end = body.span.end;
 
@@ -331,9 +328,9 @@ impl ItemParser for Parser {
                     body: body.into()
                 };
 
-                let kind = ExprKind::Item(item);
+                let kind = ElementKind::Item(item);
 
-                let expr = Expr {
+                let expr = Element {
                     kind,
                     span: self.span(start, end),
                 };
@@ -341,7 +338,7 @@ impl ItemParser for Parser {
                 expr
             }
             _ => {
-                let body = self.parse_statement();
+                let body = self.parse_complex();
 
                 let end = body.span.end;
 
@@ -351,9 +348,9 @@ impl ItemParser for Parser {
                     body: body.into()
                 };
 
-                let kind = ExprKind::Item(item);
+                let kind = ElementKind::Item(item);
 
-                let expr = Expr {
+                let expr = Element {
                     kind,
                     span: self.span(start, end),
                 };
@@ -363,10 +360,10 @@ impl ItemParser for Parser {
         }
     }
 
-    fn parse_enum(&mut self) -> Expr {
+    fn parse_enum(&mut self) -> Element {
         let enum_name = self.parse_basic();
 
-        let Expr {
+        let Element {
             span: Span { start, .. },
             ..
         } = enum_name;
@@ -375,12 +372,12 @@ impl ItemParser for Parser {
 
         let end = body.span.end;
 
-        let kind = ExprKind::Constructor {
+        let kind = ElementKind::Constructor {
             name: enum_name.into(),
             body: body.into()
         };
 
-        let expr = Expr {
+        let expr = Element {
             kind,
             span: self.span(start, end),
         };
@@ -388,7 +385,7 @@ impl ItemParser for Parser {
         expr
     }
 
-    fn parse_struct(&mut self) -> Expr {
+    fn parse_struct(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
             ..
@@ -411,9 +408,9 @@ impl ItemParser for Parser {
             fields
         };
 
-        let kind = ExprKind::Item(item);
+        let kind = ElementKind::Item(item);
 
-        let expr = Expr {
+        let expr = Element {
             kind,
             span: self.span(start, end),
         };

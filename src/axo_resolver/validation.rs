@@ -1,46 +1,46 @@
 use {
     crate::{
         axo_parser::{
-            Expr, ExprKind, Item, ItemKind
+            Element, ElementKind, Item, ItemKind
         },
 
         axo_resolver::{
+            Resolver,
             error::ErrorKind,
         }
     }
 };
 
-use crate::axo_resolver::Resolver;
-
 impl Resolver {
-    /// Validates an expression against a resolved item
-    pub fn validate(&mut self, expr: &Expr, item: &Item) {
+    pub fn validate(&mut self, expr: &Element, item: &Item) {
         match (&expr.kind, &item.kind) {
-            (ExprKind::Invoke { parameters, .. }, ItemKind::Function { parameters: func_params, .. }) => {
-                self.error(ErrorKind::ParameterMismatch {
-                    found: parameters.len(),
-                    expected: func_params.len(),
-                }, expr.span.clone());
-            },
-            (ExprKind::Invoke { parameters, .. }, ItemKind::Macro { parameters: macro_params, .. }) => {
-                self.error(ErrorKind::ParameterMismatch {
-                    found: parameters.len(),
-                    expected: macro_params.len(),
-                }, expr.span.clone());
-            },
-            (ExprKind::Constructor { body, .. }, ItemKind::Structure { fields, .. }) => {
-                if let ExprKind::Bundle(exprs) = &body.kind {
-                    self.error(ErrorKind::FieldCountMismatch {
-                        found: exprs.len(),
-                        expected: fields.len(),
+            (ElementKind::Invoke { parameters: found, .. }, ItemKind::Function { parameters: expected, .. }) => {
+                if found != expected {
+                    self.error(ErrorKind::ParameterMismatch {
+                        found: found.len(),
+                        expected: expected.len(),
                     }, expr.span.clone());
                 }
             },
-            (ExprKind::Constructor { .. }, ItemKind::Enum { .. }) => {
-                // Enums don't require field validation as they may have variants
+            (ElementKind::Invoke { parameters: found, .. }, ItemKind::Macro { parameters: expected, .. }) => {
+                if found != expected {
+                    self.error(ErrorKind::ParameterMismatch {
+                        found: found.len(),
+                        expected: expected.len(),
+                    }, expr.span.clone());
+                }
             },
-            (ExprKind::Identifier(_), ItemKind::Variable { .. }) => {
-                // Variables don't need additional validation beyond type checking
+            (ElementKind::Constructor { body, .. }, ItemKind::Structure { fields: expected, .. }) => {
+                if let ElementKind::Bundle(found) = &body.kind {
+                    if found != expected {
+                        self.error(ErrorKind::FieldCountMismatch {
+                            found: found.len(),
+                            expected: expected.len(),
+                        }, expr.span.clone());
+                    }
+                }
+            },
+            (ElementKind::Identifier(_), ItemKind::Variable { .. }) => {
             },
             (expr_kind, item_kind) => {
                 self.error(ErrorKind::TypeMismatch {

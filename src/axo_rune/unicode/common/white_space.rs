@@ -1,7 +1,11 @@
 //! Unicode `White_Space` Character Property.
 
-use crate::char_property;
-use crate::chars;
+use {
+    crate::{
+        chars,
+        char_property,
+    }
+};
 
 char_property! {
     /// Represents values of the Unicode character property

@@ -65,7 +65,7 @@ impl LiteralLexer for Lexer {
             }
             1 => {
                 let ch = content[0];
-                self.push_token(TokenKind::Char(ch), span);
+                self.push_token(TokenKind::Character(ch), span);
                 Ok(())
             }
             _ => {
@@ -127,7 +127,7 @@ impl LiteralLexer for Lexer {
 
         let content_string: String = content.into_iter().collect();
         self.push_token(
-            TokenKind::Str(content_string),
+            TokenKind::String(content_string),
             span,
         );
         Ok(())

@@ -2,17 +2,18 @@
 mod parser;
 mod statement;
 mod expression;
-mod error;
 mod primary;
 mod composite;
 mod item;
 mod fmt;
 mod delimiter;
 mod traits;
+mod error;
+mod element;
 
 pub use {
     statement::ControlFlow,
-    expression::{Expr, ExprKind},
+    element::{Element, ElementKind},
     item::{Item, ItemKind},
     parser::Parser,
     composite::Composite,
@@ -20,7 +21,12 @@ pub use {
 
     crate::{
         axo_errors::Error,
-        axo_parser::error::ErrorKind,
+    }
+};
+
+use {
+    crate::{
+        axo_parser::error::ErrorKind
     }
 };
 

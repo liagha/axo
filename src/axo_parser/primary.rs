@@ -9,7 +9,7 @@ use {
             expression::Expression,
             item::ItemParser,
             error::ErrorKind,
-            Expr, ExprKind,
+            Element, ElementKind,
             ParseError, Parser,
             Composite, ControlFlow
         },
@@ -18,37 +18,36 @@ use {
 };
 
 pub trait Primary {
-    fn parse_atom(&mut self) -> Expr;
-    fn parse_leaf(&mut self) -> Expr;
-    fn parse_primary(&mut self) -> Expr;
-    fn parse_unary(&mut self, primary: fn(&mut Parser) -> Expr) -> Expr;
-    fn parse_binary(&mut self, primary: fn(&mut Parser) -> Expr, min_precedence: u8) -> Expr;
-    fn parse_statement(&mut self) -> Expr;
+    fn parse_atom(&mut self) -> Element;
+    fn parse_leaf(&mut self) -> Element;
+    fn parse_primary(&mut self) -> Element;
+    fn parse_unary(&mut self, primary: fn(&mut Parser) -> Element) -> Element;
+    fn parse_binary(&mut self, primary: fn(&mut Parser) -> Element, min_precedence: u8) -> Element;
 }
 
 impl Primary for Parser {
-    fn parse_atom(&mut self) -> Expr {
+    fn parse_atom(&mut self) -> Element {
         let token = self.next().unwrap();
         let Token { kind, span } = token.clone();
 
         let expr = match kind {
-            TokenKind::Identifier(ident) => Expr {
-                kind: ExprKind::Identifier(ident),
+            TokenKind::Identifier(ident) => Element {
+                kind: ElementKind::Identifier(ident),
                 span,
             },
             TokenKind::Float(_)
             | TokenKind::Integer(_)
             | TokenKind::Boolean(_)
-            | TokenKind::Str(_)
+            | TokenKind::String(_)
             | TokenKind::Operator(_)
-            | TokenKind::Char(_)
+            | TokenKind::Character(_)
             | TokenKind::Punctuation(_)
             | TokenKind::Keyword(_)
             | TokenKind::Comment(_) => {
                 let Token { kind, span } = token;
 
-                Expr {
-                    kind: ExprKind::Literal(kind),
+                Element {
+                    kind: ElementKind::Literal(kind),
                     span,
                 }
             },
@@ -57,7 +56,7 @@ impl Primary for Parser {
         expr
     }
 
-    fn parse_leaf(&mut self) -> Expr {
+    fn parse_leaf(&mut self) -> Element {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
 
@@ -91,8 +90,8 @@ impl Primary for Parser {
                     },
                 },
                 TokenKind::Identifier(_)
-                | TokenKind::Str(_)
-                | TokenKind::Char(_)
+                | TokenKind::String(_)
+                | TokenKind::Character(_)
                 | TokenKind::Boolean(_)
                 | TokenKind::Float(_)
                 | TokenKind::Integer(_)
@@ -123,7 +122,7 @@ impl Primary for Parser {
         }
     }
 
-    fn parse_primary(&mut self) -> Expr {
+    fn parse_primary(&mut self) -> Element {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
 
@@ -133,8 +132,8 @@ impl Primary for Parser {
                 TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(),
                 TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
                 TokenKind::Identifier(_)
-                | TokenKind::Str(_)
-                | TokenKind::Char(_)
+                | TokenKind::String(_)
+                | TokenKind::Character(_)
                 | TokenKind::Boolean(_)
                 | TokenKind::Float(_)
                 | TokenKind::Integer(_)
@@ -165,7 +164,7 @@ impl Primary for Parser {
             self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
         }
     }
-    fn parse_unary(&mut self, primary: fn(&mut Parser) -> Expr ) -> Expr {
+    fn parse_unary(&mut self, primary: fn(&mut Parser) -> Element) -> Element {
         if let Some(Token {
                         kind: TokenKind::Operator(op),
                         span: Span { start, .. },
@@ -179,12 +178,12 @@ impl Primary for Parser {
 
                 let span = self.span(start, end);
 
-                let kind = ExprKind::Unary {
+                let kind = ElementKind::Unary {
                     operator,
                     operand: unary.into()
                 };
 
-                let expr = Expr { kind, span };
+                let expr = Element { kind, span };
 
                 return expr;
             }
@@ -201,12 +200,12 @@ impl Primary for Parser {
                 let operator = self.next().unwrap();
                 let span = self.span(expr.span.start, end);
 
-                let kind = ExprKind::Unary {
+                let kind = ElementKind::Unary {
                     operator,
                     operand: expr.into()
                 };
 
-                expr = Expr { kind, span };
+                expr = Element { kind, span };
             } else {
                 break;
             }
@@ -215,7 +214,7 @@ impl Primary for Parser {
         expr
     }
 
-    fn parse_binary(&mut self, primary: fn(&mut Parser) -> Expr, min_precedence: u8) -> Expr {
+    fn parse_binary(&mut self, primary: fn(&mut Parser) -> Element, min_precedence: u8) -> Element {
         let mut left = self.parse_unary(primary);
 
         while let Some(Token { kind: TokenKind::Operator(op), .. }) = self.peek().cloned() {
@@ -234,32 +233,18 @@ impl Primary for Parser {
                 let end = right.span.end;
                 let span = self.span(start, end);
 
-                let kind = ExprKind::Binary {
+                let kind = ElementKind::Binary {
                     left: left.into(),
                     operator,
                     right: right.into()
                 };
 
-                left = Expr { kind, span };
-
-                left = left.transform();
+                left = Element::new(kind, span);
             } else {
                 break;
             }
         }
 
         left
-    }
-
-    fn parse_statement(&mut self) -> Expr {
-        let result = if let Some(_token) = self.peek().cloned() {
-            let expr = self.parse_complex();
-
-            expr
-        } else {
-            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
-        };
-
-        result
     }
 }

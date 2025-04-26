@@ -6,6 +6,7 @@ mod axo_rune;
 mod axo_errors;
 mod axo_span;
 mod timer;
+mod axo_validator;
 
 pub use {
     axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},

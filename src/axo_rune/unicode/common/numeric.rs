@@ -3,8 +3,12 @@
 //! NOTE: This property is not defined by UCD, but is used commonly enough in Unicode algorithms and
 //! applications to provide an optimized implementation.
 
-use crate::char_property;
-use crate::chars;
+use {
+    crate::{
+        chars,
+        char_property,
+    }
+};
 
 char_property! {
     /// Represents Unicode characters with `General_Category = Nd | Nl | No`.

@@ -6,7 +6,7 @@ use {
         axo_parser::{
             error::ErrorKind,
             expression::Expression,
-            Expr, ExprKind,
+            Element, ElementKind,
             ParseError, Parser, Primary,
         },
         axo_span::{
@@ -27,9 +27,9 @@ pub trait Delimiter {
     where
         R: Spanned + Clone,
         F: FnMut(&mut Parser) -> R;
-    fn parse_braced(&mut self) -> Expr;
-    fn parse_bracketed(&mut self) -> Expr;
-    fn parse_parenthesized(&mut self) -> Expr;
+    fn parse_braced(&mut self) -> Element;
+    fn parse_bracketed(&mut self) -> Element;
+    fn parse_parenthesized(&mut self) -> Element;
 }
 
 impl Delimiter for Parser {
@@ -100,7 +100,7 @@ impl Delimiter for Parser {
         (items, self.span(start, err_end))
     }
 
-    fn parse_braced(&mut self) -> Expr {
+    fn parse_braced(&mut self) -> Element {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBrace) {
                 return self.error(&ParseError::new(
@@ -127,23 +127,23 @@ impl Delimiter for Parser {
                     self.next();
 
                     return if separator == Some(PunctuationKind::Semicolon) {
-                        let kind = ExprKind::Block(items.clone());
+                        let kind = ElementKind::Scope(items.clone());
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
                     } else {
                         let kind = if items.is_empty() {
-                            ExprKind::Block(items.clone())
+                            ElementKind::Scope(items.clone())
                         } else {
-                            ExprKind::Bundle(items.clone())
+                            ElementKind::Bundle(items.clone())
                         };
 
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
@@ -178,7 +178,7 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_statement();
+                    let expr = self.parse_complex();
 
                     items.push(expr);
                 }
@@ -191,7 +191,7 @@ impl Delimiter for Parser {
         ))
     }
 
-    fn parse_bracketed(&mut self) -> Expr {
+    fn parse_bracketed(&mut self) -> Element {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBracket) {
                 return self.error(&ParseError::new(
@@ -218,18 +218,18 @@ impl Delimiter for Parser {
                     self.next();
 
                     return if separator == Some(PunctuationKind::Semicolon) {
-                        let kind = ExprKind::Series(items.clone());
+                        let kind = ElementKind::Series(items.clone());
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
                     } else {
-                        let kind = ExprKind::Collection(items.clone());
+                        let kind = ElementKind::Collection(items.clone());
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
@@ -264,7 +264,7 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_statement();
+                    let expr = self.parse_complex();
 
                     items.push(expr);
                 }
@@ -277,7 +277,7 @@ impl Delimiter for Parser {
         ))
     }
 
-    fn parse_parenthesized(&mut self) -> Expr {
+    fn parse_parenthesized(&mut self) -> Element {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftParen) {
                 return self.error(&ParseError::new(
@@ -304,18 +304,18 @@ impl Delimiter for Parser {
                     self.next();
 
                     return if separator == Some(PunctuationKind::Semicolon) {
-                        let kind = ExprKind::Sequence(items.clone());
+                        let kind = ElementKind::Sequence(items.clone());
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
                     } else {
-                        let kind = ExprKind::Group(items.clone());
+                        let kind = ElementKind::Group(items.clone());
                         let span = self.span(start, span.end);
 
-                        Expr {
+                        Element {
                             kind,
                             span
                         }
@@ -350,7 +350,7 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_statement();
+                    let expr = self.parse_complex();
 
                     items.push(expr);
                 }

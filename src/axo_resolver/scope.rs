@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use axo_hash::HashSet;
+use hashish::HashSet;
 use crate::axo_parser::Item;
 
 /// Represents a lexical scope with symbols and optional parent scope

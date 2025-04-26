@@ -1,4 +1,9 @@
 const test = 3;
 const test = 5;
 
-test()
+if test { x + 4; } else x;
+
+if test {
+    x + 3;
+}
+
