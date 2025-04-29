@@ -79,11 +79,6 @@ pub enum ElementKind {
         // Namespace traversal
         tree: Tree<Box<Element>>,
     },
-    Closure {
-        // Anonymous function
-        parameters: Vec<Element>,
-        body: Box<Element>,
-    },
 
     // Control structures
     Conditional {

@@ -7,7 +7,6 @@ use {
         axo_parser::{
             error::ErrorKind,
             delimiter::Delimiter,
-            expression::Expression,
             ParseError, Element, ElementKind,
             Parser, Primary, ControlFlow,
         },
@@ -19,7 +18,6 @@ pub trait Composite {
     fn parse_index(&mut self, left: Element) -> Element;
     fn parse_invoke(&mut self, name: Element) -> Element;
     fn parse_constructor(&mut self, struct_name: Element) -> Element;
-    fn parse_closure(&mut self) -> Element;
 }
 
 impl Composite for Parser {
@@ -118,53 +116,5 @@ impl Composite for Parser {
         };
 
         expr
-    }
-
-    fn parse_closure(&mut self) -> Element {
-        let pipe = self.next().unwrap();
-
-        let Token {
-            span: Span { start, .. },
-            ..
-        } = pipe;
-
-        let mut parameters = Vec::new();
-
-        let mut err_end = start;
-
-        while let Some(token) = self.peek().cloned() {
-            match token {
-                Token {
-                    kind: TokenKind::Operator(OperatorKind::Pipe),
-                    span: Span { end, .. },
-                } => {
-                    self.next();
-
-                    let body = self.parse_complex();
-
-                    return Element {
-                        kind: ElementKind::Closure {
-                            parameters,
-                            body: body.into()
-                        },
-                        span: self.span(start, end),
-                    };
-                }
-                Token {
-                    kind: TokenKind::Punctuation(PunctuationKind::Comma),
-                    span: Span { end, .. }
-                } => {
-                    err_end = end;
-
-                    self.next();
-                }
-                _ => {
-                    let expr = self.parse_complex();
-                    parameters.push(expr.into());
-                }
-            }
-        }
-
-        self.error(&ParseError::new(ErrorKind::UnclosedDelimiter(pipe), self.span(start, err_end)))
     }
 }

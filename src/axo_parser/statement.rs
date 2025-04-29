@@ -14,9 +14,6 @@ use {
                 ElementKind,
             },
 
-            expression::{
-                Expression,
-            },
             delimiter::Delimiter,
             ItemKind, Parser, Primary, ParseError,
         },

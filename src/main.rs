@@ -189,7 +189,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
     if parser.errors.is_empty() {
         if config.show_ast || config.verbose {
             xprintln!(
-                    "{}" => Color::Green,
+                    "{}\n" => Color::Green,
                     format!(
                         "\n{:#?}",
                         expressions
@@ -209,7 +209,7 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
                         details
                     );
                 }
-            } else if config.verbose {
+            } else if config.verbose && !resolver.scope.all_symbols().is_empty() {
                 xprintln!(
                     "{}" => Color::Cyan,
                     format!(

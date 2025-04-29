@@ -104,8 +104,7 @@ impl Resolver {
             }
 
             // If we have a close match, suggest it as a correction
-            if suggestion.score > 0.0 {
-                dbg!();
+            if suggestion.score > 0.4 {
                 let err = ResolveError {
                     kind: ErrorKind::UndefinedSymbol(target_name.clone(), None),
                     span: target_name.span,
@@ -190,7 +189,7 @@ impl Resolver {
                 self.pop_scope();
             },
 
-            ElementKind::Literal(_) | ElementKind::Identifier(_) => {
+            ElementKind::Identifier(_) => {
                 self.lookup(&expr);
             },
 

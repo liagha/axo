@@ -6,7 +6,6 @@ use {
         },
         axo_parser::{
             delimiter::Delimiter,
-            expression::Expression,
             item::ItemParser,
             error::ErrorKind,
             Element, ElementKind,
@@ -18,15 +17,22 @@ use {
 };
 
 pub trait Primary {
-    fn parse_atom(&mut self) -> Element;
-    fn parse_leaf(&mut self) -> Element;
+    fn parse_token(&mut self) -> Element;
     fn parse_primary(&mut self) -> Element;
+    fn parse_term(&mut self) -> Element;
     fn parse_unary(&mut self, primary: fn(&mut Parser) -> Element) -> Element;
     fn parse_binary(&mut self, primary: fn(&mut Parser) -> Element, min_precedence: u8) -> Element;
+    fn parse_basic(&mut self) -> Element {
+        self.parse_binary(Parser::parse_primary, 0)
+    }
+
+    fn parse_complex(&mut self) -> Element {
+        self.parse_binary(Parser::parse_term, 0)
+    }
 }
 
 impl Primary for Parser {
-    fn parse_atom(&mut self) -> Element {
+    fn parse_token(&mut self) -> Element {
         let token = self.next().unwrap();
         let Token { kind, span } = token.clone();
 
@@ -56,7 +62,49 @@ impl Primary for Parser {
         expr
     }
 
-    fn parse_leaf(&mut self) -> Element {
+    fn parse_primary(&mut self) -> Element {
+        if let Some(token) = self.peek().cloned() {
+            let Token { kind, span } = token.clone();
+
+            match kind {
+                TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_braced(),
+                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_bracketed(),
+                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(),
+                TokenKind::Identifier(_)
+                | TokenKind::String(_)
+                | TokenKind::Character(_)
+                | TokenKind::Boolean(_)
+                | TokenKind::Float(_)
+                | TokenKind::Integer(_)
+                | TokenKind::Operator(_) => {
+                    let mut expr = self.parse_token();
+
+                    while let Some(token) = self.peek() {
+                        match &token.kind {
+                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
+                                expr = self.parse_index(expr);
+                            }
+                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
+                                expr = self.parse_invoke(expr);
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    expr
+                }
+
+                kind => {
+                    self.next();
+                    self.error(&ParseError::new(ErrorKind::UnexpectedToken(kind), span))
+                },
+            }
+        } else {
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+        }
+    }
+
+    fn parse_term(&mut self) -> Element {
         if let Some(token) = self.peek().cloned() {
             let Token { kind, span } = token.clone();
 
@@ -96,7 +144,7 @@ impl Primary for Parser {
                 | TokenKind::Float(_)
                 | TokenKind::Integer(_)
                 | TokenKind::Operator(_) => {
-                    let mut expr = self.parse_atom();
+                    let mut expr = self.parse_token();
 
                     while let Some(token) = self.peek() {
                         match &token.kind {
@@ -116,49 +164,6 @@ impl Primary for Parser {
                     expr
                 }
                 _ => self.parse_primary()
-            }
-        } else {
-            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
-        }
-    }
-
-    fn parse_primary(&mut self) -> Element {
-        if let Some(token) = self.peek().cloned() {
-            let Token { kind, span } = token.clone();
-
-            match kind {
-                TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_braced(),
-                TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_bracketed(),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(),
-                TokenKind::Operator(OperatorKind::Pipe) => self.parse_closure(),
-                TokenKind::Identifier(_)
-                | TokenKind::String(_)
-                | TokenKind::Character(_)
-                | TokenKind::Boolean(_)
-                | TokenKind::Float(_)
-                | TokenKind::Integer(_)
-                | TokenKind::Operator(_) => {
-                    let mut expr = self.parse_atom();
-
-                    while let Some(token) = self.peek() {
-                        match &token.kind {
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket) => {
-                                expr = self.parse_index(expr);
-                            }
-                            TokenKind::Punctuation(PunctuationKind::LeftParen) => {
-                                expr = self.parse_invoke(expr);
-                            }
-                            _ => break,
-                        }
-                    }
-
-                    expr
-                }
-
-                kind => {
-                    self.next();
-                    self.error(&ParseError::new(ErrorKind::UnexpectedToken(kind), span))
-                },
             }
         } else {
             self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))

@@ -1,8 +1,7 @@
 #![allow(unused_imports)]
 mod parser;
 mod statement;
-mod expression;
-mod primary;
+mod core;
 mod composite;
 mod item;
 mod fmt;
@@ -17,7 +16,7 @@ pub use {
     item::{Item, ItemKind},
     parser::Parser,
     composite::Composite,
-    primary::Primary,
+    core::Primary,
 
     crate::{
         axo_errors::Error,

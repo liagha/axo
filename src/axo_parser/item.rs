@@ -9,7 +9,6 @@ use {
         },
         axo_parser::{
             delimiter::Delimiter,
-            expression::Expression,
             error::ErrorKind,
             Element, ElementKind,
             ParseError, Parser, Primary
@@ -391,7 +390,7 @@ impl ItemParser for Parser {
             ..
         } = self.next().unwrap();
 
-        let name = self.parse_atom();
+        let name = self.parse_token();
 
         let (fields, span) = self.parse_delimited(
               TokenKind::Punctuation(PunctuationKind::LeftBrace),

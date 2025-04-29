@@ -5,7 +5,6 @@ use {
         },
         axo_parser::{
             error::ErrorKind,
-            expression::Expression,
             Element, ElementKind,
             ParseError, Parser, Primary,
         },

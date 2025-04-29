@@ -207,7 +207,7 @@ impl OperatorLexer for char {
             '*' | '/' | '^' | '|' | '&' |
             '%' | '>' | '<' | '!' | '.' |
             '@' | '\'' | '?' | '#' | '$' |
-            '\\' | '`' | '_'
+            '\\' | '`' | '_' | '"'
         )
     }
 
@@ -294,5 +294,30 @@ impl OperatorLexer for str {
                 Composite(ops)
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_char_single_operators() {
+        let operators = "~=:+*-/^|&%><!.@'?\\#$\"_`";
+        for c in operators.chars() {
+            assert!(c.is_operator(), "Character {} should be an operator", c);
+            assert_eq!(c.to_operator().to_string(), c.to_string());
+        }
+        assert!(!'a'.is_operator());
+    }
+
+    #[test]
+    fn test_str_single_operators() {
+        let operators = ["~", "=", ":", "+", "-", "*", "/", "^", "|", "&", "%", ">", "<", "!", ".", "@", "?", "'", "\\", "#", "$", "\"", "`", "_"];
+        for s in operators {
+            assert!(s.is_operator(), "String {} should be an operator", s);
+            assert_eq!(s.to_operator().to_string(), s);
+        }
+        assert!(!"a".is_operator());
     }
 }

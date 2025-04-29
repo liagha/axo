@@ -16,7 +16,6 @@ use {
         axo_span::Span,
     }
 };
-use crate::axo_parser::expression::Expression;
 
 #[derive(Clone)]
 pub struct Parser {

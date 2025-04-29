@@ -104,12 +104,6 @@ impl Hash for ElementKind {
                 member.hash(state);
             }
 
-            ElementKind::Closure { parameters, body } => {
-                core::mem::discriminant(self).hash(state);
-                parameters.hash(state);
-                body.hash(state);
-            }
-
             // Control Flow
             ElementKind::Scope(exprs) => {
                 core::mem::discriminant(self).hash(state);
@@ -215,11 +209,6 @@ impl PartialEq for ElementKind {
             (ElementKind::Path { tree: a_tree }, ElementKind::Path { tree: b_tree }) => a_tree == b_tree,
             (ElementKind::Member { object: a_obj, member: a_mem },
                 ElementKind::Member { object: b_obj, member: b_mem }) => a_obj == b_obj && a_mem == b_mem,
-
-            (ElementKind::Closure { parameters: a_params, body: a_body },
-                ElementKind::Closure { parameters: b_params, body: b_body }) => {
-                a_params == b_params && a_body == b_body
-            },
 
             // Control Flow
             (ElementKind::Scope(a), ElementKind::Scope(b)) => a == b,

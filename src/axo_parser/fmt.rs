@@ -173,11 +173,6 @@ impl Display for ElementKind {
             }
             ElementKind::Member { object, member } => write!(f, "{}.{}", object, member),
 
-            ElementKind::Closure { parameters, body } => {
-                let params_str: Vec<String> = parameters.iter().map(|e| e.to_string()).collect();
-                write!(f, "|{}| {}", params_str.join(", "), body)
-            }
-
             ElementKind::Scope(stmts) => {
                 if stmts.is_empty() {
                     write!(f, "{{}}")
@@ -291,9 +286,6 @@ impl Debug for ElementKind {
             },
             ElementKind::Member { object, member} => {
                 write!(f, "Member({:?}.{:?})", object, member)
-            },
-            ElementKind::Closure { parameters, body } => {
-                write!(f, "Closure(|{:?}| {:?})", parameters, body)
             },
 
             ElementKind::Match { target, body } => {
