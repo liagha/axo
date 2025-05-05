@@ -9,7 +9,7 @@ use {
             position::Position,
         },
     },
-    std::path::PathBuf,
+    crate::Path,
 };
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, file: PathBuf) -> Self {
+    pub fn new(tokens: Vec<Token>, file: Path) -> Self {
         Parser {
             input: tokens,
             position: Position::new(file),

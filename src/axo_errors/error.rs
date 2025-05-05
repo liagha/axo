@@ -1,4 +1,4 @@
-use std::fs::read_to_string;
+use crate::fs::read_to_string;
 use broccli::{Color, TextStyle};
 use crate::axo_errors::hint::Hint;
 use crate::axo_span::Span;

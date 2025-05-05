@@ -1,24 +1,37 @@
+mod axo_data;
+mod axo_errors;
+mod axo_fmt;
+mod axo_form;
 mod axo_lexer;
 mod axo_parser;
 mod axo_resolver;
-mod axo_data;
 mod axo_rune;
-mod axo_errors;
 mod axo_span;
 mod timer;
-mod axo_form;
-mod axo_fmt;
 
 pub use {
     axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},
     axo_parser::Parser,
+    axo_resolver::Resolver,
     axo_rune::*,
     axo_fmt::*,
     broccli::{xprintln, Color, TextStyle},
-    std::path::PathBuf,
     timer::{Timer, TimeSource, CPUCycleSource},
 };
-use crate::axo_resolver::Resolver;
+
+pub type Path = std::path::PathBuf;
+
+pub mod fs {
+    pub use std::fs::*;
+}
+
+pub mod process {
+    pub use std::process::*;
+}
+
+pub mod env {
+    pub use std::env::*;
+}
 
 struct Config {
     file_path: String,
@@ -39,14 +52,14 @@ fn main() {
         );
     }
 
-    let exec_path = std::env::current_dir()
+    let exec_path = env::current_dir()
         .map(|mut path| {
             path.push(&config.file_path);
             path
         })
         .unwrap_or_else(|e| {
             eprintln!("Failed to get current directory: {}", e);
-            std::process::exit(1);
+            process::exit(1);
         });
 
     if config.verbose {
@@ -64,7 +77,7 @@ fn main() {
 }
 
 fn parse_args() -> Config {
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = env::args().collect();
     let mut config = Config {
         file_path: String::new(),
         verbose: false,
@@ -82,13 +95,13 @@ fn parse_args() -> Config {
             "--time" => config.time_report = true,
             "-h" | "--help" => {
                 print_usage(&args[0]);
-                std::process::exit(0);
+                process::exit(0);
             }
             flag => {
                 if flag.starts_with('-') {
                     eprintln!("Unknown option: {}", flag);
                     print_usage(&args[0]);
-                    std::process::exit(1);
+                    process::exit(1);
                 }
                 config.file_path = flag.to_string();
             }
@@ -99,7 +112,7 @@ fn parse_args() -> Config {
     if config.file_path.is_empty() {
         eprintln!("No input file specified");
         print_usage(&args[0]);
-        std::process::exit(1);
+        process::exit(1);
     }
 
     config
@@ -115,7 +128,7 @@ fn print_usage(program: &str) {
     println!("  -h, --help      Show this help message");
 }
 
-fn process_file(file_path: &PathBuf, config: &Config) {
+fn process_file(file_path: &Path, config: &Config) {
     xprintln!(
         "{} {}" => Color::Blue,
         "Compiling" => Color::Blue,
@@ -124,9 +137,9 @@ fn process_file(file_path: &PathBuf, config: &Config) {
     xprintln!();
 
     let file_read_timer = Timer::new(CPUCycleSource);
-    let content = std::fs::read_to_string(file_path).unwrap_or_else(|e| {
+    let content = fs::read_to_string(file_path).unwrap_or_else(|e| {
         eprintln!("Failed to read file {}: {}", file_path.display(), e);
-        std::process::exit(1);
+        process::exit(1);
     });
 
     if config.verbose {
@@ -147,7 +160,7 @@ fn process_file(file_path: &PathBuf, config: &Config) {
     process_lexing(&content, file_path, config);
 }
 
-fn process_lexing(content: &str, file_path: &PathBuf, config: &Config) {
+fn process_lexing(content: &str, file_path: &Path, config: &Config) {
     let lex_timer = Timer::new(CPUCycleSource);
     let mut lexer = Lexer::new(content.to_string(), file_path.clone());
 
@@ -164,7 +177,7 @@ fn process_lexing(content: &str, file_path: &PathBuf, config: &Config) {
                 lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
             );
         }
-        std::process::exit(1);
+        process::exit(1);
     });
 
     if config.show_tokens || config.verbose {
@@ -182,7 +195,7 @@ fn process_lexing(content: &str, file_path: &PathBuf, config: &Config) {
     process_parsing(tokens, file_path, config);
 }
 
-fn process_parsing(tokens: Vec<Token>, file_path: &PathBuf, config: &Config) {
+fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
     let parse_timer = Timer::new(CPUCycleSource);
     let mut parser = Parser::new(tokens, file_path.clone());
     let elements = parser.parse_program();
@@ -197,7 +210,7 @@ fn process_parsing(tokens: Vec<Token>, file_path: &PathBuf, config: &Config) {
                 parse_timer.to_nanoseconds(parse_timer.elapsed().unwrap())
             );
         }
-        std::process::exit(1);
+        process::exit(1);
     }
 
     if config.show_ast || config.verbose {
@@ -234,7 +247,7 @@ fn process_resolution(elements: Vec<axo_parser::Element>, config: &Config) {
                 details
             );
         }
-        std::process::exit(1);
+        process::exit(1);
     }
 
     if config.verbose && !resolver.scope.all_symbols().is_empty() {

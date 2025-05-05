@@ -1,5 +1,5 @@
 use {
-    std::path::PathBuf,
+    crate::Path,
 
     crate::{
         axo_lexer::{
@@ -34,7 +34,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: String, file: PathBuf) -> Lexer {
+    pub fn new(input: String, file: Path) -> Lexer {
         let chars: Vec<char> = input.chars().collect();
 
         Lexer {
