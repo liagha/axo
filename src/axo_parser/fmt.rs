@@ -10,12 +10,13 @@ use {
         Formatter, Result
     }
 };
+use crate::axo_fmt::indent;
 
 impl Display for ItemKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ItemKind::Use(expr) => write!(f, "use {}", expr),
-            ItemKind::Implement { expr, body} => write!(f, "impl ({}) {}", expr, body),
+            ItemKind::Use(element) => write!(f, "use {}", element),
+            ItemKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
             ItemKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
             ItemKind::Variable { target, value, .. } => {
                 write!(f, "let {}", target)?;
@@ -63,8 +64,8 @@ impl Display for ItemKind {
 impl Debug for ItemKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ItemKind::Use(expr) => write!(f, "Use({:?})", expr),
-            ItemKind::Implement { expr, body } => write!(f, "Implement({:?} => {:?})", expr, body),
+            ItemKind::Use(element) => write!(f, "Use({:?})", element),
+            ItemKind::Implement { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
             ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
             ItemKind::Variable { target, value, mutable, ty } => {
                 let kind = if *mutable { "Variable" } else { "Constant" };
@@ -135,6 +136,10 @@ impl Display for ElementKind {
         match self {
             ElementKind::Literal(token) => write!(f, "{}", token),
             ElementKind::Identifier(ident) => write!(f, "{}", ident),
+            
+            ElementKind::Procedural(element) => {
+                write!(f, "procedural {}", element)
+            }
 
             ElementKind::Collection(elements) => {
                 let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
@@ -163,10 +168,10 @@ impl Display for ElementKind {
             }
 
             ElementKind::Binary { left, operator, right } => write!(f, "({} {} {})", left, operator, right),
-            ElementKind::Unary { operator, operand: expr } => write!(f, "({}{})", operator, expr),
+            ElementKind::Unary { operator, operand: element } => write!(f, "({}{})", operator, element),
 
-            ElementKind::Labeled { label: expr, element: ty } => write!(f, "{}: {}", expr, ty),
-            ElementKind::Index { element: expr, index } => write!(f, "{}[{}]", expr, index),
+            ElementKind::Labeled { label: element, element: ty } => write!(f, "{}: {}", element, ty),
+            ElementKind::Index { element, index } => write!(f, "{}[{}]", element, index),
             ElementKind::Invoke { target, parameters } => {
                 let args_str: Vec<String> = parameters.iter().map(|e| e.to_string()).collect();
                 write!(f, "{}({})", target, args_str.join(", "))
@@ -177,7 +182,7 @@ impl Display for ElementKind {
                 if stmts.is_empty() {
                     write!(f, "{{}}")
                 } else {
-                    let stmts_str: Vec<String> = stmts.iter().map(|e| indent(e)).collect();
+                    let stmts_str: Vec<String> = stmts.iter().map(|e| indent(&e.to_string())).collect();
                     write!(f, "{{\n{}\n}}", stmts_str.join("\n"))
                 }
             }
@@ -206,39 +211,38 @@ impl Display for ElementKind {
                 write!(f, "{} {}", name, body)
             }
 
-            ElementKind::Return(expr) => {
+            ElementKind::Return(element) => {
                 write!(f, "return")?;
 
-                if let Some(expr) = expr {
-                    write!(f, " {}", expr)?;
+                if let Some(element) = element {
+                    write!(f, " {}", element)?;
                 }
 
                 Ok(())
             }
-            ElementKind::Break(expr) => {
+            ElementKind::Break(element) => {
                 write!(f, "break")?;
 
-                if let Some(expr) = expr {
-                    write!(f, " {}", expr)?;
+                if let Some(element) = element {
+                    write!(f, " {}", element)?;
                 }
 
                 Ok(())
             }
-            ElementKind::Skip(expr) => {
+            ElementKind::Skip(element) => {
                 write!(f, "continue")?;
 
-                if let Some(expr) = expr {
-                    write!(f, " {}", expr)?;
+                if let Some(element) = element {
+                    write!(f, " {}", element)?;
                 }
 
                 Ok(())
             }
 
-            ElementKind::Chain { left, right } => write!(f, "({} {})", left, right),
             ElementKind::Bind { key, value } => write!(f, "{} => {}", key, value),
             ElementKind::Path { tree } => write!(f, "{}", tree),
 
-            ElementKind::Error(e) => write!(f, "error: {}", e)
+            ElementKind::Invalid(e) => write!(f, "error: {}", e)
         }
     }
 }
@@ -252,6 +256,9 @@ impl Debug for ElementKind {
             ElementKind::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
             },
+            ElementKind::Procedural(element) => {
+                write!(f, "Procedural({:?})", element)
+            }
             ElementKind::Series(elements) => {
                 write!(f, "Series({:?})", elements)
             }
@@ -271,15 +278,15 @@ impl Debug for ElementKind {
             ElementKind::Binary { left, operator, right } => {
                 write!(f, "Binary({:?} {:?} {:?})", left, operator, right)
             }
-            ElementKind::Unary { operator, operand: expr } => {
-                write!(f, "Unary({:?} {:?})", operator, expr)
+            ElementKind::Unary { operator, operand: element } => {
+                write!(f, "Unary({:?} {:?})", operator, element)
             },
 
-            ElementKind::Labeled { label: expr, element: ty } => {
-                write!(f, "Labeled({:?}: {:?})", expr, ty)
+            ElementKind::Labeled { label: element, element: ty } => {
+                write!(f, "Labeled({:?}: {:?})", element, ty)
             },
-            ElementKind::Index { element: expr, index } => {
-                write!(f, "Index({:?}[{:?}])", expr, index)
+            ElementKind::Index { element, index } => {
+                write!(f, "Index({:?}[{:?}])", element, index)
             },
             ElementKind::Invoke { target, parameters } => {
                 write!(f, "Invoke({:?}({:?}))", target, parameters)
@@ -323,47 +330,38 @@ impl Debug for ElementKind {
 
             ElementKind::Item(item) => write!(f, "+ {:?}", item),
 
-            ElementKind::Return(expr) => {
+            ElementKind::Return(element) => {
                 write!(f, "Return")?;
 
-                if let Some(expr) = expr {
-                    write!(f, "({:?})", expr)?;
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
                 }
 
                 Ok(())
             }
-            ElementKind::Break(expr) => {
+            ElementKind::Break(element) => {
                 write!(f, "Break")?;
 
-                if let Some(expr) = expr {
-                    write!(f, "({:?})", expr)?;
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
                 }
 
                 Ok(())
             }
-            ElementKind::Skip(expr) => {
+            ElementKind::Skip(element) => {
                 write!(f, "Continue")?;
 
-                if let Some(expr) = expr {
-                    write!(f, "({:?})", expr)?;
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
                 }
 
                 Ok(())
             }
 
-            ElementKind::Chain { left, right } => write!(f, "Chain({} {})", left, right),
             ElementKind::Bind { key, value } => write!(f, "Bind({:?} => {:?})", key, value),
             ElementKind::Path { tree } => write!(f, "Path({:?})", tree),
 
-            ElementKind::Error(e) => write!(f, "Error({:?})", e)
+            ElementKind::Invalid(e) => write!(f, "Error({:?})", e)
         }
     }
-}
-
-fn indent(expr: &Element) -> String {
-    let s = expr.to_string();
-    s.lines()
-        .map(|line| format!("    {}", line))
-        .collect::<Vec<_>>()
-        .join("\n")
 }

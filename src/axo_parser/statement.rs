@@ -4,7 +4,7 @@ use {
     crate::{
         axo_lexer::{
             Token, TokenKind,
-            KeywordKind, OperatorKind, PunctuationKind,
+            OperatorKind, PunctuationKind,
         },
         axo_parser::{
             error::ErrorKind,
@@ -23,6 +23,7 @@ use {
 };
 
 pub trait ControlFlow {
+    fn parse_procedural(&mut self) -> Element;
     fn parse_match(&mut self) -> Element;
     fn parse_conditional(&mut self) -> Element;
     fn parse_loop(&mut self) -> Element;
@@ -34,6 +35,25 @@ pub trait ControlFlow {
 }
 
 impl ControlFlow for Parser {
+    fn parse_procedural(&mut self) -> Element {
+        let Token {
+            span: Span { start, .. },
+            ..
+        } = self.next().unwrap();
+
+        let element = self.parse_complex();
+
+        let end = element.span.end;
+
+        let kind = ElementKind::Procedural(element.into());
+
+        let element = Element {
+            kind,
+            span: self.span(start, end),
+        };
+
+        element 
+    }
     fn parse_match(&mut self) -> Element {
         let Token {
             span: Span { start, .. },
@@ -51,12 +71,12 @@ impl ControlFlow for Parser {
             body: body.into()
         };
 
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_conditional(&mut self) -> Element {
@@ -69,11 +89,11 @@ impl ControlFlow for Parser {
 
         let then_branch = self.parse_complex();
 
-        let (else_branch, end) = if self.match_token(&TokenKind::Keyword(KeywordKind::Else)) {
-            let expr = self.parse_complex();
-            let end = expr.span.end;
+        let (else_branch, end) = if self.match_token(&TokenKind::Identifier("else".to_string())) {
+            let element = self.parse_complex();
+            let end = element.span.end;
 
-            (Some(expr.into()), end)
+            (Some(element.into()), end)
         } else {
             (None, then_branch.span.end)
         };
@@ -84,12 +104,12 @@ impl ControlFlow for Parser {
             alternate: else_branch.into()
         };
 
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_loop(&mut self) -> Element {
@@ -104,12 +124,12 @@ impl ControlFlow for Parser {
 
         let kind = ElementKind::Loop { condition: None, body: body.into() };
 
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_while(&mut self) -> Element {
@@ -129,12 +149,12 @@ impl ControlFlow for Parser {
             body: body.into()
         };
 
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_for(&mut self) -> Element {
@@ -154,12 +174,12 @@ impl ControlFlow for Parser {
             body: body.into()
         };
 
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
 
@@ -173,21 +193,21 @@ impl ControlFlow for Parser {
         {
             (None, end)
         } else {
-            let expr = self.parse_complex();
-            let end = expr.span.end;
+            let element = self.parse_complex();
+            let end = element.span.end;
 
-            (Some(expr.into()), end)
+            (Some(element.into()), end)
         };
 
         
 
         let kind = ElementKind::Return(value);
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_break(&mut self) -> Element {
@@ -200,19 +220,19 @@ impl ControlFlow for Parser {
         {
             (None, end)
         } else {
-            let expr = self.parse_complex();
-            let end = expr.span.end;
+            let element = self.parse_complex();
+            let end = element.span.end;
 
-            (Some(expr.into()), end)
+            (Some(element.into()), end)
         };
 
         let kind = ElementKind::Break(value);
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 
     fn parse_continue(&mut self) -> Element {
@@ -225,18 +245,18 @@ impl ControlFlow for Parser {
         {
             (None, end)
         } else {
-            let expr = self.parse_complex();
-            let end = expr.span.end;
+            let element = self.parse_complex();
+            let end = element.span.end;
 
-            (Some(expr.into()), end)
+            (Some(element.into()), end)
         };
 
         let kind = ElementKind::Skip(value);
-        let expr = Element {
+        let element = Element {
             kind,
             span: self.span(start, end),
         };
 
-        expr
+        element
     }
 }

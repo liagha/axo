@@ -12,14 +12,14 @@ use {
 };
 
 impl Resolver {
-    pub fn validate(&mut self, expr: &Element, item: &Item) {
-        match (&expr.kind, &item.kind) {
+    pub fn validate(&mut self, element: &Element, item: &Item) {
+        match (&element.kind, &item.kind) {
             (ElementKind::Invoke { parameters: found, .. }, ItemKind::Function { parameters: expected, .. }) => {
                 if found != expected {
                     self.error(ErrorKind::ParameterMismatch {
                         found: found.len(),
                         expected: expected.len(),
-                    }, expr.span.clone());
+                    }, element.span.clone());
                 }
             },
             (ElementKind::Invoke { parameters: found, .. }, ItemKind::Macro { parameters: expected, .. }) => {
@@ -27,7 +27,7 @@ impl Resolver {
                     self.error(ErrorKind::ParameterMismatch {
                         found: found.len(),
                         expected: expected.len(),
-                    }, expr.span.clone());
+                    }, element.span.clone());
                 }
             },
             (ElementKind::Constructor { body, .. }, ItemKind::Structure { fields: expected, .. }) => {
@@ -36,7 +36,7 @@ impl Resolver {
                         self.error(ErrorKind::FieldCountMismatch {
                             found: found.len(),
                             expected: expected.len(),
-                        }, expr.span.clone());
+                        }, element.span.clone());
                     }
                 }
             },
@@ -46,7 +46,7 @@ impl Resolver {
                 self.error(ErrorKind::TypeMismatch {
                     expected: format!("{:?}", expr_kind),
                     found: format!("{:?}", item_kind),
-                }, expr.span.clone());
+                }, element.span.clone());
             },
         }
     }

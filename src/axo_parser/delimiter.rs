@@ -17,73 +17,105 @@ use {
 pub trait Delimiter {
     fn parse_delimited<F, R>(
         &mut self,
-        _open_kind: TokenKind,
-        close_kind: TokenKind,
-        separator: TokenKind,
-        forced_separator: bool,
-        item_parser: F,
+        opening: TokenKind,
+        closing: TokenKind,
+        separators: &[TokenKind],
+        trailing: bool,
+        function: F,
     ) -> (Vec<R>, Span)
     where
         R: Spanned + Clone,
         F: FnMut(&mut Parser) -> R;
-    fn parse_braced(&mut self) -> Element;
-    fn parse_bracketed(&mut self) -> Element;
-    fn parse_parenthesized(&mut self) -> Element;
+
+    fn parse_braced<F>(&mut self, function: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element;
+    fn parse_bracketed<F>(&mut self, function: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element;
+    fn parse_parenthesized<F>(&mut self, function: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element;
 }
 
 impl Delimiter for Parser {
     fn parse_delimited<F, R>(
         &mut self,
-        _open_kind: TokenKind,
-        close_kind: TokenKind,
-        separator: TokenKind,
-        forced_separator: bool,
-        mut item_parser: F,
+        opening: TokenKind,
+        closing: TokenKind,
+        separators: &[TokenKind],
+        trailing: bool,
+        mut function: F,
     ) -> (Vec<R>, Span)
     where
         R: Spanned + Clone,
         F: FnMut(&mut Parser) -> R,
     {
-        let open_token = self.next().unwrap();
-        let Span { start, .. } = open_token.span;
+        let open = if let Some(open) = self.next() {
+            if open.kind == opening {
+                open
+            } else {
+                let span = open.span.clone();
+
+                self.error(&ParseError::new(
+                    ErrorKind::InvalidDelimiter,
+                    span,
+                ));
+
+                open
+            }
+        } else {
+            let span = self.span((self.position.line, self.position.column), (self.position.line, self.position.column));
+
+            self.error(&ParseError::new(
+                ErrorKind::InvalidDelimiter,
+                span.clone(),
+            ));
+
+            return (Vec::new(), span)
+        };
+
+        let Span { start, .. } = open.span;
 
         let mut items = Vec::new();
-        let mut err_end = start;
+        let mut end = start;
 
         while let Some(token) = self.peek().cloned() {
             match token.kind {
-                kind if kind == close_kind => {
+                kind if kind == closing => {
                     let close_token = self.next().unwrap();
                     let Span { end, .. } = close_token.span;
 
                     return (items, self.span(start, end));
                 }
-                kind if kind == separator => {
-                    err_end = token.span.end;
+
+                kind if separators.contains(&kind) => {
+                    end = token.span.end;
                     self.next();
                 }
+
                 _ => {
-                    let item = item_parser(self);
+                    let item = function(self);
                     let item_start = item.span().start;
 
                     items.push(item.clone());
 
-                    err_end = item.span().end;
+                    end = item.span().end;
 
-                    if forced_separator {
+                    if trailing {
                         if let Some(peek) = self.peek() {
-                            if peek.kind == separator {
-                                err_end = token.span.end;
+                            if separators.contains(&peek.kind) {
+                                end = token.span.end;
                                 self.next();
-                            } else if peek.kind != close_kind {
+                            } else if peek.kind != closing {
                                 self.next();
 
                                 self.error(&ParseError::new(
-                                    ErrorKind::MissingSeparator(separator),
-                                    self.span(item_start, err_end),
+                                    ErrorKind::MissingSeparators(separators.into()),
+                                    self.span(item_start, end),
                                 ));
 
-                                return (items, self.span(start, err_end));
+                                return (items, self.span(start, end));
                             }
                         }
                     }
@@ -92,14 +124,17 @@ impl Delimiter for Parser {
         }
 
         self.error(&ParseError::new(
-            ErrorKind::UnclosedDelimiter(open_token),
-            self.span(start, err_end),
+            ErrorKind::UnclosedDelimiter(open),
+            self.span(start, end),
         ));
 
-        (items, self.span(start, err_end))
+        (items, self.span(start, end))
     }
 
-    fn parse_braced(&mut self) -> Element {
+    fn parse_braced<F>(&mut self, mut function: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element
+    {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBrace) {
                 return self.error(&ParseError::new(
@@ -116,7 +151,7 @@ impl Delimiter for Parser {
             ..
         } = brace;
 
-        let err_end = start;
+        let end = start;
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -177,20 +212,23 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_complex();
+                    let element = function(self);
 
-                    items.push(expr);
+                    items.push(element);
                 }
             }
         }
 
         self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, err_end),
+            self.span(start, end),
         ))
     }
 
-    fn parse_bracketed(&mut self) -> Element {
+    fn parse_bracketed<F>(&mut self, mut function: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element
+    {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftBracket) {
                 return self.error(&ParseError::new(
@@ -263,9 +301,9 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_complex();
+                    let element = function(self);
 
-                    items.push(expr);
+                    items.push(element);
                 }
             }
         }
@@ -276,7 +314,10 @@ impl Delimiter for Parser {
         ))
     }
 
-    fn parse_parenthesized(&mut self) -> Element {
+    fn parse_parenthesized<F>(&mut self, mut parser: F) -> Element
+    where
+        F: FnMut(&mut Parser) -> Element
+    {
         if let Some(token) = self.peek() {
             if token.kind != TokenKind::Punctuation(PunctuationKind::LeftParen) {
                 return self.error(&ParseError::new(
@@ -311,12 +352,16 @@ impl Delimiter for Parser {
                             span
                         }
                     } else {
-                        let kind = ElementKind::Group(items.clone());
-                        let span = self.span(start, span.end);
+                        if items.len() == 1 {
+                            items.pop().unwrap()
+                        } else {
+                            let kind = ElementKind::Group(items.clone());
+                            let span = self.span(start, span.end);
 
-                        Element {
-                            kind,
-                            span
+                            Element {
+                                kind,
+                                span
+                            }
                         }
                     }
                 }
@@ -349,9 +394,9 @@ impl Delimiter for Parser {
                     }
                 }
                 _ => {
-                    let expr = self.parse_complex();
+                    let element = parser(self);
 
-                    items.push(expr);
+                    items.push(element);
                 }
             }
         }

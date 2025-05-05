@@ -235,7 +235,7 @@ impl Labeled<Token> for Element {
             }),
             ElementKind::Constructor { name, .. } => name.name(),
             ElementKind::Labeled { label, .. } => label.name(),
-            ElementKind::Index { element: expr, .. } => expr.name(),
+            ElementKind::Index { element, .. } => element.name(),
             ElementKind::Invoke { target, .. } => target.name(),
             ElementKind::Member { object, .. } => object.name(),
             ElementKind::Item(item) => item.name(),
@@ -493,8 +493,8 @@ impl SimilarityMetric<Element, Item> for ParameterCountMetric {
                 }
             },
             (ElementKind::Constructor { body, .. }, ItemKind::Structure { fields, .. }) => {
-                if let ElementKind::Bundle(exprs) = &body.kind {
-                    let constructor_field_count = exprs.len();
+                if let ElementKind::Bundle(elements) = &body.kind {
+                    let constructor_field_count = elements.len();
                     let struct_field_count = fields.len();
 
                     if constructor_field_count == struct_field_count {

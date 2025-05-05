@@ -27,27 +27,32 @@ impl Hash for ElementKind {
                 core::mem::discriminant(self).hash(state);
                 name.hash(state);
             }
+            
+            ElementKind::Procedural(element) => {
+                core::mem::discriminant(self).hash(state);
+                element.hash(state);
+            }
 
             // Composite
-            ElementKind::Group(exprs) => {
+            ElementKind::Group(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
-            ElementKind::Sequence(exprs) => {
+            ElementKind::Sequence(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
-            ElementKind::Collection(exprs) => {
+            ElementKind::Collection(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
-            ElementKind::Series(exprs) => {
+            ElementKind::Series(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
-            ElementKind::Bundle(exprs) => {
+            ElementKind::Bundle(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
             ElementKind::Constructor { name, body } => {
                 core::mem::discriminant(self).hash(state);
@@ -69,24 +74,19 @@ impl Hash for ElementKind {
             }
 
             // Access Expressions
-            ElementKind::Chain { left, right } => {
-                core::mem::discriminant(self).hash(state);
-                left.hash(state);
-                right.hash(state);
-            }
             ElementKind::Bind { key, value } => {
                 core::mem::discriminant(self).hash(state);
                 key.hash(state);
                 value.hash(state);
             }
-            ElementKind::Labeled { label, element: expr } => {
+            ElementKind::Labeled { label, element } => {
                 core::mem::discriminant(self).hash(state);
                 label.hash(state);
-                expr.hash(state);
+                element.hash(state);
             }
-            ElementKind::Index { element: expr, index } => {
+            ElementKind::Index { element, index } => {
                 core::mem::discriminant(self).hash(state);
-                expr.hash(state);
+                element.hash(state);
                 index.hash(state);
             }
             ElementKind::Invoke { target, parameters } => {
@@ -105,9 +105,9 @@ impl Hash for ElementKind {
             }
 
             // Control Flow
-            ElementKind::Scope(exprs) => {
+            ElementKind::Scope(elements) => {
                 core::mem::discriminant(self).hash(state);
-                exprs.hash(state);
+                elements.hash(state);
             }
             ElementKind::Match { target, body } => {
                 core::mem::discriminant(self).hash(state);
@@ -156,7 +156,7 @@ impl Hash for ElementKind {
                 expr_opt.hash(state);
             }
 
-            ElementKind::Error(_) => {
+            ElementKind::Invalid(_) => {
                 core::mem::discriminant(self).hash(state);
                 // Note: You'll need to implement Hash for ParseError if it doesn't already implement it
                 // error.hash(state);
@@ -235,7 +235,7 @@ impl PartialEq for ElementKind {
             (ElementKind::Break(a), ElementKind::Break(b)) => a == b,
             (ElementKind::Skip(a), ElementKind::Skip(b)) => a == b,
 
-            (ElementKind::Error(a), ElementKind::Error(b)) => a == b,
+            (ElementKind::Invalid(a), ElementKind::Invalid(b)) => a == b,
 
             // Different variants are never equal
             _ => false,
@@ -260,8 +260,8 @@ impl PartialEq for ItemKind {
         match (self, other) {
             (ItemKind::Use(e1), ItemKind::Use(e2)) => e1 == e2,
             (
-                ItemKind::Implement { expr: e1, body: b1 },
-                ItemKind::Implement { expr: e2, body: b2 },
+                ItemKind::Implement { element: e1, body: b1 },
+                ItemKind::Implement { element: e2, body: b2 },
             ) => e1 == e2 && b1 == b2,
             (
                 ItemKind::Trait { name: n1, body: b1 },
@@ -345,8 +345,8 @@ impl Hash for ItemKind {
             ItemKind::Use(e) => {
                 e.hash(state);
             }
-            ItemKind::Implement { expr, body } => {
-                expr.hash(state);
+            ItemKind::Implement { element, body } => {
+                element.hash(state);
                 body.hash(state);
             }
             ItemKind::Trait { name, body } => {

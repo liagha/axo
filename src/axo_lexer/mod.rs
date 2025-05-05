@@ -1,9 +1,8 @@
 mod token;
 mod operator;
 mod punctuation;
-mod keyword;
 mod lexer;
-mod error;
+pub mod error;
 mod number;
 mod handler;
 mod symbol;
@@ -11,7 +10,6 @@ mod literal;
 mod fmt;
 
 pub use {
-    keyword::KeywordKind,
     lexer::Lexer,
     operator::OperatorKind,
     punctuation::PunctuationKind,

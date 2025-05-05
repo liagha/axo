@@ -4,6 +4,7 @@ use {
     },
 };
 
+#[derive(Clone)]
 pub enum ErrorKind {
     InvalidChar,
     NumberParse(ParseNumberError),
@@ -15,6 +16,7 @@ pub enum ErrorKind {
     UnterminatedCommentBlock,
 }
 
+#[derive(Clone)]
 pub enum CharParseError {
     EmptyCharLiteral,
     InvalidEscapeSequence,
@@ -29,25 +31,25 @@ impl core::fmt::Display for ErrorKind {
                 write!(f, "invalid character'")
             }
             ErrorKind::NumberParse(e) => {
-                write!(f, "failed to parse number: {}", e)
+                write!(f, "failed to parse number: `{}`.", e)
             }
             ErrorKind::CharParseError(e) => {
-                write!(f, "failed to parse character literal: {}", e)
+                write!(f, "failed to parse character literal: `{}`.", e)
             }
             ErrorKind::StringParseError(e) => {
-                write!(f, "failed to parse string literal: {}", e)
+                write!(f, "failed to parse string literal: `{}`.", e)
             }
             ErrorKind::UnterminatedChar => {
-                write!(f, "unterminated character literal")
+                write!(f, "unterminated character literal.")
             }
             ErrorKind::UnterminatedBackTickString => {
-                write!(f, "unterminated backtick string literal")
+                write!(f, "unterminated backtick string literal.")
             }
             ErrorKind::UnterminatedDoubleQuoteString => {
-                write!(f, "unterminated double quote string literal")
+                write!(f, "unterminated double quote string literal.")
             }
             ErrorKind::UnterminatedCommentBlock => {
-                write!(f, "unterminated comment block")
+                write!(f, "unterminated comment block.")
             }
         }
     }

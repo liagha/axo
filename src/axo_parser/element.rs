@@ -15,7 +15,9 @@ pub enum ElementKind {
     // Primitives
     Literal(TokenKind), // Basic values (string, char, number, etc.)
     Identifier(String), // Named reference
-    Error(ParseError),  // Error representation
+    Invalid(ParseError),  // Error representation
+    
+    Procedural(Box<Element>),
 
     // Groupings
     Group(Vec<Element>),      // Comma-separated in parentheses: (a, b)
@@ -39,17 +41,13 @@ pub enum ElementKind {
     },
 
     // Associations
-    Chain {
-        left: Box<Element>,
-        right: Box<Element>,
-    },
     Bind {
         // Connects key to value
         key: Box<Element>,
         value: Box<Element>,
     },
     Labeled {
-        // Names an expression
+        // Names an element
         label: Box<Element>,
         element: Box<Element>,
     },

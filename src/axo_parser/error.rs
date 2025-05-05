@@ -14,7 +14,10 @@ use {
 pub enum ErrorKind {
     DanglingElse,
     ExpectedToken(TokenKind),
+    InvalidDelimiter,
     MissingSeparator(TokenKind),
+    MissingSeparators(Vec<TokenKind>),
+    MissingOperand,
     InconsistentSeparators,
     UnclosedDelimiter(Token),
     UnterminatedGroup,
@@ -32,35 +35,44 @@ impl core::fmt::Display for ErrorKind {
             ErrorKind::ExpectedToken(expected) => {
                 write!(f, "expected token {:?}", expected)
             }
+            ErrorKind::InvalidDelimiter => {
+                write!(f, "invalid delimiter")
+            },
             ErrorKind::DanglingElse => {
-                write!(f, "can't have an else without conditional")
+                write!(f, "can't have an else without conditional.")
             }
             ErrorKind::MissingSeparator(kind) => {
-                write!(f, "expected separator {}", kind)
+                write!(f, "expected separator `{}`.", kind)
+            }
+            ErrorKind::MissingSeparators(separators) => {
+                write!(f, "expected one of these separators: `{:?}`.", separators)
+            }
+            ErrorKind::MissingOperand => {
+                write!(f, "missing operand.")
             }
             ErrorKind::InconsistentSeparators => {
-                write!(f, "inconsistent separators")
+                write!(f, "inconsistent separators.")
             }
             ErrorKind::UnexpectedEndOfFile => {
-                write!(f, "unexpected end of file")
+                write!(f, "unexpected end of file.")
             }
             ErrorKind::UnclosedDelimiter(delimiter) => {
-                write!(f, "unclosed delimiter '{:?}'", delimiter)
+                write!(f, "unclosed delimiter `{:?}`.", delimiter)
             }
             ErrorKind::UnterminatedGroup => {
-                write!(f, "unterminated group")
+                write!(f, "unterminated group.")
             }
             ErrorKind::UnterminatedCollection => {
-                write!(f, "unterminated collection")
+                write!(f, "unterminated collection.")
             }
             ErrorKind::UnterminatedBlock => {
-                write!(f, "unterminated block")
+                write!(f, "unterminated block.")
             }
             ErrorKind::UnimplementedToken(token) => {
-                write!(f, "unimplemented token '{}'", token)
+                write!(f, "unimplemented token `{}`.", token)
             }
             ErrorKind::UnexpectedToken(token) => {
-                write!(f, "unexpected token '{}'", token)
+                write!(f, "unexpected token `{}`.", token)
             }
         }
     }

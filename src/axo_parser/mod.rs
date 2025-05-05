@@ -2,7 +2,6 @@
 mod parser;
 mod statement;
 mod core;
-mod composite;
 mod item;
 mod fmt;
 mod delimiter;
@@ -15,7 +14,6 @@ pub use {
     element::{Element, ElementKind},
     item::{Item, ItemKind},
     parser::Parser,
-    composite::Composite,
     core::Primary,
 
     crate::{

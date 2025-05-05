@@ -159,15 +159,15 @@ impl Resolver {
     }
 
     /// Resolve a list of expressions
-    pub fn resolve(&mut self, exprs: Vec<Element>) {
-        for expr in exprs {
-            self.resolve_expr(expr.into());
+    pub fn resolve(&mut self, elements: Vec<Element>) {
+        for element in elements {
+            self.resolve_expr(element.into());
         }
     }
 
-    /// Resolve a single expression
-    pub fn resolve_expr(&mut self, expr: Box<Element>) {
-        let Element { kind, span } = *expr.clone();
+    /// Resolve a single element
+    pub fn resolve_expr(&mut self, element: Box<Element>) {
+        let Element { kind, span } = *element.clone();
 
         match kind {
             ElementKind::Item(item) => {
@@ -190,11 +190,11 @@ impl Resolver {
             },
 
             ElementKind::Identifier(_) => {
-                self.lookup(&expr);
+                self.lookup(&element);
             },
 
             ElementKind::Constructor { .. } | ElementKind::Invoke { .. } | ElementKind::Index { .. } => {
-                self.lookup(&expr);
+                self.lookup(&element);
             },
 
             ElementKind::Group(elements) | ElementKind::Collection(elements) | ElementKind::Bundle(elements) => {

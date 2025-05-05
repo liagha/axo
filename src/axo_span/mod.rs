@@ -2,6 +2,7 @@
 
 pub mod span;
 mod fmt;
+pub mod position;
 
 pub use span::*;
 use crate::axo_parser::{Element, Item};

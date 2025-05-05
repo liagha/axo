@@ -6,12 +6,14 @@ mod axo_rune;
 mod axo_errors;
 mod axo_span;
 mod timer;
-mod axo_validator;
+mod axo_form;
+mod axo_fmt;
 
 pub use {
     axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},
     axo_parser::Parser,
     axo_rune::*,
+    axo_fmt::*,
     broccli::{xprintln, Color, TextStyle},
     std::path::PathBuf,
     timer::{Timer, TimeSource, CPUCycleSource},
@@ -28,8 +30,8 @@ struct Config {
 
 fn main() {
     let main_timer = Timer::new(CPUCycleSource);
-
     let config = parse_args();
+
     if config.time_report {
         println!(
             "Argument Parsing Took {} ns",
@@ -37,16 +39,15 @@ fn main() {
         );
     }
 
-    let exec_path = match std::env::current_dir() {
-        Ok(mut path) => {
+    let exec_path = std::env::current_dir()
+        .map(|mut path| {
             path.push(&config.file_path);
             path
-        }
-        Err(e) => {
+        })
+        .unwrap_or_else(|e| {
             eprintln!("Failed to get current directory: {}", e);
             std::process::exit(1);
-        }
-    };
+        });
 
     if config.verbose {
         xprintln!("Path: {}", exec_path.display());
@@ -83,14 +84,13 @@ fn parse_args() -> Config {
                 print_usage(&args[0]);
                 std::process::exit(0);
             }
-            _ => {
-                if args[i].starts_with('-') {
-                    eprintln!("Unknown option: {}", args[i]);
+            flag => {
+                if flag.starts_with('-') {
+                    eprintln!("Unknown option: {}", flag);
                     print_usage(&args[0]);
                     std::process::exit(1);
-                } else {
-                    config.file_path = args[i].clone();
                 }
+                config.file_path = flag.to_string();
             }
         }
         i += 1;
@@ -121,123 +121,75 @@ fn process_file(file_path: &PathBuf, config: &Config) {
         "Compiling" => Color::Blue,
         file_path.display()
     );
+    xprintln!();
 
     let file_read_timer = Timer::new(CPUCycleSource);
-    match std::fs::read_to_string(file_path) {
-        Ok(content) => {
-            if config.verbose {
-                xprintln!(
-                    "File Contents:\n{}" => Color::Blue,
-                    content.clone() => Color::BrightBlue
-                );
-            }
-            if config.time_report {
-                println!(
-                    "File Read Took {} ns",
-                    file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
-                );
-            }
-            lex_and_parse(content, file_path.to_str().unwrap_or("unknown"), config);
-        }
-        Err(e) => {
-            eprintln!("Failed to read file {}: {}", file_path.display(), e);
-            std::process::exit(1);
-        }
+    let content = std::fs::read_to_string(file_path).unwrap_or_else(|e| {
+        eprintln!("Failed to read file {}: {}", file_path.display(), e);
+        std::process::exit(1);
+    });
+
+    if config.verbose {
+        xprintln!(
+            "File Contents:\n{}" => Color::Blue,
+            indent(&content) => Color::BrightBlue
+        );
+        xprintln!();
     }
+
+    if config.time_report {
+        println!(
+            "File Read Took {} ns",
+            file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
+        );
+    }
+
+    process_lexing(&content, file_path, config);
 }
 
-fn lex_and_parse(content: String, file_path: &str, config: &Config) {
+fn process_lexing(content: &str, file_path: &PathBuf, config: &Config) {
     let lex_timer = Timer::new(CPUCycleSource);
-    let mut lexer = Lexer::new(content, PathBuf::from(file_path));
+    let mut lexer = Lexer::new(content.to_string(), file_path.clone());
 
-    match lexer.tokenize() {
-        Ok(tokens) => {
-            if config.show_tokens || config.verbose {
-                xprintln!("Tokens:\n{}", format_tokens(&tokens));
-            }
-            if config.time_report {
-                println!(
-                    "Lexing Took {} ns",
-                    lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
-                );
-            }
-            parse_tokens(tokens, file_path, config);
-        }
-        Err(err) => {
-            let (msg, details) = err.format();
-            xprintln!(
-                "{}\n{}" => Color::Red,
-                msg => Color::Orange,
-                details
-            );
-            if config.time_report {
-                println!(
-                    "Failed Compilation Took {} ns",
-                    lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
-                );
-            }
-            std::process::exit(1);
-        }
-    }
-}
-
-fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
-    let parse_timer = Timer::new(CPUCycleSource);
-    let mut parser = Parser::new(tokens, PathBuf::from(file_path));
-    let expressions = parser.parse_program();
-
-    if parser.errors.is_empty() {
-        if config.show_ast || config.verbose {
-            xprintln!(
-                    "{}\n" => Color::Green,
-                    format!(
-                        "\n{:#?}",
-                        expressions
-                    )
-                );
-
-            let resolver_timer = Timer::new(CPUCycleSource);
-            let mut resolver = Resolver::new();
-            resolver.resolve(expressions);
-
-            if !resolver.errors.is_empty() {
-                for err in resolver.errors {
-                    let (msg, details) = err.format();
-                    xprintln!(
-                        "{}\n{}" => Color::Red,
-                        msg => Color::Orange,
-                        details
-                    );
-                }
-            } else if config.verbose && !resolver.scope.all_symbols().is_empty() {
-                xprintln!(
-                    "{}" => Color::Cyan,
-                    format!(
-                        "Symbols:\n{:#?}",
-                        resolver.scope.all_symbols()
-                    )
-                );
-            }
-
-            if config.time_report {
-                println!(
-                    "Resolution Took {} ns",
-                    resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
-                );
-            }
-        }
+    let tokens = lexer.tokenize().unwrap_or_else(|err| {
+        let (msg, details) = err.format();
+        xprintln!(
+            "{}\n{}" => Color::Red,
+            msg => Color::Orange,
+            details
+        );
         if config.time_report {
             println!(
-                "Parsing Took {} ns",
-                parse_timer.to_nanoseconds(parse_timer.elapsed().unwrap())
+                "Failed Compilation Took {} ns",
+                lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
             );
         }
-    } else {
+        std::process::exit(1);
+    });
+
+    if config.show_tokens || config.verbose {
+        xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
+        xprintln!();
+    }
+
+    if config.time_report {
+        println!(
+            "Lexing Took {} ns",
+            lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
+        );
+    }
+
+    process_parsing(tokens, file_path, config);
+}
+
+fn process_parsing(tokens: Vec<Token>, file_path: &PathBuf, config: &Config) {
+    let parse_timer = Timer::new(CPUCycleSource);
+    let mut parser = Parser::new(tokens, file_path.clone());
+    let elements = parser.parse_program();
+
+    if !parser.errors.is_empty() {
         for err in parser.errors {
-            xprintln!(
-                "{}" => Color::Red,
-                err
-            );
+            xprintln!("{}" => Color::Red, err);
         }
         if config.time_report {
             println!(
@@ -246,6 +198,57 @@ fn parse_tokens(tokens: Vec<Token>, file_path: &str, config: &Config) {
             );
         }
         std::process::exit(1);
+    }
+
+    if config.show_ast || config.verbose {
+        let ast = elements
+            .iter()
+            .map(|element| format!("{:?}", element))
+            .collect::<Vec<String>>()
+            .join("\n");
+        xprintln!("Elements:\n{}" => Color::Green, indent(&ast));
+        xprintln!();
+    }
+
+    if config.time_report {
+        println!(
+            "Parsing Took {} ns",
+            parse_timer.to_nanoseconds(parse_timer.elapsed().unwrap())
+        );
+    }
+
+    process_resolution(elements, config);
+}
+
+fn process_resolution(elements: Vec<axo_parser::Element>, config: &Config) {
+    let resolver_timer = Timer::new(CPUCycleSource);
+    let mut resolver = Resolver::new();
+    resolver.resolve(elements);
+
+    if !resolver.errors.is_empty() {
+        for err in resolver.errors {
+            let (msg, details) = err.format();
+            xprintln!(
+                "{}\n{}" => Color::Red,
+                msg => Color::Orange,
+                details
+            );
+        }
+        std::process::exit(1);
+    }
+
+    if config.verbose && !resolver.scope.all_symbols().is_empty() {
+        xprintln!(
+            "{}" => Color::Cyan,
+            format!("Symbols:\n{:#?}", resolver.scope.all_symbols())
+        );
+    }
+
+    if config.time_report {
+        println!(
+            "Resolution Took {} ns",
+            resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
+        );
     }
 }
 
@@ -275,13 +278,6 @@ fn format_tokens(tokens: &[Token]) -> String {
                     token.span
                 )
                     .term_colorize(Color::Orange)
-                    .to_string(),
-                TokenKind::Keyword(_) => format!(
-                    "{:?} | {}",
-                    token,
-                    token.span
-                )
-                    .term_colorize(Color::Blue)
                     .to_string(),
                 _ => format!("{:?} | {}", token, token.span),
             };

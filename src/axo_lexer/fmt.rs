@@ -27,7 +27,6 @@ impl fmt::Display for TokenKind {
             TokenKind::String(str) => write!(f, "{}", str),
             TokenKind::Identifier(str) => write!(f, "{}", str),
             TokenKind::Character(char) => write!(f, "'{}'", char),
-            TokenKind::Keyword(keyword) => write!(f, "{}", keyword),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
         }
     }
@@ -45,7 +44,6 @@ impl fmt::Debug for TokenKind {
             TokenKind::String(str) => write!(f, "String({})", str),
             TokenKind::Character(char) => write!(f, "Char('{}')", char),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
-            TokenKind::Keyword(keyword) => write!(f, "Keyword({:?})", keyword),
         }
     }
 }

@@ -1,42 +1,31 @@
 #![allow(dead_code)]
 
 use {
-    std::path::PathBuf,
-
     crate::{
-        axo_lexer::{
-            Token, TokenKind,
-            OperatorKind, PunctuationKind
+        axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
+        axo_parser::{error::ErrorKind, Element, ElementKind, ParseError, Primary, ItemKind},
+        axo_span::{
+            Span,
+            position::Position,
         },
-        axo_parser::{
-            error::ErrorKind,
-            Element, ElementKind,
-            ParseError, Primary,
-        },
-        axo_span::Span,
-    }
+    },
+    std::path::PathBuf,
 };
 
 #[derive(Clone)]
 pub struct Parser {
-    tokens: Vec<Token>,
-    pub file: PathBuf,
-    pub position: usize,
-    pub line: usize,
-    pub column: usize,
-    pub expressions: Vec<Element>,
+    pub input: Vec<Token>,
+    pub position: Position,
+    pub output: Vec<Element>,
     pub errors: Vec<ParseError>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>, file: PathBuf) -> Self {
         Parser {
-            file,
-            tokens,
-            position: 0,
-            line: 1,
-            column: 1,
-            expressions: Vec::new(),
+            input: tokens,
+            position: Position::new(file),
+            output: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -44,54 +33,54 @@ impl Parser {
     pub fn error(&mut self, error: &ParseError) -> Element {
         self.errors.push(error.clone());
 
-        let current = (self.line, self.column);
+        let current = (self.position.line, self.position.column);
 
         Element {
-            kind: ElementKind::Error(error.clone()),
+            kind: ElementKind::Invalid(error.clone()),
             span: self.span(current, current),
         }
     }
 
     pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
         Span {
-            file: self.file.clone(),
+            file: self.position.file.clone(),
             start,
             end,
         }
     }
 
     pub fn full_span(&self) -> Span {
-        let end = if let Some(end) = self.tokens.last() {
+        let end = if let Some(end) = self.input.last() {
             end.span.end
         } else {
-            (1,1)
+            (1, 1)
         };
 
         Span {
-            file: self.file.clone(),
-            start: (1,1),
-            end
+            file: self.position.file.clone(),
+            start: (1, 1),
+            end,
         }
     }
 
     pub fn next(&mut self) -> Option<Token> {
-        while self.position < self.tokens.len() {
-            let token = self.tokens[self.position].clone();
-            self.position += 1;
+        while self.position.index < self.input.len() {
+            let token = self.input[self.position.index].clone();
+            self.position.index += 1;
 
             match &token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    self.line += 1;
-                    self.column = 0;
+                    self.position.line += 1;
+                    self.position.column = 0;
                     continue;
                 }
                 TokenKind::Comment(_) => {
-                    self.column += 1;
+                    self.position.column += 1;
 
                     continue;
                 }
                 _ => {
-                    self.column += 1;
+                    self.position.column += 1;
 
                     return Some(token);
                 }
@@ -102,9 +91,9 @@ impl Parser {
     }
 
     pub fn peek(&self) -> Option<&Token> {
-        let mut current = self.position;
+        let mut current = self.position.index;
 
-        while let Some(token) = self.tokens.get(current) {
+        while let Some(token) = self.input.get(current) {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
                     current += 1;
@@ -128,9 +117,9 @@ impl Parser {
     }
 
     pub fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = self.position + forward;
+        let mut current = self.position.index + forward;
 
-        while let Some(token) = self.tokens.get(current) {
+        while let Some(token) = self.input.get(current) {
             match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => {
                     current += 1;
@@ -148,11 +137,11 @@ impl Parser {
     }
 
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
-        if let Some(token) = self.tokens.get(self.position) {
+        if let Some(token) = self.input.get(self.position.index) {
             if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
-                self.position += 1;
-                self.line += 1;
-                self.column = 0;
+                self.position.index += 1;
+                self.position.line += 1;
+                self.position.column = 0;
 
                 return false;
             }
@@ -186,7 +175,7 @@ impl Parser {
     }
 
     pub fn is_at_end(&self) -> bool {
-        self.position >= self.tokens.len()
+        self.position.index >= self.input.len()
     }
 
     pub fn skip_until(&mut self, delimiters: &[TokenKind]) {
@@ -213,10 +202,7 @@ impl Parser {
 
                     if let Some(separator) = separator {
                         if separator != PunctuationKind::Comma {
-                            self.error(&ParseError::new(
-                                ErrorKind::InconsistentSeparators,
-                                span,
-                            ));
+                            self.error(&ParseError::new(ErrorKind::InconsistentSeparators, span));
                         }
                     } else {
                         separator = Some(PunctuationKind::Comma);
@@ -227,21 +213,18 @@ impl Parser {
 
                     if let Some(separator) = separator {
                         if separator != PunctuationKind::Semicolon {
-                            self.error(&ParseError::new(
-                                ErrorKind::InconsistentSeparators,
-                                span,
-                            ));
+                            self.error(&ParseError::new(ErrorKind::InconsistentSeparators, span));
                         }
                     } else {
                         separator = Some(PunctuationKind::Semicolon);
                     }
                 }
                 _ => {
-                    let expr = self.parse_complex();
+                    let element = self.parse_complex();
 
-                    items.push(expr.clone());
+                    items.push(element.clone());
 
-                    self.expressions.push(expr);
+                    self.output.push(element);
                 }
             }
         }

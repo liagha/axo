@@ -1,5 +1,4 @@
-use crate::axo_lexer::{KeywordKind, OperatorKind, PunctuationKind};
-use crate::axo_lexer::keyword::KeywordLexer;
+use crate::axo_lexer::{OperatorKind, PunctuationKind};
 use crate::axo_data::float::FloatLiteral;
 use crate::axo_span::Span;
 
@@ -19,7 +18,6 @@ pub enum TokenKind {
     Operator(OperatorKind),
     Identifier(String),
     Punctuation(PunctuationKind),
-    Keyword(KeywordKind),
     Comment(String),
 }
 
@@ -35,12 +33,8 @@ impl TokenKind {
             "true" => Some(TokenKind::Boolean(true)),
             "false" => Some(TokenKind::Boolean(false)),
             "in" => Some(TokenKind::Operator(OperatorKind::In)),
-            s => {
-                if let Some(kw) = s.to_keyword() {
-                    Some(TokenKind::Keyword(kw))
-                } else {
-                    None
-                }
+            _ => {
+                None
             },
         }
     }
