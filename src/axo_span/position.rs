@@ -9,11 +9,22 @@ pub struct Position {
     pub file: Path,
 }
 
+impl Default for Position {
+    fn default() -> Self {
+        Self {
+            line: 1,
+            column: 1,
+            index: 0,
+            file: Path::default(),
+        }
+    }
+}
+
 impl Position {
     pub fn new(file: Path) -> Self {
         Self {
             line: 1,
-            column: 0,
+            column: 1,
             index: 0,
             file,
         }
@@ -52,5 +63,15 @@ impl Position {
         corrected.index = index.min(content.len());
 
         corrected
+    }
+
+    pub fn advance(&mut self, c: char) {
+        self.index += 1;
+        if c == '\n' {
+            self.line += 1;
+            self.column = 1;
+        } else {
+            self.column += 1;
+        }
     }
 }

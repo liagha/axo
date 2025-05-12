@@ -13,6 +13,7 @@ use {
         }
     }
 };
+use crate::Peekable;
 
 pub trait Delimiter {
     fn parse_delimited<F, R>(
@@ -51,7 +52,7 @@ impl Delimiter for Parser {
         R: Spanned + Clone,
         F: FnMut(&mut Parser) -> R,
     {
-        let open = if let Some(open) = self.next() {
+        let open = if let Some(open) = self.next().clone() {
             if open.kind == opening {
                 open
             } else {
@@ -65,7 +66,7 @@ impl Delimiter for Parser {
                 open
             }
         } else {
-            let span = self.span((self.position.line, self.position.column), (self.position.line, self.position.column));
+            let span = self.current_span();
 
             self.error(&ParseError::new(
                 ErrorKind::InvalidDelimiter,
@@ -75,10 +76,10 @@ impl Delimiter for Parser {
             return (Vec::new(), span)
         };
 
-        let Span { start, .. } = open.span;
+        let Span { start, .. } = open.span.clone();
 
         let mut items = Vec::new();
-        let mut end = start;
+        let mut end = start.clone();
 
         while let Some(token) = self.peek().cloned() {
             match token.kind {
@@ -112,7 +113,7 @@ impl Delimiter for Parser {
 
                                 self.error(&ParseError::new(
                                     ErrorKind::MissingSeparators(separators.into()),
-                                    self.span(item_start, end),
+                                    self.span(item_start, end.clone()),
                                 ));
 
                                 return (items, self.span(start, end));
@@ -125,7 +126,7 @@ impl Delimiter for Parser {
 
         self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(open),
-            self.span(start, end),
+            self.span(start.clone(), end.clone()),
         ));
 
         (items, self.span(start, end))
@@ -149,9 +150,9 @@ impl Delimiter for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = brace;
+        } = brace.clone();
 
-        let end = start;
+        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -243,9 +244,9 @@ impl Delimiter for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = brace;
+        } = brace.clone();
 
-        let err_end = start;
+        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -310,7 +311,7 @@ impl Delimiter for Parser {
 
         self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, err_end),
+            self.span(start, end),
         ))
     }
 
@@ -332,9 +333,9 @@ impl Delimiter for Parser {
         let Token {
             span: Span { start, .. },
             ..
-        } = brace;
+        } = brace.clone();
 
-        let err_end = start;
+        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -403,7 +404,7 @@ impl Delimiter for Parser {
 
         self.error(&ParseError::new(
             ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, err_end),
+            self.span(start, end),
         ))
     }
 }

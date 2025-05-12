@@ -1,3 +1,4 @@
+use crate::axo_data::peekable::Peekable;
 use {
     core::cmp::PartialEq,
 
@@ -43,7 +44,7 @@ impl ControlFlow for Parser {
 
         let element = self.parse_complex();
 
-        let end = element.span.end;
+        let end = element.span.end.clone();
 
         let kind = ElementKind::Procedural(element.into());
 
@@ -64,7 +65,7 @@ impl ControlFlow for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let kind = ElementKind::Match {
             target: target.into(),
@@ -91,11 +92,11 @@ impl ControlFlow for Parser {
 
         let (else_branch, end) = if self.match_token(&TokenKind::Identifier("else".to_string())) {
             let element = self.parse_complex();
-            let end = element.span.end;
+            let end = element.span.end.clone();
 
             (Some(element.into()), end)
         } else {
-            (None, then_branch.span.end)
+            (None, then_branch.span.end.clone())
         };
 
         let kind = ElementKind::Conditional {
@@ -120,7 +121,7 @@ impl ControlFlow for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let kind = ElementKind::Loop { condition: None, body: body.into() };
 
@@ -142,7 +143,7 @@ impl ControlFlow for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let kind = ElementKind::Loop {
             condition: Some(condition.into()),
@@ -167,7 +168,7 @@ impl ControlFlow for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let kind = ElementKind::Iterate {
             clause: clause.into(),
@@ -194,12 +195,10 @@ impl ControlFlow for Parser {
             (None, end)
         } else {
             let element = self.parse_complex();
-            let end = element.span.end;
+            let end = element.span.end.clone();
 
             (Some(element.into()), end)
         };
-
-        
 
         let kind = ElementKind::Return(value);
         let element = Element {
@@ -221,7 +220,7 @@ impl ControlFlow for Parser {
             (None, end)
         } else {
             let element = self.parse_complex();
-            let end = element.span.end;
+            let end = element.span.end.clone();
 
             (Some(element.into()), end)
         };
@@ -246,7 +245,7 @@ impl ControlFlow for Parser {
             (None, end)
         } else {
             let element = self.parse_complex();
-            let end = element.span.end;
+            let end = element.span.end.clone();
 
             (Some(element.into()), end)
         };

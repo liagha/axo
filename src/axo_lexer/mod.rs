@@ -11,8 +11,8 @@ mod fmt;
 
 pub use {
     lexer::Lexer,
-    operator::OperatorKind,
-    punctuation::PunctuationKind,
+    operator::{OperatorKind, OperatorLexer},
+    punctuation::{PunctuationKind, PunctuationLexer},
     token::{Token, TokenKind},
 };
 

@@ -15,6 +15,7 @@ pub use {
     axo_resolver::Resolver,
     axo_rune::*,
     axo_fmt::*,
+    axo_data::{*, peekable::*},
     broccli::{xprintln, Color, TextStyle},
     timer::{Timer, TimeSource, CPUCycleSource},
 };
@@ -26,11 +27,15 @@ pub mod fs {
 }
 
 pub mod process {
-    pub use std::process::*;
+    pub use std::process::exit;
 }
 
 pub mod env {
-    pub use std::env::*;
+    pub use std::env::{args, current_dir, };
+}
+
+pub mod arc {
+    pub use std::sync::Arc;
 }
 
 struct Config {
@@ -42,6 +47,8 @@ struct Config {
 }
 
 fn main() {
+    println!();
+
     let main_timer = Timer::new(CPUCycleSource);
     let config = parse_args();
 
@@ -61,10 +68,6 @@ fn main() {
             eprintln!("Failed to get current directory: {}", e);
             process::exit(1);
         });
-
-    if config.verbose {
-        xprintln!("Path: {}", exec_path.display());
-    }
 
     process_file(&exec_path, &config);
 
@@ -144,8 +147,8 @@ fn process_file(file_path: &Path, config: &Config) {
 
     if config.verbose {
         xprintln!(
-            "File Contents:\n{}" => Color::Blue,
-            indent(&content) => Color::BrightBlue
+            "File Contents:\n{}" => Color::Magenta,
+            indent(&content) => Color::BrightMagenta
         );
         xprintln!();
     }
@@ -162,6 +165,12 @@ fn process_file(file_path: &Path, config: &Config) {
 
 fn process_lexing(content: &str, file_path: &Path, config: &Config) {
     let lex_timer = Timer::new(CPUCycleSource);
+
+    let tokens = axo_form::lex(content).unwrap();
+
+    xprintln!("New Lexer:\n{}", indent(&format_tokens(&*tokens)));
+    xprintln!();
+
     let mut lexer = Lexer::new(content.to_string(), file_path.clone());
 
     let tokens = lexer.tokenize().unwrap_or_else(|err| {
@@ -269,6 +278,9 @@ fn format_tokens(tokens: &[Token]) -> String {
     tokens
         .iter()
         .enumerate()
+        .filter(|(_, token)|
+            token.kind != TokenKind::Punctuation(PunctuationKind::Space)
+        )
         .map(|(i, token)| {
             let token_str = match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => format!(

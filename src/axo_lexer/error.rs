@@ -18,6 +18,7 @@ pub enum ErrorKind {
 
 #[derive(Clone)]
 pub enum CharParseError {
+    InvalidToken(String),
     EmptyCharLiteral,
     InvalidEscapeSequence,
     InvalidCharLiteral,
@@ -58,6 +59,9 @@ impl core::fmt::Display for ErrorKind {
 impl core::fmt::Display for CharParseError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            CharParseError::InvalidToken(str) => {
+                write!(f, "invalid token: `{}`", str)
+            }
             CharParseError::EmptyCharLiteral => {
                 write!(f, "empty character literal")
             }

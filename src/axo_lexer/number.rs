@@ -1,3 +1,4 @@
+use crate::axo_data::peekable::Peekable;
 use {
     crate::{
         axo_lexer::{
@@ -22,7 +23,7 @@ impl NumberLexer for Lexer {
 
         let mut number = first.to_string();
 
-        let start = (self.position.line, self.position.column);
+        let start = (self.position.index, self.position.line, self.position.column);
 
         if first == '0' {
             if let Some(prefix) = self.peek() {
@@ -38,7 +39,7 @@ impl NumberLexer for Lexer {
                             _ => unreachable!()
                         };
 
-                        while let Some(ch) = self.peek() {
+                        while let Some(ch) = self.peek().cloned() {
                             if ch.is_digit(radix) ||
                                 (radix == 16 && (('a'..='f').contains(&ch) || ('A'..='F').contains(&ch))) {
                                 let digit = self.next().unwrap();
@@ -55,14 +56,14 @@ impl NumberLexer for Lexer {
             }
         }
 
-        while let Some(ch) = self.peek() {
+        while let Some(ch) = self.peek().cloned() {
             match ch {
                 ch if ch.is_digit(10) => {
                     let digit = self.next().unwrap();
                     number.push(digit);
                 }
                 '.' => {
-                    if let Some(ch) = self.peek_ahead(1) {
+                    if let Some(ch) = self.peek_ahead(1).cloned() {
                         if ch.is_digit(10) {
                             self.next();
                             number.push('.');
@@ -79,7 +80,7 @@ impl NumberLexer for Lexer {
                 }
                 'e' | 'E' => {
                     if !number.is_empty() {
-                        if let Some(next_ch) = self.peek_ahead(1) {
+                        if let Some(next_ch) = self.peek_ahead(1).cloned() {
                             if next_ch.is_digit(10) || next_ch == '+' || next_ch == '-' {
                                 if next_ch == '+' || next_ch == '-' {
                                     if let Some(digit_after) = self.peek_ahead(2) {
@@ -114,7 +115,7 @@ impl NumberLexer for Lexer {
             }
         }
 
-        let end = (self.position.line, self.position.column);
+        let end = (self.position.index, self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         match self.lex_number(&number, span.clone()) {
@@ -125,10 +126,7 @@ impl NumberLexer for Lexer {
                 });
                 Ok(())
             },
-            Err(mut err) => {
-                if err.span.start == (0, 0) && err.span.end == (0, 0) {
-                    err = LexError::new(err.kind, span);
-                }
+            Err(err) => {
                 Err(err)
             }
         }

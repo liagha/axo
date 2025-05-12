@@ -35,18 +35,20 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
     }
 
     pub fn format(&self) -> (String, String) {
-        let source_code = read_to_string(self.span.file.clone()).unwrap();
+        let source_code = read_to_string(self.span.start.file.clone()).unwrap_or_default();
         let lines: Vec<&str> = source_code.lines().collect();
         let mut messages = String::new();
         let mut details = String::new();
 
         messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
-        let (line_start, column_start) = self.span.start;
-        let (line_end, column_end) = self.span.end;
+        let line_start = self.span.start.line;
+        let column_start = self.span.start.column;
+        let line_end = self.span.end.line;
+        let column_end = self.span.end.column;
 
         details.push_str(&format!(" --> {}:{}:{}\n",
-                                  self.span.file.display(),
+                                  self.span.start.file.display(),
                                   line_start,
                                   column_start
         ).colorize(Color::Blue));
@@ -115,7 +117,8 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
             for action in &hint.action {
                 match action {
                     Add(text, span) => {
-                        let (line_idx, col_idx) = span.start;
+                        let line_idx = span.start.line;
+                        let col_idx = span.start.column;
                         if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
                             let mut rendered = String::new();
                             let (before, after) = line.split_at(col_idx.saturating_sub(1));
@@ -143,8 +146,9 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
                     }
 
                     Remove(span) => {
-                        let (line_idx, col_start) = span.start;
-                        let col_end = span.end.1;
+                        let line_idx = span.start.line;
+                        let col_start = span.start.column;
+                        let col_end = span.end.column;
                         if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
                             let before = &line[..col_start.saturating_sub(1)];
                             let target = &line[col_start.saturating_sub(1)..col_end.saturating_sub(1)];
@@ -175,11 +179,12 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
                     }
 
                     Replace(text, span) => {
-                        let (line_idx, col_start) = span.start;
-                        let col_end = span.end.1;
+                        let line_idx = span.start.line;
+                        let col_start = span.start.column;
+                        let col_end = span.end.column;
                         if let Some(line) = lines.get(line_idx.saturating_sub(1)) {
-                            let before = &line[..col_start.saturating_sub(2)];
-                            let after = &line[col_end.saturating_sub(0)..];
+                            let before = &line[..col_start.saturating_sub(1)];
+                            let after = &line[col_end.saturating_sub(1)..];
 
                             let mut rendered = String::new();
                             rendered.push_str(before);

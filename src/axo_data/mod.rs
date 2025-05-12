@@ -2,3 +2,4 @@
 pub mod float;
 pub mod tree;
 mod fmt;
+pub mod peekable;

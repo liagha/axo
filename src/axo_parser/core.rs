@@ -15,6 +15,7 @@ use {
         axo_span::Span,
     }
 };
+use crate::axo_data::peekable::Peekable;
 
 pub type ParseFunction = fn(&mut Parser) -> Element;
 
@@ -85,7 +86,7 @@ impl Primary for Parser {
                 },
             }
         } else {
-            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.current_span()))
         }
     }
 
@@ -136,7 +137,7 @@ impl Primary for Parser {
                 _ => self.parse_primary()
             }
         } else {
-            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.full_span()))
+            self.error(&ParseError::new(ErrorKind::UnexpectedEndOfFile, self.current_span()))
         }
     }
     fn parse_unary(&mut self, function: ParseFunction) -> Element {
@@ -156,7 +157,7 @@ impl Primary for Parser {
                 }
 
                 let unary = self.parse_unary(function);
-                let end = unary.span.end;
+                let end = unary.span.end.clone();
 
                 let span = self.span(start, end);
 
@@ -181,7 +182,7 @@ impl Primary for Parser {
 
             if operator.is_postfix() {
                 let operator = self.next().unwrap();
-                let span = self.span(element.span.start, end);
+                let span = self.span(element.span.start.clone(), end);
 
                 let kind = ElementKind::Unary {
                     operator,
@@ -219,8 +220,8 @@ impl Primary for Parser {
 
                 let right = self.parse_binary(function, precedence + 1);
 
-                let start = left.span.start;
-                let end = right.span.end;
+                let start = left.span.start.clone();
+                let end = right.span.end.clone();
                 let span = self.span(start, end);
 
                 let kind = ElementKind::Binary {

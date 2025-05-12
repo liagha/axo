@@ -1,3 +1,4 @@
+use crate::axo_data::peekable::Peekable;
 use {
     core::hash::{
         Hash, Hasher
@@ -134,7 +135,7 @@ impl ItemParser for Parser {
 
         let (value, end) = {
             let element = self.parse_complex();
-            let end = element.span.end;
+            let end = element.span.end.clone();
 
             (element.into(), end)
         };
@@ -210,7 +211,7 @@ impl ItemParser for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let item = ItemKind::Implement { element: implementation.into(), body: body.into() };
         let kind = ElementKind::Item(item);
@@ -233,7 +234,7 @@ impl ItemParser for Parser {
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let item = ItemKind::Trait {
             name: trait_.into(),
@@ -265,7 +266,7 @@ impl ItemParser for Parser {
             } => {
                 let body = self.parse_complex();
 
-                let end = body.span.end;
+                let end = body.span.end.clone();
 
                 let item = ItemKind::Function {
                     name: target.into(),
@@ -285,7 +286,7 @@ impl ItemParser for Parser {
             _ => {
                 let body = self.parse_complex();
 
-                let end = body.span.end;
+                let end = body.span.end.clone();
 
                 let item = ItemKind::Function {
                     name: function.into(),
@@ -320,7 +321,7 @@ impl ItemParser for Parser {
             } => {
                 let body = self.parse_complex();
 
-                let end = body.span.end;
+                let end = body.span.end.clone();
 
                 let item = ItemKind::Macro {
                     name: target.into(),
@@ -340,7 +341,7 @@ impl ItemParser for Parser {
             _ => {
                 let body = self.parse_complex();
 
-                let end = body.span.end;
+                let end = body.span.end.clone();
 
                 let item = ItemKind::Macro {
                     name: macro_.into(),
@@ -366,11 +367,11 @@ impl ItemParser for Parser {
         let Element {
             span: Span { start, .. },
             ..
-        } = enum_name;
+        } = enum_name.clone();
 
         let body = self.parse_complex();
 
-        let end = body.span.end;
+        let end = body.span.end.clone();
 
         let kind = ElementKind::Constructor {
             name: enum_name.into(),

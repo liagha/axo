@@ -4,6 +4,7 @@ use {
     crate::{
         axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
         axo_parser::{error::ErrorKind, Element, ElementKind, ParseError, Primary, ItemKind},
+        axo_data::peekable::Peekable,
         axo_span::{
             Span,
             position::Position,
@@ -20,50 +21,48 @@ pub struct Parser {
     pub errors: Vec<ParseError>,
 }
 
-impl Parser {
-    pub fn new(tokens: Vec<Token>, file: Path) -> Self {
-        Parser {
-            input: tokens,
-            position: Position::new(file),
-            output: Vec::new(),
-            errors: Vec::new(),
+impl Peekable<Token> for Parser {
+    fn peek(&self) -> Option<&Token> {
+        let mut current = self.position.index;
+
+        while let Some(token) = self.input.get(current) {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
+                    current += 1;
+                }
+                TokenKind::Comment(_) => {
+                    current += 1;
+                }
+                _ => {
+                    return Some(token);
+                }
+            }
         }
+
+        None
     }
 
-    pub fn error(&mut self, error: &ParseError) -> Element {
-        self.errors.push(error.clone());
+    fn peek_ahead(&self, forward: usize) -> Option<&Token> {
+        let mut current = self.position.index + forward;
 
-        let current = (self.position.line, self.position.column);
-
-        Element {
-            kind: ElementKind::Invalid(error.clone()),
-            span: self.span(current, current),
+        while let Some(token) = self.input.get(current) {
+            match token.kind {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
+                    current += 1;
+                }
+                TokenKind::Comment(_) => {
+                    current += 1;
+                }
+                _ => {
+                    return Some(token);
+                }
+            }
         }
+
+        None
     }
 
-    pub fn span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
-        Span {
-            file: self.position.file.clone(),
-            start,
-            end,
-        }
-    }
-
-    pub fn full_span(&self) -> Span {
-        let end = if let Some(end) = self.input.last() {
-            end.span.end
-        } else {
-            (1, 1)
-        };
-
-        Span {
-            file: self.position.file.clone(),
-            start: (1, 1),
-            end,
-        }
-    }
-
-    pub fn next(&mut self) -> Option<Token> {
+    fn next(&mut self) -> Option<Token> {
         while self.position.index < self.input.len() {
             let token = self.input[self.position.index].clone();
             self.position.index += 1;
@@ -90,50 +89,64 @@ impl Parser {
         None
     }
 
-    pub fn peek(&self) -> Option<&Token> {
-        let mut current = self.position.index;
-
-        while let Some(token) = self.input.get(current) {
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    current += 1;
-                }
-                TokenKind::Comment(_) => {
-                    current += 1;
-                }
-                _ => {
-                    return Some(token);
-                }
-            }
-        }
-
-        None
+    fn position(&self) -> Position {
+        self.position.clone()
     }
 
-    pub fn peek_with<R>(&self, handler: fn(&Parser) -> R) -> R {
-        let parser = self.clone();
-
-        handler(&parser)
+    fn set_index(&mut self, index: usize) {
+        self.position.index = index
     }
 
-    pub fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = self.position.index + forward;
+    fn set_line(&mut self, line: usize) {
+        self.position.line = line
+    }
 
-        while let Some(token) = self.input.get(current) {
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    current += 1;
-                }
-                TokenKind::Comment(_) => {
-                    current += 1;
-                }
-                _ => {
-                    return Some(token);
-                }
-            }
+    fn set_column(&mut self, column: usize) {
+        self.position.column = column
+    }
+
+    fn set_position(&mut self, position: Position) {
+        self.position = position;
+    }
+}
+
+impl Parser {
+    pub fn new(tokens: Vec<Token>, file: Path) -> Self {
+        Parser {
+            input: tokens,
+            position: Position::new(file),
+            output: Vec::new(),
+            errors: Vec::new(),
         }
+    }
 
-        None
+    pub fn error(&mut self, error: &ParseError) -> Element {
+        self.errors.push(error.clone());
+
+        let current = self.position.clone();
+
+        Element {
+            kind: ElementKind::Invalid(error.clone()),
+            span: self.span(current.clone(), current),
+        }
+    }
+    
+    pub fn current_span(&self) -> Span {
+        self.point_span(self.position.clone())
+    }
+    
+    pub fn point_span(&self, point: Position) -> Span {
+        Span {
+            start: point.clone(),
+            end: point,
+        }
+    }
+
+    pub fn span(&self, start: Position, end: Position) -> Span {
+        Span {
+            start,
+            end,
+        }
     }
 
     pub fn match_token(&mut self, expected: &TokenKind) -> bool {
@@ -154,39 +167,6 @@ impl Parser {
         }
 
         false
-    }
-
-    pub fn peek_is_any(&self, kinds: &[TokenKind]) -> bool {
-        if let Some(token) = self.peek() {
-            kinds.contains(&token.kind)
-        } else {
-            false
-        }
-    }
-
-    pub fn match_any(&mut self, kinds: &[TokenKind]) -> bool {
-        if let Some(token) = self.peek() {
-            if kinds.contains(&token.kind) {
-                self.next();
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn is_at_end(&self) -> bool {
-        self.position.index >= self.input.len()
-    }
-
-    pub fn skip_until(&mut self, delimiters: &[TokenKind]) {
-        while !self.is_at_end() {
-            if let Some(token) = self.peek() {
-                if delimiters.contains(&token.kind) {
-                    break;
-                }
-                self.next();
-            }
-        }
     }
 
     pub fn parse_program(&mut self) -> Vec<Element> {

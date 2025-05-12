@@ -35,6 +35,8 @@ pub enum ParseNumberError {
     MalformedExponent,
     /// The input string format is invalid
     InvalidFormat(String),
+    /// Error when trying to extract a value of the wrong type
+    TypeError(String),
 }
 
 impl fmt::Display for ParseNumberError {
@@ -47,6 +49,7 @@ impl fmt::Display for ParseNumberError {
             Self::Overflow => write!(f, "numeric overflow occurred"),
             Self::MalformedExponent => write!(f, "malformed exponent in scientific notation"),
             Self::InvalidFormat(details) => write!(f, "invalid number format: {}", details),
+            Self::TypeError(details) => write!(f, "type error: {}", details),
         }
     }
 }
@@ -315,10 +318,6 @@ pub fn parser<T: NumericParser>() -> NumberParser<T> {
     NumberParser::new()
 }
 
-/// A type-inferring number parser that automatically detects the most appropriate
-/// numeric type based on the input string
-pub struct AutoNumberParser;
-
 /// Represents different automatically detected number types
 #[derive(Debug, Clone, PartialEq)]
 pub enum AutoNumber {
@@ -347,6 +346,98 @@ pub enum AutoNumber {
     /// 64-bit floating point
     F64(f64),
 }
+
+impl AutoNumber {
+    /// Checks if the value is an integer type
+    pub fn is_int(&self) -> bool {
+        match self {
+            Self::U8(_) | Self::U16(_) | Self::U32(_) | Self::U64(_) | Self::U128(_) |
+            Self::I8(_) | Self::I16(_) | Self::I32(_) | Self::I64(_) | Self::I128(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if the value is a floating point type
+    pub fn is_float(&self) -> bool {
+        match self {
+            Self::F32(_) | Self::F64(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Attempts to extract the value as an i64, if it's an integer type
+    pub fn as_int(&self) -> Result<i64, ParseNumberError> {
+        match self {
+            Self::U8(v) => Ok(*v as i64),
+            Self::U16(v) => Ok(*v as i64),
+            Self::U32(v) => Ok(*v as i64),
+            Self::U64(v) => {
+                if *v <= i64::MAX as u64 {
+                    Ok(*v as i64)
+                } else {
+                    Err(ParseNumberError::Overflow)
+                }
+            }
+            Self::U128(v) => {
+                if *v <= i64::MAX as u128 {
+                    Ok(*v as i64)
+                } else {
+                    Err(ParseNumberError::Overflow)
+                }
+            }
+            Self::I8(v) => Ok(*v as i64),
+            Self::I16(v) => Ok(*v as i64),
+            Self::I32(v) => Ok(*v as i64),
+            Self::I64(v) => Ok(*v),
+            Self::I128(v) => {
+                if *v >= i64::MIN as i128 && *v <= i64::MAX as i128 {
+                    Ok(*v as i64)
+                } else {
+                    Err(ParseNumberError::Overflow)
+                }
+            }
+            _ => Err(ParseNumberError::TypeError("not an integer type".to_string())),
+        }
+    }
+
+    /// Attempts to extract the value as an f64, if it's a floating point type or can be converted to one
+    pub fn as_float(&self) -> Result<f64, ParseNumberError> {
+        match self {
+            // Integer types can be converted to float
+            Self::U8(v) => Ok(*v as f64),
+            Self::U16(v) => Ok(*v as f64),
+            Self::U32(v) => Ok(*v as f64),
+            Self::U64(v) => Ok(*v as f64),
+            Self::U128(v) => {
+                // Large u128 values can lose precision when converted to f64
+                if *v > 9007199254740992u128 { // 2^53, limit of exact integer representation in f64
+                    Err(ParseNumberError::Overflow)
+                } else {
+                    Ok(*v as f64)
+                }
+            }
+            Self::I8(v) => Ok(*v as f64),
+            Self::I16(v) => Ok(*v as f64),
+            Self::I32(v) => Ok(*v as f64),
+            Self::I64(v) => Ok(*v as f64),
+            Self::I128(v) => {
+                // Large i128 values can lose precision when converted to f64
+                if *v > 9007199254740992i128 || *v < -9007199254740992i128 {
+                    Err(ParseNumberError::Overflow)
+                } else {
+                    Ok(*v as f64)
+                }
+            }
+            // Float types
+            Self::F32(v) => Ok(*v as f64),
+            Self::F64(v) => Ok(*v),
+        }
+    }
+}
+
+/// A type-inferring number parser that automatically detects the most appropriate
+/// numeric type based on the input string
+pub struct AutoNumberParser;
 
 impl AutoNumberParser {
     /// Creates a new auto-detecting parser
@@ -606,5 +697,38 @@ mod tests {
         // Test custom radix
         assert!(matches!(parser.parse_radix("FF", 16), Ok(AutoNumber::U8(255))));
         assert!(matches!(parser.parse_radix("FFFF", 16), Ok(AutoNumber::U16(65535))));
+    }
+
+    #[test]
+    fn test_is_int_and_is_float() {
+        let parser = auto_parser();
+
+        let int_value = parser.parse("42").unwrap();
+        let float_value = parser.parse("3.14").unwrap();
+
+        assert!(int_value.is_int());
+        assert!(!int_value.is_float());
+
+        assert!(!float_value.is_int());
+        assert!(float_value.is_float());
+    }
+
+    #[test]
+    fn test_as_int_and_as_float() {
+        let parser = auto_parser();
+
+        let int_value = parser.parse("42").unwrap();
+        let float_value = parser.parse("3.14").unwrap();
+        let large_value = parser.parse("9223372036854775808").unwrap(); // 2^63, too large for i64
+
+        // Test as_int()
+        assert_eq!(int_value.as_int(), Ok(42));
+        assert!(matches!(float_value.as_int(), Err(ParseNumberError::TypeError(_))));
+        assert!(matches!(large_value.as_int(), Err(ParseNumberError::Overflow)));
+
+        // Test as_float()
+        assert_eq!(int_value.as_float(), Ok(42.0));
+        assert_eq!(float_value.as_float().unwrap(), 3.14);
+        assert!(matches!(parser.parse("9007199254740993").unwrap().as_float(), Ok(_))); // 2^53 + 1, might lose precision
     }
 }
