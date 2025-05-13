@@ -152,7 +152,6 @@ impl Delimiter for Parser {
             ..
         } = brace.clone();
 
-        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -221,8 +220,8 @@ impl Delimiter for Parser {
         }
 
         self.error(&ParseError::new(
-            ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, end),
+            ErrorKind::UnclosedDelimiter(brace.clone()),
+            brace.span.clone(),
         ))
     }
 
@@ -246,7 +245,6 @@ impl Delimiter for Parser {
             ..
         } = brace.clone();
 
-        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -310,8 +308,8 @@ impl Delimiter for Parser {
         }
 
         self.error(&ParseError::new(
-            ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, end),
+            ErrorKind::UnclosedDelimiter(brace.clone()),
+            brace.span.clone(),
         ))
     }
 
@@ -335,7 +333,6 @@ impl Delimiter for Parser {
             ..
         } = brace.clone();
 
-        let end = start.clone();
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 
@@ -403,8 +400,8 @@ impl Delimiter for Parser {
         }
 
         self.error(&ParseError::new(
-            ErrorKind::UnclosedDelimiter(brace),
-            self.span(start, end),
+            ErrorKind::UnclosedDelimiter(brace.clone()),
+            brace.span.clone(),
         ))
     }
 }

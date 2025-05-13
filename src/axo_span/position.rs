@@ -1,11 +1,11 @@
 use crate::Path;
 use crate::fs;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
-    pub index: usize,
     pub file: Path,
 }
 
@@ -14,7 +14,6 @@ impl Default for Position {
         Self {
             line: 1,
             column: 1,
-            index: 0,
             file: Path::default(),
         }
     }
@@ -25,7 +24,6 @@ impl Position {
         Self {
             line: 1,
             column: 1,
-            index: 0,
             file,
         }
     }
@@ -51,27 +49,60 @@ impl Position {
 
         corrected.column = corrected.column.min(line_length);
 
-        let mut index = 0;
-
-        for (i, line) in lines.iter().enumerate() {
-            if i + 1 == corrected.line {
-                index += corrected.column;
-                break;
-            }
-            index += line.len() + 1;
-        }
-        corrected.index = index.min(content.len());
-
         corrected
     }
 
     pub fn advance(&mut self, c: char) {
-        self.index += 1;
         if c == '\n' {
             self.line += 1;
             self.column = 1;
         } else {
             self.column += 1;
         }
+    }
+
+    pub fn at(file: Path, line: usize, column: usize) -> Self {
+        let mut pos = Self::new(file);
+        pos.line = line;
+        pos.column = column;
+        pos.correct()
+    }
+
+    pub fn get_line_content(&self) -> Option<String> {
+        match fs::read_to_string(&self.file) {
+            Ok(content) => {
+                let lines: Vec<&str> = content.lines().collect();
+                if self.line > 0 && self.line <= lines.len() {
+                    Some(lines[self.line - 1].to_string())
+                } else {
+                    None
+                }
+            },
+            Err(_) => None,
+        }
+    }
+
+    pub fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.file != other.file {
+            return self.file.to_string_lossy().cmp(&other.file.to_string_lossy());
+        }
+
+        match self.line.cmp(&other.line) {
+            std::cmp::Ordering::Equal => self.column.cmp(&other.column),
+            other => other,
+        }
+    }
+}
+
+
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Position {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.cmp(other)
     }
 }

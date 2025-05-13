@@ -32,34 +32,44 @@ use {
 #[derive(Clone)]
 pub struct Lexer {
     pub input: Vec<char>,
+    pub index: usize,
     pub position: Position,
     pub output: Vec<Token>,
+    pub errors: Vec<LexError>,
 }
 
 impl Peekable<char> for Lexer {
-    fn peek(&self) -> Option<&char> {
-        if self.position.index < self.input.len() {
-            Some(&self.input[self.position.index])
+    fn peek_ahead(&self, n: usize) -> Option<&char> {
+        let current = self.index + n;
+
+        if current < self.input.len() {
+            Some(&self.input[current])
         } else {
             None
         }
     }
+    
+    fn peek_behind(&self, n: usize) -> Option<&char> {
+        let mut current = self.index;
 
-    fn peek_ahead(&self, n: usize) -> Option<&char> {
-        let pos = self.position.index + n;
+        if current < n {
+            return None;
+        }
+        
+        current -= n;
 
-        if pos < self.input.len() {
-            Some(&self.input[pos])
+        if current < self.input.len() {
+            Some(&self.input[current])
         } else {
             None
         }
     }
 
     fn next(&mut self) -> Option<char> {
-        if self.position.index < self.input.len() {
-            let ch = self.input[self.position.index];
+        if self.index < self.input.len() {
+            let ch = self.input[self.index];
 
-            self.position.index += 1;
+            self.index += 1;
 
             if ch == '\n' {
                 self.position.line += 1;
@@ -79,7 +89,7 @@ impl Peekable<char> for Lexer {
     }
 
     fn set_index(&mut self, index: usize) {
-        self.position.index = index
+        self.index = index
     }
 
     fn set_line(&mut self, line: usize) {
@@ -101,25 +111,25 @@ impl Lexer {
 
         Lexer {
             input: chars,
+            index: 0,
             position: Position::new(file),
             output: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
-    pub fn create_span(&self, start: (usize, usize, usize), end: (usize, usize, usize)) -> Span {
+    pub fn create_span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
         let file = self.position.file.clone();
         
         let start = Position {
-            index: start.0,
-            line: start.1,
-            column: start.2,
+            line: start.0,
+            column: start.1,
             file: file.clone(),
         };
 
         let end = Position {
-            index: end.0,
-            line: end.1,
-            column: end.2,
+            line: end.0,
+            column: end.1,
             file,
         };
 
@@ -169,8 +179,8 @@ impl Lexer {
                 _ => {
                     self.next();
 
-                    let start = (self.position.index, self.position.line, self.position.column);
-                    let end = (self.position.index, self.position.line, self.position.column);
+                    let start = (self.position.line, self.position.column);
+                    let end = (self.position.line, self.position.column);
                     let span = self.create_span(start, end);
 
                     return Err(LexError::new(ErrorKind::InvalidChar, span));

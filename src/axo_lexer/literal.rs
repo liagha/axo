@@ -18,28 +18,28 @@ pub trait LiteralLexer {
 
 impl LiteralLexer for Lexer {
     fn handle_character(&mut self) -> Result<(), LexError> {
-        self.next(); // Consume opening quote
+        self.next(); 
 
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
         let mut content = Vec::new();
         let mut closed = false;
         let mut is_escaped = false;
 
         while let Some(next_ch) = self.peek().cloned() {
             if next_ch == '\'' && !is_escaped {
-                self.next(); // Consume closing quote
+                self.next(); 
                 closed = true;
                 break;
             }
 
-            self.next(); // Consume character
+            self.next(); 
 
             if is_escaped {
-                let escape_start = (self.position.index, self.position.line, self.position.column);
+                let escape_start = (self.position.line, self.position.column);
                 match self.handle_escape(false) {
                     Ok(escaped_char) => content.push(escaped_char),
                     Err(LexError { kind, .. }) => {
-                        let escape_end = (self.position.index, self.position.line, self.position.column);
+                        let escape_end = (self.position.line, self.position.column);
                         let escape_span = self.create_span(escape_start, escape_end);
                         return Err(LexError::new(kind, escape_span));
                     }
@@ -52,14 +52,13 @@ impl LiteralLexer for Lexer {
             }
         }
 
-        let end = (self.position.index, self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         if !closed {
             return Err(LexError::new(ErrorKind::UnterminatedChar, span));
         }
 
-        // Validate character literal
         match content.len() {
             0 => {
                 Err(LexError::new(ErrorKind::CharParseError(CharParseError::EmptyCharLiteral), span))
@@ -76,8 +75,8 @@ impl LiteralLexer for Lexer {
     }
 
     fn handle_string(&mut self) -> Result<(), LexError> {
-        let quote_char = self.next().unwrap(); // Consume opening quote
-        let start = (self.position.index, self.position.line, self.position.column);
+        let quote_char = self.next().unwrap(); 
+        let start = (self.position.line, self.position.column);
         let mut content = Vec::new();
         let mut closed = false;
         let mut is_escaped = false;
@@ -87,12 +86,12 @@ impl LiteralLexer for Lexer {
             self.next();
 
             if is_escaped {
-                let escape_start = (self.position.index, self.position.line, self.position.column);
+                let escape_start = (self.position.line, self.position.column);
                 
                 match self.handle_escape(!is_multiline) {
                     Ok(escaped_char) => content.push(escaped_char),
                     Err(LexError { kind, .. }) => {
-                        let escape_end = (self.position.index, self.position.line, self.position.column);
+                        let escape_end = (self.position.line, self.position.column);
                         let escape_span = self.create_span(escape_start, escape_end);
                         return Err(LexError::new(kind, escape_span));
                     }
@@ -111,13 +110,13 @@ impl LiteralLexer for Lexer {
             }
 
             if !is_multiline && (next_ch == '\n' || next_ch == '\r') && !is_escaped {
-                let end = (self.position.index, self.position.line, self.position.column);
+                let end = (self.position.line, self.position.column);
                 let span = self.create_span(start, end);
                 return Err(LexError::new(ErrorKind::UnterminatedDoubleQuoteString, span));
             }
         }
 
-        let end = (self.position.index, self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         if !closed {

@@ -165,14 +165,15 @@ fn process_file(file_path: &Path, config: &Config) {
 
 fn process_lexing(content: &str, file_path: &Path, config: &Config) {
     let lex_timer = Timer::new(CPUCycleSource);
+    
+    let mut lexer = Lexer::new(content.to_string(), file_path.clone());
+    
+    let tokens = lexer.lex();
 
-    let tokens = axo_form::lex(content).unwrap();
-
-    xprintln!("New Lexer:\n{}", indent(&format_tokens(&*tokens)));
+    xprintln!("Tokens:\n{}", indent(&format_tokens(&*tokens)));
     xprintln!();
 
-    let mut lexer = Lexer::new(content.to_string(), file_path.clone());
-
+    /*
     let tokens = lexer.tokenize().unwrap_or_else(|err| {
         let (msg, details) = err.format();
         xprintln!(
@@ -193,7 +194,8 @@ fn process_lexing(content: &str, file_path: &Path, config: &Config) {
         xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
         xprintln!();
     }
-
+    */
+    
     if config.time_report {
         println!(
             "Lexing Took {} ns",
@@ -207,7 +209,7 @@ fn process_lexing(content: &str, file_path: &Path, config: &Config) {
 fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
     let parse_timer = Timer::new(CPUCycleSource);
     let mut parser = Parser::new(tokens, file_path.clone());
-    let elements = parser.parse_program();
+    let elements = parser.parse();
 
     if !parser.errors.is_empty() {
         for err in parser.errors {
@@ -284,27 +286,27 @@ fn format_tokens(tokens: &[Token]) -> String {
         .map(|(i, token)| {
             let token_str = match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => format!(
-                    "↓ {:?} | {} ↓\n",
+                    "↓ {:?} | {:#?} ↓\n",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Green)
                     .to_string(),
                 TokenKind::Punctuation(_) => format!(
-                    "{:?} | {}",
+                    "{:?} | {:#?}",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Green)
                     .to_string(),
                 TokenKind::Operator(_) => format!(
-                    "{:?} | {}",
+                    "{:?} | {:#?}",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Orange)
                     .to_string(),
-                _ => format!("{:?} | {}", token, token.span),
+                _ => format!("{:?} | {:#?}", token, token.span),
             };
             if i < tokens.len() - 1
                 && !matches!(token.kind, TokenKind::Punctuation(PunctuationKind::Newline))

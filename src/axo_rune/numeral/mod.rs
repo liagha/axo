@@ -1,41 +1,25 @@
 use core::fmt;
 use core::str::FromStr;
 
-/// Represents different number formats supported by the parser
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberFormat {
-    /// Decimal format (base 10)
     Decimal,
-    /// Hexadecimal format (base 16, prefixed with 0x)
     Hexadecimal,
-    /// Octal format (base 8, prefixed with 0o)
     Octal,
-    /// Binary format (base 2, prefixed with 0b)
     Binary,
-    /// Scientific notation (e.g., 1.23e-4)
     Scientific,
-    /// Custom radix (2-36)
     Custom(u8),
 }
 
-/// Possible error types that can occur during parsing
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseNumberError {
-    /// The input string is empty
     EmptyString,
-    /// The radix provided is invalid (must be 2-36)
     InvalidRadix(u8),
-    /// The input contains invalid digits for the given radix
     InvalidDigit(char),
-    /// Multiple decimal points were found
     MultipleDecimalPoints,
-    /// The input is too large for the target numeric type
     Overflow,
-    /// Scientific notation is malformed
     MalformedExponent,
-    /// The input string format is invalid
     InvalidFormat(String),
-    /// Error when trying to extract a value of the wrong type
     TypeError(String),
 }
 
@@ -56,19 +40,15 @@ impl fmt::Display for ParseNumberError {
 
 impl core::error::Error for ParseNumberError {}
 
-/// Trait for numeric types that can be parsed from strings
 pub trait NumericParser: Sized {
-    /// Parse a string into the numeric type with the specified radix
     fn from_str_radix(s: &str, radix: u8) -> Result<Self, ParseNumberError>;
 
-    /// Parse a string into the numeric type with auto-detection of format
     fn parse(s: &str) -> Result<Self, ParseNumberError> {
         let s = s.trim();
         if s.is_empty() {
             return Err(ParseNumberError::EmptyString);
         }
 
-        // Detect format and radix
         let (s, format) = detect_number_format(s)?;
 
         match format {
@@ -84,13 +64,11 @@ pub trait NumericParser: Sized {
     }
 }
 
-/// Detects the format of a number string and returns the cleaned string and format
 fn detect_number_format(s: &str) -> Result<(&str, NumberFormat), ParseNumberError> {
     if s.is_empty() {
         return Err(ParseNumberError::EmptyString);
     }
 
-    // Check for explicit radix prefix (0x, 0o, 0b)
     if s.len() >= 2 && s.starts_with('0') {
         match s.chars().nth(1).unwrap() {
             'x' | 'X' => return Ok((&s[2..], NumberFormat::Hexadecimal)),
@@ -100,37 +78,30 @@ fn detect_number_format(s: &str) -> Result<(&str, NumberFormat), ParseNumberErro
         }
     }
 
-    // Check for scientific notation
     if s.contains(['e', 'E']) && !s.starts_with(['e', 'E']) {
         return Ok((s, NumberFormat::Scientific));
     }
 
-    // If no special format detected, use decimal by default
     Ok((s, NumberFormat::Decimal))
 }
 
-/// Parses a scientific notation number into a standard float
 fn parse_scientific(s: &str) -> Result<f64, ParseNumberError> {
     let parts: Vec<&str> = s.split(['e', 'E']).collect();
     if parts.len() != 2 {
         return Err(ParseNumberError::MalformedExponent);
     }
 
-    // Parse base part
     let base = parts[0].parse::<f64>().map_err(|_| {
         ParseNumberError::InvalidFormat(format!("invalid base: {}", parts[0]))
     })?;
 
-    // Parse exponent part
     let exp = parts[1].parse::<i32>().map_err(|_| {
         ParseNumberError::InvalidFormat(format!("invalid exponent: {}", parts[1]))
     })?;
 
-    // Calculate the result using the power of the exponent
     Ok(base * 10.0_f64.powi(exp))
 }
 
-// Implementation for primitive numeric types
 macro_rules! impl_numeric_parser_for_integer {
     ($t:ty, $doc:expr) => {
         #[doc = $doc]
@@ -145,7 +116,6 @@ macro_rules! impl_numeric_parser_for_integer {
                     return Err(ParseNumberError::EmptyString);
                 }
 
-                // Handle sign
                 let (is_negative, s) = if s.starts_with('-') {
                     (true, &s[1..])
                 } else if s.starts_with('+') {
@@ -158,7 +128,6 @@ macro_rules! impl_numeric_parser_for_integer {
                     return Err(ParseNumberError::InvalidFormat("only a sign character found".to_string()));
                 }
 
-                // Parse digits
                 let mut result: $t = 0;
                 for c in s.chars() {
                     let digit = match c.to_digit(radix as u32) {
@@ -166,7 +135,6 @@ macro_rules! impl_numeric_parser_for_integer {
                         None => return Err(ParseNumberError::InvalidDigit(c)),
                     };
 
-                    // Check for overflow
                     if let Some(new_result) = result.checked_mul(radix as $t) {
                         if let Some(new_result) = new_result.checked_add(digit) {
                             result = new_result;
@@ -178,11 +146,9 @@ macro_rules! impl_numeric_parser_for_integer {
                     }
                 }
 
-                // Apply sign
                 if is_negative {
                     result = result.wrapping_neg();
 
-                    // Check for overflow on negation (e.g., for MIN_VALUE)
                     if result > 0 && s != "0" {
                         return Err(ParseNumberError::Overflow);
                     }
@@ -200,13 +166,11 @@ macro_rules! impl_numeric_parser_for_float {
         impl NumericParser for $t {
             fn from_str_radix(s: &str, radix: u8) -> Result<Self, ParseNumberError> {
                 if radix != 10 && !s.contains(['e', 'E']) {
-                    // For non-decimal bases, we need to implement our own float parsing
                     let s = s.trim();
                     if s.is_empty() {
                         return Err(ParseNumberError::EmptyString);
                     }
 
-                    // Handle sign
                     let (is_negative, s) = if s.starts_with('-') {
                         (true, &s[1..])
                     } else if s.starts_with('+') {
@@ -219,13 +183,11 @@ macro_rules! impl_numeric_parser_for_float {
                         return Err(ParseNumberError::InvalidFormat("only a sign character found".to_string()));
                     }
 
-                    // Split by decimal point
                     let parts: Vec<&str> = s.split('.').collect();
                     if parts.len() > 2 {
                         return Err(ParseNumberError::MultipleDecimalPoints);
                     }
 
-                    // Parse integer part
                     let int_part = if parts[0].is_empty() {
                         0.0
                     } else {
@@ -240,7 +202,6 @@ macro_rules! impl_numeric_parser_for_float {
                         result
                     };
 
-                    // Parse fractional part
                     let frac_part = if parts.len() == 2 {
                         let mut result = 0.0;
                         let mut factor = 1.0 / (radix as $t);
@@ -260,7 +221,6 @@ macro_rules! impl_numeric_parser_for_float {
                     let result = int_part + frac_part;
                     Ok(if is_negative { -result } else { result })
                 } else {
-                    // For decimal or scientific notation, use the standard library parser
                     <$t as FromStr>::from_str(s).map_err(|_| {
                         ParseNumberError::InvalidFormat(format!("failed to parse '{}' as {}", s, stringify!($t)))
                     })
@@ -270,7 +230,6 @@ macro_rules! impl_numeric_parser_for_float {
     };
 }
 
-// Implement for common integer types
 impl_numeric_parser_for_integer!(u8, "Implementation for u8");
 impl_numeric_parser_for_integer!(u16, "Implementation for u16");
 impl_numeric_parser_for_integer!(u32, "Implementation for u32");
@@ -285,70 +244,50 @@ impl_numeric_parser_for_integer!(i64, "Implementation for i64");
 impl_numeric_parser_for_integer!(i128, "Implementation for i128");
 impl_numeric_parser_for_integer!(isize, "Implementation for isize");
 
-// Implement for floating point types
 impl_numeric_parser_for_float!(f32, "Implementation for f32");
 impl_numeric_parser_for_float!(f64, "Implementation for f64");
 
-/// A generic number parser that can parse to any target type
 pub struct NumberParser<T> {
     _marker: core::marker::PhantomData<T>,
 }
 
 impl<T: NumericParser> NumberParser<T> {
-    /// Creates a new parser for the specified numeric type
     pub fn new() -> Self {
         Self {
             _marker: core::marker::PhantomData,
         }
     }
 
-    /// Parse a string into the numeric type
     pub fn parse(&self, s: &str) -> Result<T, ParseNumberError> {
         T::parse(s)
     }
 
-    /// Parse a string with a specific radix
     pub fn parse_radix(&self, s: &str, radix: u8) -> Result<T, ParseNumberError> {
         T::from_str_radix(s, radix)
     }
 }
 
-// Helper function to easily create a parser for a specific type
 pub fn parser<T: NumericParser>() -> NumberParser<T> {
     NumberParser::new()
 }
 
-/// Represents different automatically detected number types
 #[derive(Debug, Clone, PartialEq)]
 pub enum AutoNumber {
-    /// 8-bit unsigned integer
     U8(u8),
-    /// 16-bit unsigned integer
     U16(u16),
-    /// 32-bit unsigned integer
     U32(u32),
-    /// 64-bit unsigned integer
     U64(u64),
-    /// 128-bit unsigned integer
     U128(u128),
-    /// 8-bit signed integer
     I8(i8),
-    /// 16-bit signed integer
     I16(i16),
-    /// 32-bit signed integer
     I32(i32),
-    /// 64-bit signed integer
     I64(i64),
-    /// 128-bit signed integer
     I128(i128),
-    /// 32-bit floating point
     F32(f32),
-    /// 64-bit floating point
     F64(f64),
 }
 
 impl AutoNumber {
-    /// Checks if the value is an integer type
     pub fn is_int(&self) -> bool {
         match self {
             Self::U8(_) | Self::U16(_) | Self::U32(_) | Self::U64(_) | Self::U128(_) |
@@ -357,7 +296,6 @@ impl AutoNumber {
         }
     }
 
-    /// Checks if the value is a floating point type
     pub fn is_float(&self) -> bool {
         match self {
             Self::F32(_) | Self::F64(_) => true,
@@ -365,7 +303,6 @@ impl AutoNumber {
         }
     }
 
-    /// Attempts to extract the value as an i64, if it's an integer type
     pub fn as_int(&self) -> Result<i64, ParseNumberError> {
         match self {
             Self::U8(v) => Ok(*v as i64),
@@ -400,17 +337,14 @@ impl AutoNumber {
         }
     }
 
-    /// Attempts to extract the value as an f64, if it's a floating point type or can be converted to one
     pub fn as_float(&self) -> Result<f64, ParseNumberError> {
         match self {
-            // Integer types can be converted to float
             Self::U8(v) => Ok(*v as f64),
             Self::U16(v) => Ok(*v as f64),
             Self::U32(v) => Ok(*v as f64),
             Self::U64(v) => Ok(*v as f64),
             Self::U128(v) => {
-                // Large u128 values can lose precision when converted to f64
-                if *v > 9007199254740992u128 { // 2^53, limit of exact integer representation in f64
+                if *v > 9007199254740992u128 { 
                     Err(ParseNumberError::Overflow)
                 } else {
                     Ok(*v as f64)
@@ -421,45 +355,36 @@ impl AutoNumber {
             Self::I32(v) => Ok(*v as f64),
             Self::I64(v) => Ok(*v as f64),
             Self::I128(v) => {
-                // Large i128 values can lose precision when converted to f64
                 if *v > 9007199254740992i128 || *v < -9007199254740992i128 {
                     Err(ParseNumberError::Overflow)
                 } else {
                     Ok(*v as f64)
                 }
             }
-            // Float types
             Self::F32(v) => Ok(*v as f64),
             Self::F64(v) => Ok(*v),
         }
     }
 }
 
-/// A type-inferring number parser that automatically detects the most appropriate
-/// numeric type based on the input string
 pub struct AutoNumberParser;
 
 impl AutoNumberParser {
-    /// Creates a new auto-detecting parser
     pub fn new() -> Self {
         Self
     }
 
-    /// Parse a string and automatically determine the best numeric type
     pub fn parse(&self, s: &str) -> Result<AutoNumber, ParseNumberError> {
         let s = s.trim();
         if s.is_empty() {
             return Err(ParseNumberError::EmptyString);
         }
 
-        // Check if we have a floating point value
         if s.contains('.') || s.contains(['e', 'E']) {
-            // Try f32 first
             if let Ok(value) = parser::<f32>().parse(s) {
                 return Ok(AutoNumber::F32(value));
             }
 
-            // If f32 fails or overflows, try f64
             if let Ok(value) = parser::<f64>().parse(s) {
                 return Ok(AutoNumber::F64(value));
             }
@@ -467,11 +392,9 @@ impl AutoNumberParser {
             return Err(ParseNumberError::InvalidFormat(format!("Could not parse '{}' as a floating point number", s)));
         }
 
-        // Check for sign to determine if we need signed integers
         let is_negative = s.starts_with('-');
 
         if is_negative {
-            // Try signed integers in ascending size order
             if let Ok(value) = parser::<i8>().parse(s) {
                 return Ok(AutoNumber::I8(value));
             }
@@ -494,7 +417,6 @@ impl AutoNumberParser {
 
             Err(ParseNumberError::Overflow)
         } else {
-            // Try unsigned integers in ascending size order
             if let Ok(value) = parser::<u8>().parse(s) {
                 return Ok(AutoNumber::U8(value));
             }
@@ -519,21 +441,17 @@ impl AutoNumberParser {
         }
     }
 
-    /// Parse a string with a specific radix and automatically determine the best numeric type
     pub fn parse_radix(&self, s: &str, radix: u8) -> Result<AutoNumber, ParseNumberError> {
         let s = s.trim();
         if s.is_empty() {
             return Err(ParseNumberError::EmptyString);
         }
 
-        // Check if we have a floating point value
         if s.contains('.') {
-            // Try f32 first
             if let Ok(value) = parser::<f32>().parse_radix(s, radix) {
                 return Ok(AutoNumber::F32(value));
             }
 
-            // If f32 fails or overflows, try f64
             if let Ok(value) = parser::<f64>().parse_radix(s, radix) {
                 return Ok(AutoNumber::F64(value));
             }
@@ -541,11 +459,9 @@ impl AutoNumberParser {
             return Err(ParseNumberError::InvalidFormat(format!("Could not parse '{}' as a floating point number", s)));
         }
 
-        // Check for sign to determine if we need signed integers
         let is_negative = s.starts_with('-');
 
         if is_negative {
-            // Try signed integers in ascending size order
             if let Ok(value) = parser::<i8>().parse_radix(s, radix) {
                 return Ok(AutoNumber::I8(value));
             }
@@ -568,7 +484,6 @@ impl AutoNumberParser {
 
             Err(ParseNumberError::Overflow)
         } else {
-            // Try unsigned integers in ascending size order
             if let Ok(value) = parser::<u8>().parse_radix(s, radix) {
                 return Ok(AutoNumber::U8(value));
             }
@@ -594,7 +509,6 @@ impl AutoNumberParser {
     }
 }
 
-/// Helper function to create an auto-detecting parser
 pub fn auto_parser() -> AutoNumberParser {
     AutoNumberParser::new()
 }
@@ -670,31 +584,26 @@ mod tests {
         let parser = parser::<f64>();
         assert_eq!(parser.parse("123.456"), Ok(123.456));
         assert_eq!(parser.parse("-123.456"), Ok(-123.456));
-        assert_eq!(parser.parse_radix("A.B", 16), Ok(10.6875));  // 10 + 11/16
+        assert_eq!(parser.parse_radix("A.B", 16), Ok(10.6875));  
     }
 
     #[test]
     fn test_auto_parser() {
         let parser = auto_parser();
 
-        // Test unsigned integer auto-detection
         assert!(matches!(parser.parse("42"), Ok(AutoNumber::U8(42))));
         assert!(matches!(parser.parse("256"), Ok(AutoNumber::U16(256))));
         assert!(matches!(parser.parse("65536"), Ok(AutoNumber::U32(_))));
 
-        // Test signed integer auto-detection
         assert!(matches!(parser.parse("-42"), Ok(AutoNumber::I8(-42))));
         assert!(matches!(parser.parse("-129"), Ok(AutoNumber::I16(-129))));
         assert!(matches!(parser.parse("-32769"), Ok(AutoNumber::I32(_))));
 
-        // Test float auto-detection
         assert!(matches!(parser.parse("3.14"), Ok(AutoNumber::F32(_))));
         assert!(matches!(parser.parse("1.23e-2"), Ok(AutoNumber::F32(_))));
 
-        // Test very large float (should be F64)
         assert!(matches!(parser.parse("1.23e38"), Ok(AutoNumber::F64(_))));
 
-        // Test custom radix
         assert!(matches!(parser.parse_radix("FF", 16), Ok(AutoNumber::U8(255))));
         assert!(matches!(parser.parse_radix("FFFF", 16), Ok(AutoNumber::U16(65535))));
     }
@@ -719,16 +628,14 @@ mod tests {
 
         let int_value = parser.parse("42").unwrap();
         let float_value = parser.parse("3.14").unwrap();
-        let large_value = parser.parse("9223372036854775808").unwrap(); // 2^63, too large for i64
+        let large_value = parser.parse("9223372036854775808").unwrap(); 
 
-        // Test as_int()
         assert_eq!(int_value.as_int(), Ok(42));
         assert!(matches!(float_value.as_int(), Err(ParseNumberError::TypeError(_))));
         assert!(matches!(large_value.as_int(), Err(ParseNumberError::Overflow)));
 
-        // Test as_float()
         assert_eq!(int_value.as_float(), Ok(42.0));
         assert_eq!(float_value.as_float().unwrap(), 3.14);
-        assert!(matches!(parser.parse("9007199254740993").unwrap().as_float(), Ok(_))); // 2^53 + 1, might lose precision
+        assert!(matches!(parser.parse("9007199254740993").unwrap().as_float(), Ok(_))); 
     }
 }

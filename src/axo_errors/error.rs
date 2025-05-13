@@ -86,7 +86,7 @@ impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<
                 } else { line_length };
 
                 let caret_count = if start_col <= end_col {
-                    end_col.saturating_sub(start_col) + 1
+                    end_col.saturating_sub(start_col)
                 } else {
                     1
                 };

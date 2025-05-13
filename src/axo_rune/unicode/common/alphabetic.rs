@@ -1,4 +1,3 @@
-//! Unicode *Alphabetic* Character Property.
 
 use {
     crate::{
@@ -8,10 +7,6 @@ use {
 };
 
 char_property! {
-    /// Represents values of the Unicode character property
-    /// [*Alphabetic*](https://www.unicode.org/reports/tr44/#Alphabetic).
-    ///
-    /// The value is `true` for characters that change when lowercased, `false` otherwise.
     pub struct Alphabetic(bool) {
         abbr => "Alpha";
         long => "Alphabetic";
@@ -20,7 +15,6 @@ char_property! {
         data_table_path => "tables/alphabetic.rsv";
     }
 
-    /// Return `true` for Alphabetic characters, `false` otherwise.
     pub fn is_alphabetic(char) -> bool;
 }
 
@@ -30,7 +24,6 @@ mod tests {
     fn test_values() {
         use super::is_alphabetic;
 
-        // ASCII
         assert_eq!(is_alphabetic('\u{0020}'), false);
         assert_eq!(is_alphabetic('\u{0021}'), false);
         assert_eq!(is_alphabetic('\u{0022}'), false);
@@ -50,7 +43,6 @@ mod tests {
         assert_eq!(is_alphabetic('\u{007e}'), false);
         assert_eq!(is_alphabetic('\u{007f}'), false);
 
-        // Other BMP
         assert_eq!(is_alphabetic('\u{061b}'), false);
         assert_eq!(is_alphabetic('\u{061c}'), false);
         assert_eq!(is_alphabetic('\u{061d}'), false);
@@ -65,7 +57,6 @@ mod tests {
         assert_eq!(is_alphabetic('\u{202e}'), false);
         assert_eq!(is_alphabetic('\u{202f}'), false);
 
-        // Other Planes
         assert_eq!(is_alphabetic('\u{10000}'), true);
         assert_eq!(is_alphabetic('\u{10001}'), true);
 
@@ -86,7 +77,6 @@ mod tests {
         assert_eq!(is_alphabetic('\u{efffe}'), false);
         assert_eq!(is_alphabetic('\u{effff}'), false);
 
-        // Private-Use Area
         assert_eq!(is_alphabetic('\u{f0000}'), false);
         assert_eq!(is_alphabetic('\u{f0001}'), false);
         assert_eq!(is_alphabetic('\u{ffffe}'), false);

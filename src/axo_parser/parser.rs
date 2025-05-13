@@ -15,6 +15,7 @@ use {
 
 #[derive(Clone)]
 pub struct Parser {
+    pub index: usize,
     pub input: Vec<Token>,
     pub position: Position,
     pub output: Vec<Element>,
@@ -22,12 +23,12 @@ pub struct Parser {
 }
 
 impl Peekable<Token> for Parser {
-    fn peek(&self) -> Option<&Token> {
-        let mut current = self.position.index;
+    fn peek_ahead(&self, forward: usize) -> Option<&Token> {
+        let mut current = self.index + forward;
 
         while let Some(token) = self.input.get(current) {
             match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
+                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
                     current += 1;
                 }
                 TokenKind::Comment(_) => {
@@ -42,16 +43,24 @@ impl Peekable<Token> for Parser {
         None
     }
 
-    fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = self.position.index + forward;
+    fn peek_behind(&self, n: usize) -> Option<&Token> {
+        let mut current = self.index;
 
-        while let Some(token) = self.input.get(current) {
+        if current < n {
+            return None;
+        }
+        
+        while let Some(token) = self.input.get(current - n) {
+            if current < n {
+                return None;
+            }
+
             match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    current += 1;
+                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
+                    current -= n;
                 }
                 TokenKind::Comment(_) => {
-                    current += 1;
+                    current -= n;
                 }
                 _ => {
                     return Some(token);
@@ -63,12 +72,12 @@ impl Peekable<Token> for Parser {
     }
 
     fn next(&mut self) -> Option<Token> {
-        while self.position.index < self.input.len() {
-            let token = self.input[self.position.index].clone();
-            self.position.index += 1;
+        while self.index < self.input.len() {
+            let token = self.input[self.index].clone();
+            self.index += 1;
 
             match &token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
+                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
                     self.position.line += 1;
                     self.position.column = 0;
                     continue;
@@ -94,7 +103,7 @@ impl Peekable<Token> for Parser {
     }
 
     fn set_index(&mut self, index: usize) {
-        self.position.index = index
+        self.index = index
     }
 
     fn set_line(&mut self, line: usize) {
@@ -114,6 +123,7 @@ impl Parser {
     pub fn new(tokens: Vec<Token>, file: Path) -> Self {
         Parser {
             input: tokens,
+            index: 0,
             position: Position::new(file),
             output: Vec::new(),
             errors: Vec::new(),
@@ -132,46 +142,31 @@ impl Parser {
     }
     
     pub fn current_span(&self) -> Span {
-        self.point_span(self.position.clone())
+        Span::point(self.position.clone())
     }
     
-    pub fn point_span(&self, point: Position) -> Span {
-        Span {
-            start: point.clone(),
-            end: point,
-        }
-    }
-
     pub fn span(&self, start: Position, end: Position) -> Span {
         Span {
             start,
             end,
         }
     }
-
-    pub fn match_token(&mut self, expected: &TokenKind) -> bool {
-        if let Some(token) = self.input.get(self.position.index) {
-            if token.kind == TokenKind::Punctuation(PunctuationKind::Newline) {
-                self.position.index += 1;
-                self.position.line += 1;
-                self.position.column = 0;
-
-                return false;
-            }
-
-            if &token.kind == expected {
+    
+    pub fn match_token(&mut self, token: &TokenKind) -> bool {
+        if let Some(peek) = self.peek() {
+            if &peek.kind == token {
                 self.next();
-
-                return true;
+                
+                true
+            } else { 
+                false
             }
+        } else {
+            false
         }
-
-        false
     }
 
-    pub fn parse_program(&mut self) -> Vec<Element> {
-        // let start = (0, 0);
-
+    pub fn parse(&mut self) -> Vec<Element> {
         let mut items = Vec::new();
         let mut separator = Option::<PunctuationKind>::None;
 

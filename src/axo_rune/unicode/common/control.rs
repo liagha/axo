@@ -1,8 +1,3 @@
-//! *Control* Character Property, equal to `General_Category = Cc`.
-//!
-//! NOTE: This property is not defined by UCD, but is used commonly enough in Unicode algorithms and
-//! applications to provide an optimized implementation.
-
 use {
     crate::{
         chars,
@@ -11,10 +6,6 @@ use {
 };
 
 char_property! {
-    /// Represents Unicode characters with `General_Category = Cc`.
-    ///
-    /// The value is `true` for characters that have a control (`Cc`) *General_Category*, `false`
-    /// otherwise.
     pub struct Control(bool) {
         abbr => "Control";
         long => "Control";
@@ -23,7 +14,6 @@ char_property! {
         data_table_path => "tables/control.rsv";
     }
 
-    /// Return `true` for control characters, `false` otherwise.
     pub fn is_control(char) -> bool;
 }
 
@@ -33,7 +23,6 @@ mod tests {
     fn test_values() {
         use super::is_control;
 
-        // ASCII
         assert_eq!(is_control('\u{0000}'), true);
         assert_eq!(is_control('\u{0001}'), true);
         assert_eq!(is_control('\u{0002}'), true);
@@ -61,7 +50,6 @@ mod tests {
         assert_eq!(is_control('\u{007e}'), false);
         assert_eq!(is_control('\u{007f}'), true);
 
-        // Other BMP
         assert_eq!(is_control('\u{061b}'), false);
         assert_eq!(is_control('\u{061c}'), false);
         assert_eq!(is_control('\u{061d}'), false);
@@ -76,7 +64,6 @@ mod tests {
         assert_eq!(is_control('\u{202e}'), false);
         assert_eq!(is_control('\u{202f}'), false);
 
-        // Other Planes
         assert_eq!(is_control('\u{10000}'), false);
         assert_eq!(is_control('\u{10001}'), false);
 
@@ -97,7 +84,6 @@ mod tests {
         assert_eq!(is_control('\u{efffe}'), false);
         assert_eq!(is_control('\u{effff}'), false);
 
-        // Private-Use Area
         assert_eq!(is_control('\u{f0000}'), false);
         assert_eq!(is_control('\u{f0001}'), false);
         assert_eq!(is_control('\u{ffffe}'), false);

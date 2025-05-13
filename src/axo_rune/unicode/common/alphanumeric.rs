@@ -1,11 +1,3 @@
-//! *Alphanumeric* Character Property, equal to `General_Category = Nd | Nl | No or Alphabetic =
-//! Yes`.
-//!
-//! This is equivalent to `Alphabetic = true or Numeric = true`.
-//!
-//! NOTE: This property is not defined by UCD, but is used commonly enough in Unicode algorithms and
-//! applications to provide an optimized implementation.
-
 use {
     crate::{
         chars,
@@ -14,12 +6,6 @@ use {
 };
 
 char_property! {
-    /// Represents Unicode characters with `General_Category = Nd | Nl | No`.
-    ///
-    /// This is equivalent to `Alphabetic = true or Numeric = true`.
-    ///
-    /// The value is `true` for characters that are alphabetic or have a numeric *General_Category*,
-    /// `false` otherwise.
     pub struct Alphanumeric(bool) {
         abbr => "Alphanumeric";
         long => "Alphanumeric";
@@ -28,9 +14,6 @@ char_property! {
         data_table_path => "tables/alphanumeric.rsv";
     }
 
-    /// Return `true` for alphanumeric characters, `false` otherwise.
-    ///
-    /// This is equivalent to `is_alphabetic(char) || is_numeric(char)`.
     pub fn is_alphanumeric(char) -> bool;
 }
 
@@ -40,7 +23,6 @@ mod tests {
     fn test_values() {
         use super::is_alphanumeric;
 
-        // ASCII
         assert_eq!(is_alphanumeric('\u{0020}'), false);
         assert_eq!(is_alphanumeric('\u{0021}'), false);
         assert_eq!(is_alphanumeric('\u{0022}'), false);
@@ -60,7 +42,6 @@ mod tests {
         assert_eq!(is_alphanumeric('\u{007e}'), false);
         assert_eq!(is_alphanumeric('\u{007f}'), false);
 
-        // Other BMP
         assert_eq!(is_alphanumeric('\u{061b}'), false);
         assert_eq!(is_alphanumeric('\u{061c}'), false);
         assert_eq!(is_alphanumeric('\u{061d}'), false);
@@ -75,7 +56,6 @@ mod tests {
         assert_eq!(is_alphanumeric('\u{202e}'), false);
         assert_eq!(is_alphanumeric('\u{202f}'), false);
 
-        // Other Planes
         assert_eq!(is_alphanumeric('\u{10000}'), true);
         assert_eq!(is_alphanumeric('\u{10001}'), true);
 
@@ -96,7 +76,6 @@ mod tests {
         assert_eq!(is_alphanumeric('\u{efffe}'), false);
         assert_eq!(is_alphanumeric('\u{effff}'), false);
 
-        // Private-Use Area
         assert_eq!(is_alphanumeric('\u{f0000}'), false);
         assert_eq!(is_alphanumeric('\u{f0001}'), false);
         assert_eq!(is_alphanumeric('\u{ffffe}'), false);

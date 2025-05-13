@@ -20,7 +20,6 @@ use {
 };
 use crate::{Token, TokenKind};
 
-/// Resolver handles symbol resolution throughout the program
 #[derive(Debug)]
 pub struct Resolver {
     pub scope: Scope,
@@ -28,7 +27,6 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    /// Create a new Resolver with an empty root scope
     pub fn new() -> Self {
         Self {
             scope: Scope::new(),
@@ -36,25 +34,21 @@ impl Resolver {
         }
     }
 
-    /// Create a new scope that inherits from the current scope
     pub fn push_scope(&mut self) {
         let parent_scope = core::mem::replace(&mut self.scope, Scope::new());
         self.scope.set_parent(parent_scope);
     }
 
-    /// Pop the current scope and move back to parent scope
     pub fn pop_scope(&mut self) {
         if let Some(parent) = self.scope.take_parent() {
             self.scope = parent;
         }
     }
 
-    /// Insert a symbol into the current scope
     pub fn insert(&mut self, symbol: Item) {
         self.scope.insert(symbol);
     }
 
-    /// Look up a symbol across all visible scopes and validate the result
     pub fn lookup(&mut self, target: &Element) -> Item {
         let target_name = match target.name() {
             Some(name) => name,
@@ -79,31 +73,33 @@ impl Resolver {
         let suggestion = matcher.find_best_match(target, &*candidates);
 
         for candidate in candidates.clone() {
-            println!("all results: \n\tcandidate: {candidate} => score: {:?}", matcher.analyze(target, &candidate).score);
+            println!(
+                "Looked Up `{:?}`:",
+                target, 
+            );
+
+            println!(
+                "\t`{:?}` | Score: {:?}",
+                candidate,
+                matcher.analyze(target, &candidate).score
+            );
+            
+            println!();
         }
 
         if let Some(suggestion) = suggestion {
             let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(suggestion.candidate.to_string());
 
-            {
-                println!("Looked Up {:?} in {}", target, target.span);
-                for candidate in candidates.iter() {
-                    let m = matcher.analyze(target, candidate);
-                    println!("  {:?}: score {}", m.candidate, m.score);
-                }
-                println!();
-            }
+            println!("Best Match: `{:?}` | Score: {}", suggestion.candidate, suggestion.score);
 
-            println!("Best Match: {:?} | Score: {}\n", suggestion.candidate, suggestion.score);
-
+            println!();
+            
             self.validate(target, &suggestion.candidate);
 
-            // If we have an exact match or high confidence, return it
             if suggestion.match_type == MatchType::Exact || suggestion.score >= 0.99 {
                 return suggestion.candidate;
             }
 
-            // If we have a close match, suggest it as a correction
             if suggestion.score > 0.4 {
                 let err = ResolveError {
                     kind: ErrorKind::UndefinedSymbol(target_name.clone(), None),
@@ -141,7 +137,6 @@ impl Resolver {
         }
     }
 
-    /// Add a general error
     pub fn error(&mut self, error: ErrorKind, span: Span) -> Item {
         let error = ResolveError {
             kind: error,
@@ -158,14 +153,12 @@ impl Resolver {
         }
     }
 
-    /// Resolve a list of expressions
     pub fn resolve(&mut self, elements: Vec<Element>) {
         for element in elements {
             self.resolve_expr(element.into());
         }
     }
 
-    /// Resolve a single element
     pub fn resolve_expr(&mut self, element: Box<Element>) {
         let Element { kind, span } = *element.clone();
 

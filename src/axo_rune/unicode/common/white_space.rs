@@ -1,4 +1,3 @@
-//! Unicode `White_Space` Character Property.
 
 use {
     crate::{
@@ -8,10 +7,6 @@ use {
 };
 
 char_property! {
-    /// Represents values of the Unicode character property
-    /// [*White_Space*](https://www.unicode.org/reports/tr44/#White_Space).
-    ///
-    /// The value is `true` for characters that change when lowercased, `false` otherwise.
     pub struct WhiteSpace(bool) {
         abbr => "WSpace";
         long => "White_Space";
@@ -20,7 +15,6 @@ char_property! {
         data_table_path => "tables/white_space.rsv";
     }
 
-    /// Return `true` for white-space characters, `false` otherwise.
     pub fn is_white_space(char) -> bool;
 }
 
@@ -30,7 +24,6 @@ mod tests {
     fn test_values() {
         use super::is_white_space;
 
-        // ASCII
         assert_eq!(is_white_space('\u{0020}'), true);
         assert_eq!(is_white_space('\u{0021}'), false);
         assert_eq!(is_white_space('\u{0022}'), false);
@@ -50,7 +43,6 @@ mod tests {
         assert_eq!(is_white_space('\u{007e}'), false);
         assert_eq!(is_white_space('\u{007f}'), false);
 
-        // Other BMP
         assert_eq!(is_white_space('\u{061b}'), false);
         assert_eq!(is_white_space('\u{061c}'), false);
         assert_eq!(is_white_space('\u{061d}'), false);
@@ -65,7 +57,6 @@ mod tests {
         assert_eq!(is_white_space('\u{202e}'), false);
         assert_eq!(is_white_space('\u{202f}'), true);
 
-        // Other Planes
         assert_eq!(is_white_space('\u{10000}'), false);
         assert_eq!(is_white_space('\u{10001}'), false);
 
@@ -86,7 +77,6 @@ mod tests {
         assert_eq!(is_white_space('\u{efffe}'), false);
         assert_eq!(is_white_space('\u{effff}'), false);
 
-        // Private-Use Area
         assert_eq!(is_white_space('\u{f0000}'), false);
         assert_eq!(is_white_space('\u{f0001}'), false);
         assert_eq!(is_white_space('\u{ffffe}'), false);

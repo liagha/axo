@@ -1,60 +1,141 @@
-mod test;
+mod lexer;
 use core::fmt::Debug;
 use crate::arc::Arc;
-use crate::{Lexer, Peekable, Token};
+use crate::{Peekable};
 use crate::axo_span::Span;
-pub use test::*;
 
-pub type TransformFn<Input, Output> = Arc<dyn Fn(Vec<Formed<Input, Output>>, Span) -> Result<Output, Input> + Send + Sync>;
-pub type PredicateFn<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PatternError {
-    OffsetTooFar,
-    InvalidPattern,
-    SequencePartialMatch,
-    NoMatch,
-    LookupFailed,
-    IgnoreFailed,
-    PredicateNotSatisfied,
-    TransformFailed,
-    InvalidResult,
-    MinimumRepeatNotMet(usize, usize),
-    TerminateConditionMet,
-    NegatePatternMatched,
-    UnexpectedCharacter(char, Option<char>),
-    UnexpectedEndOfInput,
-    Custom(String),
-}
+pub type TransformFunction<Input, Output> = Arc<dyn Fn(Vec<Formed<Input, Output>>, Span) -> Result<Output, Input> + Send + Sync>;
+pub type PredicateFunction<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
 
 #[derive(Clone)]
-pub enum Pattern<Input, Output>
+pub enum PatternKind<Input, Output>
 where
     Input: Clone + PartialEq + Debug,
     Output: Clone,
 {
-    Precise(Input),
-    OneOf(Vec<Pattern<Input, Output>>),
+    Literal(Input),
+
+    Alternative(Vec<Pattern<Input, Output>>),
+
     Sequence(Vec<Pattern<Input, Output>>),
+
     Repeat {
         pattern: Box<Pattern<Input, Output>>,
         minimum: usize,
         maximum: Option<usize>,
     },
+
     Optional(Box<Pattern<Input, Output>>),
-    Lookup(Box<Pattern<Input, Output>>),
-    Ignore(Box<Pattern<Input, Output>>),
-    Predicate(PredicateFn<Input>),
-    Transform {
-        pattern: Box<Pattern<Input, Output>>,
-        transform: TransformFn<Input, Output>,
-    },
+
+    Predicate(PredicateFunction<Input>),
+
     Negate(Box<Pattern<Input, Output>>),
-    Any,
+
+    Anything,
+
+    _Marker(core::marker::PhantomData<Output>),
+}
+
+#[derive(Clone)]
+pub enum Action<Input, Output> {
+    Transform(TransformFunction<Input, Output>),
+    None,
+}
+
+#[derive(Clone)]
+pub struct Pattern<Input, Output>
+where
+    Input: Clone + PartialEq + Debug,
+    Output: Clone,
+{
+    kind: PatternKind<Input, Output>,
+    action: Action<Input, Output>,
+}
+
+impl<Input: Clone + Debug + PartialEq, Output: Clone> Pattern<Input, Output> {
+    pub fn literal(value: Input) -> Self {
+        Self {
+            kind: PatternKind::Literal(value),
+            action: Action::None,
+        }
+    }
+
+    pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output>>>) -> Self {
+        Self {
+            kind: PatternKind::Alternative(patterns.into()),
+            action: Action::None,
+        }
+    }
+
+    pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output>>>) -> Self {
+        Self {
+            kind: PatternKind::Sequence(patterns.into()),
+            action: Action::None,
+        }
+    }
+
+    pub fn repeat(
+        pattern: Box<Pattern<Input, Output>>,
+        minimum: usize,
+        maximum: Option<usize>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Repeat {
+                pattern,
+                minimum,
+                maximum,
+            },
+            action: Action::None,
+        }
+    }
+
+    pub fn optional(pattern: Box<Pattern<Input, Output>>) -> Self {
+        Self {
+            kind: PatternKind::Optional(pattern),
+            action: Action::None,
+        }
+    }
+
+    pub fn predicate(predicate: PredicateFunction<Input>) -> Self {
+        Self {
+            kind: PatternKind::Predicate(predicate),
+            action: Action::None,
+        }
+    }
+
+    pub fn negate(pattern: Box<Pattern<Input, Output>>) -> Self {
+        Self {
+            kind: PatternKind::Negate(pattern),
+            action: Action::None,
+        }
+    }
+
+    pub fn anything() -> Self {
+        Self {
+            kind: PatternKind::Anything,
+            action: Action::None,
+        }
+    }
+
+    pub fn transform(
+        pattern: Box<Pattern<Input, Output>>,
+        transform: TransformFunction<Input, Output>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Sequence(vec![*pattern]),
+            action: Action::Transform(transform),
+        }
+    }
+
+    pub fn with_action(mut self, action: Action<Input, Output>) -> Self {
+        self.action = action;
+        self
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Form<Input, Output> {
+    Empty,
     Raw(Input),
     Single(Output),
     Multiple(Vec<Formed<Input, Output>>),
@@ -62,16 +143,16 @@ pub enum Form<Input, Output> {
 
 #[derive(Clone, Debug)]
 pub struct Formed<Input, Output> {
-    form: Form<Input, Output>,
-    span: Span,
+    pub form: Form<Input, Output>,
+    pub span: Span,
 }
 
-pub trait Former<Input: Clone + Debug + PartialEq, Output: Clone, Error>: Peekable<Input> {
+pub trait Former<Input: Clone + Debug + PartialEq, Output: Clone>: Peekable<Input> {
     fn matches(&self, pattern: &Pattern<Input, Output>, offset: usize) -> (bool, usize);
     fn form(
         &mut self,
         pattern: Pattern<Input, Output>,
-    ) -> Result<Formed<Input, Output>, Error>;
+    ) -> Formed<Input, Output>;
 }
 
 impl<Input, Output> Formed<Input, Output> {
@@ -80,17 +161,22 @@ impl<Input, Output> Formed<Input, Output> {
     }
 }
 
-impl Former<char, Token, PatternError> for Lexer {
-    fn matches(&self, pattern: &Pattern<char, Token>, offset: usize) -> (bool, usize) {
-        match pattern {
-            Pattern::Precise(expect) => {
+impl<Matcher, Input, Output> Former<Input, Output> for Matcher
+where
+    Matcher: Peekable<Input>,
+    Input: Debug + PartialEq + Clone,
+    Output: Debug + Clone,
+{
+    fn matches(&self, pattern: &Pattern<Input, Output>, offset: usize) -> (bool, usize) {
+        match &pattern.kind {
+            PatternKind::Literal(expect) => {
                 if let Some(c) = self.peek_ahead(offset) {
                     (c == expect, offset + 1)
                 } else {
                     (false, offset)
                 }
             }
-            Pattern::OneOf(patterns) => {
+            PatternKind::Alternative(patterns) => {
                 for pattern in patterns {
                     let (matches, new_offset) = self.matches(pattern, offset);
                     if matches {
@@ -99,27 +185,34 @@ impl Former<char, Token, PatternError> for Lexer {
                 }
                 (false, offset)
             }
-            Pattern::Sequence(sequence) => {
+            PatternKind::Sequence(sequence) => {
                 let mut sequence_offset = offset;
+
                 for pattern in sequence.iter() {
                     let (matches, pattern_offset) = self.matches(pattern, sequence_offset);
+
                     if matches {
                         sequence_offset = pattern_offset;
                     } else {
                         return (false, offset);
                     }
                 }
+
                 (true, sequence_offset)
             }
 
-            Pattern::Repeat { pattern, minimum, maximum } => {
+            PatternKind::Repeat { pattern, minimum, maximum } => {
                 let mut current_offset = offset;
                 let mut count = 0;
 
-                while let Some(_) = self.peek() {
+                while let Some(_) = self.peek_ahead(current_offset) {
                     let (matches, new_offset) = self.matches(pattern, current_offset);
 
                     if matches {
+                        if current_offset == new_offset {
+                            break;
+                        }
+
                         count += 1;
                         current_offset = new_offset;
 
@@ -136,21 +229,13 @@ impl Former<char, Token, PatternError> for Lexer {
                 (count >= *minimum, current_offset)
             }
 
-            Pattern::Optional(pattern) => {
+            PatternKind::Optional(pattern) => {
                 let (matches, new_offset) = self.matches(pattern, offset);
 
                 (true, if matches { new_offset } else { offset })
             }
 
-            Pattern::Lookup(pattern) => {
-                let (matches, _) = self.matches(pattern, offset);
-                (matches, offset)
-            }
-            Pattern::Ignore(pattern) => {
-                let (matches, _) = self.matches(pattern, offset);
-                (matches, offset)
-            }
-            Pattern::Predicate(predicate_fn) => {
+            PatternKind::Predicate(predicate_fn) => {
                 if let Some(c) = self.peek_ahead(offset) {
                     let result = predicate_fn(&c);
                     (result, if result { offset + 1 } else { offset })
@@ -158,74 +243,68 @@ impl Former<char, Token, PatternError> for Lexer {
                     (false, offset)
                 }
             }
-            Pattern::Transform { pattern, .. } => self.matches(pattern, offset),
-            Pattern::Negate(pattern) => {
+
+            PatternKind::Negate(pattern) => {
                 let (matches, _) = self.matches(pattern, offset);
-                (!matches, offset)
+
+                (!matches, if !matches && self.peek_ahead(offset).is_some() { offset + 1 } else { offset })
             }
-            Pattern::Any => {
+
+            PatternKind::Anything => {
                 if self.peek_ahead(offset).is_some() {
                     (true, offset + 1)
                 } else {
                     (false, offset)
                 }
             }
+
+            PatternKind::_Marker(_) => {
+                (false, offset)
+            }
         }
     }
 
     fn form(
         &mut self,
-        pattern: Pattern<char, Token>,
-    ) -> Result<Formed<char, Token>, PatternError> {
+        pattern: Pattern<Input, Output>,
+    ) -> Formed<Input, Output> {
         let (matches, _) = self.matches(&pattern, 0);
 
         if matches {
-            match pattern {
-                Pattern::Precise(c) => {
+            let start = self.position();
+            let formed = match &pattern.kind {
+                PatternKind::Literal(c) => {
                     self.next();
-
-                    Ok(Formed::new(Form::Raw(c), Span::default()))
+                    Formed::new(Form::Raw(c.clone()), Span::new(start.clone(), self.position()))
                 }
 
-                Pattern::OneOf(patterns) => {
-                    for pattern in patterns {
-                        if self.matches(&pattern, 0).0 {
-                            return self.form(pattern)
-                        } else {
-                            continue;
+                PatternKind::Alternative(patterns) => {
+                    for subpattern in patterns {
+                        if self.matches(subpattern, 0).0 {
+                            return self.form(subpattern.clone());
                         }
                     }
-
-                    Err(PatternError::NoMatch)
+                    Formed::new(Form::Empty, Span::point(self.position()))
                 }
 
-                Pattern::Sequence(sequence) => {
+                PatternKind::Sequence(sequence) => {
                     let mut formed_sequence = Vec::new();
-
-                    for pattern in sequence {
-                        let formed = self.form(pattern)?;
-
+                    for subpattern in sequence {
+                        let formed = self.form(subpattern.clone());
                         formed_sequence.push(formed);
                     }
-
-                    Ok(Formed::new(Form::Multiple(formed_sequence), Span::default()))
+                    Formed::new(Form::Multiple(formed_sequence), Span::new(start.clone(), self.position()))
                 }
 
-                Pattern::Repeat {
-                    pattern,
-                    minimum,
-                    maximum
-                } => {
+                PatternKind::Repeat { pattern: subpattern, maximum, .. } => {
                     let mut formed_repeat = Vec::new();
-
                     loop {
-                        if self.matches(&pattern, 0).0 {
-                            let formed = self.form(*pattern.clone())?;
-
+                        if self.matches(subpattern, 0).0 {
+                            let formed = self.form((**subpattern).clone());
                             formed_repeat.push(formed);
 
                             if let Some(max) = maximum {
-                                if formed_repeat.len() >= max {
+                                if formed_repeat.len() >= *max {
                                     break;
                                 }
                             }
@@ -233,93 +312,85 @@ impl Former<char, Token, PatternError> for Lexer {
                             break;
                         }
                     }
-
-                    if formed_repeat.len() < minimum {
-                        return Err(PatternError::MinimumRepeatNotMet(minimum, formed_repeat.len()));
-                    }
-
-                    Ok(Formed::new(Form::Multiple(formed_repeat), Span::default()))
+                    Formed::new(Form::Multiple(formed_repeat), Span::new(start.clone(), self.position()))
                 }
 
-                Pattern::Optional(pattern) => {
-                    if self.matches(&pattern, 0).0 {
-                        self.form(*pattern)
+                PatternKind::Optional(subpattern) => {
+                    if self.matches(subpattern, 0).0 {
+                        self.form((**subpattern).clone())
                     } else {
-                        Ok(Formed::new(Form::Multiple(Vec::new()), Span::default()))
+                        Formed::new(Form::Multiple(Vec::new()), Span::new(start.clone(), self.position()))
                     }
                 }
 
-                Pattern::Lookup(pattern) => {
-                    if self.matches(&pattern, 0).0 {
-                        Ok(Formed::new(Form::Multiple(Vec::new()), Span::default()))
-                    } else {
-                        Err(PatternError::LookupFailed)
-                    }
-                }
-
-                Pattern::Ignore(pattern) => {
-                    if self.matches(&pattern, 0).0 {
-                        self.form(*pattern)?;
-                        Ok(Formed::new(Form::Multiple(Vec::new()), Span::default()))
-                    } else {
-                        Err(PatternError::IgnoreFailed)
-                    }
-                }
-
-                Pattern::Predicate(predicate) => {
+                PatternKind::Predicate(predicate) => {
                     if let Some(c) = self.peek() {
                         if predicate(&c) {
                             let character = self.next().unwrap();
-                            Ok(Formed::new(Form::Raw(character), Span::default()))
+                            Formed::new(Form::Raw(character), Span::new(start.clone(), self.position()))
                         } else {
-                            Err(PatternError::PredicateNotSatisfied)
+                            Formed::new(Form::Empty, Span::point(start.clone()))
                         }
                     } else {
-                        Err(PatternError::UnexpectedEndOfInput)
+                        Formed::new(Form::Empty, Span::point(start.clone()))
                     }
                 }
 
-                Pattern::Transform { pattern, transform } => {
-                    let formed = self.form(*pattern)?;
+                PatternKind::Negate(subpattern) => {
+                    if !self.matches(subpattern, 0).0 {
+                        if let Some(c) = self.next() {
+                            Formed::new(Form::Raw(c), Span::new(start.clone(), self.position()))
+                        } else {
+                            Formed::new(Form::Empty, Span::point(self.position()))
+                        }
+                    } else {
+                        Formed::new(Form::Empty, Span::point(start.clone()))
+                    }
+                }
+
+                PatternKind::Anything => {
+                    if let Some(c) = self.next() {
+                        Formed::new(Form::Raw(c), Span::new(start.clone(), self.position()))
+                    } else {
+                        Formed::new(Form::Empty, Span::point(self.position()))
+                    }
+                }
+
+                PatternKind::_Marker(_) => {
+                    Formed::new(Form::Empty, Span::point(self.position()))
+                }
+            };
+
+            match pattern.action {
+                Action::Transform(transform) => {
+                    let end = self.position();
+                    let span = Span::new(start, end);
 
                     match formed.form {
-                        Form::Raw(_) | Form::Single(_) => {
-                            match transform(vec![formed], Span::default()) {
-                                Ok(token) => Ok(Formed::new(Form::Single(token), Span::default())),
-                                Err(_) => Err(PatternError::TransformFailed)
+                        Form::Empty => {
+                            match transform(vec![], span.clone()) {
+                                Ok(token) => Formed::new(Form::Single(token), span),
+                                Err(_) => Formed::new(Form::Empty, Span::point(self.position()))
                             }
-                        },
-                        Form::Multiple(items) => {
-                            match transform(items, Span::default()) {
-                                Ok(token) => Ok(Formed::new(Form::Single(token), Span::default())),
-                                Err(_) => Err(PatternError::TransformFailed)
-                            }
-                        },
-                    }
-                }
-
-                Pattern::Negate(pattern) => {
-                    if !self.matches(&pattern, 0).0 {
-                        if let Some(c) = self.next() {
-                            Ok(Formed::new(Form::Raw(c), Span::default()))
-                        } else {
-                            Err(PatternError::UnexpectedEndOfInput)
                         }
-                    } else {
-                        Err(PatternError::NegatePatternMatched)
+                        Form::Raw(_) | Form::Single(_) => {
+                            match transform(vec![formed], span.clone()) {
+                                Ok(token) => Formed::new(Form::Single(token), span),
+                                Err(_) => Formed::new(Form::Empty, Span::point(self.position()))
+                            }
+                        }
+                        Form::Multiple(items) => {
+                            match transform(items, span.clone()) {
+                                Ok(token) => Formed::new(Form::Single(token), span),
+                                Err(_) => Formed::new(Form::Empty, Span::point(self.position()))
+                            }
+                        }
                     }
                 }
-
-                Pattern::Any => {
-                    if let Some(c) = self.next() {
-                        Ok(Formed::new(Form::Raw(c), Span::default()))
-                    } else {
-                        Err(PatternError::UnexpectedEndOfInput)
-                    }
-                }
+                Action::None => formed
             }
         } else {
-            Err(PatternError::NoMatch)
+            Formed::new(Form::Empty, Span::point(self.position()))
         }
     }
 }

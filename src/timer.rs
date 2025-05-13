@@ -2,7 +2,6 @@
 
 use core::arch::asm;
 
-// Custom error type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerError {
     AlreadyRunning,
@@ -11,16 +10,13 @@ pub enum TimerError {
     Overflow,
 }
 
-// Result type alias
 pub type TimerResult<T> = Result<T, TimerError>;
 
-// TimeSource trait for different time providers
 pub trait TimeSource {
     fn now(&self) -> u64;
-    fn resolution(&self) -> u64; // Ticks per second
+    fn resolution(&self) -> u64; 
 }
 
-// Architecture-specific time source implementations
 #[cfg(target_arch = "x86_64")]
 pub struct CPUCycleSource;
 
@@ -48,7 +44,6 @@ impl TimeSource for CPUCycleSource {
     }
 
     fn resolution(&self) -> u64 {
-        // Approximation for 1 GHz CPU; should be calibrated for real use
         1_000_000_000
     }
 }
@@ -79,7 +74,6 @@ impl TimeSource for ARMGenericTimerSource {
     }
 
     fn resolution(&self) -> u64 {
-        // Read the counter frequency (CNTFRQ_EL0)
         let freq: u64;
         unsafe {
             asm!("mrs {}, cntfrq_el0", out(reg) freq, options(nostack, nomem));
@@ -114,12 +108,10 @@ impl TimeSource for RISCVCycleSource {
     }
 
     fn resolution(&self) -> u64 {
-        // RISC-V typically requires calibration; using 1 MHz as a placeholder
         1_000_000
     }
 }
 
-// Fallback for unsupported architectures
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
 pub struct DummyTimeSource;
 
@@ -133,7 +125,6 @@ impl DummyTimeSource {
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
 impl TimeSource for DummyTimeSource {
     fn now(&self) -> u64 {
-        // Return 0 for unsupported architectures (requires external time source)
         0
     }
 
@@ -142,7 +133,6 @@ impl TimeSource for DummyTimeSource {
     }
 }
 
-// Timer states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerState {
     Stopped,
@@ -150,14 +140,13 @@ pub enum TimerState {
     Paused,
 }
 
-// Timer with configurable time source
 pub struct Timer<T: TimeSource> {
     time_source: T,
     state: TimerState,
     start_time: u64,
     elapsed_before_pause: u64,
     duration: Option<u64>,
-    laps: [u64; 32], // Store up to 32 lap times
+    laps: [u64; 32], 
     lap_count: usize,
 }
 
@@ -324,7 +313,6 @@ impl<T: TimeSource> Timer<T> {
     }
 }
 
-// Callback system
 pub trait TimerCallback {
     fn on_tick(&mut self, elapsed: u64, remaining: Option<u64>);
     fn on_complete(&mut self);
@@ -381,7 +369,6 @@ impl<T: TimeSource, C: TimerCallback> CallbackTimer<T, C> {
     }
 }
 
-// Countdown timer
 pub struct CountdownTimer<T: TimeSource> {
     timer: Timer<T>,
 }

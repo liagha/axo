@@ -1,83 +1,5 @@
-/// Macro for declaring a character property.
-///
-/// # Syntax (Enumerated Property)
-///
-/// ```
-/// #[macro_use]
-/// extern crate unic_char_property;
-///
-/// // First we define the type itself.
-/// char_property! {
-///     /// This is the enum type created for the character property.
-///     pub enum MyProp {
-///         abbr => "AbbrPropName";
-///         long => "Long_Property_Name";
-///         human => "Human-Readable Property Name";
-///
-///         /// Zero or more documentation or other attributes.
-///         RustName {
-///             abbr => AbbrName,
-///             long => Long_Name,
-///             human => "&'static str that is a nicer presentation of the name",
-///         }
-///     }
-///
-///     /// Module aliasing property value abbreviated names.
-///     pub mod abbr_names for abbr;
-///
-///     /// Module aliasing property value long names.
-///     pub mod long_names for long;
-/// }
-///
-/// // We also need to impl `PartialCharProperty` or `TotalCharProperty` manually.
-/// # impl unic_char_property::PartialCharProperty for MyProp {
-/// #     fn of(_: char) -> Option<Self> { None }
-/// # }
-/// #
-/// # fn main() {}
-/// ```
-///
-/// # Syntax (Binary Property)
-///
-/// ```
-/// #[macro_use] extern crate unic_char_property;
-/// # #[macro_use] extern crate unic_char_range;
-///
-/// char_property! {
-///     /// This is the newtype used for the character property.
-///     pub struct MyProp(bool) {
-///         abbr => "AbbrPropName";
-///         long => "Long_Property_Name";
-///         human => "Human-Readable Property Name";
-///
-///         // Unlike an enumerated property, a binary property will handle the table for you.
-///         data_table_path => "../tests/tables/property_table.rsv";
-///     }
-///
-///     /// A function that returns whether the given character has the property or not.
-///     pub fn is_prop(char) -> bool;
-/// }
-///
-/// // You may also want to create a trait for easy access to the properties you define.
-/// # fn main() {}
-/// ```
-///
-/// # Effect
-///
-/// - Implements the `CharProperty` trait and appropriate range trait
-/// - Implements `FromStr` accepting either the abbr or long name, ascii case insensitive
-/// - Implements `Display` using the `human` string
-/// - Populates the module `abbr_names` with `pub use` bindings of variants to their abbr names
-///   (Enumerated properties only)
-/// - Populates the module `long_names` with `pub use` bindings of variants to their long names
-///   (Enumerated properties only)
-/// - Maintains all documentation comments and other `#[attributes]` as would be expected
-///   (with some limitations, listed below)
-///
 #[macro_export]
 macro_rules! char_property {
-
-    // == Enumerated Property == //
 
     (
         $(#[$prop_meta:meta])*
@@ -162,8 +84,6 @@ macro_rules! char_property {
         }
     };
 
-    // == Binary Property == //
-
     (
         $(#[$prop_meta:meta])*
         pub struct $prop_name:ident(bool) {
@@ -188,25 +108,22 @@ macro_rules! char_property {
         }
 
         impl $prop_name {
-            /// Get (struct) property value of the character.
             pub fn of(ch: char) -> Self {
                 use $crate::axo_rune::tables::CharDataTable;
                 const TABLE: CharDataTable<()> = include!($data_path);
                 $prop_name(TABLE.contains(ch))
             }
 
-            /// Get boolean property value of the character.
             pub fn as_bool(&self) -> bool { self.0 }
         }
 
         char_property! {
             __impl FromStr for $prop_name;
-            // Yes
             "y" => $prop_name(true);
             "yes" => $prop_name(true);
             "t" => $prop_name(true);
             "true" => $prop_name(true);
-            // No
+            
             "n" => $prop_name(false);
             "no" => $prop_name(false);
             "f" => $prop_name(false);
@@ -236,8 +153,6 @@ macro_rules! char_property {
             __impl Display for $prop_name by BinaryCharProperty
         }
     };
-
-    // == Shared == //
 
     (
         __impl CharProperty for $prop_name:ident;

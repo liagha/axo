@@ -44,7 +44,6 @@ impl<T: Display> Display for Tree<T> {
     }
 }
 
-// Implement Debug if T is Debug
 impl<T: Debug> Debug for Tree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if let Some(root) = &self.root {
@@ -55,7 +54,6 @@ impl<T: Debug> Debug for Tree<T> {
     }
 }
 
-// Implement Debug if T is Debug
 impl<T: Debug> Debug for BinaryNode<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("BinaryNode")
@@ -66,7 +64,6 @@ impl<T: Debug> Debug for BinaryNode<T> {
     }
 }
 
-// Implement Debug if T is Debug
 impl<T: Debug> Debug for BinaryTree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("BinaryTree")
@@ -75,7 +72,6 @@ impl<T: Debug> Debug for BinaryTree<T> {
     }
 }
 
-// Implement Debug if T is Debug
 impl<T: Ord + Debug> Debug for BstNode<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("BstNode")
@@ -86,7 +82,6 @@ impl<T: Ord + Debug> Debug for BstNode<T> {
     }
 }
 
-// Implement Debug for BinarySearchTree if T is Debug
 impl<T: Ord + Debug> Debug for BinarySearchTree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("BinarySearchTree")
@@ -95,7 +90,6 @@ impl<T: Ord + Debug> Debug for BinarySearchTree<T> {
     }
 }
 
-// Implement Debug if T is Debug
 impl<T: Ord + Debug> Debug for AvlNode<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("AvlNode")
@@ -107,7 +101,6 @@ impl<T: Ord + Debug> Debug for AvlNode<T> {
     }
 }
 
-// Implement Debug for AvlTree if T is Debug
 impl<T: Ord + Debug> Debug for AvlTree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("AvlTree")

@@ -1,11 +1,6 @@
-//! Character data tables used in UNIC.
-
 use crate::axo_rune::CharRange;
 use crate::chars;
 
-/// A mapping from characters to some associated data.
-///
-/// For the set case, use `()` as the associated value.
 #[derive(Copy, Clone, Debug)]
 pub enum CharDataTable<V: 'static> {
     #[doc(hidden)]
@@ -21,7 +16,6 @@ impl<V> Default for CharDataTable<V> {
 }
 
 impl<V> CharDataTable<V> {
-    /// Does this table contain a mapping for a character?
     pub fn contains(&self, needle: char) -> bool {
         match *self {
             CharDataTable::Direct(table) => {
@@ -35,7 +29,6 @@ impl<V> CharDataTable<V> {
 }
 
 impl<V: Copy> CharDataTable<V> {
-    /// Find the associated data for a character in this table.
     pub fn find(&self, needle: char) -> Option<V> {
         match *self {
             CharDataTable::Direct(table) => table
@@ -49,7 +42,6 @@ impl<V: Copy> CharDataTable<V> {
         }
     }
 
-    /// Find the range and the associated data for a character in the range table.
     pub fn find_with_range(&self, needle: char) -> Option<(CharRange, V)> {
         match *self {
             CharDataTable::Direct(_) => None,
@@ -62,13 +54,11 @@ impl<V: Copy> CharDataTable<V> {
 }
 
 impl<V: Copy + Default> CharDataTable<V> {
-    /// Find the associated data for a character in this table, or the default value if not entered.
     pub fn find_or_default(&self, needle: char) -> V {
         self.find(needle).unwrap_or_else(Default::default)
     }
 }
 
-/// Iterator for `CharDataTable`. Iterates over pairs `(CharRange, V)`.
 #[derive(Debug)]
 pub struct CharDataTableIter<'a, V: 'static>(&'a CharDataTable<V>, usize);
 
@@ -101,7 +91,6 @@ impl<'a, V: Copy> Iterator for CharDataTableIter<'a, V> {
 }
 
 impl<V> CharDataTable<V> {
-    /// Iterate over the entries in this table. Yields pairs `(CharRange, V)`.
     pub fn iter(&self) -> CharDataTableIter<'_, V> {
         CharDataTableIter(self, 0)
     }

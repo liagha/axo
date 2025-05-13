@@ -18,7 +18,7 @@ impl Handler for Lexer {
         let ch = self.next().unwrap();
 
         let mut name = ch.to_string();
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
 
         while let Some(next_ch) = self.peek().cloned() {
             if next_ch.is_alphanumeric() || next_ch == '_' {
@@ -28,7 +28,7 @@ impl Handler for Lexer {
             }
         }
 
-        let end = (self.position.index, self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         match TokenKind::from_str(name.as_str()) {
@@ -42,7 +42,7 @@ impl Handler for Lexer {
     fn handle_comment(&mut self) -> Result<(), LexError> {
         self.next();
 
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
 
         if let Some(next_ch) = self.peek() {
             match next_ch {
@@ -59,7 +59,7 @@ impl Handler for Lexer {
                         self.next();
                     }
 
-                    let end = (self.position.index, self.position.line, self.position.column);
+                    let end = (self.position.line, self.position.column);
                     let span = self.create_span(start, end);
 
                     let comment_string: String = comment.into_iter().collect();
@@ -76,7 +76,7 @@ impl Handler for Lexer {
                         if last_char == '*' && next_ch == '/' {
                             closed = true;
                             if !comment.is_empty() {
-                                comment.pop(); // Remove the last '*'
+                                comment.pop(); 
                             }
                             break;
                         }
@@ -86,7 +86,7 @@ impl Handler for Lexer {
                         last_char = next_ch;
                     }
 
-                    let end = (self.position.index, self.position.line, self.position.column);
+                    let end = (self.position.line, self.position.column);
                     let span = self.create_span(start, end);
 
                     let comment_string: String = comment.into_iter().collect();
@@ -98,14 +98,14 @@ impl Handler for Lexer {
                     }
                 }
                 _ => {
-                    let end = (self.position.index, self.position.line, self.position.column);
+                    let end = (self.position.line, self.position.column);
                     let span = self.create_span(start, end);
 
                     self.push_token(TokenKind::Operator(OperatorKind::Slash), span);
                 }
             }
         } else {
-            let end = (self.position.index, self.position.line, self.position.column);
+            let end = (self.position.line, self.position.column);
             let span = self.create_span(start, end);
 
             self.push_token(TokenKind::Operator(OperatorKind::Slash), span);

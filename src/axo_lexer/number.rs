@@ -23,7 +23,7 @@ impl NumberLexer for Lexer {
 
         let mut number = first.to_string();
 
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
 
         if first == '0' {
             if let Some(prefix) = self.peek() {
@@ -115,7 +115,7 @@ impl NumberLexer for Lexer {
             }
         }
 
-        let end = (self.position.index, self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         match self.lex_number(&number, span.clone()) {

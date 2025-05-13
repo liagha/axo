@@ -1,8 +1,3 @@
-//! *Numeric* Character Property, equal to `General_Category = Nd | Nl | No`.
-//!
-//! NOTE: This property is not defined by UCD, but is used commonly enough in Unicode algorithms and
-//! applications to provide an optimized implementation.
-
 use {
     crate::{
         chars,
@@ -11,10 +6,6 @@ use {
 };
 
 char_property! {
-    /// Represents Unicode characters with `General_Category = Nd | Nl | No`.
-    ///
-    /// The value is `true` for characters that have a numeric *General_Category*, `false`
-    /// otherwise.
     pub struct Numeric(bool) {
         abbr => "Numeric";
         long => "Numeric";
@@ -23,7 +14,6 @@ char_property! {
         data_table_path => "tables/numeric.rsv";
     }
 
-    /// Return `true` for numeric characters, `false` otherwise.
     pub fn is_numeric(char) -> bool;
 }
 
@@ -33,7 +23,6 @@ mod tests {
     fn test_values() {
         use super::is_numeric;
 
-        // ASCII
         assert_eq!(is_numeric('\u{0020}'), false);
         assert_eq!(is_numeric('\u{0021}'), false);
         assert_eq!(is_numeric('\u{0022}'), false);
@@ -53,7 +42,6 @@ mod tests {
         assert_eq!(is_numeric('\u{007e}'), false);
         assert_eq!(is_numeric('\u{007f}'), false);
 
-        // Other BMP
         assert_eq!(is_numeric('\u{061b}'), false);
         assert_eq!(is_numeric('\u{061c}'), false);
         assert_eq!(is_numeric('\u{061d}'), false);
@@ -68,7 +56,6 @@ mod tests {
         assert_eq!(is_numeric('\u{202e}'), false);
         assert_eq!(is_numeric('\u{202f}'), false);
 
-        // Other Planes
         assert_eq!(is_numeric('\u{10000}'), false);
         assert_eq!(is_numeric('\u{10001}'), false);
 
@@ -89,7 +76,6 @@ mod tests {
         assert_eq!(is_numeric('\u{efffe}'), false);
         assert_eq!(is_numeric('\u{effff}'), false);
 
-        // Private-Use Area
         assert_eq!(is_numeric('\u{f0000}'), false);
         assert_eq!(is_numeric('\u{f0001}'), false);
         assert_eq!(is_numeric('\u{ffffe}'), false);

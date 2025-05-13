@@ -19,7 +19,7 @@ impl SymbolLexer for Lexer {
 
         operator.push(ch);
 
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
 
         while let Some(next_ch) = self.peek() {
             if next_ch.is_operator() {
@@ -29,7 +29,7 @@ impl SymbolLexer for Lexer {
             }
         }
 
-        let end = (self.position.index, self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         let operator = operator.iter().collect::<String>().to_operator();
@@ -40,15 +40,15 @@ impl SymbolLexer for Lexer {
     fn handle_punctuation(&mut self) {
         let ch = self.next().unwrap();
 
-        let start = (self.position.index, self.position.line, self.position.column);
-        let end = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
+        let end = (self.position.line, self.position.column);
         let span = self.create_span(start, end);
 
         self.push_token(TokenKind::Punctuation(ch.to_punctuation()), span);
     }
 
     fn handle_escape(&mut self, is_string: bool) -> Result<char, LexError> {
-        let start = (self.position.index, self.position.line, self.position.column);
+        let start = (self.position.line, self.position.column);
 
         let error_type = if is_string {
             |err| ErrorKind::StringParseError(err)
@@ -79,7 +79,7 @@ impl SymbolLexer for Lexer {
                         }
                     }
 
-                    let end = (self.position.index, self.position.line, self.position.column);
+                    let end = (self.position.line, self.position.column);
 
                     if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
                         if let Some(ch) = core::char::from_u32(hex_value) {
@@ -114,7 +114,7 @@ impl SymbolLexer for Lexer {
                             }
                         }
 
-                        let end = (self.position.index, self.position.line, self.position.column);
+                        let end = (self.position.line, self.position.column);
 
                         if !closed_brace {
                             return Err(LexError::new(error_type(CharParseError::UnterminatedEscapeSequence), self.create_span(start, end)));
@@ -130,7 +130,7 @@ impl SymbolLexer for Lexer {
                             Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                         }
                     } else {
-                        let end = (self.position.index, self.position.line, self.position.column);
+                        let end = (self.position.line, self.position.column);
 
                         Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
                     }
@@ -138,7 +138,7 @@ impl SymbolLexer for Lexer {
                 _ => Ok(next_ch),
             }
         } else {
-            let end = (self.position.index, self.position.line, self.position.column);
+            let end = (self.position.line, self.position.column);
 
             Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
         }

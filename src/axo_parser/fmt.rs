@@ -18,8 +18,16 @@ impl Display for ItemKind {
             ItemKind::Use(element) => write!(f, "use {}", element),
             ItemKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
             ItemKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
-            ItemKind::Variable { target, value, .. } => {
-                write!(f, "let {}", target)?;
+            ItemKind::Variable { target, value, mutable, ty } => {
+                if *mutable {
+                    write!(f, "var {}", target)?;
+                } else { 
+                    write!(f, "const {}", target)?;
+                }
+
+                if let Some(ty) = ty {
+                    write!(f, " : {}", ty)?;
+                }
 
                 if let Some(value) = value {
                     write!(f, " = {}", value)?;

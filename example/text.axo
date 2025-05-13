@@ -18,7 +18,7 @@ while (5 + x) {
     x = x + 7;
 }
 
-if  {
+if x > 4 {
     x = x - 10;
 } else {
     x = x + 10;
@@ -150,21 +150,7 @@ fn test x = 4;
 
 (5 + 5) * 5
 
-1..20
-200..500..333
-33
-..
-55;
-
--3;
-
-i       ++;
-
-x...
-
-.5
-
-"test"(x: string, y: i32...)
+"test"(x: string, y: i32)
 
 fn test(x, ...) {
     fn test_inside(y) y + 4
@@ -174,16 +160,6 @@ fn test(x, ...) {
 
 if 4 + x {
     x - 4;
-}
-
-var "test" { test : ss, x: i32 } = x;
-
-if x > test {
-}
-
-"StringStruct" { x }
-
-if (Test5 { x }) {
 }
 
 x -> y
