@@ -530,8 +530,8 @@ pub fn pattern() -> Pattern<char, Token> {
             Pattern::alternative([
                 line_comment(),
                 multiline_comment(),
-                number(),
                 identifier(),
+                number(),
                 quoted_string(),
                 backtick_string(),
                 character(),

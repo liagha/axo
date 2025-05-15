@@ -17,8 +17,14 @@ pub use {
     axo_fmt::*,
     axo_data::{*, peekable::*},
     broccli::{xprintln, Color, TextStyle},
-    timer::{Timer, TimeSource, CPUCycleSource},
+    timer::{Timer, TimeSource},
 };
+
+#[cfg(target_arch = "x86_64")]
+pub const TimerSource : timer::CPUCycleSource = timer::CPUCycleSource;
+
+#[cfg(target_arch = "aarch64")]
+pub const TimerSource : timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub type Path = std::path::PathBuf;
 
@@ -49,7 +55,7 @@ struct Config {
 fn main() {
     println!();
 
-    let main_timer = Timer::new(CPUCycleSource);
+    let main_timer = Timer::new(TimerSource);
     let config = parse_args();
 
     if config.time_report {
@@ -139,7 +145,7 @@ fn process_file(file_path: &Path, config: &Config) {
     );
     xprintln!();
 
-    let file_read_timer = Timer::new(CPUCycleSource);
+    let file_read_timer = Timer::new(TimerSource);
     let content = fs::read_to_string(file_path).unwrap_or_else(|e| {
         eprintln!("Failed to read file {}: {}", file_path.display(), e);
         process::exit(1);
@@ -164,7 +170,7 @@ fn process_file(file_path: &Path, config: &Config) {
 }
 
 fn process_lexing(content: &str, file_path: &Path, config: &Config) {
-    let lex_timer = Timer::new(CPUCycleSource);
+    let lex_timer = Timer::new(TimerSource);
     
     let mut lexer = Lexer::new(content.to_string(), file_path.clone());
     
@@ -207,7 +213,7 @@ fn process_lexing(content: &str, file_path: &Path, config: &Config) {
 }
 
 fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
-    let parse_timer = Timer::new(CPUCycleSource);
+    let parse_timer = Timer::new(TimerSource);
     let mut parser = Parser::new(tokens, file_path.clone());
     let elements = parser.parse();
 
@@ -245,7 +251,7 @@ fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
 }
 
 fn process_resolution(elements: Vec<axo_parser::Element>, config: &Config) {
-    let resolver_timer = Timer::new(CPUCycleSource);
+    let resolver_timer = Timer::new(TimerSource);
     let mut resolver = Resolver::new();
     resolver.resolve(elements);
 

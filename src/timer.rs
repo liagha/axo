@@ -12,7 +12,7 @@ pub enum TimerError {
 
 pub type TimerResult<T> = Result<T, TimerError>;
 
-pub trait TimeSource {
+pub trait TimeSource : Sized {
     fn now(&self) -> u64;
     fn resolution(&self) -> u64; 
 }
@@ -150,7 +150,7 @@ pub struct Timer<T: TimeSource> {
     lap_count: usize,
 }
 
-impl<T: TimeSource> Timer<T> {
+impl<T: ?Sized + TimeSource> Timer<T> {
     pub fn new(time_source: T) -> Self {
         let mut timer = Timer {
             time_source,
