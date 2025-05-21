@@ -72,27 +72,33 @@ impl Resolver {
 
         let suggestion = matcher.find_best_match(target, &*candidates);
 
-        for candidate in candidates.clone() {
-            println!(
-                "Looked Up `{:?}`:",
-                target, 
-            );
+        /*{
+            for candidate in candidates.clone() {
+                println!(
+                    "Looked Up `{:?}`:",
+                    target,
+                );
 
-            println!(
-                "\t`{:?}` | Score: {:?}",
-                candidate,
-                matcher.analyze(target, &candidate).score
-            );
-            
-            println!();
-        }
+                println!(
+                    "\t`{:?}` | Score: {:?}",
+                    candidate,
+                    matcher.analyze(target, &candidate).score
+                );
+
+                println!();
+            }
+
+            if let Some(suggestion) = suggestion.clone() {
+                println!("Best Match: `{:?}` | Score: {}", suggestion.candidate, suggestion.score);
+
+                println!();
+            }
+        }*/
 
         if let Some(suggestion) = suggestion {
             let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(suggestion.candidate.to_string());
 
-            println!("Best Match: `{:?}` | Score: {}", suggestion.candidate, suggestion.score);
 
-            println!();
             
             self.validate(target, &suggestion.candidate);
 

@@ -6,6 +6,7 @@ use {
 
 #[derive(Clone)]
 pub enum ErrorKind {
+    Custom(String),
     InvalidChar,
     NumberParse(ParseNumberError),
     CharParseError(CharParseError),
@@ -28,6 +29,10 @@ pub enum CharParseError {
 impl core::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ErrorKind::Custom(err) => {
+                write!(f, "{}", err)
+            }
+            
             ErrorKind::InvalidChar => {
                 write!(f, "invalid character'")
             }

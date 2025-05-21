@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod axo_data;
 mod axo_errors;
 mod axo_fmt;
@@ -21,10 +23,10 @@ pub use {
 };
 
 #[cfg(target_arch = "x86_64")]
-pub const TimerSource : timer::CPUCycleSource = timer::CPUCycleSource;
+pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 
 #[cfg(target_arch = "aarch64")]
-pub const TimerSource : timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
+pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub type Path = std::path::PathBuf;
 
@@ -55,7 +57,7 @@ struct Config {
 fn main() {
     println!();
 
-    let main_timer = Timer::new(TimerSource);
+    let main_timer = Timer::new(TIMERSOURCE);
     let config = parse_args();
 
     if config.time_report {
@@ -145,7 +147,7 @@ fn process_file(file_path: &Path, config: &Config) {
     );
     xprintln!();
 
-    let file_read_timer = Timer::new(TimerSource);
+    let file_read_timer = Timer::new(TIMERSOURCE);
     let content = fs::read_to_string(file_path).unwrap_or_else(|e| {
         eprintln!("Failed to read file {}: {}", file_path.display(), e);
         process::exit(1);
@@ -170,13 +172,25 @@ fn process_file(file_path: &Path, config: &Config) {
 }
 
 fn process_lexing(content: &str, file_path: &Path, config: &Config) {
-    let lex_timer = Timer::new(TimerSource);
+    let lex_timer = Timer::new(TIMERSOURCE);
     
     let mut lexer = Lexer::new(content.to_string(), file_path.clone());
     
-    let tokens = lexer.lex();
+    let (tokens, errors) = lexer.lex();
 
     xprintln!("Tokens:\n{}", indent(&format_tokens(&*tokens)));
+
+    xprintln!();
+
+    for err in errors {
+        let (msg, details) = err.format();
+        xprintln!(
+                "{}\n{}" => Color::Red,
+                msg => Color::Orange,
+                details
+            );
+    }
+
     xprintln!();
 
     /*
@@ -213,7 +227,7 @@ fn process_lexing(content: &str, file_path: &Path, config: &Config) {
 }
 
 fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
-    let parse_timer = Timer::new(TimerSource);
+    let parse_timer = Timer::new(TIMERSOURCE);
     let mut parser = Parser::new(tokens, file_path.clone());
     let elements = parser.parse();
 
@@ -251,7 +265,7 @@ fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
 }
 
 fn process_resolution(elements: Vec<axo_parser::Element>, config: &Config) {
-    let resolver_timer = Timer::new(TimerSource);
+    let resolver_timer = Timer::new(TIMERSOURCE);
     let mut resolver = Resolver::new();
     resolver.resolve(elements);
 
