@@ -12,6 +12,7 @@ use {
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
+    PatternError,
     DanglingElse,
     ExpectedToken(TokenKind),
     InvalidDelimiter,
@@ -32,6 +33,7 @@ pub enum ErrorKind {
 impl core::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            ErrorKind::PatternError => write!(f, "invalid pattern syntax"),
             ErrorKind::ExpectedToken(expected) => {
                 write!(f, "expected token {:?}", expected)
             }

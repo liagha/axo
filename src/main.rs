@@ -229,6 +229,27 @@ fn process_lexing(content: &str, file_path: &Path, config: &Config) {
 fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
     let parse_timer = Timer::new(TIMERSOURCE);
     let mut parser = Parser::new(tokens, file_path.clone());
+    
+    let (test_elements, test_errors) = parser.parse_program();
+
+    let test_ast = test_elements
+        .iter()
+        .map(|element| format!("{:?}", element))
+        .collect::<Vec<String>>()
+        .join("\n");
+    
+    xprintln!("Test Elements:\n{}" => Color::Green, indent(&test_ast));
+    xprintln!();
+
+    for err in test_errors {
+        let (msg, details) = err.format();
+        xprintln!(
+                "{}\n{}" => Color::Red,
+                msg => Color::Orange,
+                details
+            );
+    }
+
     let elements = parser.parse();
 
     if !parser.errors.is_empty() {

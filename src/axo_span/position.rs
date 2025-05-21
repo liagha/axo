@@ -1,6 +1,6 @@
 use crate::Path;
 use crate::fs;
-use std::fmt;
+use core::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
@@ -82,13 +82,13 @@ impl Position {
         }
     }
 
-    pub fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    pub fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         if self.file != other.file {
             return self.file.to_string_lossy().cmp(&other.file.to_string_lossy());
         }
 
         match self.line.cmp(&other.line) {
-            std::cmp::Ordering::Equal => self.column.cmp(&other.column),
+            core::cmp::Ordering::Equal => self.column.cmp(&other.column),
             other => other,
         }
     }
@@ -96,13 +96,13 @@ impl Position {
 
 
 impl PartialOrd for Position {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for Position {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.cmp(other)
     }
 }

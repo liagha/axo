@@ -6,7 +6,7 @@ mod item;
 mod fmt;
 mod delimiter;
 mod traits;
-mod error;
+pub(crate) mod error;
 mod element;
 
 pub use {

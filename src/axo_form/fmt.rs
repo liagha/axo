@@ -1,35 +1,35 @@
 use core::fmt::{Display, Debug, Formatter};
-use crate::axo_form::{Action, Form, Formed, PatternKind};
+use crate::axo_form::{Action, FormKind, Form, PatternKind};
 
-impl<Input, Output, Error> Display for Formed<Input, Output, Error>
+impl<Input, Output, Error> Display for Form<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self.form.clone() {
-            Form::Empty => {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self.kind.clone() {
+            FormKind::Empty => {
                 write!(f, "Empty")
             }
             
-            Form::Raw(raw) => {
+            FormKind::Raw(raw) => {
                 write!(f, "Raw({:?})", raw)
             }
             
-            Form::Single(single) => {
+            FormKind::Single(single) => {
                 write!(f, "Single({:?})", single)
             }
             
-            Form::Multiple(forms) => {
+            FormKind::Multiple(forms) => {
                 write!(f, "Multiple(")?;
                 
-                write!(f, "{:?}", forms.iter().map(|formed| formed.form.clone()).collect::<Vec<_>>())?;
+                write!(f, "{:?}", forms.iter().map(|form| form.kind.clone()).collect::<Vec<_>>())?;
                 
                 write!(f, ")")
             }
             
-            Form::Error(error) => {
+            FormKind::Error(error) => {
                 write!(f, "Error({:?})", error)
             }
         }

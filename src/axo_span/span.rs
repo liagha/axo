@@ -3,8 +3,8 @@
 use crate::Path;
 use crate::axo_span::Spanned;
 use crate::axo_span::position::Position;
-use std::fmt;
-use std::fs;
+use core::fmt;
+use crate::fs;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Span {
@@ -56,8 +56,8 @@ impl Span {
             return false;
         }
 
-        (self.start.cmp(pos) != std::cmp::Ordering::Greater) &&
-            (self.end.cmp(pos) != std::cmp::Ordering::Less)
+        (self.start.cmp(pos) != core::cmp::Ordering::Greater) &&
+            (self.end.cmp(pos) != core::cmp::Ordering::Less)
     }
 
     pub fn contains_span(&self, other: &Span) -> bool {
@@ -84,13 +84,13 @@ impl Span {
             return None;
         }
 
-        let start = if self.start.cmp(&other.start) == std::cmp::Ordering::Less {
+        let start = if self.start.cmp(&other.start) == core::cmp::Ordering::Less {
             self.start.clone()
         } else {
             other.start.clone()
         };
 
-        let end = if self.end.cmp(&other.end) == std::cmp::Ordering::Greater {
+        let end = if self.end.cmp(&other.end) == core::cmp::Ordering::Greater {
             self.end.clone()
         } else {
             other.end.clone()
