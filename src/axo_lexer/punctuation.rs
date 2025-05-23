@@ -4,14 +4,14 @@ pub enum PunctuationKind {
     Tab,
     Newline,
     CarriageReturn,
-    LeftParen,
-    RightParen,
+    LeftParenthesis,
+    RightParenthesis,
     LeftBracket,
     RightBracket,
     LeftBrace,
     RightBrace,
     Comma,
-    Semicolon,
+    SemiColon,
 }
 
 pub trait PunctuationLexer {
@@ -33,14 +33,14 @@ impl PunctuationLexer for str {
             "\t" => PunctuationKind::Tab,
             "\n" => PunctuationKind::Newline,
             "\r" => PunctuationKind::CarriageReturn,
-            "(" => PunctuationKind::LeftParen,
-            ")" => PunctuationKind::RightParen,
+            "(" => PunctuationKind::LeftParenthesis,
+            ")" => PunctuationKind::RightParenthesis,
             "[" => PunctuationKind::LeftBracket,
             "]" => PunctuationKind::RightBracket,
             "{" => PunctuationKind::LeftBrace,
             "}" => PunctuationKind::RightBrace,
             "," => PunctuationKind::Comma,
-            ";" => PunctuationKind::Semicolon,
+            ";" => PunctuationKind::SemiColon,
             _ => unreachable!(),
         }
     }
@@ -60,14 +60,14 @@ impl PunctuationLexer for char {
             '\t' => PunctuationKind::Tab,
             '\n' => PunctuationKind::Newline,
             '\r' => PunctuationKind::CarriageReturn,
-            '(' => PunctuationKind::LeftParen,
-            ')' => PunctuationKind::RightParen,
+            '(' => PunctuationKind::LeftParenthesis,
+            ')' => PunctuationKind::RightParenthesis,
             '[' => PunctuationKind::LeftBracket,
             ']' => PunctuationKind::RightBracket,
             '{' => PunctuationKind::LeftBrace,
             '}' => PunctuationKind::RightBrace,
             ',' => PunctuationKind::Comma,
-            ';' => PunctuationKind::Semicolon,
+            ';' => PunctuationKind::SemiColon,
             _ => unreachable!(),
         }
     }
@@ -80,14 +80,14 @@ impl core::fmt::Display for PunctuationKind {
             PunctuationKind::Tab => "\t",
             PunctuationKind::Newline => "\n",
             PunctuationKind::CarriageReturn => "\r",
-            PunctuationKind::LeftParen => "(",
-            PunctuationKind::RightParen => ")",
+            PunctuationKind::LeftParenthesis => "(",
+            PunctuationKind::RightParenthesis => ")",
             PunctuationKind::LeftBracket => "[",
             PunctuationKind::RightBracket => "]",
             PunctuationKind::LeftBrace => "{",
             PunctuationKind::RightBrace => "}",
             PunctuationKind::Comma => ",",
-            PunctuationKind::Semicolon => ";",
+            PunctuationKind::SemiColon => ";",
         };
         write!(f, "{}", punct_str)
     }

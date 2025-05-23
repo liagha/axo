@@ -190,7 +190,7 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
+        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::SemiColon))
         {
             (None, end)
         } else {
@@ -215,7 +215,7 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
+        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::SemiColon))
         {
             (None, end)
         } else {
@@ -240,7 +240,7 @@ impl ControlFlow for Parser {
             ..
         } = self.next().unwrap();
 
-        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::Semicolon))
+        let (value, end) = if self.match_token(&TokenKind::Punctuation(PunctuationKind::SemiColon))
         {
             (None, end)
         } else {

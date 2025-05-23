@@ -16,7 +16,7 @@ fn extract(form: &FormKind<char, Token, LexError>) -> String {
             }
             result
         }
-        
+
         FormKind::Error(_) => {
             String::new()
         }
@@ -27,8 +27,8 @@ fn line_comment() -> Pattern<char, Token, LexError> {
     Pattern::sequence([
         Pattern::sequence(
             [
-                Pattern::literal('/'),
-                Pattern::literal('/'),
+                Pattern::exact('/'),
+                Pattern::exact('/'),
             ]
         ).with_ignore(),
         Pattern::repeat(
@@ -53,16 +53,16 @@ fn multiline_comment() -> Pattern<char, Token, LexError> {
     Pattern::sequence([
         Pattern::sequence(
             [
-                Pattern::literal('/'),
-                Pattern::literal('*'),
+                Pattern::exact('/'),
+                Pattern::exact('*'),
             ]
         ).with_ignore(),
         Pattern::repeat(
             Pattern::negate(
                 Pattern::sequence(
                     [
-                        Pattern::literal('*'),
-                        Pattern::literal('/'),
+                        Pattern::exact('*'),
+                        Pattern::exact('/'),
                     ]
                 ).with_ignore(),
             ),
@@ -71,8 +71,8 @@ fn multiline_comment() -> Pattern<char, Token, LexError> {
         ),
         Pattern::sequence(
             [
-                Pattern::literal('*'),
-                Pattern::literal('/'),
+                Pattern::exact('*'),
+                Pattern::exact('/'),
             ]
         ).with_ignore(),
     ]).with_transform(
@@ -91,14 +91,14 @@ fn multiline_comment() -> Pattern<char, Token, LexError> {
 fn hex_number() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('0'),
-            Pattern::alternative([Pattern::literal('x'), Pattern::literal('X')]),
+            Pattern::exact('0'),
+            Pattern::alternative([Pattern::exact('x'), Pattern::exact('X')]),
             Pattern::repeat(
                 Pattern::alternative([
                     Pattern::predicate(Arc::new(|c| {
                         is_numeric(*c) || ('a'..='f').contains(c) || ('A'..='F').contains(c)
                     })),
-                    Pattern::literal('_'),
+                    Pattern::exact('_'),
                 ]),
                 1,
                 None,
@@ -127,12 +127,12 @@ fn hex_number() -> Pattern<char, Token, LexError> {
 fn binary_number() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('0'),
-            Pattern::alternative([Pattern::literal('b'), Pattern::literal('B')]),
+            Pattern::exact('0'),
+            Pattern::alternative([Pattern::exact('b'), Pattern::exact('B')]),
             Pattern::repeat(
                 Pattern::alternative([
                     Pattern::predicate(Arc::new(|c| *c == '0' || *c == '1')),
-                    Pattern::literal('_'),
+                    Pattern::exact('_'),
                 ]),
                 1,
                 None,
@@ -161,12 +161,12 @@ fn binary_number() -> Pattern<char, Token, LexError> {
 fn octal_number() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('0'),
-            Pattern::alternative([Pattern::literal('o'), Pattern::literal('O')]),
+            Pattern::exact('0'),
+            Pattern::alternative([Pattern::exact('o'), Pattern::exact('O')]),
             Pattern::repeat(
                 Pattern::alternative([
                     Pattern::predicate(Arc::new(|c| ('0'..='7').contains(c))),
-                    Pattern::literal('_'),
+                    Pattern::exact('_'),
                 ]),
                 1,
                 None,
@@ -199,17 +199,17 @@ fn decimal_number() -> Pattern<char, Token, LexError> {
             Pattern::repeat(
                 Pattern::alternative([
                     Pattern::predicate(Arc::new(|c| is_numeric(*c))),
-                    Pattern::literal('_'),
+                    Pattern::exact('_'),
                 ]),
                 0,
                 None,
             ),
             Pattern::optional(Pattern::sequence([
-                Pattern::literal('.'),
+                Pattern::exact('.'),
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::predicate(Arc::new(|c| is_numeric(*c))),
-                        Pattern::literal('_'),
+                        Pattern::exact('_'),
                     ]),
                     0,
                     None,
@@ -290,11 +290,11 @@ fn identifier() -> Pattern<char, Token, LexError> {
 fn quoted_string() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('"'),
+            Pattern::exact('"'),
             Pattern::repeat(
                 Pattern::alternative([
                     Pattern::sequence([
-                        Pattern::literal('\\'),
+                        Pattern::exact('\\'),
                         Pattern::predicate(Arc::new(|_| true)),
                     ]),
                     Pattern::predicate(Arc::new(|c| *c != '"' && *c != '\\' && *c != '\n')),
@@ -302,7 +302,7 @@ fn quoted_string() -> Pattern<char, Token, LexError> {
                 0,
                 None,
             ),
-            Pattern::literal('"'),
+            Pattern::exact('"'),
         ]),
         Arc::new(|chars, span| {
             let mut content = String::new();
@@ -399,13 +399,13 @@ fn quoted_string() -> Pattern<char, Token, LexError> {
 fn backtick_string() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('`'),
+            Pattern::exact('`'),
             Pattern::repeat(
                 Pattern::predicate(Arc::new(|c| *c != '`')),
                 0,
                 None,
             ),
-            Pattern::literal('`'),
+            Pattern::exact('`'),
         ]),
         Arc::new(|chars, span| {
             let mut content = String::new();
@@ -422,15 +422,15 @@ fn backtick_string() -> Pattern<char, Token, LexError> {
 fn character() -> Pattern<char, Token, LexError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::literal('\''),
+            Pattern::exact('\''),
             Pattern::alternative([
                 Pattern::sequence([
-                    Pattern::literal('\\'),
+                    Pattern::exact('\\'),
                     Pattern::predicate(Arc::new(|_| true)),
                 ]),
                 Pattern::predicate(Arc::new(|c| *c != '\'' && *c != '\\')),
             ]),
-            Pattern::literal('\''),
+            Pattern::exact('\''),
         ]),
         Arc::new(|chars, span| {
             let mut flat_chars = Vec::new();
@@ -526,11 +526,11 @@ fn punctuation() -> Pattern<char, Token, LexError> {
         })),
         Arc::new(|chars, span| {
             let mut punctuation = String::new();
-            
+
             for form in &chars {
                 punctuation.push_str(&extract(&form.kind));
             }
-            
+
             Ok(Token::new(TokenKind::Punctuation(punctuation.to_punctuation()), span))
         }),
     )
@@ -587,7 +587,7 @@ impl Lexer {
                         }
                     }
                 },
-                
+
                 FormKind::Error(err) => {
                     errors.push(err);
                 }

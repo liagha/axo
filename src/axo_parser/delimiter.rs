@@ -160,7 +160,7 @@ impl Delimiter for Parser {
                 TokenKind::Punctuation(PunctuationKind::RightBrace) => {
                     self.next();
 
-                    return if separator == Some(PunctuationKind::Semicolon) {
+                    return if separator == Some(PunctuationKind::SemiColon) {
                         let kind = ElementKind::Scope(items.clone());
                         let span = self.span(start, span.end);
 
@@ -197,18 +197,18 @@ impl Delimiter for Parser {
                         separator = Some(PunctuationKind::Comma);
                     }
                 }
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                TokenKind::Punctuation(PunctuationKind::SemiColon) => {
                     self.next();
 
                     if let Some(separator) = separator {
-                        if separator != PunctuationKind::Semicolon {
+                        if separator != PunctuationKind::SemiColon {
                             self.error(&ParseError::new(
                                 ErrorKind::InconsistentSeparators,
                                 span,
                             ));
                         }
                     } else {
-                        separator = Some(PunctuationKind::Semicolon);
+                        separator = Some(PunctuationKind::SemiColon);
                     }
                 }
                 _ => {
@@ -253,7 +253,7 @@ impl Delimiter for Parser {
                 TokenKind::Punctuation(PunctuationKind::RightBracket) => {
                     self.next();
 
-                    return if separator == Some(PunctuationKind::Semicolon) {
+                    return if separator == Some(PunctuationKind::SemiColon) {
                         let kind = ElementKind::Series(items.clone());
                         let span = self.span(start, span.end);
 
@@ -285,18 +285,18 @@ impl Delimiter for Parser {
                         separator = Some(PunctuationKind::Comma);
                     }
                 }
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                TokenKind::Punctuation(PunctuationKind::SemiColon) => {
                     self.next();
 
                     if let Some(separator) = separator {
-                        if separator != PunctuationKind::Semicolon {
+                        if separator != PunctuationKind::SemiColon {
                             self.error(&ParseError::new(
                                 ErrorKind::InconsistentSeparators,
                                 span,
                             ));
                         }
                     } else {
-                        separator = Some(PunctuationKind::Semicolon);
+                        separator = Some(PunctuationKind::SemiColon);
                     }
                 }
                 _ => {
@@ -318,9 +318,9 @@ impl Delimiter for Parser {
         F: FnMut(&mut Parser) -> Element
     {
         if let Some(token) = self.peek() {
-            if token.kind != TokenKind::Punctuation(PunctuationKind::LeftParen) {
+            if token.kind != TokenKind::Punctuation(PunctuationKind::LeftParenthesis) {
                 return self.error(&ParseError::new(
-                    ErrorKind::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftParen)),
+                    ErrorKind::ExpectedToken(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
                     token.span.clone(),
                 ));
             }
@@ -338,10 +338,10 @@ impl Delimiter for Parser {
 
         while let Some(Token { kind, span }) = self.peek().cloned() {
             match kind {
-                TokenKind::Punctuation(PunctuationKind::RightParen) => {
+                TokenKind::Punctuation(PunctuationKind::RightParenthesis) => {
                     self.next();
 
-                    return if separator == Some(PunctuationKind::Semicolon) {
+                    return if separator == Some(PunctuationKind::SemiColon) {
                         let kind = ElementKind::Sequence(items.clone());
                         let span = self.span(start, span.end);
 
@@ -377,18 +377,18 @@ impl Delimiter for Parser {
                         separator = Some(PunctuationKind::Comma);
                     }
                 }
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                TokenKind::Punctuation(PunctuationKind::SemiColon) => {
                     self.next();
 
                     if let Some(separator) = separator {
-                        if separator != PunctuationKind::Semicolon {
+                        if separator != PunctuationKind::SemiColon {
                             self.error(&ParseError::new(
                                 ErrorKind::InconsistentSeparators,
                                 span,
                             ));
                         }
                     } else {
-                        separator = Some(PunctuationKind::Semicolon);
+                        separator = Some(PunctuationKind::SemiColon);
                     }
                 }
                 _ => {

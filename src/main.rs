@@ -12,7 +12,7 @@ mod axo_span;
 mod timer;
 
 pub use {
-    axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},
+    axo_lexer::{Lexer, PunctuationKind, OperatorKind, Token, TokenKind},
     axo_parser::Parser,
     axo_resolver::Resolver,
     axo_rune::*,

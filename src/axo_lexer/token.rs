@@ -25,6 +25,13 @@ impl Token {
     pub fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }
     }
+    
+    pub fn from(kind: TokenKind) -> Self {
+        Self {
+            kind,
+            span: Span::default(),
+        }
+    }
 }
 
 impl TokenKind {

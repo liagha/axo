@@ -44,7 +44,7 @@ impl core::fmt::Display for ErrorKind {
                 write!(f, "can't have an else without conditional.")
             }
             ErrorKind::MissingSeparator(kind) => {
-                write!(f, "expected separator `{}`.", kind)
+                write!(f, "expected separator `{:?}`.", kind)
             }
             ErrorKind::MissingSeparators(separators) => {
                 write!(f, "expected one of these separators: `{:?}`.", separators)
@@ -71,10 +71,10 @@ impl core::fmt::Display for ErrorKind {
                 write!(f, "unterminated block.")
             }
             ErrorKind::UnimplementedToken(token) => {
-                write!(f, "unimplemented token `{}`.", token)
+                write!(f, "unimplemented token `{:?}`.", token)
             }
             ErrorKind::UnexpectedToken(token) => {
-                write!(f, "unexpected token `{}`.", token)
+                write!(f, "unexpected token `{:?}`.", token)
             }
         }
     }

@@ -67,7 +67,7 @@ impl Primary for Parser {
             match kind {
                 TokenKind::Punctuation(PunctuationKind::LeftBrace) => self.parse_braced(Self::parse_complex),
                 TokenKind::Punctuation(PunctuationKind::LeftBracket) => self.parse_bracketed(Self::parse_complex),
-                TokenKind::Punctuation(PunctuationKind::LeftParen) => self.parse_parenthesized(Self::parse_complex),
+                TokenKind::Punctuation(PunctuationKind::LeftParenthesis) => self.parse_parenthesized(Self::parse_complex),
                 TokenKind::Identifier(_)
                 | TokenKind::String(_)
                 | TokenKind::Character(_)

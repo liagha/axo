@@ -77,9 +77,15 @@ impl Peekable<Token> for Parser {
             self.index += 1;
 
             match &token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
+                TokenKind::Punctuation(PunctuationKind::Newline) => {
                     self.position.line += 1;
                     self.position.column = 0;
+                    
+                    continue;
+                }
+                TokenKind::Punctuation(PunctuationKind::Space) => {
+                    self.position.column += 1;
+                    
                     continue;
                 }
                 TokenKind::Comment(_) => {
@@ -183,15 +189,15 @@ impl Parser {
                         separator = Some(PunctuationKind::Comma);
                     }
                 }
-                TokenKind::Punctuation(PunctuationKind::Semicolon) => {
+                TokenKind::Punctuation(PunctuationKind::SemiColon) => {
                     self.next();
 
                     if let Some(separator) = separator {
-                        if separator != PunctuationKind::Semicolon {
+                        if separator != PunctuationKind::SemiColon {
                             self.error(&ParseError::new(ErrorKind::InconsistentSeparators, span));
                         }
                     } else {
-                        separator = Some(PunctuationKind::Semicolon);
+                        separator = Some(PunctuationKind::SemiColon);
                     }
                 }
                 _ => {
@@ -204,7 +210,7 @@ impl Parser {
             }
         }
 
-        if separator == Some(PunctuationKind::Semicolon) {
+        if separator == Some(PunctuationKind::SemiColon) {
             items
         } else {
             items

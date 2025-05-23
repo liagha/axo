@@ -44,7 +44,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            PatternKind::Literal(literal) => {
+            PatternKind::Exact(literal) => {
                 write!(f, "Literal({:?})", literal)
             }
             PatternKind::Alternative(patterns) => {
