@@ -1,4 +1,4 @@
-use core::fmt::Display;
+use crate::format::Display;
 use crate::axo_span::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

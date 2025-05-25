@@ -1,25 +1,26 @@
-use crate::fs::read_to_string;
+use crate::file::read_to_string;
 use broccli::{Color, TextStyle};
 use crate::axo_errors::hint::Hint;
 use crate::axo_span::Span;
+use crate::format::{Display, Debug, Formatter, Result};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Error<K, N = String, H = String> where K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display {
+pub struct Error<K, N = String, H = String> where K: Display, N: Display, H: Display {
     pub kind: K,
     pub span: Span,
     pub note: Option<N>,
     pub hints: Vec<Hint<H>>,
 }
 
-impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display > core::fmt::Display for Error<K, N, H> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<K: Display, N: Display, H: Display > Display for Error<K, N, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
         write!(f, "{} \n {}", msg, details)
     }
 }
 
-impl<K: core::fmt::Display, N: core::fmt::Display, H: core::fmt::Display> Error<K, N, H> {
+impl<K: Display, N: Display, H: Display> Error<K, N, H> {
     pub fn new(kind: K, span: Span) -> Self {
         Self {
             kind,
