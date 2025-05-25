@@ -12,7 +12,12 @@ pub trait Peekable<Item : PartialEq> {
 
     fn peek_ahead(&self, n: usize) -> Option<&Item>;
     fn peek_behind(&self, n: usize) -> Option<&Item>;
+    fn seek(&mut self, position: Position) {
+        self.set_position(position);
+    }
 
+    fn restore(&mut self);
+    
     fn next(&mut self) -> Option<Item>;
     
     fn match_item(&mut self, item: &Item) -> bool {

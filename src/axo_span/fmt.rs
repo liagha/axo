@@ -1,15 +1,15 @@
-use core::fmt;
+use crate::format::{Display, Debug, Formatter, Result};
 use crate::axo_span::position::Position;
 use crate::axo_span::Span;
 
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Position {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}:{}:{}", self.file.display(), self.line, self.column)
     }
 }
 
-impl fmt::Debug for Span {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for Span {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
             if self.start.file != self.end.file {
                 write!(f, "{}:{} - {}:{}",
@@ -48,8 +48,8 @@ impl fmt::Debug for Span {
 }
 
 
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Span {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if self.start.file != self.end.file {
             write!(f, "{}:{}:{} - {}:{}:{}",
                    self.start.file.display(), self.start.line, self.start.column,

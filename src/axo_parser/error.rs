@@ -3,6 +3,7 @@ use {
         Color, TextStyle
     },
     crate::{
+        format::{Debug, Display, Formatter, Result},
         axo_lexer::{
             TokenKind, Token, PunctuationKind
         },
@@ -30,8 +31,8 @@ pub enum ErrorKind {
 }
 
 
-impl core::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::PatternError => write!(f, "invalid pattern syntax"),
             ErrorKind::ExpectedToken(expected) => {
@@ -80,10 +81,8 @@ impl core::fmt::Display for ErrorKind {
     }
 }
 
-impl core::fmt::Debug for ErrorKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self)
     }
 }
-
-impl core::error::Error for ErrorKind {}

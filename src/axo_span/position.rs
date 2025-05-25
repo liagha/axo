@@ -1,6 +1,6 @@
 use crate::Path;
-use crate::fs;
-use core::fmt;
+use crate::file;
+use crate::format;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
@@ -31,7 +31,7 @@ impl Position {
     pub fn correct(&self) -> Self {
         let mut corrected = self.clone();
 
-        let content = match fs::read_to_string(&self.file) {
+        let content = match file::read_to_string(&self.file) {
             Ok(content) => content,
             Err(_) => return Self::new(self.file.clone()),
         };
@@ -69,7 +69,7 @@ impl Position {
     }
 
     pub fn get_line_content(&self) -> Option<String> {
-        match fs::read_to_string(&self.file) {
+        match file::read_to_string(&self.file) {
             Ok(content) => {
                 let lines: Vec<&str> = content.lines().collect();
                 if self.line > 0 && self.line <= lines.len() {
@@ -82,13 +82,13 @@ impl Position {
         }
     }
 
-    pub fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+    pub fn cmp(&self, other: &Self) -> crate::compare::Ordering {
         if self.file != other.file {
             return self.file.to_string_lossy().cmp(&other.file.to_string_lossy());
         }
 
         match self.line.cmp(&other.line) {
-            core::cmp::Ordering::Equal => self.column.cmp(&other.column),
+            crate::compare::Ordering::Equal => self.column.cmp(&other.column),
             other => other,
         }
     }
@@ -96,13 +96,13 @@ impl Position {
 
 
 impl PartialOrd for Position {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<crate::compare::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for Position {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> crate::compare::Ordering {
         self.cmp(other)
     }
 }

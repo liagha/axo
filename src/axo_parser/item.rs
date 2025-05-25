@@ -1,6 +1,6 @@
 use crate::axo_data::peekable::Peekable;
 use {
-    core::hash::{
+    crate::hash::{
         Hash, Hasher
     },
     crate::{

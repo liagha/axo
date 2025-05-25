@@ -2,7 +2,8 @@ use {
     matchete::MatchType,
 
     crate::{
-        axo_errors::{
+        memory::replace,
+        axo_error::{
             Action, Hint
         },
         axo_parser::{
@@ -35,7 +36,7 @@ impl Resolver {
     }
 
     pub fn push_scope(&mut self) {
-        let parent_scope = core::mem::replace(&mut self.scope, Scope::new());
+        let parent_scope = replace(&mut self.scope, Scope::new());
         self.scope.set_parent(parent_scope);
     }
 

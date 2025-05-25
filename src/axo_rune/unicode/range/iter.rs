@@ -1,7 +1,7 @@
-use core::{char, ops};
+use crate::{char, operations};
 use crate::axo_rune::unicode::CharRange;
 
-const SURROGATE_RANGE: ops::Range<u32> = 0xD800..0xE000;
+const SURROGATE_RANGE: operations::Range<u32> = 0xD800..0xE000;
 
 #[derive(Clone, Debug)]
 pub struct CharIter {

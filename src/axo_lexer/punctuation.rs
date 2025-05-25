@@ -1,3 +1,5 @@
+pub use crate::format::{Display, Debug, Formatter, Write};
+
 #[derive(Clone, Debug, PartialEq, Copy, Eq, Hash)]
 pub enum PunctuationKind {
     Space,
@@ -73,8 +75,8 @@ impl PunctuationLexer for char {
     }
 }
 
-impl core::fmt::Display for PunctuationKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl Display for PunctuationKind {
+    fn fmt(&self, f: &mut Formatter) -> crate::format::Result {
         let punct_str = match self {
             PunctuationKind::Space => " ",
             PunctuationKind::Tab => "\t",

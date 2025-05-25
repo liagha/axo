@@ -1,4 +1,4 @@
-use core::fmt::{Display, Debug, Formatter};
+use crate::format::{Display, Debug, Formatter, Result};
 use crate::axo_form::{Action, FormKind, Form, PatternKind};
 
 impl<Input, Output, Error> Display for Form<Input, Output, Error>
@@ -7,7 +7,7 @@ where
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
             FormKind::Empty => {
                 write!(f, "Empty")
@@ -42,8 +42,11 @@ where
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
+            PatternKind::Lazy(_) => {
+                write!(f, "Lazy(_)")
+            }
             PatternKind::Exact(literal) => {
                 write!(f, "Literal({:?})", literal)
             }
@@ -87,7 +90,7 @@ where
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Action::Transform(_) => write!(f, "Transform"),
             Action::Ignore => write!(f, "Ignore"),

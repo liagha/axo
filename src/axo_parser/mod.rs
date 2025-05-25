@@ -17,7 +17,7 @@ pub use {
     core::Primary,
 
     crate::{
-        axo_errors::Error,
+        axo_error::Error,
     }
 };
 

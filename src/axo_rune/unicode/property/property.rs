@@ -1,5 +1,5 @@
-use core::fmt::Debug;
-use core::hash::Hash;
+use crate::format::Debug;
+use crate::hash::Hash;
 
 pub trait CharProperty: PartialCharProperty + Debug + Eq + Hash {
     fn prop_abbr_name() -> &'static str;

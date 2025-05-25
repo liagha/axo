@@ -82,7 +82,7 @@ impl SymbolLexer for Lexer {
                     let end = (self.position.line, self.position.column);
 
                     if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                        if let Some(ch) = core::char::from_u32(hex_value) {
+                        if let Some(ch) = crate::char::from_u32(hex_value) {
                             Ok(ch)
                         } else {
                             Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))
@@ -121,7 +121,7 @@ impl SymbolLexer for Lexer {
                         }
 
                         if let Ok(hex_value) = u32::from_str_radix(&hex, 16) {
-                            if let Some(ch) = core::char::from_u32(hex_value) {
+                            if let Some(ch) = crate::char::from_u32(hex_value) {
                                 Ok(ch)
                             } else {
                                 Err(LexError::new(error_type(CharParseError::InvalidEscapeSequence), self.create_span(start, end)))

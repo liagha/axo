@@ -5,10 +5,10 @@ mod lexer;
 mod parser;
 mod pattern;
 mod action;
-use core::fmt::Debug;
-use crate::arc::Arc;
-use crate::axo_span::Span;
+use crate::format::Debug;
+use crate::thread::Arc;
 use crate::Peekable;
+use crate::axo_span::Span;
 use crate::axo_form::action::Action;
 use crate::axo_form::pattern::{Pattern, PatternKind};
 
@@ -42,13 +42,27 @@ where
     pub span: Span,
 }
 
+impl<Input, Output, Error> Form<Input, Output, Error>
+where
+    Input: Clone + PartialEq + Debug,
+    Output: Clone + Debug,
+    Error: Clone + Debug,
+{
+    fn expand(&self) -> Vec<Form<Input, Output, Error>> {
+        match self.kind.clone() {
+            FormKind::Empty => vec![],
+            FormKind::Raw(_) | FormKind::Single(_) | FormKind::Error(_) => vec![self.clone()],
+            FormKind::Multiple(items) => items,
+        }
+    }
+}
+
 pub trait Former<Input, Output, Error>: Peekable<Input>
 where
     Input: Clone + PartialEq + Debug,
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn expand(form: Form<Input, Output, Error>) -> Vec<Form<Input, Output, Error>>;
     fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>>;
     fn action(
         action: &Action<Input, Output, Error>,
@@ -77,13 +91,6 @@ where
     Output: Clone + Debug,
     Error: Clone + Debug,
 {
-    fn expand(form: Form<Input, Output, Error>) -> Vec<Form<Input, Output, Error>> {
-        match form.kind {
-            FormKind::Empty => vec![],
-            FormKind::Raw(_) | FormKind::Single(_) | FormKind::Error(_) => vec![form],
-            FormKind::Multiple(items) => items,
-        }
-    }
 
     fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>> {
         for form in forms {
@@ -96,8 +103,6 @@ where
                     }
                 }
                 FormKind::Error(_) => {
-                    println!("error");
-                    
                     return Some(form);
                 }
                 _ => continue,
@@ -140,9 +145,16 @@ where
 
     fn matches(&mut self, pattern: &Pattern<Input, Output, Error>, offset: usize) -> (bool, usize) {
         match &pattern.kind {
+            PatternKind::Lazy(factory) => {
+                let resolved_pattern = factory();
+                
+                self.matches(&resolved_pattern, offset)
+            }
+
             PatternKind::Exact(expect) => {
                 if let Some(peek) = self.peek_ahead(offset) {
                     let matches = peek == expect;
+
                     (matches, if matches { offset + 1 } else { offset })
                 } else {
                     (false, offset)
@@ -151,64 +163,64 @@ where
 
             PatternKind::Alternative(patterns) => {
                 for pattern in patterns {
-                    let (matches, new_offset) = self.matches(pattern, offset);
+                    let (matches, new) = self.matches(pattern, offset);
+
                     if matches {
-                        return (true, new_offset);
+                        return (true, new);
+                    } else {
+                        continue;
                     }
                 }
+
                 (false, offset)
             }
 
             PatternKind::Sequence(sequence) => {
-                let mut current_offset = offset;
+                let mut current = offset;
 
                 for pattern in sequence {
-                    let (matches, pattern_offset) = self.matches(pattern, current_offset);
-                    
+                    let (matches, new) = self.matches(pattern, current);
+
                     if matches {
-                        current_offset = pattern_offset;
+                        current = new;
                     } else {
                         return (false, offset);
                     }
                 }
 
-                (true, current_offset)
+                (true, current)
             }
 
             PatternKind::Repeat { pattern, minimum, maximum } => {
-                let mut current_offset = offset;
+                let mut current = offset;
                 let mut count = 0;
-                let mut last_successful_offset = offset;
 
-                loop {
-                    if self.peek_ahead(current_offset).is_none() {
+                while self.peek_ahead(current).is_some() {
+                    let (matches, new) = self.matches(pattern, current);
+
+                    if !matches || new == current {
                         break;
                     }
 
-                    let (matches, new_offset) = self.matches(pattern, current_offset);
+                    count += 1;
+                    current = new;
 
-                    if matches && new_offset > current_offset {
-                        count += 1;
-                        current_offset = new_offset;
-                        last_successful_offset = new_offset;
-
-                        if let Some(max) = maximum {
-                            if count >= *max {
-                                break;
-                            }
+                    if let Some(max) = maximum {
+                        if count >= *max {
+                            break;
                         }
-                    } else {
-                        break;
                     }
                 }
 
-                let result = count >= *minimum;
-                (result, if result { last_successful_offset } else { offset })
+                let success = count >= *minimum;
+
+                (success, if success { current } else { offset })
             }
 
             PatternKind::Optional(pattern) => {
-                let (matches, new_offset) = self.matches(pattern, offset);
-                (true, if matches { new_offset } else { offset })
+                let (matches, new) = self.matches(pattern, offset);
+
+                (true, if matches { new } else { offset })
             }
 
             PatternKind::Predicate(function) => {
@@ -226,7 +238,9 @@ where
                 }
 
                 let (matches, _) = self.matches(pattern, offset);
+
                 let result = !matches;
+
                 (result, if result { offset + 1 } else { offset })
             }
 
@@ -239,9 +253,10 @@ where
             }
 
             PatternKind::Required { pattern, .. } => {
-                let (matches, new_offset) = self.matches(pattern, offset);
+                let (matches, new) = self.matches(pattern, offset);
+
                 if matches {
-                    (true, new_offset)
+                    (true, new)
                 } else {
                     (true, offset)
                 }
@@ -251,17 +266,26 @@ where
 
     fn form(&mut self, pattern: Pattern<Input, Output, Error>) -> Form<Input, Output, Error> {
         let start = self.position();
-        let (matches, _) = self.matches(&pattern, 0);
 
-        if !matches {
+        let resolved_pattern = match &pattern.kind {
+            PatternKind::Lazy(factory) => {
+                factory()
+            }
+            _ => pattern.clone(),
+        };
+
+        let (matches, new) = self.matches(&resolved_pattern, 0);
+
+        if !matches && new > 0 {
             return Form::new(FormKind::Empty, Span::point(start.clone()));
         }
 
-        let form = match &pattern.kind {
+        let form = match &resolved_pattern.kind {
             PatternKind::Exact(input) => {
                 if let Some(actual) = self.next() {
                     if actual == *input {
                         let end = self.position();
+
                         Form::new(FormKind::Raw(input.clone()), Span::new(start.clone(), end))
                     } else {
                         Form::new(FormKind::Empty, Span::point(start.clone()))
@@ -277,45 +301,43 @@ where
                         return self.form(subpattern.clone());
                     }
                 }
+
                 Form::new(FormKind::Empty, Span::point(self.position()))
             }
 
             PatternKind::Sequence(sequence) => {
-                let mut formed_sequence = Vec::new();
+                let mut formed = Vec::new();
 
                 for subpattern in sequence {
                     let form = self.form(subpattern.clone());
-                    formed_sequence.push(form);
+
+                    formed.push(form);
                 }
 
                 Form::new(
-                    FormKind::Multiple(formed_sequence),
+                    FormKind::Multiple(formed),
                     Span::new(start.clone(), self.position()),
                 )
             }
 
             PatternKind::Repeat { pattern: subpattern, maximum, .. } => {
-                let mut formed_repeat = Vec::new();
+                let mut formed = Vec::new();
 
-                loop {
-                    if self.peek().is_none() {
-                        break;
-                    }
-
-                    let current_position = self.position();
+                while let Some(_) = self.peek() {
+                    let current = self.position();
                     let (matches, _) = self.matches(subpattern, 0);
 
                     if matches {
                         let form = self.form(*subpattern.clone());
 
-                        if self.position() == current_position {
+                        if self.position() == current {
                             break;
                         }
 
-                        formed_repeat.push(form);
+                        formed.push(form);
 
                         if let Some(max) = maximum {
-                            if formed_repeat.len() >= *max {
+                            if formed.len() >= *max {
                                 break;
                             }
                         }
@@ -325,14 +347,14 @@ where
                 }
 
                 Form::new(
-                    FormKind::Multiple(formed_repeat),
+                    FormKind::Multiple(formed),
                     Span::new(start.clone(), self.position()),
                 )
             }
 
-            PatternKind::Optional(subpattern) => {
-                if let (true, _) = self.matches(subpattern, 0) {
-                    self.form(*subpattern.clone())
+            PatternKind::Optional(sub) => {
+                if let (true, _) = self.matches(sub, 0) {
+                    self.form(*sub.clone())
                 } else {
                     Form::new(FormKind::Empty, Span::point(start.clone()))
                 }
@@ -354,8 +376,8 @@ where
                 }
             }
 
-            PatternKind::Negate(subpattern) => {
-                if let (false, _) = self.matches(subpattern, 0) {
+            PatternKind::Negate(sub) => {
+                if let (false, _) = self.matches(sub, 0) {
                     if let Some(input) = self.next() {
                         Form::new(
                             FormKind::Raw(input),
@@ -381,16 +403,18 @@ where
             }
 
             PatternKind::Required { pattern: subpattern, action } => {
-                let current_position = self.position();
+                let current = self.position();
                 let (matches, _) = self.matches(subpattern, 0);
 
                 if matches {
                     self.form(*subpattern.clone())
                 } else {
-                    let span = Span::new(current_position, self.position());
+                    let span = Span::new(current, self.position());
                     Self::action(action, Vec::new(), span)
                 }
             }
+
+            PatternKind::Lazy(_) => unreachable!("Lazy pattern should have been resolved"),
         };
 
         let end = self.position();
@@ -398,7 +422,7 @@ where
 
         match &pattern.action {
             Some(action) => {
-                let items = Self::expand(form.clone());
+                let items = form.clone().expand();
                 Self::action(action, items, span.clone())
             }
             None => form,

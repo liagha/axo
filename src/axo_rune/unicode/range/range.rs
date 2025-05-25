@@ -1,4 +1,4 @@
-use core::{char, cmp::Ordering};
+use crate::{char, compare::Ordering};
 use crate::axo_rune::unicode::CharIter;
 
 #[derive(Copy, Clone, Debug, Eq)]

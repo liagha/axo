@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use core::arch::asm;
+use crate::arch::asm;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerError {

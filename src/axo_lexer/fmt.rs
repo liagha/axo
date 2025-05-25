@@ -1,9 +1,6 @@
 use {
-    core::{
-        fmt,
-        fmt::Formatter,
-    },
     crate::{
+        format::{Display, Debug, Formatter, Result},
         axo_lexer::{
             Token, TokenKind,
             PunctuationKind,
@@ -11,8 +8,8 @@ use {
     }
 };
 
-impl fmt::Display for TokenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             TokenKind::Boolean(b) => write!(f, "{}", b),
             TokenKind::Float(n) => write!(f, "{}", n),
@@ -32,8 +29,8 @@ impl fmt::Display for TokenKind {
     }
 }
 
-impl fmt::Debug for TokenKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Debug for TokenKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             TokenKind::Boolean(b) => write!(f, "Boolean({})", b),
             TokenKind::Float(n) => write!(f, "Float({})", n),
@@ -48,14 +45,14 @@ impl fmt::Debug for TokenKind {
     }
 }
 
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.kind)
     }
 }
 
-impl fmt::Debug for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Debug for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?}", self.kind)
     }
 }

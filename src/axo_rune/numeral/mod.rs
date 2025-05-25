@@ -1,5 +1,7 @@
-use core::fmt;
-use core::str::FromStr;
+use crate::format;
+use crate::format::{Debug, Display, Formatter};
+
+use crate::string::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberFormat {
@@ -23,8 +25,8 @@ pub enum ParseNumberError {
     TypeError(String),
 }
 
-impl fmt::Display for ParseNumberError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for ParseNumberError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         match self {
             Self::EmptyString => write!(f, "cannot parse an empty string"),
             Self::InvalidRadix(radix) => write!(f, "invalid radix: {}, must be between 2 and 36", radix),
@@ -37,8 +39,6 @@ impl fmt::Display for ParseNumberError {
         }
     }
 }
-
-impl core::error::Error for ParseNumberError {}
 
 pub trait NumericParser: Sized {
     fn from_str_radix(s: &str, radix: u8) -> Result<Self, ParseNumberError>;
@@ -248,13 +248,13 @@ impl_numeric_parser_for_float!(f32, "Implementation for f32");
 impl_numeric_parser_for_float!(f64, "Implementation for f64");
 
 pub struct NumberParser<T> {
-    _marker: core::marker::PhantomData<T>,
+    _marker: crate::marker::PhantomData<T>,
 }
 
 impl<T: NumericParser> NumberParser<T> {
     pub fn new() -> Self {
         Self {
-            _marker: core::marker::PhantomData,
+            _marker: crate::marker::PhantomData,
         }
     }
 

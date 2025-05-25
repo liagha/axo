@@ -1,5 +1,6 @@
 use OperatorKind::*;
-use core::fmt::Write;
+use crate::slice;
+use crate::format::{Debug, Display, Write, Result, Formatter};
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum OperatorKind {
@@ -48,7 +49,7 @@ impl OperatorKind {
     pub fn as_slice(&self) -> &[OperatorKind] {
         match self {
             Composite(ops) => ops.as_slice(),
-            _ => core::slice::from_ref(self),
+            _ => slice::from_ref(self),
         }
     }
 
@@ -153,8 +154,8 @@ impl OperatorKind {
     }
 }
 
-impl core::fmt::Display for OperatorKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl Display for OperatorKind {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             In => write!(f, "in"),
             Tilde => write!(f, "~"),

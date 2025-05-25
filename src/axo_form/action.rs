@@ -1,5 +1,5 @@
-use core::fmt::Debug;
-use std::sync::Arc;
+use crate::format::Debug;
+use crate::thread::Arc;
 use crate::axo_form::{ErrorFunction, Form, TransformFunction};
 use crate::axo_span::Span;
 

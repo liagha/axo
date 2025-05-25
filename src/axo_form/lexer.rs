@@ -1,4 +1,4 @@
-use crate::arc::Arc;
+use crate::thread::Arc;
 use crate::float::FloatLiteral;
 use crate::axo_form::{FormKind, Former, Pattern};
 use crate::axo_lexer::{LexError, OperatorLexer, PunctuationLexer};
@@ -346,7 +346,7 @@ fn quoted_string() -> Pattern<char, Token, LexError> {
                                 i -= 1;
                                 u32::from_str_radix(&hex, 16)
                                     .ok()
-                                    .and_then(core::char::from_u32)
+                                    .and_then(crate::char::from_u32)
                                     .unwrap_or('\0')
                             }
                             'u' => {
@@ -367,7 +367,7 @@ fn quoted_string() -> Pattern<char, Token, LexError> {
                                             if flat_chars[i] == '}' {
                                                 u32::from_str_radix(&hex, 16)
                                                     .ok()
-                                                    .and_then(core::char::from_u32)
+                                                    .and_then(crate::char::from_u32)
                                                     .unwrap_or('\0')
                                             } else {
                                                 return Err(LexError::new(ErrorKind::StringParseError(CharParseError::InvalidEscapeSequence), span));
@@ -465,7 +465,7 @@ fn character() -> Pattern<char, Token, LexError> {
                             let hex = format!("{}{}", h1, h2);
                             u32::from_str_radix(&hex, 16)
                                 .ok()
-                                .and_then(core::char::from_u32)
+                                .and_then(crate::char::from_u32)
                                 .unwrap_or('\0')
                         } else {
                             return Err(LexError::new(ErrorKind::CharParseError(CharParseError::InvalidEscapeSequence), span));
@@ -486,7 +486,7 @@ fn character() -> Pattern<char, Token, LexError> {
                         }
                         u32::from_str_radix(&hex, 16)
                             .ok()
-                            .and_then(core::char::from_u32)
+                            .and_then(crate::char::from_u32)
                             .unwrap_or('\0')
                     }
                     _ => escaped_c,

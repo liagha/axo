@@ -17,7 +17,7 @@ pub use {
 };
 
 use crate::{
-    axo_errors::Error,
+    axo_error::Error,
     axo_lexer::error::ErrorKind,
 };
 

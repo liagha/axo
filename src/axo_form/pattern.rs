@@ -1,8 +1,10 @@
-use std::fmt::Debug;
-use std::sync::Arc;
+use crate::format::Debug;
+use crate::thread::Arc;
 use crate::axo_form::action::Action;
 use crate::axo_form::{ErrorFunction, Form, PredicateFunction, TransformFunction};
 use crate::axo_span::Span;
+
+pub type LazyPattern<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
 
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Error>
@@ -26,6 +28,7 @@ where
     Optional(Box<Pattern<Input, Output, Error>>),
     Predicate(PredicateFunction<Input>),
     Negate(Box<Pattern<Input, Output, Error>>),
+    Lazy(LazyPattern<Input, Output, Error>),
     Anything,
 }
 
@@ -120,6 +123,25 @@ where
                 action,
             },
             action: None,
+        }
+    }
+
+    pub fn lazy<F>(factory: F) -> Self
+    where
+        F: Fn() -> Pattern<Input, Output, Error> + Send + Sync + 'static,
+    {
+        Self {
+            kind: PatternKind::Lazy(Arc::new(factory)),
+            action: None,
+        }
+    }
+
+    pub fn resolve_lazy(&self) -> Pattern<Input, Output, Error> {
+        match &self.kind {
+            PatternKind::Lazy(factory) => {
+                factory()
+            }
+            _ => self.clone(),
         }
     }
 

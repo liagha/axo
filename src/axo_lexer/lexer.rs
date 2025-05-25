@@ -65,6 +65,16 @@ impl Peekable<char> for Lexer {
         }
     }
 
+    fn restore(&mut self) {
+        self.restore_position(
+            Position {
+                line: 1,
+                column: 1,
+                file: self.position.file.clone()
+            }
+        )
+    }
+
     fn next(&mut self) -> Option<char> {
         if self.index < self.input.len() {
             let ch = self.input[self.index];

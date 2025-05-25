@@ -15,4 +15,4 @@ mod macros;
 pub mod tables;
 
 #[doc(hidden)]
-pub use core::{fmt as __fmt, str as __str};
+pub use crate::{format as __fmt, string as __str};

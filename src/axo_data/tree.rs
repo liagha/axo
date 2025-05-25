@@ -4,8 +4,9 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-use core::cmp::Ordering;
+use crate::compare::Ordering;
 use alloc::string::String;
+use crate::memory::swap;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Tree<T> {
@@ -943,13 +944,13 @@ impl<T: Ord + Clone> BinarySearchTree<T> {
             Ordering::Equal => {
                 if current.left.is_none() {
                     let mut right_child = None;
-                    core::mem::swap(&mut right_child, &mut current.right);
+                    swap(&mut right_child, &mut current.right);
                     let removed = *node.take().unwrap();
                     *node = right_child;
                     return Some(removed.value);
                 } else if current.right.is_none() {
                     let mut left_child = None;
-                    core::mem::swap(&mut left_child, &mut current.left);
+                    swap(&mut left_child, &mut current.left);
                     let removed = *node.take().unwrap();
                     *node = left_child;
                     return Some(removed.value);
@@ -1118,7 +1119,7 @@ impl<T: Ord + Clone> AvlNode<T> {
     fn update_height(&mut self) {
         let left_height = Self::height(&self.left);
         let right_height = Self::height(&self.right);
-        self.height = 1 + core::cmp::max(left_height, right_height);
+        self.height = 1 + crate::compare::max(left_height, right_height);
     }
 
     fn right_rotate(mut root: Box<AvlNode<T>>) -> Box<AvlNode<T>> {

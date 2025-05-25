@@ -1,6 +1,6 @@
 use crate::axo_data::peekable::Peekable;
 use {
-    core::cmp::PartialEq,
+    crate::compare::PartialEq,
 
     crate::{
         axo_lexer::{
@@ -19,7 +19,7 @@ use {
             ItemKind, Parser, Primary, ParseError,
         },
         axo_span::Span,
-        axo_errors::Error,
+        axo_error::Error,
     }
 };
 

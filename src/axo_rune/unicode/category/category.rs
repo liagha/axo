@@ -270,7 +270,7 @@ impl GeneralCategory {
 #[cfg(test)]
 mod tests {
     use super::GeneralCategory as GC;
-    use core::char;
+    use crate::char;
     use crate::EnumeratedCharProperty;
 
     #[test]

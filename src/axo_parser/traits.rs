@@ -1,11 +1,14 @@
 use {
-    core::hash::{
+    crate::hash::{
         Hash, Hasher
     },
 
-    crate::axo_parser::{
-        Element, ElementKind,
-        Item, ItemKind
+    crate::{
+        memory::discriminant,
+        axo_parser::{
+            Element, ElementKind,
+            Item, ItemKind
+        },
     }
 };
 
@@ -20,144 +23,144 @@ impl Hash for ElementKind {
         match self {
             // Primary Expressions
             ElementKind::Literal(token_kind) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 token_kind.hash(state);
             }
             ElementKind::Identifier(name) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 name.hash(state);
             }
             
             ElementKind::Procedural(element) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 element.hash(state);
             }
 
             // Composite
             ElementKind::Group(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Sequence(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Collection(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Series(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Bundle(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Constructor { name, body } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
 
             // Operations
             ElementKind::Binary { left, operator, right } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 left.hash(state);
                 operator.kind.hash(state); // Only hash the kind of the token, not its span
                 right.hash(state);
             }
             ElementKind::Unary { operator, operand } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 operator.kind.hash(state); // Only hash the kind of the token, not its span
                 operand.hash(state);
             }
 
             // Access Expressions
             ElementKind::Bind { key, value } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 key.hash(state);
                 value.hash(state);
             }
             ElementKind::Labeled { label, element } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 label.hash(state);
                 element.hash(state);
             }
             ElementKind::Index { element, index } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 element.hash(state);
                 index.hash(state);
             }
             ElementKind::Invoke { target, parameters } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 target.hash(state);
                 parameters.hash(state);
             }
             ElementKind::Path { tree } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 tree.hash(state);
             }
             ElementKind::Member { object, member } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 object.hash(state);
                 member.hash(state);
             }
 
             // Control Flow
             ElementKind::Scope(elements) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 elements.hash(state);
             }
             ElementKind::Match { target, body } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 target.hash(state);
                 body.hash(state);
             }
             ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 condition.hash(state);
                 then_branch.hash(state);
                 else_branch.hash(state);
             }
             ElementKind::Loop { condition, body } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 condition.hash(state);
                 body.hash(state);
             }
             ElementKind::Iterate { clause, body } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 clause.hash(state);
                 body.hash(state);
             }
 
             // Declarations & Definitions
             ElementKind::Item(item_kind) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 item_kind.hash(state);
             }
             ElementKind::Assignment { target, value } => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 target.hash(state);
                 value.hash(state);
             }
 
             // Flow Control Statements
             ElementKind::Return(expr_opt) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
             ElementKind::Break(expr_opt) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
             ElementKind::Skip(expr_opt) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
 
             ElementKind::Invalid(_) => {
-                core::mem::discriminant(self).hash(state);
+                discriminant(self).hash(state);
                 // Note: You'll need to implement Hash for ParseError if it doesn't already implement it
                 // error.hash(state);
             }

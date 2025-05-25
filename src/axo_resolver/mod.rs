@@ -6,7 +6,7 @@ mod error;
 
 use {
     crate::{
-        axo_errors::Error,
+        axo_error::Error,
         axo_resolver::{
             error::ErrorKind,
         },

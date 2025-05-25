@@ -1,5 +1,5 @@
 use crate::axo_data::tree::{AvlNode, AvlTree, BinaryNode, BinarySearchTree, BinaryTree, BstNode, Node, Tree};
-use core::fmt::{Display, Debug, Formatter, Result};
+use crate::format::{Display, Debug, Formatter, Result};
 
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

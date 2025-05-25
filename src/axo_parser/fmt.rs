@@ -5,7 +5,7 @@ use {
             Element, ElementKind, ItemKind
         }
     },
-    core::fmt::{
+    crate::format::{
         Debug, Display,
         Formatter, Result
     }

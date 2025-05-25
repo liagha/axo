@@ -1,4 +1,5 @@
 use crate::Token;
+use crate::format::{Display, Debug, Formatter, Result};
 
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
@@ -17,8 +18,8 @@ pub enum ErrorKind {
     },
 }
 
-impl core::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::UndefinedSymbol(name, suggestion) => {
                 write!(f, "undefined symbol: `{}`", name)?;

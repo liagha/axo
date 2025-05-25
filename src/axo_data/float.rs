@@ -1,7 +1,7 @@
-use core::hash::{Hash, Hasher};
-use core::cmp::Ordering;
-use core::ops::{Add, Sub, Mul, Div, Neg, Rem};
-use core::fmt;
+use crate::hash::{Hash, Hasher};
+use crate::compare::Ordering;
+use crate::operations::{Add, Sub, Mul, Div, Neg, Rem};
+use crate::format::{Display, Debug, Formatter, Result};
 
 #[derive(Debug, Copy, Clone)]
 pub struct FloatLiteral(pub f64);
@@ -116,8 +116,8 @@ impl From<f32> for FloatLiteral {
     }
 }
 
-impl fmt::Display for FloatLiteral {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for FloatLiteral {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.0)
     }
 }

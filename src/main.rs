@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 mod axo_data;
-mod axo_errors;
+mod axo_error;
 mod axo_fmt;
 mod axo_form;
 mod axo_lexer;
@@ -10,6 +10,7 @@ mod axo_resolver;
 mod axo_rune;
 mod axo_span;
 mod timer;
+mod compiler;
 
 pub use {
     axo_lexer::{Lexer, PunctuationKind, OperatorKind, Token, TokenKind},
@@ -22,6 +23,12 @@ pub use {
     timer::{Timer, TimeSource},
 };
 
+pub enum ErrorKind {
+    PathRequired,
+}
+
+pub type CompileError = axo_error::Error<ErrorKind>;
+
 #[cfg(target_arch = "x86_64")]
 pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 
@@ -30,7 +37,7 @@ pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSour
 
 pub type Path = std::path::PathBuf;
 
-pub mod fs {
+pub mod file {
     pub use std::fs::*;
 }
 
@@ -38,12 +45,53 @@ pub mod process {
     pub use std::process::exit;
 }
 
-pub mod env {
+pub mod environment {
     pub use std::env::{args, current_dir, };
 }
 
-pub mod arc {
+pub mod thread {
     pub use std::sync::Arc;
+}
+
+pub mod memory {
+    pub use core::mem::{replace, swap, discriminant};
+}
+
+pub mod compare {
+    pub use core::cmp::*;
+}
+
+pub mod hash {
+    pub use core::hash::{Hash, Hasher};
+    pub use hashish::*;
+}
+
+pub mod char {
+    pub use core::char::*;
+}
+
+pub mod operations {
+    pub use core::ops::*;
+}
+
+pub mod arch {
+    pub use core::arch::asm;
+}
+
+pub mod marker {
+    pub use core::marker::{PhantomData};
+}
+
+pub mod string {
+    pub use core::str::FromStr;
+}
+
+pub mod slice {
+    pub use core::slice::*;
+}
+
+pub mod format {
+    pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
 struct Config {
@@ -67,7 +115,7 @@ fn main() {
         );
     }
 
-    let exec_path = env::current_dir()
+    let exec_path = environment::current_dir()
         .map(|mut path| {
             path.push(&config.file_path);
             path
@@ -88,7 +136,7 @@ fn main() {
 }
 
 fn parse_args() -> Config {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = environment::args().collect();
     let mut config = Config {
         file_path: String::new(),
         verbose: false,
@@ -148,7 +196,7 @@ fn process_file(file_path: &Path, config: &Config) {
     xprintln!();
 
     let file_read_timer = Timer::new(TIMERSOURCE);
-    let content = fs::read_to_string(file_path).unwrap_or_else(|e| {
+    let content = file::read_to_string(file_path).unwrap_or_else(|e| {
         eprintln!("Failed to read file {}: {}", file_path.display(), e);
         process::exit(1);
     });
@@ -249,6 +297,8 @@ fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
                 details
             );
     }
+
+    parser.restore();
 
     let elements = parser.parse();
 

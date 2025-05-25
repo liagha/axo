@@ -1,4 +1,4 @@
-use crate::arc::Arc;
+use crate::thread::Arc;
 use crate::axo_form::{Action, Form, FormKind, Former, Pattern};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::{Element, ElementKind, ParseError};
@@ -53,8 +53,7 @@ pub fn literal() -> Pattern<Token, Element, ParseError> {
                     | TokenKind::Character(_)
                     | TokenKind::Boolean(_)
                     | TokenKind::Float(_)
-                    | TokenKind::Integer(_) //| TokenKind::Operator(_)
-                                            //| TokenKind::Punctuation(_)
+                    | TokenKind::Integer(_)
             )
         })),
         Arc::new(|form, _| {
@@ -384,22 +383,109 @@ pub fn fallback() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(
-        Pattern::alternative([
-            whitespace(),
-            group(),
-            sequence(),
-            collection(),
-            series(),
-            bundle(),
-            scope(),
-            token(),
-            fallback(),
+pub fn delimited() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([
+        group(),
+        sequence(),
+        collection(),
+        series(),
+        bundle(),
+        scope(),
+    ])
+}
+
+pub fn prefix() -> Pattern<Token, Element, ParseError> {
+    Pattern::transform(
+        Pattern::sequence([
+            Pattern::predicate(Arc::new(|token: &Token| {
+                if let TokenKind::Operator(operator) = &token.kind {
+                    operator.is_prefix()
+                } else {
+                    false
+                }
+            })),
+            { Pattern::lazy(expression) },
         ]),
-        0,
-        None,
+        Arc::new(|forms, span: Span| {
+            let forms = forms
+                .iter()
+                .map(|form| form.expand())
+                .flatten()
+                .collect::<Vec<_>>();
+
+            let operator = match forms[0].kind.clone() {
+                FormKind::Raw(token) => token,
+                _ => unreachable!(),
+            };
+
+            let operand = match forms[1].kind.clone() {
+                FormKind::Single(element) => element,
+                _ => unreachable!(),
+            };
+
+            Ok(Element::new(
+                ElementKind::Unary {
+                    operator,
+                    operand: operand.into(),
+                },
+                span,
+            ))
+        }),
     )
+}
+
+pub fn postfix() -> Pattern<Token, Element, ParseError> {
+    Pattern::transform(
+        Pattern::sequence([
+            { Pattern::lazy(expression) },
+            Pattern::predicate(Arc::new(|token: &Token| {
+                if let TokenKind::Operator(operator) = &token.kind {
+                    operator.is_postfix()
+                } else {
+                    false
+                }
+            })),
+        ]),
+        Arc::new(|forms, span: Span| {
+            let forms = forms
+                .iter()
+                .map(|form| form.expand())
+                .flatten()
+                .collect::<Vec<_>>();
+
+            let operand = match forms[0].kind.clone() {
+                FormKind::Single(element) => element,
+                _ => unreachable!(),
+            };
+
+            let operator = match forms[1].kind.clone() {
+                FormKind::Raw(token) => token,
+                _ => unreachable!(),
+            };
+
+            Ok(Element::new(
+                ElementKind::Unary {
+                    operator,
+                    operand: operand.into(),
+                },
+                span,
+            ))
+        }),
+    )
+}
+
+pub fn expression() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([
+        whitespace(),
+        delimited(),
+        token(),
+        prefix(),
+        fallback(),
+    ])
+}
+
+pub fn pattern() -> Pattern<Token, Element, ParseError> {
+    Pattern::repeat(expression(), 0, None)
 }
 
 impl Parser {

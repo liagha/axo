@@ -1,5 +1,5 @@
 use {
-    core::cmp::{
+    crate::compare::{
         max, min
     },
     matchete::{
