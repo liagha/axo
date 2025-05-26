@@ -5,25 +5,6 @@ use crate::axo_parser::{Element, ElementKind, ParseError};
 use crate::axo_span::Span;
 use crate::{Parser, Peekable, PunctuationKind, Token, TokenKind};
 
-fn expand_elements(forms: Vec<Form<Token, Element, ParseError>>) -> Vec<Element> {
-    let mut elements: Vec<Element> = Vec::new();
-
-    for form in forms {
-        match form.kind {
-            FormKind::Single(element) => {
-                elements.push(element);
-            }
-            FormKind::Multiple(sub) => {
-                let sub = expand_elements(sub);
-
-                elements.extend(sub);
-            }
-            _ => {}
-        }
-    }
-
-    elements
-}
 
 pub fn identifier() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -112,7 +93,7 @@ pub fn group() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Group(elements), span))
         }),
     )
@@ -161,7 +142,7 @@ pub fn sequence() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Sequence(elements), span))
         }),
     )
@@ -210,7 +191,7 @@ pub fn collection() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Collection(elements), span))
         }),
     )
@@ -259,7 +240,7 @@ pub fn series() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Series(elements), span))
         }),
     )
@@ -308,7 +289,7 @@ pub fn bundle() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Bundle(elements), span))
         }),
     )
@@ -357,7 +338,7 @@ pub fn scope() -> Pattern<Token, Element, ParseError> {
             )),
         ]),
         Arc::new(|forms, span: Span| {
-            let elements = expand_elements(forms);
+            let elements = Form::expand_outputs(forms);
             Ok(Element::new(ElementKind::Sequence(elements), span))
         }),
     )
@@ -394,7 +375,7 @@ pub fn delimited() -> Pattern<Token, Element, ParseError> {
     ])
 }
 
-pub fn prefix() -> Pattern<Token, Element, ParseError> {
+pub fn unary() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
             Pattern::predicate(Arc::new(|token: &Token| {
@@ -403,70 +384,115 @@ pub fn prefix() -> Pattern<Token, Element, ParseError> {
                 } else {
                     false
                 }
-            })),
-            { Pattern::lazy(expression) },
-        ]),
-        Arc::new(|forms, span: Span| {
-            let forms = forms
-                .iter()
-                .map(|form| form.expand())
-                .flatten()
-                .collect::<Vec<_>>();
-
-            let operator = match forms[0].kind.clone() {
-                FormKind::Raw(token) => token,
-                _ => unreachable!(),
-            };
-
-            let operand = match forms[1].kind.clone() {
-                FormKind::Single(element) => element,
-                _ => unreachable!(),
-            };
-
-            Ok(Element::new(
-                ElementKind::Unary {
-                    operator,
-                    operand: operand.into(),
-                },
-                span,
-            ))
-        }),
-    )
-}
-
-pub fn postfix() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            { Pattern::lazy(expression) },
+            })).repeat_self(0, None).optional_self(),
+            Pattern::lazy(|| expression(0)),
             Pattern::predicate(Arc::new(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
                     operator.is_postfix()
                 } else {
                     false
                 }
-            })),
+            })).repeat_self(0, None).optional_self(),
         ]),
         Arc::new(|forms, span: Span| {
-            let forms = forms
-                .iter()
-                .map(|form| form.expand())
-                .flatten()
-                .collect::<Vec<_>>();
+            let sequence = forms[0].unwrap();
+            
+            let prefixes = Form::expand_inputs(sequence[0].unwrap());
+            
+            let operand = match sequence[1].clone() {
+                Form { kind: FormKind::Single(element), .. } => element,
+                _ => unreachable!()
+            };
+            
+            let mut unary : Option<Element> = None;
+            
+            for prefix in prefixes {
+                if let Some(operand) = unary.clone() {
+                    unary = Some(
+                        Element::new(
+                            ElementKind::Unary {
+                                operand: operand.clone().into(),
+                                operator: prefix,
+                            },
+                            Span::default(),
+                        )
+                    );
+                } else { 
+                    unary = Some(Element::new(
+                        ElementKind::Unary {
+                            operand: operand.clone().into(),
+                            operator: prefix,
+                        },
+                        Span::default(), 
+                    ))
+                }
+            }
 
-            let operand = match forms[0].kind.clone() {
-                FormKind::Single(element) => element,
+            let postfixes = Form::expand_inputs(sequence[2].unwrap());
+
+            for postfix in postfixes {
+                if let Some(operand) = unary.clone() {
+                    unary = Some(
+                        Element::new(
+                            ElementKind::Unary {
+                                operand: operand.clone().into(),
+                                operator: postfix,
+                            },
+                            Span::default(),
+                        )
+                    );
+                } else {
+                    unary = Some(Element::new(
+                        ElementKind::Unary {
+                            operand: operand.clone().into(),
+                            operator: postfix,
+                        },
+                        Span::default(),
+                    ))
+                }
+            }
+            
+            Ok(unary.unwrap())
+        }),
+    )
+}
+
+pub fn binary(precedence: usize) -> Pattern<Token, Element, ParseError> {
+    Pattern::transform(
+        Pattern::sequence([
+            Pattern::lazy(move || expression(precedence + 1)),
+            Pattern::predicate(Arc::new(move |token: &Token| {
+                if let TokenKind::Operator(operator) = &token.kind {
+                    operator.precedence().is_some()
+                } else {
+                    false
+                }
+            })),
+            Pattern::lazy(move || expression(precedence + 1)),
+        ]),
+        Arc::new(|forms, span: Span| {
+            let sequence = forms[0].clone().unwrap();
+
+            let left = match sequence[0].clone() {
+                Form { kind: FormKind::Single(element), .. } => element,
                 _ => unreachable!(),
             };
 
-            let operator = match forms[1].kind.clone() {
-                FormKind::Raw(token) => token,
+            let operator = match sequence[1].clone() {
+                Form { kind: FormKind::Raw(operator @ Token { kind: TokenKind::Operator(_), .. }), .. } => operator,
+                _ => unreachable!(),
+            };
+
+            let right = match sequence[2].clone() {
+                Form { kind: FormKind::Single(element), .. } => element,
                 _ => unreachable!(),
             };
 
             Ok(Element::new(
-                ElementKind::Unary {
+                ElementKind::Binary {
+                    left: Box::new(left),
                     operator,
-                    operand: operand.into(),
+                    right: Box::new(right),
                 },
                 span,
             ))
@@ -474,18 +500,19 @@ pub fn postfix() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-pub fn expression() -> Pattern<Token, Element, ParseError> {
+pub fn expression(precedence: usize) -> Pattern<Token, Element, ParseError> {
     Pattern::alternative([
         whitespace(),
+        binary(precedence),
+        unary(),
         delimited(),
         token(),
-        prefix(),
         fallback(),
     ])
 }
 
 pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(expression(), 0, None)
+    Pattern::repeat(expression(0), 0, None)
 }
 
 impl Parser {

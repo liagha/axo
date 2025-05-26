@@ -4,8 +4,8 @@ use crate::axo_form::{Action, FormKind, Form, PatternKind};
 impl<Input, Output, Error> Display for Form<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
@@ -39,8 +39,8 @@ where
 impl<Input, Output, Error> Debug for PatternKind<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -87,8 +87,8 @@ where
 impl<Input, Output, Error> Debug for Action<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {

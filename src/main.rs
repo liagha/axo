@@ -21,13 +21,8 @@ pub use {
     axo_data::{*, peekable::*},
     broccli::{xprintln, Color, TextStyle},
     timer::{Timer, TimeSource},
+    compiler::{Compiler, Config, CompilerError},
 };
-
-pub enum ErrorKind {
-    PathRequired,
-}
-
-pub type CompileError = axo_error::Error<ErrorKind>;
 
 #[cfg(target_arch = "x86_64")]
 pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
@@ -38,7 +33,7 @@ pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSour
 pub type Path = std::path::PathBuf;
 
 pub mod file {
-    pub use std::fs::*;
+    pub use std::fs::{read_to_string};
 }
 
 pub mod process {
@@ -58,7 +53,7 @@ pub mod memory {
 }
 
 pub mod compare {
-    pub use core::cmp::*;
+    pub use core::cmp::{PartialEq, Ordering, max, min};
 }
 
 pub mod hash {
@@ -67,11 +62,11 @@ pub mod hash {
 }
 
 pub mod char {
-    pub use core::char::*;
+    pub use core::char::{from_u32};
 }
 
 pub mod operations {
-    pub use core::ops::*;
+    pub use core::ops::{Add, Sub, Mul, Div, Neg, Rem, Range};
 }
 
 pub mod arch {
@@ -94,19 +89,18 @@ pub mod format {
     pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
-struct Config {
-    file_path: String,
-    verbose: bool,
-    show_tokens: bool,
-    show_ast: bool,
-    time_report: bool,
-}
-
 fn main() {
     println!();
 
     let main_timer = Timer::new(TIMERSOURCE);
-    let config = parse_args();
+
+    let config = match parse_arguments() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
 
     if config.time_report {
         println!(
@@ -115,17 +109,27 @@ fn main() {
         );
     }
 
-    let exec_path = environment::current_dir()
-        .map(|mut path| {
-            path.push(&config.file_path);
-            path
-        })
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to get current directory: {}", e);
-            process::exit(1);
-        });
+    let file_read_timer = Timer::new(TIMERSOURCE);
 
-    process_file(&exec_path, &config);
+    let mut compiler = match Compiler::new(config.clone()) {
+        Ok(compiler) => compiler,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
+
+    if config.time_report {
+        println!(
+            "File Read Took {} ns",
+            file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
+        );
+    }
+
+    if let Err(e) = compiler.compile() {
+        eprintln!("{}", e);
+        process::exit(1);
+    }
 
     if config.time_report {
         println!(
@@ -135,7 +139,7 @@ fn main() {
     }
 }
 
-fn parse_args() -> Config {
+fn parse_arguments() -> Result<Config, CompilerError> {
     let args: Vec<String> = environment::args().collect();
     let mut config = Config {
         file_path: String::new(),
@@ -169,12 +173,10 @@ fn parse_args() -> Config {
     }
 
     if config.file_path.is_empty() {
-        eprintln!("No input file specified");
-        print_usage(&args[0]);
-        process::exit(1);
+        return Err(CompilerError::PathRequired);
     }
 
-    config
+    Ok(config)
 }
 
 fn print_usage(program: &str) {
@@ -185,186 +187,6 @@ fn print_usage(program: &str) {
     println!("  -a, --ast       Show parsed AST");
     println!("  --time          Show execution time reports");
     println!("  -h, --help      Show this help message");
-}
-
-fn process_file(file_path: &Path, config: &Config) {
-    xprintln!(
-        "{} {}" => Color::Blue,
-        "Compiling" => Color::Blue,
-        file_path.display()
-    );
-    xprintln!();
-
-    let file_read_timer = Timer::new(TIMERSOURCE);
-    let content = file::read_to_string(file_path).unwrap_or_else(|e| {
-        eprintln!("Failed to read file {}: {}", file_path.display(), e);
-        process::exit(1);
-    });
-
-    if config.verbose {
-        xprintln!(
-            "File Contents:\n{}" => Color::Magenta,
-            indent(&content) => Color::BrightMagenta
-        );
-        xprintln!();
-    }
-
-    if config.time_report {
-        println!(
-            "File Read Took {} ns",
-            file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
-        );
-    }
-
-    process_lexing(&content, file_path, config);
-}
-
-fn process_lexing(content: &str, file_path: &Path, config: &Config) {
-    let lex_timer = Timer::new(TIMERSOURCE);
-    
-    let mut lexer = Lexer::new(content.to_string(), file_path.clone());
-    
-    let (tokens, errors) = lexer.lex();
-
-    xprintln!("Tokens:\n{}", indent(&format_tokens(&*tokens)));
-
-    xprintln!();
-
-    for err in errors {
-        let (msg, details) = err.format();
-        xprintln!(
-                "{}\n{}" => Color::Red,
-                msg => Color::Orange,
-                details
-            );
-    }
-
-    xprintln!();
-
-    /*
-    let tokens = lexer.tokenize().unwrap_or_else(|err| {
-        let (msg, details) = err.format();
-        xprintln!(
-            "{}\n{}" => Color::Red,
-            msg => Color::Orange,
-            details
-        );
-        if config.time_report {
-            println!(
-                "Failed Compilation Took {} ns",
-                lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
-            );
-        }
-        process::exit(1);
-    });
-
-    if config.show_tokens || config.verbose {
-        xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
-        xprintln!();
-    }
-    */
-    
-    if config.time_report {
-        println!(
-            "Lexing Took {} ns",
-            lex_timer.to_nanoseconds(lex_timer.elapsed().unwrap())
-        );
-    }
-
-    process_parsing(tokens, file_path, config);
-}
-
-fn process_parsing(tokens: Vec<Token>, file_path: &Path, config: &Config) {
-    let parse_timer = Timer::new(TIMERSOURCE);
-    let mut parser = Parser::new(tokens, file_path.clone());
-    
-    let (test_elements, test_errors) = parser.parse_program();
-
-    let test_ast = test_elements
-        .iter()
-        .map(|element| format!("{:?}", element))
-        .collect::<Vec<String>>()
-        .join("\n");
-    
-    xprintln!("Test Elements:\n{}" => Color::Green, indent(&test_ast));
-    xprintln!();
-
-    for err in test_errors {
-        let (msg, details) = err.format();
-        xprintln!(
-                "{}\n{}" => Color::Red,
-                msg => Color::Orange,
-                details
-            );
-    }
-
-    parser.restore();
-
-    let elements = parser.parse();
-
-    if !parser.errors.is_empty() {
-        for err in parser.errors {
-            xprintln!("{}" => Color::Red, err);
-        }
-        if config.time_report {
-            println!(
-                "Error Handling Took {} ns",
-                parse_timer.to_nanoseconds(parse_timer.elapsed().unwrap())
-            );
-        }
-        process::exit(1);
-    }
-
-    if config.show_ast || config.verbose {
-        let ast = elements
-            .iter()
-            .map(|element| format!("{:?}", element))
-            .collect::<Vec<String>>()
-            .join("\n");
-        xprintln!("Elements:\n{}" => Color::Green, indent(&ast));
-        xprintln!();
-    }
-
-    if config.time_report {
-        println!(
-            "Parsing Took {} ns",
-            parse_timer.to_nanoseconds(parse_timer.elapsed().unwrap())
-        );
-    }
-
-    process_resolution(elements, config);
-}
-
-fn process_resolution(elements: Vec<axo_parser::Element>, config: &Config) {
-    let resolver_timer = Timer::new(TIMERSOURCE);
-    let mut resolver = Resolver::new();
-    resolver.resolve(elements);
-
-    if !resolver.errors.is_empty() {
-        for err in resolver.errors {
-            let (msg, details) = err.format();
-            xprintln!(
-                "{}\n{}" => Color::Red,
-                msg => Color::Orange,
-                details
-            );
-        }
-        process::exit(1);
-    }
-
-    if config.verbose && !resolver.scope.all_symbols().is_empty() {
-        xprintln!(
-            "{}" => Color::Cyan,
-            format!("Symbols:\n{:#?}", resolver.scope.all_symbols())
-        );
-    }
-
-    if config.time_report {
-        println!(
-            "Resolution Took {} ns",
-            resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
-        );
-    }
 }
 
 fn format_tokens(tokens: &[Token]) -> String {

@@ -7,7 +7,7 @@ mod pattern;
 mod action;
 use crate::format::Debug;
 use crate::thread::Arc;
-use crate::Peekable;
+use crate::{Peekable};
 use crate::axo_span::Span;
 use crate::axo_form::action::Action;
 use crate::axo_form::pattern::{Pattern, PatternKind};
@@ -17,12 +17,12 @@ Arc<dyn Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Sen
 pub type PredicateFunction<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
 pub type ErrorFunction<Error> = Arc<dyn Fn(Span) -> Error>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum FormKind<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     Empty,
     Raw(Input),
@@ -31,12 +31,12 @@ where
     Error(Error),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Form<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     pub kind: FormKind<Input, Output, Error>,
     pub span: Span,
@@ -45,23 +45,114 @@ where
 impl<Input, Output, Error> Form<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
-    fn expand(&self) -> Vec<Form<Input, Output, Error>> {
+    fn unwrap(&self) -> Vec<Form<Input, Output, Error>> {
         match self.kind.clone() {
             FormKind::Empty => vec![],
             FormKind::Raw(_) | FormKind::Single(_) | FormKind::Error(_) => vec![self.clone()],
             FormKind::Multiple(items) => items,
         }
     }
+    
+    fn unwrap_input(&self) -> Option<Input> {
+        match self.kind.clone() { 
+            FormKind::Raw(input) => Some(input.clone()),
+            _ => None
+        }
+    }
+
+    fn unwrap_output(&self) -> Option<Output> {
+        match self.kind.clone() {
+            FormKind::Single(output) => Some(output.clone()),
+            _ => None
+        }
+    }
+
+    fn expand(&self) -> Vec<Form<Input, Output, Error>> {
+        let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
+
+        match self {
+            Form { kind: FormKind::Empty, .. } => {}
+            
+            Form { kind: FormKind::Multiple(forms), .. } => {
+                expanded.extend(Self::expand_forms(forms.clone()));
+            }
+            
+            form => {
+                expanded.push(form.clone());
+            }
+        }
+
+        expanded
+    }
+
+    fn expand_forms(forms: Vec<Form<Input, Output, Error>>) -> Vec<Form<Input, Output, Error>> {
+        let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
+
+        for form in forms {
+            match form {
+                Form { kind: FormKind::Multiple(sub), .. } => {
+                    let sub = Self::expand_forms(sub);
+
+                    expanded.extend(sub);
+                }
+                form => {
+                    expanded.push(form)
+                }
+            }
+        }
+
+        expanded
+    }
+
+    fn expand_inputs(forms: Vec<Form<Input, Output, Error>>) -> Vec<Input> {
+        let mut inputs: Vec<Input> = Vec::new();
+
+        for form in forms {
+            match form.kind {
+                FormKind::Raw(input) => {
+                    inputs.push(input);
+                }
+                FormKind::Multiple(sub) => {
+                    let sub = Self::expand_inputs(sub);
+
+                    inputs.extend(sub);
+                }
+                _ => {}
+            }
+        }
+
+        inputs
+    }
+
+    fn expand_outputs(forms: Vec<Form<Input, Output, Error>>) -> Vec<Output> {
+        let mut outputs: Vec<Output> = Vec::new();
+
+        for form in forms {
+            match form.kind {
+                FormKind::Single(output) => {
+                    outputs.push(output);
+                }
+                FormKind::Multiple(sub) => {
+                    let sub = Self::expand_outputs(sub);
+
+                    outputs.extend(sub);
+                }
+                _ => {}
+            }
+        }
+
+        outputs
+    }
 }
 
 pub trait Former<Input, Output, Error>: Peekable<Input>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>>;
     fn action(
@@ -76,8 +167,8 @@ where
 impl<Input, Output, Error> Form<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     pub fn new(form: FormKind<Input, Output, Error>, span: Span) -> Self {
         Self { kind: form, span }
@@ -88,8 +179,8 @@ impl<Matcher, Input, Output, Error> Former<Input, Output, Error> for Matcher
 where
     Matcher: Peekable<Input>,
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
 
     fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>> {
@@ -422,7 +513,7 @@ where
 
         match &pattern.action {
             Some(action) => {
-                let items = form.clone().expand();
+                let items = form.clone().unwrap();
                 Self::action(action, items, span.clone())
             }
             None => form,

@@ -15,8 +15,8 @@ use {
 
 #[derive(Clone)]
 pub struct Parser {
-    pub index: usize,
     pub input: Vec<Token>,
+    pub index: usize,
     pub position: Position,
     pub output: Vec<Element>,
     pub errors: Vec<ParseError>,

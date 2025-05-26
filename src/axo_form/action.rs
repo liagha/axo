@@ -7,8 +7,8 @@ use crate::axo_span::Span;
 pub enum Action<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     Transform(TransformFunction<Input, Output, Error>),
     Ignore,
@@ -22,8 +22,8 @@ where
 impl<Input, Output, Error> Action<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     pub fn map<F>(f: F) -> Self
     where

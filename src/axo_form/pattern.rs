@@ -10,8 +10,8 @@ pub type LazyPattern<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Outp
 pub enum PatternKind<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     Exact(Input),
     Alternative(Vec<Pattern<Input, Output, Error>>),
@@ -36,8 +36,8 @@ where
 pub struct Pattern<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     pub kind: PatternKind<Input, Output, Error>,
     pub action: Option<Action<Input, Output, Error>>,
@@ -46,8 +46,8 @@ where
 impl<Input, Output, Error> Pattern<Input, Output, Error>
 where
     Input: Clone + PartialEq + Debug,
-    Output: Clone + Debug,
-    Error: Clone + Debug,
+    Output: Clone + PartialEq + Debug,
+    Error: Clone + PartialEq + Debug,
 {
     pub fn exact(value: Input) -> Self {
         Self {
