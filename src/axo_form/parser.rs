@@ -1,10 +1,10 @@
+use crate::axo_form::delimited::delimited;
 use crate::axo_form::{Action, Form, FormKind, Former, Pattern};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::{Element, ElementKind, ParseError};
 use crate::axo_span::Span;
 use crate::thread::Arc;
 use crate::{Parser, Peekable, PunctuationKind, Token, TokenKind};
-use crate::axo_form::delimited::delimited;
 
 pub fn identifier() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -70,8 +70,6 @@ pub fn fallback() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-
-
 pub fn unary() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
@@ -107,7 +105,7 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                 } => element,
                 _ => {
                     unreachable!()
-                },
+                }
             };
 
             let mut unary = operand.clone();
@@ -142,91 +140,55 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
 pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
-            unary(),
-            Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::predicate(Arc::new(move |token: &Token| {
-                        if let TokenKind::Operator(operator) = &token.kind {
-                            if let Some(precedence) = operator.precedence() {
-                                precedence >= minimum
-                            } else {
-                                false
-                            }
+            {
+                unary()
+            },
+            {
+                Pattern::predicate(Arc::new(move |token: &Token| {
+                    if let TokenKind::Operator(operator) = &token.kind {
+                        if let Some(precedence) = operator.precedence() {
+                            precedence >= minimum
                         } else {
                             false
                         }
-                    })),
-                    Pattern::lazy(move || binary(minimum + 1)),
-                ]),
-                1,
-                None,
-            ),
+                    } else {
+                        false
+                    }
+                }))
+            },
+            {
+                Pattern::lazy(move || expression(minimum))
+            },
         ]),
         Arc::new(move |forms, _span: Span| {
             let sequence = forms[0].clone().unwrap();
-            
+
+            println!("Sequence: {}\n", crate::format_vec(&sequence));
+
             let mut left = sequence[0].unwrap_output().unwrap();
-            
-            let operations = sequence[1].unwrap();
-            
-            let mut precedence = 0;
 
-            for operation in operations {
-                let (operator, right) = match operation {
-                    Form {
-                        kind: FormKind::Multiple(items),
-                        ..
-                    } => {
-                        if items.len() != 2 {
-                            continue;
-                        }
-                        
-                        let operator = match items[0].clone() {
-                            Form {
-                                kind: FormKind::Raw(ref token @ Token { kind: TokenKind::Operator(ref operator), .. }),
-                                ..
-                            } => {
-                                if let Some(operator) = operator.precedence() {
-                                    if operator >= precedence {
-                                        precedence = operator;
-                                        
-                                        token.clone()
-                                    } else { 
-                                        continue;
-                                    }
-                                } else { 
-                                    continue;
-                                }
-                            },
-                            _ => continue,
-                        };
+            println!("Left: {:?}\n", left);
 
-                        let right = match items[1].clone() {
-                            Form {
-                                kind: FormKind::Single(element),
-                                ..
-                            } => element,
-                            _ => continue,
-                        };
+            let operator = sequence[1].unwrap_input().unwrap();
 
-                        (operator, right)
-                    },
-                    _ => continue,
-                };
+            println!("Operator: {:?}\n", operator);
 
-                let start = left.span.start.clone();
-                let end = right.span.end.clone();
-                let span = Span::new(start, end);
+            let right = sequence[2].unwrap_output().unwrap();
 
-                left = Element::new(
-                    ElementKind::Binary {
-                        left: Box::new(left),
-                        operator,
-                        right: Box::new(right),
-                    },
-                    span,
-                );
-            }
+            println!("Right: {:?}\n", right);
+
+            let start = left.span.start.clone();
+            let end = right.span.end.clone();
+            let span = Span::new(start, end);
+
+            left = Element::new(
+                ElementKind::Binary {
+                    left: Box::new(left),
+                    operator,
+                    right: Box::new(right),
+                },
+                span,
+            );
 
             Ok(left)
         }),
@@ -237,12 +199,12 @@ pub fn primary() -> Pattern<Token, Element, ParseError> {
     Pattern::alternative([whitespace(), delimited(), token(), fallback()])
 }
 
-pub fn expression() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([binary(0), unary(), primary()])
+pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([binary(minimum), unary(), primary()])
 }
 
 pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(expression(), 0, None)
+    Pattern::repeat(expression(0), 0, None)
 }
 
 impl Parser {

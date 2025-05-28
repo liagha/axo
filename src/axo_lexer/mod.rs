@@ -7,8 +7,8 @@ mod fmt;
 
 pub use {
     lexer::Lexer,
-    operator::{OperatorKind, OperatorLexer},
-    punctuation::{PunctuationKind, PunctuationLexer},
+    operator::{OperatorKind},
+    punctuation::{PunctuationKind},
     token::{Token, TokenKind},
 };
 

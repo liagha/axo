@@ -354,20 +354,22 @@ where
     fn form(&mut self, pattern: Pattern<Input, Output, Error>) -> Form<Input, Output, Error> {
         let start = self.position();
 
-        let resolved_pattern = match &pattern.kind {
+        let resolved = match &pattern.kind {
             PatternKind::Lazy(factory) => {
-                factory()
+                let pattern = factory();
+
+                pattern
             }
             _ => pattern.clone(),
         };
 
-        let (matches, new) = self.matches(&resolved_pattern, 0);
+        let (matches, new) = self.matches(&resolved, 0);
 
         if !matches && new > 0 {
             return Form::new(FormKind::Empty, Span::point(start.clone()));
         }
 
-        let form = match resolved_pattern.kind.clone() {
+        let form = match resolved.kind.clone() {
             PatternKind::Exact(input) => {
                 if let Some(actual) = self.next() {
                     if actual == input {

@@ -89,6 +89,10 @@ pub mod format {
     pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
+pub fn format_vec<Item: format::Display>(vector: &Vec<Item>) -> String {
+    vector.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", ")
+}
+
 fn main() {
     println!();
 
