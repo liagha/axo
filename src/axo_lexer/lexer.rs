@@ -638,19 +638,19 @@ impl Lexer {
             let form = self.form(Self::pattern());
 
             match form.kind {
-                FormKind::Single(token) => {
+                FormKind::Output(token) => {
                     tokens.push(token);
                 }
 
                 FormKind::Multiple(multi) => {
                     for item in multi {
                         match item.kind {
-                            FormKind::Single(token) => {
+                            FormKind::Output(token) => {
                                 tokens.push(token);
                             }
                             FormKind::Multiple(sub_multi) => {
                                 for sub_item in sub_multi {
-                                    if let FormKind::Single(token) = sub_item.kind {
+                                    if let FormKind::Output(token) = sub_item.kind {
                                         tokens.push(token);
                                     }
                                 }
@@ -667,7 +667,7 @@ impl Lexer {
                     errors.push(err);
                 }
 
-                FormKind::Empty | FormKind::Raw(_) => {}
+                FormKind::Empty | FormKind::Input(_) => {}
             }
         }
 

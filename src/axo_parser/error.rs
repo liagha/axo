@@ -13,6 +13,8 @@ use {
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
+    ExpectedCondition,
+    ExpectedThen,
     PatternError,
     DanglingElse,
     ExpectedToken(TokenKind),
@@ -34,6 +36,8 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
+            ErrorKind::ExpectedCondition => write!(f, "expected condition"),
+            ErrorKind::ExpectedThen => write!(f, "expected then"),
             ErrorKind::PatternError => write!(f, "invalid pattern syntax"),
             ErrorKind::ExpectedToken(expected) => {
                 write!(f, "expected token {:?}", expected)

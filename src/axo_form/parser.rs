@@ -14,10 +14,10 @@ pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Arc::new(|form, _| {
             form.first()
                 .and_then(|token| match token.kind.clone() {
-                    FormKind::Raw(Token {
-                        kind: TokenKind::Identifier(ident),
-                        span,
-                    }) => Some(Element::new(ElementKind::Identifier(ident), span)),
+                    FormKind::Input(Token {
+                                        kind: TokenKind::Identifier(ident),
+                                        span,
+                                    }) => Some(Element::new(ElementKind::Identifier(ident), span)),
                     _ => None,
                 })
                 .ok_or_else(|| unreachable!())
@@ -40,7 +40,7 @@ pub fn literal() -> Pattern<Token, Element, ParseError> {
         Arc::new(|form, _| {
             form.first()
                 .and_then(|token| match token.kind.clone() {
-                    FormKind::Raw(Token { kind, span }) => {
+                    FormKind::Input(Token { kind, span }) => {
                         Some(Element::new(ElementKind::Literal(kind), span))
                     }
                     _ => None,
@@ -50,25 +50,7 @@ pub fn literal() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-pub fn token() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([identifier(), literal()])
-}
 
-pub fn whitespace() -> Pattern<Token, Element, ParseError> {
-    Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-        token.kind == TokenKind::Punctuation(PunctuationKind::Space)
-    })))
-}
-
-pub fn fallback() -> Pattern<Token, Element, ParseError> {
-    Pattern::conditional(
-        Pattern::anything(),
-        Action::Error(Arc::new(|span| {
-            ParseError::new(ErrorKind::PatternError, span)
-        })),
-        Action::Ignore,
-    )
-}
 
 pub fn unary() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -80,8 +62,8 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                     false
                 }
             }))
-            .repeat_self(0, None)
-            .optional_self(),
+                .repeat_self(0, None)
+                .optional_self(),
             Pattern::lazy(primary),
             Pattern::predicate(Arc::new(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -90,8 +72,8 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                     false
                 }
             }))
-            .repeat_self(0, None)
-            .optional_self(),
+                .repeat_self(0, None)
+                .optional_self(),
         ]),
         Arc::new(|forms, _span: Span| {
             let sequence = forms[0].unwrap();
@@ -100,7 +82,7 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
 
             let operand = match sequence[1].clone() {
                 Form {
-                    kind: FormKind::Single(element),
+                    kind: FormKind::Output(element),
                     ..
                 } => element,
                 _ => {
@@ -140,58 +122,193 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
 pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
-            {
-                unary()
-            },
-            {
-                Pattern::predicate(Arc::new(move |token: &Token| {
-                    if let TokenKind::Operator(operator) = &token.kind {
-                        if let Some(precedence) = operator.precedence() {
-                            precedence >= minimum
+            unary(),
+            Pattern::repeat(
+                Pattern::sequence([
+                    Pattern::predicate(Arc::new(move |token: &Token| {
+                        if let TokenKind::Operator(operator) = &token.kind {
+                            if let Some(precedence) = operator.precedence() {
+                                precedence >= minimum
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
-                    } else {
-                        false
-                    }
-                }))
-            },
-            {
-                Pattern::lazy(move || expression(minimum))
-            },
+                    })),
+                    Pattern::lazy(move || unary())
+                ]),
+                0,
+                None
+            )
         ]),
         Arc::new(move |forms, _span: Span| {
             let sequence = forms[0].clone().unwrap();
 
-            println!("Sequence: {}\n", crate::format_vec(&sequence));
-
             let mut left = sequence[0].unwrap_output().unwrap();
+            let operations = sequence[1].unwrap();
 
-            println!("Left: {:?}\n", left);
+            let mut pairs = Vec::new();
 
-            let operator = sequence[1].unwrap_input().unwrap();
+            for operation in operations {
+                let sequence = operation.unwrap();
 
-            println!("Operator: {:?}\n", operator);
+                if sequence.len() >= 2 {
+                    let operator = sequence[0].unwrap_input().unwrap();
+                    let operand = sequence[1].unwrap_output().unwrap();
 
-            let right = sequence[2].unwrap_output().unwrap();
+                    let precedence = if let TokenKind::Operator(op) = &operator.kind {
+                        op.precedence().unwrap_or(0)
+                    } else {
+                        0
+                    };
 
-            println!("Right: {:?}\n", right);
+                    pairs.push((operator, operand, precedence));
+                }
+            }
 
-            let start = left.span.start.clone();
-            let end = right.span.end.clone();
-            let span = Span::new(start, end);
-
-            left = Element::new(
-                ElementKind::Binary {
-                    left: Box::new(left),
-                    operator,
-                    right: Box::new(right),
-                },
-                span,
-            );
+            left = climb(left, pairs, minimum);
 
             Ok(left)
         }),
+    )
+}
+
+fn climb(
+    mut left: Element,
+    pairs: Vec<(Token, Element, u8)>,
+    threshold: u8
+) -> Element {
+    let mut current = 0;
+
+    while current < pairs.len() {
+        let (operator, operand, precedence) = &pairs[current];
+
+        if *precedence < threshold {
+            break;
+        }
+
+        let mut right = operand.clone();
+        let mut lookahead = current + 1;
+
+        while lookahead < pairs.len() {
+            let (_, _, priority) = &pairs[lookahead];
+
+            if *priority > *precedence {
+                let mut higher = Vec::new();
+                while lookahead < pairs.len() && pairs[lookahead].2 > *precedence {
+                    higher.push(pairs[lookahead].clone());
+                    lookahead += 1;
+                }
+
+                right = climb(right, higher, *precedence + 1);
+                break;
+            } else {
+                break;
+            }
+        }
+
+        let start = left.span.start.clone();
+        let end = right.span.end.clone();
+        let span = Span::new(start, end);
+
+        left = Element::new(
+            ElementKind::Binary {
+                left: Box::new(left),
+                operator: operator.clone(),
+                right: Box::new(right),
+            },
+            span,
+        );
+
+        current = lookahead;
+    }
+
+    left
+}
+
+pub fn conditional() -> Pattern<Token, Element, ParseError> {
+    Pattern::transform(
+        Pattern::sequence([
+            Pattern::predicate(Arc::new(|token: &Token| {
+                if let TokenKind::Identifier(identifier) = &token.kind {
+                    identifier == "if"
+                } else {
+                    false
+                }
+            })).with_ignore(),
+            Pattern::required(
+                expression(0),
+                Action::Error(
+                    Arc::new(
+                        |span|
+                        ParseError::new(
+                            ErrorKind::ExpectedCondition,
+                            span
+                        )
+                    )
+                )
+            ),
+            Pattern::required(
+                expression(0),
+                Action::Error(
+                    Arc::new(
+                        |span|
+                            ParseError::new(
+                                ErrorKind::ExpectedThen,
+                                span
+                            )
+                    )
+                )
+            ),
+        ]),
+        Arc::new(|forms, _span: Span| {
+            let sequence = Form::expand_outputs(forms);
+
+            let condition = sequence[0].clone();
+
+            let then = sequence[1].clone();
+
+            Ok(Element::new(
+                ElementKind::Conditional {
+                    condition: condition.into(),
+                    then: then.into(),
+                    alternate: None,
+                },
+                _span
+            ))
+        })
+    )
+}
+
+pub fn statement() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([
+        conditional(),
+    ])
+}
+
+
+pub fn token() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([identifier(), literal()])
+}
+
+pub fn whitespace() -> Pattern<Token, Element, ParseError> {
+    Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
+        token.kind == TokenKind::Punctuation(PunctuationKind::Space)
+    })))
+}
+
+pub fn fallback() -> Pattern<Token, Element, ParseError> {
+    Pattern::conditional(
+        Pattern::predicate(Arc::new(|token: &Token| {
+            println!("Skipping {:?}", token);
+
+            true
+        })),
+        Action::Error(Arc::new(|span| {
+            ParseError::new(ErrorKind::PatternError, span)
+        })),
+        Action::Ignore,
     )
 }
 
@@ -204,7 +321,14 @@ pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
 }
 
 pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(expression(0), 0, None)
+    Pattern::alternative([
+        statement(),
+        expression(0),
+    ])
+}
+
+pub fn parser() -> Pattern<Token, Element, ParseError> {
+    Pattern::repeat(pattern(), 0, None)
 }
 
 impl Parser {
@@ -213,22 +337,22 @@ impl Parser {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let form = self.form(pattern());
+            let form = self.form(parser());
 
             match form.kind {
-                FormKind::Single(element) => {
+                FormKind::Output(element) => {
                     elements.push(element);
                 }
 
                 FormKind::Multiple(multi) => {
                     for item in multi {
                         match item.kind {
-                            FormKind::Single(element) => {
+                            FormKind::Output(element) => {
                                 elements.push(element);
                             }
                             FormKind::Multiple(sub) => {
                                 for item in sub {
-                                    if let FormKind::Single(element) = item.kind {
+                                    if let FormKind::Output(element) = item.kind {
                                         elements.push(element);
                                     }
                                 }
@@ -245,7 +369,7 @@ impl Parser {
                     errors.push(error);
                 }
 
-                FormKind::Empty | FormKind::Raw(_) => {}
+                FormKind::Empty | FormKind::Input(_) => {}
             }
         }
 

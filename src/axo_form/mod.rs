@@ -20,8 +20,8 @@ where
     Error: Clone + PartialEq + Debug,
 {
     Empty,
-    Raw(Input),
-    Single(Output),
+    Input(Input),
+    Output(Output),
     Multiple(Vec<Form<Input, Output, Error>>),
     Error(Error),
 }
@@ -46,21 +46,21 @@ where
     pub fn unwrap(&self) -> Vec<Form<Input, Output, Error>> {
         match self.kind.clone() {
             FormKind::Empty => vec![],
-            FormKind::Raw(_) | FormKind::Single(_) | FormKind::Error(_) => vec![self.clone()],
+            FormKind::Input(_) | FormKind::Output(_) | FormKind::Error(_) => vec![self.clone()],
             FormKind::Multiple(items) => items,
         }
     }
 
     pub fn unwrap_input(&self) -> Option<Input> {
         match self.kind.clone() {
-            FormKind::Raw(input) => Some(input.clone()),
+            FormKind::Input(input) => Some(input.clone()),
             _ => None
         }
     }
 
     pub fn unwrap_output(&self) -> Option<Output> {
         match self.kind.clone() {
-            FormKind::Single(output) => Some(output.clone()),
+            FormKind::Output(output) => Some(output.clone()),
             _ => None
         }
     }
@@ -107,7 +107,7 @@ where
 
         for form in forms {
             match form.kind {
-                FormKind::Raw(input) => {
+                FormKind::Input(input) => {
                     inputs.push(input);
                 }
                 FormKind::Multiple(sub) => {
@@ -127,7 +127,7 @@ where
 
         for form in forms {
             match form.kind {
-                FormKind::Single(output) => {
+                FormKind::Output(output) => {
                     outputs.push(output);
                 }
                 FormKind::Multiple(sub) => {
@@ -209,7 +209,7 @@ where
 
         let result = match action {
             Action::Transform(transform) => match transform(items, span.clone()) {
-                Ok(token) => Form::new(FormKind::Single(token), span),
+                Ok(token) => Form::new(FormKind::Output(token), span),
                 Err(_) => Form::new(FormKind::Empty, span),
             },
 
@@ -356,13 +356,22 @@ where
 
         let resolved = match &pattern.kind {
             PatternKind::Lazy(factory) => {
-                let pattern = factory();
+                let resolved_pattern = factory();
+                
+                let mut resolved_form = self.form(resolved_pattern);
 
-                pattern
+                if let Some(action) = &pattern.action {
+                    let end = self.position();
+                    let span = Span::new(start, end);
+                    let items = resolved_form.unwrap();
+                    resolved_form = Self::action(action, items, span);
+                }
+
+                return resolved_form;
             }
             _ => pattern.clone(),
         };
-
+        
         let (matches, new) = self.matches(&resolved, 0);
 
         if !matches && new > 0 {
@@ -375,7 +384,7 @@ where
                     if actual == input {
                         let end = self.position();
 
-                        Form::new(FormKind::Raw(input.clone()), Span::new(start.clone(), end))
+                        Form::new(FormKind::Input(input.clone()), Span::new(start.clone(), end))
                     } else {
                         Form::new(FormKind::Empty, Span::point(start.clone()))
                     }
@@ -402,9 +411,15 @@ where
 
                     formed.push(form);
                 }
+                
+                let kind = if formed.is_empty() {
+                    FormKind::Empty
+                } else {
+                    FormKind::Multiple(formed)
+                };
 
                 Form::new(
-                    FormKind::Multiple(formed),
+                    kind,
                     Span::new(start.clone(), self.position()),
                 )
             }
@@ -435,8 +450,14 @@ where
                     }
                 }
 
+                let kind = if formed.is_empty() {
+                    FormKind::Empty
+                } else {
+                    FormKind::Multiple(formed)
+                };
+
                 Form::new(
-                    FormKind::Multiple(formed),
+                    kind,
                     Span::new(start.clone(), self.position()),
                 )
             }
@@ -454,7 +475,7 @@ where
                     if predicate(&input) {
                         let character = self.next().unwrap();
                         Form::new(
-                            FormKind::Raw(character),
+                            FormKind::Input(character),
                             Span::new(start.clone(), self.position()),
                         )
                     } else {
@@ -469,7 +490,7 @@ where
                 if let (false, _) = self.matches(&*sub, 0) {
                     if let Some(input) = self.next() {
                         Form::new(
-                            FormKind::Raw(input),
+                            FormKind::Input(input),
                             Span::new(start.clone(), self.position()),
                         )
                     } else {
@@ -483,7 +504,7 @@ where
             PatternKind::Anything => {
                 if let Some(input) = self.next() {
                     Form::new(
-                        FormKind::Raw(input),
+                        FormKind::Input(input),
                         Span::new(start.clone(), self.position()),
                     )
                 } else {
