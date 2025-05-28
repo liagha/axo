@@ -1,6 +1,7 @@
 use crate::format::Debug;
 use crate::thread::Arc;
-use crate::axo_form::{ErrorFunction, Form, TransformFunction};
+use crate::axo_form::Form;
+use crate::axo_form::pattern::{ErrorFunction, TransformFunction};
 use crate::axo_span::Span;
 
 #[derive(Clone)]

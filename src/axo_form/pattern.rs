@@ -1,9 +1,13 @@
 use crate::format::Debug;
-use crate::thread::Arc;
+use crate::thread::{Arc};
 use crate::axo_form::action::Action;
-use crate::axo_form::{ErrorFunction, Form, PredicateFunction, TransformFunction};
+use crate::axo_form::Form;
 use crate::axo_span::Span;
 
+pub type TransformFunction<Input, Output, Error> =
+Arc<dyn Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync>;
+pub type PredicateFunction<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
+pub type ErrorFunction<Error> = Arc<dyn Fn(Span) -> Error>;
 pub type LazyPattern<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
 
 #[derive(Clone)]

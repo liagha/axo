@@ -24,7 +24,7 @@ where
             FormKind::Multiple(forms) => {
                 write!(f, "Multiple(")?;
                 
-                write!(f, "{:?}", forms.iter().map(|form| form.kind.clone()).collect::<Vec<_>>())?;
+                write!(f, "{}", forms.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", "))?;
                 
                 write!(f, ")")
             }

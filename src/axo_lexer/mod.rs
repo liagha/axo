@@ -3,10 +3,6 @@ mod operator;
 mod punctuation;
 mod lexer;
 pub mod error;
-mod number;
-mod handler;
-mod symbol;
-mod literal;
 mod fmt;
 
 pub use {

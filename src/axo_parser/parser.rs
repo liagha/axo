@@ -104,7 +104,7 @@ impl Peekable<Token> for Parser {
                     continue;
                 }
                 _ => {
-                    self.position.column += 1;
+                    self.position = token.span.end.clone();
 
                     return Some(token);
                 }

@@ -45,7 +45,7 @@ pub mod environment {
 }
 
 pub mod thread {
-    pub use std::sync::Arc;
+    pub use std::sync::{Arc, Mutex};
 }
 
 pub mod memory {

@@ -1,6 +1,7 @@
 use crate::{format_tokens, indent, xprintln, Color, Lexer, Parser, Resolver, Timer, TIMERSOURCE, Path, Peekable};
-use crate::tree::{Tree, Node};
-use crate::axo_parser::Element;
+use core::any::{Any, TypeId};
+use std::collections::HashMap;
+use crate::tree::{Node, Tree};
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -34,21 +35,72 @@ pub struct Config {
     pub time_report: bool,
 }
 
-pub struct CompilerContext {
+pub trait StageData: Any {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl StageData for Vec<crate::Token> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl StageData for Vec<crate::axo_parser::Element> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+pub struct Context {
     pub config: Config,
+    pub resolver: Resolver,
     pub file_path: Path,
     pub content: String,
-    pub tokens: Vec<crate::Token>,
-    pub elements: Vec<Element>,
+    data: HashMap<TypeId, Box<dyn StageData>>,
+}
+
+impl Context {
+    pub fn new(config: Config, file_path: Path, content: String) -> Self {
+        Context {
+            config,
+            file_path,
+            content,
+            resolver: Resolver::new(),
+            data: HashMap::new(),
+        }
+    }
+
+    pub fn set_data<T: StageData + 'static>(&mut self, data: T) {
+        self.data.insert(TypeId::of::<T>(), Box::new(data));
+    }
+
+    pub fn get_data<T: StageData + 'static>(&self) -> Option<&T> {
+        self.data
+            .get(&TypeId::of::<T>())
+            .and_then(|data| data.as_any().downcast_ref::<T>())
+    }
+
+    pub fn get_data_mut<T: StageData + 'static>(&mut self) -> Option<&mut T> {
+        self.data
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|data| data.as_any_mut().downcast_mut::<T>())
+    }
 }
 
 pub trait Stage {
-    fn entry(&mut self, context: &mut CompilerContext) -> Result<(), CompilerError>;
+    fn entry(&mut self, context: &mut Context) -> Result<(), CompilerError>;
 }
 
 pub struct Compiler {
     pub stages: Tree<Box<dyn Stage>>,
-    pub context: CompilerContext,
+    pub context: Context,
 }
 
 impl Compiler {
@@ -63,24 +115,15 @@ impl Compiler {
         let content = crate::file::read_to_string(&file_path)
             .map_err(CompilerError::FileReadError)?;
 
-        let context = CompilerContext {
-            config,
-            file_path,
-            content,
-            tokens: Vec::new(),
-            elements: Vec::new(),
-        };
+        let context = Context::new(config, file_path, content);
 
         let mut stages = Tree::new();
 
-        // Build the compilation pipeline as a tree
         let lexer_stage = Box::new(LexerStage) as Box<dyn Stage>;
         let parser_stage = Box::new(ParserStage) as Box<dyn Stage>;
-        let resolver_stage = Box::new(ResolverStage) as Box<dyn Stage>;
 
         let lexer_node = Node::new(lexer_stage);
-        let mut parser_node = Node::new(parser_stage);
-        parser_node.add_child(Node::new(resolver_stage));
+        let parser_node = Node::new(parser_stage);
 
         let mut root_node = lexer_node;
         root_node.add_child(parser_node);
@@ -106,24 +149,58 @@ impl Compiler {
             xprintln!();
         }
 
-        self.execute_stages()
+        self.execute_stages()?;
+        
+        self.resolve()
     }
 
     fn execute_stages(&mut self) -> Result<(), CompilerError> {
-        // Take the root node out temporarily to avoid holding a mutable borrow
         if let Some(mut root) = self.stages.root.take() {
             self.execute_node(&mut root)?;
-            // Put the root node back
             self.stages.root = Some(root);
         }
         Ok(())
     }
-    
+
     fn execute_node(&mut self, node: &mut Node<Box<dyn Stage>>) -> Result<(), CompilerError> {
         node.value.entry(&mut self.context)?;
-
         for child in &mut node.children {
             self.execute_node(child)?;
+        }
+        Ok(())
+    }
+
+    fn resolve(&mut self) -> Result<(), CompilerError> {
+        let resolver_timer = Timer::new(TIMERSOURCE);
+
+        let _elements = self.context
+            .get_data::<Vec<crate::axo_parser::Element>>()
+            .ok_or_else(|| CompilerError::ResolutionFailed(vec![]))?;
+
+        if !self.context.resolver.errors.is_empty() {
+            for err in &self.context.resolver.errors {
+                let (msg, details) = err.format();
+                xprintln!(
+                    "{}\n{}" => Color::Red,
+                    msg => Color::Orange,
+                    details
+                );
+            }
+            return Err(CompilerError::ResolutionFailed(self.context.resolver.errors.clone()));
+        }
+
+        if self.context.config.verbose && !self.context.resolver.scope.all_symbols().is_empty() {
+            xprintln!(
+                "{}" => Color::Cyan,
+                format!("Symbols:\n{:#?}", self.context.resolver.scope.all_symbols())
+            );
+        }
+
+        if self.context.config.time_report {
+            println!(
+                "Resolution Took {} ns",
+                resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
+            );
         }
 
         Ok(())
@@ -133,7 +210,7 @@ impl Compiler {
 pub struct LexerStage;
 
 impl Stage for LexerStage {
-    fn entry(&mut self, context: &mut CompilerContext) -> Result<(), CompilerError> {
+    fn entry(&mut self, context: &mut Context) -> Result<(), CompilerError> {
         let lex_timer = Timer::new(TIMERSOURCE);
 
         let mut lexer = Lexer::new(context.content.clone(), context.file_path.clone());
@@ -164,7 +241,7 @@ impl Stage for LexerStage {
             );
         }
 
-        context.tokens = tokens;
+        context.set_data(tokens);
         Ok(())
     }
 }
@@ -172,10 +249,14 @@ impl Stage for LexerStage {
 pub struct ParserStage;
 
 impl Stage for ParserStage {
-    fn entry(&mut self, context: &mut CompilerContext) -> Result<(), CompilerError> {
+    fn entry(&mut self, context: &mut Context) -> Result<(), CompilerError> {
         let parse_timer = Timer::new(TIMERSOURCE);
 
-        let mut parser = Parser::new(context.tokens.clone(), context.file_path.clone());
+        let tokens = context
+            .get_data::<Vec<crate::Token>>()
+            .ok_or_else(|| CompilerError::ParsingFailed(vec![]))?;
+
+        let mut parser = Parser::new(tokens.clone(), context.file_path.clone());
 
         let (test_elements, test_errors) = parser.parse_program();
 
@@ -200,7 +281,7 @@ impl Stage for ParserStage {
         }
 
         parser.restore();
-        
+
         let elements = parser.parse();
 
         if !parser.errors.is_empty() {
@@ -227,46 +308,7 @@ impl Stage for ParserStage {
             );
         }
 
-        context.elements = elements;
-        Ok(())
-    }
-}
-
-pub struct ResolverStage;
-
-impl Stage for ResolverStage {
-    fn entry(&mut self, context: &mut CompilerContext) -> Result<(), CompilerError> {
-        let resolver_timer = Timer::new(TIMERSOURCE);
-
-        let mut resolver = Resolver::new();
-        resolver.resolve(context.elements.clone());
-
-        if !resolver.errors.is_empty() {
-            for err in &resolver.errors {
-                let (msg, details) = err.format();
-                xprintln!(
-                    "{}\n{}" => Color::Red,
-                    msg => Color::Orange,
-                    details
-                );
-            }
-            return Err(CompilerError::ResolutionFailed(resolver.errors));
-        }
-
-        if context.config.verbose && !resolver.scope.all_symbols().is_empty() {
-            xprintln!(
-                "{}" => Color::Cyan,
-                format!("Symbols:\n{:#?}", resolver.scope.all_symbols())
-            );
-        }
-
-        if context.config.time_report {
-            println!(
-                "Resolution Took {} ns",
-                resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
-            );
-        }
-
+        context.set_data(elements);
         Ok(())
     }
 }

@@ -1,10 +1,10 @@
-use crate::thread::Arc;
 use crate::axo_form::{Action, Form, FormKind, Former, Pattern};
 use crate::axo_parser::error::ErrorKind;
 use crate::axo_parser::{Element, ElementKind, ParseError};
 use crate::axo_span::Span;
+use crate::thread::Arc;
 use crate::{Parser, Peekable, PunctuationKind, Token, TokenKind};
-
+use crate::axo_form::delimited::delimited;
 
 pub fn identifier() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -15,9 +15,9 @@ pub fn identifier() -> Pattern<Token, Element, ParseError> {
             form.first()
                 .and_then(|token| match token.kind.clone() {
                     FormKind::Raw(Token {
-                                      kind: TokenKind::Identifier(ident),
-                                      span,
-                                  }) => Some(Element::new(ElementKind::Identifier(ident), span)),
+                        kind: TokenKind::Identifier(ident),
+                        span,
+                    }) => Some(Element::new(ElementKind::Identifier(ident), span)),
                     _ => None,
                 })
                 .ok_or_else(|| unreachable!())
@@ -50,300 +50,6 @@ pub fn literal() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-pub fn group() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::Comma,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Group(elements), span))
-        }),
-    )
-}
-
-pub fn sequence() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::SemiColon,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Sequence(elements), span))
-        }),
-    )
-}
-
-pub fn collection() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::Comma,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Collection(elements), span))
-        }),
-    )
-}
-
-pub fn series() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::SemiColon,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Series(elements), span))
-        }),
-    )
-}
-
-pub fn bundle() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::Comma,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Bundle(elements), span))
-        }),
-    )
-}
-
-pub fn scope() -> Pattern<Token, Element, ParseError> {
-    Pattern::transform(
-        Pattern::sequence([
-            Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-            }))),
-            Pattern::optional(token()),
-            Pattern::optional(Pattern::repeat(
-                Pattern::sequence([
-                    Pattern::required(
-                        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
-                        }))),
-                        Action::Error(Arc::new(|span| {
-                            ParseError::new(
-                                ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                    PunctuationKind::SemiColon,
-                                )),
-                                span,
-                            )
-                        })),
-                    ),
-                    token(),
-                ]),
-                0,
-                None,
-            )),
-            Pattern::ignore(Pattern::required(
-                Pattern::predicate(Arc::new(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                })),
-                Action::Error(Arc::new(|span| {
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                            span.clone(),
-                        )),
-                        span,
-                    )
-                })),
-            )),
-        ]),
-        Arc::new(|forms, span: Span| {
-            let elements = Form::expand_outputs(forms);
-            Ok(Element::new(ElementKind::Sequence(elements), span))
-        }),
-    )
-}
-
 pub fn token() -> Pattern<Token, Element, ParseError> {
     Pattern::alternative([identifier(), literal()])
 }
@@ -364,16 +70,7 @@ pub fn fallback() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-pub fn delimited() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([
-        group(),
-        sequence(),
-        collection(),
-        series(),
-        bundle(),
-        scope(),
-    ])
-}
+
 
 pub fn unary() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -384,135 +81,168 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                 } else {
                     false
                 }
-            })).repeat_self(0, None).optional_self(),
-            Pattern::lazy(|| expression(0)),
+            }))
+            .repeat_self(0, None)
+            .optional_self(),
+            Pattern::lazy(primary),
             Pattern::predicate(Arc::new(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
                     operator.is_postfix()
                 } else {
                     false
                 }
-            })).repeat_self(0, None).optional_self(),
+            }))
+            .repeat_self(0, None)
+            .optional_self(),
         ]),
-        Arc::new(|forms, span: Span| {
+        Arc::new(|forms, _span: Span| {
             let sequence = forms[0].unwrap();
-            
+
             let prefixes = Form::expand_inputs(sequence[0].unwrap());
-            
+
             let operand = match sequence[1].clone() {
-                Form { kind: FormKind::Single(element), .. } => element,
-                _ => unreachable!()
+                Form {
+                    kind: FormKind::Single(element),
+                    ..
+                } => element,
+                _ => {
+                    unreachable!()
+                },
             };
-            
-            let mut unary : Option<Element> = None;
-            
+
+            let mut unary = operand.clone();
+
             for prefix in prefixes {
-                if let Some(operand) = unary.clone() {
-                    unary = Some(
-                        Element::new(
-                            ElementKind::Unary {
-                                operand: operand.clone().into(),
-                                operator: prefix,
-                            },
-                            Span::default(),
-                        )
-                    );
-                } else { 
-                    unary = Some(Element::new(
-                        ElementKind::Unary {
-                            operand: operand.clone().into(),
-                            operator: prefix,
-                        },
-                        Span::default(), 
-                    ))
-                }
+                unary = Element::new(
+                    ElementKind::Unary {
+                        operand: unary.into(),
+                        operator: prefix,
+                    },
+                    Span::default(),
+                );
             }
 
             let postfixes = Form::expand_inputs(sequence[2].unwrap());
 
             for postfix in postfixes {
-                if let Some(operand) = unary.clone() {
-                    unary = Some(
-                        Element::new(
-                            ElementKind::Unary {
-                                operand: operand.clone().into(),
-                                operator: postfix,
-                            },
-                            Span::default(),
-                        )
-                    );
-                } else {
-                    unary = Some(Element::new(
-                        ElementKind::Unary {
-                            operand: operand.clone().into(),
-                            operator: postfix,
-                        },
-                        Span::default(),
-                    ))
-                }
+                unary = Element::new(
+                    ElementKind::Unary {
+                        operand: unary.into(),
+                        operator: postfix,
+                    },
+                    Span::default(),
+                );
             }
-            
-            Ok(unary.unwrap())
+
+            Ok(unary)
         }),
     )
 }
 
-pub fn binary(precedence: usize) -> Pattern<Token, Element, ParseError> {
+pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
-            Pattern::lazy(move || expression(precedence + 1)),
-            Pattern::predicate(Arc::new(move |token: &Token| {
-                if let TokenKind::Operator(operator) = &token.kind {
-                    operator.precedence().is_some()
-                } else {
-                    false
-                }
-            })),
-            Pattern::lazy(move || expression(precedence + 1)),
+            unary(),
+            Pattern::repeat(
+                Pattern::sequence([
+                    Pattern::predicate(Arc::new(move |token: &Token| {
+                        if let TokenKind::Operator(operator) = &token.kind {
+                            if let Some(precedence) = operator.precedence() {
+                                precedence >= minimum
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    })),
+                    Pattern::lazy(move || binary(minimum + 1)),
+                ]),
+                1,
+                None,
+            ),
         ]),
-        Arc::new(|forms, span: Span| {
+        Arc::new(move |forms, _span: Span| {
             let sequence = forms[0].clone().unwrap();
+            
+            let mut left = sequence[0].unwrap_output().unwrap();
+            
+            let operations = sequence[1].unwrap();
+            
+            let mut precedence = 0;
 
-            let left = match sequence[0].clone() {
-                Form { kind: FormKind::Single(element), .. } => element,
-                _ => unreachable!(),
-            };
+            for operation in operations {
+                let (operator, right) = match operation {
+                    Form {
+                        kind: FormKind::Multiple(items),
+                        ..
+                    } => {
+                        if items.len() != 2 {
+                            continue;
+                        }
+                        
+                        let operator = match items[0].clone() {
+                            Form {
+                                kind: FormKind::Raw(ref token @ Token { kind: TokenKind::Operator(ref operator), .. }),
+                                ..
+                            } => {
+                                if let Some(operator) = operator.precedence() {
+                                    if operator >= precedence {
+                                        precedence = operator;
+                                        
+                                        token.clone()
+                                    } else { 
+                                        continue;
+                                    }
+                                } else { 
+                                    continue;
+                                }
+                            },
+                            _ => continue,
+                        };
 
-            let operator = match sequence[1].clone() {
-                Form { kind: FormKind::Raw(operator @ Token { kind: TokenKind::Operator(_), .. }), .. } => operator,
-                _ => unreachable!(),
-            };
+                        let right = match items[1].clone() {
+                            Form {
+                                kind: FormKind::Single(element),
+                                ..
+                            } => element,
+                            _ => continue,
+                        };
 
-            let right = match sequence[2].clone() {
-                Form { kind: FormKind::Single(element), .. } => element,
-                _ => unreachable!(),
-            };
+                        (operator, right)
+                    },
+                    _ => continue,
+                };
 
-            Ok(Element::new(
-                ElementKind::Binary {
-                    left: Box::new(left),
-                    operator,
-                    right: Box::new(right),
-                },
-                span,
-            ))
+                let start = left.span.start.clone();
+                let end = right.span.end.clone();
+                let span = Span::new(start, end);
+
+                left = Element::new(
+                    ElementKind::Binary {
+                        left: Box::new(left),
+                        operator,
+                        right: Box::new(right),
+                    },
+                    span,
+                );
+            }
+
+            Ok(left)
         }),
     )
 }
 
-pub fn expression(precedence: usize) -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([
-        whitespace(),
-        binary(precedence),
-        unary(),
-        delimited(),
-        token(),
-        fallback(),
-    ])
+pub fn primary() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([whitespace(), delimited(), token(), fallback()])
+}
+
+pub fn expression() -> Pattern<Token, Element, ParseError> {
+    Pattern::alternative([binary(0), unary(), primary()])
 }
 
 pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(expression(0), 0, None)
+    Pattern::repeat(expression(), 0, None)
 }
 
 impl Parser {
