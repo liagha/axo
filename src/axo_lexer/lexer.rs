@@ -611,6 +611,10 @@ impl Lexer {
             }),
         )
     }
+    
+    fn fallback() -> Pattern<char, Token, LexError> {
+        Pattern::anything().with_ignore()
+    }
 
     pub fn pattern() -> Pattern<char, Token, LexError> {
         Pattern::repeat(
@@ -624,6 +628,7 @@ impl Lexer {
                 Self::character(),
                 Self::operator(),
                 Self::punctuation(),
+                Self::fallback(),
             ]),
             0,
             None,

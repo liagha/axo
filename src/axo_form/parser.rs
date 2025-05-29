@@ -12,15 +12,16 @@ pub fn identifier() -> Pattern<Token, Element, ParseError> {
             matches!(token.kind, TokenKind::Identifier(_))
         })),
         Arc::new(|form, _| {
-            form.first()
-                .and_then(|token| match token.kind.clone() {
-                    FormKind::Input(Token {
-                                        kind: TokenKind::Identifier(ident),
-                                        span,
-                                    }) => Some(Element::new(ElementKind::Identifier(ident), span)),
-                    _ => None,
-                })
-                .ok_or_else(|| unreachable!())
+            let input = Form::expand_inputs(form)[0].clone();
+            
+            if let Token { kind: TokenKind::Identifier(identifier), span} = input {
+                Ok(Element::new(
+                    ElementKind::Identifier(identifier),
+                    span
+                ))
+            } else { 
+                unreachable!()
+            }
         }),
     )
 }
@@ -85,7 +86,8 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                     kind: FormKind::Output(element),
                     ..
                 } => element,
-                _ => {
+                form => {
+                    println!("Unreachable Form: {:?}", form);
                     unreachable!()
                 }
             };
@@ -287,7 +289,6 @@ pub fn statement() -> Pattern<Token, Element, ParseError> {
     ])
 }
 
-
 pub fn token() -> Pattern<Token, Element, ParseError> {
     Pattern::alternative([identifier(), literal()])
 }
@@ -300,8 +301,8 @@ pub fn whitespace() -> Pattern<Token, Element, ParseError> {
 
 pub fn fallback() -> Pattern<Token, Element, ParseError> {
     Pattern::conditional(
-        Pattern::predicate(Arc::new(|token: &Token| {
-            println!("Skipping {:?}", token);
+        Pattern::predicate(Arc::new(|_token: &Token| {
+            //println!("Skipping {:?}", _token);
 
             true
         })),
@@ -313,7 +314,7 @@ pub fn fallback() -> Pattern<Token, Element, ParseError> {
 }
 
 pub fn primary() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([whitespace(), delimited(), token(), fallback()])
+    Pattern::alternative([whitespace(), delimited(), token()])
 }
 
 pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
@@ -328,7 +329,7 @@ pub fn pattern() -> Pattern<Token, Element, ParseError> {
 }
 
 pub fn parser() -> Pattern<Token, Element, ParseError> {
-    Pattern::repeat(pattern(), 0, None)
+    Pattern::repeat(Pattern::alternative([pattern(), fallback()]), 0, None)
 }
 
 impl Parser {
