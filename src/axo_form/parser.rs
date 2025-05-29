@@ -13,13 +13,13 @@ pub fn identifier() -> Pattern<Token, Element, ParseError> {
         })),
         Arc::new(|form, _| {
             let input = Form::expand_inputs(form)[0].clone();
-            
+
             if let Token { kind: TokenKind::Identifier(identifier), span} = input {
                 Ok(Element::new(
                     ElementKind::Identifier(identifier),
                     span
                 ))
-            } else { 
+            } else {
                 unreachable!()
             }
         }),

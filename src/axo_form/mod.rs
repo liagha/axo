@@ -250,14 +250,10 @@ where
 
             PatternKind::Alternative(patterns) => {
                 for subpattern in patterns {
-                    if let (true, new, result) = self.predict(&subpattern, 0) {
-                        if let Some(_err) = Self::catch(result.unwrap()) {
-                            //println!("Error {:?}", _err);
+                    let (matches, new_offset) = self.matches(&subpattern, offset);
 
-                            continue;
-                        }
-
-                        return (true, new);
+                    if matches {
+                        return (true, new_offset);
                     }
                 }
 
@@ -397,14 +393,13 @@ where
 
             PatternKind::Alternative(patterns) => {
                 for subpattern in patterns {
-                    if let (true, _, result) = self.predict(&subpattern, 0) {
-                        if let Some(_err) = Self::catch(result.unwrap()) {
-                            //println!("Error {:?}", _err);
+                    let (matches, new_offset, result) = self.predict(&subpattern, offset);
 
+                    if matches {
+                        if let Some(_err) = Self::catch(result.unwrap()) {
                             continue;
                         }
-
-                        return (true, consumed, result);
+                        return (true, new_offset, result);
                     }
                 }
 
@@ -562,15 +557,22 @@ where
 
             PatternKind::Alternative(patterns) => {
                 for subpattern in patterns {
-                    if let (true, _, result) = self.predict(&subpattern, 0) {
-                        if let Some(_err) = Self::catch(result.unwrap()) {
-                            //println!("Error {:?}", _err);
+                    let saved_position = self.position();
+                    let (matches, _) = self.matches(&subpattern, 0);
 
+                    if matches {
+                        self.set_position(saved_position.clone());
+                        let result = self.form(subpattern.clone());
+
+                        if let Some(_err) = Self::catch(result.unwrap()) {
+                            self.set_position(saved_position);
                             continue;
                         }
 
-                        return self.form(subpattern.clone());
+                        return result;
                     }
+
+                    self.set_position(saved_position);
                 }
 
                 Form::new(FormKind::Empty, Span::point(self.position()))
