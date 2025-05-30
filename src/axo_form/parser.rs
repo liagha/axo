@@ -14,11 +14,12 @@ pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Arc::new(|form, _| {
             let input = Form::expand_inputs(form)[0].clone();
 
-            if let Token { kind: TokenKind::Identifier(identifier), span} = input {
-                Ok(Element::new(
-                    ElementKind::Identifier(identifier),
-                    span
-                ))
+            if let Token {
+                kind: TokenKind::Identifier(identifier),
+                span,
+            } = input
+            {
+                Ok(Element::new(ElementKind::Identifier(identifier), span))
             } else {
                 unreachable!()
             }
@@ -51,8 +52,6 @@ pub fn literal() -> Pattern<Token, Element, ParseError> {
     )
 }
 
-
-
 pub fn unary() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
         Pattern::sequence([
@@ -63,9 +62,9 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                     false
                 }
             }))
-                .repeat_self(0, None)
-                .optional_self(),
-            Pattern::lazy(primary),
+            .repeat_self(0, None)
+            .optional_self(),
+            primary(),
             Pattern::predicate(Arc::new(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
                     operator.is_postfix()
@@ -73,8 +72,8 @@ pub fn unary() -> Pattern<Token, Element, ParseError> {
                     false
                 }
             }))
-                .repeat_self(0, None)
-                .optional_self(),
+            .repeat_self(0, None)
+            .optional_self(),
         ]),
         Arc::new(|forms, _span: Span| {
             let sequence = forms[0].unwrap();
@@ -138,11 +137,11 @@ pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
                             false
                         }
                     })),
-                    Pattern::lazy(move || unary())
+                    Pattern::lazy(move || unary()),
                 ]),
                 0,
-                None
-            )
+                None,
+            ),
         ]),
         Arc::new(move |forms, _span: Span| {
             let sequence = forms[0].clone().unwrap();
@@ -176,11 +175,7 @@ pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
     )
 }
 
-fn climb(
-    mut left: Element,
-    pairs: Vec<(Token, Element, u8)>,
-    threshold: u8
-) -> Element {
+fn climb(mut left: Element, pairs: Vec<(Token, Element, u8)>, threshold: u8) -> Element {
     let mut current = 0;
 
     while current < pairs.len() {
@@ -238,30 +233,19 @@ pub fn conditional() -> Pattern<Token, Element, ParseError> {
                 } else {
                     false
                 }
-            })).with_ignore(),
+            }))
+            .with_ignore(),
             Pattern::required(
                 expression(0),
-                Action::Error(
-                    Arc::new(
-                        |span|
-                        ParseError::new(
-                            ErrorKind::ExpectedCondition,
-                            span
-                        )
-                    )
-                )
+                Action::Error(Arc::new(|span| {
+                    ParseError::new(ErrorKind::ExpectedCondition, span)
+                })),
             ),
             Pattern::required(
                 expression(0),
-                Action::Error(
-                    Arc::new(
-                        |span|
-                            ParseError::new(
-                                ErrorKind::ExpectedThen,
-                                span
-                            )
-                    )
-                )
+                Action::Error(Arc::new(|span| {
+                    ParseError::new(ErrorKind::ExpectedThen, span)
+                })),
             ),
         ]),
         Arc::new(|forms, _span: Span| {
@@ -277,16 +261,14 @@ pub fn conditional() -> Pattern<Token, Element, ParseError> {
                     then: then.into(),
                     alternate: None,
                 },
-                _span
+                _span,
             ))
-        })
+        }),
     )
 }
 
 pub fn statement() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([
-        conditional(),
-    ])
+    Pattern::alternative([conditional()])
 }
 
 pub fn token() -> Pattern<Token, Element, ParseError> {
@@ -314,7 +296,7 @@ pub fn fallback() -> Pattern<Token, Element, ParseError> {
 }
 
 pub fn primary() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([whitespace(), delimited(), token()])
+    Pattern::alternative([delimited(), token(), whitespace()])
 }
 
 pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
@@ -322,10 +304,7 @@ pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
 }
 
 pub fn pattern() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([
-        statement(),
-        expression(0),
-    ])
+    Pattern::alternative([statement(), expression(0)])
 }
 
 pub fn parser() -> Pattern<Token, Element, ParseError> {

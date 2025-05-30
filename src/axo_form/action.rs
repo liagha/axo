@@ -1,7 +1,7 @@
 use crate::format::Debug;
 use crate::thread::Arc;
 use crate::axo_form::Form;
-use crate::axo_form::pattern::{ErrorFunction, TransformFunction};
+use crate::axo_form::pattern::{Emitter, Transformer};
 use crate::axo_span::Span;
 
 #[derive(Clone)]
@@ -11,13 +11,13 @@ where
     Output: Clone + PartialEq + Debug,
     Error: Clone + PartialEq + Debug,
 {
-    Transform(TransformFunction<Input, Output, Error>),
+    Map(Transformer<Input, Output, Error>),
     Ignore,
-    Error(ErrorFunction<Error>),
-    Conditional {
+    Trigger {
         found: Box<Action<Input, Output, Error>>,
         missing: Box<Action<Input, Output, Error>>,
     },
+    Error(Emitter<Error>),
 }
 
 impl<Input, Output, Error> Action<Input, Output, Error>
@@ -30,7 +30,7 @@ where
     where
         F: Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync + 'static,
     {
-        Self::Transform(Arc::new(f))
+        Self::Map(Arc::new(f))
     }
 
     pub fn error_with<F>(f: F) -> Self
@@ -40,16 +40,16 @@ where
         Self::Error(Arc::new(f))
     }
 
-    pub fn require_or_error(function: ErrorFunction<Error>) -> Self {
-        Self::Conditional {
+    pub fn require_or_error(function: Emitter<Error>) -> Self {
+        Self::Trigger {
             found: Box::new(Self::Ignore),
             missing: Box::new(Self::Error(function)),
         }
     }
 
-    pub fn transform_if_found(transform: TransformFunction<Input, Output, Error>) -> Self {
-        Self::Conditional {
-            found: Box::new(Self::Transform(transform)),
+    pub fn transform_if_found(transform: Transformer<Input, Output, Error>) -> Self {
+        Self::Trigger {
+            found: Box::new(Self::Map(transform)),
             missing: Box::new(Self::Ignore),
         }
     }

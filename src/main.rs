@@ -2,7 +2,7 @@
 
 mod axo_data;
 mod axo_error;
-mod axo_fmt;
+mod axo_format;
 mod axo_form;
 mod axo_lexer;
 mod axo_parser;
@@ -13,11 +13,11 @@ mod timer;
 mod compiler;
 
 pub use {
-    axo_lexer::{Lexer, PunctuationKind, OperatorKind, Token, TokenKind},
+    axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},
     axo_parser::Parser,
     axo_resolver::Resolver,
     axo_rune::*,
-    axo_fmt::*,
+    axo_format::*,
     axo_data::{*, peekable::*},
     broccli::{xprintln, Color, TextStyle},
     timer::{Timer, TimeSource},
@@ -45,7 +45,7 @@ pub mod environment {
 }
 
 pub mod thread {
-    pub use std::sync::{Arc, Mutex};
+    pub use std::sync::{Arc};
 }
 
 pub mod memory {
@@ -181,57 +181,4 @@ fn parse_arguments() -> Result<Config, CompilerError> {
     }
 
     Ok(config)
-}
-
-fn print_usage(program: &str) {
-    println!("Usage: {} [OPTIONS] <file.axo>", program);
-    println!("Options:");
-    println!("  -v, --verbose   Enable verbose output");
-    println!("  -t, --tokens    Show lexer tokens");
-    println!("  -a, --ast       Show parsed AST");
-    println!("  --time          Show execution time reports");
-    println!("  -h, --help      Show this help message");
-}
-
-fn format_tokens(tokens: &[Token]) -> String {
-    tokens
-        .iter()
-        .enumerate()
-        .filter(|(_, token)|
-            token.kind != TokenKind::Punctuation(PunctuationKind::Space)
-        )
-        .map(|(i, token)| {
-            let token_str = match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => format!(
-                    "↓ {:?} | {:#?} ↓\n",
-                    token,
-                    token.span
-                )
-                    .term_colorize(Color::Green)
-                    .to_string(),
-                TokenKind::Punctuation(_) => format!(
-                    "{:?} | {:#?}",
-                    token,
-                    token.span
-                )
-                    .term_colorize(Color::Green)
-                    .to_string(),
-                TokenKind::Operator(_) => format!(
-                    "{:?} | {:#?}",
-                    token,
-                    token.span
-                )
-                    .term_colorize(Color::Orange)
-                    .to_string(),
-                _ => format!("{:?} | {:#?}", token, token.span),
-            };
-            if i < tokens.len() - 1
-                && !matches!(token.kind, TokenKind::Punctuation(PunctuationKind::Newline))
-            {
-                format!("{}, ", token_str)
-            } else {
-                token_str
-            }
-        })
-        .collect()
 }

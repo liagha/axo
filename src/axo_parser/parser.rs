@@ -24,48 +24,65 @@ pub struct Parser {
 
 impl Peekable<Token> for Parser {
     fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = self.index + forward;
+        let mut current = self.index;
+        let mut found = 0;
 
-        while let Some(token) = self.input.get(current) {
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
-                    current += 1;
-                }
-                TokenKind::Comment(_) => {
-                    current += 1;
-                }
-                _ => {
-                    return Some(token);
-                }
+        while current < self.input.len() {
+            let token = &self.input[current];
+
+            if self.should_skip_token(&token.kind) {
+                current += 1;
+                continue;
             }
+
+            if found == forward {
+                return Some(token);
+            }
+
+            found += 1;
+            current += 1;
         }
 
         None
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Token> {
-        let mut current = self.index;
-
-        if current < n {
+    fn peek_behind(&self, backward: usize) -> Option<&Token> {
+        if self.index == 0 {
             return None;
         }
-        
-        while let Some(token) = self.input.get(current - n) {
-            if current < n {
-                return None;
+
+        let mut current = self.index - 1;
+        let mut found = 0;
+
+        loop {
+            if current >= self.input.len() {
+                if current == 0 {
+                    break;
+                }
+                current -= 1;
+                continue;
             }
 
-            match token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) | TokenKind::Punctuation(PunctuationKind::Space) => {
-                    current -= n;
+            let token = &self.input[current];
+
+            if self.should_skip_token(&token.kind) {
+                if current == 0 {
+                    break;
                 }
-                TokenKind::Comment(_) => {
-                    current -= n;
-                }
-                _ => {
-                    return Some(token);
-                }
+                current -= 1;
+                continue;
             }
+
+            if found == backward {
+                return Some(token);
+            }
+
+            found += 1;
+
+            if current == 0 {
+                break;
+            }
+            current -= 1;
         }
 
         None
@@ -86,29 +103,13 @@ impl Peekable<Token> for Parser {
             let token = self.input[self.index].clone();
             self.index += 1;
 
-            match &token.kind {
-                TokenKind::Punctuation(PunctuationKind::Newline) => {
-                    self.position.line += 1;
-                    self.position.column = 0;
-                    
-                    continue;
-                }
-                TokenKind::Punctuation(PunctuationKind::Space) => {
-                    self.position.column += 1;
-                    
-                    continue;
-                }
-                TokenKind::Comment(_) => {
-                    self.position.column += 1;
-
-                    continue;
-                }
-                _ => {
-                    self.position = token.span.end.clone();
-
-                    return Some(token);
-                }
+            if self.should_skip_token(&token.kind) {
+                self.update_position_for_skipped(&token);
+                continue;
             }
+
+            self.position = token.span.end.clone();
+            return Some(token);
         }
 
         None
@@ -136,6 +137,43 @@ impl Peekable<Token> for Parser {
 }
 
 impl Parser {
+    fn should_skip_token(&self, kind: &TokenKind) -> bool {
+        if let TokenKind::Punctuation(punctuation) = kind {
+            if let PunctuationKind::Newline = punctuation {
+                return true;
+            }
+            if let PunctuationKind::Space = punctuation {
+                return true;
+            }
+        }
+
+        if let TokenKind::Comment(_) = kind {
+            return true;
+        }
+
+        false
+    }
+
+    fn update_position_for_skipped(&mut self, token: &Token) {
+        if let TokenKind::Punctuation(PunctuationKind::Newline) = &token.kind {
+            self.position.line += 1;
+            self.position.column = 1;
+            return;
+        }
+
+        if let TokenKind::Punctuation(PunctuationKind::Space) = &token.kind {
+            self.position.column += 1;
+            return;
+        }
+
+        if let TokenKind::Comment(_) = &token.kind {
+            self.position.column += token.span.end.column - token.span.start.column;
+            return;
+        }
+    }
+}
+
+impl Parser {
     pub fn new(tokens: Vec<Token>, file: Path) -> Self {
         Parser {
             input: tokens,
@@ -156,25 +194,25 @@ impl Parser {
             span: self.span(current.clone(), current),
         }
     }
-    
+
     pub fn current_span(&self) -> Span {
         Span::point(self.position.clone())
     }
-    
+
     pub fn span(&self, start: Position, end: Position) -> Span {
         Span {
             start,
             end,
         }
     }
-    
+
     pub fn match_token(&mut self, token: &TokenKind) -> bool {
         if let Some(peek) = self.peek() {
             if &peek.kind == token {
                 self.next();
-                
+
                 true
-            } else { 
+            } else {
                 false
             }
         } else {

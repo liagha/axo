@@ -10,7 +10,7 @@ use {
         Formatter, Result
     }
 };
-use crate::axo_fmt::indent;
+use crate::axo_format::indent;
 
 impl Display for ItemKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

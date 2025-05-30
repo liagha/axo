@@ -3,12 +3,12 @@ use crate::thread::{Arc};
 use crate::axo_form::action::Action;
 use crate::axo_form::Form;
 use crate::axo_span::Span;
+use crate::Peekable;
 
-pub type TransformFunction<Input, Output, Error> =
-Arc<dyn Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync>;
-pub type PredicateFunction<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-pub type ErrorFunction<Error> = Arc<dyn Fn(Span) -> Error>;
-pub type LazyPattern<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
+pub type Transformer<Input, Output, Error> = Arc<dyn Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync>;
+pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
+pub type Emitter<Error> = Arc<dyn Fn(Span) -> Error>;
+pub type Evaluator<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
 
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Error>
@@ -17,23 +17,27 @@ where
     Output: Clone + PartialEq + Debug,
     Error: Clone + PartialEq + Debug,
 {
-    Exact(Input),
+    Literal(Input),
     Alternative(Vec<Pattern<Input, Output, Error>>),
+    Guard {
+        predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
+        pattern: Box<Pattern<Input, Output, Error>>,
+    },
     Required {
         pattern: Box<Pattern<Input, Output, Error>>,
         action: Action<Input, Output, Error>,
     },
     Sequence(Vec<Pattern<Input, Output, Error>>),
-    Repeat {
+    Repetition {
         pattern: Box<Pattern<Input, Output, Error>>,
         minimum: usize,
         maximum: Option<usize>,
     },
     Optional(Box<Pattern<Input, Output, Error>>),
-    Predicate(PredicateFunction<Input>),
-    Negate(Box<Pattern<Input, Output, Error>>),
-    Lazy(LazyPattern<Input, Output, Error>),
-    Anything,
+    Condition(Predicate<Input>),
+    Negation(Box<Pattern<Input, Output, Error>>),
+    Deferred(Evaluator<Input, Output, Error>),
+    WildCard,
 }
 
 #[derive(Clone, Debug)]
@@ -55,7 +59,20 @@ where
 {
     pub fn exact(value: Input) -> Self {
         Self {
-            kind: PatternKind::Exact(value),
+            kind: PatternKind::Literal(value),
+            action: None,
+        }
+    }
+
+    pub fn guard(
+        predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
+        pattern: Pattern<Input, Output, Error>
+    ) -> Self {
+        Self {
+            kind: PatternKind::Guard {
+                predicate,
+                pattern: Box::new(pattern),
+            },
             action: None,
         }
     }
@@ -80,7 +97,7 @@ where
         maximum: Option<usize>,
     ) -> Self {
         Self {
-            kind: PatternKind::Repeat {
+            kind: PatternKind::Repetition {
                 pattern: pattern.into(),
                 minimum,
                 maximum,
@@ -96,23 +113,23 @@ where
         }
     }
 
-    pub fn predicate(predicate: PredicateFunction<Input>) -> Self {
+    pub fn predicate(predicate: Predicate<Input>) -> Self {
         Self {
-            kind: PatternKind::Predicate(predicate),
+            kind: PatternKind::Condition(predicate),
             action: None,
         }
     }
 
     pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
         Self {
-            kind: PatternKind::Negate(pattern.into()),
+            kind: PatternKind::Negation(pattern.into()),
             action: None,
         }
     }
 
     pub fn anything() -> Self {
         Self {
-            kind: PatternKind::Anything,
+            kind: PatternKind::WildCard,
             action: None,
         }
     }
@@ -135,14 +152,14 @@ where
         F: Fn() -> Pattern<Input, Output, Error> + Send + Sync + 'static,
     {
         Self {
-            kind: PatternKind::Lazy(Arc::new(factory)),
+            kind: PatternKind::Deferred(Arc::new(factory)),
             action: None,
         }
     }
 
     pub fn resolve_lazy(&self) -> Pattern<Input, Output, Error> {
         match &self.kind {
-            PatternKind::Lazy(factory) => {
+            PatternKind::Deferred(factory) => {
                 factory()
             }
             _ => self.clone(),
@@ -151,11 +168,11 @@ where
 
     pub fn transform(
         pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        transform: TransformFunction<Input, Output, Error>,
+        transform: Transformer<Input, Output, Error>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
-            action: Some(Action::Transform(transform)),
+            action: Some(Action::Map(transform)),
         }
     }
 
@@ -168,7 +185,7 @@ where
 
     pub fn error(
         pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        function: ErrorFunction<Error>,
+        function: Emitter<Error>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
@@ -183,7 +200,7 @@ where
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
-            action: Some(Action::Conditional {
+            action: Some(Action::Trigger {
                 found: Box::new(found),
                 missing: Box::new(missing),
             }),
@@ -200,7 +217,7 @@ where
         self
     }
 
-    pub fn with_error(mut self, function: ErrorFunction<Error>) -> Self {
+    pub fn with_error(mut self, function: Emitter<Error>) -> Self {
         self.action = Some(Action::Error(function));
         self
     }
@@ -210,15 +227,15 @@ where
         found: Action<Input, Output, Error>,
         missing: Action<Input, Output, Error>,
     ) -> Self {
-        self.action = Some(Action::Conditional {
+        self.action = Some(Action::Trigger {
             found: Box::new(found),
             missing: Box::new(missing),
         });
         self
     }
 
-    pub fn with_transform(mut self, transform: TransformFunction<Input, Output, Error>) -> Self {
-        self.action = Some(Action::Transform(transform));
+    pub fn with_transform(mut self, transform: Transformer<Input, Output, Error>) -> Self {
+        self.action = Some(Action::Map(transform));
         self
     }
 

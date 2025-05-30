@@ -52,10 +52,11 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Lazy(_) => {
+            PatternKind::Guard { .. } => write!(f, "Guard"),
+            PatternKind::Deferred(_) => {
                 write!(f, "Lazy")
             }
-            PatternKind::Exact(literal) => {
+            PatternKind::Literal(literal) => {
                 write!(f, "Literal({:?})", literal)
             }
             PatternKind::Alternative(patterns) => {
@@ -64,7 +65,7 @@ where
             PatternKind::Sequence(sequence) => {
                 write!(f, "Sequence({:?})", sequence)
             }
-            PatternKind::Repeat {
+            PatternKind::Repetition {
                 pattern,
                 minimum,
                 maximum,
@@ -80,9 +81,9 @@ where
             PatternKind::Optional(pattern) => {
                 write!(f, "Optional({:?})", pattern)
             }
-            PatternKind::Predicate(_) => write!(f, "Predicate"),
-            PatternKind::Negate(_) => write!(f, "Negate"),
-            PatternKind::Anything => write!(f, "Anything"),
+            PatternKind::Condition(_) => write!(f, "Predicate"),
+            PatternKind::Negation(_) => write!(f, "Negate"),
+            PatternKind::WildCard => write!(f, "Anything"),
             PatternKind::Required { pattern, action } => {
                 write!(f, "Required({:?}, {:?})", pattern, action)
             }
@@ -98,11 +99,11 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Action::Transform(_) => write!(f, "Transform"),
+            Action::Map(_) => write!(f, "Map"),
             Action::Ignore => write!(f, "Ignore"),
             Action::Error(_) => write!(f, "Error"),
-            Action::Conditional { found, missing } => {
-                write!(f, "Conditional({:?}, {:?})", found, missing)
+            Action::Trigger { found, missing } => {
+                write!(f, "Trigger({:?}, {:?})", found, missing)
             }
         }
     }

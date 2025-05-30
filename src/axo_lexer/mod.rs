@@ -3,7 +3,7 @@ mod operator;
 mod punctuation;
 mod lexer;
 pub mod error;
-mod fmt;
+mod format;
 
 pub use {
     lexer::Lexer,

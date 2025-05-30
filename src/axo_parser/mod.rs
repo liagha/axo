@@ -3,7 +3,7 @@ mod parser;
 mod statement;
 mod core;
 mod item;
-mod fmt;
+mod format;
 mod delimiter;
 mod traits;
 pub mod error;

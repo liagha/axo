@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 pub mod span;
-mod fmt;
+mod format;
 pub mod position;
 
 pub use span::*;
