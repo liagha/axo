@@ -1,10 +1,14 @@
-use crate::{Color, PunctuationKind, TextStyle, Token, TokenKind};
+use crate::{format, Color, PunctuationKind, TextStyle, Token, TokenKind};
 
 pub fn indent(string: &String) -> String {
     string.lines()
         .map(|line| format!("    {}", line))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub fn format_vec<Item: format::Display>(vector: &Vec<Item>) -> String {
+    vector.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", ")
 }
 
 pub fn print_usage(program: &str) {

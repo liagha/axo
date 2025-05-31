@@ -3,7 +3,7 @@
 use {
     crate::{
         axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
-        axo_parser::{error::ErrorKind, Element, ElementKind, ParseError, Primary, ItemKind},
+        axo_parser::{error::ErrorKind, Element, ElementKind, ParseError, ItemKind},
         axo_data::peekable::Peekable,
         axo_span::{
             Span,
@@ -203,65 +203,6 @@ impl Parser {
         Span {
             start,
             end,
-        }
-    }
-
-    pub fn match_token(&mut self, token: &TokenKind) -> bool {
-        if let Some(peek) = self.peek() {
-            if &peek.kind == token {
-                self.next();
-
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-
-    pub fn parse(&mut self) -> Vec<Element> {
-        let mut items = Vec::new();
-        let mut separator = Option::<PunctuationKind>::None;
-
-        while let Some(Token { kind, span }) = self.peek().cloned() {
-            match kind {
-                TokenKind::Punctuation(PunctuationKind::Comma) => {
-                    self.next();
-
-                    if let Some(separator) = separator {
-                        if separator != PunctuationKind::Comma {
-                            self.error(&ParseError::new(ErrorKind::InconsistentSeparators, span));
-                        }
-                    } else {
-                        separator = Some(PunctuationKind::Comma);
-                    }
-                }
-                TokenKind::Punctuation(PunctuationKind::SemiColon) => {
-                    self.next();
-
-                    if let Some(separator) = separator {
-                        if separator != PunctuationKind::SemiColon {
-                            self.error(&ParseError::new(ErrorKind::InconsistentSeparators, span));
-                        }
-                    } else {
-                        separator = Some(PunctuationKind::SemiColon);
-                    }
-                }
-                _ => {
-                    let element = self.parse_complex();
-
-                    items.push(element.clone());
-
-                    self.output.push(element);
-                }
-            }
-        }
-
-        if separator == Some(PunctuationKind::SemiColon) {
-            items
-        } else {
-            items
         }
     }
 }

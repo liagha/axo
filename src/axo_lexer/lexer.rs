@@ -140,10 +140,10 @@ impl Lexer {
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
             Pattern::repeat(Pattern::predicate(Arc::new(|c| *c != '\n')), 0, None),
         ])
-        .with_transform(Arc::new(|chars, span| {
-            let content: String = Form::expand_inputs(chars).into_iter().collect();
+        .with_transform(Arc::new(|form| {
+            let content: String = form.inputs().into_iter().collect();
 
-            Ok(Token::new(TokenKind::Comment(content.to_string()), span))
+            Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
         }))
     }
 
@@ -159,10 +159,10 @@ impl Lexer {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-        .with_transform(Arc::new(|chars, span| {
-            let content: String = Form::expand_inputs(chars).into_iter().collect();
+        .with_transform(Arc::new(|form| {
+            let content: String = form.inputs().into_iter().collect();
 
-            Ok(Token::new(TokenKind::Comment(content.to_string()), span))
+            Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
         }))
     }
 
@@ -182,14 +182,14 @@ impl Lexer {
                     None,
                 ),
             ]),
-            Arc::new(|chars, span| {
-                let number: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
 
                 match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), span)),
+                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
+                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             }),
         )
@@ -209,13 +209,13 @@ impl Lexer {
                     None,
                 ),
             ]),
-            Arc::new(|chars, span| {
-                let number: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
                 match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), span)),
+                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
+                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             }),
         )
@@ -235,13 +235,13 @@ impl Lexer {
                     None,
                 ),
             ]),
-            Arc::new(|chars, span| {
-                let number: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
                 match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), span)),
+                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
+                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             }),
         )
@@ -276,20 +276,20 @@ impl Lexer {
                     Pattern::repeat(Pattern::predicate(Arc::new(|c| is_numeric(*c))), 1, None),
                 ])),
             ]),
-            Arc::new(|chars, span| {
-                let number: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let number: String = form.inputs().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
                     let parser = crate::axo_rune::parser::<f64>();
                     match parser.parse(&number) {
-                        Ok(num) => Ok(Token::new(TokenKind::Float(FloatLiteral::from(num)), span)),
-                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), span)),
+                        Ok(num) => Ok(Token::new(TokenKind::Float(FloatLiteral::from(num)), form.span)),
+                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 } else {
                     let parser = crate::axo_rune::parser::<i128>();
                     match parser.parse(&number) {
-                        Ok(num) => Ok(Token::new(TokenKind::Integer(num), span)),
-                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), span)),
+                        Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
+                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 }
             }),
@@ -317,12 +317,12 @@ impl Lexer {
                     None,
                 ),
             ]),
-            Arc::new(|chars, span| {
-                let identifier: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let identifier: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::from_str(&identifier).unwrap_or(TokenKind::Identifier(identifier)),
-                    span,
+                    form.span,
                 ))
             }),
         )
@@ -345,11 +345,11 @@ impl Lexer {
                 ),
                 Pattern::exact('"'),
             ]),
-            Arc::new(|chars, span| {
+            Arc::new(|form| {
                 let mut content = String::new();
                 let mut i = 1;
 
-                let flat_chars = Form::expand_inputs(chars);
+                let flat_chars = form.inputs();
 
                 while i < flat_chars.len() - 1 {
                     let c = flat_chars[i];
@@ -378,7 +378,7 @@ impl Lexer {
                                                     ErrorKind::StringParseError(
                                                         CharParseError::InvalidEscapeSequence,
                                                     ),
-                                                    span,
+                                                    form.span,
                                                 ));
                                             }
                                         } else {
@@ -386,7 +386,7 @@ impl Lexer {
                                                 ErrorKind::StringParseError(
                                                     CharParseError::UnterminatedEscapeSequence,
                                                 ),
-                                                span,
+                                                form.span,
                                             ));
                                         }
                                     }
@@ -421,7 +421,7 @@ impl Lexer {
                                                         ErrorKind::StringParseError(
                                                             CharParseError::InvalidEscapeSequence,
                                                         ),
-                                                        span,
+                                                        form.span,
                                                     ));
                                                 }
                                             } else {
@@ -429,7 +429,7 @@ impl Lexer {
                                                     ErrorKind::StringParseError(
                                                         CharParseError::UnterminatedEscapeSequence,
                                                     ),
-                                                    span,
+                                                    form.span,
                                                 ));
                                             }
                                         } else {
@@ -437,7 +437,7 @@ impl Lexer {
                                                 ErrorKind::StringParseError(
                                                     CharParseError::InvalidEscapeSequence,
                                                 ),
-                                                span,
+                                                form.span,
                                             ));
                                         }
                                     } else {
@@ -445,7 +445,7 @@ impl Lexer {
                                             ErrorKind::StringParseError(
                                                 CharParseError::UnterminatedEscapeSequence,
                                             ),
-                                            span,
+                                            form.span,
                                         ));
                                     }
                                 }
@@ -457,7 +457,7 @@ impl Lexer {
                     }
                     i += 1;
                 }
-                Ok(Token::new(TokenKind::String(content), span))
+                Ok(Token::new(TokenKind::String(content), form.span))
             }),
         )
     }
@@ -469,10 +469,10 @@ impl Lexer {
                 Pattern::repeat(Pattern::predicate(Arc::new(|c| *c != '`')), 0, None),
                 Pattern::exact('`'),
             ]),
-            Arc::new(|chars, span| {
-                let content: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let content: String = form.inputs().into_iter().collect();
 
-                Ok(Token::new(TokenKind::String(content), span))
+                Ok(Token::new(TokenKind::String(content), form.span))
             }),
         )
     }
@@ -490,13 +490,13 @@ impl Lexer {
                 ]),
                 Pattern::exact('\''),
             ]),
-            Arc::new(|chars, span| {
-                let flat_chars = Form::expand_inputs(chars);
+            Arc::new(|form| {
+                let flat_chars = form.inputs();
 
                 if flat_chars.len() < 3 {
                     return Err(LexError::new(
                         ErrorKind::CharParseError(CharParseError::EmptyCharLiteral),
-                        span,
+                        form.span,
                     ));
                 }
 
@@ -504,7 +504,7 @@ impl Lexer {
                     if flat_chars.len() < 4 {
                         return Err(LexError::new(
                             ErrorKind::CharParseError(CharParseError::UnterminatedEscapeSequence),
-                            span,
+                            form.span,
                         ));
                     }
                     let escaped_c = flat_chars[2];
@@ -521,7 +521,7 @@ impl Lexer {
                                     ErrorKind::CharParseError(
                                         CharParseError::UnterminatedEscapeSequence,
                                     ),
-                                    span,
+                                    form.span,
                                 ));
                             }
                             let h1 = flat_chars[3];
@@ -537,7 +537,7 @@ impl Lexer {
                                     ErrorKind::CharParseError(
                                         CharParseError::InvalidEscapeSequence,
                                     ),
-                                    span,
+                                    form.span,
                                 ));
                             }
                         }
@@ -547,7 +547,7 @@ impl Lexer {
                                     ErrorKind::CharParseError(
                                         CharParseError::InvalidEscapeSequence,
                                     ),
-                                    span,
+                                    form.span,
                                 ));
                             }
                             let mut i = 4;
@@ -561,7 +561,7 @@ impl Lexer {
                                     ErrorKind::CharParseError(
                                         CharParseError::UnterminatedEscapeSequence,
                                     ),
-                                    span,
+                                    form.span,
                                 ));
                             }
                             u32::from_str_radix(&hex, 16)
@@ -575,7 +575,7 @@ impl Lexer {
                     flat_chars[1]
                 };
 
-                Ok(Token::new(TokenKind::Character(ch), span))
+                Ok(Token::new(TokenKind::Character(ch), form.span))
             }),
         )
     }
@@ -587,12 +587,12 @@ impl Lexer {
                 1,
                 None,
             ),
-            Arc::new(|chars, span| {
-                let operator: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let operator: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::Operator(operator.to_operator()),
-                    span,
+                    form.span,
                 ))
             }),
         )
@@ -601,12 +601,12 @@ impl Lexer {
     fn punctuation() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::predicate(Arc::new(|c: &char| c.is_punctuation())),
-            Arc::new(|chars, span| {
-                let punctuation: String = Form::expand_inputs(chars).into_iter().collect();
+            Arc::new(|form| {
+                let punctuation: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::Punctuation(punctuation.to_punctuation()),
-                    span,
+                    form.span,
                 ))
             }),
         )

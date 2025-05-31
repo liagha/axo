@@ -99,6 +99,26 @@ impl Span {
         Some(Span::new(start, end))
     }
 
+    pub fn mix(&self, other: &Span) -> Span {
+        if self.start.file != other.start.file {
+            panic!("Cannot mix spans from different files");
+        }
+
+        let start = if self.start.cmp(&other.start) == crate::compare::Ordering::Less {
+            self.start.clone()
+        } else {
+            other.start.clone()
+        };
+
+        let end = if self.end.cmp(&other.end) == crate::compare::Ordering::Greater {
+            self.end.clone()
+        } else {
+            other.end.clone()
+        };
+
+        Span::new(start, end)
+    }
+
     pub fn to_range_string(&self) -> String {
         format!("{}:{}-{}:{}",
                 self.start.line, self.start.column,

@@ -1,19 +1,19 @@
 use crate::{format_tokens, indent, xprintln, Color, Lexer, Parser, Resolver, Timer, TIMERSOURCE, Path, Peekable};
-use core::any::{Any, TypeId};
-use std::collections::HashMap;
+use crate::any::{Any, TypeId};
 use crate::tree::{Node, Tree};
+use hashish::HashMap;
 
 #[derive(Debug)]
 pub enum CompilerError {
     PathRequired,
-    FileReadError(std::io::Error),
+    FileReadError(crate::file::Error),
     LexingFailed(Vec<crate::axo_lexer::LexError>),
     ParsingFailed(Vec<crate::axo_parser::ParseError>),
     ResolutionFailed(Vec<crate::axo_resolver::ResolveError>),
 }
 
-impl std::fmt::Display for CompilerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl crate::format::Display for CompilerError {
+    fn fmt(&self, f: &mut crate::format::Formatter<'_>) -> crate::format::Result {
         match self {
             CompilerError::PathRequired => write!(f, "No input file specified"),
             CompilerError::FileReadError(e) => write!(f, "Failed to read file: {}", e),
@@ -23,8 +23,6 @@ impl std::fmt::Display for CompilerError {
         }
     }
 }
-
-impl std::error::Error for CompilerError {}
 
 #[derive(Clone)]
 pub struct Config {
@@ -258,20 +256,20 @@ impl Stage for ParserStage {
 
         let mut parser = Parser::new(tokens.clone(), context.file_path.clone());
 
-        let (test_elements, test_errors) = parser.parse_program();
+        let (elements, errors) = parser.parse_program();
 
         if context.config.verbose {
-            let test_ast = test_elements
+            let ast = elements
                 .iter()
                 .map(|element| format!("{:?}", element))
                 .collect::<Vec<String>>()
                 .join("\n");
 
-            xprintln!("Test Elements:\n{}" => Color::Green, indent(&test_ast));
+            xprintln!("Elements:\n{}" => Color::Green, indent(&ast));
             xprintln!();
         }
 
-        for err in &test_errors {
+        for err in &errors {
             let (msg, details) = err.format();
             xprintln!(
                 "{}\n{}" => Color::Red,
@@ -282,25 +280,6 @@ impl Stage for ParserStage {
 
         parser.restore();
 
-        let elements = parser.parse();
-
-        if !parser.errors.is_empty() {
-            for err in &parser.errors {
-                xprintln!("{}" => Color::Red, err);
-            }
-            return Err(CompilerError::ParsingFailed(parser.errors));
-        }
-
-        if context.config.show_ast || context.config.verbose {
-            let ast = elements
-                .iter()
-                .map(|element| format!("{:?}", element))
-                .collect::<Vec<String>>()
-                .join("\n");
-            xprintln!("Elements:\n{}" => Color::Green, indent(&ast));
-            xprintln!();
-        }
-
         if context.config.time_report {
             println!(
                 "Parsing Took {} ns",
@@ -309,6 +288,7 @@ impl Stage for ParserStage {
         }
 
         context.set_data(elements);
+
         Ok(())
     }
 }

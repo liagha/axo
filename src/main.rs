@@ -34,11 +34,12 @@ pub type Path = std::path::PathBuf;
 
 pub mod file {
     pub use std::fs::{read_to_string};
+    pub use std::io::{Error};
 }
 
-pub mod process {
+/*pub mod process {
     pub use std::process::exit;
-}
+}*/
 
 pub mod environment {
     pub use std::env::{args, current_dir, };
@@ -65,6 +66,10 @@ pub mod char {
     pub use core::char::{from_u32};
 }
 
+pub mod any {
+    pub use core::any::{Any, TypeId};
+}
+
 pub mod operations {
     pub use core::ops::{Add, Sub, Mul, Div, Neg, Rem, Range};
 }
@@ -89,8 +94,28 @@ pub mod format {
     pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
-pub fn format_vec<Item: format::Display>(vector: &Vec<Item>) -> String {
-    vector.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", ")
+
+#[derive(Debug)]
+pub enum AppError {
+    Compiler(CompilerError),
+    ArgumentParsing(String),
+    HelpRequested,
+}
+
+impl format::Display for AppError {
+    fn fmt(&self, f: &mut format::Formatter<'_>) -> format::Result {
+        match self {
+            AppError::Compiler(e) => write!(f, "{}", e),
+            AppError::ArgumentParsing(msg) => write!(f, "{}", msg),
+            AppError::HelpRequested => Ok(()), // Help is handled separately
+        }
+    }
+}
+
+impl From<CompilerError> for AppError {
+    fn from(error: CompilerError) -> Self {
+        AppError::Compiler(error)
+    }
 }
 
 fn main() {
@@ -98,13 +123,17 @@ fn main() {
 
     let main_timer = Timer::new(TIMERSOURCE);
 
-    let config = match parse_arguments() {
-        Ok(config) => config,
+    match run_application(main_timer) {
+        Ok(()) => {}
+        Err(AppError::HelpRequested) => {}
         Err(e) => {
             eprintln!("{}", e);
-            process::exit(1);
         }
-    };
+    }
+}
+
+fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
+    let config = parse_arguments()?;
 
     if config.time_report {
         println!(
@@ -115,13 +144,7 @@ fn main() {
 
     let file_read_timer = Timer::new(TIMERSOURCE);
 
-    let mut compiler = match Compiler::new(config.clone()) {
-        Ok(compiler) => compiler,
-        Err(e) => {
-            eprintln!("{}", e);
-            process::exit(1);
-        }
-    };
+    let mut compiler = Compiler::new(config.clone())?;
 
     if config.time_report {
         println!(
@@ -130,10 +153,7 @@ fn main() {
         );
     }
 
-    if let Err(e) = compiler.compile() {
-        eprintln!("{}", e);
-        process::exit(1);
-    }
+    compiler.compile()?;
 
     if config.time_report {
         println!(
@@ -141,9 +161,11 @@ fn main() {
             main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
         );
     }
+
+    Ok(())
 }
 
-fn parse_arguments() -> Result<Config, CompilerError> {
+fn parse_arguments() -> Result<Config, AppError> {
     let args: Vec<String> = environment::args().collect();
     let mut config = Config {
         file_path: String::new(),
@@ -162,22 +184,24 @@ fn parse_arguments() -> Result<Config, CompilerError> {
             "--time" => config.time_report = true,
             "-h" | "--help" => {
                 print_usage(&args[0]);
-                process::exit(0);
+                return Err(AppError::HelpRequested);
             }
             flag => {
                 if flag.starts_with('-') {
-                    eprintln!("Unknown option: {}", flag);
+                    let error_msg = format!("Unknown option: {}", flag);
+                    eprintln!("{}", error_msg);
                     print_usage(&args[0]);
-                    process::exit(1);
+                    return Err(AppError::ArgumentParsing(error_msg));
                 }
                 config.file_path = flag.to_string();
             }
         }
+
         i += 1;
     }
 
     if config.file_path.is_empty() {
-        return Err(CompilerError::PathRequired);
+        return Err(AppError::Compiler(CompilerError::PathRequired));
     }
 
     Ok(config)

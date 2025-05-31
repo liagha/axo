@@ -1,13 +1,11 @@
 #![allow(dead_code)]
 
 mod format;
-mod parser;
-mod pattern;
-mod action;
-mod delimited;
+pub mod pattern;
+pub mod action;
 
 use crate::format::Debug;
-use crate::{Peekable};
+use crate::Peekable;
 use crate::axo_span::Span;
 use crate::axo_form::action::Action;
 pub use crate::axo_form::pattern::{Pattern, PatternKind};
@@ -43,11 +41,28 @@ where
     Output: Clone + PartialEq + Debug,
     Error: Clone + PartialEq + Debug,
 {
+    fn catch(&self) -> Option<Form<Input, Output, Error>> {
+        match self.kind.clone() {
+            FormKind::Multiple(forms) => {
+                for form in forms {
+                    Self::catch(&form)?;
+                }
+            }
+
+            FormKind::Error(_) => {
+                return Some(self.clone());
+            }
+
+            _ => {},
+        }
+
+        None
+    }
+
     pub fn unwrap(&self) -> Vec<Form<Input, Output, Error>> {
         match self.kind.clone() {
-            FormKind::Empty => vec![],
-            FormKind::Input(_) | FormKind::Output(_) | FormKind::Error(_) => vec![self.clone()],
-            FormKind::Multiple(items) => items,
+            FormKind::Multiple(forms) => forms,
+            _ => vec![self.clone()],
         }
     }
 
@@ -69,8 +84,6 @@ where
         let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
 
         match self {
-            Form { kind: FormKind::Empty, .. } => {}
-
             Form { kind: FormKind::Multiple(forms), .. } => {
                 expanded.extend(Self::expand_forms(forms.clone()));
             }
@@ -83,13 +96,51 @@ where
         expanded
     }
 
+    pub fn inputs(&self) -> Vec<Input> {
+        let mut inputs: Vec<Input> = Vec::new();
+
+        for form in self.unwrap() {
+            match form.kind {
+                FormKind::Input(input) => {
+                    inputs.push(input);
+                }
+                FormKind::Multiple(sub) => {
+                    let sub = Self::expand_inputs(sub);
+
+                    inputs.extend(sub);
+                }
+                _ => {}
+            }
+        }
+
+        inputs
+    }
+
+    pub fn outputs(&self) -> Vec<Output> {
+        let mut outputs: Vec<Output> = Vec::new();
+
+        for form in self.unwrap() {
+            match form.kind {
+                FormKind::Output(output) => {
+                    outputs.push(output);
+                }
+                FormKind::Multiple(sub) => {
+                    let sub = Self::expand_outputs(sub);
+
+                    outputs.extend(sub);
+                }
+                _ => {}
+            }
+        }
+
+        outputs
+    }
+
     pub fn expand_forms(forms: Vec<Form<Input, Output, Error>>) -> Vec<Form<Input, Output, Error>> {
         let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
 
         for form in forms {
             match form {
-                Form { kind: FormKind::Empty, .. } => {}
-
                 Form { kind: FormKind::Multiple(sub), .. } => {
                     let sub = Self::expand_forms(sub);
 
@@ -151,10 +202,9 @@ where
     Output: Clone + PartialEq + Debug,
     Error: Clone + PartialEq + Debug,
 {
-    fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>>;
     fn action(
         action: &Action<Input, Output, Error>,
-        formed_items: Vec<Form<Input, Output, Error>>,
+        form: Form<Input, Output, Error>,
         span: Span,
     ) -> Form<Input, Output, Error>;
     fn matches(&mut self, pattern: &Pattern<Input, Output, Error>, offset: usize) -> (bool, usize);
@@ -179,38 +229,17 @@ where
     Output: Clone + PartialEq + Debug,
     Error: Clone + PartialEq + Debug,
 {
-
-    fn catch(forms: Vec<Form<Input, Output, Error>>) -> Option<Form<Input, Output, Error>> {
-        for form in forms {
-            match form.kind.clone() {
-                FormKind::Multiple(forms) => {
-                    if let Some(error) = Self::catch(forms) {
-                        return Some(error);
-                    } else {
-                        continue;
-                    }
-                }
-                FormKind::Error(_) => {
-                    return Some(form);
-                }
-                _ => continue,
-            }
-        }
-
-        None
-    }
-
     fn action(
         action: &Action<Input, Output, Error>,
-        items: Vec<Form<Input, Output, Error>>,
+        form: Form<Input, Output, Error>,
         span: Span,
     ) -> Form<Input, Output, Error> {
-        if let Some(err) = Self::catch(items.clone()) {
+        if let Some(err) = form.catch() {
             return err;
         }
 
         let result = match action {
-            Action::Map(transform) => match transform(items, span.clone()) {
+            Action::Map(transform) => match transform(form) {
                 Ok(output) => Form::new(FormKind::Output(output), span),
                 Err(_) => Form::new(FormKind::Empty, span),
             },
@@ -219,12 +248,8 @@ where
 
             Action::Error(function) => Form::new(FormKind::Error(function(span.clone())), span),
 
-            Action::Trigger { found, missing } => {
-                if !items.is_empty() {
-                    Self::action(found, items, span)
-                } else {
-                    Self::action(missing, Vec::new(), span)
-                }
+            Action::Trigger { found, .. } => {
+                Self::action(found, form, span)
             }
         };
 
@@ -371,8 +396,8 @@ where
                 if let Some(action) = &pattern.action {
                     let end = self.position();
                     let span = Span::new(start, end);
-                    let items = form.unwrap();
-                    form = Self::action(action, items, span);
+
+                    form = Self::action(action, form, span);
                 }
 
                 return form;
@@ -493,7 +518,7 @@ where
                 if let Some(input) = self.peek() {
                     if predicate(input) {
                         let input = self.next().unwrap();
-                        
+
                         Form::new(
                             FormKind::Input(input),
                             Span::new(start.clone(), self.position()),
@@ -539,7 +564,7 @@ where
                     self.form(*subpattern.clone())
                 } else {
                     let span = Span::new(start.clone(), self.position());
-                    Self::action(&action, Vec::new(), span)
+                    Self::action(&action, Form::new(FormKind::Empty, span.clone()), span)
                 }
             }
 
@@ -551,10 +576,9 @@ where
 
         match &pattern.action {
             Some(action) => {
-                let items = form.clone().unwrap();
-                Self::action(action, items, span.clone())
+                Self::action(action, form, span.clone())
             }
-            
+
             None => form,
         }
     }

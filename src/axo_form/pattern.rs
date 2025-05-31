@@ -5,7 +5,7 @@ use crate::axo_form::Form;
 use crate::axo_span::Span;
 use crate::Peekable;
 
-pub type Transformer<Input, Output, Error> = Arc<dyn Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync>;
+pub type Transformer<Input, Output, Error> = Arc<dyn Fn(Form<Input, Output, Error>) -> Result<Output, Error> + Send + Sync>;
 pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
 pub type Emitter<Error> = Arc<dyn Fn(Span) -> Error>;
 pub type Evaluator<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
@@ -278,11 +278,8 @@ where
         Self::predicate(Arc::new(predicate))
     }
 
-    pub fn map<F>(pattern: impl Into<Box<Pattern<Input, Output, Error>>>, f: F) -> Self
-    where
-        F: Fn(Vec<Form<Input, Output, Error>>, Span) -> Result<Output, Error> + Send + Sync + 'static,
-    {
-        Self::transform(pattern, Arc::new(f))
+    pub fn map(pattern: impl Into<Box<Pattern<Input, Output, Error>>>, f: impl Into<Transformer<Input, Output, Error>>) -> Self {
+        Self::transform(pattern, f.into())
     }
 
     pub fn empty() -> Self {
