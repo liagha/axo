@@ -26,7 +26,7 @@ pub fn scope() -> Pattern<Token, Element, ParseError> {
                                 break;
                             }
                         }
-                        TokenKind::Punctuation(PunctuationKind::SemiColon) if brace_count == 1 => {
+                        TokenKind::Punctuation(PunctuationKind::Semicolon) if brace_count == 1 => {
                             found_semicolon = true;
                         }
                         _ => {}
@@ -44,7 +44,7 @@ pub fn scope() -> Pattern<Token, Element, ParseError> {
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                         }))),
                         Pattern::lazy(|| pattern()).optional_self(),
                     ]),
@@ -227,7 +227,7 @@ pub fn sequence() -> Pattern<Token, Element, ParseError> {
                                 break;
                             }
                         }
-                        TokenKind::Punctuation(PunctuationKind::SemiColon) if paren_count == 1 => {
+                        TokenKind::Punctuation(PunctuationKind::Semicolon) if paren_count == 1 => {
                             found_semicolon = true;
                         }
                         _ => {}
@@ -245,7 +245,7 @@ pub fn sequence() -> Pattern<Token, Element, ParseError> {
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                         }))),
                         Pattern::lazy(|| pattern()).optional_self(),
                     ]),
@@ -361,7 +361,7 @@ pub fn series() -> Pattern<Token, Element, ParseError> {
                                 break;
                             }
                         }
-                        TokenKind::Punctuation(PunctuationKind::SemiColon) if bracket_count == 1 => {
+                        TokenKind::Punctuation(PunctuationKind::Semicolon) if bracket_count == 1 => {
                             found_semicolon = true;
                         }
                         _ => {}
@@ -379,7 +379,7 @@ pub fn series() -> Pattern<Token, Element, ParseError> {
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::SemiColon)
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                         }))),
                         Pattern::lazy(|| pattern()).optional_self(),
                     ]),

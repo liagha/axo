@@ -256,7 +256,7 @@ impl Stage for ParserStage {
 
         let mut parser = Parser::new(tokens.clone(), context.file_path.clone());
 
-        let (elements, errors) = parser.parse_program();
+        let (elements, errors) = parser.parse();
 
         if context.config.verbose {
             let ast = elements

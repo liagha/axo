@@ -1,4 +1,4 @@
-use crate::axo_form::{Form, FormKind, Former, Pattern};
+use crate::axo_form::{FormKind, Former, Pattern};
 use crate::axo_lexer::error::CharParseError;
 use crate::float::FloatLiteral;
 use crate::thread::Arc;
@@ -8,7 +8,7 @@ use {
         axo_data::peekable::Peekable,
         axo_lexer::{
             error::ErrorKind,
-            operator::OperatorLexer, punctuation::PunctuationLexer, LexError,
+            operator::OperatorLexer, PunctuationKind, punctuation::PunctuationLexer, LexError,
             Token, TokenKind,
         },
         axo_rune::unicode::{is_alphabetic, is_numeric},
@@ -612,6 +612,33 @@ impl Lexer {
         )
     }
     
+    fn whitespace() -> Pattern<char, Token, LexError> {
+        Pattern::transform(
+            Pattern::repeat(
+                Pattern::predicate(Arc::new(|c: &char| c.is_whitespace())),
+                1,
+                None,
+            ),
+            Arc::new(|form| {
+                let whitespace: String = form.inputs().into_iter().collect();
+                
+                if whitespace.len() == 1 {
+                    Ok(Token::new(
+                        TokenKind::Punctuation(PunctuationKind::Space),
+                        form.span,
+                    ))
+                } else if whitespace.len() > 1 {
+                    Ok(Token::new(
+                        TokenKind::Punctuation(PunctuationKind::Indentation(whitespace.len())),
+                        form.span,
+                    ))
+                } else { 
+                    unreachable!()
+                }
+            })
+        )
+    }
+    
     fn fallback() -> Pattern<char, Token, LexError> {
         Pattern::anything().with_ignore()
     }
@@ -619,6 +646,7 @@ impl Lexer {
     pub fn pattern() -> Pattern<char, Token, LexError> {
         Pattern::repeat(
             Pattern::alternative([
+                Self::whitespace(),
                 Self::line_comment(),
                 Self::multiline_comment(),
                 Self::identifier(),

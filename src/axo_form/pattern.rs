@@ -37,6 +37,10 @@ where
     Condition(Predicate<Input>),
     Negation(Box<Pattern<Input, Output, Error>>),
     Deferred(Evaluator<Input, Output, Error>),
+    Capture {
+        identifier: usize,
+        pattern: Box<Pattern<Input, Output, Error>>,
+    },
     WildCard,
 }
 
@@ -89,6 +93,23 @@ where
             kind: PatternKind::Sequence(patterns.into()),
             action: None,
         }
+    }
+
+    pub fn capture(
+        identifier: usize,
+        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Capture {
+                identifier,
+                pattern: pattern.into(),
+            },
+            action: None,
+        }
+    }
+
+    pub fn as_capture(&self, identifier: usize) -> Self {
+        Self::capture(identifier, Box::new(self.clone()))
     }
 
     pub fn repeat(

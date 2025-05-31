@@ -12,6 +12,8 @@ use {
     },
     crate::Path,
 };
+use crate::axo_form::{FormKind, Former};
+use crate::axo_parser::core::parser;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -145,6 +147,9 @@ impl Parser {
             if let PunctuationKind::Space = punctuation {
                 return true;
             }
+            if let PunctuationKind::Indentation(_) = punctuation {
+                return true;
+            }
         }
 
         if let TokenKind::Comment(_) = kind {
@@ -166,6 +171,12 @@ impl Parser {
             return;
         }
 
+        if let TokenKind::Punctuation(PunctuationKind::Indentation(size)) = &token.kind {
+            self.position.column += size;
+            
+            return;
+        }
+
         if let TokenKind::Comment(_) = &token.kind {
             self.position.column += token.span.end.column - token.span.start.column;
             return;
@@ -184,25 +195,47 @@ impl Parser {
         }
     }
 
-    pub fn error(&mut self, error: &ParseError) -> Element {
-        self.errors.push(error.clone());
+    pub fn parse(&mut self) -> (Vec<Element>, Vec<ParseError>) {
+        let mut elements = Vec::new();
+        let mut errors = Vec::new();
 
-        let current = self.position.clone();
+        while self.peek().is_some() {
+            let form = self.form(parser());
 
-        Element {
-            kind: ElementKind::Invalid(error.clone()),
-            span: self.span(current.clone(), current),
+            match form.kind {
+                FormKind::Output(element) => {
+                    elements.push(element);
+                }
+
+                FormKind::Multiple(multi) => {
+                    for item in multi {
+                        match item.kind {
+                            FormKind::Output(element) => {
+                                elements.push(element);
+                            }
+                            FormKind::Multiple(sub) => {
+                                for item in sub {
+                                    if let FormKind::Output(element) = item.kind {
+                                        elements.push(element);
+                                    }
+                                }
+                            }
+                            FormKind::Error(error) => {
+                                errors.push(error);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                FormKind::Error(error) => {
+                    errors.push(error);
+                }
+
+                FormKind::Empty | FormKind::Input(_) => {}
+            }
         }
-    }
 
-    pub fn current_span(&self) -> Span {
-        Span::point(self.position.clone())
-    }
-
-    pub fn span(&self, start: Position, end: Position) -> Span {
-        Span {
-            start,
-            end,
-        }
+        (elements, errors)
     }
 }

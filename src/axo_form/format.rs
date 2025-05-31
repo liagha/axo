@@ -56,6 +56,9 @@ where
             PatternKind::Deferred(_) => {
                 write!(f, "Lazy")
             }
+            PatternKind::Capture { pattern, identifier } => {
+                write!(f, "Capture({:?} as {:?})", pattern, identifier)
+            }
             PatternKind::Literal(literal) => {
                 write!(f, "Literal({:?})", literal)
             }

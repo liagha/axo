@@ -3,17 +3,18 @@ pub use crate::format::{Display, Debug, Formatter, Write};
 #[derive(Clone, Debug, PartialEq, Copy, Eq, Hash)]
 pub enum PunctuationKind {
     Space,
+    Indentation(usize),
     Tab,
     Newline,
-    CarriageReturn,
+    Return,
+    Comma,
+    Semicolon,
     LeftParenthesis,
     RightParenthesis,
     LeftBracket,
     RightBracket,
     LeftBrace,
     RightBrace,
-    Comma,
-    SemiColon,
 }
 
 pub trait PunctuationLexer {
@@ -34,7 +35,7 @@ impl PunctuationLexer for str {
             " " => PunctuationKind::Space,
             "\t" => PunctuationKind::Tab,
             "\n" => PunctuationKind::Newline,
-            "\r" => PunctuationKind::CarriageReturn,
+            "\r" => PunctuationKind::Return,
             "(" => PunctuationKind::LeftParenthesis,
             ")" => PunctuationKind::RightParenthesis,
             "[" => PunctuationKind::LeftBracket,
@@ -42,7 +43,7 @@ impl PunctuationLexer for str {
             "{" => PunctuationKind::LeftBrace,
             "}" => PunctuationKind::RightBrace,
             "," => PunctuationKind::Comma,
-            ";" => PunctuationKind::SemiColon,
+            ";" => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
     }
@@ -61,7 +62,7 @@ impl PunctuationLexer for char {
             ' ' => PunctuationKind::Space,
             '\t' => PunctuationKind::Tab,
             '\n' => PunctuationKind::Newline,
-            '\r' => PunctuationKind::CarriageReturn,
+            '\r' => PunctuationKind::Return,
             '(' => PunctuationKind::LeftParenthesis,
             ')' => PunctuationKind::RightParenthesis,
             '[' => PunctuationKind::LeftBracket,
@@ -69,7 +70,7 @@ impl PunctuationLexer for char {
             '{' => PunctuationKind::LeftBrace,
             '}' => PunctuationKind::RightBrace,
             ',' => PunctuationKind::Comma,
-            ';' => PunctuationKind::SemiColon,
+            ';' => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
     }
@@ -77,11 +78,12 @@ impl PunctuationLexer for char {
 
 impl Display for PunctuationKind {
     fn fmt(&self, f: &mut Formatter) -> crate::format::Result {
-        let punct_str = match self {
+        let punctuation = match self {
             PunctuationKind::Space => " ",
+            PunctuationKind::Indentation(size) => &*" ".repeat(size.clone()),
             PunctuationKind::Tab => "\t",
             PunctuationKind::Newline => "\n",
-            PunctuationKind::CarriageReturn => "\r",
+            PunctuationKind::Return => "\r",
             PunctuationKind::LeftParenthesis => "(",
             PunctuationKind::RightParenthesis => ")",
             PunctuationKind::LeftBracket => "[",
@@ -89,8 +91,9 @@ impl Display for PunctuationKind {
             PunctuationKind::LeftBrace => "{",
             PunctuationKind::RightBrace => "}",
             PunctuationKind::Comma => ",",
-            PunctuationKind::SemiColon => ";",
+            PunctuationKind::Semicolon => ";",
         };
-        write!(f, "{}", punct_str)
+
+        write!(f, "{}", punctuation)
     }
 }

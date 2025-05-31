@@ -4,6 +4,7 @@ mod format;
 pub mod pattern;
 pub mod action;
 
+use hashish::HashMap;
 use crate::format::Debug;
 use crate::Peekable;
 use crate::axo_span::Span;
@@ -33,6 +34,7 @@ where
 {
     pub kind: FormKind<Input, Output, Error>,
     pub span: Span,
+    pub captures: HashMap<usize, Form<Input, Output, Error>>,
 }
 
 impl<Input, Output, Error> Form<Input, Output, Error>
@@ -218,7 +220,42 @@ where
     Error: Clone + PartialEq + Debug,
 {
     pub fn new(form: FormKind<Input, Output, Error>, span: Span) -> Self {
-        Self { kind: form, span }
+        Self { kind: form, span, captures: HashMap::new() }
+    }
+
+    pub fn with_capture(mut self, identifier: usize, captured: Form<Input, Output, Error>) -> Self {
+        self.captures.insert(identifier, captured);
+        self
+    }
+
+    pub fn get_capture(&self, identifier: usize) -> Option<&Form<Input, Output, Error>> {
+        self.captures.get(&identifier)
+    }
+
+    pub fn get_captures(&self) -> &HashMap<usize, Form<Input, Output, Error>> {
+        &self.captures
+    }
+
+    pub fn merge_captures(&mut self, other: &Form<Input, Output, Error>) {
+        for (id, capture) in &other.captures {
+            self.captures.insert(*id, capture.clone());
+        }
+    }
+
+    pub fn all_captures(&self) -> HashMap<usize, Form<Input, Output, Error>> {
+        let mut all_captures = self.captures.clone();
+
+        match &self.kind {
+            FormKind::Multiple(forms) => {
+                for form in forms {
+                    let nested_captures = form.all_captures();
+                    all_captures.extend(nested_captures);
+                }
+            }
+            _ => {}
+        }
+
+        all_captures
     }
 }
 
@@ -262,6 +299,13 @@ where
                 let resolved_pattern = factory();
 
                 self.matches(&resolved_pattern, offset)
+            }
+
+            PatternKind::Capture {
+                pattern,
+                ..
+            } => {
+                self.matches(&*pattern, offset)
             }
 
             PatternKind::Guard { predicate, pattern } => {
@@ -426,6 +470,20 @@ where
                 }
             }
 
+            PatternKind::Capture {
+                identifier,
+                pattern,
+            } => {
+                // Parse the wrapped pattern
+                let captured_form = self.form(*pattern.clone());
+
+                // Create a new form that includes this capture
+                let mut result_form = captured_form.clone();
+                result_form.captures.insert(identifier, captured_form);
+
+                result_form
+            }
+
             PatternKind::Guard { predicate, pattern } => {
                 if predicate(self) {
                     self.form(*pattern.clone())
@@ -434,25 +492,17 @@ where
                 }
             }
 
-            PatternKind::Alternative(patterns) => {
-                for subpattern in patterns {
-                    let (matches, offset) = self.matches(&subpattern, 0);
-
-                    if matches && offset != 0 {
-                        let result = self.form(subpattern.clone());
-
-                        return result;
-                    }
-                }
-
-                Form::new(FormKind::Empty, Span::point(self.position()))
-            }
-
             PatternKind::Sequence(sequence) => {
                 let mut formed = Vec::new();
+                let mut all_captures = HashMap::new();
 
                 for subpattern in sequence {
                     let form = self.form(subpattern.clone());
+
+                    // Collect captures from each form in the sequence
+                    for (id, capture) in &form.captures {
+                        all_captures.insert(*id, capture.clone());
+                    }
 
                     formed.push(form);
                 }
@@ -463,14 +513,31 @@ where
                     FormKind::Multiple(formed)
                 };
 
-                Form::new(
+                let mut result = Form::new(
                     kind,
                     Span::new(start.clone(), self.position()),
-                )
+                );
+
+                result.captures = all_captures;
+                result
+            }
+
+            PatternKind::Alternative(patterns) => {
+                for subpattern in patterns {
+                    let (matches, offset) = self.matches(&subpattern, 0);
+
+                    if matches && offset != 0 {
+                        let result = self.form(subpattern.clone());
+                        return result;
+                    }
+                }
+
+                Form::new(FormKind::Empty, Span::point(self.position()))
             }
 
             PatternKind::Repetition { pattern: subpattern, maximum, .. } => {
                 let mut formed = Vec::new();
+                let mut all_captures = HashMap::new();
 
                 while let Some(_) = self.peek() {
                     let (matches, offset) = self.matches(&*subpattern, 0);
@@ -480,6 +547,11 @@ where
 
                         if offset == 0 {
                             break;
+                        }
+
+                        // Collect captures from each repetition
+                        for (id, capture) in &form.captures {
+                            all_captures.insert(*id, capture.clone());
                         }
 
                         formed.push(form);
@@ -500,10 +572,14 @@ where
                     FormKind::Multiple(formed)
                 };
 
-                Form::new(
+                let mut result = Form::new(
                     kind,
                     Span::new(start.clone(), self.position()),
-                )
+                );
+
+                // Add all collected captures to the result
+                result.captures = all_captures;
+                result
             }
 
             PatternKind::Optional(sub) => {

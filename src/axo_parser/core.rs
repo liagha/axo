@@ -360,8 +360,36 @@ pub fn loops() -> Pattern<Token, Element, ParseError> {
     )
 }
 
+pub fn procedural() -> Pattern<Token, Element, ParseError> {
+    Pattern::transform(
+        Pattern::sequence([
+            Pattern::predicate(Arc::new(|token: &Token| {
+                if let TokenKind::Identifier(identifier) = &token.kind {
+                    identifier == "procedural"
+                } else {
+                    false
+                }
+            })).with_ignore(),
+            Pattern::required(
+                Pattern::capture(0, Pattern::lazy(|| pattern())),
+                Action::Error(Arc::new(|span| {
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                }))
+            ),
+        ]),
+        Arc::new(|form| {
+            let body = form.get_capture(0).unwrap().unwrap_output().unwrap();
+            
+            Ok(Element::new(
+                ElementKind::Procedural(body.into()),
+                form.span.clone(),
+            ))
+        })
+    )
+}
+
 pub fn statement() -> Pattern<Token, Element, ParseError> {
-    Pattern::alternative([conditional(), loops()])
+    Pattern::alternative([conditional(), loops(), procedural()])
 }
 
 pub fn token() -> Pattern<Token, Element, ParseError> {
@@ -402,50 +430,4 @@ pub fn pattern() -> Pattern<Token, Element, ParseError> {
 
 pub fn parser() -> Pattern<Token, Element, ParseError> {
     Pattern::repeat(Pattern::alternative([pattern(), fallback()]), 0, None)
-}
-
-impl Parser {
-    pub fn parse_program(&mut self) -> (Vec<Element>, Vec<ParseError>) {
-        let mut elements = Vec::new();
-        let mut errors = Vec::new();
-
-        while self.peek().is_some() {
-            let form = self.form(parser());
-
-            match form.kind {
-                FormKind::Output(element) => {
-                    elements.push(element);
-                }
-
-                FormKind::Multiple(multi) => {
-                    for item in multi {
-                        match item.kind {
-                            FormKind::Output(element) => {
-                                elements.push(element);
-                            }
-                            FormKind::Multiple(sub) => {
-                                for item in sub {
-                                    if let FormKind::Output(element) = item.kind {
-                                        elements.push(element);
-                                    }
-                                }
-                            }
-                            FormKind::Error(error) => {
-                                errors.push(error);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                FormKind::Error(error) => {
-                    errors.push(error);
-                }
-
-                FormKind::Empty | FormKind::Input(_) => {}
-            }
-        }
-
-        (elements, errors)
-    }
 }
