@@ -1,5 +1,8 @@
 use {
-    super::Hint,
+    super::{
+        Hint,
+        Action::*,
+    },
     
     crate::{
         format::{Display, Debug, Formatter, Result},
@@ -118,8 +121,6 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
 
         for hint in &self.hints {
             details.push_str(&format!("\n{}{}\n", "hint: ".colorize(Color::Blue), hint.message.to_string().bold()));
-
-            use crate::axo_error::hint::Action::*;
 
             for action in &hint.action {
                 match action {

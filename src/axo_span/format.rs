@@ -1,6 +1,15 @@
-use crate::format::{Display, Debug, Formatter, Result};
-use crate::axo_span::position::Position;
-use crate::axo_span::Span;
+use {
+    super::{
+        Span, Position,
+    },
+    
+    crate::{
+        format::{
+            Display, Debug, 
+            Formatter, Result
+        },
+    }
+};
 
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

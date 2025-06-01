@@ -1,10 +1,12 @@
-use crate::{
-    axo_data::tree::{
-        AvlNode, AvlTree, 
-        BinaryNode, BinarySearchTree, BinaryTree, 
-        BstNode, Node, Tree,
-    },
-    format::{Debug, Display, Formatter, Result},
+use {
+    crate::{
+        axo_data::tree::{
+            AvlNode, AvlTree,
+            BinaryNode, BinarySearchTree, BinaryTree,
+            BstNode, Node, Tree,
+        },
+        format::{Debug, Display, Formatter, Result},
+    }
 };
 
 impl<T: Debug> Debug for Node<T> {

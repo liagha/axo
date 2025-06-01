@@ -12,9 +12,10 @@ use {
 
     crate::{
         Path,
-        
-        float::FloatLiteral,
+
         thread::Arc,
+        char::from_u32,
+        float::FloatLiteral,
 
         axo_form::{
             former::{
@@ -410,7 +411,7 @@ impl Lexer {
                                     i -= 1;
                                     u32::from_str_radix(&hex, 16)
                                         .ok()
-                                        .and_then(crate::char::from_u32)
+                                        .and_then(from_u32)
                                         .unwrap_or('\0')
                                 }
                                 'u' => {
@@ -431,7 +432,7 @@ impl Lexer {
                                                 if flat_chars[i] == '}' {
                                                     u32::from_str_radix(&hex, 16)
                                                         .ok()
-                                                        .and_then(crate::char::from_u32)
+                                                        .and_then(from_u32)
                                                         .unwrap_or('\0')
                                                 } else {
                                                     return Err(LexError::new(
@@ -547,7 +548,7 @@ impl Lexer {
                                 let hex = format!("{}{}", h1, h2);
                                 u32::from_str_radix(&hex, 16)
                                     .ok()
-                                    .and_then(crate::char::from_u32)
+                                    .and_then(from_u32)
                                     .unwrap_or('\0')
                             } else {
                                 return Err(LexError::new(
@@ -583,7 +584,7 @@ impl Lexer {
                             }
                             u32::from_str_radix(&hex, 16)
                                 .ok()
-                                .and_then(crate::char::from_u32)
+                                .and_then(from_u32)
                                 .unwrap_or('\0')
                         }
                         _ => escaped_c,

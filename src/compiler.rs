@@ -3,17 +3,34 @@ use {
         Path, Peekable,
         
         format_tokens, indent, xprintln, Color,
+
+        file::{
+            read_to_string,
+            Error,
+        },
+        
+        environment::current_dir,
+        
+        format::{
+            Debug, Display,
+            Formatter,
+        },
         
         axo_lexer::{
+            LexError,
             Lexer,
             Token,
         },
         
         axo_parser::{
+            ParseError,
             Parser,
+            
+            Element,
         },
         
         axo_resolver::{
+            ResolveError,
             Resolver,
         },
         
@@ -24,14 +41,14 @@ use {
 #[derive(Debug)]
 pub enum CompilerError {
     PathRequired,
-    FileReadError(crate::file::Error),
-    LexingFailed(Vec<crate::axo_lexer::LexError>),
-    ParsingFailed(Vec<crate::axo_parser::ParseError>),
-    ResolutionFailed(Vec<crate::axo_resolver::ResolveError>),
+    FileReadError(Error),
+    LexingFailed(Vec<LexError>),
+    ParsingFailed(Vec<ParseError>),
+    ResolutionFailed(Vec<ResolveError>),
 }
 
-impl crate::format::Display for CompilerError {
-    fn fmt(&self, formatter: &mut crate::format::Formatter<'_>) -> crate::format::Result {
+impl Display for CompilerError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> crate::format::Result {
         match self {
             CompilerError::PathRequired => write!(formatter, "No input file specified"),
             CompilerError::FileReadError(error) => write!(formatter, "Failed to read file: {}", error),
@@ -91,14 +108,14 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(config: Config) -> Result<Self, CompilerError> {
-        let file_path = crate::environment::current_dir()
+        let file_path = current_dir()
             .map(|mut path| {
                 path.push(&config.file_path);
                 path
             })
             .map_err(|error| CompilerError::FileReadError(error))?;
 
-        let content = crate::file::read_to_string(&file_path)
+        let content = read_to_string(&file_path)
             .map_err(CompilerError::FileReadError)?;
 
         let context = Context::new(config, file_path, content);
@@ -181,8 +198,8 @@ impl Stage<(), Vec<Token>> for LexerStage {
 
 pub struct ParserStage;
 
-impl Stage<Vec<Token>, Vec<crate::axo_parser::Element>> for ParserStage {
-    fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<crate::axo_parser::Element>, CompilerError> {
+impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
+    fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
         let parser_timer = Timer::new(TIMERSOURCE);
 
         let mut parser = Parser::new(tokens, context.file_path.clone());
@@ -223,8 +240,8 @@ impl Stage<Vec<Token>, Vec<crate::axo_parser::Element>> for ParserStage {
 
 pub struct ResolverStage;
 
-impl Stage<Vec<crate::axo_parser::Element>, ()> for ResolverStage {
-    fn execute(&mut self, context: &mut Context, _elements: Vec<crate::axo_parser::Element>) -> Result<(), CompilerError> {
+impl Stage<Vec<Element>, ()> for ResolverStage {
+    fn execute(&mut self, context: &mut Context, _elements: Vec<Element>) -> Result<(), CompilerError> {
         let resolver_timer = Timer::new(TIMERSOURCE);
 
         if !context.resolver.errors.is_empty() {

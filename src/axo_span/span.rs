@@ -1,10 +1,22 @@
 #![allow(dead_code)]
 
-use crate::Path;
-use crate::axo_span::Spanned;
-use crate::axo_span::position::Position;
-use crate::format;
-use crate::file;
+use {
+    super::{
+        Spanned,
+        Position,
+    },
+    
+    crate::{
+        Path,
+        
+        format,
+        file,
+        
+        compare::{
+            Ordering,
+        }
+    },
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Span {
@@ -56,8 +68,8 @@ impl Span {
             return false;
         }
 
-        (self.start.cmp(pos) != crate::compare::Ordering::Greater) &&
-            (self.end.cmp(pos) != crate::compare::Ordering::Less)
+        (self.start.cmp(pos) != Ordering::Greater) &&
+            (self.end.cmp(pos) != Ordering::Less)
     }
 
     pub fn contains_span(&self, other: &Span) -> bool {
@@ -84,13 +96,13 @@ impl Span {
             return None;
         }
 
-        let start = if self.start.cmp(&other.start) == crate::compare::Ordering::Less {
+        let start = if self.start.cmp(&other.start) == Ordering::Less {
             self.start.clone()
         } else {
             other.start.clone()
         };
 
-        let end = if self.end.cmp(&other.end) == crate::compare::Ordering::Greater {
+        let end = if self.end.cmp(&other.end) == Ordering::Greater {
             self.end.clone()
         } else {
             other.end.clone()
@@ -104,13 +116,13 @@ impl Span {
             panic!("Cannot mix spans from different files");
         }
 
-        let start = if self.start.cmp(&other.start) == crate::compare::Ordering::Less {
+        let start = if self.start.cmp(&other.start) == Ordering::Less {
             self.start.clone()
         } else {
             other.start.clone()
         };
 
-        let end = if self.end.cmp(&other.end) == crate::compare::Ordering::Greater {
+        let end = if self.end.cmp(&other.end) == Ordering::Greater {
             self.end.clone()
         } else {
             other.end.clone()

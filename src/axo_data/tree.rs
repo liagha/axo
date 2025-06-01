@@ -5,7 +5,7 @@ extern crate alloc;
 use {
     crate::{
         memory::swap,
-        compare::Ordering,
+        compare::{max, Ordering},
     },
     
     alloc::{
@@ -1126,7 +1126,7 @@ impl<T: Ord + Clone> AvlNode<T> {
     fn update_height(&mut self) {
         let left_height = Self::height(&self.left);
         let right_height = Self::height(&self.right);
-        self.height = 1 + crate::compare::max(left_height, right_height);
+        self.height = 1 + max(left_height, right_height);
     }
 
     fn right_rotate(mut root: Box<AvlNode<T>>) -> Box<AvlNode<T>> {
