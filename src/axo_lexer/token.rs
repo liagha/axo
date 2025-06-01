@@ -1,6 +1,14 @@
-use crate::axo_lexer::{OperatorKind, PunctuationKind};
-use crate::axo_data::float::FloatLiteral;
-use crate::axo_span::Span;
+use {
+    super::{
+        OperatorKind, PunctuationKind
+    },
+    
+    crate::{
+        axo_data::float::FloatLiteral,
+        
+        axo_span::Span,
+    }
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Token {

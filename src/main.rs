@@ -13,9 +13,6 @@ mod timer;
 mod compiler;
 
 pub use {
-    axo_lexer::{Lexer, PunctuationKind, Token, TokenKind},
-    axo_parser::Parser,
-    axo_resolver::Resolver,
     axo_rune::*,
     axo_format::*,
     axo_data::{*, peekable::*},
@@ -64,10 +61,6 @@ pub mod hash {
 
 pub mod char {
     pub use core::char::{from_u32};
-}
-
-pub mod any {
-    pub use core::any::{Any, TypeId};
 }
 
 pub mod operations {

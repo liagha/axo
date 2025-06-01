@@ -1,6 +1,12 @@
-use crate::{Lexer, Path};
-use crate::axo_span::position::Position;
-use crate::axo_span::span::Span;
+use {
+    crate::{
+        Path,
+        
+        axo_span::{
+            Span, Position
+        },
+    }
+};
 
 pub trait Peekable<Item : PartialEq> {
     fn peek(&self) -> Option<&Item> {

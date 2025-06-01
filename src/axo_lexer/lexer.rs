@@ -1,18 +1,35 @@
-use crate::axo_form::{FormKind, Former, Pattern};
-use crate::axo_lexer::error::CharParseError;
-use crate::float::FloatLiteral;
-use crate::thread::Arc;
 use {
-    crate::Path,
-    crate::{
-        axo_data::peekable::Peekable,
-        axo_lexer::{
-            error::ErrorKind,
-            operator::OperatorLexer, PunctuationKind, punctuation::PunctuationLexer, LexError,
-            Token, TokenKind,
+    super::{
+        error::{
+            ErrorKind, CharParseError,
         },
+        
+        OperatorLexer, 
+        PunctuationKind, PunctuationLexer, 
+        Token, TokenKind,
+        LexError,
+    },
+
+    crate::{
+        Path,
+        
+        float::FloatLiteral,
+        thread::Arc,
+
+        axo_form::{
+            former::{
+                Former, FormKind,
+            },
+            
+            pattern::Pattern,
+        },
+
+        axo_data::peekable::Peekable,
         axo_rune::unicode::{is_alphabetic, is_numeric},
-        axo_span::{position::Position, Span},
+
+        axo_span::{
+            Position, Span
+        },
     },
 };
 
@@ -140,11 +157,11 @@ impl Lexer {
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
             Pattern::repeat(Pattern::predicate(Arc::new(|c| *c != '\n')), 0, None),
         ])
-        .with_transform(Arc::new(|form| {
-            let content: String = form.inputs().into_iter().collect();
+            .with_transform(Arc::new(|form| {
+                let content: String = form.inputs().into_iter().collect();
 
-            Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-        }))
+                Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
+            }))
     }
 
     fn multiline_comment() -> Pattern<char, Token, LexError> {
@@ -159,11 +176,11 @@ impl Lexer {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-        .with_transform(Arc::new(|form| {
-            let content: String = form.inputs().into_iter().collect();
+            .with_transform(Arc::new(|form| {
+                let content: String = form.inputs().into_iter().collect();
 
-            Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-        }))
+                Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
+            }))
     }
 
     fn hex_number() -> Pattern<char, Token, LexError> {
@@ -611,7 +628,7 @@ impl Lexer {
             }),
         )
     }
-    
+
     fn whitespace() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::repeat(
@@ -621,7 +638,7 @@ impl Lexer {
             ),
             Arc::new(|form| {
                 let whitespace: String = form.inputs().into_iter().collect();
-                
+
                 if whitespace.len() == 1 {
                     Ok(Token::new(
                         TokenKind::Punctuation(PunctuationKind::Space),
@@ -632,13 +649,13 @@ impl Lexer {
                         TokenKind::Punctuation(PunctuationKind::Indentation(whitespace.len())),
                         form.span,
                     ))
-                } else { 
+                } else {
                     unreachable!()
                 }
             })
         )
     }
-    
+
     fn fallback() -> Pattern<char, Token, LexError> {
         Pattern::anything().with_ignore()
     }

@@ -1,16 +1,18 @@
 use {
     crate::{
+        format::{
+            Debug, Display,
+            Formatter, Result
+        },
+        
         axo_parser::{
             item::Item,
             Element, ElementKind, ItemKind
-        }
+        },
+        
+        axo_format::indent,
     },
-    crate::format::{
-        Debug, Display,
-        Formatter, Result
-    }
 };
-use crate::axo_format::indent;
 
 impl Display for ItemKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

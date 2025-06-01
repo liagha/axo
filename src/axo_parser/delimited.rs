@@ -1,11 +1,31 @@
-use crate::thread::Arc;
-use crate::axo_form::{Form, Pattern};
-use crate::axo_parser::{Element, ElementKind, ParseError};
-use crate::{Peekable, PunctuationKind, Token, TokenKind};
-use crate::axo_form::action::Action;
-use crate::axo_parser::core::{pattern};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_span::Span;
+use {
+    super::{
+        core::pattern,
+        
+        error::ErrorKind,
+        
+        Element, ElementKind, 
+        ParseError
+    },
+    
+    crate::{
+        Peekable,
+        thread::Arc,
+        
+        axo_lexer::{
+            Token, TokenKind,
+            PunctuationKind,  
+        },
+        
+        axo_form::{
+            former::{Form},
+            pattern::Pattern,
+            action::Action,
+        },
+        
+        axo_span::Span,
+    }
+};
 
 pub fn scope() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(

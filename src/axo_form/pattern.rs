@@ -1,9 +1,16 @@
-use crate::format::Debug;
-use crate::thread::{Arc};
-use crate::axo_form::action::Action;
-use crate::axo_form::Form;
-use crate::axo_span::Span;
-use crate::Peekable;
+use {
+    super::{
+        former::Form,
+        action::Action,
+    },
+
+    crate::{
+        format::Debug,
+        thread::Arc,
+        axo_span::Span,
+        Peekable,
+    }
+};
 
 pub type Transformer<Input, Output, Error> = Arc<dyn Fn(Form<Input, Output, Error>) -> Result<Output, Error> + Send + Sync>;
 pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;

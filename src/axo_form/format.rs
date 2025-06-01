@@ -1,5 +1,14 @@
-use crate::axo_form::{Action, Form, FormKind, PatternKind};
-use crate::format::{Debug, Display, Formatter, Result};
+use {
+    super::{
+        former::{Form, FormKind},
+        pattern::PatternKind,
+        action::Action,
+    },
+
+    crate::{
+        format::{Debug, Display, Formatter, Result},
+    }
+};
 
 impl<Input, Output, Error> Display for Form<Input, Output, Error>
 where

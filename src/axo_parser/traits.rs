@@ -1,15 +1,16 @@
 use {
-    crate::hash::{
-        Hash, Hasher
+    super::{
+        Element, ElementKind,
+        Item, ItemKind
     },
 
     crate::{
         memory::discriminant,
-        axo_parser::{
-            Element, ElementKind,
-            Item, ItemKind
+        
+        hash::{
+            Hash, Hasher
         },
-    }
+    },
 };
 
 impl Hash for Element {
@@ -30,7 +31,7 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 name.hash(state);
             }
-            
+
             ElementKind::Procedural(element) => {
                 discriminant(self).hash(state);
                 element.hash(state);

@@ -2,14 +2,14 @@ mod token;
 mod operator;
 mod punctuation;
 mod lexer;
-pub mod error;
 mod format;
+pub mod error;
 
 pub use {
     lexer::Lexer,
-    operator::{OperatorKind},
-    punctuation::{PunctuationKind},
-    token::{Token, TokenKind},
+    operator::*,
+    punctuation::*,
+    token::*,
 };
 
 use crate::{

@@ -1,10 +1,12 @@
 #![allow(unused_imports)]
 
-pub mod span;
+mod span;
 mod format;
-pub mod position;
+mod position;
 
 pub use span::*;
+pub use position::*;
+
 use crate::axo_parser::{Element, Item};
 
 pub trait Spanned {

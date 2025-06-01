@@ -1,4 +1,13 @@
-use crate::{format, Color, PunctuationKind, TextStyle, Token, TokenKind};
+use {
+    crate::{
+        format, Color, TextStyle, 
+        
+        axo_lexer::{
+            Token, TokenKind, 
+            PunctuationKind, 
+        },
+    }
+};
 
 pub fn indent(string: &String) -> String {
     string.lines()

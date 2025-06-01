@@ -3,23 +3,30 @@ use {
 
     crate::{
         memory::replace,
+        
         axo_error::{
             Action, Hint
         },
+        
+        axo_lexer::{
+            Token, TokenKind,
+        },
+        
         axo_parser::{
             Element, ElementKind,
             Item, ItemKind
         },
+        
         axo_resolver::{
             ResolveError,
             error::ErrorKind,
             matcher::{symbol_matcher, Labeled},
             scope::Scope,
         },
+        
         axo_span::Span,
     },
 };
-use crate::{Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Resolver {

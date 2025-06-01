@@ -1,9 +1,14 @@
-use crate::axo_data::tree::{AvlNode, AvlTree, BinaryNode, BinarySearchTree, BinaryTree, BstNode, Node, Tree};
-use crate::format::{Display, Debug, Formatter, Result};
+use crate::{
+    axo_data::tree::{
+        AvlNode, AvlTree, 
+        BinaryNode, BinarySearchTree, BinaryTree, 
+        BstNode, Node, Tree,
+    },
+    format::{Debug, Display, Formatter, Result},
+};
 
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-
         if !self.children.is_empty() {
             write!(f, "{:?} -> ", self.value)?;
 
@@ -103,8 +108,6 @@ impl<T: Ord + Debug> Debug for AvlNode<T> {
 
 impl<T: Ord + Debug> Debug for AvlTree<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("AvlTree")
-            .field("root", &self.root)
-            .finish()
+        f.debug_struct("AvlTree").field("root", &self.root).finish()
     }
 }

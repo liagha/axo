@@ -1,6 +1,11 @@
-use OperatorKind::*;
-use crate::slice;
-use crate::format::{Debug, Display, Write, Result, Formatter};
+use {
+    crate::{
+        slice,
+        format::{Debug, Display, Write, Result, Formatter},
+    },
+    
+    OperatorKind::*,
+};
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum OperatorKind {

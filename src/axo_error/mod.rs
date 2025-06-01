@@ -1,4 +1,5 @@
 mod error;
 mod hint;
-pub use hint::*;
-pub use error::*;
+
+pub use error::Error;
+pub use hint::{Hint, Action};

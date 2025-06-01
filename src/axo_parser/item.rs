@@ -1,9 +1,11 @@
-use crate::axo_data::peekable::Peekable;
 use {
-    crate::hash::{
-        Hash, Hasher
-    },
     crate::{
+        Peekable,
+        
+        hash::{
+            Hash, Hasher
+        },
+        
         axo_lexer::{
             Token, TokenKind,
             PunctuationKind,

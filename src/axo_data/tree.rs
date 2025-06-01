@@ -2,11 +2,18 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use crate::compare::Ordering;
-use alloc::string::String;
-use crate::memory::swap;
+use {
+    crate::{
+        memory::swap,
+        compare::Ordering,
+    },
+    
+    alloc::{
+        vec::Vec,
+        boxed::Box,
+        string::String,
+    },
+};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Tree<T> {

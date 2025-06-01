@@ -1,8 +1,21 @@
-use crate::axo_data::tree::{Node, Tree};
-use crate::axo_lexer::OperatorKind::{Colon, Composite, Dot, Equal};
-use crate::axo_parser::{ItemKind, ParseError};
-use crate::axo_span::Span;
-use crate::{Token, TokenKind};
+use {
+    super::{
+        ItemKind, ParseError,
+    },
+    
+    crate::{
+        axo_data::tree::{
+            Node, Tree
+        },
+        
+        axo_lexer::{
+            Token, TokenKind,
+            OperatorKind,
+        },
+        
+        axo_span::Span,
+    }
+};
 
 #[derive(Eq, Clone)]
 pub struct Element {
@@ -134,7 +147,7 @@ impl Element {
                     },
                 right,
             } => match op.as_slice() {
-                [Dot] => {
+                [OperatorKind::Dot] => {
                     let kind = ElementKind::Member {
                         object: left.clone(),
                         member: right.clone(),
@@ -142,7 +155,7 @@ impl Element {
 
                     Element { kind, span }
                 }
-                [Colon] => {
+                [OperatorKind::Colon] => {
                     let kind = ElementKind::Labeled {
                         label: left.clone(),
                         element: right.clone(),
@@ -150,7 +163,7 @@ impl Element {
 
                     Element { kind, span }
                 }
-                [Equal] => {
+                [OperatorKind::Equal] => {
                     let kind = ElementKind::Assignment {
                         target: left.clone(),
                         value: right.clone(),
@@ -158,7 +171,7 @@ impl Element {
 
                     Element { kind, span }
                 }
-                [Colon, Equal] => {
+                [OperatorKind::Colon, OperatorKind::Equal] => {
                     let item = ItemKind::Variable {
                         target: left.clone(),
                         value: Some(right.clone()),
@@ -170,7 +183,7 @@ impl Element {
 
                     Element { kind, span }
                 }
-                [Colon, Colon] => {
+                [OperatorKind::Colon, OperatorKind::Colon] => {
                     let kind = match &left.kind {
                         ElementKind::Path { tree } => {
                             let mut new_tree = tree.clone();
@@ -202,7 +215,7 @@ impl Element {
                     Element { kind, span }
                 }
                 op => {
-                    let op = Composite(op.into());
+                    let op = OperatorKind::Composite(op.into());
 
                     if let Some(op) = op.decompound() {
                         let operator = Token {

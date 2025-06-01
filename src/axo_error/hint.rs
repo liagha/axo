@@ -1,5 +1,9 @@
-use crate::format::Display;
-use crate::axo_span::Span;
+use {
+    crate::{
+        format::Display,
+        axo_span::Span,
+    }
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Hint<M: Display> {

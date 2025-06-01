@@ -1,7 +1,14 @@
-use crate::format::Debug;
-use crate::thread::Arc;
-use crate::axo_form::pattern::{Emitter, Transformer};
-use crate::axo_span::Span;
+use {
+    super::{
+        pattern::{Emitter, Transformer},
+    },
+
+    crate::{
+        format::Debug,
+        thread::Arc,
+        axo_span::Span,
+    }
+};
 
 #[derive(Clone)]
 pub enum Action<Input, Output, Error>

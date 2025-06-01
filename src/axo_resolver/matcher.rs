@@ -1,7 +1,4 @@
 use {
-    crate::compare::{
-        max, min
-    },
     matchete::{
         damerau_levenshtein_distance,
         AcronymMetric, CaseInsensitiveMetric, EditDistanceMetric,
@@ -10,9 +7,12 @@ use {
         SuffixMetric, TokenSimilarityMetric
     },
     crate::{
+        compare::{min, max},
+        
         axo_lexer::{
             Token, TokenKind
         },
+        
         axo_parser::{
             Element, ElementKind,
             Item, ItemKind,

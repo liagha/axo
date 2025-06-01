@@ -1,10 +1,31 @@
-use crate::axo_parser::delimited::delimited;
-use crate::axo_form::{action::Action, Form, FormKind, Former, Pattern};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_parser::{Element, ElementKind, ParseError};
-use crate::axo_span::{Span, Spanned};
-use crate::thread::Arc;
-use crate::{Parser, Peekable, PunctuationKind, Token, TokenKind};
+use {
+    super::{
+        Parser,
+        delimited::delimited,
+        Element, ElementKind, ParseError,
+        
+        error::ErrorKind,
+    },
+    
+    crate::{
+        Peekable,
+        
+        thread::Arc,
+        
+        axo_lexer::{
+            Token, TokenKind,
+            PunctuationKind,
+        },
+        
+        axo_form::{
+            former::{Form, FormKind, Former},
+            pattern::Pattern,
+            action::Action,
+        },
+        
+        axo_span::{Span, Spanned},
+    }
+};
 
 pub fn identifier() -> Pattern<Token, Element, ParseError> {
     Pattern::transform(
@@ -405,8 +426,6 @@ pub fn whitespace() -> Pattern<Token, Element, ParseError> {
 pub fn fallback() -> Pattern<Token, Element, ParseError> {
     Pattern::conditional(
         Pattern::predicate(Arc::new(|_token: &Token| {
-            //println!("Skipping {:?}", _token);
-
             true
         })),
         Action::Error(Arc::new(|span| {

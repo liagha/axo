@@ -1,7 +1,11 @@
-use crate::hash::{Hash, Hasher};
-use crate::compare::Ordering;
-use crate::operations::{Add, Sub, Mul, Div, Neg, Rem};
-use crate::format::{Display, Debug, Formatter, Result};
+use {
+    crate::{
+        compare::Ordering,
+        hash::{Hash, Hasher},
+        format::{Display, Debug, Formatter, Result},
+        operations::{Add, Sub, Mul, Div, Neg, Rem},
+    }
+};
 
 #[derive(Debug, Copy, Clone)]
 pub struct FloatLiteral(pub f64);

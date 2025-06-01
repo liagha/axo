@@ -1,8 +1,14 @@
-use crate::file::read_to_string;
-use broccli::{Color, TextStyle};
-use crate::axo_error::hint::Hint;
-use crate::axo_span::Span;
-use crate::format::{Display, Debug, Formatter, Result};
+use {
+    super::Hint,
+    
+    crate::{
+        format::{Display, Debug, Formatter, Result},
+        file::read_to_string,
+        axo_span::Span,
+    },
+
+    broccli::{Color, TextStyle}
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Error<K, N = String, H = String> where K: Display, N: Display, H: Display {

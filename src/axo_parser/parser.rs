@@ -1,19 +1,29 @@
 #![allow(dead_code)]
 
 use {
-    crate::{
-        axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
-        axo_parser::{error::ErrorKind, Element, ElementKind, ParseError, ItemKind},
-        axo_data::peekable::Peekable,
-        axo_span::{
-            Span,
-            position::Position,
-        },
+    super::{
+        core::parser,
+        error::ErrorKind,
+        Element, ElementKind,
+        ItemKind,
+        ParseError
     },
-    crate::Path,
+    
+    crate::{
+        Path,
+        Peekable,
+        
+        axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
+        
+        axo_span::{
+            Span, Position,
+        },
+        
+        axo_form::{
+            former::{Former, FormKind},
+        }
+    },
 };
-use crate::axo_form::{FormKind, Former};
-use crate::axo_parser::core::parser;
 
 #[derive(Clone)]
 pub struct Parser {

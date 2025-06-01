@@ -1,5 +1,13 @@
-use crate::Token;
-use crate::format::{Display, Debug, Formatter, Result};
+use {
+    crate::{
+        format::{
+            Display, Debug, 
+            Formatter, Result
+        },
+        
+        axo_lexer::Token,
+    }
+};
 
 #[derive(Debug, Clone)]
 pub enum ErrorKind {

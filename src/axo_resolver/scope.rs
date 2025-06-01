@@ -1,7 +1,12 @@
 #![allow(dead_code)]
 
-use hashish::HashSet;
-use crate::axo_parser::Item;
+use {
+    hashish::HashSet,
+    
+    crate::{
+        axo_parser::Item,
+    },
+};
 
 #[derive(Clone, Debug)]
 pub struct Scope {
