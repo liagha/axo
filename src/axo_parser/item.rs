@@ -19,6 +19,8 @@ use {
         axo_span::Span,
     }
 };
+use crate::axo_form::former::Form;
+use crate::compiler::Artifact;
 
 #[derive(Eq, Clone)]
 pub struct Item {
@@ -26,9 +28,12 @@ pub struct Item {
     pub span: Span,
 }
 
-#[derive(Eq, Clone)]
 pub enum ItemKind {
     Use(Box<Element>),
+    Formed {
+        identifier: usize,
+        form: Form<Box<dyn Artifact>, Box<dyn Artifact>, Box<dyn Artifact>>,
+    },
     Implement {
         element: Box<Element>,
         body: Box<Element>
@@ -50,7 +55,7 @@ pub enum ItemKind {
     },
     Structure {
         name: Box<Element>,
-        fields: Vec<Item>
+        fields: Vec<Element>
     },
     Enum {
         name: Box<Element>,
@@ -67,4 +72,10 @@ pub enum ItemKind {
         body: Box<Element>
     },
     Unit,
+}
+
+impl Item {
+    pub fn new(kind: ItemKind, span: Span) -> Item {
+        Item { kind, span }
+    }
 }

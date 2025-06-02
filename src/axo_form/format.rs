@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use {
     super::{
         former::{Form, FormKind},
@@ -12,9 +13,9 @@ use {
 
 impl<Input, Output, Error> Display for Form<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
@@ -55,9 +56,9 @@ where
 
 impl<Input, Output, Error> Debug for PatternKind<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -105,9 +106,9 @@ where
 
 impl<Input, Output, Error> Debug for Action<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {

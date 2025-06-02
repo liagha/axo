@@ -2,7 +2,6 @@
 
 use {
     super::{
-        core::parser,
         error::ErrorKind,
         Element, ElementKind,
         ItemKind,
@@ -13,7 +12,12 @@ use {
         Path,
         Peekable,
         
-        axo_lexer::{OperatorKind, PunctuationKind, Token, TokenKind},
+        compiler::Context,
+        
+        axo_lexer::{
+            OperatorKind, PunctuationKind, 
+            Token, TokenKind
+        },
         
         axo_span::{
             Span, Position,
@@ -24,9 +28,11 @@ use {
         }
     },
 };
+use crate::compiler::Marked;
 
 #[derive(Clone)]
 pub struct Parser {
+    pub context: Context,
     pub input: Vec<Token>,
     pub index: usize,
     pub position: Position,
@@ -195,8 +201,9 @@ impl Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>, file: Path) -> Self {
+    pub fn new(context: Context, tokens: Vec<Token>, file: Path) -> Self {
         Parser {
+            context,
             input: tokens,
             index: 0,
             position: Position::new(file),
@@ -210,7 +217,7 @@ impl Parser {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let form = self.form(parser());
+            let form = self.form(Self::parser());
 
             match form.kind {
                 FormKind::Output(element) => {
@@ -247,5 +254,15 @@ impl Parser {
         }
 
         (elements, errors)
+    }
+}
+
+impl Marked for Parser {
+    fn context(&self) -> &Context {
+        &self.context
+    }
+    
+    fn context_mut(&mut self) -> &mut Context {
+        &mut self.context
     }
 }

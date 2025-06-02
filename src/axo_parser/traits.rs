@@ -349,6 +349,10 @@ impl Hash for ItemKind {
             ItemKind::Use(e) => {
                 e.hash(state);
             }
+            ItemKind::Formed { identifier, form } => {
+                identifier.hash(state);
+                form.hash(state);
+            }
             ItemKind::Implement { element, body } => {
                 element.hash(state);
                 body.hash(state);
@@ -398,3 +402,54 @@ impl Hash for ItemKind {
     }
 }
 
+impl Clone for ItemKind {
+    fn clone(&self) -> Self {
+        match self {
+            ItemKind::Use(element) => ItemKind::Use(element.clone()),
+            ItemKind::Formed { identifier, form } => ItemKind::Formed {
+                identifier: *identifier,
+                form: form.clone(),
+            },
+            ItemKind::Implement { element, body } => ItemKind::Implement {
+                element: element.clone(),
+                body: body.clone(),
+            },
+            ItemKind::Trait { name, body } => ItemKind::Trait {
+                name: name.clone(),
+                body: body.clone(),
+            },
+            ItemKind::Variable { target, value, ty, mutable } => ItemKind::Variable {
+                target: target.clone(),
+                value: value.clone(),
+                ty: ty.clone(),
+                mutable: *mutable,
+            },
+            ItemKind::Field { name, value, ty } => ItemKind::Field {
+                name: name.clone(),
+                value: value.clone(),
+                ty: ty.clone(),
+            },
+            ItemKind::Structure { name, fields } => ItemKind::Structure {
+                name: name.clone(),
+                fields: fields.clone(),
+            },
+            ItemKind::Enum { name, body } => ItemKind::Enum {
+                name: name.clone(),
+                body: body.clone(),
+            },
+            ItemKind::Macro { name, parameters, body } => ItemKind::Macro {
+                name: name.clone(),
+                parameters: parameters.clone(),
+                body: body.clone(),
+            },
+            ItemKind::Function { name, parameters, body } => ItemKind::Function {
+                name: name.clone(),
+                parameters: parameters.clone(),
+                body: body.clone(),
+            },
+            ItemKind::Unit => ItemKind::Unit,
+        }
+    }
+}
+
+impl Eq for ItemKind {}

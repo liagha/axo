@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use {
     super::{
         former::Form,
@@ -11,8 +12,9 @@ use {
         Peekable,
     }
 };
+use crate::compiler::Context;
 
-pub type Transformer<Input, Output, Error> = Arc<dyn Fn(Form<Input, Output, Error>) -> Result<Output, Error> + Send + Sync>;
+pub type Transformer<Input, Output, Error> = Arc<dyn Fn(&mut Context, Form<Input, Output, Error>) -> Result<Output, Error> + Send + Sync>;
 pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
 pub type Emitter<Error> = Arc<dyn Fn(Span) -> Error>;
 pub type Evaluator<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
@@ -20,9 +22,9 @@ pub type Evaluator<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Literal(Input),
     Alternative(Vec<Pattern<Input, Output, Error>>),
@@ -54,9 +56,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Pattern<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub kind: PatternKind<Input, Output, Error>,
     pub action: Option<Action<Input, Output, Error>>,
@@ -64,9 +66,9 @@ where
 
 impl<Input, Output, Error> Pattern<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub fn exact(value: Input) -> Self {
         Self {

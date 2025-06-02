@@ -28,7 +28,7 @@ use {
     },
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Resolver {
     pub scope: Scope,
     pub errors: Vec<ResolveError>,
@@ -169,11 +169,11 @@ impl Resolver {
 
     pub fn resolve(&mut self, elements: Vec<Element>) {
         for element in elements {
-            self.resolve_expr(element.into());
+            self.resolve_element(element.into());
         }
     }
 
-    pub fn resolve_expr(&mut self, element: Box<Element>) {
+    pub fn resolve_element(&mut self, element: Box<Element>) {
         let Element { kind, span } = *element.clone();
 
         match kind {
@@ -206,72 +206,72 @@ impl Resolver {
 
             ElementKind::Group(elements) | ElementKind::Collection(elements) | ElementKind::Bundle(elements) => {
                 for element in elements {
-                    self.resolve_expr(element.into());
+                    self.resolve_element(element.into());
                 }
             },
 
             ElementKind::Binary { left, right, .. } => {
-                self.resolve_expr(left);
-                self.resolve_expr(right);
+                self.resolve_element(left);
+                self.resolve_element(right);
             },
 
             ElementKind::Unary { operand, .. } => {
-                self.resolve_expr(operand)
+                self.resolve_element(operand)
             },
 
             ElementKind::Bind { key, value } => {
-                self.resolve_expr(key);
-                self.resolve_expr(value);
+                self.resolve_element(key);
+                self.resolve_element(value);
             },
 
             ElementKind::Labeled { label, element: value } => {
-                self.resolve_expr(label);
-                self.resolve_expr(value);
+                self.resolve_element(label);
+                self.resolve_element(value);
             },
 
             ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
-                self.resolve_expr(condition);
+                self.resolve_element(condition);
 
                 self.push_scope();
-                self.resolve_expr(then_branch);
+                self.resolve_element(then_branch);
                 self.pop_scope();
 
                 if let Some(else_branch) = else_branch {
                     self.push_scope();
-                    self.resolve_expr(else_branch);
+                    self.resolve_element(else_branch);
                     self.pop_scope();
                 }
             },
 
             ElementKind::Match { target: clause, body } => {
-                self.resolve_expr(clause);
+                self.resolve_element(clause);
 
                 self.push_scope();
-                self.resolve_expr(body);
+                self.resolve_element(body);
                 self.pop_scope();
             },
 
             ElementKind::Loop { condition, body } => {
                 if let Some(condition) = condition {
-                    self.resolve_expr(condition);
+                    self.resolve_element(condition);
                 }
 
                 self.push_scope();
-                self.resolve_expr(body);
+                self.resolve_element(body);
                 self.pop_scope();
             },
 
             ElementKind::Iterate { clause, body } => {
-                self.resolve_expr(clause);
+                self.resolve_element(clause);
 
                 self.push_scope();
-                self.resolve_expr(body);
+                self.resolve_element(body);
                 self.pop_scope();
             },
 
             ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Skip(value) => {
                 if let Some(value) = value {
-                    self.resolve_expr(value);
+                    self.resolve_element(value);
                 }
             },
 

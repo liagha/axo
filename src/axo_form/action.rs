@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use {
     super::{
         pattern::{Emitter, Transformer},
@@ -13,9 +14,9 @@ use {
 #[derive(Clone)]
 pub enum Action<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Map(Transformer<Input, Output, Error>),
     Ignore,
@@ -28,9 +29,9 @@ where
 
 impl<Input, Output, Error> Action<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub fn map(f: impl Into<Transformer<Input, Output, Error>>) -> Self {
         Self::Map(f.into())

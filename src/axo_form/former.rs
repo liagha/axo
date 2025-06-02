@@ -1,24 +1,25 @@
+use std::hash::Hash;
 use {
-    hashish::HashMap,
-    
     super::{
         action::Action,
         pattern::{Pattern, PatternKind},
     },
-    
+
     crate::{
+        Peekable,
         format::Debug,
         axo_span::Span,
-        Peekable,
+        axo_parser::{Item, ItemKind},
     },
 };
+use crate::compiler::{Marked};
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub enum FormKind<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Empty,
     Input(Input),
@@ -27,24 +28,27 @@ where
     Error(Error),
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct Form<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub kind: FormKind<Input, Output, Error>,
     pub span: Span,
-    pub captures: HashMap<usize, Form<Input, Output, Error>>,
 }
 
 impl<Input, Output, Error> Form<Input, Output, Error>
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
+    pub fn new(form: FormKind<Input, Output, Error>, span: Span) -> Self {
+        Self { kind: form, span, }
+    }
+
     fn catch(&self) -> Option<Form<Input, Output, Error>> {
         match self.kind.clone() {
             FormKind::Multiple(forms) => {
@@ -198,15 +202,47 @@ where
 
         outputs
     }
+
+    pub fn map_types<NewInput, NewOutput, NewError, F, G, H>(
+        self,
+        input_mapper: F,
+        output_mapper: G,
+        error_mapper: H,
+    ) -> Form<NewInput, NewOutput, NewError>
+    where
+        NewInput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        NewOutput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        NewError: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        F: Fn(Input) -> NewInput + Clone,
+        G: Fn(Output) -> NewOutput + Clone,
+        H: Fn(Error) -> NewError + Clone,
+    {
+        let mapped_kind = match self.kind {
+            FormKind::Empty => FormKind::Empty,
+            FormKind::Input(input) => FormKind::Input(input_mapper(input)),
+            FormKind::Output(output) => FormKind::Output(output_mapper(output)),
+            FormKind::Multiple(forms) => {
+                let mapped_forms = forms
+                    .into_iter()
+                    .map(|form| form.map_types(input_mapper.clone(), output_mapper.clone(), error_mapper.clone()))
+                    .collect();
+                FormKind::Multiple(mapped_forms)
+            }
+            FormKind::Error(error) => FormKind::Error(error_mapper(error)),
+        };
+
+        Form::new(mapped_kind, self.span)
+    }
 }
 
-pub trait Former<Input, Output, Error>: Peekable<Input>
+pub trait Former<Input, Output, Error>: Peekable<Input> + Marked
 where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn action(
+        &mut self,
         action: &Action<Input, Output, Error>,
         form: Form<Input, Output, Error>,
         span: Span,
@@ -215,60 +251,16 @@ where
     fn form(&mut self, pattern: Pattern<Input, Output, Error>) -> Form<Input, Output, Error>;
 }
 
-impl<Input, Output, Error> Form<Input, Output, Error>
-where
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
-{
-    pub fn new(form: FormKind<Input, Output, Error>, span: Span) -> Self {
-        Self { kind: form, span, captures: HashMap::new() }
-    }
-
-    pub fn with_capture(mut self, identifier: usize, captured: Form<Input, Output, Error>) -> Self {
-        self.captures.insert(identifier, captured);
-        self
-    }
-
-    pub fn get_capture(&self, identifier: usize) -> Option<&Form<Input, Output, Error>> {
-        self.captures.get(&identifier)
-    }
-
-    pub fn get_captures(&self) -> &HashMap<usize, Form<Input, Output, Error>> {
-        &self.captures
-    }
-
-    pub fn merge_captures(&mut self, other: &Form<Input, Output, Error>) {
-        for (id, capture) in &other.captures {
-            self.captures.insert(*id, capture.clone());
-        }
-    }
-
-    pub fn all_captures(&self) -> HashMap<usize, Form<Input, Output, Error>> {
-        let mut all_captures = self.captures.clone();
-
-        match &self.kind {
-            FormKind::Multiple(forms) => {
-                for form in forms {
-                    let nested_captures = form.all_captures();
-                    all_captures.extend(nested_captures);
-                }
-            }
-            _ => {}
-        }
-
-        all_captures
-    }
-}
 
 impl<Matcher, Input, Output, Error> Former<Input, Output, Error> for Matcher
 where
-    Matcher: Peekable<Input>,
-    Input: Clone + PartialEq + Debug,
-    Output: Clone + PartialEq + Debug,
-    Error: Clone + PartialEq + Debug,
+    Matcher: Peekable<Input> + Marked,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn action(
+        &mut self,
         action: &Action<Input, Output, Error>,
         form: Form<Input, Output, Error>,
         span: Span,
@@ -278,9 +270,13 @@ where
         }
 
         let result = match action {
-            Action::Map(transform) => match transform(form) {
-                Ok(output) => Form::new(FormKind::Output(output), span),
-                Err(_) => Form::new(FormKind::Empty, span),
+            Action::Map(transform) => {
+                let context = &mut self.context_mut();
+
+                match transform(context, form) {
+                    Ok(output) => Form::new(FormKind::Output(output), span),
+                    Err(_) => Form::new(FormKind::Empty, span),
+                }
             },
 
             Action::Ignore => Form::new(FormKind::Empty, span),
@@ -288,7 +284,7 @@ where
             Action::Error(function) => Form::new(FormKind::Error(function(span.clone())), span),
 
             Action::Trigger { found, .. } => {
-                Self::action(found, form, span)
+                self.action(found, form, span)
             }
         };
 
@@ -443,11 +439,12 @@ where
                     let end = self.position();
                     let span = Span::new(start, end);
 
-                    form = Self::action(action, form, span);
+                    form = self.action(action, form, span);
                 }
 
                 return form;
             }
+
             _ => pattern.clone(),
         };
 
@@ -476,14 +473,31 @@ where
                 identifier,
                 pattern,
             } => {
-                // Parse the wrapped pattern
-                let captured_form = self.form(*pattern.clone());
+                let captured = self.form(*pattern.clone());
 
-                // Create a new form that includes this capture
-                let mut result_form = captured_form.clone();
-                result_form.captures.insert(identifier, captured_form);
+                let resolver = &mut self.context_mut().resolver;
 
-                result_form
+                let form = captured.clone().map_types(
+                    |input| Box::new(input) as Box<dyn crate::compiler::Artifact>,
+                    |output| Box::new(output) as Box<dyn crate::compiler::Artifact>,
+                    |error| Box::new(error) as Box<dyn crate::compiler::Artifact>,
+                );
+
+                let item = Item::new(
+                    ItemKind::Formed {
+                        identifier,
+                        form,
+                    },
+                    captured.span.clone(),
+                );
+
+                println!("everything's fine till here");
+
+                resolver.insert(item);
+
+                println!("inserting causes stackoverflow so this wont be printed");
+
+                Form::new(FormKind::Empty, Span::point(start.clone()))
             }
 
             PatternKind::Guard { predicate, pattern } => {
@@ -496,15 +510,9 @@ where
 
             PatternKind::Sequence(sequence) => {
                 let mut formed = Vec::new();
-                let mut all_captures = HashMap::new();
 
                 for subpattern in sequence {
                     let form = self.form(subpattern.clone());
-
-                    // Collect captures from each form in the sequence
-                    for (id, capture) in &form.captures {
-                        all_captures.insert(*id, capture.clone());
-                    }
 
                     formed.push(form);
                 }
@@ -515,12 +523,11 @@ where
                     FormKind::Multiple(formed)
                 };
 
-                let mut result = Form::new(
+                let result = Form::new(
                     kind,
                     Span::new(start.clone(), self.position()),
                 );
 
-                result.captures = all_captures;
                 result
             }
 
@@ -539,7 +546,6 @@ where
 
             PatternKind::Repetition { pattern: subpattern, maximum, .. } => {
                 let mut formed = Vec::new();
-                let mut all_captures = HashMap::new();
 
                 while let Some(_) = self.peek() {
                     let (matches, offset) = self.matches(&*subpattern, 0);
@@ -549,11 +555,6 @@ where
 
                         if offset == 0 {
                             break;
-                        }
-
-                        // Collect captures from each repetition
-                        for (id, capture) in &form.captures {
-                            all_captures.insert(*id, capture.clone());
                         }
 
                         formed.push(form);
@@ -574,13 +575,11 @@ where
                     FormKind::Multiple(formed)
                 };
 
-                let mut result = Form::new(
+                let result = Form::new(
                     kind,
                     Span::new(start.clone(), self.position()),
                 );
 
-                // Add all collected captures to the result
-                result.captures = all_captures;
                 result
             }
 
@@ -642,11 +641,12 @@ where
                     self.form(*subpattern.clone())
                 } else {
                     let span = Span::new(start.clone(), self.position());
-                    Self::action(&action, Form::new(FormKind::Empty, span.clone()), span)
+
+                    self.action(&action, Form::new(FormKind::Empty, span.clone()), span)
                 }
             }
 
-            PatternKind::Deferred(_) => unreachable!("Lazy pattern should have been resolved"),
+            PatternKind::Deferred(_) => unreachable!("lazy pattern should have been resolved."),
         };
 
         let end = self.position();
@@ -654,7 +654,7 @@ where
 
         match &pattern.action {
             Some(action) => {
-                Self::action(action, form, span.clone())
+                self.action(action, form, span.clone())
             }
 
             None => form,

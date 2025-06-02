@@ -9,7 +9,7 @@ use {
     },
 };
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub enum ErrorKind {
     Custom(String),
     InvalidChar,
@@ -22,7 +22,7 @@ pub enum ErrorKind {
     UnterminatedCommentBlock,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub enum CharParseError {
     InvalidToken(String),
     EmptyCharLiteral,

@@ -1,3 +1,5 @@
+use std::any::Any;
+use std::hash::{Hash, Hasher};
 use {
     crate::{
         Path, Peekable,
@@ -38,6 +40,11 @@ use {
     }
 };
 
+pub trait Marked {
+    fn context(&self) -> &Context;
+    fn context_mut(&mut self) -> &mut Context; 
+}
+
 #[derive(Debug)]
 pub enum CompilerError {
     PathRequired,
@@ -68,6 +75,7 @@ pub struct Config {
     pub time_report: bool,
 }
 
+#[derive(Clone)]
 pub struct Context {
     pub config: Config,
     pub resolver: Resolver,
@@ -164,7 +172,7 @@ impl Stage<(), Vec<Token>> for LexerStage {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
         let lexer_timer = Timer::new(TIMERSOURCE);
 
-        let mut lexer = Lexer::new(context.content.clone(), context.file_path.clone());
+        let mut lexer = Lexer::new(context.clone(), context.content.clone(), context.file_path.clone());
         let (tokens, errors) = lexer.lex();
 
         if !errors.is_empty() {
@@ -187,7 +195,7 @@ impl Stage<(), Vec<Token>> for LexerStage {
 
         if context.config.time_report {
             println!(
-                "Lexing Took {} ns",
+                "Lexing Took {} ns\n",
                 lexer_timer.to_nanoseconds(lexer_timer.elapsed().unwrap())
             );
         }
@@ -202,7 +210,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
         let parser_timer = Timer::new(TIMERSOURCE);
 
-        let mut parser = Parser::new(tokens, context.file_path.clone());
+        let mut parser = Parser::new(context.clone(), tokens, context.file_path.clone());
         let (elements, errors) = parser.parse();
 
         if context.config.verbose {
@@ -229,7 +237,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 
         if context.config.time_report {
             println!(
-                "Parsing Took {} ns",
+                "Parsing Took {} ns\n",
                 parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap())
             );
         }
@@ -241,8 +249,10 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 pub struct ResolverStage;
 
 impl Stage<Vec<Element>, ()> for ResolverStage {
-    fn execute(&mut self, context: &mut Context, _elements: Vec<Element>) -> Result<(), CompilerError> {
+    fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
         let resolver_timer = Timer::new(TIMERSOURCE);
+        
+        context.resolver.resolve(elements);
 
         if !context.resolver.errors.is_empty() {
             for error in &context.resolver.errors {
@@ -265,11 +275,63 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
 
         if context.config.time_report {
             println!(
-                "Resolution Took {} ns",
+                "Resolution Took {} ns\n",
                 resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
             );
         }
 
         Ok(())
+    }
+}
+
+pub trait Artifact: Debug + Send + Sync {
+    fn clone_box(&self) -> Box<dyn Artifact>;
+    fn eq_box(&self, other: &dyn Artifact) -> bool;
+    fn hash_box(&self, state: &mut dyn Hasher);
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl Clone for Box<dyn Artifact> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+impl PartialEq for Box<dyn Artifact> {
+    fn eq(&self, other: &Self) -> bool {
+        self.eq_box(other.as_ref())
+    }
+}
+
+impl Eq for Box<dyn Artifact> {}
+
+impl Hash for Box<dyn Artifact> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_box(state);
+    }
+}
+
+impl<T> Artifact for T
+where
+    T: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
+{
+    fn clone_box(&self) -> Box<dyn Artifact> {
+        Box::new(self.clone())
+    }
+
+    fn eq_box(&self, other: &dyn Artifact) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<T>() {
+            self == other
+        } else {
+            false
+        }
+    }
+
+    fn hash_box(&self, mut state: &mut dyn Hasher) {
+        self.hash(&mut state);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
