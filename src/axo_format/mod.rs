@@ -1,6 +1,8 @@
 use {
+    broccli::{Color, TextStyle},
+    
     crate::{
-        format, Color, TextStyle, 
+        format, 
         
         axo_lexer::{
             Token, TokenKind, 

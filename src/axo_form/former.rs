@@ -1,5 +1,6 @@
-use std::hash::Hash;
 use {
+    log::{debug, trace, warn},
+
     super::{
         action::Action,
         pattern::{Pattern, PatternKind},
@@ -7,317 +8,100 @@ use {
 
     crate::{
         Peekable,
+        hash::Hash,
         format::Debug,
+        compiler::{Marked, Artifact},
+
         axo_span::Span,
         axo_parser::{Item, ItemKind},
+        axo_form::form::{Form, FormKind},
     },
 };
-use crate::compiler::{Marked};
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
-pub enum FormKind<Input, Output, Error>
+#[derive(Clone, Debug)]
+pub struct Draft<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    Empty,
-    Input(Input),
-    Output(Output),
-    Multiple(Vec<Form<Input, Output, Error>>),
-    Error(Error),
+    pattern: Pattern<Input, Output, Failure>,
+    children: Vec<Draft<Input, Output, Failure>>,
+    form: Form<Input, Output, Failure>,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
-pub struct Form<Input, Output, Error>
+impl<Input, Output, Failure> Draft<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    pub kind: FormKind<Input, Output, Error>,
-    pub span: Span,
-}
-
-impl<Input, Output, Error> Form<Input, Output, Error>
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    pub fn new(form: FormKind<Input, Output, Error>, span: Span) -> Self {
-        Self { kind: form, span, }
-    }
-
-    fn catch(&self) -> Option<Form<Input, Output, Error>> {
-        match self.kind.clone() {
-            FormKind::Multiple(forms) => {
-                for form in forms {
-                    Self::catch(&form)?;
-                }
-            }
-
-            FormKind::Error(_) => {
-                return Some(self.clone());
-            }
-
-            _ => {},
-        }
-
-        None
-    }
-
-    pub fn unwrap(&self) -> Vec<Form<Input, Output, Error>> {
-        match self.kind.clone() {
-            FormKind::Multiple(forms) => forms,
-            _ => vec![self.clone()],
+    fn new(pattern: Pattern<Input, Output, Failure>, start: &crate::axo_span::Position) -> Self {
+        Self {
+            pattern,
+            children: Vec::new(),
+            form: Form::new(FormKind::Empty, Span::point(start.clone())),
         }
     }
 
-    pub fn unwrap_input(&self) -> Option<Input> {
-        match self.kind.clone() {
-            FormKind::Input(input) => Some(input.clone()),
-            _ => None
+    fn matches(&self) -> bool {
+        !matches!(self.form.kind, FormKind::Empty)
+    }
+
+    fn consumed(&self) -> usize {
+        if self.matches() {
+            1 + self.children.iter().map(|child| child.consumed()).sum::<usize>()
+        } else {
+            0
         }
     }
 
-    pub fn unwrap_output(&self) -> Option<Output> {
-        match self.kind.clone() {
-            FormKind::Output(output) => Some(output.clone()),
-            _ => None
-        }
-    }
-
-    pub fn expand(&self) -> Vec<Form<Input, Output, Error>> {
-        let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
-
-        match self {
-            Form { kind: FormKind::Multiple(forms), .. } => {
-                expanded.extend(Self::expand_forms(forms.clone()));
-            }
-
-            form => {
-                expanded.push(form.clone());
-            }
-        }
-
-        expanded
-    }
-
-    pub fn inputs(&self) -> Vec<Input> {
-        let mut inputs: Vec<Input> = Vec::new();
-
-        for form in self.unwrap() {
-            match form.kind {
-                FormKind::Input(input) => {
-                    inputs.push(input);
-                }
-                FormKind::Multiple(sub) => {
-                    let sub = Self::expand_inputs(sub);
-
-                    inputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
-        inputs
-    }
-
-    pub fn outputs(&self) -> Vec<Output> {
-        let mut outputs: Vec<Output> = Vec::new();
-
-        for form in self.unwrap() {
-            match form.kind {
-                FormKind::Output(output) => {
-                    outputs.push(output);
-                }
-                FormKind::Multiple(sub) => {
-                    let sub = Self::expand_outputs(sub);
-
-                    outputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
-        outputs
-    }
-
-    pub fn expand_forms(forms: Vec<Form<Input, Output, Error>>) -> Vec<Form<Input, Output, Error>> {
-        let mut expanded: Vec<Form<Input, Output, Error>> = Vec::new();
-
-        for form in forms {
-            match form {
-                Form { kind: FormKind::Multiple(sub), .. } => {
-                    let sub = Self::expand_forms(sub);
-
-                    expanded.extend(sub);
-                }
-                form => {
-                    expanded.push(form)
-                }
-            }
-        }
-
-        expanded
-    }
-
-    pub fn expand_inputs(forms: Vec<Form<Input, Output, Error>>) -> Vec<Input> {
-        let mut inputs: Vec<Input> = Vec::new();
-
-        for form in forms {
-            match form.kind {
-                FormKind::Input(input) => {
-                    inputs.push(input);
-                }
-                FormKind::Multiple(sub) => {
-                    let sub = Self::expand_inputs(sub);
-
-                    inputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
-        inputs
-    }
-
-    pub fn expand_outputs(forms: Vec<Form<Input, Output, Error>>) -> Vec<Output> {
-        let mut outputs: Vec<Output> = Vec::new();
-
-        for form in forms {
-            match form.kind {
-                FormKind::Output(output) => {
-                    outputs.push(output);
-                }
-                FormKind::Multiple(sub) => {
-                    let sub = Self::expand_outputs(sub);
-
-                    outputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
-        outputs
-    }
-
-    pub fn map_types<NewInput, NewOutput, NewError, F, G, H>(
-        self,
-        input_mapper: F,
-        output_mapper: G,
-        error_mapper: H,
-    ) -> Form<NewInput, NewOutput, NewError>
+    fn build<Source>(
+        &mut self,
+        source: &mut Source,
+        offset: usize
+    ) -> (bool, usize)
     where
-        NewInput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        NewOutput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        NewError: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        F: Fn(Input) -> NewInput + Clone,
-        G: Fn(Output) -> NewOutput + Clone,
-        H: Fn(Error) -> NewError + Clone,
+        Source: Peekable<Input> + Marked,
     {
-        let mapped_kind = match self.kind {
-            FormKind::Empty => FormKind::Empty,
-            FormKind::Input(input) => FormKind::Input(input_mapper(input)),
-            FormKind::Output(output) => FormKind::Output(output_mapper(output)),
-            FormKind::Multiple(forms) => {
-                let mapped_forms = forms
-                    .into_iter()
-                    .map(|form| form.map_types(input_mapper.clone(), output_mapper.clone(), error_mapper.clone()))
-                    .collect();
-                FormKind::Multiple(mapped_forms)
-            }
-            FormKind::Error(error) => FormKind::Error(error_mapper(error)),
-        };
+        let start = source.position();
 
-        Form::new(mapped_kind, self.span)
-    }
-}
-
-pub trait Former<Input, Output, Error>: Peekable<Input> + Marked
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn action(
-        &mut self,
-        action: &Action<Input, Output, Error>,
-        form: Form<Input, Output, Error>,
-        span: Span,
-    ) -> Form<Input, Output, Error>;
-    fn matches(&mut self, pattern: &Pattern<Input, Output, Error>, offset: usize) -> (bool, usize);
-    fn form(&mut self, pattern: Pattern<Input, Output, Error>) -> Form<Input, Output, Error>;
-}
-
-
-impl<Matcher, Input, Output, Error> Former<Input, Output, Error> for Matcher
-where
-    Matcher: Peekable<Input> + Marked,
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn action(
-        &mut self,
-        action: &Action<Input, Output, Error>,
-        form: Form<Input, Output, Error>,
-        span: Span,
-    ) -> Form<Input, Output, Error> {
-        if let Some(err) = form.catch() {
-            return err;
-        }
-
-        let result = match action {
-            Action::Map(transform) => {
-                let context = &mut self.context_mut();
-
-                match transform(context, form) {
-                    Ok(output) => Form::new(FormKind::Output(output), span),
-                    Err(_) => Form::new(FormKind::Empty, span),
-                }
-            },
-
-            Action::Ignore => Form::new(FormKind::Empty, span),
-
-            Action::Error(function) => Form::new(FormKind::Error(function(span.clone())), span),
-
-            Action::Trigger { found, .. } => {
-                self.action(found, form, span)
-            }
-        };
-
-        result
-    }
-
-    fn matches(&mut self, pattern: &Pattern<Input, Output, Error>, offset: usize) -> (bool, usize) {
-        match pattern.kind.clone() {
+        let result = match self.pattern.kind.clone() {
             PatternKind::Deferred(factory) => {
-                let resolved_pattern = factory();
+                let resolved = factory();
+                let mut child = Draft::new(resolved, &start);
+                let (matches, consumed) = child.build(source, offset);
 
-                self.matches(&resolved_pattern, offset)
-            }
+                if matches {
+                    self.children.push(child.clone());
+                    self.form = Form::new(FormKind::Multiple(vec![child.form.clone()]), Span::point(start));
+                }
 
-            PatternKind::Capture {
-                pattern,
-                ..
-            } => {
-                self.matches(&*pattern, offset)
+                (matches, consumed)
             }
 
             PatternKind::Guard { predicate, pattern } => {
-                if predicate(self) {
-                    self.matches(&*pattern, offset)
+                if predicate(source) {
+                    let mut child = Draft::new(*pattern, &start);
+                    let (matches, consumed) = child.build(source, offset);
+
+                    if matches {
+                        self.children.push(child);
+                        self.form = self.children[0].form.clone();
+                    }
+
+                    (matches, consumed)
                 } else {
                     (false, offset)
                 }
             }
 
             PatternKind::Literal(expect) => {
-                if let Some(peek) = self.peek_ahead(offset) {
+                if let Some(peek) = source.peek_ahead(offset) {
                     let matches = *peek == expect;
-
+                    if matches {
+                        self.form = Form::new(FormKind::Input(expect), Span::point(start));
+                    }
                     (matches, if matches { offset + 1 } else { offset })
                 } else {
                     (false, offset)
@@ -325,10 +109,16 @@ where
             }
 
             PatternKind::Alternative(patterns) => {
-                for subpattern in patterns {
-                    let (matches, new_offset) = self.matches(&subpattern, offset);
+                debug!("building alternative tree with {} options at offset {}", patterns.len(), offset);
+
+                for (index, subpattern) in patterns.iter().enumerate() {
+                    let mut child = Draft::new(subpattern.clone(), &start);
+                    let (matches, new_offset) = child.build(source, offset);
 
                     if matches {
+                        trace!("alternative {} matched successfully", index);
+                        self.children.push(child);
+                        self.form = self.children[0].form.clone();
                         return (true, new_offset);
                     }
                 }
@@ -337,27 +127,40 @@ where
             }
 
             PatternKind::Sequence(sequence) => {
+                debug!("building sequence tree with {} elements at offset {}", sequence.len(), offset);
                 let mut current = offset;
+                let mut forms = Vec::new();
 
-                for pattern in sequence {
-                    let (matches, new) = self.matches(&pattern, current);
+                for (index, pattern) in sequence.iter().enumerate() {
+                    let mut child = Draft::new(pattern.clone(), &start);
+                    let (matches, new) = child.build(source, current);
 
                     if matches {
                         current = new;
+                        forms.push(child.form.clone());
+                        self.children.push(child);
                     } else {
+                        trace!("sequence element {} failed at position {}", index, current);
                         return (false, offset);
                     }
+                }
+
+                if !forms.is_empty() {
+                    self.form = Form::new(FormKind::Multiple(forms), Span::point(start));
                 }
 
                 (true, current)
             }
 
             PatternKind::Repetition { pattern, minimum, maximum } => {
+                debug!("building repetition tree (min: {}, max: {:?}) at offset {}", minimum, maximum, offset);
                 let mut current = offset;
                 let mut count = 0;
+                let mut forms = Vec::new();
 
-                while self.peek_ahead(current).is_some() {
-                    let (matches, new) = self.matches(&*pattern, current);
+                while source.peek_ahead(current).is_some() {
+                    let mut child = Draft::new(*pattern.clone(), &start);
+                    let (matches, new) = child.build(source, current);
 
                     if !matches || new == current {
                         break;
@@ -365,6 +168,8 @@ where
 
                     count += 1;
                     current = new;
+                    forms.push(child.form.clone());
+                    self.children.push(child);
 
                     if let Some(max) = maximum {
                         if count >= max {
@@ -374,20 +179,32 @@ where
                 }
 
                 let success = count >= minimum;
+                if success && !forms.is_empty() {
+                    self.form = Form::new(FormKind::Multiple(forms), Span::point(start));
+                }
 
+                trace!("repetition matched {} times, meets minimum requirement: {}", count, success);
                 (success, if success { current } else { offset })
             }
 
             PatternKind::Optional(pattern) => {
-                let (matches, new) = self.matches(&*pattern, offset);
+                let mut child = Draft::new(*pattern, &start);
+                let (matches, new) = child.build(source, offset);
+
+                if matches {
+                    self.children.push(child);
+                    self.form = self.children[0].form.clone();
+                }
 
                 (true, if matches { new } else { offset })
             }
 
             PatternKind::Condition(function) => {
-                if let Some(peek) = self.peek_ahead(offset) {
+                if let Some(peek) = source.peek_ahead(offset) {
                     let result = function(&peek);
-
+                    if result {
+                        self.form = Form::new(FormKind::Input(peek.clone()), Span::point(start));
+                    }
                     (result, if result { offset + 1 } else { offset })
                 } else {
                     (false, offset)
@@ -395,19 +212,26 @@ where
             }
 
             PatternKind::Negation(pattern) => {
-                if self.peek_ahead(offset).is_none() {
+                if source.peek_ahead(offset).is_none() {
                     return (false, offset);
                 }
 
-                let (matches, _) = self.matches(&*pattern, offset);
-
+                let mut child = Draft::new(*pattern, &start);
+                let (matches, _) = child.build(source, offset);
                 let result = !matches;
+
+                if result {
+                    if let Some(peek) = source.peek_ahead(offset) {
+                        self.form = Form::new(FormKind::Input(peek.clone()), Span::point(start));
+                    }
+                }
 
                 (result, if result { offset + 1 } else { offset })
             }
 
             PatternKind::WildCard => {
-                if self.peek_ahead(offset).is_some() {
+                if let Some(peek) = source.peek_ahead(offset) {
+                    self.form = Form::new(FormKind::Input(peek.clone()), Span::point(start));
                     (true, offset + 1)
                 } else {
                     (false, offset)
@@ -415,249 +239,216 @@ where
             }
 
             PatternKind::Required { pattern, .. } => {
-                let (matches, new) = self.matches(&*pattern, offset);
+                let mut child = Draft::new(*pattern, &start);
+                let (matches, new) = child.build(source, offset);
 
                 if matches {
+                    self.children.push(child);
+                    self.form = self.children[0].form.clone();
                     (true, new)
                 } else {
                     (true, offset)
                 }
             }
-        }
-    }
-
-    fn form(&mut self, pattern: Pattern<Input, Output, Error>) -> Form<Input, Output, Error> {
-        let start = self.position();
-
-        let resolved = match &pattern.kind {
-            PatternKind::Deferred(factory) => {
-                let resolved = factory();
-
-                let mut form = self.form(resolved);
-
-                if let Some(action) = &pattern.action {
-                    let end = self.position();
-                    let span = Span::new(start, end);
-
-                    form = self.action(action, form, span);
-                }
-
-                return form;
-            }
-
-            _ => pattern.clone(),
         };
 
-        let (matches, new) = self.matches(&resolved, 0);
+        result
+    }
 
-        if !matches && new > 0 {
-            return Form::new(FormKind::Empty, Span::point(start.clone()));
-        }
+    fn realize<Source>(&mut self, source: &mut Source) -> Form<Input, Output, Failure>
+    where
+        Source: Peekable<Input> + Marked,
+    {
+        let start = source.position();
 
-        let form = match resolved.kind.clone() {
-            PatternKind::Literal(input) => {
-                if let Some(actual) = self.next() {
-                    if actual == input {
-                        let end = self.position();
-
-                        Form::new(FormKind::Input(input.clone()), Span::new(start.clone(), end))
-                    } else {
-                        Form::new(FormKind::Empty, Span::point(start.clone()))
-                    }
-                } else {
-                    Form::new(FormKind::Empty, Span::point(start.clone()))
+        match self.pattern.kind.clone() {
+            PatternKind::Literal(_) => {
+                if let Some(input) = source.next() {
+                    let end = source.position();
+                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
                 }
             }
 
-            PatternKind::Capture {
-                identifier,
-                pattern,
-            } => {
-                let captured = self.form(*pattern.clone());
-
-                let resolver = &mut self.context_mut().resolver;
-
-                let form = captured.clone().map_types(
-                    |input| Box::new(input) as Box<dyn crate::compiler::Artifact>,
-                    |output| Box::new(output) as Box<dyn crate::compiler::Artifact>,
-                    |error| Box::new(error) as Box<dyn crate::compiler::Artifact>,
-                );
-
-                let item = Item::new(
-                    ItemKind::Formed {
-                        identifier,
-                        form,
-                    },
-                    captured.span.clone(),
-                );
-
-                println!("everything's fine till here");
-
-                resolver.insert(item);
-
-                println!("inserting causes stackoverflow so this wont be printed");
-
-                Form::new(FormKind::Empty, Span::point(start.clone()))
-            }
-
-            PatternKind::Guard { predicate, pattern } => {
-                if predicate(self) {
-                    self.form(*pattern.clone())
-                } else {
-                    Form::new(FormKind::Empty, Span::point(start.clone()))
+            PatternKind::Condition(_) => {
+                if let Some(input) = source.next() {
+                    let end = source.position();
+                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
                 }
             }
 
-            PatternKind::Sequence(sequence) => {
-                let mut formed = Vec::new();
-
-                for subpattern in sequence {
-                    let form = self.form(subpattern.clone());
-
-                    formed.push(form);
-                }
-
-                let kind = if formed.is_empty() {
-                    FormKind::Empty
-                } else {
-                    FormKind::Multiple(formed)
-                };
-
-                let result = Form::new(
-                    kind,
-                    Span::new(start.clone(), self.position()),
-                );
-
-                result
-            }
-
-            PatternKind::Alternative(patterns) => {
-                for subpattern in patterns {
-                    let (matches, offset) = self.matches(&subpattern, 0);
-
-                    if matches && offset != 0 {
-                        let result = self.form(subpattern.clone());
-                        return result;
-                    }
-                }
-
-                Form::new(FormKind::Empty, Span::point(self.position()))
-            }
-
-            PatternKind::Repetition { pattern: subpattern, maximum, .. } => {
-                let mut formed = Vec::new();
-
-                while let Some(_) = self.peek() {
-                    let (matches, offset) = self.matches(&*subpattern, 0);
-
-                    if matches {
-                        let form = self.form(*subpattern.clone());
-
-                        if offset == 0 {
-                            break;
-                        }
-
-                        formed.push(form);
-
-                        if let Some(max) = maximum {
-                            if formed.len() >= max {
-                                break;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-
-                let kind = if formed.is_empty() {
-                    FormKind::Empty
-                } else {
-                    FormKind::Multiple(formed)
-                };
-
-                let result = Form::new(
-                    kind,
-                    Span::new(start.clone(), self.position()),
-                );
-
-                result
-            }
-
-            PatternKind::Optional(sub) => {
-                if let (true, _) = self.matches(&*sub, 0) {
-                    self.form(*sub.clone())
-                } else {
-                    Form::new(FormKind::Empty, Span::point(start.clone()))
-                }
-            }
-
-            PatternKind::Condition(predicate) => {
-                if let Some(input) = self.peek() {
-                    if predicate(input) {
-                        let input = self.next().unwrap();
-
-                        Form::new(
-                            FormKind::Input(input),
-                            Span::new(start.clone(), self.position()),
-                        )
-                    } else {
-                        Form::new(FormKind::Empty, Span::point(start.clone()))
-                    }
-                } else {
-                    Form::new(FormKind::Empty, Span::point(start.clone()))
-                }
-            }
-
-            PatternKind::Negation(sub) => {
-                if let (false, _) = self.matches(&*sub, 0) {
-                    if let Some(input) = self.next() {
-                        Form::new(
-                            FormKind::Input(input),
-                            Span::new(start.clone(), self.position()),
-                        )
-                    } else {
-                        Form::new(FormKind::Empty, Span::point(self.position()))
-                    }
-                } else {
-                    Form::new(FormKind::Empty, Span::point(start.clone()))
+            PatternKind::Negation(_) => {
+                if let Some(input) = source.next() {
+                    let end = source.position();
+                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
                 }
             }
 
             PatternKind::WildCard => {
-                if let Some(input) = self.next() {
-                    Form::new(
-                        FormKind::Input(input),
-                        Span::new(start.clone(), self.position()),
-                    )
-                } else {
-                    Form::new(FormKind::Empty, Span::point(self.position()))
+                if let Some(input) = source.next() {
+                    let end = source.position();
+                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
                 }
             }
 
-            PatternKind::Required { pattern: subpattern, action } => {
-                let (matches, _) = self.matches(&*subpattern, 0);
+            _ => {
+                // For composite patterns, realize children first
+                for child in &mut self.children {
+                    child.realize(source);
+                }
 
-                if matches {
-                    self.form(*subpattern.clone())
-                } else {
-                    let span = Span::new(start.clone(), self.position());
+                let end = source.position();
+                let span = Span::new(start, end);
 
-                    self.action(&action, Form::new(FormKind::Empty, span.clone()), span)
+                match self.pattern.kind.clone() {
+                    PatternKind::Sequence(_) | PatternKind::Repetition { .. } => {
+                        let forms: Vec<_> = self.children.iter().map(|c| c.form.clone()).collect();
+                        if !forms.is_empty() {
+                            self.form = Form::new(FormKind::Multiple(forms), span);
+                        }
+                    }
+
+                    PatternKind::Alternative(_) | PatternKind::Optional(_) |
+                    PatternKind::Guard { .. } | PatternKind::Deferred(_) => {
+                        if !self.children.is_empty() {
+                            self.form = self.children[0].form.clone();
+                        }
+                    }
+
+                    PatternKind::Required { action, .. } => {
+                        if self.children.is_empty() {
+                            warn!("required pattern failed to match, creating error form");
+                            self.form = source.action(&action, Form::new(FormKind::Empty, span.clone()), span);
+                        } else {
+                            self.form = self.children[0].form.clone();
+                        }
+                    }
+
+                    _ => {}
                 }
             }
+        }
 
-            PatternKind::Deferred(_) => unreachable!("lazy pattern should have been resolved."),
+        if let Some(action) = &self.pattern.action {
+            let span = self.form.span.clone();
+            self.form = source.action(action, self.form.clone(), span);
+        }
+
+        self.form.clone()
+    }
+}
+
+pub trait Former<Input, Output, Failure>: Peekable<Input> + Marked
+where
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn action(
+        &mut self,
+        action: &Action<Input, Output, Failure>,
+        form: Form<Input, Output, Failure>,
+        span: Span,
+    ) -> Form<Input, Output, Failure>;
+
+    fn matches(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize);
+    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure>;
+}
+
+impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
+where
+    Source: Peekable<Input> + Marked,
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn action(
+        &mut self,
+        action: &Action<Input, Output, Failure>,
+        form: Form<Input, Output, Failure>,
+        span: Span,
+    ) -> Form<Input, Output, Failure> {
+        if let Some(err) = form.catch() {
+            warn!("caught error in form before action processing, returning early");
+            return err;
+        }
+
+        let result = match action {
+            Action::Map(transform) => {
+                debug!("applying map transformation at span {:?}", span);
+                let context = &mut self.context_mut();
+
+                match transform(context, form) {
+                    Ok(output) => Form::new(FormKind::Output(output), span),
+                    Err(_) => {
+                        warn!("transformation failed, returning empty form");
+                        Form::new(FormKind::Empty, span)
+                    },
+                }
+            },
+
+            Action::Ignore => {
+                debug!("ignoring form content at span {:?}", span);
+                Form::new(FormKind::Empty, span)
+            },
+
+            Action::Capture { identifier } => {
+                debug!("forming capture pattern with identifier");
+
+                let resolver = &mut self.context_mut().resolver;
+
+                let artifact = form.clone().map(
+                    |input| Box::new(input) as Box<dyn Artifact>,
+                    |output| Box::new(output) as Box<dyn Artifact>,
+                    |error| Box::new(error) as Box<dyn Artifact>,
+                );
+
+                let item = Item::new(
+                    ItemKind::Formed { identifier: *identifier, form: artifact },
+                    form.span.clone(),
+                );
+
+                //resolver.insert(item);
+
+                form.clone()
+            }
+
+            Action::Failure(function) => {
+                warn!("creating error form with function at span {:?}", span);
+
+                Form::new(FormKind::Failure(function(span.clone())), span)
+            },
+
+            Action::Trigger { found, .. } => {
+                debug!("triggering nested action at span {:?}", span);
+
+                self.action(found, form, span)
+            }
         };
 
-        let end = self.position();
-        let span = Span::new(start, end);
+        result
+    }
 
-        match &pattern.action {
-            Some(action) => {
-                self.action(action, form, span.clone())
-            }
+    fn matches(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize) {
+        let start = self.position();
+        let mut draft = Draft::new(pattern.clone(), &start);
+        draft.build(self, offset)
+    }
 
-            None => form,
+    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure> {
+        let start = self.position();
+
+        debug!("forming pattern at position {:?}", start);
+
+        let mut draft = Draft::new(pattern, &start);
+
+        let (matches, _) = draft.build(self, 0);
+
+        if !matches {
+            debug!("pattern failed to match, returning empty form");
+
+            return Form::new(FormKind::Empty, Span::point(start));
         }
+
+        draft.realize(self)
     }
 }

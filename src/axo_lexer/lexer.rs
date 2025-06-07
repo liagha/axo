@@ -20,9 +20,8 @@ use {
         compiler::Context,
 
         axo_form::{
-            former::{
-                Former, FormKind,
-            },
+            former::Former,
+            form::FormKind,
             
             pattern::Pattern,
         },
@@ -656,6 +655,7 @@ impl Lexer {
                         form.span,
                     ))
                 } else {
+                    println!("--------- {:?}", whitespace);
                     unreachable!()
                 }
             })
@@ -711,7 +711,7 @@ impl Lexer {
                                     }
                                 }
                             }
-                            FormKind::Error(err) => {
+                            FormKind::Failure(err) => {
                                 errors.push(err);
                             }
                             _ => {}
@@ -719,7 +719,7 @@ impl Lexer {
                     }
                 }
 
-                FormKind::Error(err) => {
+                FormKind::Failure(err) => {
                     errors.push(err);
                 }
 

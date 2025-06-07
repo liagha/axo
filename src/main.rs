@@ -2,23 +2,31 @@
 
 mod axo_data;
 mod axo_error;
-mod axo_format;
 mod axo_form;
+mod axo_format;
 mod axo_lexer;
 mod axo_parser;
 mod axo_resolver;
 mod axo_rune;
 mod axo_span;
-mod timer;
 mod compiler;
+mod logger;
+mod timer;
 
 pub use {
     axo_rune::*,
     axo_format::*,
     axo_data::{*, peekable::*},
-    broccli::{xprintln, Color, TextStyle},
     timer::{Timer, TimeSource},
     compiler::{Compiler, Config, CompilerError},
+};
+
+use {
+    log::Level,
+
+    crate::{
+        logger::{LogInfo, LogPlan, Logger},
+    },
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -34,9 +42,9 @@ pub mod file {
     pub use std::io::{Error};
 }
 
-/*pub mod process {
-    pub use std::process::exit;
-}*/
+pub mod io {
+    pub use std::io::{stdout, Write};
+}
 
 pub mod environment {
     pub use std::env::{args, current_dir, };
@@ -87,7 +95,6 @@ pub mod format {
     pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
-
 #[derive(Debug)]
 pub enum AppError {
     Compiler(CompilerError),
@@ -112,6 +119,12 @@ impl From<CompilerError> for AppError {
 }
 
 fn main() {
+    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message])
+        .with_separator(" ".to_string());
+
+    let logger = Logger::new(Level::Info, plan);
+    logger.init().expect("fuck");
+
     println!();
 
     let main_timer = Timer::new(TIMERSOURCE);
@@ -160,6 +173,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
 
 fn parse_arguments() -> Result<Config, AppError> {
     let args: Vec<String> = environment::args().collect();
+    
     let mut config = Config {
         file_path: String::new(),
         verbose: false,

@@ -2,9 +2,13 @@ use {
     crate::{
         Peekable,
         
+        compiler::Artifact,
+        
         hash::{
             Hash, Hasher
         },
+        
+        axo_form::form::Form,
         
         axo_lexer::{
             Token, TokenKind,
@@ -19,10 +23,8 @@ use {
         axo_span::Span,
     }
 };
-use crate::axo_form::former::Form;
-use crate::compiler::Artifact;
 
-#[derive(Eq, Clone)]
+#[derive(Clone)]
 pub struct Item {
     pub kind: ItemKind,
     pub span: Span,

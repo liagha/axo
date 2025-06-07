@@ -1,48 +1,39 @@
-use std::any::Any;
-use std::hash::{Hash, Hasher};
 use {
-    crate::{
-        Path, Peekable,
-        
-        format_tokens, indent, xprintln, Color,
+    broccli::{xprintln, Color},
 
-        file::{
-            read_to_string,
-            Error,
-        },
-        
-        environment::current_dir,
-        
-        format::{
-            Debug, Display,
-            Formatter,
-        },
-        
+    crate::{
         axo_lexer::{
             LexError,
             Lexer,
             Token,
-        },
-        
-        axo_parser::{
+        }, axo_parser::{
+            Element,
             ParseError,
             Parser,
-            
-            Element,
         },
-        
         axo_resolver::{
             ResolveError,
             Resolver,
+        }, environment::current_dir, file::{
+            read_to_string,
+            Error,
+        }, format::{
+            Debug, Display,
+            Formatter,
         },
-        
-        Timer, TIMERSOURCE, 
+        format_tokens,
+        indent,
+        Path,
+        Peekable,
+        Timer, TIMERSOURCE,
     }
 };
+use std::any::Any;
+use std::hash::{Hash, Hasher};
 
 pub trait Marked {
     fn context(&self) -> &Context;
-    fn context_mut(&mut self) -> &mut Context; 
+    fn context_mut(&mut self) -> &mut Context;
 }
 
 #[derive(Debug)]
@@ -77,6 +68,7 @@ pub struct Config {
 
 #[derive(Clone)]
 pub struct Context {
+    pub depth: usize,
     pub config: Config,
     pub resolver: Resolver,
     pub file_path: Path,
@@ -86,6 +78,7 @@ pub struct Context {
 impl Context {
     pub fn new(config: Config, file_path: Path, content: String) -> Self {
         Context {
+            depth: 0,
             config,
             file_path,
             content,
@@ -251,7 +244,7 @@ pub struct ResolverStage;
 impl Stage<Vec<Element>, ()> for ResolverStage {
     fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
         let resolver_timer = Timer::new(TIMERSOURCE);
-        
+
         context.resolver.resolve(elements);
 
         if !context.resolver.errors.is_empty() {

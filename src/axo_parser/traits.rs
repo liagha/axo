@@ -267,6 +267,9 @@ impl PartialEq for ItemKind {
                 ItemKind::Implement { element: e1, body: b1 },
                 ItemKind::Implement { element: e2, body: b2 },
             ) => e1 == e2 && b1 == b2,
+            (ItemKind::Formed { identifier: i1, .. }, ItemKind::Formed { identifier: i2, .. }) => {
+                i1 == i2
+            },
             (
                 ItemKind::Trait { name: n1, body: b1 },
                 ItemKind::Trait { name: n2, body: b2 },
@@ -347,33 +350,40 @@ impl Hash for ItemKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             ItemKind::Use(e) => {
+                discriminant(self).hash(state);
                 e.hash(state);
             }
-            ItemKind::Formed { identifier, form } => {
+            ItemKind::Formed { identifier, .. } => {
+                discriminant(self).hash(state);
                 identifier.hash(state);
-                form.hash(state);
             }
             ItemKind::Implement { element, body } => {
+                discriminant(self).hash(state);
                 element.hash(state);
                 body.hash(state);
             }
             ItemKind::Trait { name, body } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
             ItemKind::Variable { target, .. } => {
+                discriminant(self).hash(state);
                 target.hash(state);
             }
             ItemKind::Field { name, value, ty } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 value.hash(state);
                 ty.hash(state);
             }
             ItemKind::Structure { name, fields } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 fields.hash(state);
             }
             ItemKind::Enum { name, body } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
@@ -382,6 +392,7 @@ impl Hash for ItemKind {
                 parameters,
                 body,
             } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 parameters.hash(state);
                 body.hash(state);
@@ -391,12 +402,13 @@ impl Hash for ItemKind {
                 parameters,
                 body,
             } => {
+                discriminant(self).hash(state);
                 name.hash(state);
                 parameters.hash(state);
                 body.hash(state);
             }
             ItemKind::Unit => {
-                self.hash(state);
+                discriminant(self).hash(state);
             }
         }
     }
@@ -407,7 +419,7 @@ impl Clone for ItemKind {
         match self {
             ItemKind::Use(element) => ItemKind::Use(element.clone()),
             ItemKind::Formed { identifier, form } => ItemKind::Formed {
-                identifier: *identifier,
+                identifier: identifier.clone(),
                 form: form.clone(),
             },
             ItemKind::Implement { element, body } => ItemKind::Implement {
@@ -453,3 +465,5 @@ impl Clone for ItemKind {
 }
 
 impl Eq for ItemKind {}
+
+impl Eq for Item {}

@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use {
     super::{
-        former::Form,
+        form::Form,
         action::Action,
     },
 
@@ -14,61 +14,57 @@ use {
 };
 use crate::compiler::Context;
 
-pub type Transformer<Input, Output, Error> = Arc<dyn Fn(&mut Context, Form<Input, Output, Error>) -> Result<Output, Error> + Send + Sync>;
+pub type Transformer<Input, Output, Failure> = Arc<dyn Fn(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure> + Send + Sync>;
 pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-pub type Emitter<Error> = Arc<dyn Fn(Span) -> Error>;
-pub type Evaluator<Input, Output, Error> = Arc<dyn Fn() -> Pattern<Input, Output, Error> + Send + Sync>;
+pub type Emitter<Failure> = Arc<dyn Fn(Span) -> Failure>;
+pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Pattern<Input, Output, Failure> + Send + Sync>;
 
 #[derive(Clone)]
-pub enum PatternKind<Input, Output, Error>
+pub enum PatternKind<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Literal(Input),
-    Alternative(Vec<Pattern<Input, Output, Error>>),
+    Alternative(Vec<Pattern<Input, Output, Failure>>),
     Guard {
         predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
-        pattern: Box<Pattern<Input, Output, Error>>,
+        pattern: Box<Pattern<Input, Output, Failure>>,
     },
     Required {
-        pattern: Box<Pattern<Input, Output, Error>>,
-        action: Action<Input, Output, Error>,
+        pattern: Box<Pattern<Input, Output, Failure>>,
+        action: Action<Input, Output, Failure>,
     },
-    Sequence(Vec<Pattern<Input, Output, Error>>),
+    Sequence(Vec<Pattern<Input, Output, Failure>>),
     Repetition {
-        pattern: Box<Pattern<Input, Output, Error>>,
+        pattern: Box<Pattern<Input, Output, Failure>>,
         minimum: usize,
         maximum: Option<usize>,
     },
-    Optional(Box<Pattern<Input, Output, Error>>),
+    Optional(Box<Pattern<Input, Output, Failure>>),
     Condition(Predicate<Input>),
-    Negation(Box<Pattern<Input, Output, Error>>),
-    Deferred(Evaluator<Input, Output, Error>),
-    Capture {
-        identifier: usize,
-        pattern: Box<Pattern<Input, Output, Error>>,
-    },
+    Negation(Box<Pattern<Input, Output, Failure>>),
+    Deferred(Evaluator<Input, Output, Failure>),
     WildCard,
 }
 
 #[derive(Clone, Debug)]
-pub struct Pattern<Input, Output, Error>
+pub struct Pattern<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    pub kind: PatternKind<Input, Output, Error>,
-    pub action: Option<Action<Input, Output, Error>>,
+    pub kind: PatternKind<Input, Output, Failure>,
+    pub action: Option<Action<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Error> Pattern<Input, Output, Error>
+impl<Input, Output, Failure> Pattern<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub fn exact(value: Input) -> Self {
         Self {
@@ -79,7 +75,7 @@ where
 
     pub fn guard(
         predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
-        pattern: Pattern<Input, Output, Error>
+        pattern: Pattern<Input, Output, Failure>
     ) -> Self {
         Self {
             kind: PatternKind::Guard {
@@ -90,14 +86,14 @@ where
         }
     }
 
-    pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Alternative(patterns.into()),
             action: None,
         }
     }
 
-    pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Sequence(patterns.into()),
             action: None,
@@ -106,14 +102,11 @@ where
 
     pub fn capture(
         identifier: usize,
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
     ) -> Self {
         Self {
-            kind: PatternKind::Capture {
-                identifier,
-                pattern: pattern.into(),
-            },
-            action: None,
+            kind: pattern.into().kind,
+            action: Some(Action::Capture { identifier }),
         }
     }
 
@@ -122,7 +115,7 @@ where
     }
 
     pub fn repeat(
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         minimum: usize,
         maximum: Option<usize>,
     ) -> Self {
@@ -136,7 +129,7 @@ where
         }
     }
 
-    pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Optional(pattern.into()),
             action: None,
@@ -150,7 +143,7 @@ where
         }
     }
 
-    pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Negation(pattern.into()),
             action: None,
@@ -165,8 +158,8 @@ where
     }
 
     pub fn required(
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        action: Action<Input, Output, Error>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Required {
@@ -179,7 +172,7 @@ where
 
     pub fn lazy<F>(factory: F) -> Self
     where
-        F: Fn() -> Pattern<Input, Output, Error> + Send + Sync + 'static,
+        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
     {
         Self {
             kind: PatternKind::Deferred(Arc::new(factory)),
@@ -187,7 +180,7 @@ where
         }
     }
 
-    pub fn resolve_lazy(&self) -> Pattern<Input, Output, Error> {
+    pub fn resolve_lazy(&self) -> Pattern<Input, Output, Failure> {
         match &self.kind {
             PatternKind::Deferred(factory) => {
                 factory()
@@ -197,8 +190,8 @@ where
     }
 
     pub fn transform(
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        transform: Transformer<Input, Output, Error>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        transform: Transformer<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
@@ -206,7 +199,7 @@ where
         }
     }
 
-    pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
             action: Some(Action::Ignore),
@@ -214,19 +207,19 @@ where
     }
 
     pub fn error(
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        function: Emitter<Error>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        function: Emitter<Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
-            action: Some(Action::Error(function)),
+            action: Some(Action::Failure(function)),
         }
     }
 
     pub fn conditional(
-        pattern: impl Into<Box<Pattern<Input, Output, Error>>>,
-        found: Action<Input, Output, Error>,
-        missing: Action<Input, Output, Error>,
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        found: Action<Input, Output, Failure>,
+        missing: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
@@ -237,7 +230,7 @@ where
         }
     }
 
-    pub fn with_action(mut self, action: Action<Input, Output, Error>) -> Self {
+    pub fn with_action(mut self, action: Action<Input, Output, Failure>) -> Self {
         self.action = Some(action);
         self
     }
@@ -247,15 +240,15 @@ where
         self
     }
 
-    pub fn with_error(mut self, function: Emitter<Error>) -> Self {
-        self.action = Some(Action::Error(function));
+    pub fn with_error(mut self, function: Emitter<Failure>) -> Self {
+        self.action = Some(Action::Failure(function));
         self
     }
 
     pub fn with_conditional(
         mut self,
-        found: Action<Input, Output, Error>,
-        missing: Action<Input, Output, Error>,
+        found: Action<Input, Output, Failure>,
+        missing: Action<Input, Output, Failure>,
     ) -> Self {
         self.action = Some(Action::Trigger {
             found: Box::new(found),
@@ -264,35 +257,35 @@ where
         self
     }
 
-    pub fn with_transform(mut self, transform: Transformer<Input, Output, Error>) -> Self {
+    pub fn with_transform(mut self, transform: Transformer<Input, Output, Failure>) -> Self {
         self.action = Some(Action::Map(transform));
         self
     }
 
-    pub fn any_of(patterns: impl Into<Vec<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn any_of(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self::alternative(patterns)
     }
 
-    pub fn all_of(patterns: impl Into<Vec<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn all_of(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self::sequence(patterns)
     }
 
-    pub fn maybe(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn maybe(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self::optional(pattern)
     }
 
-    pub fn not(pattern: impl Into<Box<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn not(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self::negate(pattern)
     }
 
-    pub fn anything_except(patterns: impl Into<Vec<Pattern<Input, Output, Error>>>) -> Self {
+    pub fn anything_except(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self::negate(Box::new(Self::alternative(patterns)))
     }
 
     pub fn delimited(
-        open: Pattern<Input, Output, Error>,
-        content: Pattern<Input, Output, Error>,
-        close: Pattern<Input, Output, Error>,
+        open: Pattern<Input, Output, Failure>,
+        content: Pattern<Input, Output, Failure>,
+        close: Pattern<Input, Output, Failure>,
     ) -> Self {
         Self::sequence(vec![
             open.with_ignore(),
@@ -308,7 +301,7 @@ where
         Self::predicate(Arc::new(predicate))
     }
 
-    pub fn map(pattern: impl Into<Box<Pattern<Input, Output, Error>>>, f: impl Into<Transformer<Input, Output, Error>>) -> Self {
+    pub fn map(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>, f: impl Into<Transformer<Input, Output, Failure>>) -> Self {
         Self::transform(pattern, f.into())
     }
 
@@ -316,11 +309,11 @@ where
         Self::optional(Box::new(Self::negate(Box::new(Self::anything()))))
     }
 
-    pub fn then(self, other: Pattern<Input, Output, Error>) -> Self {
+    pub fn then(self, other: Pattern<Input, Output, Failure>) -> Self {
         Self::sequence(vec![self, other])
     }
 
-    pub fn or(self, other: Pattern<Input, Output, Error>) -> Self {
+    pub fn or(self, other: Pattern<Input, Output, Failure>) -> Self {
         Self::alternative(vec![self, other])
     }
 

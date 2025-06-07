@@ -3,27 +3,27 @@ use {
 
     crate::{
         memory::replace,
-        
+
         axo_error::{
             Action, Hint
         },
-        
+
         axo_lexer::{
             Token, TokenKind,
         },
-        
+
         axo_parser::{
             Element, ElementKind,
             Item, ItemKind
         },
-        
+
         axo_resolver::{
             ResolveError,
             error::ErrorKind,
             matcher::{symbol_matcher, Labeled},
             scope::Scope,
         },
-        
+
         axo_span::Span,
     },
 };
@@ -53,6 +53,7 @@ impl Resolver {
         }
     }
 
+    #[inline(always)]
     pub fn insert(&mut self, symbol: Item) {
         self.scope.insert(symbol);
     }
@@ -107,7 +108,7 @@ impl Resolver {
             let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(suggestion.candidate.to_string());
 
 
-            
+
             self.validate(target, &suggestion.candidate);
 
             if suggestion.match_type == MatchType::Exact || suggestion.score >= 0.99 {

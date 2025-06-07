@@ -1,31 +1,33 @@
 use {
+    log::trace,
+    
     super::{
-        Parser,
-        Element, ElementKind, ParseError,
-
         error::ErrorKind,
+        Element, ElementKind, ParseError,
+        Parser,
     },
-
     crate::{
-        Peekable,
+        axo_form::{
+            action::Action,
+            pattern::Pattern,
+            former::Former,
 
-        thread::Arc,
+            form::{
+                Form, FormKind,
+            }
+        },
 
         axo_lexer::{
-            Token, TokenKind,
-            PunctuationKind,
+            PunctuationKind, Token,
+            TokenKind,
         },
 
-        axo_form::{
-            former::{Form, FormKind, Former},
-            pattern::Pattern,
-            action::Action,
-        },
+        axo_parser::ItemKind,
 
-        axo_span::{Span, Spanned},
+        axo_span::Span,
+        thread::Arc,
     }
 };
-use crate::axo_parser::ItemKind;
 
 
 impl Parser {
@@ -251,13 +253,13 @@ impl Parser {
                     .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::Error(Arc::new(|span| {
+                    Action::Failure(Arc::new(|span| {
                         ParseError::new(ErrorKind::ExpectedCondition, span)
                     })),
                 ),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::Error(Arc::new(|span| {
+                    Action::Failure(Arc::new(|span| {
                         ParseError::new(ErrorKind::ExpectedBody, span)
                     })),
                 ),
@@ -322,7 +324,7 @@ impl Parser {
                     })).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(ErrorKind::ExpectedBody, span)
                         })),
                     ),
@@ -337,13 +339,13 @@ impl Parser {
                     })).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(ErrorKind::ExpectedCondition, span)
                         })),
                     ),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(ErrorKind::ExpectedBody, span)
                         })),
                     ),
@@ -393,18 +395,16 @@ impl Parser {
                         false
                     }
                 })).with_ignore(),
-                Pattern::lazy(|| {
-                    Pattern::capture(
-                        0,
-                        Self::pattern()
-                    )
-                })
+                Pattern::capture(
+                    0,
+                    Pattern::lazy(Self::identifier),
+                )
             ]),
-            Arc::new(move |context, form| {
+            Arc::new(move |context, _| {
                 let symbols = context.resolver.scope.symbols.clone();
                 let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. }));
 
-                println!("formed: {:?}", formed);
+                trace!("formed element: {:?}", formed);
 
                 Ok(Element::new(
                     ElementKind::Invalid(ParseError::new(ErrorKind::PatternError, Span::default())),
@@ -433,7 +433,7 @@ impl Parser {
             Pattern::predicate(Arc::new(|_token: &Token| {
                 true
             })),
-            Action::Error(Arc::new(|span| {
+            Action::Failure(Arc::new(|span| {
                 ParseError::new(ErrorKind::PatternError, span)
             })),
             Action::Ignore,
@@ -453,6 +453,14 @@ impl Parser {
     }
 
     pub fn parser() -> Pattern<Token, Element, ParseError> {
-        Pattern::repeat(Pattern::alternative([Self::pattern(), Self::fallback()]), 0, None)
+        Pattern::repeat(
+            Pattern::alternative([
+                Self::pattern(), 
+                Pattern::predicate(Arc::new(|token: &Token| {
+                    token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
+                })
+                ), 
+                Self::fallback()]
+            ), 0, None)
     }
 }

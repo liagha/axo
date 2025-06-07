@@ -1,21 +1,21 @@
-use std::hash::Hash;
 use {
     super::{
-        former::{Form, FormKind},
+        form::{Form, FormKind},
         pattern::PatternKind,
         action::Action,
     },
 
     crate::{
+        hash::Hash,
         format::{Debug, Display, Formatter, Result},
     }
 };
 
-impl<Input, Output, Error> Display for Form<Input, Output, Error>
+impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
@@ -47,27 +47,24 @@ where
                 write!(f, ")")
             }
 
-            FormKind::Error(error) => {
-                write!(f, "Error({:?})", error)
+            FormKind::Failure(error) => {
+                write!(f, "Failure({:?})", error)
             }
         }
     }
 }
 
-impl<Input, Output, Error> Debug for PatternKind<Input, Output, Error>
+impl<Input, Output, Failure> Debug for PatternKind<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             PatternKind::Guard { .. } => write!(f, "Guard"),
             PatternKind::Deferred(_) => {
                 write!(f, "Lazy")
-            }
-            PatternKind::Capture { pattern, identifier } => {
-                write!(f, "Capture({:?} as {:?})", pattern, identifier)
             }
             PatternKind::Literal(literal) => {
                 write!(f, "Literal({:?})", literal)
@@ -104,17 +101,18 @@ where
     }
 }
 
-impl<Input, Output, Error> Debug for Action<Input, Output, Error>
+impl<Input, Output, Failure> Debug for Action<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Error: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Action::Map(_) => write!(f, "Map"),
             Action::Ignore => write!(f, "Ignore"),
-            Action::Error(_) => write!(f, "Error"),
+            Action::Failure(_) => write!(f, "Failure"),
+            Action::Capture { identifier } => write!(f, "Capture({:?})", identifier),
             Action::Trigger { found, missing } => {
                 write!(f, "Trigger({:?}, {:?})", found, missing)
             }

@@ -24,7 +24,8 @@ use {
         },
         
         axo_form::{
-            former::{Former, FormKind},
+            former::Former,
+            form::FormKind,
         }
     },
 };
@@ -237,7 +238,7 @@ impl Parser {
                                     }
                                 }
                             }
-                            FormKind::Error(error) => {
+                            FormKind::Failure(error) => {
                                 errors.push(error);
                             }
                             _ => {}
@@ -245,7 +246,7 @@ impl Parser {
                     }
                 }
 
-                FormKind::Error(error) => {
+                FormKind::Failure(error) => {
                     errors.push(error);
                 }
 

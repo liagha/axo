@@ -17,9 +17,9 @@ use {
         },
 
         axo_form::{
-            former::{Form},
             pattern::Pattern,
             action::Action,
+            form::Form,
         },
 
         axo_span::Span,
@@ -75,7 +75,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftBrace,
@@ -142,7 +142,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftBrace,
@@ -209,7 +209,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftParenthesis,
@@ -276,7 +276,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftParenthesis,
@@ -343,7 +343,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftBracket,
@@ -410,7 +410,7 @@ impl Parser {
                         Pattern::predicate(Arc::new(|token: &Token| {
                             token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                         })),
-                        Action::Error(Arc::new(|span| {
+                        Action::Failure(Arc::new(|span| {
                             ParseError::new(
                                 ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                     PunctuationKind::LeftBracket,
@@ -440,7 +440,7 @@ impl Parser {
                     Pattern::predicate(Arc::new(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     })),
-                    Action::Error(Arc::new(|span| {
+                    Action::Failure(Arc::new(|span| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                 PunctuationKind::LeftBrace,
@@ -469,7 +469,7 @@ impl Parser {
                     Pattern::predicate(Arc::new(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     })),
-                    Action::Error(Arc::new(|span| {
+                    Action::Failure(Arc::new(|span| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
@@ -498,7 +498,7 @@ impl Parser {
                     Pattern::predicate(Arc::new(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     })),
-                    Action::Error(Arc::new(|span| {
+                    Action::Failure(Arc::new(|span| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,

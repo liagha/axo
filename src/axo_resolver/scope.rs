@@ -46,35 +46,42 @@ impl Scope {
         self.symbols.contains(symbol)
     }
 
+    // Stack-safe version using iteration instead of recursion
     pub fn contains(&self, symbol: &Item) -> bool {
-        if self.contains_local(symbol) {
-            return true;
-        }
+        let mut current = Some(self);
 
-        if let Some(parent) = &self.parent {
-            return parent.contains(symbol);
+        while let Some(scope) = current {
+            if scope.symbols.contains(symbol) {
+                return true;
+            }
+            current = scope.parent.as_deref();
         }
 
         false
     }
 
+    // Stack-safe version using iteration instead of recursion
     pub fn all_symbols(&self) -> HashSet<Item> {
-        let mut all_symbols = self.symbols.clone();
+        let mut all_symbols = HashSet::new();
+        let mut current = Some(self);
 
-        if let Some(parent) = &self.parent {
-            all_symbols.extend(parent.all_symbols());
+        while let Some(scope) = current {
+            all_symbols.extend(scope.symbols.iter().cloned());
+            current = scope.parent.as_deref();
         }
 
         all_symbols
     }
 
+    // Stack-safe version using iteration instead of recursion
     pub fn find(&self, symbol: &Item) -> Option<Item> {
-        if let Some(found) = self.symbols.get(symbol) {
-            return Some(found.clone());
-        }
+        let mut current = Some(self);
 
-        if let Some(parent) = &self.parent {
-            return parent.find(symbol);
+        while let Some(scope) = current {
+            if let Some(found) = scope.symbols.get(symbol) {
+                return Some(found.clone());
+            }
+            current = scope.parent.as_deref();
         }
 
         None
