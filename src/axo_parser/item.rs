@@ -2,7 +2,9 @@ use {
     crate::{
         Peekable,
         
-        compiler::Artifact,
+        any::Any,
+        
+        artifact::Artifact,
         
         hash::{
             Hash, Hasher
@@ -34,7 +36,7 @@ pub enum ItemKind {
     Use(Box<Element>),
     Formed {
         identifier: usize,
-        form: Form<Box<dyn Artifact>, Box<dyn Artifact>, Box<dyn Artifact>>,
+        form: Form<Artifact, Artifact, Artifact>,
     },
     Implement {
         element: Box<Element>,

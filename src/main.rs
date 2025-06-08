@@ -12,6 +12,7 @@ mod axo_span;
 mod compiler;
 mod logger;
 mod timer;
+mod artifact;
 
 pub use {
     axo_rune::*,
@@ -71,6 +72,10 @@ pub mod char {
     pub use core::char::{from_u32};
 }
 
+pub mod any {
+    pub use core::any::{Any, TypeId};
+}
+
 pub mod operations {
     pub use core::ops::{Add, Sub, Mul, Div, Neg, Rem, Range};
 }
@@ -122,11 +127,10 @@ fn main() {
     let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message])
         .with_separator(" ".to_string());
 
-    let logger = Logger::new(Level::Info, plan);
-    logger.init().expect("fuck");
+    let logger = Logger::new(Level::max(), plan);
 
     println!();
-
+    
     let main_timer = Timer::new(TIMERSOURCE);
 
     match run_application(main_timer) {
@@ -141,7 +145,7 @@ fn main() {
 fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
     let config = parse_arguments()?;
 
-    if config.time_report {
+    if config.verbose {
         println!(
             "Argument Parsing Took {} ns",
             main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
@@ -152,7 +156,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
 
     let mut compiler = Compiler::new(config.clone())?;
 
-    if config.time_report {
+    if config.verbose {
         println!(
             "File Read Took {} ns",
             file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
@@ -161,7 +165,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
 
     compiler.compile()?;
 
-    if config.time_report {
+    if config.verbose {
         println!(
             "Total Compilation Took {} ns",
             main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
@@ -175,20 +179,14 @@ fn parse_arguments() -> Result<Config, AppError> {
     let args: Vec<String> = environment::args().collect();
     
     let mut config = Config {
-        file_path: String::new(),
+        path: String::new(),
         verbose: false,
-        show_tokens: false,
-        show_ast: false,
-        time_report: false,
     };
 
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
             "-v" | "--verbose" => config.verbose = true,
-            "-t" | "--tokens" => config.show_tokens = true,
-            "-a" | "--ast" => config.show_ast = true,
-            "--time" => config.time_report = true,
             "-h" | "--help" => {
                 print_usage(&args[0]);
                 return Err(AppError::HelpRequested);
@@ -200,14 +198,14 @@ fn parse_arguments() -> Result<Config, AppError> {
                     print_usage(&args[0]);
                     return Err(AppError::ArgumentParsing(error_msg));
                 }
-                config.file_path = flag.to_string();
+                config.path = flag.to_string();
             }
         }
 
         i += 1;
     }
 
-    if config.file_path.is_empty() {
+    if config.path.is_empty() {
         return Err(AppError::Compiler(CompilerError::PathRequired));
     }
 

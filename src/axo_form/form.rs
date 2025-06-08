@@ -1,7 +1,12 @@
-use std::fmt::Debug;
-use std::hash::Hash;
-use log::{debug, warn};
-use crate::axo_span::Span;
+use {
+    log::{debug, warn},
+    
+    crate::{
+        hash::Hash,
+        format::Debug,
+        axo_span::Span,
+    }
+};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub enum FormKind<Input, Output, Failure>

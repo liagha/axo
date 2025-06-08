@@ -28,7 +28,7 @@ use {
         thread::Arc,
     }
 };
-
+use crate::axo_parser::Item;
 
 impl Parser {
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
@@ -397,15 +397,15 @@ impl Parser {
                 })).with_ignore(),
                 Pattern::capture(
                     0,
-                    Pattern::lazy(Self::identifier),
+                    Pattern::lazy(Self::pattern),
                 )
             ]),
             Arc::new(move |context, _| {
                 let symbols = context.resolver.scope.symbols.clone();
-                let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. }));
+                let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. })).unwrap();
 
-                trace!("formed element: {:?}", formed);
-
+                trace!("formed variable: {:?}.", formed);
+                
                 Ok(Element::new(
                     ElementKind::Invalid(ParseError::new(ErrorKind::PatternError, Span::default())),
                     Span::default()

@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use {
     super::{
         form::Form,
@@ -6,13 +5,14 @@ use {
     },
 
     crate::{
+        hash::Hash,
+        compiler::Context,
         format::Debug,
         thread::Arc,
         axo_span::Span,
         Peekable,
     }
 };
-use crate::compiler::Context;
 
 pub type Transformer<Input, Output, Failure> = Arc<dyn Fn(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure> + Send + Sync>;
 pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
@@ -324,4 +324,150 @@ where
     pub fn repeat_self(self, min: usize, max: Option<usize>) -> Self {
         Self::repeat(Box::new(self), min, max)
     }
+}
+
+#[macro_export]
+macro_rules! pattern {
+    // Empty pattern
+    () => {
+        Pattern::empty()
+    };
+
+    // Wildcard
+    (_) => {
+        Pattern::anything()
+    };
+
+    // Lazy evaluation (@ factory)
+    (@ $factory:expr) => {
+        Pattern::lazy($factory)
+    };
+
+    // Delimited pattern (open <> content <> close)
+    ($open:tt <> $content:tt <> $close:tt) => {
+        Pattern::delimited(
+            pattern!($open),
+            pattern!($content),
+            pattern!($close)
+        )
+    };
+
+    // Alternative (|) - handles multiple alternatives with proper recursion
+    ($first:tt | $($rest:tt)|+) => {
+        Pattern::alternative(vec![
+            pattern!($first),
+            $(pattern!($rest),)+
+        ])
+    };
+
+    // Actions - these need to come BEFORE sequence handling for proper precedence
+
+    // Transform with inline closure (pattern => |args| body)
+    ($pattern:tt => |$($args:tt)*| $body:expr) => {
+        pattern!($pattern).with_transform(Arc::new(|$($args)*| $body))
+    };
+
+    // Transform (pattern => transform)
+    ($pattern:tt => $transform:expr) => {
+        pattern!($pattern).with_transform($transform)
+    };
+
+    // Guard (pattern :: guard)
+    ($pattern:tt :: $guard:expr) => {
+        Pattern::guard($guard, pattern!($pattern))
+    };
+
+    // Ignore action (pattern >> ignore)
+    ($pattern:tt >> ignore) => {
+        pattern!($pattern).with_ignore()
+    };
+
+    // Error action (pattern >> error(emitter))
+    ($pattern:tt >> error($emitter:expr)) => {
+        pattern!($pattern).with_error($emitter)
+    };
+
+    // Capture action (pattern >> capture(id))
+    ($pattern:tt >> capture($id:expr)) => {
+        pattern!($pattern).as_capture($id)
+    };
+
+    // Conditional action (pattern >> if(found, missing))
+    ($pattern:tt >> if($found:expr, $missing:expr)) => {
+        pattern!($pattern).with_conditional($found, $missing)
+    };
+
+    // Repetition patterns with recursion
+
+    // Optional (pattern?)
+    ($pattern:tt ?) => {
+        Pattern::optional(Box::new(pattern!($pattern)))
+    };
+
+    // Zero or more (pattern*)
+    ($pattern:tt *) => {
+        Pattern::repeat(Box::new(pattern!($pattern)), 0, None)
+    };
+
+    // One or more (pattern+)
+    ($pattern:tt +) => {
+        Pattern::repeat(Box::new(pattern!($pattern)), 1, None)
+    };
+
+    // Repetition with exact count {n}
+    ($pattern:tt { $exact:literal }) => {
+        Pattern::repeat(Box::new(pattern!($pattern)), $exact, Some($exact))
+    };
+
+    // Repetition with range {min, max}
+    ($pattern:tt { $min:literal , $max:literal }) => {
+        Pattern::repeat(Box::new(pattern!($pattern)), $min, Some($max))
+    };
+
+    // Repetition with minimum only {min,}
+    ($pattern:tt { $min:literal , }) => {
+        Pattern::repeat(Box::new(pattern!($pattern)), $min, None)
+    };
+
+    // Negation (!pattern)
+    (!$pattern:tt) => {
+        Pattern::negate(Box::new(pattern!($pattern)))
+    };
+
+    // Closure/predicate - this needs to come before sequence to avoid conflicts
+    (|$($args:tt)*| $body:expr) => {
+        Pattern::when(|$($args)*| $body)
+    };
+
+    // Parenthesized expressions - handle grouping, process contents recursively
+    (($($inner:tt)*)) => {
+        pattern!($($inner)*)
+    };
+
+    // Sequence handling - this comes AFTER actions to ensure proper precedence
+    // Multiple comma-separated patterns
+    ($first:tt , $($rest:tt),+ $(,)?) => {
+        Pattern::sequence(vec![
+            pattern!($first),
+            $(pattern!($rest),)+
+        ])
+    };
+
+    // Two patterns separated by comma (base case)
+    ($first:tt , $second:tt) => {
+        Pattern::sequence(vec![
+            pattern!($first),
+            pattern!($second)
+        ])
+    };
+
+    // Literal values (characters, strings, etc.)
+    ($literal:literal) => {
+        Pattern::exact($literal)
+    };
+
+    // Raw expression passthrough for complex patterns - this should be last
+    ($expr:expr) => {
+        $expr
+    };
 }

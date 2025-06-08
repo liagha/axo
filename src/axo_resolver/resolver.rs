@@ -53,7 +53,6 @@ impl Resolver {
         }
     }
 
-    #[inline(always)]
     pub fn insert(&mut self, symbol: Item) {
         self.scope.insert(symbol);
     }

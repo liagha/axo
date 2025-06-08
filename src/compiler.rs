@@ -28,8 +28,6 @@ use {
         Timer, TIMERSOURCE,
     }
 };
-use std::any::Any;
-use std::hash::{Hash, Hasher};
 
 pub trait Marked {
     fn context(&self) -> &Context;
@@ -59,11 +57,8 @@ impl Display for CompilerError {
 
 #[derive(Clone)]
 pub struct Config {
-    pub file_path: String,
+    pub path: String,
     pub verbose: bool,
-    pub show_tokens: bool,
-    pub show_ast: bool,
-    pub time_report: bool,
 }
 
 #[derive(Clone)]
@@ -111,7 +106,7 @@ impl Compiler {
     pub fn new(config: Config) -> Result<Self, CompilerError> {
         let file_path = current_dir()
             .map(|mut path| {
-                path.push(&config.file_path);
+                path.push(&config.path);
                 path
             })
             .map_err(|error| CompilerError::FileReadError(error))?;
@@ -181,12 +176,10 @@ impl Stage<(), Vec<Token>> for LexerStage {
             return Err(CompilerError::LexingFailed(errors));
         }
 
-        if context.config.show_tokens || context.config.verbose {
+        if context.config.verbose {
             xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
             xprintln!();
-        }
-
-        if context.config.time_report {
+            
             println!(
                 "Lexing Took {} ns\n",
                 lexer_timer.to_nanoseconds(lexer_timer.elapsed().unwrap())
@@ -228,7 +221,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 
         parser.restore();
 
-        if context.config.time_report {
+        if context.config.verbose {
             println!(
                 "Parsing Took {} ns\n",
                 parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap())
@@ -266,7 +259,7 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
             );
         }
 
-        if context.config.time_report {
+        if context.config.verbose {
             println!(
                 "Resolution Took {} ns\n",
                 resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
@@ -277,54 +270,3 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
     }
 }
 
-pub trait Artifact: Debug + Send + Sync {
-    fn clone_box(&self) -> Box<dyn Artifact>;
-    fn eq_box(&self, other: &dyn Artifact) -> bool;
-    fn hash_box(&self, state: &mut dyn Hasher);
-    fn as_any(&self) -> &dyn Any;
-}
-
-impl Clone for Box<dyn Artifact> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
-impl PartialEq for Box<dyn Artifact> {
-    fn eq(&self, other: &Self) -> bool {
-        self.eq_box(other.as_ref())
-    }
-}
-
-impl Eq for Box<dyn Artifact> {}
-
-impl Hash for Box<dyn Artifact> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.hash_box(state);
-    }
-}
-
-impl<T> Artifact for T
-where
-    T: Debug + Clone + Hash + PartialEq + Eq + Send + Sync + 'static,
-{
-    fn clone_box(&self) -> Box<dyn Artifact> {
-        Box::new(self.clone())
-    }
-
-    fn eq_box(&self, other: &dyn Artifact) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<T>() {
-            self == other
-        } else {
-            false
-        }
-    }
-
-    fn hash_box(&self, mut state: &mut dyn Hasher) {
-        self.hash(&mut state);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}

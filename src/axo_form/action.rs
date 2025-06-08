@@ -1,10 +1,10 @@
-use std::hash::Hash;
 use {
     super::{
         pattern::{Emitter, Transformer},
     },
 
     crate::{
+        hash::Hash,
         format::Debug,
         thread::Arc,
         axo_span::Span,

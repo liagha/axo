@@ -10,7 +10,8 @@ use {
         Peekable,
         hash::Hash,
         format::Debug,
-        compiler::{Marked, Artifact},
+        compiler::Marked,
+        artifact::Artifact,
 
         axo_span::Span,
         axo_parser::{Item, ItemKind},
@@ -350,7 +351,7 @@ where
         span: Span,
     ) -> Form<Input, Output, Failure>;
 
-    fn matches(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize);
+    fn fit(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize);
     fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
@@ -397,17 +398,17 @@ where
                 let resolver = &mut self.context_mut().resolver;
 
                 let artifact = form.clone().map(
-                    |input| Box::new(input) as Box<dyn Artifact>,
-                    |output| Box::new(output) as Box<dyn Artifact>,
-                    |error| Box::new(error) as Box<dyn Artifact>,
+                    |input| Artifact::new(input),
+                    |output| Artifact::new(output),
+                    |error| Artifact::new(error),
                 );
-
+                
                 let item = Item::new(
                     ItemKind::Formed { identifier: *identifier, form: artifact },
                     form.span.clone(),
                 );
-
-                //resolver.insert(item);
+                
+                resolver.insert(item);
 
                 form.clone()
             }
@@ -428,7 +429,7 @@ where
         result
     }
 
-    fn matches(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize) {
+    fn fit(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize) {
         let start = self.position();
         let mut draft = Draft::new(pattern.clone(), &start);
         draft.build(self, offset)

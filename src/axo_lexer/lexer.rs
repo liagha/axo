@@ -14,9 +14,10 @@ use {
         Path,
 
         thread::Arc,
+        compiler::Marked,
         char::from_u32,
         float::FloatLiteral,
-        
+
         compiler::Context,
 
         axo_form::{
@@ -34,7 +35,6 @@ use {
         },
     },
 };
-use crate::compiler::Marked;
 
 #[derive(Clone)]
 pub struct Lexer {
