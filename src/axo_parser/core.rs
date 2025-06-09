@@ -1,6 +1,6 @@
 use {
     log::trace,
-    
+
     super::{
         error::ErrorKind,
         Element, ElementKind, ParseError,
@@ -405,7 +405,7 @@ impl Parser {
                 let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. })).unwrap();
 
                 trace!("formed variable: {:?}.", formed);
-                
+
                 Ok(Element::new(
                     ElementKind::Invalid(ParseError::new(ErrorKind::PatternError, Span::default())),
                     Span::default()
@@ -448,6 +448,24 @@ impl Parser {
         Pattern::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
     }
 
+    pub fn ignore() -> Pattern<Token, Element, ParseError> {
+        Pattern::ignore(Pattern::alternative([
+            Pattern::predicate(
+                |token: &Token| {
+                    matches!(
+                        token.kind,
+                        TokenKind::Comment(_)
+                        | TokenKind::Punctuation(PunctuationKind::Newline)
+                        | TokenKind::Punctuation(PunctuationKind::Tab)
+                        | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                        | TokenKind::Punctuation(PunctuationKind::Space)
+                        | TokenKind::Punctuation(PunctuationKind::Semicolon)
+                    )
+                }
+            )
+        ]))
+    }
+
     pub fn pattern() -> Pattern<Token, Element, ParseError> {
         Pattern::alternative([Self::statement(), Self::expression(0)])
     }
@@ -455,11 +473,8 @@ impl Parser {
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
             Pattern::alternative([
-                Self::pattern(), 
-                Pattern::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                }
-                ), 
+                Self::pattern(),
+                Self::ignore(),
                 Self::fallback()]
             ), 0, None)
     }

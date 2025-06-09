@@ -60,7 +60,7 @@ where
     {
         Self::Inspect(Arc::new(Mutex::new(inspector)))
     }
-    
+
     pub fn map_simple<T>(mut transformer: T) -> Self
     where
         T: FnMut(Form<Input, Output, Failure>) -> Output + Send + Sync + 'static,

@@ -40,7 +40,7 @@ simple_element
 // Nested combinations
 (group_start, [inner, collection], {bundle, elements})
 [outer; (inner, group); {scope; operations}]
-{main, (sub, elements); [list; items]}
+{main, (sub, elements), [list; items]}
 
 // Complex nesting
 (
@@ -48,7 +48,7 @@ simple_element
     [config; params],
     {
         database,
-        cache;
+        cache,
         logging
     }
 )

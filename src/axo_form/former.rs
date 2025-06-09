@@ -39,7 +39,6 @@ where
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn new(pattern: Pattern<Input, Output, Failure>, start: &crate::axo_span::Position) -> Self {
-        debug!("creating new draft for pattern: {}", pattern);
         Self {
             pattern,
             children: Vec::new(),
@@ -61,18 +60,22 @@ where
         let result = match self.pattern.kind.clone() {
             PatternKind::Deferred(factory) => {
                 debug!("resolving deferred pattern at offset {}", offset);
-                let mut guard = factory.lock().unwrap();
 
+                let mut guard = factory.lock().unwrap();
                 let resolved = guard();
+
                 debug!("deferred pattern resolved to: {}", resolved);
 
                 let mut child = Draft::new(resolved, &start);
+
                 let (matches, consumed) = child.build(source, offset);
 
                 if matches {
                     debug!("deferred pattern matched, child form: {}", child.form);
+
                     self.children.push(child.clone());
                     self.form = Form::new(FormKind::Multiple(vec![child.form.clone()]), Span::point(start));
+
                     trace!("deferred pattern final form: {}", self.form);
                 } else {
                     debug!("deferred pattern failed to match");
@@ -83,13 +86,16 @@ where
 
             PatternKind::Wrap(ref pattern) => {
                 debug!("building wrap pattern with inner pattern: {}", pattern);
+
                 let mut child = Draft::new(*pattern.clone(), &start);
                 let (matches, consumed) = child.build(source, offset);
 
                 if matches {
                     debug!("wrap inner pattern matched, form: {}", child.form);
+
                     self.children.push(child);
                     self.form = self.children[0].form.clone();
+
                     trace!("wrap pattern final form: {}", self.form);
                 } else {
                     debug!("wrap inner pattern failed to match");
@@ -386,12 +392,16 @@ where
 
         if let Some(ref action) = self.pattern.action {
             debug!("applying action to form: action={}, current_form={}", action, self.form);
+            
             let span = self.form.span.clone();
+            
             self.form = source.action(action, self.form.clone(), span);
+            
             debug!("action applied, new form: {}", self.form);
         }
 
         debug!("pattern realization completed, final form: {}", self.form);
+        
         self.form.clone()
     }
 }
@@ -492,7 +502,7 @@ where
                 };
 
                 let chosen_action = if has_content { found } else { missing };
-                debug!("trigger choosing {} action based on content presence: {}", 
+                debug!("trigger choosing {} action based on content presence: {}",
                    if has_content { "found" } else { "missing" }, has_content);
 
                 self.action(chosen_action, form, span)
@@ -540,22 +550,26 @@ where
                 guard(form.clone());
 
                 debug!("inspection completed, returning original form");
+                
                 form.clone()
             },
         };
 
         debug!("action processing complete, result form: {}", result);
+        
         result
     }
 
     fn fit(&mut self, pattern: &Pattern<Input, Output, Failure>, offset: usize) -> (bool, usize) {
         let start = self.position();
+        
         debug!("fitting pattern: {} at offset {} (position: {})", pattern, offset, start);
 
         let mut draft = Draft::new(pattern.clone(), &start);
         let result = draft.build(self, offset);
 
         debug!("fit result for pattern: matches={}, consumed={}", result.0, result.1);
+        
         result
     }
 
@@ -565,17 +579,20 @@ where
         debug!("forming pattern: {} at position {}", pattern, start);
 
         let mut draft = Draft::new(pattern, &start);
-
         let (matches, consumed) = draft.build(self, 0);
+        
         debug!("pattern build phase: matches={}, consumed={}", matches, consumed);
 
         if !matches {
             debug!("pattern failed to match, returning empty form");
+            
             return Form::new(FormKind::Empty, Span::point(start));
         }
 
-        let final_form = draft.realize(self);
-        debug!("pattern formation complete, final form: {}", final_form);
-        final_form
+        let form = draft.realize(self);
+        
+        debug!("pattern formation complete, final form: {}", form);
+        
+        form
     }
 }

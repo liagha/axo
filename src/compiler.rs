@@ -123,9 +123,8 @@ impl Compiler {
                 context,
                 (),
                 LexerStage,
-                ParserStage,
-                ResolverStage
-            )
+                ParserStage
+            ).map(|_| ())
         })
     }
 
