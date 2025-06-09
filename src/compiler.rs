@@ -14,10 +14,12 @@ use {
         axo_resolver::{
             ResolveError,
             Resolver,
-        }, environment::current_dir, file::{
+        }, 
+        file::{
             read_to_string,
             Error,
-        }, format::{
+        }, 
+        format::{
             Debug, Display,
             Formatter,
         },
@@ -32,6 +34,12 @@ use {
 pub trait Marked {
     fn context(&self) -> &Context;
     fn context_mut(&mut self) -> &mut Context;
+    fn resolver(&self) -> &Resolver {
+        &self.context().resolver
+    }
+    fn resolver_mut(&mut self) -> &mut Resolver {
+        &mut self.context_mut().resolver
+    }
 }
 
 #[derive(Debug)]
@@ -41,6 +49,8 @@ pub enum CompilerError {
     LexingFailed(Vec<LexError>),
     ParsingFailed(Vec<ParseError>),
     ResolutionFailed(Vec<ResolveError>),
+    ArgumentParsing(String),
+    HelpRequested,
 }
 
 impl Display for CompilerError {
@@ -51,31 +61,25 @@ impl Display for CompilerError {
             CompilerError::LexingFailed(_) => write!(formatter, "Lexing failed with errors"),
             CompilerError::ParsingFailed(_) => write!(formatter, "Parsing failed with errors"),
             CompilerError::ResolutionFailed(_) => write!(formatter, "Resolution failed with errors"),
+            CompilerError::ArgumentParsing(msg) => write!(formatter, "{}", msg),
+            CompilerError::HelpRequested => Ok(()),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct Config {
-    pub path: String,
-    pub verbose: bool,
-}
-
-#[derive(Clone)]
 pub struct Context {
-    pub depth: usize,
-    pub config: Config,
+    pub verbose: bool,
     pub resolver: Resolver,
-    pub file_path: Path,
+    pub path: Path,
     pub content: String,
 }
 
 impl Context {
-    pub fn new(config: Config, file_path: Path, content: String) -> Self {
+    pub fn new(file_path: Path, content: String) -> Self {
         Context {
-            depth: 0,
-            config,
-            file_path,
+            verbose: false,
+            path: file_path,
             content,
             resolver: Resolver::new(),
         }
@@ -103,18 +107,12 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(config: Config) -> Result<Self, CompilerError> {
-        let file_path = current_dir()
-            .map(|mut path| {
-                path.push(&config.path);
-                path
-            })
-            .map_err(|error| CompilerError::FileReadError(error))?;
-
-        let content = read_to_string(&file_path)
+    pub fn new(path: Path, verbose: bool) -> Result<Self, CompilerError> {
+        let content = read_to_string(&path)
             .map_err(CompilerError::FileReadError)?;
 
-        let context = Context::new(config, file_path, content);
+        let mut context = Context::new(path, content);
+        context.verbose = verbose;
 
         Ok(Compiler { context })
     }
@@ -138,11 +136,11 @@ impl Compiler {
         xprintln!(
             "{} {}" => Color::Blue,
             "Compiling" => Color::Blue,
-            self.context.file_path.display()
+            self.context.path.display()
         );
         xprintln!();
 
-        if self.context.config.verbose {
+        if self.context.verbose {
             xprintln!(
                 "File Contents:\n{}" => Color::Magenta,
                 indent(&self.context.content) => Color::BrightMagenta
@@ -160,7 +158,7 @@ impl Stage<(), Vec<Token>> for LexerStage {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
         let lexer_timer = Timer::new(TIMERSOURCE);
 
-        let mut lexer = Lexer::new(context.clone(), context.content.clone(), context.file_path.clone());
+        let mut lexer = Lexer::new(context.clone(), context.content.clone(), context.path.clone());
         let (tokens, errors) = lexer.lex();
 
         if !errors.is_empty() {
@@ -176,10 +174,10 @@ impl Stage<(), Vec<Token>> for LexerStage {
             return Err(CompilerError::LexingFailed(errors));
         }
 
-        if context.config.verbose {
+        if context.verbose {
             xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
             xprintln!();
-            
+
             println!(
                 "Lexing Took {} ns\n",
                 lexer_timer.to_nanoseconds(lexer_timer.elapsed().unwrap())
@@ -196,10 +194,10 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
         let parser_timer = Timer::new(TIMERSOURCE);
 
-        let mut parser = Parser::new(context.clone(), tokens, context.file_path.clone());
+        let mut parser = Parser::new(context.clone(), tokens, context.path.clone());
         let (elements, errors) = parser.parse();
 
-        if context.config.verbose {
+        if context.verbose {
             let tree = elements
                 .iter()
                 .map(|element| format!("{:?}", element))
@@ -221,7 +219,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 
         parser.restore();
 
-        if context.config.verbose {
+        if context.verbose {
             println!(
                 "Parsing Took {} ns\n",
                 parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap())
@@ -252,14 +250,14 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
             return Err(CompilerError::ResolutionFailed(context.resolver.errors.clone()));
         }
 
-        if context.config.verbose && !context.resolver.scope.all_symbols().is_empty() {
+        if context.verbose && !context.resolver.scope.all_symbols().is_empty() {
             xprintln!(
                 "{}" => Color::Cyan,
                 format!("Symbols:\n{:#?}", context.resolver.scope.all_symbols())
             );
         }
 
-        if context.config.verbose {
+        if context.verbose {
             println!(
                 "Resolution Took {} ns\n",
                 resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
@@ -269,4 +267,3 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
         Ok(())
     }
 }
-

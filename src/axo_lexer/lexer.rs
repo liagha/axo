@@ -13,7 +13,6 @@ use {
     crate::{
         Path,
 
-        thread::Arc,
         compiler::Marked,
         char::from_u32,
         float::FloatLiteral,
@@ -35,6 +34,7 @@ use {
         },
     },
 };
+use crate::axo_form::form::Form;
 
 #[derive(Clone)]
 pub struct Lexer {
@@ -47,6 +47,9 @@ pub struct Lexer {
 }
 
 impl Peekable<char> for Lexer {
+    fn len(&self) -> usize {
+        self.input.len()
+    }
     fn peek_ahead(&self, n: usize) -> Option<&char> {
         let current = self.index + n;
 
@@ -160,13 +163,13 @@ impl Lexer {
     fn line_comment() -> Pattern<char, Token, LexError> {
         Pattern::sequence([
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
-            Pattern::repeat(Pattern::predicate(Arc::new(|c| *c != '\n')), 0, None),
+            Pattern::repeat(Pattern::predicate(|c| *c != '\n'), 0, None),
         ])
-            .with_transform(Arc::new(|_, form| {
+            .with_transform(|_, form| {
                 let content: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-            }))
+            })
     }
 
     fn multiline_comment() -> Pattern<char, Token, LexError> {
@@ -181,11 +184,11 @@ impl Lexer {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-            .with_transform(Arc::new(|_, form| {
+            .with_transform(|_, form: Form<char, Token, LexError>| {
                 let content: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-            }))
+            })
     }
 
     fn hex_number() -> Pattern<char, Token, LexError> {
@@ -195,16 +198,16 @@ impl Lexer {
                 Pattern::alternative([Pattern::exact('x'), Pattern::exact('X')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(Arc::new(|c| {
+                        Pattern::predicate(|c| {
                             is_numeric(*c) || ('a'..='f').contains(c) || ('A'..='F').contains(c)
-                        })),
+                        }),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
@@ -213,7 +216,7 @@ impl Lexer {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                     Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
-            }),
+            },
         )
     }
 
@@ -224,14 +227,14 @@ impl Lexer {
                 Pattern::alternative([Pattern::exact('b'), Pattern::exact('B')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(Arc::new(|c| *c == '0' || *c == '1')),
+                        Pattern::predicate(|c| *c == '0' || *c == '1'),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
@@ -239,7 +242,7 @@ impl Lexer {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                     Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
-            }),
+            },
         )
     }
 
@@ -250,14 +253,14 @@ impl Lexer {
                 Pattern::alternative([Pattern::exact('o'), Pattern::exact('O')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(Arc::new(|c| ('0'..='7').contains(c))),
+                        Pattern::predicate(|c| ('0'..='7').contains(c)),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     1,
                     None,
                 ),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
                 let parser = crate::axo_rune::parser::<i128>();
@@ -265,17 +268,17 @@ impl Lexer {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                     Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                 }
-            }),
+            },
         )
     }
 
     fn decimal_number() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(Arc::new(|c| is_numeric(*c))),
+                Pattern::predicate(|c| is_numeric(*c)),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(Arc::new(|c| is_numeric(*c))),
+                        Pattern::predicate(|c| is_numeric(*c)),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     0,
@@ -285,7 +288,7 @@ impl Lexer {
                     Pattern::exact('.'),
                     Pattern::repeat(
                         Pattern::alternative([
-                            Pattern::predicate(Arc::new(|c| is_numeric(*c))),
+                            Pattern::predicate(|c| is_numeric(*c)),
                             Pattern::exact('_').with_ignore(),
                         ]),
                         0,
@@ -293,12 +296,12 @@ impl Lexer {
                     ),
                 ])),
                 Pattern::optional(Pattern::sequence([
-                    Pattern::predicate(Arc::new(|c| *c == 'e' || *c == 'E')),
-                    Pattern::optional(Pattern::predicate(Arc::new(|c| *c == '+' || *c == '-'))),
-                    Pattern::repeat(Pattern::predicate(Arc::new(|c| is_numeric(*c))), 1, None),
+                    Pattern::predicate(|c| *c == 'e' || *c == 'E'),
+                    Pattern::optional(Pattern::predicate(|c| *c == '+' || *c == '-')),
+                    Pattern::repeat(Pattern::predicate(|c| is_numeric(*c)), 1, None),
                 ])),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
@@ -314,7 +317,7 @@ impl Lexer {
                         Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 }
-            }),
+            },
         )
     }
 
@@ -330,23 +333,23 @@ impl Lexer {
     fn identifier() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(Arc::new(|c| is_alphabetic(*c) || *c == '_')),
+                Pattern::predicate(|c| is_alphabetic(*c) || *c == '_'),
                 Pattern::repeat(
-                    Pattern::predicate(Arc::new(|c| {
+                    Pattern::predicate(|c| {
                         is_alphabetic(*c) || is_numeric(*c) || *c == '_'
-                    })),
+                    }),
                     0,
                     None,
                 ),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let identifier: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::from_str(&identifier).unwrap_or(TokenKind::Identifier(identifier)),
                     form.span,
                 ))
-            }),
+            },
         )
     }
 
@@ -358,16 +361,16 @@ impl Lexer {
                     Pattern::alternative([
                         Pattern::sequence([
                             Pattern::exact('\\'),
-                            Pattern::predicate(Arc::new(|_| true)),
+                            Pattern::predicate(|_| true),
                         ]),
-                        Pattern::predicate(Arc::new(|c| *c != '"' && *c != '\\' && *c != '\n')),
+                        Pattern::predicate(|c| *c != '"' && *c != '\\' && *c != '\n'),
                     ]),
                     0,
                     None,
                 ),
                 Pattern::exact('"'),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let mut content = String::new();
                 let mut i = 1;
 
@@ -480,7 +483,7 @@ impl Lexer {
                     i += 1;
                 }
                 Ok(Token::new(TokenKind::String(content), form.span))
-            }),
+            },
         )
     }
 
@@ -488,14 +491,14 @@ impl Lexer {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('`'),
-                Pattern::repeat(Pattern::predicate(Arc::new(|c| *c != '`')), 0, None),
+                Pattern::repeat(Pattern::predicate(|c| *c != '`'), 0, None),
                 Pattern::exact('`'),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let content: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(TokenKind::String(content), form.span))
-            }),
+            },
         )
     }
 
@@ -506,13 +509,13 @@ impl Lexer {
                 Pattern::alternative([
                     Pattern::sequence([
                         Pattern::exact('\\'),
-                        Pattern::predicate(Arc::new(|_| true)),
+                        Pattern::predicate(|_| true),
                     ]),
-                    Pattern::predicate(Arc::new(|c| *c != '\'' && *c != '\\')),
+                    Pattern::predicate(|c| *c != '\'' && *c != '\\'),
                 ]),
                 Pattern::exact('\''),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let flat_chars = form.inputs();
 
                 if flat_chars.len() < 3 {
@@ -598,50 +601,50 @@ impl Lexer {
                 };
 
                 Ok(Token::new(TokenKind::Character(ch), form.span))
-            }),
+            },
         )
     }
 
     fn operator() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::repeat(
-                Pattern::predicate(Arc::new(|c: &char| c.is_operator())),
+                Pattern::predicate(|c: &char| c.is_operator()),
                 1,
                 None,
             ),
-            Arc::new(|_, form| {
+            |_, form| {
                 let operator: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::Operator(operator.to_operator()),
                     form.span,
                 ))
-            }),
+            },
         )
     }
 
     fn punctuation() -> Pattern<char, Token, LexError> {
         Pattern::transform(
-            Pattern::predicate(Arc::new(|c: &char| c.is_punctuation())),
-            Arc::new(|_, form| {
+            Pattern::predicate(|c: &char| c.is_punctuation()),
+            |_, form| {
                 let punctuation: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
                     TokenKind::Punctuation(punctuation.to_punctuation()),
                     form.span,
                 ))
-            }),
+            },
         )
     }
 
     fn whitespace() -> Pattern<char, Token, LexError> {
         Pattern::transform(
             Pattern::repeat(
-                Pattern::predicate(Arc::new(|c: &char| c.is_whitespace())),
+                Pattern::predicate(|c: &char| c.is_whitespace() && *c != '\n'),
                 1,
                 None,
             ),
-            Arc::new(|_, form| {
+            |_, form| {
                 let whitespace: String = form.inputs().into_iter().collect();
 
                 if whitespace.len() == 1 {
@@ -655,10 +658,9 @@ impl Lexer {
                         form.span,
                     ))
                 } else {
-                    println!("--------- {:?}", whitespace);
                     unreachable!()
                 }
-            })
+            }
         )
     }
 

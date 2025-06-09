@@ -12,7 +12,7 @@ use {
         Path,
         Peekable,
         
-        compiler::Context,
+        compiler::{Context, Marked},
         
         axo_lexer::{
             OperatorKind, PunctuationKind, 
@@ -29,7 +29,6 @@ use {
         }
     },
 };
-use crate::compiler::Marked;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -42,6 +41,10 @@ pub struct Parser {
 }
 
 impl Peekable<Token> for Parser {
+    fn len(&self) -> usize {
+        self.input.len()
+    }
+    
     fn peek_ahead(&self, forward: usize) -> Option<&Token> {
         let mut current = self.index;
         let mut found = 0;

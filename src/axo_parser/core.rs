@@ -33,10 +33,10 @@ use crate::axo_parser::Item;
 impl Parser {
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
-            Pattern::predicate(Arc::new(|token: &Token| {
+            Pattern::predicate(|token: &Token| {
                 matches!(token.kind, TokenKind::Identifier(_))
-            })),
-            Arc::new(|_, form| {
+            }),
+            |_, form| {
                 let input = form.inputs()[0].clone();
 
                 if let Token {
@@ -48,13 +48,13 @@ impl Parser {
                 } else {
                     unreachable!()
                 }
-            }),
+            },
         )
     }
 
     pub fn literal() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
-            Pattern::predicate(Arc::new(|token: &Token| {
+            Pattern::predicate(|token: &Token| {
                 matches!(
                 token.kind,
                 TokenKind::String(_)
@@ -63,8 +63,8 @@ impl Parser {
                     | TokenKind::Float(_)
                     | TokenKind::Integer(_)
             )
-            })),
-            Arc::new(|_, form| {
+            }),
+            |_, form| {
                 form.expand().first()
                     .and_then(|token| match token.kind.clone() {
                         FormKind::Input(Token { kind, span }) => {
@@ -73,34 +73,34 @@ impl Parser {
                         _ => None,
                     })
                     .ok_or_else(|| unreachable!())
-            }),
+            },
         )
     }
 
     pub fn unary() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(Arc::new(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
                         operator.is_prefix()
                     } else {
                         false
                     }
-                }))
+                })
                     .repeat_self(0, None)
                     .optional_self(),
                 Self::primary(),
-                Pattern::predicate(Arc::new(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
                         operator.is_postfix()
                     } else {
                         false
                     }
-                }))
+                })
                     .repeat_self(0, None)
                     .optional_self(),
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let sequence = form.unwrap()[0].clone().unwrap();
 
                 let prefixes = Form::expand_inputs(sequence[0].unwrap());
@@ -132,7 +132,7 @@ impl Parser {
                 }
 
                 Ok(unary)
-            }),
+            },
         )
     }
 
@@ -142,7 +142,7 @@ impl Parser {
                 Self::unary(),
                 Pattern::repeat(
                     Pattern::sequence([
-                        Pattern::predicate(Arc::new(move |token: &Token| {
+                        Pattern::predicate(move |token: &Token| {
                             if let TokenKind::Operator(operator) = &token.kind {
                                 if let Some(precedence) = operator.precedence() {
                                     precedence >= minimum
@@ -152,14 +152,14 @@ impl Parser {
                             } else {
                                 false
                             }
-                        })),
+                        }),
                         Pattern::lazy(move || Self::unary()),
                     ]),
                     0,
                     None,
                 ),
             ]),
-            Arc::new(move |_, form| {
+            move |_, form| {
                 let sequence = form.unwrap()[0].clone().unwrap();
 
                 let mut left = sequence[0].unwrap_output().unwrap();
@@ -187,7 +187,7 @@ impl Parser {
                 left = Self::climb(left, pairs, minimum);
 
                 Ok(left)
-            }),
+            },
         )
     }
 
@@ -243,40 +243,40 @@ impl Parser {
     pub fn conditional() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(Arc::new(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "if"
                     } else {
                         false
                     }
-                }))
+                })
                     .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::Failure(Arc::new(|span| {
+                    Action::failure(|span| {
                         ParseError::new(ErrorKind::ExpectedCondition, span)
-                    })),
+                    }),
                 ),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::Failure(Arc::new(|span| {
+                    Action::failure(|span| {
                         ParseError::new(ErrorKind::ExpectedBody, span)
-                    })),
+                    }),
                 ),
                 Pattern::optional(
                     Pattern::sequence([
-                        Pattern::predicate(Arc::new(|token: &Token| {
+                        Pattern::predicate(|token: &Token| {
                             if let TokenKind::Identifier(identifier) = &token.kind {
                                 identifier == "else"
                             } else {
                                 false
                             }
-                        })).with_ignore(),
+                        }).with_ignore(),
                         Pattern::lazy(|| Self::pattern()),
                     ])
                 )
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let sequence = form.outputs();
 
                 let condition = sequence[0].clone();
@@ -307,7 +307,7 @@ impl Parser {
                     ))
                 }
 
-            }),
+            },
         )
     }
 
@@ -315,43 +315,43 @@ impl Parser {
         Pattern::transform(
             Pattern::alternative([
                 Pattern::sequence([
-                    Pattern::predicate(Arc::new(|token: &Token| {
+                    Pattern::predicate(|token: &Token| {
                         if let TokenKind::Identifier(identifier) = &token.kind {
                             identifier == "loop"
                         } else {
                             false
                         }
-                    })).with_ignore(),
+                    }).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Failure(Arc::new(|span| {
+                        Action::failure(|span| {
                             ParseError::new(ErrorKind::ExpectedBody, span)
-                        })),
+                        }),
                     ),
                 ]),
                 Pattern::sequence([
-                    Pattern::predicate(Arc::new(|token: &Token| {
+                    Pattern::predicate(|token: &Token| {
                         if let TokenKind::Identifier(identifier) = &token.kind {
                             identifier == "while"
                         } else {
                             false
                         }
-                    })).with_ignore(),
+                    }).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Failure(Arc::new(|span| {
+                        Action::failure(|span| {
                             ParseError::new(ErrorKind::ExpectedCondition, span)
-                        })),
+                        }),
                     ),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::Failure(Arc::new(|span| {
+                        Action::failure(|span| {
                             ParseError::new(ErrorKind::ExpectedBody, span)
-                        })),
+                        }),
                     ),
                 ])
             ]),
-            Arc::new(|_, form| {
+            |_, form| {
                 let sequence = form.outputs();
 
                 if sequence.len() == 1 {
@@ -381,26 +381,26 @@ impl Parser {
                 } else {
                     unreachable!()
                 }
-            })
+            }
         )
     }
 
     pub fn variable() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(Arc::new(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "var"
                     } else {
                         false
                     }
-                })).with_ignore(),
+                }).with_ignore(),
                 Pattern::capture(
                     0,
                     Pattern::lazy(Self::pattern),
                 )
             ]),
-            Arc::new(move |context, _| {
+            move |context, _| {
                 let symbols = context.resolver.scope.symbols.clone();
                 let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. })).unwrap();
 
@@ -410,7 +410,7 @@ impl Parser {
                     ElementKind::Invalid(ParseError::new(ErrorKind::PatternError, Span::default())),
                     Span::default()
                 ))
-            })
+            }
         )
     }
 
@@ -423,19 +423,19 @@ impl Parser {
     }
 
     pub fn whitespace() -> Pattern<Token, Element, ParseError> {
-        Pattern::ignore(Pattern::predicate(Arc::new(|token: &Token| {
+        Pattern::ignore(Pattern::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Space)
-        })))
+        }))
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
         Pattern::conditional(
-            Pattern::predicate(Arc::new(|_token: &Token| {
+            Pattern::predicate(|_token: &Token| {
                 true
-            })),
-            Action::Failure(Arc::new(|span| {
+            }),
+            Action::failure(|span| {
                 ParseError::new(ErrorKind::PatternError, span)
-            })),
+            }),
             Action::Ignore,
         )
     }
@@ -456,9 +456,9 @@ impl Parser {
         Pattern::repeat(
             Pattern::alternative([
                 Self::pattern(), 
-                Pattern::predicate(Arc::new(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                })
+                }
                 ), 
                 Self::fallback()]
             ), 0, None)

@@ -1,1 +1,11 @@
-var x
+{ }
+
+{ single }
+
+{ single_comma, }
+
+{ single_semi; }
+
+{ bundle, second, }
+
+{ scope; second; }

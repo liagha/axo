@@ -9,6 +9,8 @@ use {
 };
 
 pub trait Peekable<Item : PartialEq> {
+    fn len(&self) -> usize;
+    
     fn peek(&self) -> Option<&Item> {
         self.peek_ahead(0)
     }

@@ -1,23 +1,13 @@
+use crate::axo_form::action::Emitter;
+use std::sync::Mutex;
 use {
-    super::{
-        form::Form,
-        action::Action,
-    },
-
-    crate::{
-        hash::Hash,
-        compiler::Context,
-        format::Debug,
-        thread::Arc,
-        axo_span::Span,
-        Peekable,
-    }
+    super::{action::Action, form::Form},
+    crate::{compiler::Context, format::Debug, hash::Hash, thread::Arc, Peekable},
 };
 
-pub type Transformer<Input, Output, Failure> = Arc<dyn Fn(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure> + Send + Sync>;
-pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-pub type Emitter<Failure> = Arc<dyn Fn(Span) -> Failure>;
-pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Pattern<Input, Output, Failure> + Send + Sync>;
+pub type Predicate<Input> = Arc<Mutex<dyn FnMut(&Input) -> bool + Send + Sync>>;
+pub type Evaluator<Input, Output, Failure> =
+    Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
 
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
@@ -27,14 +17,11 @@ where
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Literal(Input),
+    Wrap(Box<Pattern<Input, Output, Failure>>),
     Alternative(Vec<Pattern<Input, Output, Failure>>),
     Guard {
-        predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
+        predicate: Arc<Mutex<dyn FnMut(&dyn Peekable<Input>) -> bool + Send + Sync>>,
         pattern: Box<Pattern<Input, Output, Failure>>,
-    },
-    Required {
-        pattern: Box<Pattern<Input, Output, Failure>>,
-        action: Action<Input, Output, Failure>,
     },
     Sequence(Vec<Pattern<Input, Output, Failure>>),
     Repetition {
@@ -73,13 +60,13 @@ where
         }
     }
 
-    pub fn guard(
-        predicate: Arc<dyn Fn(&dyn Peekable<Input>) -> bool + Send + Sync>,
-        pattern: Pattern<Input, Output, Failure>
-    ) -> Self {
+    pub fn guard<F>(predicate: F, pattern: Pattern<Input, Output, Failure>) -> Self
+    where
+        F: FnMut(&dyn Peekable<Input>) -> bool + Send + Sync + 'static,
+    {
         Self {
             kind: PatternKind::Guard {
-                predicate,
+                predicate: Arc::new(Mutex::new(predicate)),
                 pattern: Box::new(pattern),
             },
             action: None,
@@ -136,9 +123,12 @@ where
         }
     }
 
-    pub fn predicate(predicate: Predicate<Input>) -> Self {
+    pub fn predicate<F>(predicate: F) -> Self
+    where
+        F: FnMut(&Input) -> bool + Send + Sync + 'static,
+    {
         Self {
-            kind: PatternKind::Condition(predicate),
+            kind: PatternKind::Condition(Arc::new(Mutex::new(predicate))),
             action: None,
         }
     }
@@ -162,20 +152,20 @@ where
         action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Required {
-                pattern: pattern.into(),
-                action,
-            },
-            action: None,
+            kind: PatternKind::Wrap(pattern.into()),
+            action: Some(Action::Trigger {
+                found: Action::execute(|| {}).into(),
+                missing: action.into(),
+            }),
         }
     }
 
     pub fn lazy<F>(factory: F) -> Self
     where
-        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
+        F: FnMut() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
     {
         Self {
-            kind: PatternKind::Deferred(Arc::new(factory)),
+            kind: PatternKind::Deferred(Arc::new(Mutex::new(factory))),
             action: None,
         }
     }
@@ -183,19 +173,27 @@ where
     pub fn resolve_lazy(&self) -> Pattern<Input, Output, Failure> {
         match &self.kind {
             PatternKind::Deferred(factory) => {
-                factory()
+                let mut guard = factory.lock().unwrap();
+
+                guard()
             }
             _ => self.clone(),
         }
     }
 
-    pub fn transform(
+    pub fn transform<T>(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        transform: Transformer<Input, Output, Failure>,
-    ) -> Self {
+        transform: T,
+    ) -> Self
+    where
+        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
+            + Send
+            + Sync
+            + 'static,
+    {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
-            action: Some(Action::Map(transform)),
+            action: Some(Action::Map(Arc::new(Mutex::new(transform)))),
         }
     }
 
@@ -230,6 +228,16 @@ where
         }
     }
 
+    pub fn action(
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        action: Action<Input, Output, Failure>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            action: Some(action),
+        }
+    }
+
     pub fn with_action(mut self, action: Action<Input, Output, Failure>) -> Self {
         self.action = Some(action);
         self
@@ -257,8 +265,14 @@ where
         self
     }
 
-    pub fn with_transform(mut self, transform: Transformer<Input, Output, Failure>) -> Self {
-        self.action = Some(Action::Map(transform));
+    pub fn with_transform<T>(mut self, transform: T) -> Self
+    where
+        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.action = Some(Action::Map(Arc::new(Mutex::new(transform))));
         self
     }
 
@@ -287,22 +301,7 @@ where
         content: Pattern<Input, Output, Failure>,
         close: Pattern<Input, Output, Failure>,
     ) -> Self {
-        Self::sequence(vec![
-            open.with_ignore(),
-            content,
-            close.with_ignore(),
-        ])
-    }
-
-    pub fn when<F>(predicate: F) -> Self
-    where
-        F: Fn(&Input) -> bool + Send + Sync + 'static,
-    {
-        Self::predicate(Arc::new(predicate))
-    }
-
-    pub fn map(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>, f: impl Into<Transformer<Input, Output, Failure>>) -> Self {
-        Self::transform(pattern, f.into())
+        Self::sequence(vec![open.with_ignore(), content, close.with_ignore()])
     }
 
     pub fn empty() -> Self {
@@ -324,150 +323,4 @@ where
     pub fn repeat_self(self, min: usize, max: Option<usize>) -> Self {
         Self::repeat(Box::new(self), min, max)
     }
-}
-
-#[macro_export]
-macro_rules! pattern {
-    // Empty pattern
-    () => {
-        Pattern::empty()
-    };
-
-    // Wildcard
-    (_) => {
-        Pattern::anything()
-    };
-
-    // Lazy evaluation (@ factory)
-    (@ $factory:expr) => {
-        Pattern::lazy($factory)
-    };
-
-    // Delimited pattern (open <> content <> close)
-    ($open:tt <> $content:tt <> $close:tt) => {
-        Pattern::delimited(
-            pattern!($open),
-            pattern!($content),
-            pattern!($close)
-        )
-    };
-
-    // Alternative (|) - handles multiple alternatives with proper recursion
-    ($first:tt | $($rest:tt)|+) => {
-        Pattern::alternative(vec![
-            pattern!($first),
-            $(pattern!($rest),)+
-        ])
-    };
-
-    // Actions - these need to come BEFORE sequence handling for proper precedence
-
-    // Transform with inline closure (pattern => |args| body)
-    ($pattern:tt => |$($args:tt)*| $body:expr) => {
-        pattern!($pattern).with_transform(Arc::new(|$($args)*| $body))
-    };
-
-    // Transform (pattern => transform)
-    ($pattern:tt => $transform:expr) => {
-        pattern!($pattern).with_transform($transform)
-    };
-
-    // Guard (pattern :: guard)
-    ($pattern:tt :: $guard:expr) => {
-        Pattern::guard($guard, pattern!($pattern))
-    };
-
-    // Ignore action (pattern >> ignore)
-    ($pattern:tt >> ignore) => {
-        pattern!($pattern).with_ignore()
-    };
-
-    // Error action (pattern >> error(emitter))
-    ($pattern:tt >> error($emitter:expr)) => {
-        pattern!($pattern).with_error($emitter)
-    };
-
-    // Capture action (pattern >> capture(id))
-    ($pattern:tt >> capture($id:expr)) => {
-        pattern!($pattern).as_capture($id)
-    };
-
-    // Conditional action (pattern >> if(found, missing))
-    ($pattern:tt >> if($found:expr, $missing:expr)) => {
-        pattern!($pattern).with_conditional($found, $missing)
-    };
-
-    // Repetition patterns with recursion
-
-    // Optional (pattern?)
-    ($pattern:tt ?) => {
-        Pattern::optional(Box::new(pattern!($pattern)))
-    };
-
-    // Zero or more (pattern*)
-    ($pattern:tt *) => {
-        Pattern::repeat(Box::new(pattern!($pattern)), 0, None)
-    };
-
-    // One or more (pattern+)
-    ($pattern:tt +) => {
-        Pattern::repeat(Box::new(pattern!($pattern)), 1, None)
-    };
-
-    // Repetition with exact count {n}
-    ($pattern:tt { $exact:literal }) => {
-        Pattern::repeat(Box::new(pattern!($pattern)), $exact, Some($exact))
-    };
-
-    // Repetition with range {min, max}
-    ($pattern:tt { $min:literal , $max:literal }) => {
-        Pattern::repeat(Box::new(pattern!($pattern)), $min, Some($max))
-    };
-
-    // Repetition with minimum only {min,}
-    ($pattern:tt { $min:literal , }) => {
-        Pattern::repeat(Box::new(pattern!($pattern)), $min, None)
-    };
-
-    // Negation (!pattern)
-    (!$pattern:tt) => {
-        Pattern::negate(Box::new(pattern!($pattern)))
-    };
-
-    // Closure/predicate - this needs to come before sequence to avoid conflicts
-    (|$($args:tt)*| $body:expr) => {
-        Pattern::when(|$($args)*| $body)
-    };
-
-    // Parenthesized expressions - handle grouping, process contents recursively
-    (($($inner:tt)*)) => {
-        pattern!($($inner)*)
-    };
-
-    // Sequence handling - this comes AFTER actions to ensure proper precedence
-    // Multiple comma-separated patterns
-    ($first:tt , $($rest:tt),+ $(,)?) => {
-        Pattern::sequence(vec![
-            pattern!($first),
-            $(pattern!($rest),)+
-        ])
-    };
-
-    // Two patterns separated by comma (base case)
-    ($first:tt , $second:tt) => {
-        Pattern::sequence(vec![
-            pattern!($first),
-            pattern!($second)
-        ])
-    };
-
-    // Literal values (characters, strings, etc.)
-    ($literal:literal) => {
-        Pattern::exact($literal)
-    };
-
-    // Raw expression passthrough for complex patterns - this should be last
-    ($expr:expr) => {
-        $expr
-    };
 }

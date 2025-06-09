@@ -19,7 +19,7 @@ pub use {
     axo_format::*,
     axo_data::{*, peekable::*},
     timer::{Timer, TimeSource},
-    compiler::{Compiler, Config, CompilerError},
+    compiler::{Compiler, CompilerError},
 };
 
 use {
@@ -48,11 +48,11 @@ pub mod io {
 }
 
 pub mod environment {
-    pub use std::env::{args, current_dir, };
+    pub use std::env::{args, };
 }
 
 pub mod thread {
-    pub use std::sync::{Arc};
+    pub use std::sync::{Arc, Mutex};
 }
 
 pub mod memory {
@@ -100,52 +100,30 @@ pub mod format {
     pub use core::fmt::{Display, Debug, Formatter, Result, Write};
 }
 
-#[derive(Debug)]
-pub enum AppError {
-    Compiler(CompilerError),
-    ArgumentParsing(String),
-    HelpRequested,
-}
-
-impl format::Display for AppError {
-    fn fmt(&self, f: &mut format::Formatter<'_>) -> format::Result {
-        match self {
-            AppError::Compiler(e) => write!(f, "{}", e),
-            AppError::ArgumentParsing(msg) => write!(f, "{}", msg),
-            AppError::HelpRequested => Ok(()), // Help is handled separately
-        }
-    }
-}
-
-impl From<CompilerError> for AppError {
-    fn from(error: CompilerError) -> Self {
-        AppError::Compiler(error)
-    }
-}
-
 fn main() {
-    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message])
-        .with_separator(" ".to_string());
+    /*
+    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(" ".to_string());
 
     let logger = Logger::new(Level::max(), plan);
-
+    logger.init().expect("fuck");
+*/
     println!();
-    
+
     let main_timer = Timer::new(TIMERSOURCE);
 
     match run_application(main_timer) {
         Ok(()) => {}
-        Err(AppError::HelpRequested) => {}
+        Err(CompilerError::HelpRequested) => {}
         Err(e) => {
             eprintln!("{}", e);
         }
     }
 }
 
-fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
-    let config = parse_arguments()?;
+fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerError> {
+    let (path, verbose) = parse_arguments()?;
 
-    if config.verbose {
+    if verbose {
         println!(
             "Argument Parsing Took {} ns",
             main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
@@ -154,9 +132,9 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
 
     let file_read_timer = Timer::new(TIMERSOURCE);
 
-    let mut compiler = Compiler::new(config.clone())?;
+    let mut compiler = Compiler::new(path, verbose)?;
 
-    if config.verbose {
+    if verbose {
         println!(
             "File Read Took {} ns",
             file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
@@ -165,7 +143,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
 
     compiler.compile()?;
 
-    if config.verbose {
+    if verbose {
         println!(
             "Total Compilation Took {} ns",
             main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
@@ -175,39 +153,37 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), AppError> {
     Ok(())
 }
 
-fn parse_arguments() -> Result<Config, AppError> {
+fn parse_arguments() -> Result<(Path, bool), CompilerError> {
     let args: Vec<String> = environment::args().collect();
-    
-    let mut config = Config {
-        path: String::new(),
-        verbose: false,
-    };
+
+    let mut path = String::new();
+    let mut verbose = false;
 
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "-v" | "--verbose" => config.verbose = true,
+            "-v" | "--verbose" => verbose = true,
             "-h" | "--help" => {
                 print_usage(&args[0]);
-                return Err(AppError::HelpRequested);
+                return Err(CompilerError::HelpRequested);
             }
             flag => {
                 if flag.starts_with('-') {
                     let error_msg = format!("Unknown option: {}", flag);
                     eprintln!("{}", error_msg);
                     print_usage(&args[0]);
-                    return Err(AppError::ArgumentParsing(error_msg));
+                    return Err(CompilerError::ArgumentParsing(error_msg));
                 }
-                config.path = flag.to_string();
+                path = flag.to_string();
             }
         }
 
         i += 1;
     }
 
-    if config.path.is_empty() {
-        return Err(AppError::Compiler(CompilerError::PathRequired));
+    if path.is_empty() {
+        return Err(CompilerError::PathRequired);
     }
 
-    Ok(config)
+    Ok((Path::from(path), verbose))
 }
