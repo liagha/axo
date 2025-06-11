@@ -109,7 +109,7 @@ macro_rules! char_property {
 
         impl $prop_name {
             pub fn of(ch: char) -> Self {
-                use $crate::axo_rune::tables::CharDataTable;
+                use $crate::axo_text::tables::CharDataTable;
                 const TABLE: CharDataTable<()> = include!($data_path);
                 $prop_name(TABLE.contains(ch))
             }
@@ -185,7 +185,7 @@ macro_rules! char_property {
     };
 
     ( __impl Display for $prop_name:ident by $trait:ident ) => {
-        impl $crate::axo_rune::__fmt::Display for $prop_name {
+        impl $crate::axo_text::__fmt::Display for $prop_name {
             fn fmt(&self, f: &mut $crate::__fmt::Formatter) -> $crate::__fmt::Result {
                 $crate::$trait::human_name(self).fmt(f)
             }

@@ -159,12 +159,6 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 expr_opt.hash(state);
             }
-
-            ElementKind::Invalid(_) => {
-                discriminant(self).hash(state);
-                // Note: You'll need to implement Hash for ParseError if it doesn't already implement it
-                // error.hash(state);
-            }
         }
     }
 }
@@ -238,8 +232,6 @@ impl PartialEq for ElementKind {
             (ElementKind::Return(a), ElementKind::Return(b)) => a == b,
             (ElementKind::Break(a), ElementKind::Break(b)) => a == b,
             (ElementKind::Skip(a), ElementKind::Skip(b)) => a == b,
-
-            (ElementKind::Invalid(a), ElementKind::Invalid(b)) => a == b,
 
             // Different variants are never equal
             _ => false,

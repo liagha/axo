@@ -4,8 +4,8 @@ use {
             Display, Debug, 
             Formatter, Result
         },
-        
-        axo_lexer::Token,
+
+        axo_scanner::Token,
     }
 };
 

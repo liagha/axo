@@ -1,10 +1,10 @@
+pub mod vector;
+
 use {
     broccli::{Color, TextStyle},
     
     crate::{
-        format, 
-        
-        axo_lexer::{
+        axo_scanner::{
             Token, TokenKind, 
             PunctuationKind, 
         },
@@ -18,15 +18,11 @@ pub fn indent(string: &String) -> String {
         .join("\n")
 }
 
-pub fn format_vec<Item: format::Display>(vector: &Vec<Item>) -> String {
-    vector.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", ")
-}
-
 pub fn print_usage(program: &str) {
     println!("Usage: {} [OPTIONS] <file.axo>", program);
     println!("Options:");
     println!("  -v, --verbose   Enable verbose output");
-    println!("  -t, --tokens    Show lexer tokens");
+    println!("  -t, --tokens    Show scanner tokens");
     println!("  -a, --ast       Show parsed AST");
     println!("  --time          Show execution time reports");
     println!("  -h, --help      Show this help message");

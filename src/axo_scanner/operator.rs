@@ -200,12 +200,12 @@ impl Display for OperatorKind {
     }
 }
 
-pub trait OperatorLexer {
+pub trait Operator {
     fn is_operator(&self) -> bool;
     fn to_operator(&self) -> OperatorKind;
 }
 
-impl OperatorLexer for char {
+impl Operator for char {
     fn is_operator(&self) -> bool {
         matches!(
             self,
@@ -248,7 +248,7 @@ impl OperatorLexer for char {
     }
 }
 
-impl OperatorLexer for str {
+impl Operator for str {
     fn is_operator(&self) -> bool {
         matches!(
             self,

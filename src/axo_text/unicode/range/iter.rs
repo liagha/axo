@@ -1,5 +1,5 @@
 use crate::{char, operations};
-use crate::axo_rune::unicode::CharRange;
+use crate::axo_text::unicode::CharRange;
 
 const SURROGATE_RANGE: operations::Range<u32> = 0xD800..0xE000;
 

@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        axo_rune::unicode::TotalCharProperty,
+        axo_text::unicode::TotalCharProperty,
         char_property,
     }
 };
@@ -211,7 +211,7 @@ impl Default for GeneralCategory {
 }
 
 mod data {
-    use crate::axo_rune::unicode::tables::CharDataTable;
+    use crate::axo_text::unicode::tables::CharDataTable;
     use crate::chars;
     use crate::unicode::category::category::abbr_names::*;
 

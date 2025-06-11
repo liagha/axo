@@ -11,18 +11,18 @@ use {
     crate::{
         Path,
         Peekable,
-        
+
         compiler::{Context, Marked},
-        
-        axo_lexer::{
+
+        axo_scanner::{
             OperatorKind, PunctuationKind, 
             Token, TokenKind
         },
-        
+
         axo_span::{
             Span, Position,
         },
-        
+
         axo_form::{
             former::Former,
             form::FormKind,

@@ -8,11 +8,11 @@ use {
     },
     crate::{
         compare::{min, max},
-        
-        axo_lexer::{
+
+        axo_scanner::{
             Token, TokenKind
         },
-        
+
         axo_parser::{
             Element, ElementKind,
             Item, ItemKind,

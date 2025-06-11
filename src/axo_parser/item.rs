@@ -1,18 +1,18 @@
 use {
     crate::{
         Peekable,
-        
+
         any::Any,
-        
+
         artifact::Artifact,
-        
+
         hash::{
             Hash, Hasher
         },
-        
+
         axo_form::form::Form,
-        
-        axo_lexer::{
+
+        axo_scanner::{
             Token, TokenKind,
             PunctuationKind,
             OperatorKind,

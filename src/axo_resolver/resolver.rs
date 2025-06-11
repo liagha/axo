@@ -8,7 +8,7 @@ use {
             Action, Hint
         },
 
-        axo_lexer::{
+        axo_scanner::{
             Token, TokenKind,
         },
 

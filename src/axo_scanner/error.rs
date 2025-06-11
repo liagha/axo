@@ -4,8 +4,8 @@ use {
             Debug, Display, 
             Formatter, Result
         },
-        
-        axo_rune::numeral::ParseNumberError,
+
+        axo_text::numeral::ParseNumberError,
     },
 };
 

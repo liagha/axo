@@ -8,10 +8,11 @@ use {
     crate::{
         hash::Hash,
         format::{Debug, Display, Formatter, Result},
+        
+        axo_format::vector::Show,
+        axo_form::pattern::Pattern,
     }
 };
-use crate::axo_form::pattern::Pattern;
-use crate::format_vec;
 
 impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
 where
@@ -174,7 +175,7 @@ where
             Action::Map(_) => write!(f, "map"),
             Action::Execute(_) => write!(f, "execute"),
             Action::Inspect(_) => write!(f, "inspect"),
-            Action::Multiple(actions) => write!(f, "multiple({})", format_vec(actions)),
+            Action::Multiple(actions) => write!(f, "multiple({})", actions.format()),
             Action::Trigger { found, missing } => write!(f, "trigger({}, {})", found, missing),
             Action::Capture { identifier } => write!(f, "capture({})", identifier),
             Action::Ignore => write!(f, "ignore"),

@@ -24,12 +24,12 @@ pub enum PunctuationKind {
     RightBrace,
 }
 
-pub trait PunctuationLexer {
+pub trait Punctuation {
     fn is_punctuation(&self) -> bool;
     fn to_punctuation(&self) -> PunctuationKind;
 }
 
-impl PunctuationLexer for str {
+impl Punctuation for str {
     fn is_punctuation(&self) -> bool {
         matches!(
             self,
@@ -56,7 +56,7 @@ impl PunctuationLexer for str {
     }
 }
 
-impl PunctuationLexer for char {
+impl Punctuation for char {
     fn is_punctuation(&self) -> bool {
         matches!(
             self,

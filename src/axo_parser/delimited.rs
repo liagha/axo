@@ -11,7 +11,7 @@ use {
         Peekable,
         thread::Arc,
 
-        axo_lexer::{
+        axo_scanner::{
             Token, TokenKind,
             PunctuationKind,
         },
@@ -148,6 +148,8 @@ impl Parser {
                                 Action::Ignore,
                                 Action::failure(
                                     |span| {
+                                        println!("Separator Error at {:?}", span);
+                                        
                                         ParseError::new(
                                             ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Comma)),
                                             span,
@@ -200,6 +202,8 @@ impl Parser {
                                 Action::Ignore,
                                 Action::failure(
                                     |span| {
+                                        println!("Separator Error at {:?}", span);
+                                        
                                         ParseError::new(
                                             ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                                             span,
@@ -252,6 +256,8 @@ impl Parser {
                                 Action::Ignore,
                                 Action::failure(
                                     |span| {
+                                        println!("Separator Error at {:?}", span);
+                                        
                                         ParseError::new(
                                             ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Comma)),
                                             span,

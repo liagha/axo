@@ -4,10 +4,10 @@ mod axo_data;
 mod axo_error;
 mod axo_form;
 mod axo_format;
-mod axo_lexer;
+mod axo_scanner;
 mod axo_parser;
 mod axo_resolver;
-mod axo_rune;
+mod axo_text;
 mod axo_span;
 mod compiler;
 mod logger;
@@ -15,7 +15,7 @@ mod timer;
 mod artifact;
 
 pub use {
-    axo_rune::*,
+    axo_text::*,
     axo_format::*,
     axo_data::{*, peekable::*},
     timer::{Timer, TimeSource},
@@ -101,12 +101,11 @@ pub mod format {
 }
 
 fn main() {
-    /*
     let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(" ".to_string());
 
     let logger = Logger::new(Level::max(), plan);
     logger.init().expect("fuck");
-*/
+
     println!();
 
     let main_timer = Timer::new(TIMERSOURCE);

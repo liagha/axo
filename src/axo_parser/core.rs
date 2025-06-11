@@ -17,7 +17,7 @@ use {
             }
         },
 
-        axo_lexer::{
+        axo_scanner::{
             PunctuationKind, Token,
             TokenKind,
         },
@@ -407,7 +407,7 @@ impl Parser {
                 trace!("formed variable: {:?}.", formed);
 
                 Ok(Element::new(
-                    ElementKind::Invalid(ParseError::new(ErrorKind::PatternError, Span::default())),
+                    ElementKind::Item(ItemKind::Unit),
                     Span::default()
                 ))
             }
@@ -426,18 +426,6 @@ impl Parser {
         Pattern::ignore(Pattern::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Space)
         }))
-    }
-
-    pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::conditional(
-            Pattern::predicate(|_token: &Token| {
-                true
-            }),
-            Action::failure(|span| {
-                ParseError::new(ErrorKind::PatternError, span)
-            }),
-            Action::Ignore,
-        )
     }
 
     pub fn primary() -> Pattern<Token, Element, ParseError> {
@@ -470,12 +458,24 @@ impl Parser {
         Pattern::alternative([Self::statement(), Self::expression(0)])
     }
 
+    pub fn fallback() -> Pattern<Token, Element, ParseError> {
+        Pattern::conditional(
+            Pattern::predicate(|_token: &Token| {
+                true
+            }),
+            Action::failure(|span| {
+                ParseError::new(ErrorKind::PatternError, span)
+            }),
+            Action::Ignore,
+        )
+    }
+
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
             Pattern::alternative([
                 Self::pattern(),
                 Self::ignore(),
-                Self::fallback()]
-            ), 0, None)
+                Self::fallback()
+            ]), 0, None)
     }
 }

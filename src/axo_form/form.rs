@@ -1,6 +1,4 @@
 use {
-    log::{debug, warn},
-    
     crate::{
         hash::Hash,
         format::Debug,
@@ -40,7 +38,6 @@ where
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub fn new(form: FormKind<Input, Output, Failure>, span: Span) -> Self {
-        debug!("creating form with span {:?}", span);
         Self { kind: form, span, }
     }
 
@@ -49,14 +46,12 @@ where
             FormKind::Multiple(forms) => {
                 for form in forms {
                     if let Some(error_form) = Self::catch(&form) {
-                        warn!("error form detected in multiple forms, propagating upward");
                         return Some(error_form);
                     }
                 }
             }
 
             FormKind::Failure(_) => {
-                warn!("caught error form, returning for propagation");
                 return Some(self.clone());
             }
 
@@ -92,7 +87,6 @@ where
 
         match self {
             Form { kind: FormKind::Multiple(forms), .. } => {
-                debug!("expanding {} nested forms recursively", forms.len());
                 expanded.extend(Self::expand_forms(forms.clone()));
             }
 
@@ -120,7 +114,6 @@ where
             }
         }
 
-        debug!("extracted {} inputs from form structure", inputs.len());
         inputs
     }
 
@@ -140,7 +133,6 @@ where
             }
         }
 
-        debug!("extracted {} outputs from form structure", outputs.len());
         outputs
     }
 
@@ -200,26 +192,25 @@ where
         outputs
     }
 
-    pub fn map<NewInput, NewOutput, NewError, F, G, H>(
+    pub fn map<MappedI, MappedO, MappedF, F, G, H>(
         self,
         input_mapper: F,
         output_mapper: G,
         error_mapper: H,
-    ) -> Form<NewInput, NewOutput, NewError>
+    ) -> Form<MappedI, MappedO, MappedF>
     where
-        NewInput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        NewOutput: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        NewError: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        F: Fn(Input) -> NewInput + Clone,
-        G: Fn(Output) -> NewOutput + Clone,
-        H: Fn(Failure) -> NewError + Clone,
+        MappedI: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        MappedO: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        MappedF: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        F: Fn(Input) -> MappedI + Clone,
+        G: Fn(Output) -> MappedO + Clone,
+        H: Fn(Failure) -> MappedF + Clone,
     {
-        let mapped_kind = match self.kind {
+        let mapped = match self.kind {
             FormKind::Empty => FormKind::Empty,
             FormKind::Input(input) => FormKind::Input(input_mapper(input)),
             FormKind::Output(output) => FormKind::Output(output_mapper(output)),
             FormKind::Multiple(forms) => {
-                debug!("mapping {} forms to new types", forms.len());
                 let mapped_forms = forms
                     .into_iter()
                     .map(|form| form.map(input_mapper.clone(), output_mapper.clone(), error_mapper.clone()))
@@ -229,6 +220,6 @@ where
             FormKind::Failure(error) => FormKind::Failure(error_mapper(error)),
         };
 
-        Form::new(mapped_kind, self.span)
+        Form::new(mapped, self.span)
     }
 }

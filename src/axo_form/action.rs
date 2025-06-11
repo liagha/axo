@@ -61,27 +61,6 @@ where
         Self::Inspect(Arc::new(Mutex::new(inspector)))
     }
 
-    pub fn map_simple<T>(mut transformer: T) -> Self
-    where
-        T: FnMut(Form<Input, Output, Failure>) -> Output + Send + Sync + 'static,
-        Failure: Default,
-    {
-        Self::map(move |_ctx, form| Ok(transformer(form)))
-    }
-
-    pub fn extract_input<T>(mut extractor: T) -> Self
-    where
-        T: FnMut(&Input) -> Output + Send + Sync + 'static,
-        Failure: Default,
-    {
-        Self::map(move |_ctx, form| {
-            match form.kind {
-                crate::axo_form::form::FormKind::Input(ref input) => Ok(extractor(input)),
-                _ => Err(Failure::default()),
-            }
-        })
-    }
-
     pub fn execute<T>(executor: T) -> Self
     where T: FnMut() + Send + Sync + 'static,
     {

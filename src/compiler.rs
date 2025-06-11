@@ -2,9 +2,9 @@ use {
     broccli::{xprintln, Color},
 
     crate::{
-        axo_lexer::{
-            LexError,
-            Lexer,
+        axo_scanner::{
+            ScanError,
+            Scanner,
             Token,
         }, axo_parser::{
             Element,
@@ -14,11 +14,11 @@ use {
         axo_resolver::{
             ResolveError,
             Resolver,
-        }, 
+        },
         file::{
             read_to_string,
             Error,
-        }, 
+        },
         format::{
             Debug, Display,
             Formatter,
@@ -46,7 +46,7 @@ pub trait Marked {
 pub enum CompilerError {
     PathRequired,
     FileReadError(Error),
-    LexingFailed(Vec<LexError>),
+    ScanningFailed(Vec<ScanError>),
     ParsingFailed(Vec<ParseError>),
     ResolutionFailed(Vec<ResolveError>),
     ArgumentParsing(String),
@@ -58,7 +58,7 @@ impl Display for CompilerError {
         match self {
             CompilerError::PathRequired => write!(formatter, "No input file specified"),
             CompilerError::FileReadError(error) => write!(formatter, "Failed to read file: {}", error),
-            CompilerError::LexingFailed(_) => write!(formatter, "Lexing failed with errors"),
+            CompilerError::ScanningFailed(_) => write!(formatter, "Scanning failed with errors"),
             CompilerError::ParsingFailed(_) => write!(formatter, "Parsing failed with errors"),
             CompilerError::ResolutionFailed(_) => write!(formatter, "Resolution failed with errors"),
             CompilerError::ArgumentParsing(msg) => write!(formatter, "{}", msg),
@@ -122,7 +122,7 @@ impl Compiler {
             pipeline!(
                 context,
                 (),
-                LexerStage,
+                ScannerStage,
                 ParserStage
             ).map(|_| ())
         })
@@ -151,14 +151,14 @@ impl Compiler {
     }
 }
 
-pub struct LexerStage;
+pub struct ScannerStage;
 
-impl Stage<(), Vec<Token>> for LexerStage {
+impl Stage<(), Vec<Token>> for ScannerStage {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
-        let lexer_timer = Timer::new(TIMERSOURCE);
+        let scanner_timer = Timer::new(TIMERSOURCE);
 
-        let mut lexer = Lexer::new(context.clone(), context.content.clone(), context.path.clone());
-        let (tokens, errors) = lexer.lex();
+        let mut scanner = Scanner::new(context.clone(), context.content.clone(), context.path.clone());
+        let (tokens, errors) = scanner.scan();
 
         if !errors.is_empty() {
             for error in &errors {
@@ -170,7 +170,7 @@ impl Stage<(), Vec<Token>> for LexerStage {
                 );
             }
             xprintln!();
-            return Err(CompilerError::LexingFailed(errors));
+            return Err(CompilerError::ScanningFailed(errors));
         }
 
         if context.verbose {
@@ -178,8 +178,8 @@ impl Stage<(), Vec<Token>> for LexerStage {
             xprintln!();
 
             println!(
-                "Lexing Took {} ns\n",
-                lexer_timer.to_nanoseconds(lexer_timer.elapsed().unwrap())
+                "Scanning Took {} ns\n",
+                scanner_timer.to_nanoseconds(scanner_timer.elapsed().unwrap())
             );
         }
 

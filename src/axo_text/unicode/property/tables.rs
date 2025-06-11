@@ -1,4 +1,4 @@
-use crate::axo_rune::CharRange;
+use crate::axo_text::CharRange;
 use crate::chars;
 
 #[derive(Copy, Clone, Debug)]

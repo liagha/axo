@@ -16,24 +16,24 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    Literal(Input),
-    Wrap(Box<Pattern<Input, Output, Failure>>),
     Alternative(Vec<Pattern<Input, Output, Failure>>),
+    Condition(Predicate<Input>),
+    Deferred(Evaluator<Input, Output, Failure>),
     Guard {
         predicate: Arc<Mutex<dyn FnMut(&dyn Peekable<Input>) -> bool + Send + Sync>>,
         pattern: Box<Pattern<Input, Output, Failure>>,
     },
-    Sequence(Vec<Pattern<Input, Output, Failure>>),
+    Literal(Input),
+    Negation(Box<Pattern<Input, Output, Failure>>),
+    Optional(Box<Pattern<Input, Output, Failure>>),
     Repetition {
         pattern: Box<Pattern<Input, Output, Failure>>,
         minimum: usize,
         maximum: Option<usize>,
     },
-    Optional(Box<Pattern<Input, Output, Failure>>),
-    Condition(Predicate<Input>),
-    Negation(Box<Pattern<Input, Output, Failure>>),
-    Deferred(Evaluator<Input, Output, Failure>),
+    Sequence(Vec<Pattern<Input, Output, Failure>>),
     WildCard,
+    Wrap(Box<Pattern<Input, Output, Failure>>),
 }
 
 #[derive(Clone, Debug)]

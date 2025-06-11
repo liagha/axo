@@ -5,7 +5,7 @@ use {
     
     crate::{
         format::{Debug, Display, Formatter, Result},
-        axo_lexer::{
+        axo_scanner::{
             TokenKind, Token, PunctuationKind
         },
         axo_parser::Element,

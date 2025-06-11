@@ -253,8 +253,6 @@ impl Display for ElementKind {
 
             ElementKind::Bind { key, value } => write!(f, "{} => {}", key, value),
             ElementKind::Path { tree } => write!(f, "{}", tree),
-
-            ElementKind::Invalid(e) => write!(f, "error: {}", e)
         }
     }
 }
@@ -372,8 +370,6 @@ impl Debug for ElementKind {
 
             ElementKind::Bind { key, value } => write!(f, "Bind({:?} => {:?})", key, value),
             ElementKind::Path { tree } => write!(f, "Path({:?})", tree),
-
-            ElementKind::Invalid(e) => write!(f, "Error({:?})", e)
         }
     }
 }

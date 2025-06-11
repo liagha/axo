@@ -3,11 +3,10 @@ use {
         error::{
             ErrorKind, CharParseError,
         },
-        
-        OperatorLexer, 
-        PunctuationKind, PunctuationLexer, 
+        Operator,
+        PunctuationKind, Punctuation,
         Token, TokenKind,
-        LexError,
+        ScanError,
     },
 
     crate::{
@@ -27,7 +26,7 @@ use {
         },
 
         axo_data::peekable::Peekable,
-        axo_rune::unicode::{is_alphabetic, is_numeric},
+        axo_text::unicode::{is_alphabetic, is_numeric},
 
         axo_span::{
             Position, Span
@@ -37,16 +36,16 @@ use {
 use crate::axo_form::form::Form;
 
 #[derive(Clone)]
-pub struct Lexer {
+pub struct Scanner {
     pub context: Context,
     pub input: Vec<char>,
     pub index: usize,
     pub position: Position,
     pub output: Vec<Token>,
-    pub errors: Vec<LexError>,
+    pub errors: Vec<ScanError>,
 }
 
-impl Peekable<char> for Lexer {
+impl Peekable<char> for Scanner {
     fn len(&self) -> usize {
         self.input.len()
     }
@@ -124,11 +123,11 @@ impl Peekable<char> for Lexer {
     }
 }
 
-impl Lexer {
-    pub fn new(context: Context, input: String, file: Path) -> Lexer {
+impl Scanner {
+    pub fn new(context: Context, input: String, file: Path) -> Scanner {
         let chars: Vec<char> = input.chars().collect();
 
-        Lexer {
+        Scanner {
             context,
             input: chars,
             index: 0,
@@ -160,7 +159,7 @@ impl Lexer {
         self.output.push(Token { kind, span });
     }
 
-    fn line_comment() -> Pattern<char, Token, LexError> {
+    fn line_comment() -> Pattern<char, Token, ScanError> {
         Pattern::sequence([
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
             Pattern::repeat(Pattern::predicate(|c| *c != '\n'), 0, None),
@@ -172,7 +171,7 @@ impl Lexer {
             })
     }
 
-    fn multiline_comment() -> Pattern<char, Token, LexError> {
+    fn multiline_comment() -> Pattern<char, Token, ScanError> {
         Pattern::sequence([
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('*')]).with_ignore(),
             Pattern::repeat(
@@ -184,14 +183,14 @@ impl Lexer {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-            .with_transform(|_, form: Form<char, Token, LexError>| {
+            .with_transform(|_, form: Form<char, Token, ScanError>| {
                 let content: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
             })
     }
 
-    fn hex_number() -> Pattern<char, Token, LexError> {
+    fn hex_number() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
@@ -210,17 +209,17 @@ impl Lexer {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_rune::parser::<i128>();
+                let parser = crate::axo_text::parser::<i128>();
 
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
+                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             },
         )
     }
 
-    fn binary_number() -> Pattern<char, Token, LexError> {
+    fn binary_number() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
@@ -237,16 +236,16 @@ impl Lexer {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_rune::parser::<i128>();
+                let parser = crate::axo_text::parser::<i128>();
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
+                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             },
         )
     }
 
-    fn octal_number() -> Pattern<char, Token, LexError> {
+    fn octal_number() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
@@ -263,16 +262,16 @@ impl Lexer {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_rune::parser::<i128>();
+                let parser = crate::axo_text::parser::<i128>();
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
+                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                 }
             },
         )
     }
 
-    fn decimal_number() -> Pattern<char, Token, LexError> {
+    fn decimal_number() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::predicate(|c| is_numeric(*c)),
@@ -305,23 +304,23 @@ impl Lexer {
                 let number: String = form.inputs().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
-                    let parser = crate::axo_rune::parser::<f64>();
+                    let parser = crate::axo_text::parser::<f64>();
                     match parser.parse(&number) {
                         Ok(num) => Ok(Token::new(TokenKind::Float(FloatLiteral::from(num)), form.span)),
-                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
+                        Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 } else {
-                    let parser = crate::axo_rune::parser::<i128>();
+                    let parser = crate::axo_text::parser::<i128>();
                     match parser.parse(&number) {
                         Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                        Err(e) => Err(LexError::new(ErrorKind::NumberParse(e), form.span)),
+                        Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 }
             },
         )
     }
 
-    fn number() -> Pattern<char, Token, LexError> {
+    fn number() -> Pattern<char, Token, ScanError> {
         Pattern::alternative([
             Self::hex_number(),
             Self::binary_number(),
@@ -330,7 +329,7 @@ impl Lexer {
         ])
     }
 
-    fn identifier() -> Pattern<char, Token, LexError> {
+    fn identifier() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::predicate(|c| is_alphabetic(*c) || *c == '_'),
@@ -353,7 +352,7 @@ impl Lexer {
         )
     }
 
-    fn quoted_string() -> Pattern<char, Token, LexError> {
+    fn quoted_string() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('"'),
@@ -399,7 +398,7 @@ impl Lexer {
                                                 hex.push(hex_c);
                                                 i += 1;
                                             } else {
-                                                return Err(LexError::new(
+                                                return Err(ScanError::new(
                                                     ErrorKind::StringParseError(
                                                         CharParseError::InvalidEscapeSequence,
                                                     ),
@@ -407,7 +406,7 @@ impl Lexer {
                                                 ));
                                             }
                                         } else {
-                                            return Err(LexError::new(
+                                            return Err(ScanError::new(
                                                 ErrorKind::StringParseError(
                                                     CharParseError::UnterminatedEscapeSequence,
                                                 ),
@@ -442,7 +441,7 @@ impl Lexer {
                                                         .and_then(from_u32)
                                                         .unwrap_or('\0')
                                                 } else {
-                                                    return Err(LexError::new(
+                                                    return Err(ScanError::new(
                                                         ErrorKind::StringParseError(
                                                             CharParseError::InvalidEscapeSequence,
                                                         ),
@@ -450,7 +449,7 @@ impl Lexer {
                                                     ));
                                                 }
                                             } else {
-                                                return Err(LexError::new(
+                                                return Err(ScanError::new(
                                                     ErrorKind::StringParseError(
                                                         CharParseError::UnterminatedEscapeSequence,
                                                     ),
@@ -458,7 +457,7 @@ impl Lexer {
                                                 ));
                                             }
                                         } else {
-                                            return Err(LexError::new(
+                                            return Err(ScanError::new(
                                                 ErrorKind::StringParseError(
                                                     CharParseError::InvalidEscapeSequence,
                                                 ),
@@ -466,7 +465,7 @@ impl Lexer {
                                             ));
                                         }
                                     } else {
-                                        return Err(LexError::new(
+                                        return Err(ScanError::new(
                                             ErrorKind::StringParseError(
                                                 CharParseError::UnterminatedEscapeSequence,
                                             ),
@@ -487,7 +486,7 @@ impl Lexer {
         )
     }
 
-    fn backtick_string() -> Pattern<char, Token, LexError> {
+    fn backtick_string() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('`'),
@@ -502,7 +501,7 @@ impl Lexer {
         )
     }
 
-    fn character() -> Pattern<char, Token, LexError> {
+    fn character() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('\''),
@@ -519,7 +518,7 @@ impl Lexer {
                 let flat_chars = form.inputs();
 
                 if flat_chars.len() < 3 {
-                    return Err(LexError::new(
+                    return Err(ScanError::new(
                         ErrorKind::CharParseError(CharParseError::EmptyCharLiteral),
                         form.span,
                     ));
@@ -527,7 +526,7 @@ impl Lexer {
 
                 let ch = if flat_chars[1] == '\\' {
                     if flat_chars.len() < 4 {
-                        return Err(LexError::new(
+                        return Err(ScanError::new(
                             ErrorKind::CharParseError(CharParseError::UnterminatedEscapeSequence),
                             form.span,
                         ));
@@ -542,7 +541,7 @@ impl Lexer {
                         '0' => '\0',
                         'x' => {
                             if flat_chars.len() < 6 {
-                                return Err(LexError::new(
+                                return Err(ScanError::new(
                                     ErrorKind::CharParseError(
                                         CharParseError::UnterminatedEscapeSequence,
                                     ),
@@ -558,7 +557,7 @@ impl Lexer {
                                     .and_then(from_u32)
                                     .unwrap_or('\0')
                             } else {
-                                return Err(LexError::new(
+                                return Err(ScanError::new(
                                     ErrorKind::CharParseError(
                                         CharParseError::InvalidEscapeSequence,
                                     ),
@@ -568,7 +567,7 @@ impl Lexer {
                         }
                         'u' => {
                             if flat_chars.len() < 5 || flat_chars[3] != '{' {
-                                return Err(LexError::new(
+                                return Err(ScanError::new(
                                     ErrorKind::CharParseError(
                                         CharParseError::InvalidEscapeSequence,
                                     ),
@@ -582,7 +581,7 @@ impl Lexer {
                                 i += 1;
                             }
                             if i >= flat_chars.len() || flat_chars[i] != '}' {
-                                return Err(LexError::new(
+                                return Err(ScanError::new(
                                     ErrorKind::CharParseError(
                                         CharParseError::UnterminatedEscapeSequence,
                                     ),
@@ -605,7 +604,7 @@ impl Lexer {
         )
     }
 
-    fn operator() -> Pattern<char, Token, LexError> {
+    fn operator() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::repeat(
                 Pattern::predicate(|c: &char| c.is_operator()),
@@ -623,7 +622,7 @@ impl Lexer {
         )
     }
 
-    fn punctuation() -> Pattern<char, Token, LexError> {
+    fn punctuation() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::predicate(|c: &char| c.is_punctuation()),
             |_, form| {
@@ -637,7 +636,7 @@ impl Lexer {
         )
     }
 
-    fn whitespace() -> Pattern<char, Token, LexError> {
+    fn whitespace() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
             Pattern::repeat(
                 Pattern::predicate(|c: &char| c.is_whitespace() && *c != '\n'),
@@ -664,11 +663,11 @@ impl Lexer {
         )
     }
 
-    fn fallback() -> Pattern<char, Token, LexError> {
+    fn fallback() -> Pattern<char, Token, ScanError> {
         Pattern::anything().with_ignore()
     }
 
-    pub fn pattern() -> Pattern<char, Token, LexError> {
+    pub fn pattern() -> Pattern<char, Token, ScanError> {
         Pattern::repeat(
             Pattern::alternative([
                 Self::whitespace(),
@@ -688,7 +687,7 @@ impl Lexer {
         )
     }
 
-    pub fn lex(&mut self) -> (Vec<Token>, Vec<LexError>) {
+    pub fn scan(&mut self) -> (Vec<Token>, Vec<ScanError>) {
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
 
@@ -733,7 +732,7 @@ impl Lexer {
     }
 }
 
-impl Marked for Lexer {
+impl Marked for Scanner {
     fn context(&self) -> &Context {
         &self.context
     }
