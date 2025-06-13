@@ -1,20 +1,20 @@
 use {
     crate::{
+        artifact::Artifact,
         hash::Hash,
         format::Debug,
-        compiler::Context,
+        compiler::{Context, Marked},
         thread::{Arc, Mutex},
+        Peekable,
 
         axo_span::Span,
-        axo_form::form::Form,
+        axo_parser::{Item, ItemKind},
+        axo_form::{
+            form::{Form, FormKind},
+            former::{Draft, Record},
+        },
     }
 };
-use crate::artifact::Artifact;
-use crate::axo_form::form::FormKind;
-use crate::axo_form::former::{Draft, Record};
-use crate::axo_parser::{Item, ItemKind};
-use crate::compiler::Marked;
-use crate::Peekable;
 
 /// A transformer function that processes a form and returns either a successful output or a failure.
 /// Takes a mutable context and a form, returning a Result containing the transformed output or an error.
@@ -235,7 +235,6 @@ where
                 
                 draft.form = form.clone();
                 draft.record = Record::Failed;
-                println!("The Fucking Form: {:?}", form);
             }
             
             _ => unreachable!(),

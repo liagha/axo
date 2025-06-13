@@ -56,7 +56,7 @@ pub mod thread {
 }
 
 pub mod memory {
-    pub use core::mem::{replace, swap, discriminant};
+    pub use core::mem::{replace, swap, discriminant, drop};
 }
 
 pub mod compare {
