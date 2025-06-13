@@ -41,24 +41,28 @@ where
         Self { kind: form, span, }
     }
 
-    pub fn catch(&self) -> Option<Form<Input, Output, Failure>> {
+    pub fn catch(&self) -> Vec<Form<Input, Output, Failure>> {
+        let mut result = Vec::new();
+        
         match self.kind.clone() {
             FormKind::Multiple(forms) => {
                 for form in forms {
-                    if let Some(error_form) = Self::catch(&form) {
-                        return Some(error_form);
+                    let errs = Self::catch(&form);
+                    
+                    if !errs.is_empty() {
+                        result.extend(errs);
                     }
                 }
             }
 
             FormKind::Failure(_) => {
-                return Some(self.clone());
+                result.push(self.clone());
             }
 
             _ => {},
         }
 
-        None
+        result
     }
 
     pub fn unwrap(&self) -> Vec<Form<Input, Output, Failure>> {

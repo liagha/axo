@@ -112,7 +112,7 @@ where
             PatternKind::Condition(_) => write!(f, "predicate"),
             PatternKind::Negation(_) => write!(f, "negate"),
             PatternKind::WildCard => write!(f, "anything"),
-            PatternKind::Wrap(pattern) => write!(f, "wrap({})", pattern),
+            PatternKind::Wrapper(pattern) => write!(f, "wrap({})", pattern),
         }
     }
 }
@@ -157,7 +157,7 @@ where
             PatternKind::Condition(_) => write!(f, "Predicate"),
             PatternKind::Negation(_) => write!(f, "Negate"),
             PatternKind::WildCard => write!(f, "Anything"),
-            PatternKind::Wrap(pattern) => {
+            PatternKind::Wrapper(pattern) => {
                 write!(f, "Wrap({:?})", pattern)
             }
         }
@@ -173,7 +173,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Action::Map(_) => write!(f, "map"),
-            Action::Execute(_) => write!(f, "execute"),
+            Action::Perform(_) => write!(f, "execute"),
             Action::Inspect(_) => write!(f, "inspect"),
             Action::Multiple(actions) => write!(f, "multiple({})", actions.format()),
             Action::Trigger { found, missing } => write!(f, "trigger({}, {})", found, missing),
@@ -193,7 +193,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Action::Map(_) => write!(f, "Map"),
-            Action::Execute(_) => write!(f, "Execute"),
+            Action::Perform(_) => write!(f, "Execute"),
             Action::Inspect(_) => write!(f, "Inspect"),
             Action::Multiple(actions) => write!(f, "Multiple({:?})", actions),
             Action::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),

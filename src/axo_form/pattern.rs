@@ -1,14 +1,26 @@
-use crate::axo_form::action::Emitter;
-use std::sync::Mutex;
 use {
     super::{action::Action, form::Form},
-    crate::{compiler::Context, format::Debug, hash::Hash, thread::Arc, Peekable},
+    crate::{
+        Peekable,
+        axo_form::action::Emitter,
+        compiler::Context, 
+        format::Debug, 
+        hash::Hash, 
+        thread::{Arc, Mutex},
+    },
 };
 
+/// A predicate function that examines input and returns whether it matches some condition.
+/// Used in conditional patterns to test input values.
 pub type Predicate<Input> = Arc<Mutex<dyn FnMut(&Input) -> bool + Send + Sync>>;
-pub type Evaluator<Input, Output, Failure> =
-    Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
 
+/// An evaluator function that lazily creates patterns when needed.
+/// Used for recursive or context-dependent pattern construction.
+pub type Evaluator<Input, Output, Failure> =
+Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
+
+/// The core matching behaviors that patterns can exhibit.
+/// Each kind defines how a pattern attempts to match against input.
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
 where
@@ -16,26 +28,60 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
+    /// Matches if any of the contained patterns match (logical OR).
+    /// Tries patterns in order and succeeds on the first match.
     Alternative(Vec<Pattern<Input, Output, Failure>>),
+
+    /// Matches input that satisfies the given predicate function.
+    /// The predicate receives the input value and returns true/false.
     Condition(Predicate<Input>),
+
+    /// Lazily evaluates to create a pattern when needed.
+    /// Useful for recursive patterns or context-dependent matching.
     Deferred(Evaluator<Input, Output, Failure>),
+
+    /// Matches the inner pattern only if the guard predicate succeeds.
+    /// The guard examines the entire source, not just the current input.
     Guard {
         predicate: Arc<Mutex<dyn FnMut(&dyn Peekable<Input>) -> bool + Send + Sync>>,
         pattern: Box<Pattern<Input, Output, Failure>>,
     },
+
+    /// Matches exactly the specified input value.
+    /// Uses equality comparison to determine matches.
     Literal(Input),
+
+    /// Matches input that does NOT match the inner pattern (logical NOT).
+    /// Succeeds when the inner pattern fails, and vice versa.
     Negation(Box<Pattern<Input, Output, Failure>>),
+
+    /// Optionally matches the inner pattern.
+    /// Always succeeds, whether the inner pattern matches or not.
     Optional(Box<Pattern<Input, Output, Failure>>),
+
+    /// Matches the inner pattern a specified number of times.
+    /// Must match at least `minimum` times, up to `maximum` times (if specified).
     Repetition {
         pattern: Box<Pattern<Input, Output, Failure>>,
         minimum: usize,
         maximum: Option<usize>,
     },
+
+    /// Matches all contained patterns in order (logical AND).
+    /// All patterns must succeed for the sequence to succeed.
     Sequence(Vec<Pattern<Input, Output, Failure>>),
+
+    /// Matches any single input value.
+    /// Never fails as long as input is available.
     WildCard,
-    Wrap(Box<Pattern<Input, Output, Failure>>),
+
+    /// Wraps another pattern without changing its behavior.
+    /// Used for applying actions to existing patterns.
+    Wrapper(Box<Pattern<Input, Output, Failure>>),
 }
 
+/// A pattern defines how to match input and what action to take on successful matches.
+/// Patterns are the building blocks of the parsing system, combining matching logic with transformation actions.
 #[derive(Clone, Debug)]
 pub struct Pattern<Input, Output, Failure>
 where
@@ -43,7 +89,9 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
+    /// The matching behavior of this pattern
     pub kind: PatternKind<Input, Output, Failure>,
+    /// Optional action to execute when the pattern matches
     pub action: Option<Action<Input, Output, Failure>>,
 }
 
@@ -152,9 +200,9 @@ where
         action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrap(pattern.into()),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(Action::Trigger {
-                found: Action::execute(|| {}).into(),
+                found: Action::perform(|| {}).into(),
                 missing: action.into(),
             }),
         }

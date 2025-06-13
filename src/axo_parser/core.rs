@@ -459,15 +459,17 @@ impl Parser {
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::conditional(
-            Pattern::predicate(|_token: &Token| {
-                true
-            }),
-            Action::failure(|span| {
-                ParseError::new(ErrorKind::PatternError, span)
-            }),
-            Action::Ignore,
-        )
+        Pattern::alternative([
+            Pattern::conditional(
+                Pattern::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Punctuation(_))
+                }),
+                Action::failure(|span| {
+                    ParseError::new(ErrorKind::UnexpectedPunctuation, span)
+                }),
+                Action::Ignore,
+            )
+        ])
     }
 
     pub fn parser() -> Pattern<Token, Element, ParseError> {

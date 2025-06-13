@@ -221,39 +221,20 @@ impl Parser {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let form = self.form(Self::parser());
-
-            match form.kind {
-                FormKind::Output(element) => {
-                    elements.push(element);
-                }
-
-                FormKind::Multiple(multi) => {
-                    for item in multi {
-                        match item.kind {
-                            FormKind::Output(element) => {
-                                elements.push(element);
-                            }
-                            FormKind::Multiple(sub) => {
-                                for item in sub {
-                                    if let FormKind::Output(element) = item.kind {
-                                        elements.push(element);
-                                    }
-                                }
-                            }
-                            FormKind::Failure(error) => {
-                                errors.push(error);
-                            }
-                            _ => {}
-                        }
+            let forms = self.form(Self::parser()).expand();
+            
+            for form in forms {
+                match form.kind {
+                    FormKind::Output(element) => {
+                        elements.push(element);
                     }
-                }
 
-                FormKind::Failure(error) => {
-                    errors.push(error);
-                }
+                    FormKind::Failure(error) => {
+                        errors.push(error);
+                    }
 
-                FormKind::Empty | FormKind::Input(_) => {}
+                    FormKind::Multiple(_) | FormKind::Empty | FormKind::Input(_) => {}
+                }
             }
         }
 

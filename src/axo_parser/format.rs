@@ -117,11 +117,7 @@ impl Debug for ItemKind {
 
 impl Debug for Element {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if f.alternate() {
-            write!(f, "{:?} | [{}]", self.kind, self.span)
-        } else {
-            write!(f, "{:?}", self.kind)
-        }
+        write!(f, "{:?} | {:#?}", self.kind, self.span)
     }
 }
 
