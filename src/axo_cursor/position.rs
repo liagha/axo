@@ -11,7 +11,7 @@ use {
 pub struct Position {
     pub line: usize,
     pub column: usize,
-    pub file: Path,
+    pub path: Path,
 }
 
 impl Default for Position {
@@ -19,7 +19,7 @@ impl Default for Position {
         Self {
             line: 1,
             column: 1,
-            file: Path::default(),
+            path: Path::default(),
         }
     }
 }
@@ -29,22 +29,22 @@ impl Position {
         Self {
             line: 1,
             column: 1,
-            file,
+            path: file,
         }
     }
 
     pub fn correct(&self) -> Self {
         let mut corrected = self.clone();
 
-        let content = match read_to_string(&self.file) {
+        let content = match read_to_string(&self.path) {
             Ok(content) => content,
-            Err(_) => return Self::new(self.file.clone()),
+            Err(_) => return Self::new(self.path.clone()),
         };
 
         let lines: Vec<&str> = content.lines().collect();
 
         if lines.is_empty() {
-            return Self::new(self.file.clone());
+            return Self::new(self.path.clone());
         }
 
         corrected.line = corrected.line.max(1).min(lines.len());
@@ -74,7 +74,7 @@ impl Position {
     }
 
     pub fn get_line_content(&self) -> Option<String> {
-        match read_to_string(&self.file) {
+        match read_to_string(&self.path) {
             Ok(content) => {
                 let lines: Vec<&str> = content.lines().collect();
                 if self.line > 0 && self.line <= lines.len() {
@@ -88,8 +88,8 @@ impl Position {
     }
 
     pub fn cmp(&self, other: &Self) -> Ordering {
-        if self.file != other.file {
-            return self.file.to_string_lossy().cmp(&other.file.to_string_lossy());
+        if self.path != other.path {
+            return self.path.to_string_lossy().cmp(&other.path.to_string_lossy());
         }
 
         match self.line.cmp(&other.line) {

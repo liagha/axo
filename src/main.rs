@@ -8,26 +8,23 @@ mod axo_scanner;
 mod axo_parser;
 mod axo_resolver;
 mod axo_text;
-mod axo_span;
+mod axo_cursor;
 mod compiler;
 mod logger;
 mod timer;
 mod artifact;
 
 pub use {
-    axo_text::*,
+    axo_data::*,
     axo_format::*,
-    axo_data::{*, peekable::*},
-    timer::{Timer, TimeSource},
+    axo_text::*,
     compiler::{Compiler, CompilerError},
+    timer::{TimeSource, Timer},
 };
 
 use {
+    crate::logger::{LogInfo, LogPlan, Logger},
     log::Level,
-
-    crate::{
-        logger::{LogInfo, LogPlan, Logger},
-    },
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -39,8 +36,8 @@ pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSour
 pub type Path = std::path::PathBuf;
 
 pub mod file {
-    pub use std::fs::{read_to_string};
-    pub use std::io::{Error};
+    pub use std::fs::read_to_string;
+    pub use std::io::Error;
 }
 
 pub mod io {
@@ -48,7 +45,7 @@ pub mod io {
 }
 
 pub mod environment {
-    pub use std::env::{args, };
+    pub use std::env::args;
 }
 
 pub mod thread {
@@ -56,11 +53,11 @@ pub mod thread {
 }
 
 pub mod memory {
-    pub use core::mem::{replace, swap, discriminant, drop};
+    pub use core::mem::{discriminant, drop, replace, swap};
 }
 
 pub mod compare {
-    pub use core::cmp::{PartialEq, Ordering, max, min};
+    pub use core::cmp::{max, min, Ordering, PartialEq};
 }
 
 pub mod hash {
@@ -69,7 +66,7 @@ pub mod hash {
 }
 
 pub mod char {
-    pub use core::char::{from_u32};
+    pub use core::char::from_u32;
 }
 
 pub mod any {
@@ -77,7 +74,7 @@ pub mod any {
 }
 
 pub mod operations {
-    pub use core::ops::{Add, Sub, Mul, Div, Neg, Rem, Range};
+    pub use core::ops::{Add, Div, Mul, Neg, Range, Rem, Sub};
 }
 
 pub mod arch {
@@ -85,7 +82,7 @@ pub mod arch {
 }
 
 pub mod marker {
-    pub use core::marker::{PhantomData};
+    pub use core::marker::PhantomData;
 }
 
 pub mod string {
@@ -97,7 +94,7 @@ pub mod slice {
 }
 
 pub mod format {
-    pub use core::fmt::{Display, Debug, Formatter, Result, Write};
+    pub use core::fmt::{Debug, Display, Formatter, Result, Write};
 }
 
 fn main() {

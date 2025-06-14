@@ -24,7 +24,7 @@ use {
             scope::Scope,
         },
 
-        axo_span::Span,
+        axo_cursor::Span,
     },
 };
 

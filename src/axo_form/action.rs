@@ -5,9 +5,8 @@ use {
         format::Debug,
         compiler::{Context, Marked},
         thread::{Arc, Mutex},
-        Peekable,
 
-        axo_span::Span,
+        axo_cursor::Peekable,
         axo_parser::{Item, ItemKind},
         axo_form::{
             form::{Form, FormKind},
@@ -22,7 +21,7 @@ pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Context,
 
 /// An emitter function that generates a failure from a span location.
 /// Used to create error messages or failure states at specific positions in the input.
-pub type Emitter<Failure> = Arc<Mutex<dyn FnMut(Span) -> Failure + Send + Sync>>;
+pub type Emitter<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync>>;
 
 /// An executor function that performs side effects without returning a value.
 /// Used for logging, debugging, or other operations that don't transform the form.
@@ -76,7 +75,7 @@ where
 
     /// Generate a failure form using the provided emitter function.
     /// The emitter receives the current span and produces a failure value.
-    Failure(Emitter<Failure>), //Executable
+    Failure(Emitter<Input, Output, Failure>), //Executable
 }
 
 impl<Input, Output, Failure> Action<Input, Output, Failure>
@@ -117,10 +116,9 @@ where
         let result = match self {
             Action::Map(transform) => {
                 let mut guard = transform.lock().unwrap();
-                let context = &mut source.context_mut();
                 let span = draft.form.span.clone();
 
-                match guard(context, draft.form.clone()) {
+                match guard(source.context_mut(), draft.form.clone()) {
                     Ok(output) => {
                         let mapped = Form::new(FormKind::Output(output), span);
 
@@ -181,7 +179,7 @@ where
 
                 resolver.insert(item);
             }
-            
+
             _ => unreachable!(),
         };
 
@@ -224,15 +222,15 @@ where
             Action::Ignore => {
                 let span = draft.form.span.clone();
                 
-                Form::new(FormKind::<Input, Output, Failure>::Empty, span);
+                Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             },
 
             Action::Failure(function) => {
                 let span = draft.form.span.clone();
-                
+
                 let mut guard = function.lock().unwrap();
-                let form = Form::new(FormKind::Failure(guard(span.clone())), span);
-                
+                let form = Form::new(FormKind::Failure(guard(source.context_mut(), draft.form.clone())), span);
+
                 draft.form = form.clone();
                 draft.record = Record::Failed;
             }
@@ -244,7 +242,7 @@ where
     }
     
     pub fn failure<T>(transform: T) -> Self
-    where T: FnMut(Span) -> Failure + Send + Sync + 'static,
+    where T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
     {
         Self::Failure(Arc::new(Mutex::new(transform)))
     }

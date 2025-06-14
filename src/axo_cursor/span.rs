@@ -64,7 +64,7 @@ impl Span {
     }
 
     pub fn contains(&self, pos: &Position) -> bool {
-        if self.start.file != pos.file {
+        if self.start.path != pos.path {
             return false;
         }
 
@@ -73,7 +73,7 @@ impl Span {
     }
 
     pub fn contains_span(&self, other: &Span) -> bool {
-        if self.start.file != other.start.file || self.start.file != other.end.file {
+        if self.start.path != other.start.path || self.start.path != other.end.path {
             return false;
         }
 
@@ -81,7 +81,7 @@ impl Span {
     }
 
     pub fn overlaps(&self, other: &Span) -> bool {
-        if self.start.file != other.start.file {
+        if self.start.path != other.start.path {
             return false;
         }
 
@@ -92,7 +92,7 @@ impl Span {
     }
 
     pub fn merge(&self, other: &Span) -> Option<Span> {
-        if self.start.file != other.start.file {
+        if self.start.path != other.start.path {
             return None;
         }
 
@@ -112,7 +112,7 @@ impl Span {
     }
 
     pub fn mix(&self, other: &Span) -> Span {
-        if self.start.file != other.start.file {
+        if self.start.path != other.start.path {
             panic!("Cannot mix spans from different files");
         }
 
@@ -138,7 +138,7 @@ impl Span {
     }
 
     pub fn line_spans(&self) -> Vec<Span> {
-        if self.start.file != self.end.file {
+        if self.start.path != self.end.path {
             return Vec::new();
         }
 
@@ -153,7 +153,7 @@ impl Span {
             let end_of_line = Position {
                 line: self.start.line,
                 column: line_content.len() + 1,
-                file: self.start.file.clone(),
+                path: self.start.path.clone(),
             };
             result.push(Span::new(self.start.clone(), end_of_line));
         }
@@ -162,7 +162,7 @@ impl Span {
             let start_pos = Position {
                 line: line_num,
                 column: 1,
-                file: self.start.file.clone(),
+                path: self.start.path.clone(),
             };
             let mut end_pos = start_pos.clone();
 
@@ -179,7 +179,7 @@ impl Span {
         let start_of_last_line = Position {
             line: self.end.line,
             column: 1,
-            file: self.start.file.clone(),
+            path: self.start.path.clone(),
         };
         let start_of_last_line = start_of_last_line.correct();
 

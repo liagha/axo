@@ -1,7 +1,7 @@
 use {
     crate::{
         format::Display,
-        axo_span::Span,
+        axo_cursor::Span,
     }
 };
 

@@ -3,9 +3,11 @@
 mod span;
 mod format;
 mod position;
+mod peekable;
 
 pub use span::*;
 pub use position::*;
+pub use peekable::*;
 
 use crate::axo_parser::{Element, Item};
 

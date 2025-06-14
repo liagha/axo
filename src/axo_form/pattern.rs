@@ -1,7 +1,7 @@
 use {
     super::{action::Action, form::Form},
     crate::{
-        Peekable,
+        axo_cursor::Peekable,
         axo_form::action::Emitter,
         compiler::Context, 
         format::Debug, 
@@ -254,7 +254,7 @@ where
 
     pub fn error(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        function: Emitter<Failure>,
+        function: Emitter<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Sequence(vec![*pattern.into()]),
@@ -296,7 +296,7 @@ where
         self
     }
 
-    pub fn with_error(mut self, function: Emitter<Failure>) -> Self {
+    pub fn with_error(mut self, function: Emitter<Input, Output, Failure>) -> Self {
         self.action = Some(Action::Failure(function));
         self
     }

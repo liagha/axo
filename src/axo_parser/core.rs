@@ -24,7 +24,7 @@ use {
 
         axo_parser::ItemKind,
 
-        axo_span::Span,
+        axo_cursor::Span,
         thread::Arc,
     }
 };
@@ -253,14 +253,14 @@ impl Parser {
                     .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::failure(|span| {
-                        ParseError::new(ErrorKind::ExpectedCondition, span)
+                    Action::failure(|_, form| {
+                        ParseError::new(ErrorKind::ExpectedCondition, form.span)
                     }),
                 ),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::failure(|span| {
-                        ParseError::new(ErrorKind::ExpectedBody, span)
+                    Action::failure(|_, form| {
+                        ParseError::new(ErrorKind::ExpectedBody, form.span)
                     }),
                 ),
                 Pattern::optional(
@@ -324,8 +324,8 @@ impl Parser {
                     }).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::failure(|span| {
-                            ParseError::new(ErrorKind::ExpectedBody, span)
+                        Action::failure(|_, form| {
+                            ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
                 ]),
@@ -339,14 +339,14 @@ impl Parser {
                     }).with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::failure(|span| {
-                            ParseError::new(ErrorKind::ExpectedCondition, span)
+                        Action::failure(|_, form| {
+                            ParseError::new(ErrorKind::ExpectedCondition, form.span)
                         }),
                     ),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
-                        Action::failure(|span| {
-                            ParseError::new(ErrorKind::ExpectedBody, span)
+                        Action::failure(|_, form| {
+                            ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
                 ])
@@ -464,8 +464,8 @@ impl Parser {
                 Pattern::predicate(|token: &Token| {
                     matches!(token.kind, TokenKind::Punctuation(_))
                 }),
-                Action::failure(|span| {
-                    ParseError::new(ErrorKind::UnexpectedPunctuation, span)
+                Action::failure(|_, form| {
+                    ParseError::new(ErrorKind::UnexpectedPunctuation, form.span)
                 }),
                 Action::Ignore,
             )

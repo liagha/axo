@@ -5,8 +5,8 @@ use {
     
     crate::{
         axo_data::float::FloatLiteral,
-        
-        axo_span::Span,
+
+        axo_cursor::Span,
     }
 };
 

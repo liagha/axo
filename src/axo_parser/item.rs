@@ -1,7 +1,5 @@
 use {
     crate::{
-        Peekable,
-
         any::Any,
 
         artifact::Artifact,
@@ -22,7 +20,7 @@ use {
             Element, ElementKind,
             ParseError, Parser
         },
-        axo_span::Span,
+        axo_cursor::Span,
     }
 };
 

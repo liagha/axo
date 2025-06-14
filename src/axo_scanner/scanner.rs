@@ -1,46 +1,30 @@
 use {
     super::{
-        error::{
-            ErrorKind, CharParseError,
-        },
-        Operator,
-        PunctuationKind, Punctuation,
-        Token, TokenKind,
-        ScanError,
+        error::{CharParseError, ErrorKind},
+        Operator, Punctuation, PunctuationKind, ScanError, Token, TokenKind,
     },
-
     crate::{
-        Path,
-
-        compiler::Marked,
-        char::from_u32,
-        float::FloatLiteral,
-
-        compiler::Context,
-
+        axo_cursor::{Peekable, Position, Span},
         axo_form::{
+            form::{Form, FormKind},
             former::Former,
-            form::FormKind,
-            
             pattern::Pattern,
         },
-
-        axo_data::peekable::Peekable,
         axo_text::unicode::{is_alphabetic, is_numeric},
-
-        axo_span::{
-            Position, Span
-        },
+        char::from_u32,
+        compiler::Context,
+        compiler::Marked,
+        float::FloatLiteral,
+        Path,
     },
 };
-use crate::axo_form::form::Form;
 
 #[derive(Clone)]
 pub struct Scanner {
     pub context: Context,
-    pub input: Vec<char>,
     pub index: usize,
     pub position: Position,
+    pub input: Vec<char>,
     pub output: Vec<Token>,
     pub errors: Vec<ScanError>,
 }
@@ -49,6 +33,7 @@ impl Peekable<char> for Scanner {
     fn len(&self) -> usize {
         self.input.len()
     }
+
     fn peek_ahead(&self, n: usize) -> Option<&char> {
         let current = self.index + n;
 
@@ -76,10 +61,10 @@ impl Peekable<char> for Scanner {
     }
 
     fn restore(&mut self) {
-        self.restore_position(Position {
+        self.set_position(Position {
             line: 1,
             column: 1,
-            file: self.position.file.clone(),
+            path: self.position.path.clone(),
         })
     }
 
@@ -106,20 +91,16 @@ impl Peekable<char> for Scanner {
         self.position.clone()
     }
 
-    fn set_index(&mut self, index: usize) {
-        self.index = index
+    fn position_mut(&mut self) -> &mut Position {
+        &mut self.position
     }
 
-    fn set_line(&mut self, line: usize) {
-        self.position.line = line
+    fn index(&self) -> usize {
+        self.index
     }
 
-    fn set_column(&mut self, column: usize) {
-        self.position.column = column
-    }
-
-    fn set_position(&mut self, position: Position) {
-        self.position = position;
+    fn index_mut(&mut self) -> &mut usize {
+        &mut self.index
     }
 }
 
@@ -138,18 +119,18 @@ impl Scanner {
     }
 
     pub fn create_span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
-        let file = self.position.file.clone();
+        let file = self.position.path.clone();
 
         let start = Position {
             line: start.0,
             column: start.1,
-            file: file.clone(),
+            path: file.clone(),
         };
 
         let end = Position {
             line: end.0,
             column: end.1,
-            file,
+            path: file,
         };
 
         Span { start, end }
@@ -164,11 +145,14 @@ impl Scanner {
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
             Pattern::repeat(Pattern::predicate(|c| *c != '\n'), 0, None),
         ])
-            .with_transform(|_, form| {
-                let content: String = form.inputs().into_iter().collect();
+        .with_transform(|_, form| {
+            let content: String = form.inputs().into_iter().collect();
 
-                Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-            })
+            Ok(Token::new(
+                TokenKind::Comment(content.to_string()),
+                form.span,
+            ))
+        })
     }
 
     fn multiline_comment() -> Pattern<char, Token, ScanError> {
@@ -183,11 +167,14 @@ impl Scanner {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-            .with_transform(|_, form: Form<char, Token, ScanError>| {
-                let content: String = form.inputs().into_iter().collect();
+        .with_transform(|_, form: Form<char, Token, ScanError>| {
+            let content: String = form.inputs().into_iter().collect();
 
-                Ok(Token::new(TokenKind::Comment(content.to_string()), form.span))
-            })
+            Ok(Token::new(
+                TokenKind::Comment(content.to_string()),
+                form.span,
+            ))
+        })
     }
 
     fn hex_number() -> Pattern<char, Token, ScanError> {
@@ -306,7 +293,10 @@ impl Scanner {
                 if number.contains('.') || number.to_lowercase().contains('e') {
                     let parser = crate::axo_text::parser::<f64>();
                     match parser.parse(&number) {
-                        Ok(num) => Ok(Token::new(TokenKind::Float(FloatLiteral::from(num)), form.span)),
+                        Ok(num) => Ok(Token::new(
+                            TokenKind::Float(FloatLiteral::from(num)),
+                            form.span,
+                        )),
                         Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 } else {
@@ -334,9 +324,7 @@ impl Scanner {
             Pattern::sequence([
                 Pattern::predicate(|c| is_alphabetic(*c) || *c == '_'),
                 Pattern::repeat(
-                    Pattern::predicate(|c| {
-                        is_alphabetic(*c) || is_numeric(*c) || *c == '_'
-                    }),
+                    Pattern::predicate(|c| is_alphabetic(*c) || is_numeric(*c) || *c == '_'),
                     0,
                     None,
                 ),
@@ -358,10 +346,7 @@ impl Scanner {
                 Pattern::exact('"'),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::sequence([
-                            Pattern::exact('\\'),
-                            Pattern::predicate(|_| true),
-                        ]),
+                        Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
                         Pattern::predicate(|c| *c != '"' && *c != '\\' && *c != '\n'),
                     ]),
                     0,
@@ -506,10 +491,7 @@ impl Scanner {
             Pattern::sequence([
                 Pattern::exact('\''),
                 Pattern::alternative([
-                    Pattern::sequence([
-                        Pattern::exact('\\'),
-                        Pattern::predicate(|_| true),
-                    ]),
+                    Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
                     Pattern::predicate(|c| *c != '\'' && *c != '\\'),
                 ]),
                 Pattern::exact('\''),
@@ -606,11 +588,7 @@ impl Scanner {
 
     fn operator() -> Pattern<char, Token, ScanError> {
         Pattern::transform(
-            Pattern::repeat(
-                Pattern::predicate(|c: &char| c.is_operator()),
-                1,
-                None,
-            ),
+            Pattern::repeat(Pattern::predicate(|c: &char| c.is_operator()), 1, None),
             |_, form| {
                 let operator: String = form.inputs().into_iter().collect();
 
@@ -659,7 +637,7 @@ impl Scanner {
                 } else {
                     unreachable!()
                 }
-            }
+            },
         )
     }
 
@@ -724,7 +702,7 @@ impl Scanner {
                     errors.push(err);
                 }
 
-                FormKind::Empty | FormKind::Input(_) => {}
+                FormKind::Blank | FormKind::Input(_) => {}
             }
         }
 
@@ -736,7 +714,7 @@ impl Marked for Scanner {
     fn context(&self) -> &Context {
         &self.context
     }
-    
+
     fn context_mut(&mut self) -> &mut Context {
         &mut self.context
     }

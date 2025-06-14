@@ -13,7 +13,7 @@ use {
             OperatorKind,
         },
 
-        axo_span::Span,
+        axo_cursor::Span,
     }
 };
 

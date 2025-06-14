@@ -1,41 +1,22 @@
 #![allow(dead_code)]
 
 use {
-    super::{
-        error::ErrorKind,
-        Element, ElementKind,
-        ItemKind,
-        ParseError
-    },
-    
+    super::{error::ErrorKind, Element, ElementKind, ItemKind, ParseError},
     crate::{
-        Path,
-        Peekable,
-
+        axo_cursor::{Peekable, Position, Span},
+        axo_form::{form::FormKind, former::Former},
+        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         compiler::{Context, Marked},
-
-        axo_scanner::{
-            OperatorKind, PunctuationKind, 
-            Token, TokenKind
-        },
-
-        axo_span::{
-            Span, Position,
-        },
-
-        axo_form::{
-            former::Former,
-            form::FormKind,
-        }
+        Path,
     },
 };
 
 #[derive(Clone)]
 pub struct Parser {
     pub context: Context,
-    pub input: Vec<Token>,
     pub index: usize,
     pub position: Position,
+    pub input: Vec<Token>,
     pub output: Vec<Element>,
     pub errors: Vec<ParseError>,
 }
@@ -44,7 +25,7 @@ impl Peekable<Token> for Parser {
     fn len(&self) -> usize {
         self.input.len()
     }
-    
+
     fn peek_ahead(&self, forward: usize) -> Option<&Token> {
         let mut current = self.index;
         let mut found = 0;
@@ -111,13 +92,11 @@ impl Peekable<Token> for Parser {
     }
 
     fn restore(&mut self) {
-        self.restore_position(
-            Position {
-                line: 1,
-                column: 1,
-                file: self.position.file.clone()
-            }
-        )
+        self.set_position(Position {
+            line: 1,
+            column: 1,
+            path: self.position.path.clone(),
+        })
     }
 
     fn next(&mut self) -> Option<Token> {
@@ -141,20 +120,16 @@ impl Peekable<Token> for Parser {
         self.position.clone()
     }
 
-    fn set_index(&mut self, index: usize) {
-        self.index = index
+    fn position_mut(&mut self) -> &mut Position {
+        &mut self.position
     }
 
-    fn set_line(&mut self, line: usize) {
-        self.position.line = line
+    fn index(&self) -> usize {
+        self.index
     }
 
-    fn set_column(&mut self, column: usize) {
-        self.position.column = column
-    }
-
-    fn set_position(&mut self, position: Position) {
-        self.position = position;
+    fn index_mut(&mut self) -> &mut usize {
+        &mut self.index
     }
 }
 
@@ -193,7 +168,7 @@ impl Parser {
 
         if let TokenKind::Punctuation(PunctuationKind::Indentation(size)) = &token.kind {
             self.position.column += size;
-            
+
             return;
         }
 
@@ -222,7 +197,7 @@ impl Parser {
 
         while self.peek().is_some() {
             let forms = self.form(Self::parser()).expand();
-            
+
             for form in forms {
                 match form.kind {
                     FormKind::Output(element) => {
@@ -233,7 +208,7 @@ impl Parser {
                         errors.push(error);
                     }
 
-                    FormKind::Multiple(_) | FormKind::Empty | FormKind::Input(_) => {}
+                    FormKind::Multiple(_) | FormKind::Blank | FormKind::Input(_) => {}
                 }
             }
         }
@@ -246,7 +221,7 @@ impl Marked for Parser {
     fn context(&self) -> &Context {
         &self.context
     }
-    
+
     fn context_mut(&mut self) -> &mut Context {
         &mut self.context
     }

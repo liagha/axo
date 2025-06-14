@@ -22,7 +22,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
-            FormKind::Empty => {
+            FormKind::Blank => {
                 write!(f, "Empty")
             }
 

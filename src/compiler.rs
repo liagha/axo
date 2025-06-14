@@ -6,7 +6,8 @@ use {
             ScanError,
             Scanner,
             Token,
-        }, axo_parser::{
+        },
+        axo_parser::{
             Element,
             ParseError,
             Parser,
@@ -26,7 +27,6 @@ use {
         format_tokens,
         indent,
         Path,
-        Peekable,
         Timer, TIMERSOURCE,
     }
 };
@@ -215,8 +215,6 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                 details
             );
         }
-
-        parser.restore();
 
         if context.verbose {
             println!(

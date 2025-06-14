@@ -2,7 +2,7 @@ use {
     crate::{
         hash::Hash,
         format::Debug,
-        axo_span::Span,
+        axo_cursor::Span,
     }
 };
 
@@ -13,7 +13,7 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    Empty,
+    Blank,
     Input(Input),
     Output(Output),
     Multiple(Vec<Form<Input, Output, Failure>>),
@@ -211,7 +211,7 @@ where
         H: Fn(Failure) -> MappedF + Clone,
     {
         let mapped = match self.kind {
-            FormKind::Empty => FormKind::Empty,
+            FormKind::Blank => FormKind::Blank,
             FormKind::Input(input) => FormKind::Input(input_mapper(input)),
             FormKind::Output(output) => FormKind::Output(output_mapper(output)),
             FormKind::Multiple(forms) => {
