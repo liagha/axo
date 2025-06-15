@@ -91,6 +91,7 @@ where
             Action::Multiple(_) => true,
             Action::Trigger { .. } => true,
             Action::Capture { .. } => true,
+            Action::Failure(_) => true,
             _ => false,
         }
     }
@@ -116,9 +117,12 @@ where
         let result = match self {
             Action::Map(transform) => {
                 let mut guard = transform.lock().unwrap();
+                let transformed = guard(source.context_mut(), draft.form.clone());
+                drop(guard);
+                
                 let span = draft.form.span.clone();
 
-                match guard(source.context_mut(), draft.form.clone()) {
+                match transformed {
                     Ok(output) => {
                         let mapped = Form::new(FormKind::Output(output), span);
 
@@ -132,8 +136,8 @@ where
             
             Action::Inspect(inspector) => {
                 let mut guard = inspector.lock().unwrap();
-
                 let action = guard(draft.form.clone());
+                drop(guard);
                 
                 draft.pattern.action = Some(action.clone());
                 
@@ -180,6 +184,18 @@ where
                 resolver.insert(item);
             }
 
+            Action::Failure(function) => {
+                let span = draft.form.span.clone();
+
+                println!("err with form {:?}", draft.form);
+
+                let mut guard = function.lock().unwrap();
+                let form = Form::new(FormKind::Failure(guard(source.context_mut(), draft.form.clone())), span);
+
+                draft.form = form.clone();
+                draft.record = Record::Failed;
+            }
+
             _ => unreachable!(),
         };
 
@@ -194,11 +210,12 @@ where
     where
         Source: Peekable<Input> + Marked,
     {
+        
         let result = match self {
             Action::Perform(executor) => {
                 let mut guard = executor.lock().unwrap();
-                
                 guard();
+                drop(guard);
             }
 
             Action::Multiple(actions) => {
@@ -225,13 +242,7 @@ where
                 Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             },
 
-            Action::Failure(function) => {
-                let span = draft.form.span.clone();
-
-                let mut guard = function.lock().unwrap();
-                let form = Form::new(FormKind::Failure(guard(source.context_mut(), draft.form.clone())), span);
-
-                draft.form = form.clone();
+            Action::Failure(_) => {
                 draft.record = Record::Failed;
             }
             

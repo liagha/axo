@@ -11,6 +11,7 @@ use {
         hash::Hash,
     },
 };
+use crate::axo_form::action::Action;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Record {
@@ -353,6 +354,7 @@ where
     where
         Source: Peekable<Input> + Marked,
     {
+
         let start = source.position();
 
         match &self.pattern.kind {
@@ -376,8 +378,10 @@ where
                     child.realize(source);
                 }
 
-                if let Some(first_child) = self.children.first() {
-                    self.form = first_child.form.clone();
+                if let Some(first) = self.children.first() {
+                    self.form = first.form.clone();
+                } else {
+                    println!("Fuck :{:?}\n---{:?}", self.form, self.pattern);
                 }
             }
 
@@ -386,18 +390,26 @@ where
                     child.realize(source);
                 }
 
-                if !self.children.is_empty() {
-                    let forms: Vec<_> = self.children.iter().map(|c| c.form.clone()).collect();
-                    let end = source.position();
-                    self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
-                }
+                let forms: Vec<_> = self.children.iter().map(|draft| draft.form.clone()).collect();
+
+                let end = source.position();
+
+                self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
             }
         }
+        
+        if let Some(action) = &self.pattern.action.clone() {
+            match self.record {
+                Record::Failed => {
+                    if matches!(action, Action::Failure(_)) {
+                        action.apply(source, self);
+                    }
+                }
 
-        if !self.record.is_failed() {
-            if let Some(action) = &self.pattern.action.clone() {
-                if action.is_applicable() {
-                    action.apply(source, self);
+                _ => {
+                    if action.is_applicable() {
+                        action.apply(source, self);
+                    }
                 }
             }
         }

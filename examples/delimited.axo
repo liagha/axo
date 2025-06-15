@@ -61,10 +61,9 @@ simple_element
         permissions,
         roles,
         access_levels
-    ];
+    ;
     {
         session;
         timeout;
         refresh
     }
-}
