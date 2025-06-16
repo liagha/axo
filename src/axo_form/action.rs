@@ -187,8 +187,6 @@ where
             Action::Failure(function) => {
                 let span = draft.form.span.clone();
 
-                println!("err with form {:?}", draft.form);
-
                 let mut guard = function.lock().unwrap();
                 let form = Form::new(FormKind::Failure(guard(source.context_mut(), draft.form.clone())), span);
 

@@ -22,6 +22,7 @@ pub struct Parser {
 }
 
 impl Peekable<Token> for Parser {
+    #[inline]
     fn len(&self) -> usize {
         self.input.len()
     }
@@ -30,10 +31,8 @@ impl Peekable<Token> for Parser {
         let mut current = self.index;
         let mut found = 0;
 
-        while current < self.input.len() {
-            let token = &self.input[current];
-
-            if self.should_skip_token(&token.kind) {
+        while let Some(token) = self.get(current) {
+            if Self::is_skippable(&token.kind) {
                 current += 1;
                 continue;
             }
@@ -68,7 +67,7 @@ impl Peekable<Token> for Parser {
 
             let token = &self.input[current];
 
-            if self.should_skip_token(&token.kind) {
+            if Self::is_skippable(&token.kind) {
                 if current == 0 {
                     break;
                 }
@@ -99,21 +98,28 @@ impl Peekable<Token> for Parser {
         })
     }
 
-    fn next(&mut self) -> Option<Token> {
-        while self.index < self.input.len() {
-            let token = self.input[self.index].clone();
-            self.index += 1;
-
-            if self.should_skip_token(&token.kind) {
-                self.update_position_for_skipped(&token);
+    fn next(&mut self, position: &mut Position) -> Option<Token> {
+        while let Some(token) = self.get(self.index).cloned() {
+            *position = token.span.end.clone();
+            
+            if Self::is_skippable(&token.kind) {
+                self.index += 1;
+                
                 continue;
             }
-
-            self.position = token.span.end.clone();
+            
             return Some(token);
         }
 
         None
+    }
+
+    fn input(&self) -> &[Token] {
+        self.input.as_slice()
+    }
+
+    fn input_mut(&mut self) -> &mut [Token] {
+        &mut self.input
     }
 
     fn position(&self) -> Position {
@@ -134,47 +140,13 @@ impl Peekable<Token> for Parser {
 }
 
 impl Parser {
-    fn should_skip_token(&self, kind: &TokenKind) -> bool {
-        if let TokenKind::Punctuation(punctuation) = kind {
-            if let PunctuationKind::Newline = punctuation {
-                return true;
-            }
-            if let PunctuationKind::Space = punctuation {
-                return true;
-            }
-            if let PunctuationKind::Indentation(_) = punctuation {
-                return true;
-            }
-        }
-
-        if let TokenKind::Comment(_) = kind {
-            return true;
-        }
-
-        false
-    }
-
-    fn update_position_for_skipped(&mut self, token: &Token) {
-        if let TokenKind::Punctuation(PunctuationKind::Newline) = &token.kind {
-            self.position.line += 1;
-            self.position.column = 1;
-            return;
-        }
-
-        if let TokenKind::Punctuation(PunctuationKind::Space) = &token.kind {
-            self.position.column += 1;
-            return;
-        }
-
-        if let TokenKind::Punctuation(PunctuationKind::Indentation(size)) = &token.kind {
-            self.position.column += size;
-
-            return;
-        }
-
-        if let TokenKind::Comment(_) = &token.kind {
-            self.position.column += token.span.end.column - token.span.start.column;
-            return;
+    fn is_skippable(kind: &TokenKind) -> bool {
+        match kind {
+            TokenKind::Punctuation(PunctuationKind::Newline) => true,
+            TokenKind::Punctuation(PunctuationKind::Space) => true,
+            TokenKind::Punctuation(PunctuationKind::Indentation(_)) => true,
+            TokenKind::Character(_) => true,
+            _ => false,
         }
     }
 }

@@ -34,6 +34,7 @@ impl Default for Span {
 }
 
 impl Span {
+    #[inline]
     pub fn new(start: Position, end: Position) -> Self {
         Span {
             start,
@@ -41,15 +42,18 @@ impl Span {
         }
     }
 
+    #[inline]
     pub fn extend(&mut self, size: (usize, usize)) {
         self.end.line += size.0;
         self.end.column += size.1;
     }
 
+    #[inline]
     pub fn extend_to(&mut self, other: Box<dyn Spanned>) {
         self.end = other.span().end;
     }
 
+    #[inline]
     pub fn point(pos: Position) -> Self {
         Self {
             start: pos.clone(),
@@ -57,12 +61,14 @@ impl Span {
         }
     }
 
+    #[inline]
     pub fn from_coords(file: Path, start_line: usize, start_col: usize, end_line: usize, end_col: usize) -> Self {
         let start = Position::at(file.clone(), start_line, start_col);
         let end = Position::at(file, end_line, end_col);
         Self::new(start, end)
     }
 
+    #[inline]
     pub fn contains(&self, pos: &Position) -> bool {
         if self.start.path != pos.path {
             return false;
@@ -80,6 +86,7 @@ impl Span {
         self.contains(&other.start) && self.contains(&other.end)
     }
 
+    #[inline]
     pub fn overlaps(&self, other: &Span) -> bool {
         if self.start.path != other.start.path {
             return false;

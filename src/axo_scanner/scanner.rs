@@ -68,23 +68,29 @@ impl Peekable<char> for Scanner {
         })
     }
 
-    fn next(&mut self) -> Option<char> {
+    fn next(&mut self, position: &mut Position) -> Option<char> {
         if self.index < self.input.len() {
             let ch = self.input[self.index];
 
-            self.index += 1;
-
             if ch == '\n' {
-                self.position.line += 1;
-                self.position.column = 1;
+                position.line += 1;
+                position.column = 1;
             } else {
-                self.position.column += 1;
+                position.column += 1;
             }
 
             Some(ch)
         } else {
             None
         }
+    }
+
+    fn input(&self) -> &[char] {
+        self.input.as_slice()
+    }
+
+    fn input_mut(&mut self) -> &mut [char] {
+        &mut self.input
     }
 
     fn position(&self) -> Position {
