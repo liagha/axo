@@ -98,14 +98,9 @@ where
 
                 self.record = child.record;
 
-                match child.record {
-                    Record::Aligned | Record::Failed => {
-                        self.form = child.form.clone();
-                        self.children.push(child);
-                        consumed
-                    }
-                    _ => offset,
-                }
+                self.form = child.form.clone();
+                self.children.push(child);
+                consumed
             }
 
             PatternKind::Literal(expect) => {
@@ -328,6 +323,10 @@ where
     where
         Source: Peekable<Input> + Marked,
     {
+        if self.record == Record::Blank {
+            return;
+        }
+
         let start = source.position();
 
         match &self.pattern.kind {

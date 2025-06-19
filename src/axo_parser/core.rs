@@ -19,9 +19,17 @@ use {
 impl Parser {
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
-            Pattern::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
+            Pattern::predicate(|token: &Token| {
+                let result = matches!(token.kind, TokenKind::Identifier(_));
+
+                println!("Found: {:#?} => {}", token, result);
+
+                result
+            }),
             |_, form| {
                 let input = form.inputs()[0].clone();
+
+                println!("Extracted {:?}", input);
 
                 if let Token {
                     kind: TokenKind::Identifier(identifier),

@@ -148,11 +148,8 @@ where
         let result = match self {
             Action::Map(transform) => {
                 if draft.record != Record::Aligned {
-                    println!("Not Aligned {:?}", draft);
-
                     return;
                 } else {
-                    println!("Aligned {:#?}", draft);
                 }
 
                 let mut guard = transform.lock().unwrap();
@@ -249,7 +246,6 @@ where
                 );
 
                 draft.form = form.clone();
-                draft.record = Record::Failed;
                 draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
         };
