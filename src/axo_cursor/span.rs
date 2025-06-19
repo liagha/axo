@@ -1,21 +1,8 @@
 #![allow(dead_code)]
 
 use {
-    super::{
-        Spanned,
-        Position,
-    },
-    
-    crate::{
-        Path,
-        
-        format,
-        file,
-        
-        compare::{
-            Ordering,
-        }
-    },
+    super::{Position, Spanned},
+    crate::{compare::Ordering, file, format, Path},
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -36,10 +23,7 @@ impl Default for Span {
 impl Span {
     #[inline]
     pub fn new(start: Position, end: Position) -> Self {
-        Span {
-            start,
-            end,
-        }
+        Span { start, end }
     }
 
     #[inline]
@@ -62,7 +46,13 @@ impl Span {
     }
 
     #[inline]
-    pub fn from_coords(file: Path, start_line: usize, start_col: usize, end_line: usize, end_col: usize) -> Self {
+    pub fn from_coords(
+        file: Path,
+        start_line: usize,
+        start_col: usize,
+        end_line: usize,
+        end_col: usize,
+    ) -> Self {
         let start = Position::at(file.clone(), start_line, start_col);
         let end = Position::at(file, end_line, end_col);
         Self::new(start, end)
@@ -74,8 +64,7 @@ impl Span {
             return false;
         }
 
-        (self.start.cmp(pos) != Ordering::Greater) &&
-            (self.end.cmp(pos) != Ordering::Less)
+        (self.start.cmp(pos) != Ordering::Greater) && (self.end.cmp(pos) != Ordering::Less)
     }
 
     pub fn contains_span(&self, other: &Span) -> bool {
@@ -92,10 +81,10 @@ impl Span {
             return false;
         }
 
-        self.contains(&other.start) ||
-            self.contains(&other.end) ||
-            other.contains(&self.start) ||
-            other.contains(&self.end)
+        self.contains(&other.start)
+            || self.contains(&other.end)
+            || other.contains(&self.start)
+            || other.contains(&self.end)
     }
 
     pub fn merge(&self, other: &Span) -> Option<Span> {
@@ -139,9 +128,10 @@ impl Span {
     }
 
     pub fn to_range_string(&self) -> String {
-        format!("{}:{}-{}:{}",
-                self.start.line, self.start.column,
-                self.end.line, self.end.column)
+        format!(
+            "{}:{}-{}:{}",
+            self.start.line, self.start.column, self.end.line, self.end.column
+        )
     }
 
     pub fn line_spans(&self) -> Vec<Span> {
@@ -196,9 +186,23 @@ impl Span {
     }
 }
 
-
 impl Spanned for Span {
     fn span(&self) -> Span {
         self.clone()
+    }
+}
+
+impl<Item: Spanned> Spanned for Vec<Item> {
+    fn span(&self) -> Span {
+        if self.len() >= 2 {
+            let start = self.first().unwrap().span().start;
+            let end = self.last().unwrap().span().end;
+
+            Span { start, end }
+        } else if self.len() == 1 {
+            self.first().unwrap().span()
+        } else {
+            Span::default()
+        }
     }
 }

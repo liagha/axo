@@ -1,28 +1,11 @@
 use {
-    super::{
-        error::ErrorKind,
-
-        Parser,
-        Element, ElementKind,
-        ParseError
-    },
-
+    super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
+        axo_cursor::{Span, Spanned},
+        axo_form::{action::Action, form::Form, pattern::Pattern},
+        axo_scanner::{PunctuationKind, Token, TokenKind},
         thread::Arc,
-
-        axo_scanner::{
-            Token, TokenKind,
-            PunctuationKind,
-        },
-
-        axo_form::{
-            pattern::Pattern,
-            action::Action,
-            form::Form,
-        },
-
-        axo_cursor::Span,
-    }
+    },
 };
 
 impl Parser {
@@ -39,19 +22,19 @@ impl Parser {
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Action::failure(
-                                |_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Comma)),
-                                        form.span,
-                                    )
-                                }
-                            )
+                            Action::failure(|_, form| {
+                                ParseError::new(
+                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                        PunctuationKind::Comma,
+                                    )),
+                                    form.span,
+                                )
+                            }),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -59,9 +42,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),
@@ -88,19 +72,19 @@ impl Parser {
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Action::failure(
-                                |_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                                        form.span,
-                                    )
-                                }
-                            )
+                            Action::failure(|_, form| {
+                                ParseError::new(
+                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                        PunctuationKind::Semicolon,
+                                    )),
+                                    form.span,
+                                )
+                            }),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -108,9 +92,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),
@@ -127,29 +112,33 @@ impl Parser {
     pub fn group() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                (Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-                })),
+                }))
+                .with_ignore(),
                 Pattern::lazy(|| Self::pattern()).optional_self(),
                 Pattern::repeat(
                     Pattern::sequence([
-                        Pattern::required(
+                        Pattern::action(
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Action::failure(
-                                |_, form| {
+                            Action::trigger(
+                                Action::ignore(),
+                                Action::failure(|_, form| {
                                     ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Comma)),
+                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                            PunctuationKind::Comma,
+                                        )),
                                         form.span,
                                     )
-                                }
-                            )
+                                }),
+                            ),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -157,9 +146,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftParenthesis,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),
@@ -167,6 +157,8 @@ impl Parser {
             ]),
             move |_, form| {
                 let elements = form.outputs();
+
+                println!("Group Form: {:?}", form.expand());
 
                 Ok(Element::new(ElementKind::Group(elements), form.span))
             },
@@ -186,19 +178,19 @@ impl Parser {
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Action::failure(
-                                |_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                                        form.span,
-                                    )
-                                }
-                            )
+                            Action::failure(|_, form| {
+                                ParseError::new(
+                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                        PunctuationKind::Semicolon,
+                                    )),
+                                    form.span,
+                                )
+                            }),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -206,9 +198,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftParenthesis,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),
@@ -235,19 +228,19 @@ impl Parser {
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Action::failure(
-                                |_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Comma)),
-                                        form.span,
-                                    )
-                                }
-                            )
+                            Action::failure(|_, form| {
+                                ParseError::new(
+                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                        PunctuationKind::Comma,
+                                    )),
+                                    form.span,
+                                )
+                            }),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -255,9 +248,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftBracket,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),
@@ -284,19 +278,19 @@ impl Parser {
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Action::failure(
-                                |_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                                        form.span,
-                                    )
-                                }
-                            )
+                            Action::failure(|_, form| {
+                                ParseError::new(
+                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                        PunctuationKind::Semicolon,
+                                    )),
+                                    form.span,
+                                )
+                            }),
                         ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
-                    None
+                    None,
                 ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
@@ -304,9 +298,10 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(TokenKind::Punctuation(
-                                PunctuationKind::LeftBracket,
-                            ), Span::default())),
+                            ErrorKind::UnclosedDelimiter(Token::new(
+                                TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                Span::default(),
+                            )),
                             form.span,
                         )
                     }),

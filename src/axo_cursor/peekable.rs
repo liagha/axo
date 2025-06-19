@@ -10,41 +10,40 @@ pub trait Peekable<Item: PartialEq> {
     fn peek_behind(&self, n: usize) -> Option<&Item>;
 
     fn restore(&mut self);
-    
+
     /// Consuming input in a peekable
     fn advance(&mut self) -> Option<Item> {
         let mut position = self.position();
-        let result = self.next(&mut position);
-        
+        let mut index = self.index();
+
+        let result = self.next(&mut index, &mut position);
+
         if result.is_some() {
-            *self.index_mut() += 1;
+            self.set_index(index);
+
             self.set_position(position);
         }
-        
+
         result
     }
-    
-    /// Advancing but on a position.
-    fn next(&mut self, position: &mut Position) -> Option<Item>;
-    
-    fn forward(&mut self, position: &Position, amount: usize) -> Position {
-        let mut position = position.clone();
-        
+
+    /// Advancing but on a position and index.
+    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Item>;
+
+    fn forward(&self, index: &mut usize, position: &mut Position, amount: usize) {
         for _ in 0..amount {
-            self.next(&mut position);
+            self.next(index, position);
         }
-        
-        position
     }
-    
+
     fn get(&self, index: usize) -> Option<&Item> {
         self.input().get(index)
     }
-    
+
     fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
         self.input_mut().get_mut(index)
     }
-    
+
     fn input(&self) -> &[Item];
     fn input_mut(&mut self) -> &mut [Item];
 
@@ -59,6 +58,10 @@ pub trait Peekable<Item: PartialEq> {
 
     fn peek_previous(&self) -> Option<&Item> {
         self.peek_behind(1)
+    }
+
+    fn set_index(&mut self, index: usize) {
+        *self.index_mut() = index;
     }
 
     fn set_position(&mut self, position: Position) {

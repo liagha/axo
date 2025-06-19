@@ -28,20 +28,13 @@ impl Peekable<Token> for Parser {
     }
 
     fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = self.index;
-        let mut found = 0;
+        let mut current = 0;
 
-        while let Some(token) = self.get(current) {
-            if Self::is_skippable(&token.kind) {
-                current += 1;
-                continue;
-            }
-
-            if found == forward {
+        while let Some(token) = self.get(self.index + current) {
+            if current == forward {
                 return Some(token);
             }
 
-            found += 1;
             current += 1;
         }
 
@@ -49,42 +42,14 @@ impl Peekable<Token> for Parser {
     }
 
     fn peek_behind(&self, backward: usize) -> Option<&Token> {
-        if self.index == 0 {
-            return None;
-        }
+        let mut current = 0;
 
-        let mut current = self.index - 1;
-        let mut found = 0;
-
-        loop {
-            if current >= self.input.len() {
-                if current == 0 {
-                    break;
-                }
-                current -= 1;
-                continue;
-            }
-
-            let token = &self.input[current];
-
-            if Self::is_skippable(&token.kind) {
-                if current == 0 {
-                    break;
-                }
-                current -= 1;
-                continue;
-            }
-
-            if found == backward {
+        while let Some(token) = self.get(self.index - current) {
+            if current == backward {
                 return Some(token);
             }
 
-            found += 1;
-
-            if current == 0 {
-                break;
-            }
-            current -= 1;
+            current += 1;
         }
 
         None
@@ -98,16 +63,12 @@ impl Peekable<Token> for Parser {
         })
     }
 
-    fn next(&mut self, position: &mut Position) -> Option<Token> {
-        while let Some(token) = self.get(self.index).cloned() {
+    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
+        if let Some(token) = self.get(*index).cloned() {
             *position = token.span.end.clone();
-            
-            if Self::is_skippable(&token.kind) {
-                self.index += 1;
-                
-                continue;
-            }
-            
+
+            *index += 1;
+
             return Some(token);
         }
 
@@ -136,18 +97,6 @@ impl Peekable<Token> for Parser {
 
     fn index_mut(&mut self) -> &mut usize {
         &mut self.index
-    }
-}
-
-impl Parser {
-    fn is_skippable(kind: &TokenKind) -> bool {
-        match kind {
-            TokenKind::Punctuation(PunctuationKind::Newline) => true,
-            TokenKind::Punctuation(PunctuationKind::Space) => true,
-            TokenKind::Punctuation(PunctuationKind::Indentation(_)) => true,
-            TokenKind::Character(_) => true,
-            _ => false,
-        }
     }
 }
 

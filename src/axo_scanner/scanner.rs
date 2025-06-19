@@ -4,7 +4,7 @@ use {
         Operator, Punctuation, PunctuationKind, ScanError, Token, TokenKind,
     },
     crate::{
-        axo_cursor::{Peekable, Position, Span},
+        axo_cursor::{Peekable, Position},
         axo_form::{
             form::{Form, FormKind},
             former::Former,
@@ -68,21 +68,21 @@ impl Peekable<char> for Scanner {
         })
     }
 
-    fn next(&mut self, position: &mut Position) -> Option<char> {
-        if self.index < self.input.len() {
-            let ch = self.input[self.index];
-
-            if ch == '\n' {
+    fn next(&self, index: &mut usize, position: &mut Position) -> Option<char> {
+        if let Some(ch) = self.get(*index) {
+            if *ch == '\n' {
                 position.line += 1;
                 position.column = 1;
             } else {
                 position.column += 1;
             }
 
-            Some(ch)
-        } else {
-            None
+            *index += 1;
+
+            return Some(*ch);
         }
+
+        None
     }
 
     fn input(&self) -> &[char] {
@@ -122,28 +122,6 @@ impl Scanner {
             output: Vec::new(),
             errors: Vec::new(),
         }
-    }
-
-    pub fn create_span(&self, start: (usize, usize), end: (usize, usize)) -> Span {
-        let file = self.position.path.clone();
-
-        let start = Position {
-            line: start.0,
-            column: start.1,
-            path: file.clone(),
-        };
-
-        let end = Position {
-            line: end.0,
-            column: end.1,
-            path: file,
-        };
-
-        Span { start, end }
-    }
-
-    pub fn push_token(&mut self, kind: TokenKind, span: Span) {
-        self.output.push(Token { kind, span });
     }
 
     fn line_comment() -> Pattern<char, Token, ScanError> {

@@ -1,41 +1,25 @@
+use crate::axo_parser::Item;
 use {
-    log::trace,
-
-    super::{
-        error::ErrorKind,
-        Element, ElementKind, ParseError,
-        Parser,
-    },
+    super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
+        axo_cursor::Span,
         axo_form::{
             action::Action,
-            pattern::Pattern,
+            form::{Form, FormKind},
             former::Former,
-
-            form::{
-                Form, FormKind,
-            }
+            pattern::Pattern,
         },
-
-        axo_scanner::{
-            PunctuationKind, Token,
-            TokenKind,
-        },
-
         axo_parser::ItemKind,
-
-        axo_cursor::Span,
+        axo_scanner::{PunctuationKind, Token, TokenKind},
         thread::Arc,
-    }
+    },
+    log::trace,
 };
-use crate::axo_parser::Item;
 
 impl Parser {
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
-            Pattern::predicate(|token: &Token| {
-                matches!(token.kind, TokenKind::Identifier(_))
-            }),
+            Pattern::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
             |_, form| {
                 let input = form.inputs()[0].clone();
 
@@ -56,16 +40,17 @@ impl Parser {
         Pattern::transform(
             Pattern::predicate(|token: &Token| {
                 matches!(
-                token.kind,
-                TokenKind::String(_)
-                    | TokenKind::Character(_)
-                    | TokenKind::Boolean(_)
-                    | TokenKind::Float(_)
-                    | TokenKind::Integer(_)
-            )
+                    token.kind,
+                    TokenKind::String(_)
+                        | TokenKind::Character(_)
+                        | TokenKind::Boolean(_)
+                        | TokenKind::Float(_)
+                        | TokenKind::Integer(_)
+                )
             }),
             |_, form| {
-                form.expand().first()
+                form.expand()
+                    .first()
                     .and_then(|token| match token.kind.clone() {
                         FormKind::Input(Token { kind, span }) => {
                             Some(Element::new(ElementKind::Literal(kind), span))
@@ -87,8 +72,8 @@ impl Parser {
                         false
                     }
                 })
-                    .repeat_self(0, None)
-                    .optional_self(),
+                .repeat_self(0, None)
+                .optional_self(),
                 Self::primary(),
                 Pattern::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
@@ -97,8 +82,8 @@ impl Parser {
                         false
                     }
                 })
-                    .repeat_self(0, None)
-                    .optional_self(),
+                .repeat_self(0, None)
+                .optional_self(),
             ]),
             |_, form| {
                 let sequence = form.unwrap()[0].clone().unwrap();
@@ -250,7 +235,7 @@ impl Parser {
                         false
                     }
                 })
-                    .with_ignore(),
+                .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
                     Action::failure(|_, form| {
@@ -259,22 +244,19 @@ impl Parser {
                 ),
                 Pattern::required(
                     Pattern::lazy(|| Self::pattern()),
-                    Action::failure(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedBody, form.span)
-                    }),
+                    Action::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
                 ),
-                Pattern::optional(
-                    Pattern::sequence([
-                        Pattern::predicate(|token: &Token| {
-                            if let TokenKind::Identifier(identifier) = &token.kind {
-                                identifier == "else"
-                            } else {
-                                false
-                            }
-                        }).with_ignore(),
-                        Pattern::lazy(|| Self::pattern()),
-                    ])
-                )
+                Pattern::optional(Pattern::sequence([
+                    Pattern::predicate(|token: &Token| {
+                        if let TokenKind::Identifier(identifier) = &token.kind {
+                            identifier == "else"
+                        } else {
+                            false
+                        }
+                    })
+                    .with_ignore(),
+                    Pattern::lazy(|| Self::pattern()),
+                ])),
             ]),
             |_, form| {
                 let sequence = form.outputs();
@@ -306,7 +288,6 @@ impl Parser {
                         span,
                     ))
                 }
-
             },
         )
     }
@@ -321,7 +302,8 @@ impl Parser {
                         } else {
                             false
                         }
-                    }).with_ignore(),
+                    })
+                    .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
                         Action::failure(|_, form| {
@@ -336,7 +318,8 @@ impl Parser {
                         } else {
                             false
                         }
-                    }).with_ignore(),
+                    })
+                    .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::pattern()),
                         Action::failure(|_, form| {
@@ -349,7 +332,7 @@ impl Parser {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
-                ])
+                ]),
             ]),
             |_, form| {
                 let sequence = form.outputs();
@@ -361,9 +344,9 @@ impl Parser {
                     Ok(Element::new(
                         ElementKind::Loop {
                             condition: None,
-                            body: body.into()
+                            body: body.into(),
                         },
-                        span
+                        span,
                     ))
                 } else if sequence.len() == 2 {
                     let condition = sequence[0].clone();
@@ -374,14 +357,14 @@ impl Parser {
                     Ok(Element::new(
                         ElementKind::Loop {
                             condition: Some(condition.into()),
-                            body: body.into()
+                            body: body.into(),
                         },
-                        span
+                        span,
                     ))
                 } else {
                     unreachable!()
                 }
-            }
+            },
         )
     }
 
@@ -394,23 +377,24 @@ impl Parser {
                     } else {
                         false
                     }
-                }).with_ignore(),
-                Pattern::capture(
-                    0,
-                    Pattern::lazy(Self::pattern),
-                )
+                })
+                .with_ignore(),
+                Pattern::capture(0, Pattern::lazy(Self::pattern)),
             ]),
             move |context, _| {
                 let symbols = context.resolver.scope.symbols.clone();
-                let formed = symbols.iter().find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. })).unwrap();
+                let formed = symbols
+                    .iter()
+                    .find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. }))
+                    .unwrap();
 
                 trace!("formed variable: {:?}.", formed);
 
                 Ok(Element::new(
                     ElementKind::Item(ItemKind::Unit),
-                    Span::default()
+                    Span::default(),
                 ))
-            }
+            },
         )
     }
 
@@ -437,21 +421,19 @@ impl Parser {
     }
 
     pub fn ignore() -> Pattern<Token, Element, ParseError> {
-        Pattern::ignore(Pattern::alternative([
-            Pattern::predicate(
-                |token: &Token| {
-                    matches!(
-                        token.kind,
-                        TokenKind::Comment(_)
+        Pattern::skip(Pattern::alternative([Pattern::predicate(
+            |token: &Token| {
+                matches!(
+                    token.kind,
+                    TokenKind::Comment(_)
                         | TokenKind::Punctuation(PunctuationKind::Newline)
                         | TokenKind::Punctuation(PunctuationKind::Tab)
                         | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                         | TokenKind::Punctuation(PunctuationKind::Space)
                         | TokenKind::Punctuation(PunctuationKind::Semicolon)
-                    )
-                }
-            )
-        ]))
+                )
+            },
+        )]))
     }
 
     pub fn pattern() -> Pattern<Token, Element, ParseError> {
@@ -459,25 +441,25 @@ impl Parser {
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([
-            Pattern::conditional(
-                Pattern::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Punctuation(_))
-                }),
-                Action::failure(|_, form| {
-                    ParseError::new(ErrorKind::UnexpectedPunctuation, form.span)
-                }),
-                Action::Ignore,
-            )
-        ])
+        Pattern::conditional(
+            Pattern::anything(),
+            Action::failure(
+                |_, form: Form<Token, Element, crate::axo_error::Error<ErrorKind>>| {
+                    ParseError::new(
+                        ErrorKind::UnexpectedToken(form.unwrap_input().unwrap().kind),
+                        form.span,
+                    )
+                },
+            ),
+            Action::Ignore,
+        )
     }
 
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
-            Pattern::alternative([
-                Self::pattern(),
-                Self::ignore(),
-                Self::fallback()
-            ]), 0, None)
+            Pattern::alternative([Self::ignore(), Self::pattern(), Self::fallback()]),
+            0,
+            None,
+        )
     }
 }

@@ -1,17 +1,15 @@
 use {
     super::{
+        action::Action,
         form::{Form, FormKind},
         pattern::PatternKind,
-        action::Action,
     },
-
     crate::{
-        hash::Hash,
-        format::{Debug, Display, Formatter, Result},
-        
-        axo_format::vector::Show,
         axo_form::pattern::Pattern,
-    }
+        axo_format::vector::Show,
+        format::{Debug, Display, Formatter, Result},
+        hash::Hash,
+    },
 };
 
 impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
@@ -76,7 +74,6 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Guard { .. } => write!(f, "guard"),
             PatternKind::Deferred(_) => {
                 write!(f, "lazy")
             }
@@ -84,13 +81,21 @@ where
                 write!(f, "{:?}", literal)
             }
             PatternKind::Alternative(patterns) => {
-                let patterns = patterns.iter().map(|pattern| pattern.to_string()).collect::<Vec<_>>().join(" | ");
-                
+                let patterns = patterns
+                    .iter()
+                    .map(|pattern| pattern.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" | ");
+
                 write!(f, "{}", patterns)
             }
             PatternKind::Sequence(sequence) => {
-                let patterns = sequence.iter().map(|pattern| pattern.to_string()).collect::<Vec<_>>().join(", ");
-                
+                let patterns = sequence
+                    .iter()
+                    .map(|pattern| pattern.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
                 write!(f, "{}", patterns)
             }
             PatternKind::Repetition {
@@ -125,7 +130,6 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Guard { .. } => write!(f, "Guard"),
             PatternKind::Deferred(_) => {
                 write!(f, "Lazy")
             }
@@ -179,6 +183,7 @@ where
             Action::Trigger { found, missing } => write!(f, "trigger({}, {})", found, missing),
             Action::Capture { identifier } => write!(f, "capture({})", identifier),
             Action::Ignore => write!(f, "ignore"),
+            Action::Skip => write!(f, "skip"),
             Action::Failure(_) => write!(f, "failure"),
         }
     }
@@ -199,6 +204,7 @@ where
             Action::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
             Action::Capture { identifier } => write!(f, "Capture({:?})", identifier),
             Action::Ignore => write!(f, "Ignore"),
+            Action::Skip => write!(f, "Skip"),
             Action::Failure(_) => write!(f, "Failure"),
         }
     }

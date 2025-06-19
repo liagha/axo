@@ -3,9 +3,9 @@ use {
     crate::{
         axo_cursor::Peekable,
         axo_form::action::Emitter,
-        compiler::Context, 
-        format::Debug, 
-        hash::Hash, 
+        compiler::Context,
+        format::Debug,
+        hash::Hash,
         thread::{Arc, Mutex},
     },
 };
@@ -17,7 +17,7 @@ pub type Predicate<Input> = Arc<Mutex<dyn FnMut(&Input) -> bool + Send + Sync>>;
 /// An evaluator function that lazily creates patterns when needed.
 /// Used for recursive or context-dependent pattern construction.
 pub type Evaluator<Input, Output, Failure> =
-Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
+    Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
 
 /// The core matching behaviors that patterns can exhibit.
 /// Each kind defines how a pattern attempts to match against input.
@@ -39,13 +39,6 @@ where
     /// Lazily evaluates to create a pattern when needed.
     /// Useful for recursive patterns or context-dependent matching.
     Deferred(Evaluator<Input, Output, Failure>),
-
-    /// Matches the inner pattern only if the guard predicate succeeds.
-    /// The guard examines the entire source, not just the current input.
-    Guard {
-        predicate: Arc<Mutex<dyn FnMut(&dyn Peekable<Input>) -> bool + Send + Sync>>,
-        pattern: Box<Pattern<Input, Output, Failure>>,
-    },
 
     /// Matches exactly the specified input value.
     /// Uses equality comparison to determine matches.
@@ -104,19 +97,6 @@ where
     pub fn exact(value: Input) -> Self {
         Self {
             kind: PatternKind::Literal(value),
-            action: None,
-        }
-    }
-
-    pub fn guard<F>(predicate: F, pattern: Pattern<Input, Output, Failure>) -> Self
-    where
-        F: FnMut(&dyn Peekable<Input>) -> bool + Send + Sync + 'static,
-    {
-        Self {
-            kind: PatternKind::Guard {
-                predicate: Arc::new(Mutex::new(predicate)),
-                pattern: Box::new(pattern),
-            },
             action: None,
         }
     }
@@ -240,15 +220,22 @@ where
             + 'static,
     {
         Self {
-            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(Action::Map(Arc::new(Mutex::new(transform)))),
         }
     }
 
     pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(Action::Ignore),
+        }
+    }
+
+    pub fn skip(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
+        Self {
+            kind: PatternKind::Wrapper(pattern.into()),
+            action: Some(Action::Skip),
         }
     }
 
@@ -257,7 +244,7 @@ where
         function: Emitter<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(Action::Failure(function)),
         }
     }
@@ -268,7 +255,7 @@ where
         missing: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(Action::Trigger {
                 found: Box::new(found),
                 missing: Box::new(missing),
@@ -281,7 +268,7 @@ where
         action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Sequence(vec![*pattern.into()]),
+            kind: PatternKind::Wrapper(pattern.into()),
             action: Some(action),
         }
     }
