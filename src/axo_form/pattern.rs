@@ -1,7 +1,6 @@
 use {
     super::{action::Action, form::Form},
     crate::{
-        axo_cursor::Peekable,
         axo_form::action::Emitter,
         compiler::Context,
         format::Debug,
