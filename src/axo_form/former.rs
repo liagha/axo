@@ -155,7 +155,6 @@ where
                     }
                 }
 
-                // fallback
                 if let Some((child, consumed)) = failed {
                     self.record.fail();
                     self.form = child.form.clone();
