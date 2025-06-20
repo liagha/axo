@@ -37,27 +37,13 @@ impl Peekable<char> for Scanner {
     fn peek_ahead(&self, n: usize) -> Option<&char> {
         let current = self.index + n;
 
-        if current < self.input.len() {
-            Some(&self.input[current])
-        } else {
-            None
-        }
+        self.get(current)
     }
 
     fn peek_behind(&self, n: usize) -> Option<&char> {
-        let mut current = self.index;
+        let current = self.index - n;
 
-        if current < n {
-            return None;
-        }
-
-        current -= n;
-
-        if current < self.input.len() {
-            Some(&self.input[current])
-        } else {
-            None
-        }
+        self.get(current)
     }
 
     fn restore(&mut self) {
@@ -133,7 +119,7 @@ impl Scanner {
             let content: String = form.inputs().into_iter().collect();
 
             Ok(Token::new(
-                TokenKind::Comment(content.to_string()),
+                TokenKind::Comment(content.trim().to_string()),
                 form.span,
             ))
         })
@@ -155,7 +141,7 @@ impl Scanner {
             let content: String = form.inputs().into_iter().collect();
 
             Ok(Token::new(
-                TokenKind::Comment(content.to_string()),
+                TokenKind::Comment(content.trim().to_string()),
                 form.span,
             ))
         })

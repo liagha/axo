@@ -1,11 +1,6 @@
-use {
-    crate::{
-        format::{Display, Debug, Formatter, Result},
-        axo_scanner::{
-            Token, TokenKind,
-            PunctuationKind,
-        }
-    }
+use crate::{
+    axo_scanner::{PunctuationKind, Token, TokenKind},
+    format::{Debug, Display, Formatter, Result},
 };
 
 impl Display for TokenKind {
@@ -16,15 +11,15 @@ impl Display for TokenKind {
             TokenKind::Integer(n) => write!(f, "{}", n),
             TokenKind::Punctuation(c) => {
                 if c == &PunctuationKind::Newline {
-                    return write!(f, "\n")
+                    return write!(f, "\n");
                 }
                 write!(f, "{}", c)
-            },
+            }
             TokenKind::Operator(c) => write!(f, "{}", c),
             TokenKind::String(str) => write!(f, "{}", str),
             TokenKind::Identifier(str) => write!(f, "{}", str),
             TokenKind::Character(char) => write!(f, "'{}'", char),
-            TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
+            TokenKind::Comment(comment) => write!(f, "//({})", comment),
         }
     }
 }
@@ -53,7 +48,10 @@ impl Display for Token {
 
 impl Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.kind)
+        if f.alternate() {
+            write!(f, "{:?}", self.kind)
+        } else {
+            write!(f, "{:?} | {:?}", self.kind, self.span)
+        }
     }
 }
-

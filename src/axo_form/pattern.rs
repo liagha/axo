@@ -33,7 +33,7 @@ where
 
     /// Matches input that satisfies the given predicate function.
     /// The predicate receives the input value and returns true/false.
-    Condition(Predicate<Input>),
+    Predicate(Predicate<Input>),
 
     /// Lazily evaluates to create a pattern when needed.
     /// Useful for recursive patterns or context-dependent matching.
@@ -155,7 +155,7 @@ where
         F: FnMut(&Input) -> bool + Send + Sync + 'static,
     {
         Self {
-            kind: PatternKind::Condition(Arc::new(Mutex::new(predicate))),
+            kind: PatternKind::Predicate(Arc::new(Mutex::new(predicate))),
             action: None,
         }
     }
@@ -194,17 +194,6 @@ where
         Self {
             kind: PatternKind::Deferred(Arc::new(Mutex::new(factory))),
             action: None,
-        }
-    }
-
-    pub fn resolve_lazy(&self) -> Pattern<Input, Output, Failure> {
-        match &self.kind {
-            PatternKind::Deferred(factory) => {
-                let mut guard = factory.lock().unwrap();
-
-                guard()
-            }
-            _ => self.clone(),
         }
     }
 
@@ -328,14 +317,6 @@ where
 
     pub fn anything_except(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self::negate(Box::new(Self::alternative(patterns)))
-    }
-
-    pub fn delimited(
-        open: Pattern<Input, Output, Failure>,
-        content: Pattern<Input, Output, Failure>,
-        close: Pattern<Input, Output, Failure>,
-    ) -> Self {
-        Self::sequence(vec![open.with_ignore(), content, close.with_ignore()])
     }
 
     pub fn empty() -> Self {

@@ -27,32 +27,16 @@ impl Peekable<Token> for Parser {
         self.input.len()
     }
 
-    fn peek_ahead(&self, forward: usize) -> Option<&Token> {
-        let mut current = 0;
+    fn peek_ahead(&self, n: usize) -> Option<&Token> {
+        let current = self.index + n;
 
-        while let Some(token) = self.get(self.index + current) {
-            if current == forward {
-                return Some(token);
-            }
-
-            current += 1;
-        }
-
-        None
+        self.get(current)
     }
 
-    fn peek_behind(&self, backward: usize) -> Option<&Token> {
-        let mut current = 0;
+    fn peek_behind(&self, n: usize) -> Option<&Token> {
+        let current = self.index - n;
 
-        while let Some(token) = self.get(self.index - current) {
-            if current == backward {
-                return Some(token);
-            }
-
-            current += 1;
-        }
-
-        None
+        self.get(current)
     }
 
     fn restore(&mut self) {
@@ -64,12 +48,12 @@ impl Peekable<Token> for Parser {
     }
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
-        if let Some(token) = self.get(*index).cloned() {
+        if let Some(token) = self.get(*index) {
             *position = token.span.end.clone();
 
             *index += 1;
 
-            return Some(token);
+            return Some(token.clone());
         }
 
         None

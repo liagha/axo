@@ -114,7 +114,7 @@ where
             PatternKind::Optional(pattern) => {
                 write!(f, "{}?", pattern)
             }
-            PatternKind::Condition(_) => write!(f, "predicate"),
+            PatternKind::Predicate(_) => write!(f, "predicate"),
             PatternKind::Negation(_) => write!(f, "negate"),
             PatternKind::WildCard => write!(f, "anything"),
             PatternKind::Wrapper(pattern) => write!(f, "wrap({})", pattern),
@@ -158,7 +158,7 @@ where
             PatternKind::Optional(pattern) => {
                 write!(f, "Optional({:?})", pattern)
             }
-            PatternKind::Condition(_) => write!(f, "Predicate"),
+            PatternKind::Predicate(_) => write!(f, "Predicate"),
             PatternKind::Negation(_) => write!(f, "Negate"),
             PatternKind::WildCard => write!(f, "Anything"),
             PatternKind::Wrapper(pattern) => {

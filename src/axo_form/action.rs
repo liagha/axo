@@ -103,8 +103,6 @@ where
                 drop(guard);
 
                 draft.pattern.action = Some(action.clone());
-
-                action.apply(source, draft);
             }
 
             Action::Multiple(actions) => {
@@ -121,8 +119,6 @@ where
                 };
 
                 draft.pattern.action = Some(*chosen.clone());
-
-                chosen.apply(source, draft);
             }
 
             Action::Ignore => {}
@@ -287,19 +283,6 @@ where
         Self::Perform(Arc::new(Mutex::new(executor)))
     }
 
-    pub fn log<S: Into<String>>(message: S) -> Self {
-        let msg = message.into();
-        Self::perform(move || {
-            log::info!("{}", msg);
-        })
-    }
-
-    pub fn debug_form() -> Self {
-        Self::perform(|| {
-            log::debug!("Form processed");
-        })
-    }
-
     pub fn capture(identifier: usize) -> Self {
         Self::Capture { identifier }
     }
@@ -340,10 +323,6 @@ where
 
     pub fn with_capture(self, identifier: usize) -> Self {
         self.then(Self::capture(identifier))
-    }
-
-    pub fn with_log<S: Into<String>>(self, message: S) -> Self {
-        self.then(Self::log(message))
     }
 
     pub fn with_ignore(self) -> Self {

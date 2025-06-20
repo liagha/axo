@@ -22,7 +22,7 @@ impl Parser {
             Pattern::predicate(|token: &Token| {
                 let result = matches!(token.kind, TokenKind::Identifier(_));
 
-                println!("Found: {:#?} => {}", token, result);
+                println!("Found: {:?} => {}", token, result);
 
                 result
             }),
