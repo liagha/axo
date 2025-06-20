@@ -2,7 +2,9 @@
 
 use {
     super::{Position, Spanned},
-    crate::{compare::Ordering, file, format, Path},
+    crate::{
+        axo_form::form::Form, compare::Ordering, file, format, format::Debug, hash::Hash, Path,
+    },
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -12,6 +14,7 @@ pub struct Span {
 }
 
 impl Default for Span {
+    #[inline]
     fn default() -> Self {
         Self {
             start: Position::default(),
@@ -189,6 +192,17 @@ impl Span {
 impl Spanned for Span {
     fn span(&self) -> Span {
         self.clone()
+    }
+}
+
+impl<Input, Output, Failure> Spanned for Form<Input, Output, Failure>
+where
+    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn span(&self) -> Span {
+        self.span.clone()
     }
 }
 

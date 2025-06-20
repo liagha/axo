@@ -20,18 +20,33 @@ pub enum Record {
 
 impl Record {
     #[inline]
-    pub fn is_aligned(self) -> bool {
-        matches!(self, Record::Aligned)
+    pub fn is_aligned(&self) -> bool {
+        matches!(self, &Record::Aligned)
     }
 
     #[inline]
-    pub fn is_failed(self) -> bool {
-        matches!(self, Record::Failed)
+    pub fn is_effected(&self) -> bool {
+        matches!(self, &Record::Aligned | &Record::Failed)
     }
 
     #[inline]
-    pub fn is_blank(self) -> bool {
-        matches!(self, Record::Blank)
+    pub fn is_blank(&self) -> bool {
+        matches!(self, &Record::Blank)
+    }
+
+    #[inline]
+    pub fn align(&mut self) {
+        *self = Record::Aligned;
+    }
+
+    #[inline]
+    pub fn skip(&mut self) {
+        *self = Record::Skipped;
+    }
+
+    #[inline]
+    pub fn fail(&mut self) {
+        *self = Record::Failed;
     }
 }
 
@@ -68,15 +83,13 @@ where
     where
         Source: Peekable<Input> + Marked,
     {
-        let start = source.position();
-
         let consumed = match &self.pattern.kind {
             PatternKind::Deferred(function) => {
                 let mut guard = function.lock().unwrap();
                 let resolved = guard();
                 drop(guard);
 
-                let mut child = Draft::new(resolved, Span::point(start.clone()));
+                let mut child = Draft::new(resolved, Span::default());
                 let consumed = child.build(source, offset);
 
                 self.record = child.record;
@@ -87,7 +100,7 @@ where
             }
 
             PatternKind::Wrapper(pattern) => {
-                let mut child = Draft::new((**pattern).clone(), Span::point(start.clone()));
+                let mut child = Draft::new((**pattern).clone(), Span::default());
                 let consumed = child.build(source, offset);
 
                 self.record = child.record;
@@ -100,9 +113,10 @@ where
             PatternKind::Literal(expect) => {
                 if let Some(peek) = source.peek_ahead(offset) {
                     if peek == expect {
-                        self.record = Record::Aligned;
+                        self.record.align();
                         self.form =
-                            Form::new(FormKind::Input(expect.clone()), Span::point(start.clone()));
+                            Form::new(FormKind::Input(expect.clone()), Span::default());
+
                         offset + 1
                     } else {
                         offset
@@ -116,14 +130,15 @@ where
                 let mut failed = None;
 
                 for pattern in patterns {
-                    let mut child = Draft::new(pattern.clone(), Span::point(start.clone()));
+                    let mut child = Draft::new(pattern.clone(), Span::default());
                     let consumed = child.build(source, offset);
 
                     match child.record {
                         Record::Aligned => {
-                            self.record = Record::Aligned;
+                            self.record.align();
                             self.form = child.form.clone();
                             self.children.push(child);
+
                             return consumed;
                         }
                         Record::Skipped => {
@@ -134,12 +149,15 @@ where
                                 failed = Some((child, consumed));
                             }
                         }
-                        _ => {}
+                        Record::Blank => {
+                            continue;
+                        }
                     }
                 }
 
+                // fallback
                 if let Some((child, consumed)) = failed {
-                    self.record = Record::Failed;
+                    self.record.fail();
                     self.form = child.form.clone();
                     self.children.push(child);
                     consumed
@@ -151,40 +169,28 @@ where
 
             PatternKind::Sequence(sequence) => {
                 let mut current = offset;
-                let mut forms = Vec::with_capacity(sequence.len());
                 self.children.reserve(sequence.len());
 
                 for pattern in sequence {
-                    let mut child = Draft::new(pattern.clone(), Span::point(start.clone()));
+                    let mut child = Draft::new(pattern.clone(), Span::default());
                     let consumed = child.build(source, current);
 
                     match child.record {
-                        Record::Aligned => {
+                        Record::Aligned | Record::Skipped => {
                             current = consumed;
-                            forms.push(child.form.clone());
-
-                            self.record = Record::Aligned;
+                            self.record.align();
                             self.children.push(child);
                         }
                         Record::Failed => {
                             current = consumed;
-                            forms.push(child.form.clone());
-
-                            self.record = Record::Failed;
+                            self.record.fail();
                             self.children.push(child);
 
                             break;
                         }
-                        _ => {
+                        Record::Blank => {
                             current = offset;
                             self.record = Record::Blank;
-
-                            if !forms.is_empty() {
-                                self.form = Form::new(
-                                    FormKind::Multiple(forms),
-                                    Span::point(start.clone()),
-                                );
-                            }
 
                             break;
                         }
@@ -204,7 +210,7 @@ where
                 let mut forms = Vec::new();
 
                 while source.peek_ahead(current).is_some() {
-                    let mut child = Draft::new(*pattern.clone(), Span::point(start.clone()));
+                    let mut child = Draft::new(*pattern.clone(), Span::default());
                     let consumed = child.build(source, current);
 
                     if consumed == current || child.record.is_blank() {
@@ -225,8 +231,8 @@ where
                 }
 
                 if count >= *minimum {
-                    self.record = Record::Aligned;
-                    self.form = Form::new(FormKind::Multiple(forms), Span::point(start.clone()));
+                    self.record.align();
+                    self.form = Form::new(FormKind::Multiple(forms), Span::default());
                     current
                 } else {
                     self.record = Record::Blank;
@@ -235,20 +241,19 @@ where
             }
 
             PatternKind::Optional(pattern) => {
-                let mut child = Draft::new((**pattern).clone(), Span::point(start.clone()));
+                let mut child = Draft::new((**pattern).clone(), Span::default());
                 let consumed = child.build(source, offset);
 
+                self.record.align();
+                
                 match child.record {
                     Record::Aligned | Record::Failed => {
-                        self.record = Record::Aligned;
                         self.form = child.form.clone();
                         self.children.push(child);
 
                         consumed
                     }
                     _ => {
-                        self.record = Record::Aligned;
-
                         offset
                     }
                 }
@@ -261,9 +266,9 @@ where
                     drop(guard);
 
                     if result {
-                        self.record = Record::Aligned;
+                        self.record.align();
                         self.form =
-                            Form::new(FormKind::Input(peek.clone()), Span::point(start.clone()));
+                            Form::new(FormKind::Input(peek.clone()), Span::default());
                         offset + 1
                     } else {
                         offset
@@ -275,15 +280,15 @@ where
 
             PatternKind::Negation(pattern) => {
                 if source.peek_ahead(offset).is_some() {
-                    let mut child = Draft::new((**pattern).clone(), Span::point(start.clone()));
+                    let mut child = Draft::new((**pattern).clone(), Span::default());
                     child.build(source, offset);
 
                     if child.record != Record::Aligned {
-                        self.record = Record::Aligned;
+                        self.record.align();
                         if let Some(peek) = source.peek_ahead(offset) {
                             self.form = Form::new(
                                 FormKind::Input(peek.clone()),
-                                Span::point(start.clone()),
+                                Span::default(),
                             );
                         }
                         offset + 1
@@ -299,9 +304,9 @@ where
 
             PatternKind::WildCard => {
                 if let Some(peek) = source.peek_ahead(offset) {
-                    self.record = Record::Aligned;
+                    self.record.align();
                     self.form =
-                        Form::new(FormKind::Input(peek.clone()), Span::point(start.clone()));
+                        Form::new(FormKind::Input(peek.clone()), Span::default());
                     offset + 1
                 } else {
                     offset
@@ -327,10 +332,12 @@ where
             | PatternKind::Predicate(_)
             | PatternKind::Negation(_)
             | PatternKind::WildCard => {
-                if let Some(input) = source.advance() {
-                    let end = source.position();
+                if self.record.is_aligned() {
+                    if let Some(input) = source.advance() {
+                        let end = source.position();
 
-                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
+                        self.form = Form::new(FormKind::Input(input), Span::new(start, end));
+                    }
                 }
             }
 
@@ -338,29 +345,33 @@ where
             | PatternKind::Optional(_)
             | PatternKind::Deferred(_)
             | PatternKind::Wrapper(_) => {
-                for child in &mut self.children {
-                    child.realize(source);
+                if self.record.is_effected() {
+                    for child in &mut self.children {
+                        child.realize(source);
 
-                    if child.record == Record::Aligned {
-                        self.form = child.form.clone();
+                        if child.record.is_effected() {
+                            self.form = child.form.clone();
+                        }
                     }
                 }
             }
 
             PatternKind::Sequence(_) | PatternKind::Repetition { .. } => {
-                for child in &mut self.children {
-                    child.realize(source);
+                if self.record.is_effected() {
+                    for child in &mut self.children {
+                        child.realize(source);
+                    }
+
+                    let forms: Vec<_> = self
+                        .children
+                        .iter()
+                        .map(|draft| draft.form.clone())
+                        .collect();
+
+                    let end = source.position();
+
+                    self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
                 }
-
-                let forms: Vec<_> = self
-                    .children
-                    .iter()
-                    .map(|draft| draft.form.clone())
-                    .collect();
-
-                let end = source.position();
-
-                self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
             }
         }
 

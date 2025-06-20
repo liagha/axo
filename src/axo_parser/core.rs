@@ -19,17 +19,9 @@ use {
 impl Parser {
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
-            Pattern::predicate(|token: &Token| {
-                let result = matches!(token.kind, TokenKind::Identifier(_));
-
-                println!("Found: {:?} => {}", token, result);
-
-                result
-            }),
+            Pattern::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
             |_, form| {
                 let input = form.inputs()[0].clone();
-
-                println!("Extracted {:?}", input);
 
                 if let Token {
                     kind: TokenKind::Identifier(identifier),
@@ -70,7 +62,7 @@ impl Parser {
         )
     }
 
-    pub fn unary() -> Pattern<Token, Element, ParseError> {
+    pub fn prefixed() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::predicate(|token: &Token| {
@@ -80,18 +72,8 @@ impl Parser {
                         false
                     }
                 })
-                .repeat_self(0, None)
-                .optional_self(),
+                .repeat_self(1, None),
                 Self::primary(),
-                Pattern::predicate(|token: &Token| {
-                    if let TokenKind::Operator(operator) = &token.kind {
-                        operator.is_postfix()
-                    } else {
-                        false
-                    }
-                })
-                .repeat_self(0, None)
-                .optional_self(),
             ]),
             |_, form| {
                 let sequence = form.unwrap()[0].clone().unwrap();
@@ -112,7 +94,32 @@ impl Parser {
                     );
                 }
 
-                let postfixes = Form::expand_inputs(sequence[2].unwrap());
+                Ok(unary)
+            },
+        )
+    }
+
+    pub fn postfixed() -> Pattern<Token, Element, ParseError> {
+        Pattern::transform(
+            Pattern::sequence([
+                Self::primary(),
+                Pattern::predicate(|token: &Token| {
+                    if let TokenKind::Operator(operator) = &token.kind {
+                        operator.is_postfix()
+                    } else {
+                        false
+                    }
+                })
+                .repeat_self(1, None),
+            ]),
+            |_, form| {
+                let sequence = form.unwrap()[0].clone().unwrap();
+
+                let operand = sequence[0].unwrap_output().unwrap();
+
+                let postfixes = Form::expand_inputs(sequence[1].unwrap());
+
+                let mut unary = operand.clone();
 
                 for postfix in postfixes {
                     unary = Element::new(
@@ -127,6 +134,10 @@ impl Parser {
                 Ok(unary)
             },
         )
+    }
+
+    pub fn unary() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Self::prefixed(), Self::postfixed()])
     }
 
     pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {

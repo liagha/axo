@@ -67,3 +67,4 @@ simple_element
         timeout;
         refresh
     }
+}

@@ -143,11 +143,6 @@ where
     {
         let result = match self {
             Action::Map(transform) => {
-                if draft.record != Record::Aligned {
-                    return;
-                } else {
-                }
-
                 let mut guard = transform.lock().unwrap();
                 let transformed = guard(source.context_mut(), draft.form.clone());
                 drop(guard);

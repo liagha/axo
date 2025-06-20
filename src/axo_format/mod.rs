@@ -37,27 +37,27 @@ pub fn format_tokens(tokens: &[Token]) -> String {
         .map(|(i, token)| {
             let token_str = match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => format!(
-                    "↓ {:?} | {:#?} ↓\n",
+                    "↓ {:#?} | {:#?} ↓\n",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Green)
                     .to_string(),
                 TokenKind::Punctuation(_) => format!(
-                    "{:?} | {:#?}",
+                    "{:#?} | {:#?}",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Green)
                     .to_string(),
                 TokenKind::Operator(_) => format!(
-                    "{:?} | {:#?}",
+                    "{:#?} | {:#?}",
                     token,
                     token.span
                 )
                     .term_colorize(Color::Orange)
                     .to_string(),
-                _ => format!("{:?} | {:#?}", token, token.span),
+                _ => format!("{:#?} | {:#?}", token, token.span),
             };
             if i < tokens.len() - 1
                 && !matches!(token.kind, TokenKind::Punctuation(PunctuationKind::Newline))

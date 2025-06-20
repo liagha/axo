@@ -15,22 +15,8 @@ impl Parser {
                 Pattern::ignore(Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })),
-                Pattern::lazy(|| Self::pattern()).optional_self(),
                 Pattern::repeat(
                     Pattern::sequence([
-                        Pattern::required(
-                            Pattern::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Action::failure(|_, form| {
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Comma,
-                                    )),
-                                    form.span,
-                                )
-                            }),
-                        ),
                         Pattern::lazy(|| Self::pattern()).optional_self(),
                     ]),
                     0,
@@ -117,29 +103,6 @@ impl Parser {
                 }))
                 .with_ignore(),
                 Pattern::lazy(|| Self::pattern()).optional_self(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::action(
-                            Pattern::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Action::trigger(
-                                Action::ignore(),
-                                Action::failure(|_, form| {
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                            PunctuationKind::Comma,
-                                        )),
-                                        form.span,
-                                    )
-                                }),
-                            ),
-                        ),
-                        Pattern::lazy(|| Self::pattern()).optional_self(),
-                    ]),
-                    0,
-                    None,
-                ),
                 Pattern::required(
                     Pattern::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
@@ -157,8 +120,6 @@ impl Parser {
             ]),
             move |_, form| {
                 let elements = form.outputs();
-
-                println!("Group Form: {:?}", form.expand());
 
                 Ok(Element::new(ElementKind::Group(elements), form.span))
             },
