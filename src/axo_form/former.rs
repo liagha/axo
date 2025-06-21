@@ -330,8 +330,6 @@ where
             | PatternKind::Wrapper(_) => {
                 for child in &mut self.children {
                     child.realize(source);
-
-                    self.form = child.form.clone();
                 }
             }
 
