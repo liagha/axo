@@ -1,4 +1,3 @@
-use crate::axo_parser::Item;
 use {
     super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
@@ -9,7 +8,7 @@ use {
             former::Former,
             pattern::Pattern,
         },
-        axo_parser::ItemKind,
+        axo_parser::{Item, ItemKind},
         axo_scanner::{PunctuationKind, Token, TokenKind},
         thread::Arc,
     },
@@ -63,7 +62,7 @@ impl Parser {
     }
 
     pub fn prefixed() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
+        Pattern::action(
             Pattern::sequence([
                 Pattern::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
@@ -72,15 +71,13 @@ impl Parser {
                         false
                     }
                 })
-                .repeat_self(1, None),
+                    .as_repeat(1, None),
                 Self::primary(),
             ]),
-            |_, form| {
-                let sequence = form.unwrap()[0].clone().unwrap();
+            Action::map(|_, form: Form<Token, Element, ParseError>| {
+                let prefixes = form.inputs();
 
-                let prefixes = Form::expand_inputs(sequence[0].unwrap());
-
-                let operand = sequence[1].unwrap_output().unwrap();
+                let operand = form.outputs()[0].clone();
 
                 let mut unary = operand.clone();
 
@@ -95,7 +92,7 @@ impl Parser {
                 }
 
                 Ok(unary)
-            },
+            })
         )
     }
 
@@ -110,7 +107,7 @@ impl Parser {
                         false
                     }
                 })
-                .repeat_self(1, None),
+                .as_repeat(1, None),
             ]),
             |_, form| {
                 let sequence = form.unwrap()[0].clone().unwrap();
@@ -159,7 +156,7 @@ impl Parser {
                         }),
                         Pattern::lazy(move || Self::unary()),
                     ]),
-                    0,
+                    1,
                     None,
                 ),
             ]),
@@ -425,14 +422,8 @@ impl Parser {
         Pattern::alternative([Self::identifier(), Self::literal()])
     }
 
-    pub fn whitespace() -> Pattern<Token, Element, ParseError> {
-        Pattern::ignore(Pattern::predicate(|token: &Token| {
-            token.kind == TokenKind::Punctuation(PunctuationKind::Space)
-        }))
-    }
-
     pub fn primary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::delimited(), Self::token(), Self::whitespace()])
+        Pattern::alternative([Self::delimited(), Self::token()])
     }
 
     pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
@@ -460,23 +451,26 @@ impl Parser {
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::conditional(
+        Pattern::action(
             Pattern::anything(),
             Action::failure(
-                |_, form: Form<Token, Element, crate::axo_error::Error<ErrorKind>>| {
+                |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
                         ErrorKind::UnexpectedToken(form.unwrap_input().unwrap().kind),
                         form.span,
                     )
                 },
             ),
-            Action::Ignore,
         )
     }
 
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
-            Pattern::alternative([Self::ignore(), Self::pattern(), Self::fallback()]),
+            Pattern::alternative([
+                Self::ignore(), 
+                Self::pattern(), 
+                Self::fallback()
+            ]),
             0,
             None,
         )

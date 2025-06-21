@@ -215,12 +215,21 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                 details
             );
         }
+        
 
         if context.verbose {
-            println!(
-                "Parsing Took {} ns\n",
-                parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap())
-            );
+            if !errors.is_empty() {
+                xprintln!(
+                    "parsing ended in {}ns with {} errors." => Color::Red, 
+                    parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap()), 
+                    errors.len());
+            } else { 
+                xprintln!(
+                    "parsing took {}ns" => Color::Green,
+                    parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap()), 
+                );
+            }
+            
         }
 
         Ok(elements)

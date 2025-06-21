@@ -3,7 +3,7 @@ use crate::{
     axo_cursor::Peekable,
     axo_form::{
         form::{Form, FormKind},
-        former::{Draft, Record},
+        former::{Draft},
     },
     axo_parser::{Item, ItemKind},
     compiler::{Context, Marked},
@@ -112,7 +112,7 @@ where
             }
 
             Action::Trigger { found, missing } => {
-                let chosen = if draft.record == Record::Aligned {
+                let chosen = if draft.record.is_aligned() {
                     found
                 } else {
                     missing
@@ -121,14 +121,12 @@ where
                 draft.pattern.action = Some(*chosen.clone());
             }
 
-            Action::Ignore => {}
-
             Action::Skip => {
-                draft.record = Record::Skipped;
+                draft.record.skip();
             }
 
             Action::Failure(_) => {
-                draft.record = Record::Failed;
+                draft.record.fail();
             }
 
             _ => {}
@@ -178,7 +176,7 @@ where
             }
 
             Action::Trigger { found, missing } => {
-                let chosen = if draft.record == Record::Aligned {
+                let chosen = if draft.record.is_aligned() {
                     found
                 } else {
                     missing
@@ -237,7 +235,6 @@ where
                 );
 
                 draft.form = form.clone();
-                draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
         };
 

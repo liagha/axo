@@ -331,11 +331,11 @@ where
         Self::alternative(vec![self, other])
     }
 
-    pub fn optional_self(self) -> Self {
+    pub fn as_optional(self) -> Self {
         Self::optional(Box::new(self))
     }
 
-    pub fn repeat_self(self, min: usize, max: Option<usize>) -> Self {
+    pub fn as_repeat(self, min: usize, max: Option<usize>) -> Self {
         Self::repeat(Box::new(self), min, max)
     }
 }
