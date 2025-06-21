@@ -110,6 +110,7 @@ impl Parser {
                 .as_repeat(1, None),
             ]),
             |_, form| {
+                println!("{:?}", form);
                 let sequence = form.unwrap()[0].clone().unwrap();
 
                 let operand = sequence[0].unwrap_output().unwrap();
@@ -253,13 +254,13 @@ impl Parser {
                 })
                 .with_ignore(),
                 Pattern::required(
-                    Pattern::lazy(|| Self::pattern()),
+                    Pattern::lazy(|| Self::element()),
                     Action::failure(|_, form| {
                         ParseError::new(ErrorKind::ExpectedCondition, form.span)
                     }),
                 ),
                 Pattern::required(
-                    Pattern::lazy(|| Self::pattern()),
+                    Pattern::lazy(|| Self::element()),
                     Action::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
                 ),
                 Pattern::optional(Pattern::sequence([
@@ -271,7 +272,7 @@ impl Parser {
                         }
                     })
                     .with_ignore(),
-                    Pattern::lazy(|| Self::pattern()),
+                    Pattern::lazy(|| Self::element()),
                 ])),
             ]),
             |_, form| {
@@ -321,7 +322,7 @@ impl Parser {
                     })
                     .with_ignore(),
                     Pattern::required(
-                        Pattern::lazy(|| Self::pattern()),
+                        Pattern::lazy(|| Self::element()),
                         Action::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
@@ -337,13 +338,13 @@ impl Parser {
                     })
                     .with_ignore(),
                     Pattern::required(
-                        Pattern::lazy(|| Self::pattern()),
+                        Pattern::lazy(|| Self::element()),
                         Action::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedCondition, form.span)
                         }),
                     ),
                     Pattern::required(
-                        Pattern::lazy(|| Self::pattern()),
+                        Pattern::lazy(|| Self::element()),
                         Action::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
@@ -395,7 +396,7 @@ impl Parser {
                     }
                 })
                 .with_ignore(),
-                Pattern::capture(0, Pattern::lazy(Self::pattern)),
+                Pattern::capture(0, Pattern::lazy(Self::element)),
             ]),
             move |context, _| {
                 let symbols = context.resolver.scope.symbols.clone();
@@ -446,13 +447,19 @@ impl Parser {
         )]))
     }
 
-    pub fn pattern() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::statement(), Self::expression(0)])
+    pub fn element() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([
+            Self::ignore(),
+            Self::statement(),
+            Self::expression(0)
+        ])
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
         Pattern::action(
-            Pattern::anything(),
+            Pattern::predicate(|_token| {
+                true
+            }),
             Action::failure(
                 |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
@@ -467,8 +474,7 @@ impl Parser {
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
             Pattern::alternative([
-                Self::ignore(), 
-                Self::pattern(), 
+                Self::element(),
                 Self::fallback()
             ]),
             0,

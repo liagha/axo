@@ -79,6 +79,8 @@ where
     /// Used to discard unwanted matches while continuing processing.
     Ignore,
 
+    /// Ignore and Skip the current form and go forward in the Alternative pattern.
+    /// Used for whitespaces so no additional skipping in the parser is needed.
     Skip,
 
     /// Generate a failure form using the provided emitter function.
@@ -96,13 +98,14 @@ where
     where
         Source: Peekable<Input> + Marked,
     {
-        let result = match self {
+        match self {
             Action::Inspect(inspector) => {
                 let mut guard = inspector.lock().unwrap();
                 let action = guard(draft.form.clone());
                 drop(guard);
 
                 draft.pattern.action = Some(action.clone());
+                action.apply(source, draft);
             }
 
             Action::Multiple(actions) => {
@@ -119,6 +122,8 @@ where
                 };
 
                 draft.pattern.action = Some(*chosen.clone());
+                
+                chosen.apply(source, draft);
             }
 
             Action::Skip => {
@@ -130,17 +135,19 @@ where
             }
 
             _ => {}
-        };
-
-        result
+        }
     }
 
     pub fn execute<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
     where
         Source: Peekable<Input> + Marked,
     {
-        let result = match self {
+        match self {
             Action::Map(transform) => {
+                if !draft.record.is_aligned() {
+                    return;
+                }
+                
                 let mut guard = transform.lock().unwrap();
                 let transformed = guard(source.context_mut(), draft.form.clone());
                 drop(guard);
@@ -236,9 +243,7 @@ where
 
                 draft.form = form.clone();
             }
-        };
-
-        result
+        }
     }
 
     pub fn failure<T>(transform: T) -> Self

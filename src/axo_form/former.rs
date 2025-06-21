@@ -30,8 +30,8 @@ impl Record {
     }
 
     #[inline]
-    pub fn is_failed(&self) -> bool { 
-        matches!(self, Record::Failed) 
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Record::Failed)
     }
 
     #[inline]
@@ -73,9 +73,9 @@ where
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub offset: usize,
+    pub record: Record,
     pub pattern: Pattern<Input, Output, Failure>,
     pub form: Form<Input, Output, Failure>,
-    pub record: Record,
     pub children: Vec<Draft<Input, Output, Failure>>,
 }
 
@@ -89,9 +89,9 @@ where
     pub fn new(offset: usize, pattern: Pattern<Input, Output, Failure>, span: Span) -> Self {
         Self {
             offset,
+            record: Record::Blank,
             pattern,
             form: Form::new(FormKind::Blank, span),
-            record: Record::Blank,
             children: Vec::new(),
         }
     }
@@ -101,76 +101,6 @@ where
         Source: Peekable<Input> + Marked,
     {
         match self.pattern.kind.clone() {
-            // Parents
-            PatternKind::Alternative(patterns) => {
-                let mut result: Option<Draft<Input, Output, Failure>> = None;
-
-                for pattern in patterns {
-                    let mut draft = Draft::new(self.offset, pattern, Span::default());
-                    draft.build(source);
-
-                    match draft.record {
-                        Record::Aligned => {
-                            result = Some(draft);
-                            
-                            break;
-                        }
-                        Record::Skipped => {
-                            if let Some(stack) = &result {
-                                if stack.record.is_failed() {
-                                    result = Some(draft);
-                                }
-                            } else { 
-                                result = Some(draft);
-                            }
-                        }
-                        Record::Failed => {
-                            if result.is_none() {
-                                result = Some(draft);
-                            }
-                        }
-                        Record::Blank => {
-                            continue;
-                        }
-                    }
-                }
-
-                if let Some(draft) = result {
-                    *self = draft;
-                } else {
-                    self.record.empty();
-                }
-            }
-            
-            PatternKind::Deferred(function) => {
-                let mut guard = function.lock().unwrap();
-                let resolved = guard();
-                drop(guard);
-
-                let mut draft = Draft::new(self.offset, resolved, Span::default());
-                draft.build(source);
-
-                *self = draft;
-            }
-
-            PatternKind::Optional(pattern) => {
-                let mut draft = Draft::new(self.offset, *pattern, Span::default());
-                draft.build(source);
-
-                if draft.record.is_effected() {
-                    *self = draft;
-                }
-
-                self.record.align();
-            }
-
-            PatternKind::Wrapper(pattern) => {
-                let mut child = Draft::new(self.offset, *pattern, Span::default());
-                child.build(source);
-
-                *self = child;
-            }
-            
             // Consumers
             PatternKind::Literal(expect) => {
                 if let Some(peek) = source.peek_ahead(self.offset) {
@@ -178,6 +108,19 @@ where
                         self.offset += 1;
                         self.record.align();
                         self.form = Form::new(FormKind::Input(expect), Span::default());
+                    }
+                }
+            }
+
+            PatternKind::Negation(pattern) => {
+                if let Some(peek) = source.peek_ahead(self.offset).cloned() {
+                    let mut draft = Draft::new(self.offset, *pattern, Span::default());
+                    draft.build(source);
+
+                    if !draft.record.is_aligned() {
+                        self.offset += 1;
+                        self.record.align();
+                        self.form = Form::new(FormKind::Input(peek), Span::default());
                     }
                 }
             }
@@ -196,29 +139,79 @@ where
                 }
             }
 
-            PatternKind::Negation(pattern) => {
-                if let Some(peek) = source.peek_ahead(self.offset).cloned() {
-                    let mut child = Draft::new(self.offset, *pattern, Span::default());
-                    child.build(source);
-
-                    if !child.record.is_aligned() {
-                        self.offset += 1;
-                        self.record.align();
-                        self.form = Form::new(FormKind::Input(peek), Span::default());
-                    } else {
-                        self.record.empty();
-                    }
-                } else {
-                    self.record.empty();
-                }
-            }
-
             PatternKind::WildCard => {
                 if let Some(peek) = source.peek_ahead(self.offset) {
                     self.offset += 1;
                     self.record.align();
                     self.form = Form::new(FormKind::Input(peek.clone()), Span::default());
                 }
+            }
+
+            // Parents
+            PatternKind::Alternative(patterns) => {
+                for pattern in patterns {
+                    let mut draft = Draft::new(self.offset, pattern, Span::default());
+                    draft.build(source);
+
+                    match draft.record {
+                        Record::Aligned => {
+                            self.offset = draft.offset;
+                            self.record = draft.record;
+                            self.form = draft.form.clone();
+                            self.children.push(draft);
+
+                            break;
+                        }
+                        Record::Failed => {
+                            self.offset = draft.offset;
+                            self.record = draft.record;
+                            self.form = draft.form.clone();
+                            self.children.push(draft);
+                        }
+                        Record::Skipped => {
+                            self.offset = draft.offset;
+                            self.children.push(draft);
+                        }
+                        Record::Blank => { continue }
+                    }
+                }
+            }
+
+            PatternKind::Deferred(function) => {
+                let mut guard = function.lock().unwrap();
+                let resolved = guard();
+                drop(guard);
+
+                let mut draft = Draft::new(self.offset, resolved, Span::default());
+                draft.build(source);
+
+                self.offset = draft.offset;
+                self.record = draft.record;
+                self.form = draft.form.clone();
+                self.children.push(draft);
+            }
+
+            PatternKind::Optional(pattern) => {
+                let mut draft = Draft::new(self.offset, *pattern, Span::default());
+                draft.build(source);
+
+                if draft.record.is_effected() {
+                    self.offset = draft.offset;
+                    self.form = draft.form.clone();
+                    self.children.push(draft);
+                }
+
+                self.record.align();
+            }
+
+            PatternKind::Wrapper(pattern) => {
+                let mut draft = Draft::new(self.offset, *pattern, Span::default());
+                draft.build(source);
+
+                self.offset = draft.offset;
+                self.record = draft.record;
+                self.form = draft.form.clone();
+                self.children.push(draft);
             }
 
             // Chains
@@ -249,7 +242,7 @@ where
 
                             break;
                         }
-                        
+
                         Record::Skipped => {}
                     }
                 }
@@ -281,7 +274,7 @@ where
                         }
 
                         Record::Blank => break,
-                        
+
                         Record::Skipped => {}
                     }
 
@@ -295,8 +288,6 @@ where
                 if count >= minimum {
                     self.offset = current;
                     self.record.align();
-                } else {
-                    self.record.empty();
                 }
             }
         }
@@ -306,54 +297,73 @@ where
         }
     }
 
-    pub fn realize<Source>(&mut self, source: &mut Source)
+    pub fn fit<Source>(&mut self, source: &mut Source)
     where
         Source: Peekable<Input> + Marked,
     {
-        let start = source.position();
+        match self.record {
+            Record::Aligned | Record::Skipped | Record::Failed => {
+                let start = source.position();
 
-        match &self.pattern.kind {
-            PatternKind::Literal(_)
-            | PatternKind::Predicate(_)
-            | PatternKind::Negation(_)
-            | PatternKind::WildCard => {
-                if let Some(input) = source.advance() {
-                    let end = source.position();
+                match &self.pattern.kind {
+                    PatternKind::Literal(_)
+                    | PatternKind::Negation(_)
+                    | PatternKind::Predicate(_)
+                    | PatternKind::WildCard => {
+                        if let Some(input) = source.advance() {
+                            let end = source.position();
 
-                    self.form = Form::new(FormKind::Input(input), Span::new(start, end));
+                            self.form = Form::new(FormKind::Input(input), Span::new(start, end));
+                        }
+                    }
+
+                    PatternKind::Alternative(_)
+                    | PatternKind::Deferred(_)
+                    | PatternKind::Optional(_)
+                    | PatternKind::Wrapper(_) => {
+                        for child in &mut self.children {
+                            match child.record {
+                                Record::Aligned => {
+                                    child.fit(source);
+                                    self.form = child.form.clone();
+
+                                    break;
+                                }
+                                Record::Skipped => {
+                                    child.fit(source);
+                                }
+                                Record::Failed => {
+                                    child.fit(source);
+                                    self.form = child.form.clone();
+                                }
+                                Record::Blank => { continue }
+                            }
+                        }
+                    }
+
+                    PatternKind::Sequence(_) | PatternKind::Repetition { .. } => {
+                        let mut forms = Vec::with_capacity(self.children.len());
+
+                        for child in &mut self.children {
+                            child.fit(source);
+
+                            forms.push(child.form.clone());
+                        }
+
+                        let end = source.position();
+
+                        self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
+                    }
+                }
+
+                self.children.clear();
+
+                if let Some(action) = &self.pattern.action.clone() {
+                    action.execute(source, self);
                 }
             }
 
-            PatternKind::Alternative(_)
-            | PatternKind::Optional(_)
-            | PatternKind::Deferred(_)
-            | PatternKind::Wrapper(_) => {
-                for child in &mut self.children {
-                    child.realize(source);
-                }
-            }
-
-            PatternKind::Sequence(_) | PatternKind::Repetition { .. } => {
-                for child in &mut self.children {
-                    child.realize(source);
-                }
-
-                let forms: Vec<_> = self
-                    .children
-                    .iter()
-                    .map(|draft| draft.form.clone())
-                    .collect();
-
-                let end = source.position();
-
-                self.form = Form::new(FormKind::Multiple(forms), Span::new(start, end));
-            }
-        }
-
-        self.children.clear();
-
-        if let Some(action) = &self.pattern.action.clone() {
-            action.execute(source, self);
+            Record::Blank => {}
         }
     }
 }
@@ -378,8 +388,7 @@ where
         let mut draft = Draft::new(0, pattern, Span::default());
 
         draft.build(self);
-
-        draft.realize(self);
+        draft.fit(self);
 
         draft.form
     }
