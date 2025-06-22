@@ -3,7 +3,7 @@
 use {
     super::{Position, Spanned},
     crate::{
-        axo_form::form::Form, compare::Ordering, file, format, format::Debug, hash::Hash, Path,
+        axo_form::form::Form, compare::Ordering, file, format, format::Debug, hash::Hash,
     },
 };
 
@@ -46,19 +46,6 @@ impl Span {
             start: pos.clone(),
             end: pos,
         }
-    }
-
-    #[inline]
-    pub fn from_coords(
-        file: Path,
-        start_line: usize,
-        start_col: usize,
-        end_line: usize,
-        end_col: usize,
-    ) -> Self {
-        let start = Position::at(file.clone(), start_line, start_col);
-        let end = Position::at(file, end_line, end_col);
-        Self::new(start, end)
     }
 
     #[inline]
@@ -112,7 +99,7 @@ impl Span {
 
     pub fn mix(&self, other: &Span) -> Span {
         if self.start.path != other.start.path {
-            panic!("cannot mix spans from `{}` with `{}`", self.start.path.display(), other.start.path.display());
+            panic!("cannot mix spans from `{}` with `{}`", self.start.path, other.start.path);
         }
 
         let start = if self.start.cmp(&other.start) == Ordering::Less {
@@ -153,7 +140,7 @@ impl Span {
             let end_of_line = Position {
                 line: self.start.line,
                 column: line_content.len() + 1,
-                path: self.start.path.clone(),
+                path: self.start.path,
             };
             result.push(Span::new(self.start.clone(), end_of_line));
         }
@@ -162,7 +149,7 @@ impl Span {
             let start_pos = Position {
                 line: line_num,
                 column: 1,
-                path: self.start.path.clone(),
+                path: self.start.path,
             };
             let mut end_pos = start_pos.clone();
 
@@ -179,7 +166,7 @@ impl Span {
         let start_of_last_line = Position {
             line: self.end.line,
             column: 1,
-            path: self.start.path.clone(),
+            path: self.start.path,
         };
         let start_of_last_line = start_of_last_line.correct();
 

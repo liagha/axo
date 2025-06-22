@@ -15,7 +15,6 @@ use {
         compiler::Context,
         compiler::Marked,
         float::FloatLiteral,
-        Path,
     },
 };
 
@@ -50,7 +49,7 @@ impl Peekable<char> for Scanner {
         self.set_position(Position {
             line: 1,
             column: 1,
-            path: self.position.path.clone(),
+            path: self.position.path,
         })
     }
 
@@ -97,7 +96,7 @@ impl Peekable<char> for Scanner {
 }
 
 impl Scanner {
-    pub fn new(context: Context, input: String, file: Path) -> Scanner {
+    pub fn new(context: Context, input: String, file: &'static str) -> Scanner {
         let chars: Vec<char> = input.chars().collect();
 
         Scanner {

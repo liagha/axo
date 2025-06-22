@@ -1,7 +1,9 @@
 use {
-    super::pattern::{Pattern, PatternKind},
+    super::{
+        pattern::{Pattern, PatternKind},
+    },
     crate::{
-        axo_cursor::{Peekable, Span},
+        axo_cursor::{Position, Peekable, Span, Spanned},
         axo_form::form::{Form, FormKind},
         compiler::Marked,
         format::Debug,
@@ -9,7 +11,6 @@ use {
         memory::drop,
     },
 };
-use crate::axo_cursor::{Position, Spanned};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Record {
@@ -109,10 +110,14 @@ where
                         let start = self.position.clone();
                         source.next(&mut self.index, &mut self.position);
                         let end = self.position.clone();
-                        
+
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
+                    } else {
+                        self.record.empty();
                     }
+                } else {
+                    self.record.empty();
                 }
             }
 
@@ -128,24 +133,34 @@ where
 
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
+                    } else {
+                        self.record.empty();
                     }
+                } else {
+                    self.record.empty();
                 }
             }
 
             PatternKind::Predicate(function) => {
                 if let Some(peek) = source.get(self.index).cloned() {
-                    let mut guard = function.lock().unwrap();
-                    let result = guard(&peek);
-                    drop(guard);
+                    let predicate = function.lock().map_or(false, |mut guard| {
+                        let predicate = guard(&peek);
+                        drop(guard);
+                        predicate
+                    });
 
-                    if result {
+                    if predicate {
                         let start = self.position.clone();
                         source.next(&mut self.index, &mut self.position);
                         let end = self.position.clone();
 
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
+                    } else {
+                        self.record.empty();
                     }
+                } else {
+                    self.record.empty();
                 }
             }
 
@@ -157,13 +172,15 @@ where
 
                     self.record.align();
                     self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
+                } else {
+                    self.record.empty();
                 }
             }
 
             // Parents
             PatternKind::Alternative(patterns) => {
                 let mut fallback = None;
-                
+
                 for pattern in patterns {
                     let mut draft = Draft::new(self.index, self.position.clone(), pattern);
                     draft.build(source);
@@ -174,8 +191,7 @@ where
                             self.position = draft.position;
                             self.record.align();
                             self.form = draft.form;
-
-                            break;
+                            return;
                         }
                         Record::Skipped => {
                             self.index = draft.index;
@@ -186,22 +202,31 @@ where
                                 fallback = Some(draft);
                             }
                         }
-                        Record::Blank => { continue }
+                        Record::Blank => {
+                            continue;
+                        }
                     }
                 }
-                
+
                 if let Some(fallback) = fallback {
                     self.index = fallback.index;
                     self.position = fallback.position;
                     self.record.fail();
                     self.form = fallback.form;
+                } else {
+                    self.record.empty();
                 }
             }
 
             PatternKind::Deferred(function) => {
-                let mut guard = function.lock().unwrap();
-                let resolved = guard();
-                drop(guard);
+                let resolved = if let Ok(mut guard) = function.lock() {
+                    let resolved = guard();
+                    drop(guard);
+                    resolved
+                } else {
+                    self.record.empty();
+                    return;
+                };
 
                 let mut draft = Draft::new(self.index, self.position.clone(), resolved);
                 draft.build(source);
@@ -247,27 +272,22 @@ where
 
                     match child.record {
                         Record::Aligned => {
+                            self.record.align();
                             index = child.index;
                             position = child.position.clone();
-                            self.record.align();
                             forms.push(child.form);
                         }
                         Record::Failed => {
+                            self.record.fail();
                             index = child.index;
                             position = child.position.clone();
-                            self.record.fail();
                             forms.push(child.form);
-
                             break;
                         }
                         Record::Blank => {
-                            index = self.index;
-                            position = child.position.clone();
                             self.record.empty();
-
                             break;
                         }
-
                         Record::Skipped => {}
                     }
                 }
@@ -275,7 +295,11 @@ where
                 self.index = index;
                 self.position = position;
 
-                self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
+                if forms.is_empty() {
+                    self.form = Form::new(FormKind::Blank, Span::point(self.position.clone()));
+                } else {
+                    self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
+                }
             }
 
             PatternKind::Repetition {
@@ -286,7 +310,7 @@ where
                 let mut index = self.index;
                 let mut position = self.position.clone();
                 let mut forms = Vec::new();
-                
+
                 while source.peek_ahead(index).is_some() {
                     let mut child = Draft::new(index, position.clone(), *pattern.clone());
                     child.build(source);
@@ -296,15 +320,13 @@ where
                     }
 
                     match child.record {
-                        Record::Aligned | Record::Skipped | Record::Failed => {
+                        Record::Aligned | Record::Failed => {
                             index = child.index;
                             position = child.position.clone();
                             forms.push(child.form);
                         }
+                        Record::Skipped => {}
                         Record::Blank => {
-                            index = self.index;
-                            position = child.position.clone();
-
                             break;
                         }
                     }
@@ -320,7 +342,14 @@ where
                     self.index = index;
                     self.position = position.clone();
                     self.record.align();
-                    self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
+
+                    if forms.is_empty() {
+                        self.form = Form::new(FormKind::Blank, Span::point(self.position.clone()));
+                    } else {
+                        self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
+                    }
+                } else {
+                    self.record.empty();
                 }
             }
         }
@@ -356,7 +385,7 @@ where
             self.set_index(draft.index);
             self.set_position(draft.position);
         }
-        
+
         draft.form
     }
 }

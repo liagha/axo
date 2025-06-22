@@ -45,7 +45,7 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
     }
 
     pub fn format(&self) -> (String, String) {
-        let source_code = read_to_string(self.span.start.path.clone()).unwrap_or_default();
+        let source_code = read_to_string(self.span.start.path).unwrap_or_default();
         let lines: Vec<&str> = source_code.lines().collect();
         let mut messages = String::new();
         let mut details = String::new();
@@ -58,7 +58,7 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
         let column_end = self.span.end.column;
 
         details.push_str(&format!(" --> {}:{}:{}\n",
-                                  self.span.start.path.display(),
+                                  self.span.start.path,
                                   line_start,
                                   column_start
         ).colorize(Color::Blue));

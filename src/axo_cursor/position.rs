@@ -1,17 +1,16 @@
 use {
     crate::{
-        Path,
         file::{read_to_string},
         format,
         compare::{Ordering},
     }
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
-    pub path: Path,
+    pub path: &'static str,
 }
 
 impl Default for Position {
@@ -19,13 +18,13 @@ impl Default for Position {
         Self {
             line: 1,
             column: 1,
-            path: Path::default(),
+            path: "",
         }
     }
 }
 
 impl Position {
-    pub fn new(file: Path) -> Self {
+    pub fn new(file: &'static str) -> Self {
         Self {
             line: 1,
             column: 1,
@@ -38,13 +37,13 @@ impl Position {
 
         let content = match read_to_string(&self.path) {
             Ok(content) => content,
-            Err(_) => return Self::new(self.path.clone()),
+            Err(_) => return Self::new(self.path),
         };
 
         let lines: Vec<&str> = content.lines().collect();
 
         if lines.is_empty() {
-            return Self::new(self.path.clone());
+            return Self::new(self.path);
         }
 
         corrected.line = corrected.line.max(1).min(lines.len());
@@ -66,7 +65,7 @@ impl Position {
         }
     }
 
-    pub fn at(file: Path, line: usize, column: usize) -> Self {
+    pub fn at(file: &'static str, line: usize, column: usize) -> Self {
         let mut pos = Self::new(file);
         pos.line = line;
         pos.column = column;
@@ -89,7 +88,7 @@ impl Position {
 
     pub fn cmp(&self, other: &Self) -> Ordering {
         if self.path != other.path {
-            return self.path.to_string_lossy().cmp(&other.path.to_string_lossy());
+            return self.path.cmp(&other.path);
         }
 
         match self.line.cmp(&other.line) {

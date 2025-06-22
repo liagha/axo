@@ -28,7 +28,6 @@ use {
         },
         format_tokens,
         indent,
-        Path,
         Timer, TIMERSOURCE,
     }
 };
@@ -73,12 +72,12 @@ impl Display for CompilerError {
 pub struct Context {
     pub verbose: bool,
     pub resolver: Resolver,
-    pub path: Path,
+    pub path: &'static str,
     pub content: String,
 }
 
 impl Context {
-    pub fn new(file_path: Path, content: String) -> Self {
+    pub fn new(file_path: &'static str, content: String) -> Self {
         Context {
             verbose: false,
             path: file_path,
@@ -109,7 +108,7 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(path: Path, verbose: bool) -> Result<Self, CompilerError> {
+    pub fn new(path: &'static str, verbose: bool) -> Result<Self, CompilerError> {
         let content = read_to_string(&path)
             .map_err(CompilerError::FileReadError)?;
 
@@ -137,7 +136,7 @@ impl Compiler {
         xprintln!(
             "{} {}" => Color::Blue,
             "Compiling" => Color::Blue,
-            self.context.path.display()
+            self.context.path
         );
         xprintln!();
 
@@ -159,7 +158,7 @@ impl Stage<(), Vec<Token>> for ScannerStage {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
         let scanner_timer = Timer::new(TIMERSOURCE);
 
-        let mut scanner = Scanner::new(context.clone(), context.content.clone(), context.path.clone());
+        let mut scanner = Scanner::new(context.clone(), context.content.clone(), context.path);
         let (tokens, errors) = scanner.scan();
 
         if !errors.is_empty() {
@@ -206,7 +205,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
         let parser_timer = Timer::new(TIMERSOURCE);
 
-        let mut parser = Parser::new(context.clone(), tokens, context.path.clone());
+        let mut parser = Parser::new(context.clone(), tokens, context.path);
         let (elements, errors) = parser.parse();
 
         for error in &errors {

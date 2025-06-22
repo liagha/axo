@@ -1,6 +1,5 @@
 use crate::{
     axo_cursor::{Position, Span},
-    Path,
 };
 
 pub trait Peekable<Item: PartialEq> {
@@ -76,7 +75,7 @@ pub trait Peekable<Item: PartialEq> {
         self.position_mut().column = line;
     }
 
-    fn set_path(&mut self, path: Path) {
+    fn set_path(&mut self, path: &'static str) {
         self.position_mut().path = path;
     }
 

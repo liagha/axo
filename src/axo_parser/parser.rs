@@ -7,7 +7,6 @@ use {
         axo_form::{form::FormKind, former::Former},
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         compiler::{Context, Marked},
-        Path,
     },
 };
 
@@ -43,7 +42,7 @@ impl Peekable<Token> for Parser {
         self.set_position(Position {
             line: 1,
             column: 1,
-            path: self.position.path.clone(),
+            path: self.position.path,
         })
     }
 
@@ -85,7 +84,7 @@ impl Peekable<Token> for Parser {
 }
 
 impl Parser {
-    pub fn new(context: Context, tokens: Vec<Token>, file: Path) -> Self {
+    pub fn new(context: Context, tokens: Vec<Token>, file: &'static str) -> Self {
         Parser {
             context,
             input: tokens,

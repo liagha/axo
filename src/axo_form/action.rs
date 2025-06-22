@@ -3,7 +3,7 @@ use crate::{
     axo_cursor::Peekable,
     axo_form::{
         form::{Form, FormKind},
-        former::{Draft},
+        former::Draft,
     },
     axo_parser::{Item, ItemKind},
     compiler::{Context, Marked},
@@ -17,15 +17,15 @@ use crate::{
 pub type Transformer<Input, Output, Failure> = Arc<
     Mutex<
         dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
-            + Send
-            + Sync,
+        + Send
+        + Sync,
     >,
 >;
 
 /// An emitter function that generates a failure from a span location.
 /// Used to create error messages or failure states at specific positions in the input.
 pub type Emitter<Input, Output, Failure> =
-    Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync>>;
+Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync>>;
 
 /// An executor function that performs side effects without returning a value.
 /// Used for logging, debugging, or other operations that don't transform the form.
@@ -75,7 +75,7 @@ where
     /// Used to discard unwanted matches while continuing processing.
     Ignore,
 
-    /// Ignore and Skip the current form and go forward in the Alternative pattern.
+    /// Skip the current form and move forward in pattern matching.
     /// Used for whitespaces so no additional skipping in the parser is needed.
     Skip,
 
@@ -100,20 +100,24 @@ where
                     return;
                 }
 
-                let mut guard = transform.lock().unwrap();
-                let transformed = guard(source.context_mut(), draft.form.clone());
-                drop(guard);
+                let result = if let Ok(mut guard) = transform.lock() {
+                    let result = guard(source.context_mut(), draft.form.clone());
+                    drop(guard);
+                    result
+                } else {
+                    return;
+                };
 
                 let span = draft.form.span.clone();
 
-                match transformed {
+                match result {
                     Ok(output) => {
                         let mapped = Form::new(FormKind::Output(output), span);
-
                         draft.form = mapped;
                     }
                     Err(error) => {
                         draft.form = Form::new(FormKind::Failure(error), span);
+                        draft.record.fail();
                     }
                 }
             }
@@ -154,48 +158,53 @@ where
                 }
 
                 let span = draft.form.span.clone();
-
                 draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
             Action::Skip => {
-                if !draft.record.is_skipped() {
-                    return;
+                if draft.record.is_aligned() {
+                    let span = draft.form.span.clone();
+
+                    draft.record.skip();
+                    draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
                 }
-
-                let span = draft.form.span.clone();
-
-                draft.record.skip();
-                draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
             Action::Perform(executor) => {
                 if !draft.record.is_aligned() {
                     return;
                 }
-                
-                let mut guard = executor.lock().unwrap();
-                guard();
-                drop(guard);
+
+                if let Ok(mut guard) = executor.lock() {
+                    guard();
+                    drop(guard);
+                }
             }
 
             Action::Failure(function) => {
-                if !draft.record.is_failed() {
-                    return;
-                }
-                
                 let span = draft.form.span.clone();
 
-                let mut guard = function.lock().unwrap();
-                let form = Form::new(
-                    FormKind::Failure(guard(source.context_mut(), draft.form.clone())),
-                    span.clone(),
-                );
+                if let Ok(mut guard) = function.lock() {
+                    let failure = guard(source.context_mut(), draft.form.clone());
+                    drop(guard);
 
-                draft.record.fail();
-                draft.form = form.clone();
+                    let form = Form::new(FormKind::Failure(failure), span);
+                    draft.record.fail();
+                    draft.form = form;
+                }
             }
-            _ => {}
+
+            Action::Trigger { found, missing } => {
+                let chosen = if draft.record.is_aligned() {
+                    found
+                } else {
+                    missing
+                };
+
+                draft.pattern.action = Some(*chosen.clone());
+
+                chosen.execute(source, draft);
+            }
         }
     }
 
@@ -209,9 +218,9 @@ where
     pub fn map<T>(transformer: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     {
         Self::Map(Arc::new(Mutex::new(transformer)))
     }
@@ -229,6 +238,10 @@ where
 
     pub fn ignore() -> Self {
         Self::Ignore
+    }
+
+    pub fn skip() -> Self {
+        Self::Skip
     }
 
     pub fn multiple(actions: Vec<Self>) -> Self {

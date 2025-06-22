@@ -12,9 +12,10 @@ impl Parser {
     pub fn bundle() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                })),
+                })
+                .with_ignore(),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
@@ -42,9 +43,8 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
-                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                                Span::default(),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftBrace,
                             )),
                             form.span,
                         )
@@ -62,9 +62,10 @@ impl Parser {
     pub fn scope() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                })),
+                })
+                .with_ignore(),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
@@ -92,10 +93,9 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
+                            ErrorKind::UnclosedDelimiter(
                                 TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                                Span::default(),
-                            )),
+                            ),
                             form.span,
                         )
                     }),
@@ -146,9 +146,8 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
-                                TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                                Span::default(),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftParenthesis,
                             )),
                             form.span,
                         )
@@ -169,7 +168,7 @@ impl Parser {
                 Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 })
-                    .with_ignore(),
+                .with_ignore(),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
@@ -200,9 +199,8 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
-                                TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                                Span::default(),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftParenthesis,
                             )),
                             form.span,
                         )
@@ -220,9 +218,10 @@ impl Parser {
     pub fn collection() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                })),
+                })
+                .with_ignore(),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
@@ -250,9 +249,8 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
-                                TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                                Span::default(),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftBracket,
                             )),
                             form.span,
                         )
@@ -270,9 +268,10 @@ impl Parser {
     pub fn series() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                })),
+                })
+                .with_ignore(),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
@@ -300,9 +299,8 @@ impl Parser {
                     }),
                     Action::failure(|_, form| {
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(Token::new(
-                                TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                                Span::default(),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftBracket,
                             )),
                             form.span,
                         )

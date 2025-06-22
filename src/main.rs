@@ -34,8 +34,6 @@ pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 #[cfg(target_arch = "aarch64")]
 pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
-pub type Path = std::path::PathBuf;
-
 pub mod file {
     pub use std::fs::read_to_string;
     pub use std::io::Error;
@@ -152,7 +150,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
     Ok(())
 }
 
-fn parse_arguments() -> Result<(Path, bool), CompilerError> {
+fn parse_arguments() -> Result<(&'static str, bool), CompilerError> {
     let args: Vec<String> = environment::args().collect();
 
     let mut path = String::new();
@@ -183,6 +181,6 @@ fn parse_arguments() -> Result<(Path, bool), CompilerError> {
     if path.is_empty() {
         return Err(CompilerError::PathRequired);
     }
-
-    Ok((Path::from(path), verbose))
+    
+    Ok((path.leak(), verbose))
 }

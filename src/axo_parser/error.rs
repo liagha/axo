@@ -19,7 +19,7 @@ pub enum ErrorKind {
     PatternError,
     DanglingElse,
     MissingSeparator(TokenKind),
-    UnclosedDelimiter(Token),
+    UnclosedDelimiter(TokenKind),
     UnexpectedPunctuation,
     UnexpectedToken(TokenKind),
 }
