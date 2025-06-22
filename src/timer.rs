@@ -141,10 +141,10 @@ pub enum TimerState {
 }
 
 pub struct Timer<T: TimeSource> {
-    time_source: T,
+    source: T,
     state: TimerState,
-    start_time: u64,
-    elapsed_before_pause: u64,
+    start: u64,
+    elapsed: u64,
     duration: Option<u64>,
     laps: [u64; 32], 
     lap_count: usize,
@@ -153,10 +153,10 @@ pub struct Timer<T: TimeSource> {
 impl<T: ?Sized + TimeSource> Timer<T> {
     pub fn new(time_source: T) -> Self {
         let mut timer = Timer {
-            time_source,
+            source: time_source,
             state: TimerState::Stopped,
-            start_time: 0,
-            elapsed_before_pause: 0,
+            start: 0,
+            elapsed: 0,
             duration: None,
             laps: [0; 32],
             lap_count: 0,
@@ -171,10 +171,12 @@ impl<T: ?Sized + TimeSource> Timer<T> {
         if self.state == TimerState::Running {
             return Err(TimerError::AlreadyRunning);
         }
+        
         self.state = TimerState::Running;
-        self.start_time = self.time_source.now();
-        self.elapsed_before_pause = 0;
+        self.start = self.source.now();
+        self.elapsed = 0;
         self.lap_count = 0;
+        
         Ok(())
     }
 
@@ -184,7 +186,7 @@ impl<T: ?Sized + TimeSource> Timer<T> {
         }
         let elapsed = self.elapsed()?;
         self.state = TimerState::Stopped;
-        self.elapsed_before_pause = 0;
+        self.elapsed = 0;
         Ok(elapsed)
     }
 
@@ -192,7 +194,7 @@ impl<T: ?Sized + TimeSource> Timer<T> {
         match self.state {
             TimerState::Running => {
                 let elapsed = self.elapsed()?;
-                self.elapsed_before_pause = elapsed;
+                self.elapsed = elapsed;
                 self.state = TimerState::Paused;
                 Ok(elapsed)
             }
@@ -204,7 +206,7 @@ impl<T: ?Sized + TimeSource> Timer<T> {
     pub fn resume(&mut self) -> TimerResult<()> {
         match self.state {
             TimerState::Paused => {
-                self.start_time = self.time_source.now();
+                self.start = self.source.now();
                 self.state = TimerState::Running;
                 Ok(())
             }
@@ -215,27 +217,27 @@ impl<T: ?Sized + TimeSource> Timer<T> {
 
     pub fn reset(&mut self) {
         self.state = TimerState::Stopped;
-        self.start_time = 0;
-        self.elapsed_before_pause = 0;
+        self.start = 0;
+        self.elapsed = 0;
         self.lap_count = 0;
     }
 
     pub fn elapsed(&self) -> TimerResult<u64> {
         match self.state {
             TimerState::Stopped => {
-                if self.elapsed_before_pause > 0 {
-                    Ok(self.elapsed_before_pause)
+                if self.elapsed > 0 {
+                    Ok(self.elapsed)
                 } else {
                     Err(TimerError::NotRunning)
                 }
             }
-            TimerState::Paused => Ok(self.elapsed_before_pause),
+            TimerState::Paused => Ok(self.elapsed),
             TimerState::Running => {
-                let now = self.time_source.now();
-                if now < self.start_time {
+                let now = self.source.now();
+                if now < self.start {
                     Err(TimerError::Overflow)
                 } else {
-                    Ok(self.elapsed_before_pause + (now - self.start_time))
+                    Ok(self.elapsed + (now - self.start))
                 }
             }
         }
@@ -284,19 +286,19 @@ impl<T: ?Sized + TimeSource> Timer<T> {
     }
 
     pub fn to_seconds(&self, time: u64) -> u64 {
-        time / self.time_source.resolution()
+        time / self.source.resolution()
     }
 
     pub fn to_milliseconds(&self, time: u64) -> u64 {
-        time * 1_000 / self.time_source.resolution()
+        time * 1_000 / self.source.resolution()
     }
 
     pub fn to_microseconds(&self, time: u64) -> u64 {
-        time * 1_000_000 / self.time_source.resolution()
+        time * 1_000_000 / self.source.resolution()
     }
 
     pub fn to_nanoseconds(&self, time: u64) -> u64 {
-        time * 1_000_000_000 / self.time_source.resolution()
+        time * 1_000_000_000 / self.source.resolution()
     }
 
     pub fn remaining(&self) -> TimerResult<Option<u64>> {

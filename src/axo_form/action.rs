@@ -54,16 +54,12 @@ where
     /// The form passes through unchanged after execution.
     Perform(Executor),
 
-    /// Inspect the form and dynamically choose an action based on its content.
-    /// The inspector function examines the form and returns the action to perform.
-    Inspect(Inspector<Input, Output, Failure>),
-
     /// Execute multiple actions in sequence.
     /// Each action is applied to the result of the previous action.
     Multiple(Vec<Action<Input, Output, Failure>>),
 
     /// Conditional execution based on whether the form has content.
-    /// Executes `found` if the form contains input/output data, `missing` if it's empty/failed.
+    /// Executes `found` if the draft was Aligned, `missing` if it Failed or didn't Align.
     Trigger {
         found: Box<Action<Input, Output, Failure>>,
         missing: Box<Action<Input, Output, Failure>>,
@@ -94,50 +90,6 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    pub fn apply<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
-    where
-        Source: Peekable<Input> + Marked,
-    {
-        match self {
-            Action::Inspect(inspector) => {
-                let mut guard = inspector.lock().unwrap();
-                let action = guard(draft.form.clone());
-                drop(guard);
-
-                draft.pattern.action = Some(action.clone());
-                action.apply(source, draft);
-            }
-
-            Action::Multiple(actions) => {
-                for action in actions {
-                    action.apply(source, draft);
-                }
-            }
-
-            Action::Trigger { found, missing } => {
-                let chosen = if draft.record.is_aligned() {
-                    found
-                } else {
-                    missing
-                };
-
-                draft.pattern.action = Some(*chosen.clone());
-                
-                chosen.apply(source, draft);
-            }
-
-            Action::Skip => {
-                draft.record.skip();
-            }
-
-            Action::Failure(_) => {
-                draft.record.fail();
-            }
-
-            _ => {}
-        }
-    }
-
     pub fn execute<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
     where
         Source: Peekable<Input> + Marked,
@@ -147,7 +99,7 @@ where
                 if !draft.record.is_aligned() {
                     return;
                 }
-                
+
                 let mut guard = transform.lock().unwrap();
                 let transformed = guard(source.context_mut(), draft.form.clone());
                 drop(guard);
@@ -166,35 +118,17 @@ where
                 }
             }
 
-            Action::Inspect(inspector) => {
-                let mut guard = inspector.lock().unwrap();
-                let action = guard(draft.form.clone());
-                drop(guard);
-
-                draft.pattern.action = Some(action.clone());
-
-                action.execute(source, draft);
-            }
-
             Action::Multiple(actions) => {
                 for action in actions.iter() {
                     action.execute(source, draft);
                 }
             }
 
-            Action::Trigger { found, missing } => {
-                let chosen = if draft.record.is_aligned() {
-                    found
-                } else {
-                    missing
-                };
-
-                draft.pattern.action = Some(*chosen.clone());
-
-                chosen.execute(source, draft);
-            }
-
             Action::Capture { identifier } => {
+                if !draft.record.is_aligned() {
+                    return;
+                }
+
                 let resolver = &mut source.context_mut().resolver;
 
                 let artifact = draft.form.clone().map(
@@ -215,24 +149,41 @@ where
             }
 
             Action::Ignore => {
+                if !draft.record.is_aligned() {
+                    return;
+                }
+
                 let span = draft.form.span.clone();
 
                 draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
             Action::Skip => {
+                if !draft.record.is_skipped() {
+                    return;
+                }
+
                 let span = draft.form.span.clone();
 
+                draft.record.skip();
                 draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
             Action::Perform(executor) => {
+                if !draft.record.is_aligned() {
+                    return;
+                }
+                
                 let mut guard = executor.lock().unwrap();
                 guard();
                 drop(guard);
             }
 
             Action::Failure(function) => {
+                if !draft.record.is_failed() {
+                    return;
+                }
+                
                 let span = draft.form.span.clone();
 
                 let mut guard = function.lock().unwrap();
@@ -241,8 +192,10 @@ where
                     span.clone(),
                 );
 
+                draft.record.fail();
                 draft.form = form.clone();
             }
+            _ => {}
         }
     }
 
@@ -261,16 +214,6 @@ where
             + 'static,
     {
         Self::Map(Arc::new(Mutex::new(transformer)))
-    }
-
-    pub fn inspect<T>(inspector: T) -> Self
-    where
-        T: FnMut(Form<Input, Output, Failure>) -> Action<Input, Output, Failure>
-            + Send
-            + Sync
-            + 'static,
-    {
-        Self::Inspect(Arc::new(Mutex::new(inspector)))
     }
 
     pub fn perform<T>(executor: T) -> Self

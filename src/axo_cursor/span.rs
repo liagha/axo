@@ -214,7 +214,7 @@ impl<Item: Spanned> Spanned for Vec<Item> {
 
             Span { start, end }
         } else if self.len() == 1 {
-            self.first().unwrap().span()
+            self[0].span()
         } else {
             Span::default()
         }

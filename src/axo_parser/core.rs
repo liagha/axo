@@ -441,7 +441,6 @@ impl Parser {
                         | TokenKind::Punctuation(PunctuationKind::Tab)
                         | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                         | TokenKind::Punctuation(PunctuationKind::Space)
-                        | TokenKind::Punctuation(PunctuationKind::Semicolon)
                 )
             },
         )]))

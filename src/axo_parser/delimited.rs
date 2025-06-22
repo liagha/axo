@@ -15,7 +15,7 @@ impl Parser {
                 Pattern::ignore(Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::required(
@@ -31,7 +31,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
@@ -65,7 +65,7 @@ impl Parser {
                 Pattern::ignore(Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::required(
@@ -81,7 +81,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
@@ -116,7 +116,7 @@ impl Parser {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 })
                 .with_ignore(),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::action(
@@ -135,7 +135,7 @@ impl Parser {
                                 }),
                             ),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
@@ -166,26 +166,30 @@ impl Parser {
     pub fn sequence() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::ignore(Pattern::predicate(|token: &Token| {
+                Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-                })),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                })
+                    .with_ignore(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
-                        Pattern::required(
+                        Pattern::action(
                             Pattern::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Action::failure(|_, form| {
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Semicolon,
-                                    )),
-                                    form.span,
-                                )
-                            }),
+                            Action::trigger(
+                                Action::ignore(),
+                                Action::failure(|_, form| {
+                                    ParseError::new(
+                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                            PunctuationKind::Semicolon,
+                                        )),
+                                        form.span,
+                                    )
+                                }),
+                            ),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
@@ -208,7 +212,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Sequence(elements), form.span))
+                Ok(Element::new(ElementKind::Group(elements), form.span))
             },
         )
     }
@@ -219,7 +223,7 @@ impl Parser {
                 Pattern::ignore(Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::required(
@@ -235,7 +239,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
@@ -269,7 +273,7 @@ impl Parser {
                 Pattern::ignore(Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })),
-                Pattern::lazy(|| Self::element()).as_optional(),
+                Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([
                         Pattern::required(
@@ -285,7 +289,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(|| Self::element()).as_optional(),
+                        Pattern::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,

@@ -5,8 +5,8 @@ use {
         pattern::PatternKind,
     },
     crate::{
-        axo_form::pattern::Pattern,
-        axo_format::vector::Show,
+        any::{Any},
+        vector::Show,
         format::{Debug, Display, Formatter, Result},
         hash::Hash,
     },
@@ -33,91 +33,12 @@ where
             }
 
             FormKind::Multiple(forms) => {
-                write!(f, "Multiple(")?;
-
-                write!(
-                    f,
-                    "{}",
-                    forms
-                        .iter()
-                        .map(|form| form.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
-
-                write!(f, ")")
+                write!(f, "Multiple({})", forms.format())
             }
 
             FormKind::Failure(error) => {
                 write!(f, "Failure({:?})", error)
             }
-        }
-    }
-}
-
-impl<Input, Output, Failure> Display for Pattern<Input, Output, Failure>
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.kind)
-    }
-}
-
-impl<Input, Output, Failure> Display for PatternKind<Input, Output, Failure>
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            PatternKind::Deferred(_) => {
-                write!(f, "lazy")
-            }
-            PatternKind::Literal(literal) => {
-                write!(f, "{:?}", literal)
-            }
-            PatternKind::Alternative(patterns) => {
-                let patterns = patterns
-                    .iter()
-                    .map(|pattern| pattern.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" | ");
-
-                write!(f, "{}", patterns)
-            }
-            PatternKind::Sequence(sequence) => {
-                let patterns = sequence
-                    .iter()
-                    .map(|pattern| pattern.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-
-                write!(f, "{}", patterns)
-            }
-            PatternKind::Repetition {
-                pattern,
-                minimum,
-                maximum,
-            } => {
-                write!(f, "{}..{}", pattern, minimum)?;
-
-                if let Some(maximum) = maximum {
-                    write!(f, "-{}", maximum)?;
-                }
-
-                write!(f, ")")
-            }
-            PatternKind::Optional(pattern) => {
-                write!(f, "{}?", pattern)
-            }
-            PatternKind::Predicate(_) => write!(f, "predicate"),
-            PatternKind::Negation(_) => write!(f, "negate"),
-            PatternKind::WildCard => write!(f, "anything"),
-            PatternKind::Wrapper(pattern) => write!(f, "wrap({})", pattern),
         }
     }
 }
@@ -130,8 +51,8 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Deferred(_) => {
-                write!(f, "Lazy")
+            PatternKind::Deferred(function) => {
+                write!(f, "Lazy({:?})", function.type_id())
             }
             PatternKind::Literal(literal) => {
                 write!(f, "Literal({:?})", literal)
@@ -147,8 +68,12 @@ where
                 minimum,
                 maximum,
             } => {
-                write!(f, "Repeat({:?}, {}", pattern, minimum)?;
+                write!(f, "Repeat({:?}", pattern)?;
 
+                if *minimum != 0 {
+                    write!(f, ", {}", minimum)?;
+                }
+                
                 if let Some(maximum) = maximum {
                     write!(f, "-{}", maximum)?;
                 }
@@ -168,27 +93,6 @@ where
     }
 }
 
-impl<Input, Output, Failure> Display for Action<Input, Output, Failure>
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Action::Map(_) => write!(f, "map"),
-            Action::Perform(_) => write!(f, "execute"),
-            Action::Inspect(_) => write!(f, "inspect"),
-            Action::Multiple(actions) => write!(f, "multiple({})", actions.format()),
-            Action::Trigger { found, missing } => write!(f, "trigger({}, {})", found, missing),
-            Action::Capture { identifier } => write!(f, "capture({})", identifier),
-            Action::Ignore => write!(f, "ignore"),
-            Action::Skip => write!(f, "skip"),
-            Action::Failure(_) => write!(f, "failure"),
-        }
-    }
-}
-
 impl<Input, Output, Failure> Debug for Action<Input, Output, Failure>
 where
     Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -197,15 +101,14 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Action::Map(_) => write!(f, "Map"),
-            Action::Perform(_) => write!(f, "Execute"),
-            Action::Inspect(_) => write!(f, "Inspect"),
+            Action::Map(function) => write!(f, "Map({:?})", function.type_id()),
+            Action::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
             Action::Multiple(actions) => write!(f, "Multiple({:?})", actions),
             Action::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
             Action::Capture { identifier } => write!(f, "Capture({:?})", identifier),
             Action::Ignore => write!(f, "Ignore"),
             Action::Skip => write!(f, "Skip"),
-            Action::Failure(_) => write!(f, "Failure"),
+            Action::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
         }
     }
 }

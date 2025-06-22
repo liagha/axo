@@ -1,5 +1,7 @@
 use {
     broccli::{xprintln, Color},
+    
+    core::time::Duration,
 
     crate::{
         axo_scanner::{
@@ -176,11 +178,22 @@ impl Stage<(), Vec<Token>> for ScannerStage {
         if context.verbose {
             xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
             xprintln!();
+            
+            if !errors.is_empty() {
+                let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
-            println!(
-                "Scanning Took {} ns\n",
-                scanner_timer.to_nanoseconds(scanner_timer.elapsed().unwrap())
-            );
+                xprintln!(
+                    "Scanning Ended In {} Seconds With {} Errors." => Color::Red, 
+                    duration.as_secs_f64(), 
+                    errors.len());
+            } else {
+                let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
+
+                xprintln!(
+                    "Scanning Ended In {} Seconds" => Color::Green,
+                    duration.as_secs_f64(), 
+                );
+            }
         }
 
         Ok(tokens)
@@ -196,6 +209,15 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
         let mut parser = Parser::new(context.clone(), tokens, context.path.clone());
         let (elements, errors) = parser.parse();
 
+        for error in &errors {
+            let (message, details) = error.format();
+            xprintln!(
+                "{}\n{}" => Color::Red,
+                message => Color::Orange,
+                details
+            );
+        }
+
         if context.verbose {
             let tree = elements
                 .iter()
@@ -205,31 +227,22 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 
             xprintln!("Elements:\n{}" => Color::Green, indent(&tree));
             xprintln!();
-        }
-
-        for error in &errors {
-            let (message, details) = error.format();
-            xprintln!(
-                "{}\n{}" => Color::Red,
-                message => Color::Orange,
-                details
-            );
-        }
-        
-
-        if context.verbose {
+            
             if !errors.is_empty() {
+                let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
+                
                 xprintln!(
-                    "parsing ended in {}ns with {} errors." => Color::Red, 
-                    parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap()), 
+                    "Parsing Ended In {} Seconds With {} Errors." => Color::Red, 
+                    duration.as_secs_f64(), 
                     errors.len());
             } else { 
+                let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
+                
                 xprintln!(
-                    "parsing took {}ns" => Color::Green,
-                    parser_timer.to_nanoseconds(parser_timer.elapsed().unwrap()), 
+                    "Parsing Ended In {} Seconds" => Color::Green,
+                    duration.as_secs_f64(), 
                 );
             }
-            
         }
 
         Ok(elements)

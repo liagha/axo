@@ -14,6 +14,7 @@ mod logger;
 mod timer;
 mod artifact;
 
+use std::time::Duration;
 pub use {
     axo_data::*,
     axo_format::*,
@@ -140,9 +141,11 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
     compiler.compile()?;
 
     if verbose {
+        let duration = Duration::from_nanos(main_timer.elapsed().unwrap());
+        
         println!(
             "Total Compilation Took {} ns",
-            main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
+            duration.as_secs_f64()
         );
     }
 
