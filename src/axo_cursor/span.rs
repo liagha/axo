@@ -112,7 +112,7 @@ impl Span {
 
     pub fn mix(&self, other: &Span) -> Span {
         if self.start.path != other.start.path {
-            panic!("Cannot mix spans from different files");
+            panic!("cannot mix spans from `{}` with `{}`", self.start.path.display(), other.start.path.display());
         }
 
         let start = if self.start.cmp(&other.start) == Ordering::Less {
@@ -209,10 +209,10 @@ where
 impl<Item: Spanned> Spanned for Vec<Item> {
     fn span(&self) -> Span {
         if self.len() >= 2 {
-            let start = self.first().unwrap().span().start;
-            let end = self.last().unwrap().span().end;
+            let start = self.first().unwrap().span();
+            let end = self.last().unwrap().span();
 
-            Span { start, end }
+            Span::mix(&start, &end)
         } else if self.len() == 1 {
             self[0].span()
         } else {
