@@ -85,7 +85,6 @@ where
             }
             PatternKind::Predicate(_) => write!(f, "Predicate"),
             PatternKind::Negation(_) => write!(f, "Negate"),
-            PatternKind::WildCard => write!(f, "Anything"),
             PatternKind::Wrapper(pattern) => {
                 write!(f, "Wrap({:?})", pattern)
             }

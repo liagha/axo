@@ -639,7 +639,9 @@ impl Scanner {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let form = self.form(Self::pattern());
+            let form = self.form(&|pattern| { 
+                pattern.clone() 
+            }, Self::pattern());
 
             match form.kind {
                 FormKind::Output(token) => {

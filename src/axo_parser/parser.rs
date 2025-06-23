@@ -9,6 +9,7 @@ use {
         compiler::{Context, Marked},
     },
 };
+use crate::axo_form::pattern::Pattern;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -100,7 +101,11 @@ impl Parser {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let forms = self.form(Self::parser()).expand();
+            let forms = self.form(&|pattern| {
+                Pattern::alternative([
+                    pattern.clone(),
+                ])
+            }, Self::parser()).expand();
 
             for form in forms {
                 match form.kind {

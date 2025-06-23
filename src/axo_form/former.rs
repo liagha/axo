@@ -12,6 +12,8 @@ use {
     },
 };
 
+pub type FormEntry<Input, Output, Failure> = dyn Fn(&Pattern<Input, Output, Failure>) -> Pattern<Input, Output, Failure>;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Record {
     Aligned,
@@ -91,25 +93,27 @@ where
     pub fn new(index: usize, position: Position, pattern: Pattern<Input, Output, Failure>) -> Self {
         Self {
             index,
-            position: position.clone(),
+            position,
             record: Record::Blank,
             pattern,
-            form: Form::new(FormKind::Blank, Span::point(position.clone())),
+            form: Form::new(FormKind::Blank, Span::point(position)),
         }
     }
 
-    pub fn build<Source>(&mut self, source: &mut Source)
+    pub fn build<Source>(&mut self, entry: &FormEntry<Input, Output, Failure>, source: &mut Source)
     where
         Source: Peekable<Input> + Marked,
     {
-        match self.pattern.kind.clone() {
+        let pattern = entry(&self.pattern);
+
+        match pattern.kind {
             // Consumers
             PatternKind::Literal(expect) => {
                 if let Some(peek) = source.get(self.index).cloned() {
                     if peek == expect {
-                        let start = self.position.clone();
+                        let start = self.position;
                         source.next(&mut self.index, &mut self.position);
-                        let end = self.position.clone();
+                        let end = self.position;
 
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
@@ -123,13 +127,13 @@ where
 
             PatternKind::Negation(pattern) => {
                 if let Some(peek) = source.get(self.index).cloned() {
-                    let mut draft = Draft::new(self.index, self.position.clone(), *pattern);
-                    draft.build(source);
+                    let mut draft = Draft::new(self.index, self.position, *pattern);
+                    draft.build(entry, source);
 
                     if !draft.record.is_aligned() {
-                        let start = self.position.clone();
+                        let start = self.position;
                         source.next(&mut self.index, &mut self.position);
-                        let end = self.position.clone();
+                        let end = self.position;
 
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
@@ -150,9 +154,9 @@ where
                     });
 
                     if predicate {
-                        let start = self.position.clone();
+                        let start = self.position;
                         source.next(&mut self.index, &mut self.position);
-                        let end = self.position.clone();
+                        let end = self.position;
 
                         self.record.align();
                         self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
@@ -164,26 +168,13 @@ where
                 }
             }
 
-            PatternKind::WildCard => {
-                if let Some(peek) = source.get(self.index).cloned() {
-                    let start = self.position.clone();
-                    source.next(&mut self.index, &mut self.position);
-                    let end = self.position.clone();
-
-                    self.record.align();
-                    self.form = Form::new(FormKind::Input(peek), Span::new(start, end));
-                } else {
-                    self.record.empty();
-                }
-            }
-
             // Parents
             PatternKind::Alternative(patterns) => {
                 let mut fallback = None;
 
                 for pattern in patterns {
-                    let mut draft = Draft::new(self.index, self.position.clone(), pattern);
-                    draft.build(source);
+                    let mut draft = Draft::new(self.index, self.position, pattern);
+                    draft.build(entry, source);
 
                     match draft.record {
                         Record::Aligned => {
@@ -228,8 +219,8 @@ where
                     return;
                 };
 
-                let mut draft = Draft::new(self.index, self.position.clone(), resolved);
-                draft.build(source);
+                let mut draft = Draft::new(self.index, self.position, resolved);
+                draft.build(entry, source);
 
                 self.index = draft.index;
                 self.position = draft.position;
@@ -238,8 +229,8 @@ where
             }
 
             PatternKind::Optional(pattern) => {
-                let mut draft = Draft::new(self.index, self.position.clone(), *pattern);
-                draft.build(source);
+                let mut draft = Draft::new(self.index, self.position, *pattern);
+                draft.build(entry, source);
 
                 if draft.record.is_effected() {
                     self.index = draft.index;
@@ -251,8 +242,8 @@ where
             }
 
             PatternKind::Wrapper(pattern) => {
-                let mut draft = Draft::new(self.index, self.position.clone(), *pattern);
-                draft.build(source);
+                let mut draft = Draft::new(self.index, self.position, *pattern);
+                draft.build(entry, source);
 
                 self.index = draft.index;
                 self.position = draft.position;
@@ -263,24 +254,24 @@ where
             // Chains
             PatternKind::Sequence(sequence) => {
                 let mut index = self.index;
-                let mut position = self.position.clone();
+                let mut position = self.position;
                 let mut forms = Vec::with_capacity(sequence.len());
 
                 for pattern in sequence {
-                    let mut child = Draft::new(index, position.clone(), pattern);
-                    child.build(source);
+                    let mut child = Draft::new(index, position, pattern);
+                    child.build(entry, source);
 
                     match child.record {
                         Record::Aligned => {
                             self.record.align();
                             index = child.index;
-                            position = child.position.clone();
+                            position = child.position;
                             forms.push(child.form);
                         }
                         Record::Failed => {
                             self.record.fail();
                             index = child.index;
-                            position = child.position.clone();
+                            position = child.position;
                             forms.push(child.form);
                             break;
                         }
@@ -296,7 +287,7 @@ where
                 self.position = position;
 
                 if forms.is_empty() {
-                    self.form = Form::new(FormKind::Blank, Span::point(self.position.clone()));
+                    self.form = Form::new(FormKind::Blank, Span::point(self.position));
                 } else {
                     self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
                 }
@@ -308,12 +299,12 @@ where
                 maximum,
             } => {
                 let mut index = self.index;
-                let mut position = self.position.clone();
+                let mut position = self.position;
                 let mut forms = Vec::new();
 
                 while source.peek_ahead(index).is_some() {
-                    let mut child = Draft::new(index, position.clone(), *pattern.clone());
-                    child.build(source);
+                    let mut child = Draft::new(index, position, *pattern.clone());
+                    child.build(entry, source);
 
                     if child.index == index {
                         break;
@@ -322,7 +313,7 @@ where
                     match child.record {
                         Record::Aligned | Record::Failed => {
                             index = child.index;
-                            position = child.position.clone();
+                            position = child.position;
                             forms.push(child.form);
                         }
                         Record::Skipped => {}
@@ -340,11 +331,11 @@ where
 
                 if forms.len() >= minimum {
                     self.index = index;
-                    self.position = position.clone();
+                    self.position = position;
                     self.record.align();
 
                     if forms.is_empty() {
-                        self.form = Form::new(FormKind::Blank, Span::point(self.position.clone()));
+                        self.form = Form::new(FormKind::Blank, Span::point(self.position));
                     } else {
                         self.form = Form::new(FormKind::Multiple(forms.clone()), forms.span());
                     }
@@ -366,7 +357,7 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure>;
+    fn form(&mut self, entry: &FormEntry<Input, Output, Failure>, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
 impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
@@ -376,10 +367,10 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure> {
+    fn form(&mut self, entry: &FormEntry<Input, Output, Failure>, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), pattern);
 
-        draft.build(self);
+        draft.build(entry, self);
 
         if draft.record.is_effected() {
             self.set_index(draft.index);

@@ -208,6 +208,7 @@ where
         }
     }
 
+    #[inline]
     pub fn failure<T>(transform: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
@@ -215,6 +216,7 @@ where
         Self::Failure(Arc::new(Mutex::new(transform)))
     }
 
+    #[inline]
     pub fn map<T>(transformer: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
@@ -225,6 +227,7 @@ where
         Self::Map(Arc::new(Mutex::new(transformer)))
     }
 
+    #[inline]
     pub fn perform<T>(executor: T) -> Self
     where
         T: FnMut() + Send + Sync + 'static,
@@ -232,22 +235,27 @@ where
         Self::Perform(Arc::new(Mutex::new(executor)))
     }
 
+    #[inline]
     pub fn capture(identifier: usize) -> Self {
         Self::Capture { identifier }
     }
 
+    #[inline]
     pub fn ignore() -> Self {
         Self::Ignore
     }
 
+    #[inline]
     pub fn skip() -> Self {
         Self::Skip
     }
 
+    #[inline]
     pub fn multiple(actions: Vec<Self>) -> Self {
         Self::Multiple(actions)
     }
 
+    #[inline]
     pub fn chain<I>(actions: I) -> Self
     where
         I: IntoIterator<Item = Self>,
@@ -255,6 +263,7 @@ where
         Self::Multiple(actions.into_iter().collect())
     }
 
+    #[inline]
     pub fn trigger(found: Self, missing: Self) -> Self {
         Self::Trigger {
             found: Box::new(found),
@@ -262,22 +271,16 @@ where
         }
     }
 
-    pub fn when_found(action: Self) -> Self {
-        Self::trigger(action, Self::ignore())
-    }
-
-    pub fn when_missing(action: Self) -> Self {
-        Self::trigger(Self::ignore(), action)
-    }
-
     pub fn then(self, next: Self) -> Self {
         Self::multiple(vec![self, next])
     }
 
+    #[inline]
     pub fn with_capture(self, identifier: usize) -> Self {
         self.then(Self::capture(identifier))
     }
 
+    #[inline]
     pub fn with_ignore(self) -> Self {
         self.then(Self::ignore())
     }

@@ -448,7 +448,6 @@ impl Parser {
 
     pub fn element() -> Pattern<Token, Element, ParseError> {
         Pattern::alternative([
-            Self::ignore(),
             Self::statement(),
             Self::expression(0)
         ])

@@ -63,10 +63,6 @@ where
     /// All patterns must succeed for the sequence to succeed.
     Sequence(Vec<Pattern<Input, Output, Failure>>),
 
-    /// Matches any single input value.
-    /// Never fails as long as input is available.
-    WildCard,
-
     /// Wraps another pattern without changing its behavior.
     /// Used for applying actions to existing patterns.
     Wrapper(Box<Pattern<Input, Output, Failure>>),
@@ -93,6 +89,7 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
+    #[inline]
     pub fn exact(value: Input) -> Self {
         Self {
             kind: PatternKind::Literal(value),
@@ -100,6 +97,7 @@ where
         }
     }
 
+    #[inline]
     pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Alternative(patterns.into()),
@@ -107,6 +105,7 @@ where
         }
     }
 
+    #[inline]
     pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Sequence(patterns.into()),
@@ -114,6 +113,7 @@ where
         }
     }
 
+    #[inline]
     pub fn capture(
         identifier: usize,
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
@@ -124,10 +124,12 @@ where
         }
     }
 
+    #[inline]
     pub fn as_capture(&self, identifier: usize) -> Self {
         Self::capture(identifier, Box::new(self.clone()))
     }
 
+    #[inline]
     pub fn repeat(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         minimum: usize,
@@ -143,6 +145,7 @@ where
         }
     }
 
+    #[inline]
     pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Optional(pattern.into()),
@@ -150,6 +153,7 @@ where
         }
     }
 
+    #[inline]
     pub fn predicate<F>(predicate: F) -> Self
     where
         F: FnMut(&Input) -> bool + Send + Sync + 'static,
@@ -160,6 +164,7 @@ where
         }
     }
 
+    #[inline]
     pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Negation(pattern.into()),
@@ -167,13 +172,17 @@ where
         }
     }
 
+    #[inline]
     pub fn anything() -> Self {
-        Self {
-            kind: PatternKind::WildCard,
-            action: None,
-        }
+        Self::predicate(|_| true)
     }
 
+    #[inline]
+    pub fn nothing() -> Self {
+        Self::predicate(|_| false)
+    }
+
+    #[inline]
     pub fn required(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         action: Action<Input, Output, Failure>,
@@ -187,6 +196,7 @@ where
         }
     }
 
+    #[inline]
     pub fn lazy<F>(factory: F) -> Self
     where
         F: FnMut() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
@@ -197,6 +207,7 @@ where
         }
     }
 
+    #[inline]
     pub fn transform<T>(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         transform: T,
@@ -213,6 +224,7 @@ where
         }
     }
 
+    #[inline]
     pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Wrapper(pattern.into()),
@@ -220,6 +232,7 @@ where
         }
     }
 
+    #[inline]
     pub fn skip(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Wrapper(pattern.into()),
@@ -227,6 +240,7 @@ where
         }
     }
 
+    #[inline]
     pub fn error(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         function: Emitter<Input, Output, Failure>,
@@ -237,6 +251,7 @@ where
         }
     }
 
+    #[inline]
     pub fn conditional(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         found: Action<Input, Output, Failure>,
@@ -251,6 +266,7 @@ where
         }
     }
 
+    #[inline]
     pub fn action(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         action: Action<Input, Output, Failure>,
@@ -261,21 +277,25 @@ where
         }
     }
 
+    #[inline]
     pub fn with_action(mut self, action: Action<Input, Output, Failure>) -> Self {
         self.action = Some(action);
         self
     }
 
+    #[inline]
     pub fn with_ignore(mut self) -> Self {
         self.action = Some(Action::Ignore);
         self
     }
 
+    #[inline]
     pub fn with_error(mut self, function: Emitter<Input, Output, Failure>) -> Self {
         self.action = Some(Action::Failure(function));
         self
     }
 
+    #[inline]
     pub fn with_conditional(
         mut self,
         found: Action<Input, Output, Failure>,
@@ -288,6 +308,7 @@ where
         self
     }
 
+    #[inline]
     pub fn with_transform<T>(mut self, transform: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
@@ -299,43 +320,13 @@ where
         self
     }
 
-    pub fn any_of(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
-        Self::alternative(patterns)
+    #[inline]
+    pub fn as_optional(&self) -> Self {
+        Self::optional(Box::new(self.clone()))
     }
 
-    pub fn all_of(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
-        Self::sequence(patterns)
-    }
-
-    pub fn maybe(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self::optional(pattern)
-    }
-
-    pub fn not(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self::negate(pattern)
-    }
-
-    pub fn anything_except(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
-        Self::negate(Box::new(Self::alternative(patterns)))
-    }
-
-    pub fn empty() -> Self {
-        Self::optional(Box::new(Self::negate(Box::new(Self::anything()))))
-    }
-
-    pub fn then(self, other: Pattern<Input, Output, Failure>) -> Self {
-        Self::sequence(vec![self, other])
-    }
-
-    pub fn or(self, other: Pattern<Input, Output, Failure>) -> Self {
-        Self::alternative(vec![self, other])
-    }
-
-    pub fn as_optional(self) -> Self {
-        Self::optional(Box::new(self))
-    }
-
-    pub fn as_repeat(self, min: usize, max: Option<usize>) -> Self {
-        Self::repeat(Box::new(self), min, max)
+    #[inline]
+    pub fn as_repeat(&self, min: usize, max: Option<usize>) -> Self {
+        Self::repeat(Box::new(self.clone()), min, max)
     }
 }
