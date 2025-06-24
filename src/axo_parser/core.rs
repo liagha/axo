@@ -431,8 +431,8 @@ impl Parser {
         Pattern::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
     }
 
-    pub fn ignore() -> Pattern<Token, Element, ParseError> {
-        Pattern::skip(Pattern::alternative([Pattern::predicate(
+    pub fn whitespace() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Pattern::predicate(
             |token: &Token| {
                 matches!(
                     token.kind,
@@ -443,7 +443,7 @@ impl Parser {
                         | TokenKind::Punctuation(PunctuationKind::Space)
                 )
             },
-        )]))
+        )])
     }
 
     pub fn element() -> Pattern<Token, Element, ParseError> {

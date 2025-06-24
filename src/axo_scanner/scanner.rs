@@ -70,11 +70,11 @@ impl Peekable<char> for Scanner {
         None
     }
 
-    fn input(&self) -> &[char] {
-        self.input.as_slice()
+    fn input(&self) -> &Vec<char> {
+        &self.input
     }
 
-    fn input_mut(&mut self) -> &mut [char] {
+    fn input_mut(&mut self) -> &mut Vec<char> {
         &mut self.input
     }
 
@@ -639,9 +639,7 @@ impl Scanner {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let form = self.form(&|pattern| { 
-                pattern.clone() 
-            }, Self::pattern());
+            let form = self.form(Self::pattern());
 
             match form.kind {
                 FormKind::Output(token) => {

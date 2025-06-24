@@ -1,6 +1,8 @@
 use crate::{
     artifact::Artifact,
-    axo_cursor::Peekable,
+    axo_cursor::{
+        Position, Peekable,
+    },
     axo_form::{
         form::{Form, FormKind},
         former::Draft,
@@ -31,11 +33,17 @@ Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Failure + Sen
 /// Used for logging, debugging, or other operations that don't transform the form.
 pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
 
-/// An inspector function that examines a form and returns an action to be performed.
+/// An inspector function that examines a draft and returns an action to be performed.
 /// Used for dynamic action selection based on form content.
 pub type Inspector<Input, Output, Failure> = Arc<
-    Mutex<dyn FnMut(Form<Input, Output, Failure>) -> Action<Input, Output, Failure> + Send + Sync>,
+    Mutex<dyn FnMut(Draft<Input, Output, Failure>) -> Action<Input, Output, Failure> + Send + Sync>,
 >;
+
+/// A shifter for repositioning the cursor of the draft.
+pub type Shifter = Arc<dyn Fn(&mut usize, &mut Position)>;
+
+/// A tweaker for changing the info of the draft.
+pub type Tweaker<Input, Output, Failure> = Arc<dyn Fn(&mut Draft<Input, Output, Failure>) + Send + Sync>;
 
 /// Actions define what happens when patterns match during form processing.
 /// Each action can transform, execute side effects, or control the flow of processing.
@@ -78,6 +86,17 @@ where
     /// Skip the current form and move forward in pattern matching.
     /// Used for whitespaces so no additional skipping in the parser is needed.
     Skip,
+    
+    /// Shift the position of a draft.
+    Shift(Shifter),
+    
+    /// Clearing the records of a draft.
+    Pardon,
+    
+    /// Tweak the info of a draft.
+    Tweak(Tweaker<Input, Output, Failure>),
+    
+    Remove,
 
     /// Generate a failure form using the provided emitter function.
     /// The emitter receives the current span and produces a failure value.
@@ -90,6 +109,7 @@ where
     Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
+    #[inline]
     pub fn execute<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
     where
         Source: Peekable<Input> + Marked,
@@ -193,6 +213,10 @@ where
                     draft.form = form;
                 }
             }
+            
+            Action::Shift(shifter) => {
+                shifter(&mut draft.index, &mut draft.position);
+            }
 
             Action::Trigger { found, missing } => {
                 let chosen = if draft.record.is_aligned() {
@@ -204,6 +228,15 @@ where
                 draft.pattern.action = Some(*chosen.clone());
 
                 chosen.execute(source, draft);
+            },
+            Action::Tweak(tweaker) => {
+                tweaker(draft);
+            }
+            Action::Remove => {
+                source.remove(draft.index);
+            }
+            Action::Pardon => {
+                draft.record.empty();
             }
         }
     }

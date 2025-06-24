@@ -3,13 +3,18 @@
 use {
     super::{error::ErrorKind, Element, ElementKind, ItemKind, ParseError},
     crate::{
+        format::Debug,
+        hash::Hash,
         axo_cursor::{Peekable, Position, Span},
-        axo_form::{form::FormKind, former::Former},
+        axo_form::{
+            pattern::Pattern,
+            form::FormKind, 
+            former::Former,
+        },
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         compiler::{Context, Marked},
     },
 };
-use crate::axo_form::pattern::Pattern;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -49,7 +54,7 @@ impl Peekable<Token> for Parser {
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
         if let Some(token) = self.get(*index) {
-            *position = token.span.end.clone();
+            *position = token.span.end;
 
             *index += 1;
 
@@ -59,11 +64,11 @@ impl Peekable<Token> for Parser {
         None
     }
 
-    fn input(&self) -> &[Token] {
-        self.input.as_slice()
+    fn input(&self) -> &Vec<Token> {
+        &self.input
     }
 
-    fn input_mut(&mut self) -> &mut [Token] {
+    fn input_mut(&mut self) -> &mut Vec<Token> {
         &mut self.input
     }
 
@@ -95,17 +100,30 @@ impl Parser {
             errors: Vec::new(),
         }
     }
-
+    
+    pub fn strainer() -> Pattern<Token, Element, ParseError> {
+        Pattern::repeat(
+            Pattern::predicate(|token: &Token| {
+                !matches!(token.kind, 
+                    TokenKind::Punctuation(PunctuationKind::Newline)
+                    | TokenKind::Punctuation(PunctuationKind::Tab)
+                    | TokenKind::Punctuation(PunctuationKind::Space)
+                    | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                )
+            }),
+            0,
+            None
+        )
+    }
+    
     pub fn parse(&mut self) -> (Vec<Element>, Vec<ParseError>) {
         let mut elements = Vec::new();
         let mut errors = Vec::new();
+        
+        self.strain(Self::strainer());
 
         while self.peek().is_some() {
-            let forms = self.form(&|pattern| {
-                Pattern::alternative([
-                    pattern.clone(),
-                ])
-            }, Self::parser()).expand();
+            let forms = self.form(Self::parser()).expand();
 
             for form in forms {
                 match form.kind {

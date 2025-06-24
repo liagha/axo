@@ -42,9 +42,17 @@ pub trait Peekable<Item: PartialEq> {
     fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
         self.input_mut().get_mut(index)
     }
+    
+    fn insert(&mut self, index: usize, item: Item) {
+        self.input_mut().insert(index, item);
+    }
+    
+    fn remove(&mut self, index: usize) -> Option<Item> {
+        Some(self.input_mut().remove(index))
+    }
 
-    fn input(&self) -> &[Item];
-    fn input_mut(&mut self) -> &mut [Item];
+    fn input(&self) -> &Vec<Item>;
+    fn input_mut(&mut self) -> &mut Vec<Item>;
 
     fn position(&self) -> Position;
     fn position_mut(&mut self) -> &mut Position;

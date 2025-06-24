@@ -208,15 +208,6 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
         let mut parser = Parser::new(context.clone(), tokens, context.path);
         let (elements, errors) = parser.parse();
 
-        for error in &errors {
-            let (message, details) = error.format();
-            xprintln!(
-                "{}\n{}" => Color::Red,
-                message => Color::Orange,
-                details
-            );
-        }
-
         if context.verbose {
             let tree = elements
                 .iter()
@@ -226,17 +217,27 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
 
             xprintln!("Elements:\n{}" => Color::Green, indent(&tree));
             xprintln!();
-            
+
             if !errors.is_empty() {
                 let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
+
+                for error in &errors {
+                    let (message, details) = error.format();
+                    xprintln!(
+                        "{}\n{}" => Color::Red,
+                        message => Color::Orange,
+                        details
+                    );
+                }
                 
                 xprintln!(
                     "Parsing Ended In {} Seconds With {} Errors." => Color::Red, 
                     duration.as_secs_f64(), 
-                    errors.len());
-            } else { 
+                    errors.len()
+                );
+            } else {
                 let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
-                
+
                 xprintln!(
                     "Parsing Ended In {} Seconds" => Color::Green,
                     duration.as_secs_f64(), 

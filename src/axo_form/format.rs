@@ -51,22 +51,23 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Deferred(function) => {
+            PatternKind::Deferred { function } => {
                 write!(f, "Lazy({:?})", function.type_id())
             }
-            PatternKind::Literal(literal) => {
-                write!(f, "Literal({:?})", literal)
+            PatternKind::Literal { value } => {
+                write!(f, "Literal({:?})", value)
             }
-            PatternKind::Alternative(patterns) => {
+            PatternKind::Alternative { patterns } => {
                 write!(f, "Alternative({:?})", patterns)
             }
-            PatternKind::Sequence(sequence) => {
-                write!(f, "Sequence({:?})", sequence)
+            PatternKind::Sequence { patterns } => {
+                write!(f, "Sequence({:?})", patterns)
             }
             PatternKind::Repetition {
                 pattern,
                 minimum,
                 maximum,
+                ..
             } => {
                 write!(f, "Repeat({:?}", pattern)?;
 
@@ -80,12 +81,12 @@ where
 
                 write!(f, ")")
             }
-            PatternKind::Optional(pattern) => {
+            PatternKind::Optional { pattern } => {
                 write!(f, "Optional({:?})", pattern)
             }
-            PatternKind::Predicate(_) => write!(f, "Predicate"),
-            PatternKind::Negation(_) => write!(f, "Negate"),
-            PatternKind::Wrapper(pattern) => {
+            PatternKind::Predicate { .. } => write!(f, "Predicate"),
+            PatternKind::Negation { .. } => write!(f, "Negate"),
+            PatternKind::Wrapper { pattern } => {
                 write!(f, "Wrap({:?})", pattern)
             }
         }
@@ -107,7 +108,11 @@ where
             Action::Capture { identifier } => write!(f, "Capture({:?})", identifier),
             Action::Ignore => write!(f, "Ignore"),
             Action::Skip => write!(f, "Skip"),
+            Action::Shift(function) => write!(f, "Shifter({:?})", function.type_id()),
             Action::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
+            Action::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
+            Action::Remove => write!(f, "Remove"),
+            Action::Pardon => write!(f, "Pardon"),
         }
     }
 }

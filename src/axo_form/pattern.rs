@@ -29,27 +29,39 @@ where
 {
     /// Matches if any of the contained patterns match (logical OR).
     /// Tries patterns in order and succeeds on the first match.
-    Alternative(Vec<Pattern<Input, Output, Failure>>),
+    Alternative {
+        patterns: Vec<Pattern<Input, Output, Failure>>
+    },
 
     /// Matches input that satisfies the given predicate function.
     /// The predicate receives the input value and returns true/false.
-    Predicate(Predicate<Input>),
+    Predicate { 
+        function: Predicate<Input>, 
+    },
 
     /// Lazily evaluates to create a pattern when needed.
     /// Useful for recursive patterns or context-dependent matching.
-    Deferred(Evaluator<Input, Output, Failure>),
+    Deferred { 
+        function: Evaluator<Input, Output, Failure> 
+    },
 
     /// Matches exactly the specified input value.
     /// Uses equality comparison to determine matches.
-    Literal(Input),
+    Literal {
+        value: Input
+    },
 
     /// Matches input that does NOT match the inner pattern (logical NOT).
     /// Succeeds when the inner pattern fails, and vice versa.
-    Negation(Box<Pattern<Input, Output, Failure>>),
+    Negation {
+        pattern: Box<Pattern<Input, Output, Failure>>
+    },
 
     /// Optionally matches the inner pattern.
     /// Always succeeds, whether the inner pattern matches or not.
-    Optional(Box<Pattern<Input, Output, Failure>>),
+    Optional { 
+        pattern: Box<Pattern<Input, Output, Failure>> 
+    },
 
     /// Matches the inner pattern a specified number of times.
     /// Must match at least `minimum` times, up to `maximum` times (if specified).
@@ -61,11 +73,15 @@ where
 
     /// Matches all contained patterns in order (logical AND).
     /// All patterns must succeed for the sequence to succeed.
-    Sequence(Vec<Pattern<Input, Output, Failure>>),
+    Sequence { 
+        patterns: Vec<Pattern<Input, Output, Failure>>, 
+    },
 
     /// Wraps another pattern without changing its behavior.
     /// Used for applying actions to existing patterns.
-    Wrapper(Box<Pattern<Input, Output, Failure>>),
+    Wrapper { 
+        pattern: Box<Pattern<Input, Output, Failure>> 
+    },
 }
 
 /// A pattern defines how to match input and what action to take on successful matches.
@@ -92,7 +108,9 @@ where
     #[inline]
     pub fn exact(value: Input) -> Self {
         Self {
-            kind: PatternKind::Literal(value),
+            kind: PatternKind::Literal { 
+                value 
+            },
             action: None,
         }
     }
@@ -100,7 +118,9 @@ where
     #[inline]
     pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Alternative(patterns.into()),
+            kind: PatternKind::Alternative {
+                patterns: patterns.into()
+            },
             action: None,
         }
     }
@@ -108,7 +128,9 @@ where
     #[inline]
     pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Sequence(patterns.into()),
+            kind: PatternKind::Sequence { 
+                patterns: patterns.into() 
+            },
             action: None,
         }
     }
@@ -148,7 +170,9 @@ where
     #[inline]
     pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Optional(pattern.into()),
+            kind: PatternKind::Optional { 
+                pattern: pattern.into() 
+            },
             action: None,
         }
     }
@@ -159,7 +183,9 @@ where
         F: FnMut(&Input) -> bool + Send + Sync + 'static,
     {
         Self {
-            kind: PatternKind::Predicate(Arc::new(Mutex::new(predicate))),
+            kind: PatternKind::Predicate { 
+                function: Arc::new(Mutex::new(predicate)) 
+            },
             action: None,
         }
     }
@@ -167,7 +193,9 @@ where
     #[inline]
     pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Negation(pattern.into()),
+            kind: PatternKind::Negation { 
+                pattern: pattern.into() 
+            },
             action: None,
         }
     }
@@ -188,7 +216,9 @@ where
         action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Trigger {
                 found: Action::perform(|| {}).into(),
                 missing: action.into(),
@@ -202,7 +232,9 @@ where
         F: FnMut() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
     {
         Self {
-            kind: PatternKind::Deferred(Arc::new(Mutex::new(factory))),
+            kind: PatternKind::Deferred { 
+                function: Arc::new(Mutex::new(factory)) 
+            },
             action: None,
         }
     }
@@ -219,7 +251,9 @@ where
             + 'static,
     {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Map(Arc::new(Mutex::new(transform)))),
         }
     }
@@ -227,7 +261,9 @@ where
     #[inline]
     pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Ignore),
         }
     }
@@ -235,7 +271,9 @@ where
     #[inline]
     pub fn skip(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Skip),
         }
     }
@@ -246,7 +284,9 @@ where
         function: Emitter<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Failure(function)),
         }
     }
@@ -258,7 +298,9 @@ where
         missing: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(Action::Trigger {
                 found: Box::new(found),
                 missing: Box::new(missing),
@@ -272,7 +314,9 @@ where
         action: Action<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper(pattern.into()),
+            kind: PatternKind::Wrapper { 
+                pattern: pattern.into() 
+            },
             action: Some(action),
         }
     }

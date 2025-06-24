@@ -14,7 +14,7 @@ mod logger;
 mod timer;
 mod artifact;
 
-use std::time::Duration;
+use core::time::Duration;
 pub use {
     axo_data::*,
     axo_format::*,
