@@ -109,6 +109,7 @@ impl Parser {
                     | TokenKind::Punctuation(PunctuationKind::Tab)
                     | TokenKind::Punctuation(PunctuationKind::Space)
                     | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                    | TokenKind::Comment(_)
                 )
             }),
             0,

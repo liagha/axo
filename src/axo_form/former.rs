@@ -383,11 +383,26 @@ where
     Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn strain(&mut self, pattern: Pattern<Input, Output, Failure>) {
-        let mut draft = Draft::new(0, self.position(), pattern);
+        let mut inputs = Vec::with_capacity(self.len());
+        let mut index = 0;
+        let mut position = self.position();
+        
+        while self.get(index).is_some() {
+            let mut draft = Draft::new(index, position, pattern.clone());
+            draft.build(self);
 
-        draft.build(self);
+            if draft.record.is_aligned() {
+                index = draft.index + 1;
+                position = draft.position;
 
-        println!("Inputs: {:?}", draft.consumed);
+                inputs.extend(draft.consumed);
+            } else { 
+                index = draft.index + 1;
+                position = draft.position;
+            }
+        }
+        
+        *self.input_mut() = inputs;
     }
 
     fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure> {
