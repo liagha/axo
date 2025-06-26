@@ -6,6 +6,7 @@ use {
     
     OperatorKind::*,
 };
+use crate::axo_scanner::Character;
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum OperatorKind {
@@ -203,6 +204,49 @@ impl Display for OperatorKind {
 pub trait Operator {
     fn is_operator(&self) -> bool;
     fn to_operator(&self) -> OperatorKind;
+}
+
+impl Operator for Character {
+    fn is_operator(&self) -> bool {
+        matches!(
+            self.value,
+            '~' | '=' | ':' | '+' | '-' |
+            '*' | '/' | '^' | '|' | '&' |
+            '%' | '>' | '<' | '!' | '.' |
+            '@' | '\'' | '?' | '#' | '$' |
+            '\\' | '`' | '_' | '"'
+        )
+    }
+
+    fn to_operator(&self) -> OperatorKind {
+        match self.value {
+            '@' => At,
+            '&' => Ampersand,
+            '\\' => Backslash,
+            '^' => Caret,
+            ':' => Colon,
+            '$' => Dollar,
+            '.' => Dot,
+            '"' => DoubleQuote,
+            '=' => Equal,
+            '!' => Exclamation,
+            '>' => RightAngle,
+            '#' => Hash,
+            '<' => LeftAngle,
+            '-' => Minus,
+            '%' => Percent,
+            '|' => Pipe,
+            '+' => Plus,
+            '?' => QuestionMark,
+            '\'' => SingleQuote,
+            '/' => Slash,
+            '*' => Star,
+            '~' => Tilde,
+            '_' => Underscore,
+            '`' => Backtick,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Operator for char {

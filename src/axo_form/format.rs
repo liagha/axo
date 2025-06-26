@@ -5,23 +5,24 @@ use {
         pattern::PatternKind,
     },
     crate::{
+        hash::Hash,
         any::{Any},
         vector::Show,
         format::{Debug, Display, Formatter, Result},
-        hash::Hash,
+        axo_cursor::Spanned,
     },
 };
 
 impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.kind.clone() {
             FormKind::Blank => {
-                write!(f, "Empty")
+                write!(f, "Empty | {:?}", self.span)
             }
 
             FormKind::Input(input) => {
@@ -45,9 +46,9 @@ where
 
 impl<Input, Output, Failure> Debug for PatternKind<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -56,6 +57,9 @@ where
             }
             PatternKind::Literal { value } => {
                 write!(f, "Literal({:?})", value)
+            }
+            PatternKind::Twin { value } => {
+                write!(f, "Twin({:?})", value.type_id())
             }
             PatternKind::Alternative { patterns } => {
                 write!(f, "Alternative({:?})", patterns)
@@ -95,9 +99,9 @@ where
 
 impl<Input, Output, Failure> Debug for Action<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {

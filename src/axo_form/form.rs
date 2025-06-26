@@ -2,16 +2,18 @@ use {
     crate::{
         hash::Hash,
         format::Debug,
-        axo_cursor::Span,
+        axo_cursor::{
+            Span, Spanned,
+        },
     }
 };
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub enum FormKind<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Blank,
     Input(Input),
@@ -23,9 +25,9 @@ where
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct Form<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub kind: FormKind<Input, Output, Failure>,
     pub span: Span,
@@ -33,12 +35,47 @@ where
 
 impl<Input, Output, Failure> Form<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub fn new(form: FormKind<Input, Output, Failure>, span: Span) -> Self {
         Self { kind: form, span, }
+    }
+
+    pub fn blank(span: Span) -> Self {
+        Self::new(FormKind::Blank, span)
+    }
+
+    pub fn input(input: Input) -> Self {
+        Self {
+            kind: FormKind::Input(input.clone()),
+            span: input.span(),
+        }
+    }
+
+    pub fn output(output: Output) -> Self {
+        Self {
+            kind: FormKind::Output(output.clone()),
+            span: output.span(),
+        }
+    }
+
+    pub fn multiple(forms: Vec<Form<Input, Output, Failure>>) -> Self {
+        if forms.len() == 1 {
+            Self::new(FormKind::Multiple(forms.clone()), forms[0].span)
+        } else if forms.len() >= 2 {
+            let extended = Self::expand_forms(forms.clone());
+            let start = extended.first().unwrap().span;
+            let end = extended.last().unwrap().span;
+
+            Self::new(FormKind::Multiple(forms), Span::mix(&start, &end))
+        } else {
+            Self {
+                kind: FormKind::Blank,
+                span: Span::default(),
+            }
+        }
     }
 
     pub fn catch(&self) -> Vec<Form<Input, Output, Failure>> {
@@ -203,9 +240,9 @@ where
         error_mapper: H,
     ) -> Form<MappedI, MappedO, MappedF>
     where
-        MappedI: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        MappedO: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        MappedF: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        MappedI: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        MappedO: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        MappedF: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
         F: Fn(Input) -> MappedI + Clone,
         G: Fn(Output) -> MappedO + Clone,
         H: Fn(Failure) -> MappedF + Clone,
@@ -215,11 +252,12 @@ where
             FormKind::Input(input) => FormKind::Input(input_mapper(input)),
             FormKind::Output(output) => FormKind::Output(output_mapper(output)),
             FormKind::Multiple(forms) => {
-                let mapped_forms = forms
+                let forms = forms
                     .into_iter()
                     .map(|form| form.map(input_mapper.clone(), output_mapper.clone(), error_mapper.clone()))
                     .collect();
-                FormKind::Multiple(mapped_forms)
+                
+                FormKind::Multiple(forms)
             }
             FormKind::Failure(error) => FormKind::Failure(error_mapper(error)),
         };

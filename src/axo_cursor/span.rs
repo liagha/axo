@@ -3,11 +3,25 @@
 use {
     super::{Position, Spanned},
     crate::{
-        axo_form::form::Form, compare::Ordering, file, format, format::Debug, hash::Hash,
+        hash::Hash,
+        file, format,
+        compare::Ordering,
+        format::{
+            Debug, Display,
+        },
+        axo_form::{
+            form::Form,
+        },
+        axo_scanner::{
+            Character, Token,
+        },
+        axo_parser::{
+            Element,
+        }
     },
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub start: Position,
     pub end: Position,
@@ -122,88 +136,5 @@ impl Span {
             "{}:{}-{}:{}",
             self.start.line, self.start.column, self.end.line, self.end.column
         )
-    }
-
-    pub fn line_spans(&self) -> Vec<Span> {
-        if self.start.path != self.end.path {
-            return Vec::new();
-        }
-
-        let mut result = Vec::new();
-
-        if self.start.line == self.end.line {
-            result.push(self.clone());
-            return result;
-        }
-
-        if let Some(line_content) = self.start.get_line_content() {
-            let end_of_line = Position {
-                line: self.start.line,
-                column: line_content.len() + 1,
-                path: self.start.path,
-            };
-            result.push(Span::new(self.start.clone(), end_of_line));
-        }
-
-        for line_num in (self.start.line + 1)..self.end.line {
-            let start_pos = Position {
-                line: line_num,
-                column: 1,
-                path: self.start.path,
-            };
-            let mut end_pos = start_pos.clone();
-
-            if let Some(line_content) = start_pos.get_line_content() {
-                end_pos.column = line_content.len() + 1;
-            }
-
-            let start_pos = start_pos.correct();
-            let end_pos = end_pos.correct();
-
-            result.push(Span::new(start_pos, end_pos));
-        }
-
-        let start_of_last_line = Position {
-            line: self.end.line,
-            column: 1,
-            path: self.start.path,
-        };
-        let start_of_last_line = start_of_last_line.correct();
-
-        result.push(Span::new(start_of_last_line, self.end.clone()));
-
-        result
-    }
-}
-
-impl Spanned for Span {
-    fn span(&self) -> Span {
-        self.clone()
-    }
-}
-
-impl<Input, Output, Failure> Spanned for Form<Input, Output, Failure>
-where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn span(&self) -> Span {
-        self.span.clone()
-    }
-}
-
-impl<Item: Spanned> Spanned for Vec<Item> {
-    fn span(&self) -> Span {
-        if self.len() >= 2 {
-            let start = self.first().unwrap().span();
-            let end = self.last().unwrap().span();
-
-            Span::mix(&start, &end)
-        } else if self.len() == 1 {
-            self[0].span()
-        } else {
-            Span::default()
-        }
     }
 }

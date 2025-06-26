@@ -1,20 +1,24 @@
 use {
     super::{
         error::{CharParseError, ErrorKind},
+        character::Character,
         Operator, Punctuation, PunctuationKind, ScanError, Token, TokenKind,
     },
     crate::{
-        axo_cursor::{Peekable, Position},
+        char::from_u32,
+        float::FloatLiteral,
+        compiler::{
+            Context, Marked,
+        },
         axo_form::{
             form::{Form, FormKind},
             former::Former,
             pattern::Pattern,
         },
-        axo_text::unicode::{is_alphabetic, is_numeric},
-        char::from_u32,
-        compiler::Context,
-        compiler::Marked,
-        float::FloatLiteral,
+        axo_cursor::{
+            Peekable, Position,
+            Span,
+        },
     },
 };
 
@@ -23,23 +27,23 @@ pub struct Scanner {
     pub context: Context,
     pub index: usize,
     pub position: Position,
-    pub input: Vec<char>,
+    pub input: Vec<Character>,
     pub output: Vec<Token>,
     pub errors: Vec<ScanError>,
 }
 
-impl Peekable<char> for Scanner {
+impl Peekable<Character> for Scanner {
     fn len(&self) -> usize {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&char> {
+    fn peek_ahead(&self, n: usize) -> Option<&Character> {
         let current = self.index + n;
 
         self.get(current)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&char> {
+    fn peek_behind(&self, n: usize) -> Option<&Character> {
         let current = self.index - n;
 
         self.get(current)
@@ -53,7 +57,7 @@ impl Peekable<char> for Scanner {
         })
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position) -> Option<char> {
+    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Character> {
         if let Some(ch) = self.get(*index) {
             if *ch == '\n' {
                 position.line += 1;
@@ -70,11 +74,11 @@ impl Peekable<char> for Scanner {
         None
     }
 
-    fn input(&self) -> &Vec<char> {
+    fn input(&self) -> &Vec<Character> {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Vec<char> {
+    fn input_mut(&mut self) -> &mut Vec<Character> {
         &mut self.input
     }
 
@@ -96,12 +100,54 @@ impl Peekable<char> for Scanner {
 }
 
 impl Scanner {
+    pub fn inspect(start: Position, input: Vec<char>) -> Vec<Character> {
+        let mut position = start;
+        let mut characters = Vec::new();
+
+        for char in input {
+            let character = match char {
+                '\n' => {
+                    let start = position;
+                    position.add_line(1);
+                    position.set_column(1);
+                        
+                    Character {
+                        value: char,
+                        span: Span {
+                            start,
+                            end: position,
+                        }
+                    }
+                }
+                char => {
+                    let start = position;
+                    position.add_column(1);
+                    
+                    Character {
+                        value: char,
+                        span: Span {
+                            start,
+                            end: position,
+                        }
+                    }
+                }
+            };
+
+            characters.push(character);
+        }
+
+        characters
+    }
+
     pub fn new(context: Context, input: String, file: &'static str) -> Scanner {
+        let start = Position::new(file);
         let chars: Vec<char> = input.chars().collect();
+
+        let characters = Self::inspect(start, chars);
 
         Scanner {
             context,
-            input: chars,
+            input: characters,
             index: 0,
             position: Position::new(file),
             output: Vec::new(),
@@ -109,10 +155,10 @@ impl Scanner {
         }
     }
 
-    fn line_comment() -> Pattern<char, Token, ScanError> {
+    fn line_comment() -> Pattern<Character, Token, ScanError> {
         Pattern::sequence([
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
-            Pattern::repeat(Pattern::predicate(|c| *c != '\n'), 0, None),
+            Pattern::repeat(Pattern::predicate(|c: &Character| *c != '\n'), 0, None),
         ])
         .with_transform(|_, form| {
             let content: String = form.inputs().into_iter().collect();
@@ -124,7 +170,7 @@ impl Scanner {
         })
     }
 
-    fn multiline_comment() -> Pattern<char, Token, ScanError> {
+    fn multiline_comment() -> Pattern<Character, Token, ScanError> {
         Pattern::sequence([
             Pattern::sequence([Pattern::exact('/'), Pattern::exact('*')]).with_ignore(),
             Pattern::repeat(
@@ -136,7 +182,7 @@ impl Scanner {
             ),
             Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
         ])
-        .with_transform(|_, form: Form<char, Token, ScanError>| {
+        .with_transform(|_, form: Form<Character, Token, ScanError>| {
             let content: String = form.inputs().into_iter().collect();
 
             Ok(Token::new(
@@ -146,15 +192,15 @@ impl Scanner {
         })
     }
 
-    fn hex_number() -> Pattern<char, Token, ScanError> {
+    fn hex_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
                 Pattern::alternative([Pattern::exact('x'), Pattern::exact('X')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(|c| {
-                            is_numeric(*c) || ('a'..='f').contains(c) || ('A'..='F').contains(c)
+                        Pattern::predicate(|c: &Character| {
+                            c.is_alphanumeric()
                         }),
                         Pattern::exact('_').with_ignore(),
                     ]),
@@ -175,14 +221,14 @@ impl Scanner {
         )
     }
 
-    fn binary_number() -> Pattern<char, Token, ScanError> {
+    fn binary_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
                 Pattern::alternative([Pattern::exact('b'), Pattern::exact('B')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(|c| *c == '0' || *c == '1'),
+                        Pattern::predicate(|c: &Character| *c == '0' || *c == '1'),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     1,
@@ -201,14 +247,14 @@ impl Scanner {
         )
     }
 
-    fn octal_number() -> Pattern<char, Token, ScanError> {
+    fn octal_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('0'),
                 Pattern::alternative([Pattern::exact('o'), Pattern::exact('O')]),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(|c| ('0'..='7').contains(c)),
+                        Pattern::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     1,
@@ -227,13 +273,13 @@ impl Scanner {
         )
     }
 
-    fn decimal_number() -> Pattern<char, Token, ScanError> {
+    fn decimal_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(|c| is_numeric(*c)),
+                Pattern::predicate(|c: &Character| c.is_numeric()),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::predicate(|c| is_numeric(*c)),
+                        Pattern::predicate(|c: &Character| c.is_numeric()),
                         Pattern::exact('_').with_ignore(),
                     ]),
                     0,
@@ -243,7 +289,7 @@ impl Scanner {
                     Pattern::exact('.'),
                     Pattern::repeat(
                         Pattern::alternative([
-                            Pattern::predicate(|c| is_numeric(*c)),
+                            Pattern::predicate(|c: &Character| c.is_numeric()),
                             Pattern::exact('_').with_ignore(),
                         ]),
                         0,
@@ -251,9 +297,9 @@ impl Scanner {
                     ),
                 ])),
                 Pattern::optional(Pattern::sequence([
-                    Pattern::predicate(|c| *c == 'e' || *c == 'E'),
-                    Pattern::optional(Pattern::predicate(|c| *c == '+' || *c == '-')),
-                    Pattern::repeat(Pattern::predicate(|c| is_numeric(*c)), 1, None),
+                    Pattern::predicate(|c: &Character| *c == 'e' || *c == 'E'),
+                    Pattern::optional(Pattern::predicate(|c: &Character| *c == '+' || *c == '-')),
+                    Pattern::repeat(Pattern::predicate(|c: &Character| c.is_numeric()), 1, None),
                 ])),
             ]),
             |_, form| {
@@ -279,7 +325,7 @@ impl Scanner {
         )
     }
 
-    fn number() -> Pattern<char, Token, ScanError> {
+    fn number() -> Pattern<Character, Token, ScanError> {
         Pattern::alternative([
             Self::hex_number(),
             Self::binary_number(),
@@ -288,12 +334,12 @@ impl Scanner {
         ])
     }
 
-    fn identifier() -> Pattern<char, Token, ScanError> {
+    fn identifier() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::predicate(|c| is_alphabetic(*c) || *c == '_'),
+                Pattern::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
                 Pattern::repeat(
-                    Pattern::predicate(|c| is_alphabetic(*c) || is_numeric(*c) || *c == '_'),
+                    Pattern::predicate(|c: &Character| c.is_alphabetic() || c.is_numeric() || *c == '_'),
                     0,
                     None,
                 ),
@@ -309,14 +355,14 @@ impl Scanner {
         )
     }
 
-    fn quoted_string() -> Pattern<char, Token, ScanError> {
+    fn quoted_string() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('"'),
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
-                        Pattern::predicate(|c| *c != '"' && *c != '\\' && *c != '\n'),
+                        Pattern::predicate(|c: &Character| *c != '"' && *c != '\\' && *c != '\n'),
                     ]),
                     0,
                     None,
@@ -334,7 +380,7 @@ impl Scanner {
                     if c == '\\' {
                         i += 1;
                         if i < flat_chars.len() - 1 {
-                            let escaped_c = flat_chars[i];
+                            let escaped_c = flat_chars[i].value;
                             content.push(match escaped_c {
                                 'n' => '\n',
                                 'r' => '\r',
@@ -349,7 +395,7 @@ impl Scanner {
                                         if i < flat_chars.len() - 1 {
                                             let hex_c = flat_chars[i];
                                             if hex_c.is_digit(16) {
-                                                hex.push(hex_c);
+                                                hex.push(hex_c.value);
                                                 i += 1;
                                             } else {
                                                 return Err(ScanError::new(
@@ -385,7 +431,7 @@ impl Scanner {
                                                 if hex_c == '}' {
                                                     break;
                                                 }
-                                                hex.push(hex_c);
+                                                hex.push(hex_c.value);
                                                 i += 1;
                                             }
                                             if i < flat_chars.len() - 1 {
@@ -431,7 +477,7 @@ impl Scanner {
                             });
                         }
                     } else {
-                        content.push(c);
+                        content.push(c.value);
                     }
                     i += 1;
                 }
@@ -440,11 +486,11 @@ impl Scanner {
         )
     }
 
-    fn backtick_string() -> Pattern<char, Token, ScanError> {
+    fn backtick_string() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('`'),
-                Pattern::repeat(Pattern::predicate(|c| *c != '`'), 0, None),
+                Pattern::repeat(Pattern::predicate(|c: &Character| *c != '`'), 0, None),
                 Pattern::exact('`'),
             ]),
             |_, form| {
@@ -455,13 +501,13 @@ impl Scanner {
         )
     }
 
-    fn character() -> Pattern<char, Token, ScanError> {
+    fn character() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
                 Pattern::exact('\''),
                 Pattern::alternative([
                     Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
-                    Pattern::predicate(|c| *c != '\'' && *c != '\\'),
+                    Pattern::predicate(|c: &Character| *c != '\'' && *c != '\\'),
                 ]),
                 Pattern::exact('\''),
             ]),
@@ -482,7 +528,7 @@ impl Scanner {
                             form.span,
                         ));
                     }
-                    let escaped_c = flat_chars[2];
+                    let escaped_c = flat_chars[2].value;
                     match escaped_c {
                         'n' => '\n',
                         'r' => '\r',
@@ -499,8 +545,8 @@ impl Scanner {
                                     form.span,
                                 ));
                             }
-                            let h1 = flat_chars[3];
-                            let h2 = flat_chars[4];
+                            let h1 = flat_chars[3].value;
+                            let h2 = flat_chars[4].value;
                             if h1.is_digit(16) && h2.is_digit(16) {
                                 let hex = format!("{}{}", h1, h2);
                                 u32::from_str_radix(&hex, 16)
@@ -528,7 +574,7 @@ impl Scanner {
                             let mut i = 4;
                             let mut hex = String::new();
                             while i < flat_chars.len() && flat_chars[i] != '}' {
-                                hex.push(flat_chars[i]);
+                                hex.push(flat_chars[i].value);
                                 i += 1;
                             }
                             if i >= flat_chars.len() || flat_chars[i] != '}' {
@@ -547,7 +593,7 @@ impl Scanner {
                         _ => escaped_c,
                     }
                 } else {
-                    flat_chars[1]
+                    flat_chars[1].value
                 };
 
                 Ok(Token::new(TokenKind::Character(ch), form.span))
@@ -555,9 +601,9 @@ impl Scanner {
         )
     }
 
-    fn operator() -> Pattern<char, Token, ScanError> {
+    fn operator() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
-            Pattern::repeat(Pattern::predicate(|c: &char| c.is_operator()), 1, None),
+            Pattern::repeat(Pattern::predicate(|c: &Character| c.is_operator()), 1, None),
             |_, form| {
                 let operator: String = form.inputs().into_iter().collect();
 
@@ -569,9 +615,9 @@ impl Scanner {
         )
     }
 
-    fn punctuation() -> Pattern<char, Token, ScanError> {
+    fn punctuation() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
-            Pattern::predicate(|c: &char| c.is_punctuation()),
+            Pattern::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
                 let punctuation: String = form.inputs().into_iter().collect();
 
@@ -583,10 +629,10 @@ impl Scanner {
         )
     }
 
-    fn whitespace() -> Pattern<char, Token, ScanError> {
+    fn whitespace() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::repeat(
-                Pattern::predicate(|c: &char| c.is_whitespace() && *c != '\n'),
+                Pattern::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
                 1,
                 None,
             ),
@@ -610,11 +656,11 @@ impl Scanner {
         )
     }
 
-    fn fallback() -> Pattern<char, Token, ScanError> {
+    fn fallback() -> Pattern<Character, Token, ScanError> {
         Pattern::anything().with_ignore()
     }
 
-    pub fn pattern() -> Pattern<char, Token, ScanError> {
+    pub fn pattern() -> Pattern<Character, Token, ScanError> {
         Pattern::repeat(
             Pattern::alternative([
                 Self::whitespace(),

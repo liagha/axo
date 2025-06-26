@@ -1,11 +1,18 @@
 use {
     super::{action::Action, form::Form},
     crate::{
-        axo_form::action::Emitter,
-        compiler::Context,
-        format::Debug,
         hash::Hash,
-        thread::{Arc, Mutex},
+        format::Debug,
+        compiler::Context,
+        thread::{
+            Arc, Mutex
+        },
+        axo_cursor::{
+            Spanned,  
+        },
+        axo_form::{
+            action::Emitter,
+        },
     },
 };
 
@@ -23,9 +30,9 @@ pub type Evaluator<Input, Output, Failure> =
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     /// Matches if any of the contained patterns match (logical OR).
     /// Tries patterns in order and succeeds on the first match.
@@ -49,6 +56,12 @@ where
     /// Uses equality comparison to determine matches.
     Literal {
         value: Input
+    },
+    
+    /// Matches the input value using the PartialEq trait.
+    /// Allows for different types than Input to be used.
+    Twin {
+        value: Arc<dyn PartialEq<Input>>,  
     },
 
     /// Matches input that does NOT match the inner pattern (logical NOT).
@@ -89,9 +102,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Pattern<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     /// The matching behavior of this pattern
     pub kind: PatternKind<Input, Output, Failure>,
@@ -101,15 +114,24 @@ where
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure>
 where
-    Input: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     #[inline]
-    pub fn exact(value: Input) -> Self {
+    pub fn literal(value: Input) -> Self {
         Self {
             kind: PatternKind::Literal { 
                 value 
+            },
+            action: None,
+        }
+    }
+    
+    pub fn exact(value: impl PartialEq<Input> + 'static) -> Self {
+        Self {
+            kind: PatternKind::Twin {
+                value: Arc::new(value),
             },
             action: None,
         }

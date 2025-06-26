@@ -4,6 +4,7 @@ use {
             Display, Debug, 
             Formatter
         },
+        axo_scanner::Character,
     },
 };
 
@@ -51,6 +52,33 @@ impl Punctuation for str {
             "}" => PunctuationKind::RightBrace,
             "," => PunctuationKind::Comma,
             ";" => PunctuationKind::Semicolon,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Punctuation for Character {
+    fn is_punctuation(&self) -> bool {
+        matches!(
+            self.value,
+            ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
+        )
+    }
+
+    fn to_punctuation(&self) -> PunctuationKind {
+        match self.value {
+            ' ' => PunctuationKind::Space,
+            '\t' => PunctuationKind::Tab,
+            '\n' => PunctuationKind::Newline,
+            '\r' => PunctuationKind::Return,
+            '(' => PunctuationKind::LeftParenthesis,
+            ')' => PunctuationKind::RightParenthesis,
+            '[' => PunctuationKind::LeftBracket,
+            ']' => PunctuationKind::RightBracket,
+            '{' => PunctuationKind::LeftBrace,
+            '}' => PunctuationKind::RightBrace,
+            ',' => PunctuationKind::Comma,
+            ';' => PunctuationKind::Semicolon,
             _ => unreachable!(),
         }
     }

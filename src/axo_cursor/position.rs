@@ -2,7 +2,12 @@ use {
     crate::{
         file::{read_to_string},
         format,
-        compare::{Ordering},
+        compare::{
+            Ordering
+        },
+        operations::{
+            Add, Sub, Mul, Div
+        },
     }
 };
 
@@ -24,6 +29,7 @@ impl Default for Position {
 }
 
 impl Position {
+    #[inline]
     pub fn new(file: &'static str) -> Self {
         Self {
             line: 1,
@@ -31,61 +37,77 @@ impl Position {
             path: file,
         }
     }
-
-    pub fn correct(&self) -> Self {
-        let mut corrected = self.clone();
-
-        let content = match read_to_string(&self.path) {
-            Ok(content) => content,
-            Err(_) => return Self::new(self.path),
-        };
-
-        let lines: Vec<&str> = content.lines().collect();
-
-        if lines.is_empty() {
-            return Self::new(self.path);
-        }
-
-        corrected.line = corrected.line.max(1).min(lines.len());
-
-        let line_index = corrected.line.saturating_sub(1);
-        let line_length = lines[line_index].len();
-
-        corrected.column = corrected.column.min(line_length);
-
-        corrected
+    
+    #[inline]
+    pub fn set_line(&mut self, line: usize) {
+        self.line = line;
     }
 
-    pub fn advance(&mut self, c: char) {
-        if c == '\n' {
-            self.line += 1;
-            self.column = 1;
-        } else {
-            self.column += 1;
+    #[inline]
+    pub fn set_column(&mut self, column: usize) {
+        self.column = column;
+    }
+
+    #[inline]
+    pub fn set_path(&mut self, path: &'static str) {
+        self.path = path;
+    }
+
+    #[inline]
+    pub fn swap_line(&self, line: usize) -> Self {
+        Self {
+            line,
+            column: self.column,
+            path: self.path
         }
     }
 
-    pub fn at(file: &'static str, line: usize, column: usize) -> Self {
-        let mut pos = Self::new(file);
-        pos.line = line;
-        pos.column = column;
-        pos.correct()
-    }
-
-    pub fn get_line_content(&self) -> Option<String> {
-        match read_to_string(&self.path) {
-            Ok(content) => {
-                let lines: Vec<&str> = content.lines().collect();
-                if self.line > 0 && self.line <= lines.len() {
-                    Some(lines[self.line - 1].to_string())
-                } else {
-                    None
-                }
-            },
-            Err(_) => None,
+    #[inline]
+    pub fn swap_column(&self, column: usize) -> Self {
+        Self {
+            line: self.line,
+            column,
+            path: self.path
         }
     }
 
+    #[inline]
+    pub fn swap_path(&self, path: &'static str) -> Self {
+        Self {
+            line: self.line,
+            column: self.column,
+            path,
+        }
+    }
+
+    #[inline]
+    pub fn join_line(&self, amount: usize) -> Self {
+        Self {
+            line: self.line + amount,
+            column: self.column,
+            path: self.path,
+        }
+    }
+
+    #[inline]
+    pub fn join_column(&self, amount: usize) -> Self {
+        Self {
+            line: self.line,
+            column: self.column + amount,
+            path: self.path,
+        }
+    }
+
+    #[inline]
+    pub fn add_line(&mut self, amount: usize) {
+        self.line += amount;
+    }
+
+    #[inline]
+    pub fn add_column(&mut self, amount: usize) {
+        self.column += amount;
+    }
+    
     pub fn cmp(&self, other: &Self) -> Ordering {
         if self.path != other.path {
             return self.path.cmp(&other.path);
@@ -97,7 +119,6 @@ impl Position {
         }
     }
 }
-
 
 impl PartialOrd for Position {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

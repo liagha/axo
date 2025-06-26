@@ -142,104 +142,37 @@ impl Parser {
         Pattern::transform(
             Pattern::sequence([
                 Self::unary(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::predicate(move |token: &Token| {
-                            if let TokenKind::Operator(operator) = &token.kind {
-                                if let Some(precedence) = operator.precedence() {
-                                    precedence >= minimum
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-                        }),
-                        Pattern::lazy(move || Self::unary()),
-                    ]),
-                    1,
-                    None,
-                ),
+                Pattern::predicate(move |token: &Token| {
+                    if let TokenKind::Operator(operator) = &token.kind {
+                        if let Some(precedence) = operator.precedence() {
+                            precedence > minimum
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }),
+                Pattern::lazy(move || Self::expression(minimum)),
             ]),
             move |_, form| {
-                let sequence = form.unwrap()[0].clone().unwrap();
+                let outputs = form.outputs();
+                let left = outputs[0].clone();
+                let operator = form.inputs()[0].clone();
+                let right = outputs[1].clone();
 
-                let mut left = sequence[0].unwrap_output().unwrap();
-                let operations = sequence[1].unwrap();
+                let operation = Element::new(
+                    ElementKind::Binary {
+                        left: left.clone().into(),
+                        operator,
+                        right: right.clone().into(),
+                    },
+                    Span::mix(&left.span, &right.span)
+                );
 
-                let mut pairs = Vec::new();
-
-                for operation in operations {
-                    let sequence = operation.unwrap();
-
-                    if sequence.len() >= 2 {
-                        let operator = sequence[0].unwrap_input().unwrap();
-                        let operand = sequence[1].unwrap_output().unwrap();
-
-                        let precedence = if let TokenKind::Operator(op) = &operator.kind {
-                            op.precedence().unwrap_or(0)
-                        } else {
-                            0
-                        };
-
-                        pairs.push((operator, operand, precedence));
-                    }
-                }
-
-                left = Self::climb(left, pairs, minimum);
-
-                Ok(left)
+                Ok(operation)
             },
         )
-    }
-
-    fn climb(mut left: Element, pairs: Vec<(Token, Element, u8)>, threshold: u8) -> Element {
-        let mut current = 0;
-
-        while current < pairs.len() {
-            let (operator, operand, precedence) = &pairs[current];
-
-            if *precedence < threshold {
-                break;
-            }
-
-            let mut right = operand.clone();
-            let mut lookahead = current + 1;
-
-            while lookahead < pairs.len() {
-                let (_, _, priority) = &pairs[lookahead];
-
-                if *priority > *precedence {
-                    let mut higher = Vec::new();
-                    while lookahead < pairs.len() && pairs[lookahead].2 > *precedence {
-                        higher.push(pairs[lookahead].clone());
-                        lookahead += 1;
-                    }
-
-                    right = Self::climb(right, higher, *precedence + 1);
-                    break;
-                } else {
-                    break;
-                }
-            }
-
-            let start = left.span.start.clone();
-            let end = right.span.end.clone();
-            let span = Span::new(start, end);
-
-            left = Element::new(
-                ElementKind::Binary {
-                    left: Box::new(left),
-                    operator: operator.clone(),
-                    right: Box::new(right),
-                },
-                span,
-            );
-
-            current = lookahead;
-        }
-
-        left
     }
 
     pub fn conditional() -> Pattern<Token, Element, ParseError> {

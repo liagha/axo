@@ -114,8 +114,7 @@ impl Parser {
             Pattern::sequence([
                 Pattern::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-                })
-                .with_ignore(),
+                }),
                 Pattern::lazy(Self::element).as_optional(),
                 Pattern::repeat(
                     Pattern::sequence([

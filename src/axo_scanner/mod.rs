@@ -4,9 +4,11 @@ mod punctuation;
 mod scanner;
 mod format;
 pub mod error;
+mod character;
 
 pub use {
     scanner::Scanner,
+    character::Character,
     operator::*,
     punctuation::*,
     token::*,
