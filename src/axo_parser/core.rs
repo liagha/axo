@@ -16,6 +16,8 @@ use {
 };
 
 impl Parser {
+    // Basic Token Patterns
+
     pub fn identifier() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
@@ -61,6 +63,113 @@ impl Parser {
         )
     }
 
+    pub fn token() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Self::identifier(), Self::literal()])
+    }
+
+    pub fn whitespace() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Pattern::predicate(
+            |token: &Token| {
+                matches!(
+                    token.kind,
+                    TokenKind::Comment(_)
+                        | TokenKind::Punctuation(PunctuationKind::Newline)
+                        | TokenKind::Punctuation(PunctuationKind::Tab)
+                        | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                        | TokenKind::Punctuation(PunctuationKind::Space)
+                )
+            },
+        )])
+    }
+    
+    // Compounds
+
+    pub fn invoke() -> Pattern<Token, Element, ParseError> {
+        Pattern::transform(
+            Pattern::sequence([
+                Self::primary(),
+                Self::group(),
+            ]),
+            |_, form| {
+                let outputs = form.outputs().clone();
+                let element = outputs[0].clone();
+                let group = outputs[1].clone();
+
+                Ok(
+                    Element::new(
+                        ElementKind::Invoke {
+                            target: element.clone().into(),
+                            parameters: group.clone().into(),
+                        },
+                        Span::mix(&element.span, &group.span)
+                    )
+                )
+            }
+        )
+    }
+    
+    pub fn index() -> Pattern<Token, Element, ParseError> {
+        Pattern::transform(
+            Pattern::sequence([
+                Self::primary(),
+                Self::collection(),
+            ]),
+            |_, form| {
+                let outputs = form.outputs().clone();
+                let element = outputs[0].clone();
+                let index = outputs[1].clone();
+                
+                Ok(
+                    Element::new(
+                        ElementKind::Index {
+                            element: element.clone().into(),
+                            index: index.clone().into(),
+                        },
+                        Span::mix(&element.span, &index.span)
+                    )
+                )
+            }
+        )    
+    }
+
+    pub fn constructor() -> Pattern<Token, Element, ParseError> {
+        Pattern::transform(
+            Pattern::sequence([
+                Self::primary(),
+                Self::bundle(),
+            ]),
+            |_, form| {
+                let outputs = form.outputs().clone();
+                let element = outputs[0].clone();
+                let bundle = outputs[1].clone();
+
+                Ok(
+                    Element::new(
+                        ElementKind::Constructor {
+                            name: element.clone().into(),
+                            body: bundle.clone().into(),
+                        },
+                        Span::mix(&element.span, &bundle.span)
+                    )
+                )
+            }
+        )
+    }
+    
+    pub fn compound() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([
+            Self::invoke(), Self::index(), Self::constructor(),
+        ])
+    }
+
+    // Primary Elements
+
+    pub fn primary() -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Self::delimited(), Self::token()])
+    }
+
+    // Unary Operations
+
     pub fn prefixed() -> Pattern<Token, Element, ParseError> {
         Pattern::action(
             Pattern::sequence([
@@ -76,9 +185,7 @@ impl Parser {
             ]),
             Action::map(|_, form: Form<Token, Element, ParseError>| {
                 let prefixes = form.inputs();
-
                 let operand = form.outputs()[0].clone();
-
                 let mut unary = operand.clone();
 
                 for prefix in prefixes {
@@ -107,16 +214,12 @@ impl Parser {
                         false
                     }
                 })
-                .as_repeat(1, None),
+                    .as_repeat(1, None),
             ]),
             |_, form| {
-                println!("{:?}", form);
                 let sequence = form.unwrap()[0].clone().unwrap();
-
                 let operand = sequence[0].unwrap_output().unwrap();
-
                 let postfixes = Form::expand_inputs(sequence[1].unwrap());
-
                 let mut unary = operand.clone();
 
                 for postfix in postfixes {
@@ -135,45 +238,127 @@ impl Parser {
     }
 
     pub fn unary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::prefixed(), Self::postfixed()])
+        Pattern::alternative([
+            Self::compound(),
+            Self::prefixed(), 
+            Self::postfixed(), 
+            Self::primary(),
+        ])
     }
+
+    // Binary Operations
 
     pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::sequence([
-                Self::unary(),
-                Pattern::predicate(move |token: &Token| {
-                    if let TokenKind::Operator(operator) = &token.kind {
-                        if let Some(precedence) = operator.precedence() {
-                            precedence > minimum
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }),
-                Pattern::lazy(move || Self::expression(minimum)),
+                Pattern::alternative([
+                    Self::statement(),
+                    Self::unary(),
+                ]),
+                Pattern::repeat(
+                    Pattern::sequence([
+                        Pattern::predicate(move |token: &Token| {
+                            if let TokenKind::Operator(operator) = &token.kind {
+                                if let Some(precedence) = operator.precedence() {
+                                    precedence >= minimum
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        }),
+                        Pattern::alternative([
+                            Self::statement(),
+                            Self::unary(),
+                        ])
+                    ]),
+                    1,
+                    None,
+                ),
             ]),
             move |_, form| {
-                let outputs = form.outputs();
-                let left = outputs[0].clone();
-                let operator = form.inputs()[0].clone();
-                let right = outputs[1].clone();
+                let sequence = form.unwrap();
+                let mut left = sequence[0].unwrap_output().unwrap();
+                let operations = sequence[1].unwrap();
+                let mut pairs = Vec::new();
 
-                let operation = Element::new(
-                    ElementKind::Binary {
-                        left: left.clone().into(),
-                        operator,
-                        right: right.clone().into(),
-                    },
-                    Span::mix(&left.span, &right.span)
-                );
+                for operation in operations {
+                    let sequence = operation.unwrap();
+                    if sequence.len() >= 2 {
+                        let operator = sequence[0].unwrap_input().unwrap();
+                        let operand = sequence[1].unwrap_output().unwrap();
+                        let precedence = if let TokenKind::Operator(op) = &operator.kind {
+                            op.precedence().unwrap_or(0)
+                        } else {
+                            0
+                        };
+                        pairs.push((operator, operand, precedence));
+                    }
+                }
 
-                Ok(operation)
+                left = Self::climb(left, pairs, minimum);
+                Ok(left)
             },
         )
     }
+
+    fn climb(mut left: Element, pairs: Vec<(Token, Element, u8)>, threshold: u8) -> Element {
+        let mut current = 0;
+
+        while current < pairs.len() {
+            let (operator, operand, precedence) = &pairs[current];
+
+            if *precedence < threshold {
+                break;
+            }
+
+            let mut right = operand.clone();
+            let mut lookahead = current + 1;
+
+            while lookahead < pairs.len() {
+                let (_, _, priority) = &pairs[lookahead];
+
+                if *priority > *precedence {
+                    let mut higher = Vec::new();
+                    while lookahead < pairs.len() && pairs[lookahead].2 > *precedence {
+                        higher.push(pairs[lookahead].clone());
+                        lookahead += 1;
+                    }
+
+                    right = Self::climb(right, higher, *precedence + 1);
+                    break;
+                } else {
+                    break;
+                }
+            }
+
+            let start = left.span.start.clone();
+            let end = right.span.end.clone();
+            let span = Span::new(start, end);
+
+            left = Element::new(
+                ElementKind::Binary {
+                    left: Box::new(left),
+                    operator: operator.clone(),
+                    right: Box::new(right),
+                },
+                span,
+            );
+
+            current = lookahead;
+        }
+
+        left
+    }
+
+    // Expressions
+
+    pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
+        Pattern::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
+    }
+
+    // Statements
 
     pub fn conditional() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
@@ -185,7 +370,7 @@ impl Parser {
                         false
                     }
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::element()),
                     Action::failure(|_, form| {
@@ -204,20 +389,17 @@ impl Parser {
                             false
                         }
                     })
-                    .with_ignore(),
+                        .with_ignore(),
                     Pattern::lazy(|| Self::element()),
                 ])),
             ]),
             |_, form| {
                 let sequence = form.outputs();
-
                 let condition = sequence[0].clone();
-
                 let then = sequence[1].clone();
 
                 if let Some(alternate) = sequence.get(2).cloned() {
                     let span = condition.span.mix(&alternate.span);
-
                     Ok(Element::new(
                         ElementKind::Conditional {
                             condition: condition.into(),
@@ -228,7 +410,6 @@ impl Parser {
                     ))
                 } else {
                     let span = condition.span.mix(&then.span);
-
                     Ok(Element::new(
                         ElementKind::Conditional {
                             condition: condition.into(),
@@ -242,7 +423,7 @@ impl Parser {
         )
     }
 
-    pub fn loops() -> Pattern<Token, Element, ParseError> {
+    pub fn cycle() -> Pattern<Token, Element, ParseError> {
         Pattern::transform(
             Pattern::alternative([
                 Pattern::sequence([
@@ -253,7 +434,7 @@ impl Parser {
                             false
                         }
                     })
-                    .with_ignore(),
+                        .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::element()),
                         Action::failure(|_, form| {
@@ -269,7 +450,7 @@ impl Parser {
                             false
                         }
                     })
-                    .with_ignore(),
+                        .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::element()),
                         Action::failure(|_, form| {
@@ -290,9 +471,8 @@ impl Parser {
                 if sequence.len() == 1 {
                     let body = sequence[0].clone();
                     let span = body.span.clone();
-
                     Ok(Element::new(
-                        ElementKind::Loop {
+                        ElementKind::Cycle {
                             condition: None,
                             body: body.into(),
                         },
@@ -301,11 +481,9 @@ impl Parser {
                 } else if sequence.len() == 2 {
                     let condition = sequence[0].clone();
                     let body = sequence[1].clone();
-
                     let span = condition.span.mix(&body.span);
-
                     Ok(Element::new(
-                        ElementKind::Loop {
+                        ElementKind::Cycle {
                             condition: Some(condition.into()),
                             body: body.into(),
                         },
@@ -328,7 +506,7 @@ impl Parser {
                         false
                     }
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Pattern::capture(0, Pattern::lazy(Self::element)),
             ]),
             move |context, _| {
@@ -349,35 +527,10 @@ impl Parser {
     }
 
     pub fn statement() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::conditional(), Self::loops(), Self::variable()])
+        Pattern::alternative([Self::conditional(), Self::cycle(), Self::variable()])
     }
 
-    pub fn token() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::identifier(), Self::literal()])
-    }
-
-    pub fn primary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::delimited(), Self::token()])
-    }
-
-    pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
-    }
-
-    pub fn whitespace() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Pattern::predicate(
-            |token: &Token| {
-                matches!(
-                    token.kind,
-                    TokenKind::Comment(_)
-                        | TokenKind::Punctuation(PunctuationKind::Newline)
-                        | TokenKind::Punctuation(PunctuationKind::Tab)
-                        | TokenKind::Punctuation(PunctuationKind::Indentation(_))
-                        | TokenKind::Punctuation(PunctuationKind::Space)
-                )
-            },
-        )])
-    }
+    // Top-Level Elements
 
     pub fn element() -> Pattern<Token, Element, ParseError> {
         Pattern::alternative([
@@ -388,9 +541,7 @@ impl Parser {
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
         Pattern::action(
-            Pattern::predicate(|_token| {
-                true
-            }),
+            Pattern::predicate(|_token| true),
             Action::failure(
                 |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
@@ -402,6 +553,7 @@ impl Parser {
         )
     }
 
+    /// Main parser entry point
     pub fn parser() -> Pattern<Token, Element, ParseError> {
         Pattern::repeat(
             Pattern::alternative([

@@ -87,7 +87,6 @@ pub enum ElementKind {
     /// Used for code blocks, scoped execution, or structured control flow.
     Scope(Vec<Element>),
 
-    // Operations
     /// Binary operation between two expressions: `left op right`
     ///
     /// # Examples
@@ -115,18 +114,6 @@ pub enum ElementKind {
         operator: Token,
         /// The operand being operated on
         operand: Box<Element>,
-    },
-
-    /// Binds a key to a value, typically used in mapping or assignment contexts
-    ///
-    /// # Examples
-    /// - `key => value` (in match expressions)
-    /// - `name -> type` (in type annotations)
-    Bind {
-        /// The key or pattern to bind
-        key: Box<Element>,
-        /// The value being bound
-        value: Box<Element>,
     },
 
     /// Associates a label with an element for naming or documentation
@@ -168,7 +155,7 @@ pub enum ElementKind {
         /// The function or method being called
         target: Box<Element>,
         /// The list of arguments passed to the function
-        parameters: Vec<Element>,
+        parameters: Box<Element>,
     },
 
     /// Constructor call for creating instances: `Type { fields... }`
@@ -205,7 +192,7 @@ pub enum ElementKind {
     ///
     /// Can represent both infinite loops and conditional loops depending
     /// on whether a condition is provided.
-    Loop {
+    Cycle {
         /// Optional condition for while-style loops (None for infinite loops)
         condition: Option<Box<Element>>,
         /// The loop body to execute repeatedly
@@ -420,22 +407,6 @@ impl Element {
                         let kind = ElementKind::Assignment {
                             target: left.into(),
                             value: operation.into(),
-                        };
-
-                        Element { kind, span }
-                    } else if op.is_arrow() {
-                        // Right arrow: key -> value
-                        let kind = ElementKind::Bind {
-                            key: left.clone(),
-                            value: right.clone(),
-                        };
-
-                        Element { kind, span }
-                    } else if op.is_left_arrow() {
-                        // Left arrow: value <- key (reversed bind)
-                        let kind = ElementKind::Bind {
-                            key: right.clone(),
-                            value: left.clone(),
                         };
 
                         Element { kind, span }

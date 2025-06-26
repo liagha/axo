@@ -181,8 +181,7 @@ impl Display for ElementKind {
             ElementKind::Labeled { label: element, element: ty } => write!(f, "{}: {}", element, ty),
             ElementKind::Index { element, index } => write!(f, "{}[{}]", element, index),
             ElementKind::Invoke { target, parameters } => {
-                let args_str: Vec<String> = parameters.iter().map(|e| e.to_string()).collect();
-                write!(f, "{}({})", target, args_str.join(", "))
+                write!(f, "{}{}", target, parameters)
             }
             ElementKind::Member { object, member } => write!(f, "{}.{}", object, member),
 
@@ -204,7 +203,7 @@ impl Display for ElementKind {
 
                 Ok(())
             }
-            ElementKind::Loop { condition, body } => {
+            ElementKind::Cycle { condition, body } => {
                 if let Some(condition) = condition {
                     write!(f, "while {} {}\n", condition, body)
                 } else {
@@ -247,7 +246,6 @@ impl Display for ElementKind {
                 Ok(())
             }
 
-            ElementKind::Bind { key, value } => write!(f, "{} => {}", key, value),
             ElementKind::Path { tree } => write!(f, "{}", tree),
         }
     }
@@ -313,7 +311,7 @@ impl Debug for ElementKind {
 
                 write!(f, ")")
             }
-            ElementKind::Loop { condition, body } => {
+            ElementKind::Cycle { condition, body } => {
                 if let Some(condition) = condition {
                     write!(f, "While({:?} | {:?})", condition, body)
                 } else {
@@ -364,7 +362,6 @@ impl Debug for ElementKind {
                 Ok(())
             }
 
-            ElementKind::Bind { key, value } => write!(f, "Bind({:?} => {:?})", key, value),
             ElementKind::Path { tree } => write!(f, "Path({:?})", tree),
         }
     }

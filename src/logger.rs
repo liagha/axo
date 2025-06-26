@@ -1,7 +1,19 @@
-use broccli::{Color, TextStyle};
-use chrono::Timelike;
-use log::{Log, Metadata, Record, Level, SetLoggerError};
-use crate::io::{stdout, Write};
+use {
+    chrono::Timelike,
+    broccli::{
+        Color, TextStyle
+    },
+    log::{
+        Log, Metadata, 
+        Record, Level,
+        SetLoggerError
+    },
+    crate::{
+        io::{
+            stdout, Write
+        },
+    }
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LogInfo {

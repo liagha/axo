@@ -182,14 +182,18 @@ impl Stage<(), Vec<Token>> for ScannerStage {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
                 xprintln!(
-                    "Scanning Ended In {} Seconds With {} Errors." => Color::Red, 
-                    duration.as_secs_f64(), 
-                    errors.len());
+                    "Finished {} {}s with {} {}." => Color::Green,
+                    "`scanning` in" => Color::White,
+                    duration.as_secs_f64(),
+                    errors.len() => Color::BrightRed,
+                    "errors" => Color::Red,
+                );
             } else {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
                 xprintln!(
-                    "Scanning Ended In {} Seconds" => Color::Green,
+                    "Finished {} {}s." => Color::Green,
+                    "`scanning` in" => Color::White,
                     duration.as_secs_f64(), 
                 );
             }
@@ -229,18 +233,21 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                         details
                     );
                 }
-                
+
                 xprintln!(
-                    "Parsing Ended In {} Seconds With {} Errors." => Color::Red, 
-                    duration.as_secs_f64(), 
-                    errors.len()
+                    "Finished {} {}s with {} {}." => Color::Green,
+                    "`parsing` in" => Color::White,
+                    duration.as_secs_f64(),
+                    errors.len() => Color::BrightRed,
+                    "errors" => Color::Red,
                 );
             } else {
                 let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
 
                 xprintln!(
-                    "Parsing Ended In {} Seconds" => Color::Green,
-                    duration.as_secs_f64(), 
+                    "Finished {} {}s." => Color::Green,
+                    "`parsing` in" => Color::White,
+                    duration.as_secs_f64(),
                 );
             }
         }

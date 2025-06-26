@@ -468,30 +468,6 @@ pub struct ParameterCountMetric;
 impl SimilarityMetric<Element, Item> for ParameterCountMetric {
     fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { parameters, .. }, ItemKind::Function { parameters: func_params, .. }) => {
-                let query_param_count = parameters.len();
-                let candidate_param_count = func_params.len();
-
-                if query_param_count == candidate_param_count {
-                    0.9
-                } else if (query_param_count as isize - candidate_param_count as isize).abs() <= 2 {
-                    0.7 - 0.1 * (query_param_count as isize - candidate_param_count as isize).abs() as f64
-                } else {
-                    0.0
-                }
-            },
-            (ElementKind::Invoke { parameters, .. }, ItemKind::Macro { parameters: macro_params, .. }) => {
-                let query_param_count = parameters.len();
-                let candidate_param_count = macro_params.len();
-
-                if query_param_count == candidate_param_count {
-                    0.9
-                } else if (query_param_count as isize - candidate_param_count as isize).abs() <= 2 {
-                    0.7 - 0.1 * (query_param_count as isize - candidate_param_count as isize).abs() as f64
-                } else {
-                    0.0
-                }
-            },
             (ElementKind::Constructor { body, .. }, ItemKind::Structure { fields, .. }) => {
                 if let ElementKind::Bundle(elements) = &body.kind {
                     let constructor_field_count = elements.len();
@@ -650,13 +626,6 @@ impl SimilarityMetric<Element, Item> for PartialIdentifierMetric {
 impl PartialEq<Item> for Element {
     fn eq(&self, other: &Item) -> bool {
         match (&self.kind, &other.kind) {
-            (ElementKind::Invoke { target, parameters }, ItemKind::Function { name, parameters: func_params, .. }) => {
-                target.name() == name.name() && parameters.len() == func_params.len()
-            },
-            (ElementKind::Invoke { target, parameters }, ItemKind::Macro { name, parameters: macro_params, .. }) => {
-                target.name() == name.name() && parameters.len() == macro_params.len()
-            },
-
             (ElementKind::Identifier(ident), ItemKind::Variable { target, .. }) => {
                 if let Element { kind: ElementKind::Identifier(target_ident), .. } = *target.clone() {
                     ident == &target_ident

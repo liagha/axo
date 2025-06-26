@@ -78,11 +78,6 @@ impl Hash for ElementKind {
             }
 
             // Access Expressions
-            ElementKind::Bind { key, value } => {
-                discriminant(self).hash(state);
-                key.hash(state);
-                value.hash(state);
-            }
             ElementKind::Labeled { label, element } => {
                 discriminant(self).hash(state);
                 label.hash(state);
@@ -124,7 +119,7 @@ impl Hash for ElementKind {
                 then_branch.hash(state);
                 else_branch.hash(state);
             }
-            ElementKind::Loop { condition, body } => {
+            ElementKind::Cycle { condition, body } => {
                 discriminant(self).hash(state);
                 condition.hash(state);
                 body.hash(state);
@@ -194,8 +189,6 @@ impl PartialEq for ElementKind {
             },
 
             // Access Expressions
-            (ElementKind::Bind { key: a_key, value: a_value },
-                ElementKind::Bind { key: b_key, value: b_value }) => a_key == b_key && a_value == b_value,
             (ElementKind::Labeled { label: a_label, element: a_expr },
                 ElementKind::Labeled { label: b_label, element: b_expr }) => a_label == b_label && a_expr == b_expr,
             (ElementKind::Index { element: a_expr, index: a_index },
@@ -216,8 +209,8 @@ impl PartialEq for ElementKind {
                 ElementKind::Conditional { condition: b_cond, then: b_then, alternate: b_else }) => {
                 a_cond == b_cond && a_then == b_then && a_else == b_else
             },
-            (ElementKind::Loop { condition: a_cond, body: a_body },
-                ElementKind::Loop { condition: b_cond, body: b_body }) => a_cond == b_cond && a_body == b_body,
+            (ElementKind::Cycle { condition: a_cond, body: a_body },
+                ElementKind::Cycle { condition: b_cond, body: b_body }) => a_cond == b_cond && a_body == b_body,
             (ElementKind::Iterate { clause: a_clause, body: a_body },
                 ElementKind::Iterate { clause: b_clause, body: b_body }) => a_clause == b_clause && a_body == b_body,
 

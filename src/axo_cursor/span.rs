@@ -111,6 +111,7 @@ impl Span {
         Some(Span::new(start, end))
     }
 
+    #[inline]
     pub fn mix(&self, other: &Span) -> Span {
         if self.start.path != other.start.path {
             panic!("cannot mix spans from `{}` with `{}`", self.start.path, other.start.path);

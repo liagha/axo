@@ -15,6 +15,7 @@ mod timer;
 mod artifact;
 
 use core::time::Duration;
+use broccli::{xprintln, Color};
 pub use {
     axo_data::*,
     axo_format::*,
@@ -89,11 +90,17 @@ pub mod string {
 }
 
 pub mod slice {
-    pub use core::slice::*;
+    pub use core::slice::{
+        from_ref,
+    };
 }
 
 pub mod format {
-    pub use core::fmt::{Debug, Display, Formatter, Result, Write};
+    pub use core::fmt::{
+        Debug, Display,
+        Formatter, Result, 
+        Write
+    };
 }
 
 fn main() {
@@ -119,9 +126,13 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
     let (path, verbose) = parse_arguments()?;
 
     if verbose {
-        println!(
-            "Argument Parsing Took {} ns",
-            main_timer.to_nanoseconds(main_timer.elapsed().unwrap())
+        let duration = Duration::from_nanos(main_timer.elapsed().unwrap());
+
+        xprintln!(
+            "Finished {} {} {}s." => Color::Blue,
+            "`examining`" => Color::White,
+            "in",
+            duration.as_secs_f64(),
         );
     }
 
@@ -130,9 +141,13 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
     let mut compiler = Compiler::new(path, verbose)?;
 
     if verbose {
-        println!(
-            "File Read Took {} ns",
-            file_read_timer.to_nanoseconds(file_read_timer.elapsed().unwrap())
+        let duration = Duration::from_nanos(file_read_timer.elapsed().unwrap());
+
+        xprintln!(
+            "  Finished {} {} {}s." => Color::Blue,
+            "`analyzing`" => Color::White,
+            "in",
+            duration.as_secs_f64(),
         );
     }
 
@@ -140,10 +155,12 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
 
     if verbose {
         let duration = Duration::from_nanos(main_timer.elapsed().unwrap());
-        
-        println!(
-            "Total Compilation Took {} ns",
-            duration.as_secs_f64()
+
+        xprintln!(
+            "Finished {} {} {}s." => Color::Blue,
+            "`compiling`" => Color::White,
+            "in",
+            duration.as_secs_f64(),
         );
     }
 

@@ -219,11 +219,6 @@ impl Resolver {
                 self.resolve_element(operand)
             },
 
-            ElementKind::Bind { key, value } => {
-                self.resolve_element(key);
-                self.resolve_element(value);
-            },
-
             ElementKind::Labeled { label, element: value } => {
                 self.resolve_element(label);
                 self.resolve_element(value);
@@ -251,7 +246,7 @@ impl Resolver {
                 self.pop_scope();
             },
 
-            ElementKind::Loop { condition, body } => {
+            ElementKind::Cycle { condition, body } => {
                 if let Some(condition) = condition {
                     self.resolve_element(condition);
                 }
