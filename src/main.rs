@@ -35,6 +35,10 @@ pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 #[cfg(target_arch = "aarch64")]
 pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
+pub mod data {
+    //pub use std::collections::VecDeque;
+}
+
 pub mod file {
     pub use std::fs::read_to_string;
     pub use std::io::Error;
@@ -136,12 +140,12 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
         );
     }
 
-    let file_read_timer = Timer::new(TIMERSOURCE);
+    let timer = Timer::new(TIMERSOURCE);
 
     let mut compiler = Compiler::new(path, verbose)?;
 
     if verbose {
-        let duration = Duration::from_nanos(file_read_timer.elapsed().unwrap());
+        let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
         xprintln!(
             "  Finished {} {} {}s." => Color::Blue,
@@ -173,9 +177,8 @@ fn parse_arguments() -> Result<(&'static str, bool), CompilerError> {
     let mut path = String::new();
     let mut verbose = false;
 
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
+    for arg in args.clone() {
+        match arg.as_str() {
             "-v" | "--verbose" => verbose = true,
             "-h" | "--help" => {
                 print_usage(&args[0]);
@@ -191,8 +194,6 @@ fn parse_arguments() -> Result<(&'static str, bool), CompilerError> {
                 path = flag.to_string();
             }
         }
-
-        i += 1;
     }
 
     if path.is_empty() {

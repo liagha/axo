@@ -138,14 +138,12 @@ impl Compiler {
             "Compiling" => Color::Blue,
             self.context.path
         );
-        xprintln!();
 
         if self.context.verbose {
             xprintln!(
                 "File Contents:\n{}" => Color::Magenta,
                 indent(&self.context.content) => Color::BrightMagenta
             );
-            xprintln!();
         }
 
         build_pipeline(&mut self.context)

@@ -11,6 +11,7 @@ use {
 
     broccli::{Color, TextStyle}
 };
+use crate::axo_cursor::Location;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Error<K, N = String, H = String> where K: Display, N: Display, H: Display {
@@ -56,59 +57,61 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
             count
         }
 
-        let source = read_to_string(self.span.start.path).unwrap_or_default();
-        let lines: Vec<&str> = source.lines().collect();
-
         let mut messages = String::new();
         let mut details = String::new();
 
-        messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
+        if let Location::File(path) = self.span.start.location {
+            let source = read_to_string(path).unwrap_or_default();
+            let lines: Vec<&str> = source.lines().collect();
 
-        let start = self.span.start;
-        let end = self.span.end;
-        let surround = 3;
+            messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
-        let beginning = start.line.saturating_sub(surround);
-        let finish = end.line.saturating_add(surround);
+            let start = self.span.start;
+            let end = self.span.end;
+            let surround = 3;
 
-        let max = count_digits(lines.len()) + 2;
+            let beginning = start.line.saturating_sub(surround);
+            let finish = end.line.saturating_add(surround);
 
-        details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
+            let max = count_digits(lines.len()) + 2;
 
-        for index in beginning..=finish {
-            if let Some(line) = lines.get(index) {
-                let index = index + 1;
-                let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
-                
-                details.push_str(&format!("{}|  {}\n", identifier, line));
+            details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
 
-                let highlighter = "^".colorize(Color::Red);
+            for index in beginning..=finish {
+                if let Some(line) = lines.get(index) {
+                    let index = index + 1;
+                    let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
 
-                if start.line == end.line {
-                    if index == start.line {
-                        if start.column == end.column {
-                            let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter);
-                            details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                    details.push_str(&format!("{}|  {}\n", identifier, line));
+
+                    let highlighter = "^".colorize(Color::Red);
+
+                    if start.line == end.line {
+                        if index == start.line {
+                            if start.column == end.column {
+                                let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter);
+                                details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                            } else {
+                                let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(end.column - start.column));
+                                details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                            }
+                        }
+                    } else {
+                        let terminus = line.len();
+
+                        let highlight = if index == start.line {
+                            format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(terminus.saturating_sub(start.column) + 1))
+                        } else if start.line < index && index < end.line {
+                            format!("{}", highlighter.repeat(terminus))
+                        } else if index == end.line {
+                            format!("{}", highlighter.repeat(end.column - 1))
                         } else {
-                            let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(end.column - start.column));
+                            "".to_string()
+                        };
+
+                        if !highlight.is_empty() {
                             details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
                         }
-                    }
-                } else {
-                    let terminus = line.len();
-
-                    let highlight = if index == start.line {
-                        format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(terminus.saturating_sub(start.column) + 1))
-                    } else if start.line < index && index < end.line {
-                        format!("{}", highlighter.repeat(terminus))
-                    } else if index == end.line {
-                        format!("{}", highlighter.repeat(end.column - 1))
-                    } else {
-                        "".to_string()
-                    };
-
-                    if !highlight.is_empty() {
-                        details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
                     }
                 }
             }

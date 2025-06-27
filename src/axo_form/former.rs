@@ -4,7 +4,7 @@ use {
     },
     crate::{
         axo_cursor::{
-            Position, Peekable, 
+            Position, Peekable,
             Span, Spanned,
         },
         axo_form::form::{Form, FormKind},
@@ -124,8 +124,8 @@ where
                     self.record.empty();
                 }
             }
-            
-            PatternKind::Twin { value } => {
+
+            PatternKind::Identical { value } => {
                 if let Some(peek) = source.get(self.marker).cloned() {
                     if value.eq(&peek) {
                         source.next(&mut self.marker, &mut self.position);
@@ -138,7 +138,7 @@ where
                     }
                 } else {
                     self.record.empty();
-                } 
+                }
             }
 
             PatternKind::Negation { pattern } => {
@@ -399,7 +399,7 @@ where
         let mut inputs = Vec::with_capacity(self.len());
         let mut index = 0;
         let mut position = self.position();
-        
+
         while self.get(index).is_some() {
             let mut draft = Draft::new(index, position, pattern.clone());
             draft.build(self);
@@ -409,12 +409,12 @@ where
                 position = draft.position;
 
                 inputs.extend(draft.consumed);
-            } else { 
+            } else {
                 index = draft.marker + 1;
                 position = draft.position;
             }
         }
-        
+
         *self.input_mut() = inputs;
     }
 

@@ -60,7 +60,7 @@ where
     
     /// Matches the input value using the PartialEq trait.
     /// Allows for different types than Input to be used.
-    Twin {
+    Identical {
         value: Arc<dyn PartialEq<Input>>,  
     },
 
@@ -87,7 +87,7 @@ where
     /// Matches all contained patterns in order (logical AND).
     /// All patterns must succeed for the sequence to succeed.
     Sequence { 
-        patterns: Vec<Pattern<Input, Output, Failure>>, 
+        patterns: Vec<Pattern<Input, Output, Failure>>,
     },
 
     /// Wraps another pattern without changing its behavior.
@@ -130,7 +130,7 @@ where
     
     pub fn exact(value: impl PartialEq<Input> + 'static) -> Self {
         Self {
-            kind: PatternKind::Twin {
+            kind: PatternKind::Identical {
                 value: Arc::new(value),
             },
             action: None,

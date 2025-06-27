@@ -58,7 +58,7 @@ where
             PatternKind::Literal { value } => {
                 write!(f, "Literal({:?})", value)
             }
-            PatternKind::Twin { value } => {
+            PatternKind::Identical { value } => {
                 write!(f, "Twin({:?})", value.type_id())
             }
             PatternKind::Alternative { patterns } => {

@@ -12,10 +12,16 @@ use {
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Location {
+    File(&'static str),
+    Void,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
-    pub path: &'static str,
+    pub location: Location,
 }
 
 impl Default for Position {
@@ -23,7 +29,7 @@ impl Default for Position {
         Self {
             line: 1,
             column: 1,
-            path: "",
+            location: Location::Void,
         }
     }
 }
@@ -34,7 +40,16 @@ impl Position {
         Self {
             line: 1,
             column: 1,
-            path: file,
+            location: Location::File(file),
+        }
+    }
+    
+    #[inline]
+    pub fn path(line: usize, column: usize, path: &'static str) -> Self {
+        Self {
+            line,
+            column,
+            location: Location::File(path),
         }
     }
     
@@ -50,7 +65,12 @@ impl Position {
 
     #[inline]
     pub fn set_path(&mut self, path: &'static str) {
-        self.path = path;
+        self.location = Location::File(path);
+    }
+    
+    #[inline]
+    pub fn set_location(&mut self, location: Location) {
+        self.location = location;
     }
 
     #[inline]
@@ -58,7 +78,7 @@ impl Position {
         Self {
             line,
             column: self.column,
-            path: self.path
+            location: self.location
         }
     }
 
@@ -67,7 +87,7 @@ impl Position {
         Self {
             line: self.line,
             column,
-            path: self.path
+            location: self.location
         }
     }
 
@@ -76,7 +96,16 @@ impl Position {
         Self {
             line: self.line,
             column: self.column,
-            path,
+            location: Location::File(path),
+        }
+    }
+
+    #[inline]
+    pub fn swap_location(&self, location: Location) -> Self {
+        Self {
+            line: self.line,
+            column: self.column,
+            location,
         }
     }
 
@@ -85,7 +114,7 @@ impl Position {
         Self {
             line: self.line + amount,
             column: self.column,
-            path: self.path,
+            location: self.location,
         }
     }
 
@@ -94,7 +123,7 @@ impl Position {
         Self {
             line: self.line,
             column: self.column + amount,
-            path: self.path,
+            location: self.location,
         }
     }
 
@@ -109,8 +138,8 @@ impl Position {
     }
     
     pub fn cmp(&self, other: &Self) -> Ordering {
-        if self.path != other.path {
-            return self.path.cmp(&other.path);
+        if self.location != other.location {
+            return Ordering::Less;
         }
 
         match self.line.cmp(&other.line) {

@@ -8,19 +8,29 @@ use {
             Display, Debug, 
             Formatter, Result
         },
+        axo_cursor::Location,
     }
 };
 
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self { 
+            Location::File(file) => write!(f, "{}", file),
+            Location::Void => write!(f, "0"),
+        }
+    }
+}
+
 impl Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}:{}:{}", self.path, self.line, self.column)
+        write!(f, "{}:{}:{}", self.location, self.line, self.column)
     }
 }
 
 impl Debug for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
-            if self.start.path != self.end.path {
+            if self.start.location != self.end.location {
                 write!(f, "{}:{} - {}:{}",
                        self.start.line, self.start.column,
                        self.end.line, self.end.column)
@@ -37,19 +47,19 @@ impl Debug for Span {
                        self.end.line, self.end.column)
             }
         } else {
-            if self.start.path != self.end.path {
+            if self.start.location != self.end.location {
                 write!(f, "{}:{}:{} - {}:{}:{}",
-                       self.start.path, self.start.line, self.start.column,
-                       self.end.path, self.end.line, self.end.column)
+                       self.start.location, self.start.line, self.start.column,
+                       self.end.location, self.end.line, self.end.column)
             } else if self.start.line == self.end.line && self.start.column == self.end.column {
-                write!(f, "{}:{}:{}", self.start.path, self.start.line, self.start.column)
+                write!(f, "{}:{}:{}", self.start.location, self.start.line, self.start.column)
             } else if self.start.line == self.end.line {
                 write!(f, "{}:{}:{}-{}",
-                       self.start.path, self.start.line,
+                       self.start.location, self.start.line,
                        self.start.column, self.end.column)
             } else {
                 write!(f, "{}:{}:{}-{}:{}",
-                       self.start.path, self.start.line, self.start.column,
+                       self.start.location, self.start.line, self.start.column,
                        self.end.line, self.end.column)
             }
         }
@@ -59,19 +69,19 @@ impl Debug for Span {
 
 impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if self.start.path != self.end.path {
+        if self.start.location != self.end.location {
             write!(f, "{}:{}:{} - {}:{}:{}",
-                   self.start.path, self.start.line, self.start.column,
-                   self.end.path, self.end.line, self.end.column)
+                   self.start.location, self.start.line, self.start.column,
+                   self.end.location, self.end.line, self.end.column)
         } else if self.start.line == self.end.line && self.start.column == self.end.column {
-            write!(f, "{}:{}:{}", self.start.path, self.start.line, self.start.column)
+            write!(f, "{}:{}:{}", self.start.location, self.start.line, self.start.column)
         } else if self.start.line == self.end.line {
             write!(f, "{}:{}:{}-{}",
-                   self.start.path, self.start.line,
+                   self.start.location, self.start.line,
                    self.start.column, self.end.column)
         } else {
             write!(f, "{}:{}:{}-{}:{}",
-                   self.start.path, self.start.line, self.start.column,
+                   self.start.location, self.start.line, self.start.column,
                    self.end.line, self.end.column)
         }
     }

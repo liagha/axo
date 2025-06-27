@@ -1,6 +1,7 @@
 use crate::{
     axo_cursor::{Position, Span},
 };
+use crate::axo_cursor::Location;
 
 pub trait Peekable<Item: PartialEq> {
     fn len(&self) -> usize;
@@ -84,7 +85,11 @@ pub trait Peekable<Item: PartialEq> {
     }
 
     fn set_path(&mut self, path: &'static str) {
-        self.position_mut().path = path;
+        self.position_mut().location = Location::File(path);
+    }
+    
+    fn set_location(&mut self, location: Location) {
+        self.position_mut().location = location;
     }
 
     fn skip(&mut self, count: usize) {

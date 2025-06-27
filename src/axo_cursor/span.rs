@@ -64,7 +64,7 @@ impl Span {
 
     #[inline]
     pub fn contains(&self, pos: &Position) -> bool {
-        if self.start.path != pos.path {
+        if self.start.location != pos.location {
             return false;
         }
 
@@ -72,7 +72,7 @@ impl Span {
     }
 
     pub fn contains_span(&self, other: &Span) -> bool {
-        if self.start.path != other.start.path || self.start.path != other.end.path {
+        if self.start.location != other.start.location || self.start.location != other.end.location {
             return false;
         }
 
@@ -81,7 +81,7 @@ impl Span {
 
     #[inline]
     pub fn overlaps(&self, other: &Span) -> bool {
-        if self.start.path != other.start.path {
+        if self.start.location != other.start.location {
             return false;
         }
 
@@ -92,7 +92,7 @@ impl Span {
     }
 
     pub fn merge(&self, other: &Span) -> Option<Span> {
-        if self.start.path != other.start.path {
+        if self.start.location != other.start.location {
             return None;
         }
 
@@ -113,8 +113,8 @@ impl Span {
 
     #[inline]
     pub fn mix(&self, other: &Span) -> Span {
-        if self.start.path != other.start.path {
-            panic!("cannot mix spans from `{}` with `{}`", self.start.path, other.start.path);
+        if self.start.location != other.start.location {
+            panic!("cannot mix spans from `{}` with `{}`", self.start.location, other.start.location);
         }
 
         let start = if self.start.cmp(&other.start) == Ordering::Less {

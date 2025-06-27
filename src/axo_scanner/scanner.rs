@@ -53,7 +53,7 @@ impl Peekable<Character> for Scanner {
         self.set_position(Position {
             line: 1,
             column: 1,
-            path: self.position.path,
+            location: self.position.location,
         })
     }
 

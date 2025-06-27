@@ -87,7 +87,7 @@ where
     
     /// Tweak the info of a draft.
     Tweak(Tweaker<Input, Output, Failure>),
-    
+
     Remove,
 
     /// Generate a failure form using the provided emitter function.
@@ -213,8 +213,6 @@ where
                 } else {
                     missing
                 };
-
-                draft.pattern.action = Some(*chosen.clone());
 
                 chosen.execute(source, draft);
             },

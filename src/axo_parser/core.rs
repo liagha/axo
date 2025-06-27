@@ -165,7 +165,7 @@ impl Parser {
     // Primary Elements
 
     pub fn primary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::delimited(), Self::token()])
+        Pattern::alternative([Self::compound(), Self::delimited(), Self::token()])
     }
 
     // Unary Operations
@@ -239,7 +239,6 @@ impl Parser {
 
     pub fn unary() -> Pattern<Token, Element, ParseError> {
         Pattern::alternative([
-            Self::compound(),
             Self::prefixed(), 
             Self::postfixed(), 
             Self::primary(),
