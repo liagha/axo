@@ -1,5 +1,12 @@
 use {
-    super::{action::Action, form::Form},
+    super::{
+        order::Order, 
+        form::Form,
+        functions::{
+            Emitter, Evaluator,
+            Predicate,
+        },
+    },
     crate::{
         hash::Hash,
         format::Debug,
@@ -10,23 +17,10 @@ use {
         axo_cursor::{
             Spanned,  
         },
-        axo_form::{
-            action::Emitter,
-        },
     },
 };
 
-/// A predicate function that examines input and returns whether it matches some condition.
-/// Used in conditional patterns to test input values.
-pub type Predicate<Input> = Arc<Mutex<dyn FnMut(&Input) -> bool + Send + Sync>>;
 
-/// An evaluator function that lazily creates patterns when needed.
-/// Used for recursive or context-dependent pattern construction.
-pub type Evaluator<Input, Output, Failure> =
-    Arc<Mutex<dyn FnMut() -> Pattern<Input, Output, Failure> + Send + Sync>>;
-
-/// The core matching behaviors that patterns can exhibit.
-/// Each kind defines how a pattern attempts to match against input.
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
 where
@@ -34,82 +28,58 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    /// Matches if any of the contained patterns match (logical OR).
-    /// Tries patterns in order and succeeds on the first match.
     Alternative {
         patterns: Vec<Pattern<Input, Output, Failure>>
     },
 
-    /// Matches input that satisfies the given predicate function.
-    /// The predicate receives the input value and returns true/false.
-    Predicate { 
+    Predicate {
         function: Predicate<Input>, 
     },
 
-    /// Lazily evaluates to create a pattern when needed.
-    /// Useful for recursive patterns or context-dependent matching.
-    Deferred { 
+    Deferred {
         function: Evaluator<Input, Output, Failure> 
     },
 
-    /// Matches exactly the specified input value.
-    /// Uses equality comparison to determine matches.
     Literal {
         value: Input
     },
     
-    /// Matches the input value using the PartialEq trait.
-    /// Allows for different types than Input to be used.
     Identical {
         value: Arc<dyn PartialEq<Input>>,  
     },
 
-    /// Matches input that does NOT match the inner pattern (logical NOT).
-    /// Succeeds when the inner pattern fails, and vice versa.
     Negation {
         pattern: Box<Pattern<Input, Output, Failure>>
     },
 
-    /// Optionally matches the inner pattern.
-    /// Always succeeds, whether the inner pattern matches or not.
-    Optional { 
+    Optional {
         pattern: Box<Pattern<Input, Output, Failure>> 
     },
 
-    /// Matches the inner pattern a specified number of times.
-    /// Must match at least `minimum` times, up to `maximum` times (if specified).
     Repetition {
         pattern: Box<Pattern<Input, Output, Failure>>,
         minimum: usize,
         maximum: Option<usize>,
     },
 
-    /// Matches all contained patterns in order (logical AND).
-    /// All patterns must succeed for the sequence to succeed.
-    Sequence { 
+    Sequence {
         patterns: Vec<Pattern<Input, Output, Failure>>,
     },
 
-    /// Wraps another pattern without changing its behavior.
-    /// Used for applying actions to existing patterns.
-    Wrapper { 
+    Wrapper {
         pattern: Box<Pattern<Input, Output, Failure>> 
     },
 }
 
-/// A pattern defines how to match input and what action to take on successful matches.
-/// Patterns are the building blocks of the parsing system, combining matching logic with transformation actions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Pattern<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    /// The matching behavior of this pattern
     pub kind: PatternKind<Input, Output, Failure>,
-    /// Optional action to execute when the pattern matches
-    pub action: Option<Action<Input, Output, Failure>>,
+    pub order: Option<Order<Input, Output, Failure>>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure>
@@ -124,7 +94,7 @@ where
             kind: PatternKind::Literal { 
                 value 
             },
-            action: None,
+            order: None,
         }
     }
     
@@ -133,7 +103,7 @@ where
             kind: PatternKind::Identical {
                 value: Arc::new(value),
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -143,7 +113,7 @@ where
             kind: PatternKind::Alternative {
                 patterns: patterns.into()
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -153,7 +123,7 @@ where
             kind: PatternKind::Sequence { 
                 patterns: patterns.into() 
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -164,7 +134,7 @@ where
     ) -> Self {
         Self {
             kind: pattern.into().kind,
-            action: Some(Action::Capture { identifier }),
+            order: Some(Order::Capture { identifier }),
         }
     }
 
@@ -185,7 +155,7 @@ where
                 minimum,
                 maximum,
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -195,7 +165,7 @@ where
             kind: PatternKind::Optional { 
                 pattern: pattern.into() 
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -208,7 +178,7 @@ where
             kind: PatternKind::Predicate { 
                 function: Arc::new(Mutex::new(predicate)) 
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -218,7 +188,7 @@ where
             kind: PatternKind::Negation { 
                 pattern: pattern.into() 
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -235,15 +205,15 @@ where
     #[inline]
     pub fn required(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        action: Action<Input, Output, Failure>,
+        order: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(Action::Trigger {
-                found: Action::perform(|| {}).into(),
-                missing: action.into(),
+            order: Some(Order::Trigger {
+                found: Order::perform(|| {}).into(),
+                missing: order.into(),
             }),
         }
     }
@@ -251,13 +221,13 @@ where
     #[inline]
     pub fn lazy<F>(factory: F) -> Self
     where
-        F: FnMut() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
+        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
     {
         Self {
             kind: PatternKind::Deferred { 
-                function: Arc::new(Mutex::new(factory)) 
+                function: Arc::new(factory)
             },
-            action: None,
+            order: None,
         }
     }
 
@@ -276,7 +246,7 @@ where
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(Action::Map(Arc::new(Mutex::new(transform)))),
+            order: Some(Order::Convert(Arc::new(Mutex::new(transform)))),
         }
     }
 
@@ -286,7 +256,7 @@ where
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(Action::Ignore),
+            order: Some(Order::Ignore),
         }
     }
 
@@ -296,34 +266,21 @@ where
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(Action::Skip),
-        }
-    }
-
-    #[inline]
-    pub fn error(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        function: Emitter<Input, Output, Failure>,
-    ) -> Self {
-        Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
-            },
-            action: Some(Action::Failure(function)),
+            order: Some(Order::Skip),
         }
     }
 
     #[inline]
     pub fn conditional(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        found: Action<Input, Output, Failure>,
-        missing: Action<Input, Output, Failure>,
+        found: Order<Input, Output, Failure>,
+        missing: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(Action::Trigger {
+            order: Some(Order::Trigger {
                 found: Box::new(found),
                 missing: Box::new(missing),
             }),
@@ -331,43 +288,43 @@ where
     }
 
     #[inline]
-    pub fn action(
+    pub fn order(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        action: Action<Input, Output, Failure>,
+        order: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
             kind: PatternKind::Wrapper { 
                 pattern: pattern.into() 
             },
-            action: Some(action),
+            order: Some(order),
         }
     }
 
     #[inline]
-    pub fn with_action(mut self, action: Action<Input, Output, Failure>) -> Self {
-        self.action = Some(action);
+    pub fn with_action(mut self, order: Order<Input, Output, Failure>) -> Self {
+        self.order = Some(order);
         self
     }
 
     #[inline]
     pub fn with_ignore(mut self) -> Self {
-        self.action = Some(Action::Ignore);
+        self.order = Some(Order::Ignore);
         self
     }
 
     #[inline]
     pub fn with_error(mut self, function: Emitter<Input, Output, Failure>) -> Self {
-        self.action = Some(Action::Failure(function));
+        self.order = Some(Order::Failure(function));
         self
     }
 
     #[inline]
     pub fn with_conditional(
         mut self,
-        found: Action<Input, Output, Failure>,
-        missing: Action<Input, Output, Failure>,
+        found: Order<Input, Output, Failure>,
+        missing: Order<Input, Output, Failure>,
     ) -> Self {
-        self.action = Some(Action::Trigger {
+        self.order = Some(Order::Trigger {
             found: Box::new(found),
             missing: Box::new(missing),
         });
@@ -382,7 +339,7 @@ where
             + Sync
             + 'static,
     {
-        self.action = Some(Action::Map(Arc::new(Mutex::new(transform))));
+        self.order = Some(Order::Convert(Arc::new(Mutex::new(transform))));
         self
     }
 

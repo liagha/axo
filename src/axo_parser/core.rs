@@ -3,7 +3,7 @@ use {
     crate::{
         axo_cursor::Span,
         axo_form::{
-            action::Action,
+            order::Order,
             form::{Form, FormKind},
             former::Former,
             pattern::Pattern,
@@ -81,97 +81,17 @@ impl Parser {
             },
         )])
     }
-    
-    // Compounds
-
-    pub fn invoke() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Self::primary(),
-                Self::group(),
-            ]),
-            |_, form| {
-                let outputs = form.outputs().clone();
-                let element = outputs[0].clone();
-                let group = outputs[1].clone();
-
-                Ok(
-                    Element::new(
-                        ElementKind::Invoke {
-                            target: element.clone().into(),
-                            parameters: group.clone().into(),
-                        },
-                        Span::mix(&element.span, &group.span)
-                    )
-                )
-            }
-        )
-    }
-    
-    pub fn index() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Self::primary(),
-                Self::collection(),
-            ]),
-            |_, form| {
-                let outputs = form.outputs().clone();
-                let element = outputs[0].clone();
-                let index = outputs[1].clone();
-                
-                Ok(
-                    Element::new(
-                        ElementKind::Index {
-                            element: element.clone().into(),
-                            index: index.clone().into(),
-                        },
-                        Span::mix(&element.span, &index.span)
-                    )
-                )
-            }
-        )    
-    }
-
-    pub fn constructor() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Self::primary(),
-                Self::bundle(),
-            ]),
-            |_, form| {
-                let outputs = form.outputs().clone();
-                let element = outputs[0].clone();
-                let bundle = outputs[1].clone();
-
-                Ok(
-                    Element::new(
-                        ElementKind::Constructor {
-                            name: element.clone().into(),
-                            body: bundle.clone().into(),
-                        },
-                        Span::mix(&element.span, &bundle.span)
-                    )
-                )
-            }
-        )
-    }
-    
-    pub fn compound() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([
-            Self::invoke(), Self::index(), Self::constructor(),
-        ])
-    }
 
     // Primary Elements
 
     pub fn primary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::compound(), Self::delimited(), Self::token()])
+        Pattern::alternative([Self::delimited(), Self::token()])
     }
 
     // Unary Operations
 
     pub fn prefixed() -> Pattern<Token, Element, ParseError> {
-        Pattern::action(
+        Pattern::order(
             Pattern::sequence([
                 Pattern::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
@@ -183,7 +103,7 @@ impl Parser {
                     .as_repeat(1, None),
                 Self::primary(),
             ]),
-            Action::map(|_, form: Form<Token, Element, ParseError>| {
+            Order::map(|_, form: Form<Token, Element, ParseError>| {
                 let prefixes = form.inputs();
                 let operand = form.outputs()[0].clone();
                 let mut unary = operand.clone();
@@ -207,29 +127,66 @@ impl Parser {
         Pattern::transform(
             Pattern::sequence([
                 Self::primary(),
-                Pattern::predicate(|token: &Token| {
-                    if let TokenKind::Operator(operator) = &token.kind {
-                        operator.is_postfix()
-                    } else {
-                        false
-                    }
-                })
-                    .as_repeat(1, None),
+                Pattern::alternative([
+                    Self::group(),
+                    Self::collection(),
+                    Self::bundle(),
+                    Pattern::predicate(|token: &Token| {
+                        if let TokenKind::Operator(operator) = &token.kind {
+                            operator.is_postfix()
+                        } else {
+                            false
+                        }
+                    })
+                ]).as_repeat(1, None),
             ]),
             |_, form| {
-                let sequence = form.unwrap()[0].clone().unwrap();
+                let sequence = form.unwrap().clone();
                 let operand = sequence[0].unwrap_output().unwrap();
-                let postfixes = Form::expand_inputs(sequence[1].unwrap());
+                let postfixes = sequence[1].unwrap();
                 let mut unary = operand.clone();
 
                 for postfix in postfixes {
-                    unary = Element::new(
-                        ElementKind::Unary {
-                            operand: unary.into(),
-                            operator: postfix,
-                        },
-                        Span::default(),
-                    );
+                    if let Some(token) = postfix.unwrap_input() {
+                        unary = Element::new(
+                            ElementKind::Unary {
+                                operand: unary.into(),
+                                operator: token,
+                            },
+                            Span::default(),
+                        );
+                    } else if let Some(element) = postfix.unwrap_output() {
+                        match element.kind {
+                            ElementKind::Group(_) => {
+                                unary = Element::new(
+                                    ElementKind::Invoke {
+                                        target: unary.into(),
+                                        parameters: element.into(),
+                                    },
+                                    Span::default(),
+                                )
+                            }
+                            ElementKind::Collection(_) => {
+                                unary = Element::new(
+                                    ElementKind::Index {
+                                        element: unary.into(),
+                                        index: element.into(),
+                                    },
+                                    Span::default(),
+                                )
+                            }
+                            ElementKind::Bundle(_) => {
+                                unary = Element::new(
+                                    ElementKind::Constructor {
+                                        name: unary.into(),
+                                        body: element.into(),
+                                    },
+                                    Span::default(),
+                                )
+                            }
+                            _ => {}
+                        }
+                    }
                 }
 
                 Ok(unary)
@@ -239,8 +196,8 @@ impl Parser {
 
     pub fn unary() -> Pattern<Token, Element, ParseError> {
         Pattern::alternative([
-            Self::prefixed(), 
-            Self::postfixed(), 
+            Self::prefixed(),
+            Self::postfixed(),
             Self::primary(),
         ])
     }
@@ -372,13 +329,13 @@ impl Parser {
                     .with_ignore(),
                 Pattern::required(
                     Pattern::lazy(|| Self::element()),
-                    Action::failure(|_, form| {
+                    Order::failure(|_, form| {
                         ParseError::new(ErrorKind::ExpectedCondition, form.span)
                     }),
                 ),
                 Pattern::required(
                     Pattern::lazy(|| Self::element()),
-                    Action::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
+                    Order::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
                 ),
                 Pattern::optional(Pattern::sequence([
                     Pattern::predicate(|token: &Token| {
@@ -436,7 +393,7 @@ impl Parser {
                         .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::element()),
-                        Action::failure(|_, form| {
+                        Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
@@ -452,13 +409,13 @@ impl Parser {
                         .with_ignore(),
                     Pattern::required(
                         Pattern::lazy(|| Self::element()),
-                        Action::failure(|_, form| {
+                        Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedCondition, form.span)
                         }),
                     ),
                     Pattern::required(
                         Pattern::lazy(|| Self::element()),
-                        Action::failure(|_, form| {
+                        Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
@@ -539,9 +496,9 @@ impl Parser {
     }
 
     pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::action(
+        Pattern::order(
             Pattern::predicate(|_token| true),
-            Action::failure(
+            Order::failure(
                 |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
                         ErrorKind::UnexpectedToken(form.unwrap_input().unwrap().kind),

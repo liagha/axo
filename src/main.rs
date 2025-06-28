@@ -36,7 +36,7 @@ pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub mod data {
-    //pub use std::collections::VecDeque;
+    pub use std::collections::VecDeque;
 }
 
 pub mod file {

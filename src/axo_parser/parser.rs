@@ -8,7 +8,7 @@ use {
         axo_cursor::{Peekable, Position, Span},
         axo_form::{
             pattern::Pattern,
-            form::FormKind, 
+            form::FormKind,
             former::Former,
         },
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -100,27 +100,23 @@ impl Parser {
             errors: Vec::new(),
         }
     }
-    
+
     pub fn strainer() -> Pattern<Token, Element, ParseError> {
-        Pattern::repeat(
-            Pattern::predicate(|token: &Token| {
-                !matches!(token.kind, 
+        Pattern::predicate(|token: &Token| {
+            !matches!(token.kind, 
                     TokenKind::Punctuation(PunctuationKind::Newline)
                     | TokenKind::Punctuation(PunctuationKind::Tab)
                     | TokenKind::Punctuation(PunctuationKind::Space)
                     | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                     | TokenKind::Comment(_)
                 )
-            }),
-            0,
-            None
-        )
+        })
     }
-    
+
     pub fn parse(&mut self) -> (Vec<Element>, Vec<ParseError>) {
         let mut elements = Vec::new();
         let mut errors = Vec::new();
-        
+
         self.strain(Self::strainer());
 
         while self.peek().is_some() {

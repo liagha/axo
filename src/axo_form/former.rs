@@ -226,14 +226,7 @@ where
             }
 
             PatternKind::Deferred { function } => {
-                let resolved = if let Ok(mut guard) = function.lock() {
-                    let resolved = guard();
-                    drop(guard);
-                    resolved
-                } else {
-                    self.record.empty();
-                    return;
-                };
+                let resolved = function();
 
                 let mut draft = Draft::new(self.marker, self.position, resolved);
                 draft.build(source);
@@ -372,8 +365,8 @@ where
             }
         }
 
-        if let Some(action) = &self.pattern.action.clone() {
-            action.execute(source, self);
+        if let Some(order) = &self.pattern.order.clone() {
+            order.execute(source, self);
         }
     }
 }

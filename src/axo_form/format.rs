@@ -1,6 +1,6 @@
 use {
     super::{
-        action::Action,
+        order::Order,
         form::{Form, FormKind},
         pattern::PatternKind,
     },
@@ -59,7 +59,7 @@ where
                 write!(f, "Literal({:?})", value)
             }
             PatternKind::Identical { value } => {
-                write!(f, "Twin({:?})", value.type_id())
+                write!(f, "Identical({:?})", value.type_id())
             }
             PatternKind::Alternative { patterns } => {
                 write!(f, "Alternative({:?})", patterns)
@@ -78,7 +78,7 @@ where
                 if *minimum != 0 {
                     write!(f, ", {}", minimum)?;
                 }
-                
+
                 if let Some(maximum) = maximum {
                     write!(f, "-{}", maximum)?;
                 }
@@ -97,7 +97,7 @@ where
     }
 }
 
-impl<Input, Output, Failure> Debug for Action<Input, Output, Failure>
+impl<Input, Output, Failure> Debug for Order<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -105,18 +105,18 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Action::Map(function) => write!(f, "Map({:?})", function.type_id()),
-            Action::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
-            Action::Multiple(actions) => write!(f, "Multiple({:?})", actions),
-            Action::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
-            Action::Capture { identifier } => write!(f, "Capture({:?})", identifier),
-            Action::Ignore => write!(f, "Ignore"),
-            Action::Skip => write!(f, "Skip"),
-            Action::Shift(function) => write!(f, "Shifter({:?})", function.type_id()),
-            Action::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
-            Action::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
-            Action::Remove => write!(f, "Remove"),
-            Action::Pardon => write!(f, "Pardon"),
+            Order::Convert(function) => write!(f, "Map({:?})", function.type_id()),
+            Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
+            Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
+            Order::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
+            Order::Capture { identifier } => write!(f, "Capture({:?})", identifier),
+            Order::Ignore => write!(f, "Ignore"),
+            Order::Skip => write!(f, "Skip"),
+            Order::Shift(function) => write!(f, "Shifter({:?})", function.type_id()),
+            Order::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
+            Order::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
+            Order::Remove => write!(f, "Remove"),
+            Order::Pardon => write!(f, "Pardon"),
         }
     }
 }

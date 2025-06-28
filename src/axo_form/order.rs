@@ -1,101 +1,52 @@
-use crate::{
-    artifact::Artifact,
-    axo_cursor::{
-        Position, Peekable,
-        Spanned,
-    },
-    axo_form::{
+use {
+    super::{
         form::{Form, FormKind},
         former::Draft,
+        functions::{
+            Emitter, Executor,
+            Shifter,
+            Transformer, Tweaker,
+        },
     },
-    axo_parser::{Item, ItemKind},
-    compiler::{Context, Marked},
-    format::Debug,
-    hash::Hash,
-    thread::{Arc, Mutex},
+    crate::{
+        artifact::Artifact,
+        axo_cursor::{
+            Peekable,
+            Spanned,
+        },
+        axo_parser::{Item, ItemKind},
+        compiler::{Context, Marked},
+        format::Debug,
+        hash::Hash,
+        thread::{Arc, Mutex},
+    }
 };
 
-/// A transformer function that processes a form and returns either a successful output or a failure.
-/// Takes a mutable context and a form, returning a Result containing the transformed output or an error.
-pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure> + Send + Sync>>;
-
-/// An emitter function that generates a failure from a span location.
-/// Used to create error messages or failure states at specific positions in the input.
-pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
-
-/// An executor function that performs side effects without returning a value.
-/// Used for logging, debugging, or other operations that don't transform the form.
-pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
-
-/// An inspector function that examines a draft and returns an action to be performed.
-/// Used for dynamic action selection based on form content.
-pub type Inspector<Input, Output, Failure> = dyn Fn(Draft<Input, Output, Failure>) -> Action<Input, Output, Failure> + Send + Sync;
-
-/// A shifter for repositioning the cursor of the draft.
-pub type Shifter = Arc<dyn Fn(&mut usize, &mut Position)>;
-
-/// A tweaker for changing the info of the draft.
-pub type Tweaker<Input, Output, Failure> = Arc<dyn Fn(&mut Draft<Input, Output, Failure>) + Send + Sync>;
-
-/// Actions define what happens when patterns match during form processing.
-/// Each action can transform, execute side effects, or control the flow of processing.
 #[derive(Clone)]
-pub enum Action<Input, Output, Failure>
+pub enum Order<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    /// Transform the input form into an output form using the provided transformer function.
-    /// If transformation fails, the form becomes a failure form.
-    Map(Transformer<Input, Output, Failure>),
-
-    /// Execute a side effect without modifying the form.
-    /// The form passes through unchanged after execution.
-    Perform(Executor),
-
-    /// Execute multiple actions in sequence.
-    /// Each action is applied to the result of the previous action.
-    Multiple(Vec<Action<Input, Output, Failure>>),
-
-    /// Conditional execution based on whether the form has content.
-    /// Executes `found` if the draft was Aligned, `missing` if it Failed or didn't Align.
-    Trigger {
-        found: Box<Action<Input, Output, Failure>>,
-        missing: Box<Action<Input, Output, Failure>>,
-    },
-
-    /// Capture the current form state and store it in the resolver with the given identifier.
-    /// The form is converted to an artifact and stored for later retrieval.
-    Capture {
-        identifier: usize,
-    },
-
-    /// Ignore the current form and replace it with an empty form.
-    /// Used to discard unwanted matches while continuing processing.
-    Ignore,
-
-    /// Skip the current form and move forward in pattern matching.
-    /// Used for whitespaces so no additional skipping in the parser is needed.
-    Skip,
-    
-    /// Shift the position of a draft.
-    Shift(Shifter),
-    
-    /// Clearing the records of a draft.
-    Pardon,
-    
-    /// Tweak the info of a draft.
-    Tweak(Tweaker<Input, Output, Failure>),
-
-    Remove,
-
-    /// Generate a failure form using the provided emitter function.
-    /// The emitter receives the current span and produces a failure value.
+    Capture { identifier: usize, },
+    Convert(Transformer<Input, Output, Failure>),
     Failure(Emitter<Input, Output, Failure>),
+    Ignore,
+    Multiple(Vec<Order<Input, Output, Failure>>),
+    Pardon,
+    Perform(Executor),
+    Remove,
+    Shift(Shifter),
+    Skip,
+    Trigger { 
+        found: Box<Order<Input, Output, Failure>>,
+        missing: Box<Order<Input, Output, Failure>>, 
+    },
+    Tweak(Tweaker<Input, Output, Failure>),
 }
 
-impl<Input, Output, Failure> Action<Input, Output, Failure>
+impl<Input, Output, Failure> Order<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -107,7 +58,7 @@ where
         Source: Peekable<Input> + Marked,
     {
         match self {
-            Action::Map(transform) => {
+            Order::Convert(transform) => {
                 if !draft.record.is_aligned() {
                     return;
                 }
@@ -134,13 +85,13 @@ where
                 }
             }
 
-            Action::Multiple(actions) => {
-                for action in actions.iter() {
-                    action.execute(source, draft);
+            Order::Multiple(actions) => {
+                for order in actions.iter() {
+                    order.execute(source, draft);
                 }
             }
 
-            Action::Capture { identifier } => {
+            Order::Capture { identifier } => {
                 if !draft.record.is_aligned() {
                     return;
                 }
@@ -164,7 +115,7 @@ where
                 resolver.insert(item);
             }
 
-            Action::Ignore => {
+            Order::Ignore => {
                 if !draft.record.is_aligned() {
                     return;
                 }
@@ -173,7 +124,7 @@ where
                 draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
-            Action::Skip => {
+            Order::Skip => {
                 if draft.record.is_aligned() {
                     let span = draft.form.span.clone();
 
@@ -182,7 +133,7 @@ where
                 }
             }
 
-            Action::Perform(executor) => {
+            Order::Perform(executor) => {
                 if !draft.record.is_aligned() {
                     return;
                 }
@@ -193,7 +144,7 @@ where
                 }
             }
 
-            Action::Failure(function) => {
+            Order::Failure(function) => {
                 let span = draft.form.span.clone();
 
                 let failure = function(source.context_mut(), draft.form.clone());
@@ -203,26 +154,28 @@ where
                 draft.form = form;
             }
             
-            Action::Shift(shifter) => {
+            Order::Shift(shifter) => {
                 shifter(&mut draft.marker, &mut draft.position);
             }
 
-            Action::Trigger { found, missing } => {
+            Order::Trigger { found, missing } => {
                 let chosen = if draft.record.is_aligned() {
                     found
                 } else {
                     missing
                 };
+                
+                draft.pattern.order = Some(*chosen.clone());
 
                 chosen.execute(source, draft);
             },
-            Action::Tweak(tweaker) => {
+            Order::Tweak(tweaker) => {
                 tweaker(draft);
             }
-            Action::Remove => {
+            Order::Remove => {
                 source.remove(draft.marker);
             }
-            Action::Pardon => {
+            Order::Pardon => {
                 draft.record.empty();
             }
         }
@@ -244,7 +197,7 @@ where
         + Sync
         + 'static,
     {
-        Self::Map(Arc::new(Mutex::new(transformer)))
+        Self::Convert(Arc::new(Mutex::new(transformer)))
     }
 
     #[inline]
