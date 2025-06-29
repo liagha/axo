@@ -29,7 +29,7 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    Capture { identifier: usize, },
+    Capture(Artifact),
     Convert(Transformer<Input, Output, Failure>),
     Failure(Emitter<Input, Output, Failure>),
     Ignore,
@@ -91,7 +91,7 @@ where
                 }
             }
 
-            Order::Capture { identifier } => {
+            Order::Capture(identifier) => {
                 if !draft.record.is_aligned() {
                     return;
                 }
@@ -106,7 +106,7 @@ where
 
                 let item = Item::new(
                     ItemKind::Formed {
-                        identifier: *identifier,
+                        identifier: identifier.clone(),
                         form: artifact,
                     },
                     draft.form.span.clone(),
@@ -209,8 +209,8 @@ where
     }
 
     #[inline]
-    pub fn capture(identifier: usize) -> Self {
-        Self::Capture { identifier }
+    pub fn capture(identifier: Artifact) -> Self {
+        Self::Capture(identifier)
     }
 
     #[inline]
@@ -249,7 +249,7 @@ where
     }
 
     #[inline]
-    pub fn with_capture(self, identifier: usize) -> Self {
+    pub fn with_capture(self, identifier: Artifact) -> Self {
         self.then(Self::capture(identifier))
     }
 

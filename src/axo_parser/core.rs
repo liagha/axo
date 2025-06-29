@@ -14,6 +14,7 @@ use {
     },
     log::trace,
 };
+use crate::artifact::Artifact;
 
 impl Parser {
     // Basic Token Patterns
@@ -463,17 +464,9 @@ impl Parser {
                     }
                 })
                     .with_ignore(),
-                Pattern::capture(0, Pattern::lazy(Self::element)),
+                Pattern::lazy(Self::element),
             ]),
             move |context, _| {
-                let symbols = context.resolver.scope.symbols.clone();
-                let formed = symbols
-                    .iter()
-                    .find(|item| matches!(item.kind, ItemKind::Formed { identifier: 0, .. }))
-                    .unwrap();
-
-                trace!("formed variable: {:?}.", formed);
-
                 Ok(Element::new(
                     ElementKind::Item(ItemKind::Unit),
                     Span::default(),

@@ -33,7 +33,7 @@ pub struct Item {
 pub enum ItemKind {
     Use(Box<Element>),
     Formed {
-        identifier: usize,
+        identifier: Artifact,
         form: Form<Artifact, Artifact, Artifact>,
     },
     Implement {

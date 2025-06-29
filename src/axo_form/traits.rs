@@ -170,7 +170,7 @@ where
                 found.hash(state);
                 missing.hash(state);
             }
-            Order::Capture { identifier } => {
+            Order::Capture(identifier) => {
                 4u8.hash(state);
                 identifier.hash(state);
             }
@@ -221,7 +221,7 @@ where
                 Order::Trigger { found: f1, missing: m1 },
                 Order::Trigger { found: f2, missing: m2 }
             ) => f1 == f2 && m1 == m2,
-            (Order::Capture { identifier: id1 }, Order::Capture { identifier: id2 }) => {
+            (Order::Capture(id1), Order::Capture(id2)) => {
                 id1 == id2
             }
             (Order::Ignore, Order::Ignore) => true,

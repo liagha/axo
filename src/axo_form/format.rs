@@ -106,7 +106,7 @@ where
             Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
             Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
             Order::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
-            Order::Capture { identifier } => write!(f, "Capture({:?})", identifier),
+            Order::Capture(identifier) => write!(f, "Capture({:?})", identifier),
             Order::Ignore => write!(f, "Ignore"),
             Order::Skip => write!(f, "Skip"),
             Order::Shift(function) => write!(f, "Shifter({:?})", function.type_id()),

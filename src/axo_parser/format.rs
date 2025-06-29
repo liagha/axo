@@ -18,7 +18,7 @@ impl Display for ItemKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ItemKind::Use(element) => write!(f, "use {}", element),
-            ItemKind::Formed { identifier, form } => write!(f, "formed({}, {})", identifier, form),
+            ItemKind::Formed { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
             ItemKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
             ItemKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
             ItemKind::Variable { target, value, mutable, ty } => {

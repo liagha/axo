@@ -19,6 +19,7 @@ use {
         },
     },
 };
+use crate::artifact::Artifact;
 
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
@@ -115,17 +116,17 @@ where
 
     #[inline]
     pub fn capture(
-        identifier: usize,
+        identifier: Artifact,
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
     ) -> Self {
         Self {
             kind: pattern.into().kind,
-            order: Some(Order::Capture { identifier }),
+            order: Some(Order::Capture(identifier)),
         }
     }
 
     #[inline]
-    pub fn as_capture(&self, identifier: usize) -> Self {
+    pub fn as_capture(&self, identifier: Artifact) -> Self {
         Self::capture(identifier, Box::new(self.clone()))
     }
 
