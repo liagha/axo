@@ -36,7 +36,7 @@ pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
 pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub mod data {
-    pub use std::collections::VecDeque;
+    //pub use std::collections::VecDeque;
 }
 
 pub mod file {
@@ -66,7 +66,8 @@ pub mod compare {
 
 pub mod hash {
     pub use core::hash::{Hash, Hasher};
-    pub use hashish::*;
+    pub use hashish::{HashMap, HashSet};
+    pub use std::collections::hash_map::DefaultHasher;
 }
 
 pub mod char {

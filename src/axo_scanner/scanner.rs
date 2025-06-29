@@ -157,7 +157,7 @@ impl Scanner {
 
     fn line_comment() -> Pattern<Character, Token, ScanError> {
         Pattern::sequence([
-            Pattern::sequence([Pattern::exact('/'), Pattern::exact('/')]).with_ignore(),
+            Pattern::sequence([Pattern::literal('/'), Pattern::literal('/')]).with_ignore(),
             Pattern::repeat(Pattern::predicate(|c: &Character| *c != '\n'), 0, None),
         ])
         .with_transform(|_, form| {
@@ -172,15 +172,15 @@ impl Scanner {
 
     fn multiline_comment() -> Pattern<Character, Token, ScanError> {
         Pattern::sequence([
-            Pattern::sequence([Pattern::exact('/'), Pattern::exact('*')]).with_ignore(),
+            Pattern::sequence([Pattern::literal('/'), Pattern::literal('*')]).with_ignore(),
             Pattern::repeat(
                 Pattern::negate(
-                    Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
+                    Pattern::sequence([Pattern::literal('*'), Pattern::literal('/')]).with_ignore(),
                 ),
                 0,
                 None,
             ),
-            Pattern::sequence([Pattern::exact('*'), Pattern::exact('/')]).with_ignore(),
+            Pattern::sequence([Pattern::literal('*'), Pattern::literal('/')]).with_ignore(),
         ])
         .with_transform(|_, form: Form<Character, Token, ScanError>| {
             let content: String = form.inputs().into_iter().collect();
@@ -195,14 +195,14 @@ impl Scanner {
     fn hex_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('0'),
-                Pattern::alternative([Pattern::exact('x'), Pattern::exact('X')]),
+                Pattern::literal('0'),
+                Pattern::alternative([Pattern::literal('x'), Pattern::literal('X')]),
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::predicate(|c: &Character| {
                             c.is_alphanumeric()
                         }),
-                        Pattern::exact('_').with_ignore(),
+                        Pattern::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -224,12 +224,12 @@ impl Scanner {
     fn binary_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('0'),
-                Pattern::alternative([Pattern::exact('b'), Pattern::exact('B')]),
+                Pattern::literal('0'),
+                Pattern::alternative([Pattern::literal('b'), Pattern::literal('B')]),
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::predicate(|c: &Character| *c == '0' || *c == '1'),
-                        Pattern::exact('_').with_ignore(),
+                        Pattern::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -250,12 +250,12 @@ impl Scanner {
     fn octal_number() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('0'),
-                Pattern::alternative([Pattern::exact('o'), Pattern::exact('O')]),
+                Pattern::literal('0'),
+                Pattern::alternative([Pattern::literal('o'), Pattern::literal('O')]),
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
-                        Pattern::exact('_').with_ignore(),
+                        Pattern::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -280,17 +280,17 @@ impl Scanner {
                 Pattern::repeat(
                     Pattern::alternative([
                         Pattern::predicate(|c: &Character| c.is_numeric()),
-                        Pattern::exact('_').with_ignore(),
+                        Pattern::literal('_').with_ignore(),
                     ]),
                     0,
                     None,
                 ),
                 Pattern::optional(Pattern::sequence([
-                    Pattern::exact('.'),
+                    Pattern::literal('.'),
                     Pattern::repeat(
                         Pattern::alternative([
                             Pattern::predicate(|c: &Character| c.is_numeric()),
-                            Pattern::exact('_').with_ignore(),
+                            Pattern::literal('_').with_ignore(),
                         ]),
                         0,
                         None,
@@ -358,16 +358,16 @@ impl Scanner {
     fn quoted_string() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('"'),
+                Pattern::literal('"'),
                 Pattern::repeat(
                     Pattern::alternative([
-                        Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
+                        Pattern::sequence([Pattern::literal('\\'), Pattern::predicate(|_| true)]),
                         Pattern::predicate(|c: &Character| *c != '"' && *c != '\\' && *c != '\n'),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::exact('"'),
+                Pattern::literal('"'),
             ]),
             |_, form| {
                 let mut content = String::new();
@@ -489,9 +489,9 @@ impl Scanner {
     fn backtick_string() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('`'),
+                Pattern::literal('`'),
                 Pattern::repeat(Pattern::predicate(|c: &Character| *c != '`'), 0, None),
-                Pattern::exact('`'),
+                Pattern::literal('`'),
             ]),
             |_, form| {
                 let content: String = form.inputs().into_iter().collect();
@@ -504,12 +504,12 @@ impl Scanner {
     fn character() -> Pattern<Character, Token, ScanError> {
         Pattern::transform(
             Pattern::sequence([
-                Pattern::exact('\''),
+                Pattern::literal('\''),
                 Pattern::alternative([
-                    Pattern::sequence([Pattern::exact('\\'), Pattern::predicate(|_| true)]),
+                    Pattern::sequence([Pattern::literal('\\'), Pattern::predicate(|_| true)]),
                     Pattern::predicate(|c: &Character| *c != '\'' && *c != '\\'),
                 ]),
-                Pattern::exact('\''),
+                Pattern::literal('\''),
             ]),
             |_, form| {
                 let flat_chars = form.inputs();

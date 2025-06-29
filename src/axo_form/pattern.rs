@@ -40,15 +40,11 @@ where
         function: Evaluator<Input, Output, Failure> 
     },
 
-    Literal {
-        value: Input
-    },
-    
     Identical {
         value: Arc<dyn PartialEq<Input>>,  
     },
 
-    Negation {
+    Reject {
         pattern: Box<Pattern<Input, Output, Failure>>
     },
 
@@ -89,16 +85,7 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     #[inline]
-    pub fn literal(value: Input) -> Self {
-        Self {
-            kind: PatternKind::Literal { 
-                value 
-            },
-            order: None,
-        }
-    }
-    
-    pub fn exact(value: impl PartialEq<Input> + 'static) -> Self {
+    pub fn literal(value: impl PartialEq<Input> + 'static) -> Self {
         Self {
             kind: PatternKind::Identical {
                 value: Arc::new(value),
@@ -185,8 +172,8 @@ where
     #[inline]
     pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Negation { 
-                pattern: pattern.into() 
+            kind: PatternKind::Reject {
+                pattern: pattern.into()
             },
             order: None,
         }

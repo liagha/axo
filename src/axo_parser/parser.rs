@@ -102,15 +102,19 @@ impl Parser {
     }
 
     pub fn strainer() -> Pattern<Token, Element, ParseError> {
-        Pattern::predicate(|token: &Token| {
-            !matches!(token.kind, 
+        Pattern::repeat(
+            Pattern::predicate(|token: &Token| {
+                !matches!(token.kind, 
                     TokenKind::Punctuation(PunctuationKind::Newline)
                     | TokenKind::Punctuation(PunctuationKind::Tab)
                     | TokenKind::Punctuation(PunctuationKind::Space)
                     | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                     | TokenKind::Comment(_)
                 )
-        })
+            }),
+            0,
+            None
+        )
     }
 
     pub fn parse(&mut self) -> (Vec<Element>, Vec<ParseError>) {
@@ -118,7 +122,7 @@ impl Parser {
         let mut errors = Vec::new();
 
         self.strain(Self::strainer());
-
+        
         while self.peek().is_some() {
             let forms = self.form(Self::parser()).expand();
 

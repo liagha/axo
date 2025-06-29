@@ -1,29 +1,3 @@
 [collection, example]
 (group, example)
 test()[]
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Stamp(u64);
-
-impl Stamp {
-    pub fn from_pattern<Input, Output, Failure>(pattern: &Pattern<Input, Output, Failure>) -> Self
-    where
-        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-        Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    {
-        let mut hasher = DefaultHasher::new();
-        pattern.hash(&mut hasher);
-        Stamp(hasher.finish())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Stash<Input, Output, Failure>
-where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    pub patterns: HashMap<Stamp, Pattern<Input, Output, Failure>>,
-}

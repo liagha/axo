@@ -128,9 +128,9 @@ impl Parser {
             Pattern::sequence([
                 Self::primary(),
                 Pattern::alternative([
-                    Self::group(),
-                    Self::collection(),
-                    Self::bundle(),
+                    //Self::group(),
+                    //Self::collection(),
+                    //Self::bundle(),
                     Pattern::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
                             operator.is_postfix()

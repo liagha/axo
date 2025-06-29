@@ -1,13 +1,19 @@
 use {
     super::{
+        order::Order,
         pattern::{Pattern, PatternKind},
+        form::{Form, FormKind},
     },
     crate::{
         axo_cursor::{
             Position, Peekable,
             Span, Spanned,
         },
-        axo_form::form::{Form, FormKind},
+        hash::{
+            HashMap,
+            Hasher,
+            DefaultHasher,
+        },
         compiler::Marked,
         format::Debug,
         hash::Hash,
@@ -70,6 +76,73 @@ impl Record {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Stamp(u64);
+
+impl Stamp {
+    pub fn from_pattern<Input, Output, Failure>(pattern: &Pattern<Input, Output, Failure>) -> Self
+    where
+        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    {
+        let mut hasher = DefaultHasher::new();
+        pattern.hash(&mut hasher);
+        Stamp(hasher.finish())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Stash<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub patterns: HashMap<Stamp, Pattern<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Stash<Input, Output, Failure> 
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub fn new() -> Self {
+        Self {
+            patterns: HashMap::new(),
+        }
+    }
+}
+
+pub struct Composer<Input, Output, Failure>
+where 
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub stash: Stash<Input, Output, Failure>,
+    pub orders: Vec<Order<Input, Output, Failure>>
+}
+
+impl<Input, Output, Failure> Composer<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub fn new() -> Self {
+        Self {
+            stash: Stash::new(),
+            orders: Vec::new()
+        }
+    }
+
+    pub fn compose(&mut self, ) {
+
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Draft<Input, Output, Failure>
 where
@@ -109,22 +182,6 @@ where
     {
         match self.pattern.kind.clone() {
             // Consumers
-            PatternKind::Literal { value } => {
-                if let Some(peek) = source.get(self.marker).cloned() {
-                    if peek == value {
-                        source.next(&mut self.marker, &mut self.position);
-
-                        self.consumed.push(peek.clone());
-                        self.record.align();
-                        self.form = Form::input(peek);
-                    } else {
-                        self.record.empty();
-                    }
-                } else {
-                    self.record.empty();
-                }
-            }
-
             PatternKind::Identical { value } => {
                 if let Some(peek) = source.get(self.marker).cloned() {
                     if value.eq(&peek) {
@@ -141,7 +198,7 @@ where
                 }
             }
 
-            PatternKind::Negation { pattern } => {
+            PatternKind::Reject { pattern } => {
                 if let Some(peek) = source.get(self.marker).cloned() {
                     let mut draft = Draft::new(self.marker, self.position, *pattern);
                     draft.build(source);

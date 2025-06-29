@@ -55,9 +55,6 @@ where
             PatternKind::Deferred { function } => {
                 write!(f, "Lazy({:?})", function.type_id())
             }
-            PatternKind::Literal { value } => {
-                write!(f, "Literal({:?})", value)
-            }
             PatternKind::Identical { value } => {
                 write!(f, "Identical({:?})", value.type_id())
             }
@@ -89,7 +86,7 @@ where
                 write!(f, "Optional({:?})", pattern)
             }
             PatternKind::Predicate { .. } => write!(f, "Predicate"),
-            PatternKind::Negation { .. } => write!(f, "Negate"),
+            PatternKind::Reject { pattern } => write!(f, "Reject({:?})", pattern),
             PatternKind::Wrapper { pattern } => {
                 write!(f, "Wrap({:?})", pattern)
             }
