@@ -17,7 +17,6 @@ use {
         compiler::Marked,
         format::Debug,
         hash::Hash,
-        memory::drop,
     },
 };
 
@@ -137,9 +136,9 @@ where
             orders: Vec::new()
         }
     }
-
+    
     pub fn compose(&mut self, ) {
-
+        
     }
 }
 
@@ -219,11 +218,7 @@ where
 
             PatternKind::Predicate { function } => {
                 if let Some(peek) = source.get(self.marker).cloned() {
-                    let predicate = function.lock().map_or(false, |mut guard| {
-                        let predicate = guard(&peek);
-                        drop(guard);
-                        predicate
-                    });
+                    let predicate = function(&peek);
 
                     if predicate {
                         source.next(&mut self.marker, &mut self.position);

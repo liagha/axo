@@ -20,7 +20,6 @@ use {
     },
 };
 
-
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
 where
@@ -33,23 +32,23 @@ where
     },
 
     Predicate {
-        function: Predicate<Input>, 
+        function: Predicate<Input>,
     },
 
     Deferred {
-        function: Evaluator<Input, Output, Failure> 
-    },
-
-    Identical {
-        value: Arc<dyn PartialEq<Input>>,  
+        function: Evaluator<Input, Output, Failure>
     },
 
     Reject {
         pattern: Box<Pattern<Input, Output, Failure>>
     },
 
+    Identical {
+        value: Arc<dyn PartialEq<Input>>,
+    },
+
     Optional {
-        pattern: Box<Pattern<Input, Output, Failure>> 
+        pattern: Box<Pattern<Input, Output, Failure>>
     },
 
     Repetition {
@@ -63,7 +62,7 @@ where
     },
 
     Wrapper {
-        pattern: Box<Pattern<Input, Output, Failure>> 
+        pattern: Box<Pattern<Input, Output, Failure>>
     },
 }
 
@@ -159,11 +158,11 @@ where
     #[inline]
     pub fn predicate<F>(predicate: F) -> Self
     where
-        F: FnMut(&Input) -> bool + Send + Sync + 'static,
+        F: Fn(&Input) -> bool + Send + Sync + 'static,
     {
         Self {
             kind: PatternKind::Predicate { 
-                function: Arc::new(Mutex::new(predicate)) 
+                function: Arc::new(predicate) 
             },
             order: None,
         }
