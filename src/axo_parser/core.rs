@@ -466,7 +466,7 @@ impl Parser {
                     .with_ignore(),
                 Pattern::lazy(Self::element),
             ]),
-            move |context, _| {
+            move |_, _| {
                 Ok(Element::new(
                     ElementKind::Item(ItemKind::Unit),
                     Span::default(),
