@@ -7,7 +7,7 @@ use {
     }
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct FloatLiteral(pub f64);
 
 impl PartialEq for FloatLiteral {

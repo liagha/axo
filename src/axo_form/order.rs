@@ -22,7 +22,7 @@ use {
     }
 };
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Pulse {
     Escape,
     Terminate,

@@ -5,7 +5,7 @@ use {
     },
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Character {
     pub value: char,
     pub span: Span,

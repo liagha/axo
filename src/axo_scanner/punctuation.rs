@@ -8,7 +8,7 @@ use {
     },
 };
 
-#[derive(Clone, Debug, PartialEq, Copy, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PunctuationKind {
     Space,
     Indentation(usize),

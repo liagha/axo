@@ -40,7 +40,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Artifact {
     inner: Arc<dyn Asset>,
 }

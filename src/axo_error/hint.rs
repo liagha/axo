@@ -5,13 +5,13 @@ use {
     }
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Hint<M: Display> {
     pub message: M,
     pub action: Vec<Action>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Action {
     Add(String, Span),
     AddLine(String, usize),

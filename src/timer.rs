@@ -2,7 +2,7 @@
 
 use crate::arch::asm;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimerError {
     AlreadyRunning,
     NotRunning,
@@ -133,7 +133,7 @@ impl TimeSource for DummyTimeSource {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimerState {
     Stopped,
     Running,

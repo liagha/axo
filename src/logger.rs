@@ -15,7 +15,7 @@ use {
     }
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LogInfo {
     Time,
     Level,
@@ -24,7 +24,7 @@ pub enum LogInfo {
     Message,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct LogPlan {
     components: Vec<LogInfo>,
     separator: String,

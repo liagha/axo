@@ -1,7 +1,7 @@
 use crate::{char, compare::Ordering};
 use crate::axo_text::unicode::CharIter;
 
-#[derive(Copy, Clone, Debug, Eq)]
+#[derive(Clone, Copy, Debug, Eq)]
 pub struct CharRange {
     pub low: char,
 

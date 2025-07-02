@@ -21,7 +21,7 @@ use {
     },
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Span {
     pub start: Position,
     pub end: Position,

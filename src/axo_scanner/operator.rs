@@ -2,13 +2,13 @@ use {
     crate::{
         slice,
         format::{Debug, Display, Write, Result, Formatter},
+        axo_scanner::Character,
     },
     
     OperatorKind::*,
 };
-use crate::axo_scanner::Character;
 
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum OperatorKind {
     // Single character operators (sorted alphabetically)
     At,                      // @ (annotation or pattern binding)

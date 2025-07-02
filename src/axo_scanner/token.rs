@@ -10,13 +10,13 @@ use {
     }
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum TokenKind {
     Float(FloatLiteral),
     Integer(i128),

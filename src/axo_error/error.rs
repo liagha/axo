@@ -6,14 +6,13 @@ use {
     crate::{
         format::{Display, Debug, Formatter, Result},
         file::read_to_string,
-        axo_cursor::Span,
+        axo_cursor::{Span, Location},
     },
 
     broccli::{Color, TextStyle}
 };
-use crate::axo_cursor::Location;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Error<K, N = String, H = String> where K: Display, N: Display, H: Display {
     pub kind: K,
     pub span: Span,

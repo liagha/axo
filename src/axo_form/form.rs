@@ -8,7 +8,7 @@ use {
     }
 };
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FormKind<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -22,7 +22,7 @@ where
     Failure(Failure),
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Form<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,

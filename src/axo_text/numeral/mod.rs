@@ -3,7 +3,7 @@ use crate::format::{Debug, Display, Formatter};
 
 use crate::string::FromStr;
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NumberFormat {
     Decimal,
     Hexadecimal,
@@ -13,7 +13,7 @@ pub enum NumberFormat {
     Custom(u8),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ParseNumberError {
     EmptyString,
     InvalidRadix(u8),
@@ -271,7 +271,7 @@ pub fn parser<T: NumericParser>() -> NumberParser<T> {
     NumberParser::new()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AutoNumber {
     U8(u8),
     U16(u16),

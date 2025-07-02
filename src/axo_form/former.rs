@@ -15,7 +15,7 @@ use {
     },
 };
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Record {
     Aligned,
     Skipped,

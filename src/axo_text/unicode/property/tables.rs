@@ -1,7 +1,7 @@
 use crate::axo_text::CharRange;
 use crate::chars;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum CharDataTable<V: 'static> {
     #[doc(hidden)]
     Direct(&'static [(char, V)]),

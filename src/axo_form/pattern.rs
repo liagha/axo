@@ -81,7 +81,7 @@ where
     },
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Pattern<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,

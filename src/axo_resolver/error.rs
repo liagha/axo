@@ -9,7 +9,7 @@ use {
     }
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum ErrorKind {
     UndefinedSymbol(Token, Option<String>),
     ParameterMismatch {

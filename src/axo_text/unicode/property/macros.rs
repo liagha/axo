@@ -27,7 +27,7 @@ macro_rules! char_property {
     ) => {
         $(#[$prop_meta])*
         #[allow(bad_style)]
-        #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
         pub enum $prop_name {
             $( $(#[$variant_meta])* $variant_name, )*
         }
@@ -99,7 +99,7 @@ macro_rules! char_property {
 
     ) => {
         $(#[$prop_meta])*
-        #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
+        #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
         pub struct $prop_name(bool);
 
         $(#[$is_fn_meta])*
