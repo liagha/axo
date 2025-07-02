@@ -52,16 +52,16 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            PatternKind::Deferred { function } => {
+            PatternKind::Deferred { function, .. } => {
                 write!(f, "Lazy({:?})", function.type_id())
             }
-            PatternKind::Identical { value } => {
+            PatternKind::Identical { value, .. } => {
                 write!(f, "Identical({:?})", value.type_id())
             }
-            PatternKind::Alternative { patterns } => {
+            PatternKind::Alternative { patterns, .. } => {
                 write!(f, "Alternative({:?})", patterns)
             }
-            PatternKind::Sequence { patterns } => {
+            PatternKind::Sequence { patterns, .. } => {
                 write!(f, "Sequence({:?})", patterns)
             }
             PatternKind::Repetition {
@@ -82,12 +82,9 @@ where
 
                 write!(f, ")")
             }
-            PatternKind::Optional { pattern } => {
-                write!(f, "Optional({:?})", pattern)
-            }
             PatternKind::Predicate { .. } => write!(f, "Predicate"),
-            PatternKind::Reject { pattern } => write!(f, "Reject({:?})", pattern),
-            PatternKind::Wrapper { pattern } => {
+            PatternKind::Reject { pattern, .. } => write!(f, "Reject({:?})", pattern),
+            PatternKind::Wrapper { pattern, .. } => {
                 write!(f, "Wrap({:?})", pattern)
             }
         }
@@ -102,18 +99,15 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
+            Order::Yawn => write!(f, "Yawn"),
             Order::Convert(function) => write!(f, "Map({:?})", function.type_id()),
             Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
             Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
             Order::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
             Order::Capture(identifier) => write!(f, "Capture({:?})", identifier),
-            Order::Ignore => write!(f, "Ignore"),
-            Order::Skip => write!(f, "Skip"),
-            Order::Shift(function) => write!(f, "Shifter({:?})", function.type_id()),
             Order::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
-            Order::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
-            Order::Remove => write!(f, "Remove"),
-            Order::Pardon => write!(f, "Pardon"),
+            Order::Inspect(inspector) => write!(f, "Inspect({:?})", inspector.type_id()),
+            Order::Pulse(pulse) => write!(f, "{:?}", pulse),
         }
     }
 }

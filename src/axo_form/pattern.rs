@@ -1,25 +1,27 @@
 use {
     super::{
-        order::Order, 
+        order::Order,
         form::Form,
-        functions::{
-            Emitter, Evaluator,
+        former::Record,
+        helper::{
+            Evaluator,
             Predicate,
         },
     },
     crate::{
         hash::Hash,
         format::Debug,
+        artifact::Artifact,
         compiler::Context,
         thread::{
-            Arc, Mutex
+            Arc,
         },
         axo_cursor::{
-            Spanned,  
+            Spanned,
         },
     },
 };
-use crate::artifact::Artifact;
+use crate::axo_form::order::Pulse;
 
 #[derive(Clone)]
 pub enum PatternKind<Input, Output, Failure>
@@ -29,41 +31,53 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     Alternative {
-        patterns: Vec<Pattern<Input, Output, Failure>>
+        patterns: Vec<Pattern<Input, Output, Failure>>,
+        order: Order<Input, Output, Failure>,
+        finish: Order<Input, Output, Failure>,
     },
 
     Predicate {
         function: Predicate<Input>,
+        align: Order<Input, Output, Failure>,
+        miss: Order<Input, Output, Failure>,
     },
 
     Deferred {
-        function: Evaluator<Input, Output, Failure>
+        function: Evaluator<Input, Output, Failure>,
+        order: Order<Input, Output, Failure>,
     },
 
     Reject {
-        pattern: Box<Pattern<Input, Output, Failure>>
+        pattern: Box<Pattern<Input, Output, Failure>>,
+        align: Order<Input, Output, Failure>,
+        miss: Order<Input, Output, Failure>,
     },
 
     Identical {
         value: Arc<dyn PartialEq<Input>>,
-    },
-
-    Optional {
-        pattern: Box<Pattern<Input, Output, Failure>>
+        align: Order<Input, Output, Failure>,
+        miss: Order<Input, Output, Failure>,
     },
 
     Repetition {
         pattern: Box<Pattern<Input, Output, Failure>>,
         minimum: usize,
         maximum: Option<usize>,
+        order: Order<Input, Output, Failure>,
+        lack: Order<Input, Output, Failure>,
+        exceed: Order<Input, Output, Failure>,
+        finish: Order<Input, Output, Failure>,
     },
 
     Sequence {
         patterns: Vec<Pattern<Input, Output, Failure>>,
+        order: Order<Input, Output, Failure>,
+        finish: Order<Input, Output, Failure>,
     },
 
     Wrapper {
-        pattern: Box<Pattern<Input, Output, Failure>>
+        pattern: Box<Pattern<Input, Output, Failure>>,
+        order: Order<Input, Output, Failure>,
     },
 }
 
@@ -89,6 +103,12 @@ where
         Self {
             kind: PatternKind::Identical {
                 value: Arc::new(value),
+                align: Order::multiple([
+                    Order::Pulse(Pulse::Feast),
+                    Order::Pulse(Pulse::Imitate),
+                    Order::Pulse(Pulse::Align)
+                ]),
+                miss: Order::Pulse(Pulse::Pardon),
             },
             order: None,
         }
@@ -98,7 +118,34 @@ where
     pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
             kind: PatternKind::Alternative {
-                patterns: patterns.into()
+                patterns: patterns.into(),
+                order: Order::inspect(|draft| {
+                    match draft.record {
+                        Record::Aligned => Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Imitate),
+                            Order::Pulse(Pulse::Align),
+                            Order::Pulse(Pulse::Escape),
+                        ]),
+                        Record::Skipped => Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Proceed),
+                        ]),
+                        Record::Failed => Order::Pulse(Pulse::Inject),
+                        Record::Blank => Order::Pulse(Pulse::Proceed),
+                    }
+                }),
+                finish: Order::inspect(|draft| {
+                    if !draft.stack.is_empty() {
+                        Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Imitate),
+                            Order::Pulse(Pulse::Fail),
+                        ])
+                    } else {
+                        Order::Pulse(Pulse::Pardon)
+                    }
+                })
             },
             order: None,
         }
@@ -107,11 +154,162 @@ where
     #[inline]
     pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Sequence { 
-                patterns: patterns.into() 
+            kind: PatternKind::Sequence {
+                patterns: patterns.into(),
+                order: Order::inspect(|draft| {
+                    match draft.record {
+                        Record::Aligned => Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Inject),
+                            Order::Pulse(Pulse::Align),
+                            Order::Pulse(Pulse::Proceed),
+                        ]),
+                        Record::Failed => Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Inject),
+                            Order::Pulse(Pulse::Fail),
+                            Order::Pulse(Pulse::Terminate),
+                        ]),
+                        Record::Blank => Order::multiple([
+                            Order::Pulse(Pulse::Pardon),
+                            Order::Pulse(Pulse::Terminate),
+                        ]),
+                        Record::Skipped => Order::Pulse(Pulse::Proceed),
+                    }
+                }),
+                finish: Order::multiple([
+                    Order::Pulse(Pulse::Forge),
+                ]),
             },
             order: None,
         }
+    }
+
+    #[inline]
+    pub fn repeat(
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        minimum: usize,
+        maximum: Option<usize>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Repetition {
+                pattern: pattern.into(),
+                minimum,
+                maximum,
+                order: Order::inspect(|draft| {
+                    match draft.record {
+                        Record::Aligned | Record::Failed => Order::multiple([
+                            Order::Pulse(Pulse::Feast),
+                            Order::Pulse(Pulse::Inject),
+                        ]),
+                        Record::Skipped => {
+                            Order::Pulse(Pulse::Proceed)
+                        }
+                        Record::Blank => Order::Pulse(Pulse::Terminate),
+                    }
+                }),
+                lack: Order::Pulse(Pulse::Pardon),
+                exceed: Order::Pulse(Pulse::Terminate),
+                finish: Order::multiple([
+                    Order::Pulse(Pulse::Feast),
+                    Order::Pulse(Pulse::Forge),
+                    Order::Pulse(Pulse::Align),
+                ]),
+            },
+            order: None,
+        }
+    }
+
+    #[inline]
+    pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
+        Self {
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::multiple([
+                    Order::inspect(|draft| {
+                        match draft.record {
+                            Record::Aligned | Record::Failed => Order::Pulse(Pulse::Imitate),
+                            Record::Blank | Record::Skipped => Order::Yawn,
+                        }
+                    }),
+                    Order::Pulse(Pulse::Align)
+                ]),
+            },
+            order: None,
+        }
+    }
+
+    #[inline]
+    pub fn predicate<F>(predicate: F) -> Self
+    where
+        F: Fn(&Input) -> bool + Send + Sync + 'static,
+    {
+        Self {
+            kind: PatternKind::Predicate {
+                function: Arc::new(predicate),
+                align: Order::multiple([
+                    Order::Pulse(Pulse::Feast),
+                    Order::Pulse(Pulse::Imitate),
+                    Order::Pulse(Pulse::Align),
+                ]),
+                miss: Order::Pulse(Pulse::Pardon),
+            },
+            order: None,
+        }
+    }
+
+    #[inline]
+    pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
+        Self {
+            kind: PatternKind::Reject {
+                pattern: pattern.into(),
+                align: Order::multiple([
+                    Order::Pulse(Pulse::Feast),
+                    Order::Pulse(Pulse::Imitate),
+                    Order::Pulse(Pulse::Align),
+                ]),
+                miss: Order::Pulse(Pulse::Pardon),
+            },
+            order: None,
+        }
+    }
+
+    #[inline]
+    pub fn lazy<F>(factory: F) -> Self
+    where
+        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
+    {
+        Self {
+            kind: PatternKind::Deferred {
+                function: Arc::new(factory),
+                order: Order::Pulse(Pulse::Imitate),
+            },
+            order: None,
+        }
+    }
+
+    #[inline]
+    pub fn order(
+        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        order: Order<Input, Output, Failure>,
+    ) -> Self {
+        Self {
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
+            },
+            order: Some(order),
+        }
+    }
+
+    #[inline]
+    pub fn anything() -> Self {
+        Self::predicate(|_| true)
+    }
+
+    #[inline]
+    pub fn nothing() -> Self {
+        Self::predicate(|_| false)
     }
 
     #[inline]
@@ -131,90 +329,19 @@ where
     }
 
     #[inline]
-    pub fn repeat(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        minimum: usize,
-        maximum: Option<usize>,
-    ) -> Self {
-        Self {
-            kind: PatternKind::Repetition {
-                pattern: pattern.into(),
-                minimum,
-                maximum,
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Optional { 
-                pattern: pattern.into() 
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn predicate<F>(predicate: F) -> Self
-    where
-        F: Fn(&Input) -> bool + Send + Sync + 'static,
-    {
-        Self {
-            kind: PatternKind::Predicate { 
-                function: Arc::new(predicate) 
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Reject {
-                pattern: pattern.into()
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn anything() -> Self {
-        Self::predicate(|_| true)
-    }
-
-    #[inline]
-    pub fn nothing() -> Self {
-        Self::predicate(|_| false)
-    }
-
-    #[inline]
     pub fn required(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        order: Order<Input, Output, Failure>,
+        error_order: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
-            order: Some(Order::Trigger {
-                found: Order::perform(|| {}).into(),
-                missing: order.into(),
-            }),
-        }
-    }
-
-    #[inline]
-    pub fn lazy<F>(factory: F) -> Self
-    where
-        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
-    {
-        Self {
-            kind: PatternKind::Deferred { 
-                function: Arc::new(factory)
-            },
-            order: None,
+            order: Some(Order::trigger(
+                Order::Yawn,
+                error_order,
+            )),
         }
     }
 
@@ -225,35 +352,38 @@ where
     ) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
-            order: Some(Order::Convert(Arc::new(Mutex::new(transform)))),
+            order: Some(Order::map(transform)),
         }
     }
 
     #[inline]
     pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
-            order: Some(Order::Ignore),
+            order: Some(Order::ignore()),
         }
     }
 
     #[inline]
     pub fn skip(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
-            order: Some(Order::Skip),
+            order: Some(Order::skip()),
         }
     }
 
@@ -264,24 +394,23 @@ where
         missing: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
-            order: Some(Order::Trigger {
-                found: Box::new(found),
-                missing: Box::new(missing),
-            }),
+            order: Some(Order::trigger(found, missing)),
         }
     }
 
     #[inline]
-    pub fn order(
+    pub fn with_order(
         pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
         order: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper { 
-                pattern: pattern.into() 
+            kind: PatternKind::Wrapper {
+                pattern: pattern.into(),
+                order: Order::Pulse(Pulse::Imitate),
             },
             order: Some(order),
         }
@@ -295,13 +424,22 @@ where
 
     #[inline]
     pub fn with_ignore(mut self) -> Self {
-        self.order = Some(Order::Ignore);
+        self.order = Some(Order::ignore());
         self
     }
 
     #[inline]
-    pub fn with_error(mut self, function: Emitter<Input, Output, Failure>) -> Self {
-        self.order = Some(Order::Failure(function));
+    pub fn with_skip(mut self) -> Self {
+        self.order = Some(Order::skip());
+        self
+    }
+
+    #[inline]
+    pub fn with_error<F>(mut self, function: F) -> Self 
+    where 
+        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static
+    {
+        self.order = Some(Order::failure(function));
         self
     }
 
@@ -311,10 +449,7 @@ where
         found: Order<Input, Output, Failure>,
         missing: Order<Input, Output, Failure>,
     ) -> Self {
-        self.order = Some(Order::Trigger {
-            found: Box::new(found),
-            missing: Box::new(missing),
-        });
+        self.order = Some(Order::trigger(found, missing));
         self
     }
 
@@ -322,11 +457,20 @@ where
     pub fn with_transform<T>(mut self, transform: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     {
-        self.order = Some(Order::Convert(Arc::new(Mutex::new(transform))));
+        self.order = Some(Order::map(transform));
+        self
+    }
+
+    #[inline]
+    pub fn with_perform<T>(mut self, executor: T) -> Self
+    where
+        T: FnMut() + Send + Sync + 'static,
+    {
+        self.order = Some(Order::perform(executor));
         self
     }
 
@@ -338,5 +482,16 @@ where
     #[inline]
     pub fn as_repeat(&self, min: usize, max: Option<usize>) -> Self {
         Self::repeat(Box::new(self.clone()), min, max)
+    }
+
+    #[inline]
+    pub fn expect(self, error_message: &'static str) -> Self
+    where
+        Failure: From<&'static str>,
+    {
+        self.with_conditional(
+            Order::Pulse(Pulse::Ignore),
+            Order::failure(move |_ctx, _form| Failure::from(error_message))
+        )
     }
 }

@@ -2,10 +2,10 @@ use {
     super::{
         form::{Form, FormKind},
         former::Draft,
-        functions::{
+        helper::{
             Emitter, Executor,
-            Shifter,
-            Transformer, Tweaker,
+            Transformer,
+            Inspector,
         },
     },
     crate::{
@@ -22,6 +22,24 @@ use {
     }
 };
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+pub enum Pulse {
+    Escape,
+    Terminate,
+    Proceed,
+    
+    Feast,
+    Inject,
+    Forge,
+    Imitate,
+
+    Align,
+    Skip,
+    Fail,
+    Pardon,
+    Ignore,
+}
+
 #[derive(Clone)]
 pub enum Order<Input, Output, Failure>
 where
@@ -32,18 +50,29 @@ where
     Capture(Artifact),
     Convert(Transformer<Input, Output, Failure>),
     Failure(Emitter<Input, Output, Failure>),
-    Ignore,
-    Multiple(Vec<Order<Input, Output, Failure>>),
-    Pardon,
     Perform(Executor),
-    Remove,
-    Shift(Shifter),
-    Skip,
-    Trigger { 
+    Inspect(Inspector<Input, Output, Failure>),
+    Trigger {
         found: Box<Order<Input, Output, Failure>>,
-        missing: Box<Order<Input, Output, Failure>>, 
+        missing: Box<Order<Input, Output, Failure>>,
     },
-    Tweak(Tweaker<Input, Output, Failure>),
+
+    Multiple(Vec<Order<Input, Output, Failure>>),
+
+    Pulse(Pulse),
+    
+    Yawn,
+}
+
+impl<Input, Output, Failure> Default for Order<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn default() -> Self {
+        Self::Pulse(Pulse::Ignore)
+    }
 }
 
 impl<Input, Output, Failure> Order<Input, Output, Failure>
@@ -53,95 +82,85 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     #[inline]
-    pub fn execute<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
-    where
-        Source: Peekable<Input> + Marked,
-    {
+    pub fn execute<Source>(
+        &self,
+        source: &mut Source,
+        draft: &mut Draft<Input, Output, Failure>
+    ) -> Vec<Pulse>
+    where Source: Peekable<Input> + Marked {
         match self {
+            Order::Yawn => vec![],
             Order::Convert(transform) => {
-                if !draft.record.is_aligned() {
-                    return;
-                }
+                if draft.record.is_aligned() {
+                    let result = if let Ok(mut guard) = transform.lock() {
+                        let result = guard(source.context_mut(), draft.form.clone());
+                        drop(guard);
+                        result
+                    } else {
+                        return vec![];
+                    };
 
-                let result = if let Ok(mut guard) = transform.lock() {
-                    let result = guard(source.context_mut(), draft.form.clone());
-                    drop(guard);
-                    result
-                } else {
-                    return;
-                };
+                    let span = draft.form.span.clone();
 
-                let span = draft.form.span.clone();
-
-                match result {
-                    Ok(output) => {
-                        let mapped = Form::new(FormKind::Output(output), span);
-                        draft.form = mapped;
-                    }
-                    Err(error) => {
-                        draft.form = Form::new(FormKind::Failure(error), span);
-                        draft.record.fail();
+                    match result {
+                        Ok(output) => {
+                            let mapped = Form::new(FormKind::Output(output), span);
+                            draft.form = mapped;
+                        }
+                        Err(error) => {
+                            draft.form = Form::new(FormKind::Failure(error), span);
+                            draft.record.fail();
+                        }
                     }
                 }
+
+                vec![]
             }
 
             Order::Multiple(actions) => {
+                let mut pulses = Vec::new();
+                
                 for order in actions.iter() {
-                    order.execute(source, draft);
+                    let pulse = order.execute(source, draft);
+                    pulses.extend(pulse);
                 }
+                
+                pulses
             }
 
             Order::Capture(identifier) => {
-                if !draft.record.is_aligned() {
-                    return;
-                }
-
-                let resolver = &mut source.context_mut().resolver;
-
-                let artifact = draft.form.clone().map(
-                    |input| Artifact::new(input),
-                    |output| Artifact::new(output),
-                    |error| Artifact::new(error),
-                );
-
-                let item = Item::new(
-                    ItemKind::Formed {
-                        identifier: identifier.clone(),
-                        form: artifact,
-                    },
-                    draft.form.span.clone(),
-                );
-
-                resolver.insert(item);
-            }
-
-            Order::Ignore => {
-                if !draft.record.is_aligned() {
-                    return;
-                }
-
-                let span = draft.form.span.clone();
-                draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
-            }
-
-            Order::Skip => {
                 if draft.record.is_aligned() {
-                    let span = draft.form.span.clone();
+                    let resolver = &mut source.context_mut().resolver;
 
-                    draft.record.skip();
-                    draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
+                    let artifact = draft.form.clone().map(
+                        |input| Artifact::new(input),
+                        |output| Artifact::new(output),
+                        |error| Artifact::new(error),
+                    );
+
+                    let item = Item::new(
+                        ItemKind::Formed {
+                            identifier: identifier.clone(),
+                            form: artifact,
+                        },
+                        draft.form.span.clone(),
+                    );
+
+                    resolver.insert(item);
                 }
+                
+                vec![]
             }
 
             Order::Perform(executor) => {
-                if !draft.record.is_aligned() {
-                    return;
+                if draft.record.is_aligned() {
+                    if let Ok(mut guard) = executor.lock() {
+                        guard();
+                        drop(guard);
+                    }
                 }
 
-                if let Ok(mut guard) = executor.lock() {
-                    guard();
-                    drop(guard);
-                }
+                vec![]
             }
 
             Order::Failure(function) => {
@@ -152,10 +171,8 @@ where
                 let form = Form::new(FormKind::Failure(failure), span);
                 draft.record.fail();
                 draft.form = form;
-            }
-            
-            Order::Shift(shifter) => {
-                shifter(&mut draft.marker, &mut draft.position);
+
+                vec![]
             }
 
             Order::Trigger { found, missing } => {
@@ -164,21 +181,28 @@ where
                 } else {
                     missing
                 };
-                
+
                 draft.pattern.order = Some(*chosen.clone());
 
-                chosen.execute(source, draft);
+                chosen.execute(source, draft)
             },
-            Order::Tweak(tweaker) => {
-                tweaker(draft);
+            Order::Inspect(inspector) => {
+                let action = inspector(draft.clone());
+                
+                action.execute(source, draft)
             }
-            Order::Remove => {
-                source.remove(draft.marker);
-            }
-            Order::Pardon => {
-                draft.record.empty();
+            Order::Pulse(pulse) => {
+                vec![pulse.clone()]
             }
         }
+    }
+
+    #[inline]
+    pub fn inspect<I>(inspector: I) -> Self
+    where
+        I: Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync + 'static
+    {
+        Self::Inspect(Arc::new(inspector))
     }
 
     #[inline]
@@ -215,17 +239,17 @@ where
 
     #[inline]
     pub fn ignore() -> Self {
-        Self::Ignore
+        Self::Pulse(Pulse::Ignore)
     }
 
     #[inline]
     pub fn skip() -> Self {
-        Self::Skip
+        Self::Pulse(Pulse::Skip)
     }
 
     #[inline]
-    pub fn multiple(actions: Vec<Self>) -> Self {
-        Self::Multiple(actions)
+    pub fn multiple(actions: impl Into<Vec<Self>>) -> Self {
+        Self::Multiple(actions.into())
     }
 
     #[inline]

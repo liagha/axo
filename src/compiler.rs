@@ -141,7 +141,8 @@ impl Compiler {
 
         if self.context.verbose {
             xprintln!(
-                "File Contents:\n{}" => Color::Magenta,
+                "{}:\n{}" => Color::Magenta,
+                self.context.path,
                 indent(&self.context.content) => Color::BrightMagenta
             );
         }
