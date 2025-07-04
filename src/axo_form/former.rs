@@ -18,7 +18,6 @@ use {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Record {
     Aligned,
-    Skipped,
     Failed,
     Blank,
 }
@@ -27,11 +26,6 @@ impl Record {
     #[inline]
     pub fn is_aligned(&self) -> bool {
         matches!(self, &Record::Aligned)
-    }
-
-    #[inline]
-    pub fn is_skipped(&self) -> bool {
-        matches!(self, &Record::Skipped)
     }
 
     #[inline]
@@ -52,11 +46,6 @@ impl Record {
     #[inline]
     pub fn align(&mut self) {
         *self = Record::Aligned;
-    }
-
-    #[inline]
-    pub fn skip(&mut self) {
-        *self = Record::Skipped;
     }
 
     #[inline]
@@ -116,38 +105,6 @@ where
         }
     }
 
-    pub fn consumer<Source>(&mut self, source: &mut Source, peek: Input, pulses: Vec<Pulse>)
-    where
-        Source: Peekable<Input> + Marked,
-    {
-        for pulse in pulses {
-            match pulse {
-                Pulse::Escape => return,
-                Pulse::Forge => {
-                    self.forge()
-                },
-                Pulse::Imitate => {
-                    self.form = Form::input(peek.clone())
-                },
-                Pulse::Feast => {
-                    source.next(&mut self.marker, &mut self.position);
-                    self.consumed.push(peek.clone());
-                }
-                Pulse::Align => self.record.align(),
-                Pulse::Skip => {
-                    self.record.skip();
-                    self.form = Form::blank(Span::point(self.position));
-                },
-                Pulse::Ignore => {
-                    self.form = Form::blank(Span::point(self.position));
-                },
-                Pulse::Fail => self.record.fail(),
-                Pulse::Pardon => self.record.empty(),
-                _ => {}
-            }
-        }
-    }
-
     pub fn build<Source>(&mut self, source: &mut Source)
     where
         Source: Peekable<Input> + Marked,
@@ -158,7 +115,27 @@ where
                     if value.eq(&peek) {
                         let pulses = align.execute(source, self);
 
-                        self.consumer(source, peek, pulses);
+                        for pulse in pulses {
+                            match pulse {
+                                Pulse::Forge => {
+                                    self.forge()
+                                },
+                                Pulse::Imitate => {
+                                    self.form = Form::input(peek.clone())
+                                },
+                                Pulse::Feast => {
+                                    source.next(&mut self.marker, &mut self.position);
+                                    self.consumed.push(peek.clone());
+                                }
+                                Pulse::Align => self.record.align(),
+                                Pulse::Ignore => {
+                                    self.form = Form::blank(Span::point(self.position));
+                                },
+                                Pulse::Fail => self.record.fail(),
+                                Pulse::Pardon => self.record.empty(),
+                                _ => {}
+                            }
+                        }
                     } else {
                         miss.execute(source, self);
                     }
@@ -175,7 +152,28 @@ where
                     if !draft.record.is_aligned() {
                         let pulses = align.execute(source, self);
 
-                        self.consumer(source, peek, pulses);
+                        for pulse in pulses {
+                            match pulse {
+                                
+                                Pulse::Forge => {
+                                    self.forge()
+                                },
+                                Pulse::Imitate => {
+                                    self.form = Form::input(peek.clone())
+                                },
+                                Pulse::Feast => {
+                                    source.next(&mut self.marker, &mut self.position);
+                                    self.consumed.push(peek.clone());
+                                }
+                                Pulse::Align => self.record.align(),
+                                Pulse::Ignore => {
+                                    self.form = Form::blank(Span::point(self.position));
+                                },
+                                Pulse::Fail => self.record.fail(),
+                                Pulse::Pardon => self.record.empty(),
+                                _ => {}
+                            }
+                        }
                     } else {
                         miss.execute(source, self);
                     }
@@ -191,7 +189,28 @@ where
                     if predicate {
                         let pulses = align.execute(source, self);
 
-                        self.consumer(source, peek, pulses);
+                        for pulse in pulses {
+                            match pulse {
+                                
+                                Pulse::Forge => {
+                                    self.forge()
+                                },
+                                Pulse::Imitate => {
+                                    self.form = Form::input(peek.clone())
+                                },
+                                Pulse::Feast => {
+                                    source.next(&mut self.marker, &mut self.position);
+                                    self.consumed.push(peek.clone());
+                                }
+                                Pulse::Align => self.record.align(),
+                                Pulse::Ignore => {
+                                    self.form = Form::blank(Span::point(self.position));
+                                },
+                                Pulse::Fail => self.record.fail(),
+                                Pulse::Pardon => self.record.empty(),
+                                _ => {}
+                            }
+                        }
                     } else {
                         miss.execute(source, self);
                     }
@@ -209,7 +228,7 @@ where
 
                     for pulse in pulses {
                         match pulse {
-                            Pulse::Escape => return,
+                            
                             Pulse::Terminate => break 'outer,
                             Pulse::Proceed => continue 'outer,
                             Pulse::Forge => {
@@ -227,10 +246,6 @@ where
                                 self.consumed = child.consumed.clone();
                             }
                             Pulse::Align => self.record.align(),
-                            Pulse::Skip => {
-                                self.record.skip();
-                                child.form = Form::blank(Span::point(self.position));
-                            },
                             Pulse::Ignore => {
                                 child.form = Form::blank(Span::point(self.position));
                             },
@@ -244,7 +259,7 @@ where
 
                 for pulse in pulses {
                     match pulse {
-                        Pulse::Escape => return,
+                        
                         Pulse::Forge => {
                             self.forge()
                         },
@@ -261,11 +276,6 @@ where
                             }
                         }
                         Pulse::Align => self.record.align(),
-                        Pulse::Skip => {
-                            self.record.skip();
-
-                            self.form = Form::blank(Span::point(self.position));
-                        },
                         Pulse::Ignore => {
                             self.form = Form::blank(Span::point(self.position));
                         },
@@ -286,7 +296,7 @@ where
 
                 for pulse in pulses {
                     match pulse {
-                        Pulse::Escape => return,
+                        
                         Pulse::Forge => {
                             self.forge()
                         },
@@ -306,10 +316,6 @@ where
                             self.consumed = child.consumed.clone();
                         }
                         Pulse::Align => self.record.align(),
-                        Pulse::Skip => {
-                            self.record.skip();
-                            self.form = Form::blank(Span::point(self.position));
-                        },
                         Pulse::Ignore => {
                             self.form = Form::blank(Span::point(self.position));
                         },
@@ -328,7 +334,7 @@ where
 
                 for pulse in pulses {
                     match pulse {
-                        Pulse::Escape => return,
+                        
                         Pulse::Forge => {
                             self.forge()
                         },
@@ -348,10 +354,6 @@ where
                             self.consumed = child.consumed.clone();
                         }
                         Pulse::Align => self.record.align(),
-                        Pulse::Skip => {
-                            self.record.skip();
-                            self.form = Form::blank(Span::point(self.position));
-                        },
                         Pulse::Ignore => {
                             self.form = Form::blank(Span::point(self.position));
                         },
@@ -375,7 +377,7 @@ where
 
                     for pulse in pulses {
                         match pulse {
-                            Pulse::Escape => return,
+                            
                             Pulse::Terminate => break 'outer,
                             Pulse::Proceed => continue 'outer,
                             Pulse::Forge => {
@@ -393,10 +395,6 @@ where
                                 self.consumed = child.consumed.clone();
                             }
                             Pulse::Align => self.record.align(),
-                            Pulse::Skip => {
-                                self.record.skip();
-                                child.form = Form::blank(Span::point(self.position));
-                            },
                             Pulse::Ignore => {
                                 child.form = Form::blank(Span::point(self.position));
                             },
@@ -410,7 +408,7 @@ where
 
                 for pulse in pulses {
                     match pulse {
-                        Pulse::Escape => return,
+                        
                         Pulse::Forge => {
                             self.forge()
                         },
@@ -441,7 +439,7 @@ where
 
                     for pulse in pulses {
                         match pulse {
-                            Pulse::Escape => return,
+                            
                             Pulse::Terminate => break 'outer,
                             Pulse::Proceed => continue 'outer,
                             Pulse::Forge => {
@@ -459,10 +457,6 @@ where
                                 consumed.extend(child.consumed.clone());
                             }
                             Pulse::Align => self.record.align(),
-                            Pulse::Skip => {
-                                self.record.skip();
-                                self.form = Form::blank(Span::point(self.position));
-                            },
                             Pulse::Ignore => {
                                 self.form = Form::blank(Span::point(self.position));
                             },
@@ -477,7 +471,7 @@ where
 
                             for pulse in pulses {
                                 match pulse {
-                                    Pulse::Escape => return,
+                                    
                                     Pulse::Terminate => break 'outer,
                                     Pulse::Proceed => continue 'outer,
                                     Pulse::Forge => {
@@ -495,10 +489,6 @@ where
                                         consumed.extend(child.consumed.clone());
                                     }
                                     Pulse::Align => self.record.align(),
-                                    Pulse::Skip => {
-                                        self.record.skip();
-                                        self.form = Form::blank(Span::point(self.position));
-                                    },
                                     Pulse::Ignore => {
                                         self.form = Form::blank(Span::point(self.position));
                                     },
@@ -515,7 +505,7 @@ where
 
                     for pulse in pulses {
                         match pulse {
-                            Pulse::Escape => return,
+                            
                             Pulse::Forge => {
                                 self.forge()
                             },
@@ -532,7 +522,7 @@ where
 
                     for pulse in pulses {
                         match pulse {
-                            Pulse::Escape => return,
+                            
                             Pulse::Forge => {
                                 self.forge()
                             },

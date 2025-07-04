@@ -24,7 +24,6 @@ use {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Pulse {
-    Escape,
     Terminate,
     Proceed,
     
@@ -34,7 +33,6 @@ pub enum Pulse {
     Imitate,
 
     Align,
-    Skip,
     Fail,
     Pardon,
     Ignore,
@@ -240,11 +238,6 @@ where
     #[inline]
     pub fn ignore() -> Self {
         Self::Pulse(Pulse::Ignore)
-    }
-
-    #[inline]
-    pub fn skip() -> Self {
-        Self::Pulse(Pulse::Skip)
     }
 
     #[inline]
