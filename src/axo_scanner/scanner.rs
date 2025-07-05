@@ -5,10 +5,13 @@ use {
         Operator, Punctuation, PunctuationKind, ScanError, Token, TokenKind,
     },
     crate::{
-        char::from_u32,
+        character::from_u32,
         float::FloatLiteral,
         compiler::{
             Context, Marked,
+        },
+        axo_text::{
+            parser,  
         },
         axo_form::{
             form::{Form, FormKind},
@@ -211,7 +214,7 @@ impl Scanner {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_text::parser::<i128>();
+                let parser = parser::<i128>();
 
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
@@ -238,7 +241,7 @@ impl Scanner {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_text::parser::<i128>();
+                let parser = parser::<i128>();
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                     Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
@@ -264,7 +267,7 @@ impl Scanner {
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
 
-                let parser = crate::axo_text::parser::<i128>();
+                let parser = parser::<i128>();
                 match parser.parse(&number) {
                     Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                     Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
@@ -306,7 +309,7 @@ impl Scanner {
                 let number: String = form.inputs().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
-                    let parser = crate::axo_text::parser::<f64>();
+                    let parser = parser::<f64>();
                     match parser.parse(&number) {
                         Ok(num) => Ok(Token::new(
                             TokenKind::Float(FloatLiteral::from(num)),
@@ -315,7 +318,7 @@ impl Scanner {
                         Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
                     }
                 } else {
-                    let parser = crate::axo_text::parser::<i128>();
+                    let parser = parser::<i128>();
                     match parser.parse(&number) {
                         Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
                         Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),

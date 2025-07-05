@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use {
     super::{
         helper::Source,
@@ -10,6 +9,7 @@ use {
             Position, Peekable,
             Span, Spanned,
         },
+        marker::PhantomData,
         compiler::Marked,
         format::Debug,
         hash::Hash,

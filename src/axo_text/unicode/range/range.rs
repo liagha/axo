@@ -1,5 +1,10 @@
-use crate::{char, compare::Ordering};
-use crate::axo_text::unicode::CharIter;
+use {
+    crate::{
+        character,
+        compare::Ordering,
+        axo_text::unicode::CharIter,
+    }
+};
 
 #[derive(Clone, Copy, Debug, Eq)]
 pub struct CharRange {
@@ -36,7 +41,7 @@ impl CharRange {
     }
 
     pub fn all() -> CharRange {
-        CharRange::closed('\u{0}', char::MAX)
+        CharRange::closed('\u{0}', character::MAX)
     }
 
     pub fn assigned_normal_planes() -> CharRange {

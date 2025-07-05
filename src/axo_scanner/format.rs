@@ -1,6 +1,8 @@
-use crate::{
-    axo_scanner::{PunctuationKind, Token, TokenKind},
-    format::{Debug, Display, Formatter, Result},
+use {
+    crate::{
+        axo_scanner::{PunctuationKind, Token, TokenKind},
+        format::{Debug, Display, Formatter, Result},
+    }
 };
 
 impl Display for TokenKind {

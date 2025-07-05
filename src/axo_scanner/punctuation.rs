@@ -1,6 +1,7 @@
 use {
     crate::{
         format::{
+            self,
             Display, Debug, 
             Formatter
         },
@@ -112,7 +113,7 @@ impl Punctuation for char {
 }
 
 impl Display for PunctuationKind {
-    fn fmt(&self, f: &mut Formatter) -> crate::format::Result {
+    fn fmt(&self, f: &mut Formatter) -> format::Result {
         let punctuation = match self {
             PunctuationKind::Space => " ",
             PunctuationKind::Indentation(size) => &*" ".repeat(size.clone()),

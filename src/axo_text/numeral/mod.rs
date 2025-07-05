@@ -1,7 +1,10 @@
-use crate::format;
-use crate::format::{Debug, Display, Formatter};
-
-use crate::string::FromStr;
+use {
+    crate::{
+        format::{self, Debug, Display, Formatter},
+        string::FromStr,
+        marker::PhantomData,
+    }
+};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NumberFormat {
@@ -248,13 +251,13 @@ impl_numeric_parser_for_float!(f32, "Implementation for f32");
 impl_numeric_parser_for_float!(f64, "Implementation for f64");
 
 pub struct NumberParser<T> {
-    _marker: crate::marker::PhantomData<T>,
+    _marker: PhantomData<T>,
 }
 
 impl<T: NumericParser> NumberParser<T> {
     pub fn new() -> Self {
         Self {
-            _marker: crate::marker::PhantomData,
+            _marker: PhantomData,
         }
     }
 

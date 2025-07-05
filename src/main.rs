@@ -13,6 +13,7 @@ mod compiler;
 mod logger;
 mod timer;
 mod artifact;
+mod axo_checker;
 
 use core::time::Duration;
 use broccli::{xprintln, Color};
@@ -25,7 +26,9 @@ pub use {
 };
 
 use {
-    crate::logger::{LogInfo, LogPlan, Logger},
+    crate::{
+        logger::{LogInfo, LogPlan, Logger},
+    },
     log::Level,
 };
 
@@ -70,8 +73,10 @@ pub mod hash {
     pub use std::collections::hash_map::DefaultHasher;
 }
 
-pub mod char {
-    pub use core::char::from_u32;
+pub mod character {
+    pub use core::char::{
+        from_u32, from_u32_unchecked, MAX
+    };
 }
 
 pub mod any {
@@ -82,7 +87,7 @@ pub mod operations {
     pub use core::ops::{Add, Div, Mul, Neg, Range, Rem, Sub};
 }
 
-pub mod arch {
+pub mod architecture {
     pub use core::arch::asm;
 }
 

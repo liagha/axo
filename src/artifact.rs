@@ -5,11 +5,10 @@ use {
         any::{Any, TypeId},
         hash::{Hash, Hasher},
         axo_cursor::{
-            Spanned
+            Span, Spanned,
         },
     },
 };
-use crate::axo_cursor::Span;
 
 pub trait Asset: Spanned + Any + Send + Sync + Debug {
     fn dyn_hash(&self, state: &mut dyn Hasher);

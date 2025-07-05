@@ -1,4 +1,8 @@
-use crate::format::Display;
+use {
+    crate::{
+        format::Display,
+    }
+};
 
 pub trait Show {
     fn format(&self) -> String;

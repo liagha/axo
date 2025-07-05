@@ -8,7 +8,6 @@ pub mod form;
 pub mod former;
 
 pub mod helper {
-    use std::fmt::Debug;
     use {
         super::{
             order::Order,
@@ -21,6 +20,7 @@ pub mod helper {
             hash::{Hash, Hasher},
             thread::{Arc, Mutex},
             compiler::{Context, Marked},
+            format::Debug,
             axo_cursor::{
                 Position, Peekable, Spanned
             },

@@ -23,6 +23,7 @@ use {
             Error,
         },
         format::{
+            self,
             Debug, Display,
             Formatter,
         },
@@ -55,7 +56,7 @@ pub enum CompilerError {
 }
 
 impl Display for CompilerError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> crate::format::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> format::Result {
         match self {
             CompilerError::PathRequired => write!(formatter, "No input file specified"),
             CompilerError::FileReadError(error) => write!(formatter, "Failed to read file: {}", error),

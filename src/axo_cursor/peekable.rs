@@ -1,5 +1,7 @@
-use crate::{
-    axo_cursor::{Position, Span, Location},
+use {
+    crate::{
+        axo_cursor::{Position, Span, Location},
+    }
 };
 
 pub trait Peekable<Item: PartialEq> {

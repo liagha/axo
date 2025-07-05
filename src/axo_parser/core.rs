@@ -10,12 +10,13 @@ use {
         },
         axo_parser::{Symbol, SymbolKind},
         axo_scanner::{PunctuationKind, Token, TokenKind},
+        artifact::Artifact,
+        axo_cursor::Spanned,
         thread::Arc,
     },
     log::trace,
 };
-use crate::artifact::Artifact;
-use crate::axo_cursor::Spanned;
+
 
 impl Parser {
     // Basic Token Patterns

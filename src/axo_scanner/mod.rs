@@ -14,9 +14,11 @@ pub use {
     token::*,
 };
 
-use crate::{
-    axo_error::Error,
-    axo_scanner::error::ErrorKind,
+use {
+    crate::{
+        axo_error::Error,
+        axo_scanner::error::ErrorKind,
+    }
 };
 
 pub type ScanError = Error<ErrorKind>;
