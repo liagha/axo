@@ -3,6 +3,7 @@ use {
         order::Order,
         form::{Form},
         former::Draft,
+        helper::Source,
     },
     crate::{
         artifact::Artifact,
@@ -11,28 +12,11 @@ use {
         compiler::Context,
         thread::{Arc, Mutex},
         axo_cursor::{
-            Spanned, Peekable, Span,
+            Spanned, Span,
         },
-        compiler::Marked,
     },
 };
 
-// Create a combined trait for Source requirements
-pub trait Source<Input>: Peekable<Input> + Marked
-where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-}
-
-// Blanket implementation for any type that satisfies both traits
-impl<T, Input> Source<Input> for T
-where
-    T: Peekable<Input> + Marked,
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-}
-
-// Solution 2: Use boxed trait object for source
 pub trait Pattern<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -43,11 +27,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Identical<Input> {
+pub struct Literal<Input> {
     pub value: Arc<dyn PartialEq<Input> + Send + Sync>,
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Identical<Input>
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Literal<Input>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -56,21 +40,21 @@ where
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = source.get(draft.marker).cloned() {
             if self.value.eq(&peek) {
+                draft.align();
                 source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
-                draft.record.align();
                 draft.form = Form::input(peek);
             } else {
-                draft.record.empty();
+                draft.empty();
             }
         } else {
-            draft.record.empty();
+            draft.empty();
         }
     }
 }
 
 #[derive(Clone)]
-pub struct Reject<Input, Output, Failure>
+pub struct Negate<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -79,7 +63,7 @@ where
     pub pattern: Box<Classifier<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Reject<Input, Output, Failure>
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Negate<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -87,19 +71,19 @@ where
 {
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = source.get(draft.marker).cloned() {
-            let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-            inner_draft.build(source);
+            let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+            child.build(source);
 
-            if !inner_draft.record.is_aligned() {
+            if !child.is_aligned() {
+                draft.align();
                 source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
-                draft.record.align();
                 draft.form = Form::input(peek);
             } else {
-                draft.record.empty();
+                draft.empty();
             }
         } else {
-            draft.record.empty();
+            draft.empty();
         }
     }
 }
@@ -120,15 +104,15 @@ where
             let predicate = (self.function)(&peek);
 
             if predicate {
+                draft.align();
                 source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
-                draft.record.align();
                 draft.form = Form::input(peek);
             } else {
-                draft.record.empty();
+                draft.empty();
             }
         } else {
-            draft.record.empty();
+            draft.empty();
         }
     }
 }
@@ -153,41 +137,37 @@ where
         let mut fallback = None;
 
         for pattern in &self.patterns {
-            let mut inner_draft = Draft::new(draft.marker, draft.position, pattern.clone());
-            inner_draft.build(source);
+            let mut child = Draft::new(draft.marker, draft.position, pattern.clone());
+            child.build(source);
 
-            match inner_draft.record {
-                super::former::Record::Aligned => {
-                    draft.marker = inner_draft.marker;
-                    draft.position = inner_draft.position;
-                    draft.consumed = inner_draft.consumed;
-                    draft.record.align();
-                    draft.form = inner_draft.form;
+            match child.record {
+                1 => {
+                    draft.align();
+                    draft.marker = child.marker;
+                    draft.position = child.position;
+                    draft.consumed = child.consumed;
+                    draft.form = child.form;
                     return;
                 }
-                super::former::Record::Skipped => {
-                    draft.marker = inner_draft.marker;
-                    draft.position = inner_draft.position;
-                }
-                super::former::Record::Failed => {
+                0 => {
                     if fallback.is_none() {
-                        fallback = Some(inner_draft);
+                        fallback = Some(child);
                     }
                 }
-                super::former::Record::Blank => {
+                _ => {
                     continue;
                 }
             }
         }
 
         if let Some(fallback) = fallback {
+            draft.fail();
             draft.marker = fallback.marker;
             draft.position = fallback.position;
             draft.consumed = fallback.consumed;
-            draft.record.fail();
             draft.form = fallback.form;
         } else {
-            draft.record.empty();
+            draft.empty();
         }
     }
 }
@@ -210,14 +190,14 @@ where
 {
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
         let resolved = (self.function)();
-        let mut inner_draft = Draft::new(draft.marker, draft.position, resolved);
-        inner_draft.build(source);
+        let mut child = Draft::new(draft.marker, draft.position, resolved);
+        child.build(source);
 
-        draft.marker = inner_draft.marker;
-        draft.position = inner_draft.position;
-        draft.consumed = inner_draft.consumed;
-        draft.record = inner_draft.record;
-        draft.form = inner_draft.form;
+        draft.marker = child.marker;
+        draft.position = child.position;
+        draft.consumed = child.consumed;
+        draft.record = child.record;
+        draft.form = child.form;
     }
 }
 
@@ -238,17 +218,17 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-        inner_draft.build(source);
+        let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+        child.build(source);
 
-        if inner_draft.record.is_effected() {
-            draft.marker = inner_draft.marker;
-            draft.position = inner_draft.position;
-            draft.consumed = inner_draft.consumed;
-            draft.form = inner_draft.form;
+        if child.is_effected() {
+            draft.marker = child.marker;
+            draft.position = child.position;
+            draft.consumed = child.consumed;
+            draft.form = child.form;
         }
 
-        draft.record.align();
+        draft.align();
     }
 }
 
@@ -269,14 +249,14 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-        inner_draft.build(source);
+        let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+        child.build(source);
 
-        draft.marker = inner_draft.marker;
-        draft.position = inner_draft.position;
-        draft.consumed = inner_draft.consumed;
-        draft.record = inner_draft.record;
-        draft.form = inner_draft.form;
+        draft.marker = child.marker;
+        draft.position = child.position;
+        draft.consumed = child.consumed;
+        draft.record = child.record;
+        draft.form = child.form;
     }
 }
 
@@ -307,26 +287,25 @@ where
             child.build(source);
 
             match child.record {
-                super::former::Record::Aligned => {
-                    draft.record.align();
+                1 => {
+                    draft.align();
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                super::former::Record::Failed => {
-                    draft.record.fail();
+                0 => {
+                    draft.fail();
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                     break;
                 }
-                super::former::Record::Blank => {
-                    draft.record.empty();
+                _ => {
+                    draft.empty();
                     break;
                 }
-                super::former::Record::Skipped => {}
             }
         }
 
@@ -376,14 +355,13 @@ where
             }
 
             match child.record {
-                super::former::Record::Aligned | super::former::Record::Failed => {
+                1 | 0 => {
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                super::former::Record::Skipped => {}
-                super::former::Record::Blank => {
+                _ => {
                     break;
                 }
             }
@@ -396,10 +374,10 @@ where
         }
 
         if forms.len() >= self.minimum {
+            draft.align();
             draft.marker = index;
             draft.position = position;
             draft.consumed = consumed;
-            draft.record.align();
 
             if forms.is_empty() {
                 draft.form = Form::blank(Span::point(draft.position));
@@ -407,7 +385,7 @@ where
                 draft.form = Form::multiple(forms);
             }
         } else {
-            draft.record.empty();
+            draft.empty();
         }
     }
 }
@@ -455,7 +433,7 @@ where
     }
 
     pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'static) -> Self {
-        Self::new(Arc::new(Identical {
+        Self::new(Arc::new(Literal {
             value: Arc::new(value),
         }))
     }
@@ -492,7 +470,7 @@ where
     }
 
     pub fn negate(pattern: Self) -> Self {
-        Self::new(Arc::new(Reject {
+        Self::new(Arc::new(Negate {
             pattern: Box::new(pattern),
         }))
     }

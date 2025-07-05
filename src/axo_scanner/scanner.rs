@@ -619,7 +619,6 @@ impl Scanner {
         Classifier::transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
-                println!("form: {:?}", form);
                 let punctuation: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(

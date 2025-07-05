@@ -57,7 +57,7 @@ where
     {
         match self {
             Order::Convert(transform) => {
-                if !draft.record.is_aligned() {
+                if !draft.is_aligned() {
                     return;
                 }
 
@@ -78,7 +78,7 @@ where
                     }
                     Err(error) => {
                         draft.form = Form::new(FormKind::Failure(error), span);
-                        draft.record.fail();
+                        draft.fail();
                     }
                 }
             }
@@ -90,7 +90,7 @@ where
             }
 
             Order::Capture(identifier) => {
-                if !draft.record.is_aligned() {
+                if !draft.is_aligned() {
                     return;
                 }
 
@@ -114,7 +114,7 @@ where
             }
 
             Order::Ignore => {
-                if !draft.record.is_aligned() {
+                if !draft.is_aligned() {
                     return;
                 }
 
@@ -123,16 +123,16 @@ where
             }
 
             Order::Skip => {
-                if draft.record.is_aligned() {
+                if draft.is_aligned() {
                     let span = draft.form.span.clone();
 
-                    draft.record.skip();
+                    draft.empty();
                     draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
                 }
             }
 
             Order::Perform(executor) => {
-                if !draft.record.is_aligned() {
+                if !draft.is_aligned() {
                     return;
                 }
 
@@ -148,12 +148,12 @@ where
                 let failure = function(source.context_mut(), draft.form.clone());
 
                 let form = Form::new(FormKind::Failure(failure), span);
-                draft.record.fail();
+                draft.fail();
                 draft.form = form;
             }
 
             Order::Trigger { found, missing } => {
-                let chosen = if draft.record.is_aligned() {
+                let chosen = if draft.is_aligned() {
                     found
                 } else {
                     missing
@@ -170,7 +170,7 @@ where
                 source.remove(draft.marker);
             }
             Order::Pardon => {
-                draft.record.empty();
+                draft.empty();
             }
         }
     }

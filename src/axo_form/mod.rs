@@ -8,6 +8,7 @@ pub mod form;
 pub mod former;
 
 pub mod helper {
+    use std::fmt::Debug;
     use {
         super::{
             order::Order,
@@ -19,10 +20,23 @@ pub mod helper {
             any::TypeId,
             hash::{Hash, Hasher},
             thread::{Arc, Mutex},
-            compiler::Context,
-            axo_cursor::Position,
+            compiler::{Context, Marked},
+            axo_cursor::{
+                Position, Peekable, Spanned
+            },
         },
     };
+
+    pub trait Source<Input>: Peekable<Input> + Marked
+    where
+        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    {}
+
+    impl<Target, Input> Source<Input> for Target
+    where
+        Target: Peekable<Input> + Marked,
+        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    {}
 
     pub fn fingerprint<T: ?Sized + 'static>(ptr: &T, state: &mut impl Hasher) {
         TypeId::of::<T>().hash(state);
