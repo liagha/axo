@@ -8,13 +8,14 @@ use {
             former::Former,
             pattern::Classifier,
         },
-        axo_parser::{Item, ItemKind},
+        axo_parser::{Symbol, SymbolKind},
         axo_scanner::{PunctuationKind, Token, TokenKind},
         thread::Arc,
     },
     log::trace,
 };
 use crate::artifact::Artifact;
+use crate::axo_cursor::Spanned;
 
 impl Parser {
     // Basic Token Patterns
@@ -92,7 +93,7 @@ impl Parser {
     // Unary Operations
 
     pub fn prefixed() -> Classifier<Token, Element, ParseError> {
-        Classifier::order(
+        Classifier::ordered(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
@@ -129,9 +130,9 @@ impl Parser {
             Classifier::sequence([
                 Self::primary(),
                 Classifier::alternative([
-                    //Self::group(),
-                    //Self::collection(),
-                    //Self::bundle(),
+                    Self::group(),
+                    Self::collection(),
+                    Self::bundle(),
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
                             operator.is_postfix()
@@ -194,6 +195,7 @@ impl Parser {
             },
         )
     }
+
 
     pub fn unary() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
@@ -464,14 +466,68 @@ impl Parser {
                     }
                 })
                     .with_ignore(),
-                Classifier::lazy(Self::element),
+                Classifier::alternative([
+                    Self::token(),
+                ]),
             ]),
-            move |_, _| {
+            move |_, form| {
+                let body = form.outputs()[0].clone();
+
+                let (target, value) = if let ElementKind::Assignment { target, value } = body.kind {
+                    (*target, Some(value))
+                } else {
+                    (body, None)
+                };
+
                 Ok(Element::new(
-                    ElementKind::Item(ItemKind::Unit),
-                    Span::default(),
+                    ElementKind::Symbolization(
+                        SymbolKind::Variable {
+                            target: target.into(),
+                            value,
+                            ty: None,
+                            mutable: false,
+                        }
+                    ),
+                    form.span,
                 ))
             },
+        )
+    }
+
+    pub fn structure() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
+                    if let TokenKind::Identifier(identifier) = &token.kind {
+                        identifier == "struct"
+                    } else {
+                        false
+                    }
+                }),
+                Self::token(),
+                Self::bundle(),
+            ]),
+            |_, form| {
+                let outputs = form.outputs().clone();
+
+                let name = outputs[0].clone();
+
+                let fields = if let ElementKind::Bundle(fields) = outputs[1].kind.clone() {
+                    fields
+                } else {
+                    unreachable!()
+                };
+
+                Ok(Element::new(
+                    ElementKind::Symbolization(
+                        SymbolKind::Structure {
+                            name: name.into(),
+                            fields: fields.into(),
+                        }
+                    ),
+                    outputs.span()
+                ))
+            }
         )
     }
 
@@ -488,8 +544,15 @@ impl Parser {
         ])
     }
 
+    pub fn symbolization() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([
+            Self::structure(),
+            Self::variable(),
+        ])
+    }
+
     pub fn fallback() -> Classifier<Token, Element, ParseError> {
-        Classifier::order(
+        Classifier::ordered(
             Classifier::predicate(|_token| true),
             Order::failure(
                 |_, form: Form<Token, Element, ParseError>| {
@@ -502,10 +565,10 @@ impl Parser {
         )
     }
 
-    /// Main parser entry point
     pub fn parser() -> Classifier<Token, Element, ParseError> {
         Classifier::repeat(
             Classifier::alternative([
+                Self::symbolization(),
                 Self::element(),
                 Self::fallback()
             ]),

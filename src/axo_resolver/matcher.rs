@@ -15,7 +15,7 @@ use {
 
         axo_parser::{
             Element, ElementKind,
-            Item, ItemKind,
+            Symbol, SymbolKind,
         },
     }
 };
@@ -238,37 +238,36 @@ impl Labeled<Token> for Element {
             ElementKind::Index { element, .. } => element.name(),
             ElementKind::Invoke { target, .. } => target.name(),
             ElementKind::Member { object, .. } => object.name(),
-            ElementKind::Item(item) => item.name(),
+            ElementKind::Symbolization(symbol) => symbol.name(),
             ElementKind::Assignment { target, .. } => target.name(),
             _ => None,
         }
     }
 }
 
-impl Labeled<Token> for Item {
+impl Labeled<Token> for Symbol {
     fn name(&self) -> Option<Token> {
-        let Item { kind, .. } = self.clone();
+        let Symbol { kind, .. } = self.clone();
         kind.name()
     }
 }
 
-impl Labeled<Token> for ItemKind {
+impl Labeled<Token> for SymbolKind {
     fn name(&self) -> Option<Token> {
         match self {
-            ItemKind::Trait { name, .. } => name.name(),
-            ItemKind::Variable { target, .. } => target.name(),
-            ItemKind::Field { name, .. } => name.name(),
-            ItemKind::Structure { name, .. } => name.name(),
-            ItemKind::Enum { name, .. } => name.name(),
-            ItemKind::Macro { name, .. } => name.name(),
-            ItemKind::Function { name, .. } => name.name(),
+            SymbolKind::Trait { name, .. } => name.name(),
+            SymbolKind::Variable { target, .. } => target.name(),
+            SymbolKind::Field { name, .. } => name.name(),
+            SymbolKind::Structure { name, .. } => name.name(),
+            SymbolKind::Enumeration { name, .. } => name.name(),
+            SymbolKind::Function { name, .. } => name.name(),
             _ => None,
         }
     }
 }
 
-impl SimilarityMetric<Element, Item> for CaseInsensitiveMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for CaseInsensitiveMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 if query_token.to_string().to_lowercase() == candidate_token.to_string().to_lowercase() {
@@ -283,8 +282,8 @@ impl SimilarityMetric<Element, Item> for CaseInsensitiveMetric {
 
 }
 
-impl SimilarityMetric<Element, Item> for PrefixMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for PrefixMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 let query_lower = query_token.to_string().to_lowercase();
@@ -303,7 +302,7 @@ impl SimilarityMetric<Element, Item> for PrefixMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("Prefix".to_string()))
@@ -313,8 +312,8 @@ impl SimilarityMetric<Element, Item> for PrefixMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for SubstringMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for SubstringMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 let query_lower = query_token.to_string().to_lowercase();
@@ -334,8 +333,8 @@ impl SimilarityMetric<Element, Item> for SubstringMetric {
 
 }
 
-impl SimilarityMetric<Element, Item> for AcronymMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for AcronymMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 if query_token.to_string().len() > self.max_acronym_length {
@@ -366,7 +365,7 @@ impl SimilarityMetric<Element, Item> for AcronymMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("Acronym".to_string()))
@@ -376,8 +375,8 @@ impl SimilarityMetric<Element, Item> for AcronymMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for KeyboardProximityMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for KeyboardProximityMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 let s1_lower = query_token.to_string().to_lowercase();
@@ -429,8 +428,8 @@ impl SimilarityMetric<Element, Item> for KeyboardProximityMetric {
 
 }
 
-impl SimilarityMetric<Element, Item> for SuffixMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for SuffixMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(query_token), Some(candidate_token)) => {
                 let query_lower = query_token.to_string().to_lowercase();
@@ -449,7 +448,7 @@ impl SimilarityMetric<Element, Item> for SuffixMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("Suffix".to_string()))
@@ -465,10 +464,10 @@ pub struct SymbolTypeMetric;
 #[derive(Debug)]
 pub struct ParameterCountMetric;
 
-impl SimilarityMetric<Element, Item> for ParameterCountMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for ParameterCountMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Constructor { body, .. }, ItemKind::Structure { fields, .. }) => {
+            (ElementKind::Constructor { body, .. }, SymbolKind::Structure { fields, .. }) => {
                 if let ElementKind::Bundle(elements) = &body.kind {
                     let constructor_field_count = elements.len();
                     let struct_field_count = fields.len();
@@ -489,7 +488,7 @@ impl SimilarityMetric<Element, Item> for ParameterCountMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("ParameterCount".to_string()))
@@ -512,29 +511,28 @@ impl Default for ContextualRelevanceMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for ContextualRelevanceMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for ContextualRelevanceMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match &query.kind {
             ElementKind::Identifier(_) => {
                 match &candidate.kind {
-                    ItemKind::Variable { .. } => self.context_weight,
-                    ItemKind::Function { .. } => self.context_weight - 0.1,
-                    ItemKind::Structure { .. } => self.context_weight - 0.2,
-                    ItemKind::Enum { .. } => self.context_weight - 0.2,
+                    SymbolKind::Variable { .. } => self.context_weight,
+                    SymbolKind::Function { .. } => self.context_weight - 0.1,
+                    SymbolKind::Structure { .. } => self.context_weight - 0.2,
+                    SymbolKind::Enumeration { .. } => self.context_weight - 0.2,
                     _ => 0.0,
                 }
             },
             ElementKind::Invoke { .. } => {
                 match &candidate.kind {
-                    ItemKind::Function { .. } => self.context_weight,
-                    ItemKind::Macro { .. } => self.context_weight - 0.1,
+                    SymbolKind::Function { .. } => self.context_weight,
                     _ => 0.0,
                 }
             },
             ElementKind::Constructor { .. } => {
                 match &candidate.kind {
-                    ItemKind::Structure { .. } => self.context_weight,
-                    ItemKind::Enum { .. } => self.context_weight - 0.1,
+                    SymbolKind::Structure { .. } => self.context_weight,
+                    SymbolKind::Enumeration { .. } => self.context_weight - 0.1,
                     _ => 0.0,
                 }
             },
@@ -543,7 +541,7 @@ impl SimilarityMetric<Element, Item> for ContextualRelevanceMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("ContextualRelevance".to_string()))
@@ -556,8 +554,8 @@ impl SimilarityMetric<Element, Item> for ContextualRelevanceMetric {
 #[derive(Debug)]
 pub struct ScopeProximityMetric;
 
-impl SimilarityMetric<Element, Item> for ScopeProximityMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for ScopeProximityMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (query.name(), candidate.name()) {
             (Some(_), Some(_)) => 0.65,
             _ => 0.0,
@@ -565,7 +563,7 @@ impl SimilarityMetric<Element, Item> for ScopeProximityMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("ScopeProximity".to_string()))
@@ -588,8 +586,8 @@ impl Default for PartialIdentifierMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for PartialIdentifierMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for PartialIdentifierMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
             (ElementKind::Identifier(query_ident), _) => {
                 if query_ident.len() < self.min_length {
@@ -613,7 +611,7 @@ impl SimilarityMetric<Element, Item> for PartialIdentifierMetric {
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("PartialIdentifier".to_string()))
@@ -623,10 +621,10 @@ impl SimilarityMetric<Element, Item> for PartialIdentifierMetric {
     }
 }
 
-impl PartialEq<Item> for Element {
-    fn eq(&self, other: &Item) -> bool {
+impl PartialEq<Symbol> for Element {
+    fn eq(&self, other: &Symbol) -> bool {
         match (&self.kind, &other.kind) {
-            (ElementKind::Identifier(ident), ItemKind::Variable { target, .. }) => {
+            (ElementKind::Identifier(ident), SymbolKind::Variable { target, .. }) => {
                 if let Element { kind: ElementKind::Identifier(target_ident), .. } = *target.clone() {
                     ident == &target_ident
                 } else {
@@ -634,10 +632,10 @@ impl PartialEq<Item> for Element {
                 }
             },
 
-            (ElementKind::Constructor { name: expr_name, .. }, ItemKind::Structure { name: struct_name, .. }) => {
+            (ElementKind::Constructor { name: expr_name, .. }, SymbolKind::Structure { name: struct_name, .. }) => {
                 expr_name.name() == struct_name.name()
             },
-            (ElementKind::Constructor { name: expr_name, .. }, ItemKind::Enum { name: enum_name, .. }) => {
+            (ElementKind::Constructor { name: expr_name, .. }, SymbolKind::Enumeration { name: enum_name, .. }) => {
                 expr_name.name() == enum_name.name()
             },
 
@@ -646,8 +644,8 @@ impl PartialEq<Item> for Element {
     }
 }
 
-impl SimilarityMetric<Element, Item> for ExactMatchMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for ExactMatchMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         if query == candidate {
             0.70
         } else {
@@ -655,7 +653,7 @@ impl SimilarityMetric<Element, Item> for ExactMatchMetric {
         }
     }
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         if self.calculate(query, candidate) > 0.0 {
             Some(MatchType::Exact)
         } else {
@@ -664,28 +662,26 @@ impl SimilarityMetric<Element, Item> for ExactMatchMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for SymbolTypeMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for SymbolTypeMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { .. }, ItemKind::Function { .. }) => 0.98,
-            (ElementKind::Invoke { .. }, ItemKind::Macro { .. }) => 0.95,
-            (ElementKind::Invoke { .. }, ItemKind::Variable { .. }) => 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Function { .. }) => 0.98,
+            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => 0.0,
 
-            (ElementKind::Identifier(_), ItemKind::Variable { .. }) => 0.95,
-            (ElementKind::Identifier(_), ItemKind::Function { .. }) => 0.9,
-            (ElementKind::Identifier(_), ItemKind::Macro { .. }) => 0.85,
-            (ElementKind::Identifier(_), ItemKind::Structure { .. }) => 0.8,
-            (ElementKind::Identifier(_), ItemKind::Enum { .. }) => 0.75,
+            (ElementKind::Identifier(_), SymbolKind::Variable { .. }) => 0.95,
+            (ElementKind::Identifier(_), SymbolKind::Function { .. }) => 0.9,
+            (ElementKind::Identifier(_), SymbolKind::Structure { .. }) => 0.8,
+            (ElementKind::Identifier(_), SymbolKind::Enumeration { .. }) => 0.75,
 
-            (ElementKind::Constructor { .. }, ItemKind::Structure { .. }) => 0.95,
-            (ElementKind::Constructor { .. }, ItemKind::Enum { .. }) => 0.9,
+            (ElementKind::Constructor { .. }, SymbolKind::Structure { .. }) => 0.95,
+            (ElementKind::Constructor { .. }, SymbolKind::Enumeration { .. }) => 0.9,
 
             _ => 0.0,
         }
     }
 
 
-    fn match_type(&self, query: &Element, candidate: &Item) -> Option<MatchType> {
+    fn match_type(&self, query: &Element, candidate: &Symbol) -> Option<MatchType> {
         let score = self.calculate(query, candidate);
         if score > 0.0 {
             Some(MatchType::Similar("SymbolType".to_string()))
@@ -695,13 +691,13 @@ impl SimilarityMetric<Element, Item> for SymbolTypeMetric {
     }
 }
 
-impl SimilarityMetric<Element, Item> for TokenSimilarityMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for TokenSimilarityMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { .. }, ItemKind::Variable { .. }) => return 0.0,
-            (ElementKind::Invoke { .. }, ItemKind::Function { .. } | ItemKind::Macro { .. }) => {},
+            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => return 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Function { .. }) => {},
             (ElementKind::Identifier(_), _) => {},
-            (ElementKind::Constructor { .. }, ItemKind::Structure { .. } | ItemKind::Enum { .. }) => {},
+            (ElementKind::Constructor { .. }, SymbolKind::Structure { .. } | SymbolKind::Enumeration { .. }) => {},
             _ => return 0.0,
         }
 
@@ -721,10 +717,10 @@ impl SimilarityMetric<Element, Item> for TokenSimilarityMetric {
 
 }
 
-impl SimilarityMetric<Element, Item> for EditDistanceMetric {
-    fn calculate(&self, query: &Element, candidate: &Item) -> f64 {
+impl SimilarityMetric<Element, Symbol> for EditDistanceMetric {
+    fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { .. }, ItemKind::Variable { .. }) => return 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => return 0.0,
             _ => {},
         }
 
@@ -745,8 +741,8 @@ impl SimilarityMetric<Element, Item> for EditDistanceMetric {
 
 }
 
-pub fn symbol_matcher() -> Matcher<Element, Item> {
-    MatcherBuilder::<Element, Item>::new()
+pub fn symbol_matcher() -> Matcher<Element, Symbol> {
+    MatcherBuilder::<Element, Symbol>::new()
         .metric(ExactMatchMetric, 0.30)
         .metric(SymbolTypeMetric, 0.25)
         .metric(ParameterCountMetric, 0.15)

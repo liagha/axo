@@ -6,22 +6,22 @@ use {
         },
         
         axo_parser::{
-            item::Item,
-            Element, ElementKind, ItemKind
+            symbol::Symbol,
+            Element, ElementKind, SymbolKind
         },
         
         axo_format::indent,
     },
 };
 
-impl Display for ItemKind {
+impl Display for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ItemKind::Use(element) => write!(f, "use {}", element),
-            ItemKind::Formed { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
-            ItemKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
-            ItemKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
-            ItemKind::Variable { target, value, mutable, ty } => {
+            SymbolKind::Inclusion { target } => write!(f, "use {}", target),
+            SymbolKind::Formed { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
+            SymbolKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
+            SymbolKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
+            SymbolKind::Variable { target, value, mutable, ty } => {
                 if *mutable {
                     write!(f, "var {}", target)?;
                 } else { 
@@ -38,23 +38,18 @@ impl Display for ItemKind {
 
                 Ok(())
             },
-            ItemKind::Structure { name, fields} => {
+            SymbolKind::Structure { name, fields} => {
                 let fields = fields.iter().map(|field| field.to_string()).collect::<Vec<_>>().join(", ");
 
                 write!(f, "struct ({}) {}", name, fields)
             },
-            ItemKind::Enum { name, body} => write!(f, "enum ({}) {}", name, body),
-            ItemKind::Macro { name, parameters, body} => {
-                let params = parameters.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
-
-                write!(f, "macro {}({}) {}", name, params, body)
-            },
-            ItemKind::Function { name, parameters, body} => {
+            SymbolKind::Enumeration { name, body} => write!(f, "enum ({}) {}", name, body),
+            SymbolKind::Function { name, parameters, body} => {
                 let params = parameters.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
 
                 write!(f, "fn {}({}) {}", name, params, body)
             },
-            ItemKind::Field { name, value, ty } => {
+            SymbolKind::Field { name, value, ty } => {
                 write!(f, "{}", name)?;
 
                 if let Some(ty) = ty {
@@ -67,19 +62,18 @@ impl Display for ItemKind {
                     write!(f, "")
                 }
             },
-            ItemKind::Unit => write!(f, "()")
         }
     }
 }
 
-impl Debug for ItemKind {
+impl Debug for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ItemKind::Use(element) => write!(f, "Use({:?})", element),
-            ItemKind::Formed { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
-            ItemKind::Implement { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
-            ItemKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
-            ItemKind::Variable { target, value, mutable, ty } => {
+            SymbolKind::Inclusion { target } => write!(f, "Inclusion({:?})", target),
+            SymbolKind::Formed { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
+            SymbolKind::Implement { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
+            SymbolKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
+            SymbolKind::Variable { target, value, mutable, ty } => {
                 let kind = if *mutable { "Variable" } else { "Constant" };
                 write!(f, "{}({:?}", kind, target)?;
 
@@ -93,11 +87,10 @@ impl Debug for ItemKind {
 
                 write!(f, ")")
             },
-            ItemKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
-            ItemKind::Enum { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
-            ItemKind::Macro { name, parameters, body } => write!(f, "Macro({:?}({:?}) {:?})", name, parameters, body),
-            ItemKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
-            ItemKind::Field { name, value, ty } => {
+            SymbolKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
+            SymbolKind::Enumeration { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
+            SymbolKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
+            SymbolKind::Field { name, value, ty } => {
                 write!(f, "Field({:?}", name)?;
 
                 if let Some(ty) = ty {
@@ -110,7 +103,6 @@ impl Debug for ItemKind {
 
                 write!(f, ")")
             },
-            ItemKind::Unit => write!(f, "()")
         }
     }
 }
@@ -127,13 +119,13 @@ impl Display for Element {
     }
 }
 
-impl Debug for Item {
+impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
-impl Display for Item {
+impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.kind)
     }
@@ -212,7 +204,7 @@ impl Display for ElementKind {
             },
             ElementKind::Iterate { clause, body} => write!(f, "for {} {}\n", clause, body),
 
-            ElementKind::Item(item) => write!(f, "{}", item),
+            ElementKind::Symbolization(symbol) => write!(f, "{}", symbol),
             ElementKind::Assignment { target, value} => write!(f, "{} = {}", target, value),
             ElementKind::Constructor { name, body } => {
                 write!(f, "{} {}", name, body)
@@ -332,7 +324,7 @@ impl Debug for ElementKind {
                 write!(f, "Constructor({:?} | {:?})", name, body)
             },
 
-            ElementKind::Item(item) => write!(f, "+ {:?}", item),
+            ElementKind::Symbolization(symbol) => write!(f, "+ {:?}", symbol),
 
             ElementKind::Return(element) => {
                 write!(f, "Return")?;

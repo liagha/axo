@@ -1,7 +1,7 @@
 use {
     crate::{
         axo_parser::{
-            Element, Item, 
+            Element, Symbol, 
         },
 
         axo_resolver::{
@@ -11,6 +11,6 @@ use {
 };
 
 impl Resolver {
-    pub fn validate(&mut self, _element: &Element, _item: &Item) {
+    pub fn validate(&mut self, _element: &Element, _item: &Symbol) {
     }
 }

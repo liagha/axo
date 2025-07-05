@@ -1,6 +1,6 @@
 use {
     super::{
-        ItemKind, ParseError,
+        SymbolKind, ParseError,
     },
 
     crate::{
@@ -219,10 +219,10 @@ pub enum ElementKind {
         body: Box<Element>,
     },
 
-    /// Module-level item definition (function, type, constant, etc.)
+    /// Module-level symbol definition (function, type, constant, etc.)
     ///
     /// Represents top-level declarations that define reusable components.
-    Item(ItemKind),
+    Symbolization(SymbolKind),
 
     /// Variable assignment: `target = value`
     ///
@@ -336,14 +336,14 @@ impl Element {
                 }
                 // Variable declaration: target := value
                 [OperatorKind::Colon, OperatorKind::Equal] => {
-                    let item = ItemKind::Variable {
+                    let symbol = SymbolKind::Variable {
                         target: left.clone(),
                         value: Some(right.clone()),
                         ty: None,
                         mutable: false,
                     };
 
-                    let kind = ElementKind::Item(item);
+                    let kind = ElementKind::Symbolization(symbol);
 
                     Element { kind, span }
                 }

@@ -13,7 +13,7 @@ use {
             Peekable,
             Spanned,
         },
-        axo_parser::{Item, ItemKind},
+        axo_parser::{Symbol, SymbolKind},
         compiler::{Context, Marked},
         format::Debug,
         hash::Hash,
@@ -102,15 +102,15 @@ where
                     |error| Artifact::new(error),
                 );
 
-                let item = Item::new(
-                    ItemKind::Formed {
+                let symbol = Symbol::new(
+                    SymbolKind::Formed {
                         identifier: identifier.clone(),
                         form: artifact,
                     },
                     draft.form.span.clone(),
                 );
 
-                resolver.insert(item);
+                resolver.insert(symbol);
             }
 
             Order::Ignore => {
@@ -220,14 +220,6 @@ where
     #[inline]
     pub fn multiple(actions: Vec<Self>) -> Self {
         Self::Multiple(actions)
-    }
-
-    #[inline]
-    pub fn chain<I>(actions: I) -> Self
-    where
-        I: IntoIterator<Item = Self>,
-    {
-        Self::Multiple(actions.into_iter().collect())
     }
 
     #[inline]

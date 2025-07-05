@@ -42,7 +42,7 @@ where
             marker: index,
             position,
             consumed: Vec::new(),
-            record: -2,
+            record: -1,
             classifier: pattern,
             form: Form::new(FormKind::Blank, Span::point(position)),
         }
@@ -50,8 +50,7 @@ where
 
     /// Aligned = 1
     /// Failed = 0
-    /// Skipped = -1
-    /// Blank = -2
+    /// Blank = -1
     #[inline]
     pub fn is_aligned(&self) -> bool {
         matches!(self.record, 1)
@@ -69,7 +68,7 @@ where
 
     #[inline]
     pub fn is_blank(&self) -> bool {
-        matches!(self.record, -2)
+        matches!(self.record, -1)
     }
 
     #[inline]
@@ -84,7 +83,7 @@ where
 
     #[inline]
     pub fn empty(&mut self) {
-        self.record = -2;
+        self.record = -1;
     }
 
     pub fn build(&mut self, source: &mut dyn Source<Input>) {

@@ -16,7 +16,7 @@ use {
             form::Form
         },
         axo_parser::{
-            Element, Item
+            Element, Symbol
         },
         axo_scanner::{
             Character, Token
@@ -52,7 +52,7 @@ impl Spanned for Element {
     }
 }
 
-impl Spanned for Item {
+impl Spanned for Symbol {
     fn span(&self) -> Span {
         self.span.clone()
     }

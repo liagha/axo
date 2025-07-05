@@ -134,38 +134,29 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        let mut fallback = None;
+        let mut best_child: Option<Draft<Input, Output, Failure>> = None;
+        let mut best_score = i8::MIN;
 
         for pattern in &self.patterns {
             let mut child = Draft::new(draft.marker, draft.position, pattern.clone());
             child.build(source);
 
-            match child.record {
-                1 => {
-                    draft.align();
-                    draft.marker = child.marker;
-                    draft.position = child.position;
-                    draft.consumed = child.consumed;
-                    draft.form = child.form;
-                    return;
-                }
-                0 => {
-                    if fallback.is_none() {
-                        fallback = Some(child);
-                    }
-                }
-                _ => {
-                    continue;
+            if child.record > best_score {
+                best_score = child.record;
+                best_child = Some(child);
+
+                if best_score == 1 {
+                    break;
                 }
             }
         }
 
-        if let Some(fallback) = fallback {
-            draft.fail();
-            draft.marker = fallback.marker;
-            draft.position = fallback.position;
-            draft.consumed = fallback.consumed;
-            draft.form = fallback.form;
+        if let Some(best) = best_child {
+            draft.record = best.record;
+            draft.marker = best.marker;
+            draft.position = best.position;
+            draft.consumed = best.consumed;
+            draft.form = best.form;
         } else {
             draft.empty();
         }
@@ -257,6 +248,42 @@ where
         draft.consumed = child.consumed;
         draft.record = child.record;
         draft.form = child.form;
+    }
+}
+
+#[derive(Clone)]
+pub struct Ranked<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+    pub precedence: i8,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Ranked<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+        child.build(source);
+
+        draft.marker = child.marker;
+        draft.position = child.position;
+        draft.consumed = child.consumed.clone();
+        draft.form = child.form.clone();
+
+        if child.is_aligned() {
+            draft.record = self.precedence.max(1);
+        } else if child.is_failed() {
+            draft.record = self.precedence.min(0);
+        } else {
+            draft.record = child.record;
+        }
     }
 }
 
@@ -415,7 +442,7 @@ where
     }
 
     #[inline]
-    pub fn order(
+    pub fn ordered(
         classifier: impl Into<Box<Classifier<Input, Output, Failure>>>,
         order: Order<Input, Output, Failure>,
     ) -> Self {
@@ -435,6 +462,21 @@ where
     pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'static) -> Self {
         Self::new(Arc::new(Literal {
             value: Arc::new(value),
+        }))
+    }
+
+    pub fn negate(pattern: Self) -> Self {
+        Self::new(Arc::new(Negate {
+            pattern: Box::new(pattern),
+        }))
+    }
+    
+    pub fn predicate<F>(predicate: F) -> Self
+    where
+        F: Fn(&Input) -> bool + Send + Sync + 'static,
+    {
+        Self::new(Arc::new(Predicate {
+            function: Arc::new(predicate),
         }))
     }
 
@@ -460,24 +502,16 @@ where
         }))
     }
 
-    pub fn predicate<F>(predicate: F) -> Self
-    where
-        F: Fn(&Input) -> bool + Send + Sync + 'static,
-    {
-        Self::new(Arc::new(Predicate {
-            function: Arc::new(predicate),
-        }))
-    }
-
-    pub fn negate(pattern: Self) -> Self {
-        Self::new(Arc::new(Negate {
-            pattern: Box::new(pattern),
-        }))
-    }
-
     pub fn wrapper(pattern: Self) -> Self {
         Self::new(Arc::new(Wrapper {
             pattern: Box::new(pattern),
+        }))
+    }
+
+    pub fn ranked(pattern: Self, precedence: i8) -> Self {
+        Self::new(Arc::new(Ranked {
+            pattern: Box::new(pattern),
+            precedence,
         }))
     }
 

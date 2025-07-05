@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 mod parser;
-mod item;
+mod symbol;
 mod format;
 mod traits;
 mod element;
@@ -10,7 +10,7 @@ pub mod error;
 
 pub use {
     element::{Element, ElementKind},
-    item::{Item, ItemKind},
+    symbol::{Symbol, SymbolKind},
     parser::Parser
 };
 

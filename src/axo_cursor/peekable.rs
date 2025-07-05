@@ -1,7 +1,6 @@
 use crate::{
-    axo_cursor::{Position, Span},
+    axo_cursor::{Position, Span, Location},
 };
-use crate::axo_cursor::Location;
 
 pub trait Peekable<Item: PartialEq> {
     fn len(&self) -> usize;
@@ -11,7 +10,6 @@ pub trait Peekable<Item: PartialEq> {
 
     fn restore(&mut self);
 
-    /// Consuming input in a peekable
     fn advance(&mut self) -> Option<Item> {
         let mut position = self.position();
         let mut index = self.index();
@@ -27,7 +25,6 @@ pub trait Peekable<Item: PartialEq> {
         result
     }
 
-    /// Advancing but on a position and index.
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Item>;
 
     fn forward(&self, index: &mut usize, position: &mut Position, amount: usize) {

@@ -118,7 +118,7 @@ impl Parser {
                 Classifier::lazy(Self::element).as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
-                        Classifier::order(
+                        Classifier::ordered(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
@@ -171,7 +171,7 @@ impl Parser {
                 Classifier::lazy(Self::element).as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
-                        Classifier::order(
+                        Classifier::ordered(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),

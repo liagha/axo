@@ -1,7 +1,5 @@
 use {
     crate::{
-        any::Any,
-
         artifact::Artifact,
 
         hash::{
@@ -25,13 +23,20 @@ use {
 };
 
 #[derive(Clone)]
-pub struct Item {
-    pub kind: ItemKind,
+pub struct Symbol {
+    pub kind: SymbolKind,
     pub span: Span,
 }
 
-pub enum ItemKind {
-    Use(Box<Element>),
+pub enum SymbolKind {
+    Inclusion {
+        target: Box<Element> 
+    },
+    Field {
+        name: Box<Element>,
+        value: Option<Box<Element>>,
+        ty: Option<Box<Element>>,
+    },
     Formed {
         identifier: Artifact,
         form: Form<Artifact, Artifact, Artifact>,
@@ -50,34 +55,23 @@ pub enum ItemKind {
         ty: Option<Box<Element>>,
         mutable: bool,
     },
-    Field {
-        name: Box<Element>,
-        value: Option<Box<Element>>,
-        ty: Option<Box<Element>>,
-    },
     Structure {
         name: Box<Element>,
         fields: Vec<Element>
     },
-    Enum {
+    Enumeration {
         name: Box<Element>,
         body: Box<Element>,
-    },
-    Macro {
-        name: Box<Element>,
-        parameters: Vec<Element>,
-        body: Box<Element>
     },
     Function {
         name: Box<Element>,
         parameters: Vec<Element>,
         body: Box<Element>
     },
-    Unit,
 }
 
-impl Item {
-    pub fn new(kind: ItemKind, span: Span) -> Item {
-        Item { kind, span }
+impl Symbol {
+    pub fn new(kind: SymbolKind, span: Span) -> Symbol {
+        Symbol { kind, span }
     }
 }

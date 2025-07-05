@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use {
-    super::{error::ErrorKind, Element, ElementKind, ItemKind, ParseError},
+    super::{error::ErrorKind, Element, ElementKind, SymbolKind, ParseError},
     crate::{
         format::Debug,
         hash::Hash,

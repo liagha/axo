@@ -1,7 +1,7 @@
 use {
     super::{
         Element, ElementKind,
-        Item, ItemKind
+        Symbol, SymbolKind
     },
 
     crate::{
@@ -131,9 +131,9 @@ impl Hash for ElementKind {
             }
 
             // Declarations & Definitions
-            ElementKind::Item(item_kind) => {
+            ElementKind::Symbolization(symbol) => {
                 discriminant(self).hash(state);
-                item_kind.hash(state);
+                symbol.hash(state);
             }
             ElementKind::Assignment { target, value } => {
                 discriminant(self).hash(state);
@@ -215,7 +215,7 @@ impl PartialEq for ElementKind {
                 ElementKind::Iterate { clause: b_clause, body: b_body }) => a_clause == b_clause && a_body == b_body,
 
             // Declarations & Definitions
-            (ElementKind::Item(a), ElementKind::Item(b)) => a == b,
+            (ElementKind::Symbolization(a), ElementKind::Symbolization(b)) => a == b,
             (ElementKind::Assignment { target: a_target, value: a_value },
                 ElementKind::Assignment { target: b_target, value: b_value }) => {
                 a_target == b_target && a_value == b_value
@@ -232,41 +232,41 @@ impl PartialEq for ElementKind {
     }
 }
 
-impl PartialEq for Item {
+impl PartialEq for Symbol {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
     }
 }
 
-impl Hash for Item {
+impl Hash for Symbol {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
     }
 }
 
-impl PartialEq for ItemKind {
+impl PartialEq for SymbolKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (ItemKind::Use(e1), ItemKind::Use(e2)) => e1 == e2,
+            (SymbolKind::Inclusion { target: t1 }, SymbolKind::Inclusion { target: t2 }) => t1 == t2,
             (
-                ItemKind::Implement { element: e1, body: b1 },
-                ItemKind::Implement { element: e2, body: b2 },
+                SymbolKind::Implement { element: e1, body: b1 },
+                SymbolKind::Implement { element: e2, body: b2 },
             ) => e1 == e2 && b1 == b2,
-            (ItemKind::Formed { identifier: i1, .. }, ItemKind::Formed { identifier: i2, .. }) => {
+            (SymbolKind::Formed { identifier: i1, .. }, SymbolKind::Formed { identifier: i2, .. }) => {
                 i1 == i2
             },
             (
-                ItemKind::Trait { name: n1, body: b1 },
-                ItemKind::Trait { name: n2, body: b2 },
+                SymbolKind::Trait { name: n1, body: b1 },
+                SymbolKind::Trait { name: n2, body: b2 },
             ) => n1 == n2 && b1 == b2,
             (
-                ItemKind::Variable {
+                SymbolKind::Variable {
                     target: t1,
                     value: _v1,
                     ty: _ty1,
                     mutable: _m1,
                 },
-                ItemKind::Variable {
+                SymbolKind::Variable {
                     target: t2,
                     value: _v2,
                     ty: _ty2,
@@ -276,103 +276,90 @@ impl PartialEq for ItemKind {
                 t1 == t2
             },
             (
-                ItemKind::Field {
+                SymbolKind::Field {
                     name: n1,
                     value: v1,
                     ty: ty1,
                 },
-                ItemKind::Field {
+                SymbolKind::Field {
                     name: n2,
                     value: v2,
                     ty: ty2,
                 },
             ) => n1 == n2 && v1 == v2 && ty1 == ty2,
             (
-                ItemKind::Structure {
+                SymbolKind::Structure {
                     name: n1,
                     fields: f1,
                 },
-                ItemKind::Structure {
+                SymbolKind::Structure {
                     name: n2,
                     fields: f2,
                 },
             ) => n1 == n2 && f1 == f2,
             (
-                ItemKind::Enum { name: n1, body: b1 },
-                ItemKind::Enum { name: n2, body: b2 },
+                SymbolKind::Enumeration { name: n1, body: b1 },
+                SymbolKind::Enumeration { name: n2, body: b2 },
             ) => n1 == n2 && b1 == b2,
             (
-                ItemKind::Macro {
+                SymbolKind::Function {
                     name: n1,
                     parameters: p1,
                     body: b1,
                 },
-                ItemKind::Macro {
+                SymbolKind::Function {
                     name: n2,
                     parameters: p2,
                     body: b2,
                 },
             ) => n1 == n2 && p1 == p2 && b1 == b2,
-            (
-                ItemKind::Function {
-                    name: n1,
-                    parameters: p1,
-                    body: b1,
-                },
-                ItemKind::Function {
-                    name: n2,
-                    parameters: p2,
-                    body: b2,
-                },
-            ) => n1 == n2 && p1 == p2 && b1 == b2,
-            (ItemKind::Unit, ItemKind::Unit) => true,
             _ => false,
         }
     }
 }
 
-impl Hash for ItemKind {
+impl Hash for SymbolKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            ItemKind::Use(e) => {
+            SymbolKind::Inclusion { target } => {
                 discriminant(self).hash(state);
-                e.hash(state);
+                target.hash(state);
             }
-            ItemKind::Formed { identifier, .. } => {
+            SymbolKind::Formed { identifier, .. } => {
                 discriminant(self).hash(state);
                 identifier.hash(state);
             }
-            ItemKind::Implement { element, body } => {
+            SymbolKind::Implement { element, body } => {
                 discriminant(self).hash(state);
                 element.hash(state);
                 body.hash(state);
             }
-            ItemKind::Trait { name, body } => {
+            SymbolKind::Trait { name, body } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
-            ItemKind::Variable { target, .. } => {
+            SymbolKind::Variable { target, .. } => {
                 discriminant(self).hash(state);
                 target.hash(state);
             }
-            ItemKind::Field { name, value, ty } => {
+            SymbolKind::Field { name, value, ty } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 value.hash(state);
                 ty.hash(state);
             }
-            ItemKind::Structure { name, fields } => {
+            SymbolKind::Structure { name, fields } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 fields.hash(state);
             }
-            ItemKind::Enum { name, body } => {
+            SymbolKind::Enumeration { name, body } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
-            ItemKind::Macro {
+            SymbolKind::Function {
                 name,
                 parameters,
                 body,
@@ -381,74 +368,55 @@ impl Hash for ItemKind {
                 name.hash(state);
                 parameters.hash(state);
                 body.hash(state);
-            }
-            ItemKind::Function {
-                name,
-                parameters,
-                body,
-            } => {
-                discriminant(self).hash(state);
-                name.hash(state);
-                parameters.hash(state);
-                body.hash(state);
-            }
-            ItemKind::Unit => {
-                discriminant(self).hash(state);
             }
         }
     }
 }
 
-impl Clone for ItemKind {
+impl Clone for SymbolKind {
     fn clone(&self) -> Self {
         match self {
-            ItemKind::Use(element) => ItemKind::Use(element.clone()),
-            ItemKind::Formed { identifier, form } => ItemKind::Formed {
+            SymbolKind::Inclusion { target } => SymbolKind::Inclusion { target: target.clone() },
+            SymbolKind::Formed { identifier, form } => SymbolKind::Formed {
                 identifier: identifier.clone(),
                 form: form.clone(),
             },
-            ItemKind::Implement { element, body } => ItemKind::Implement {
+            SymbolKind::Implement { element, body } => SymbolKind::Implement {
                 element: element.clone(),
                 body: body.clone(),
             },
-            ItemKind::Trait { name, body } => ItemKind::Trait {
+            SymbolKind::Trait { name, body } => SymbolKind::Trait {
                 name: name.clone(),
                 body: body.clone(),
             },
-            ItemKind::Variable { target, value, ty, mutable } => ItemKind::Variable {
+            SymbolKind::Variable { target, value, ty, mutable } => SymbolKind::Variable {
                 target: target.clone(),
                 value: value.clone(),
                 ty: ty.clone(),
                 mutable: *mutable,
             },
-            ItemKind::Field { name, value, ty } => ItemKind::Field {
+            SymbolKind::Field { name, value, ty } => SymbolKind::Field {
                 name: name.clone(),
                 value: value.clone(),
                 ty: ty.clone(),
             },
-            ItemKind::Structure { name, fields } => ItemKind::Structure {
+            SymbolKind::Structure { name, fields } => SymbolKind::Structure {
                 name: name.clone(),
                 fields: fields.clone(),
             },
-            ItemKind::Enum { name, body } => ItemKind::Enum {
+            SymbolKind::Enumeration { name, body } => SymbolKind::Enumeration {
                 name: name.clone(),
                 body: body.clone(),
             },
-            ItemKind::Macro { name, parameters, body } => ItemKind::Macro {
-                name: name.clone(),
-                parameters: parameters.clone(),
-                body: body.clone(),
-            },
-            ItemKind::Function { name, parameters, body } => ItemKind::Function {
+            SymbolKind::Function { name, parameters, body } => SymbolKind::Function {
                 name: name.clone(),
                 parameters: parameters.clone(),
                 body: body.clone(),
             },
-            ItemKind::Unit => ItemKind::Unit,
         }
     }
 }
 
-impl Eq for ItemKind {}
+impl Eq for SymbolKind {}
 
-impl Eq for Item {}
+impl Eq for Symbol {}

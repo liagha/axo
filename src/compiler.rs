@@ -1,6 +1,6 @@
 use {
     broccli::{xprintln, Color},
-    
+
     core::time::Duration,
 
     crate::{
@@ -124,7 +124,8 @@ impl Compiler {
                 context,
                 (),
                 ScannerStage,
-                ParserStage
+                ParserStage,
+                ResolverStage
             ).map(|_| ())
         })
     }
@@ -138,6 +139,7 @@ impl Compiler {
             "Compiling" => Color::Blue,
             self.context.path
         );
+        xprintln!();
 
         if self.context.verbose {
             xprintln!(
@@ -145,6 +147,7 @@ impl Compiler {
                 self.context.path,
                 indent(&self.context.content) => Color::BrightMagenta
             );
+            xprintln!();
         }
 
         build_pipeline(&mut self.context)
@@ -168,15 +171,15 @@ impl Stage<(), Vec<Token>> for ScannerStage {
                     message => Color::Orange,
                     details
                 );
+                xprintln!();
             }
-            xprintln!();
             return Err(CompilerError::ScanningFailed(errors));
         }
 
         if context.verbose {
             xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
             xprintln!();
-            
+
             if !errors.is_empty() {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
@@ -187,14 +190,16 @@ impl Stage<(), Vec<Token>> for ScannerStage {
                     errors.len() => Color::BrightRed,
                     "errors" => Color::Red,
                 );
+                xprintln!();
             } else {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
                 xprintln!(
                     "Finished {} {}s." => Color::Green,
                     "`scanning` in" => Color::White,
-                    duration.as_secs_f64(), 
+                    duration.as_secs_f64(),
                 );
+                xprintln!();
             }
         }
 
@@ -218,8 +223,10 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                 .collect::<Vec<String>>()
                 .join("\n");
 
-            xprintln!("Elements:\n{}" => Color::Green, indent(&tree));
-            xprintln!();
+            if !tree.is_empty() {
+                xprintln!("Elements:\n{}" => Color::Green, indent(&tree));
+                xprintln!();
+            }
 
             if !errors.is_empty() {
                 let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
@@ -231,6 +238,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                         message => Color::Orange,
                         details
                     );
+                    xprintln!();
                 }
 
                 xprintln!(
@@ -240,6 +248,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                     errors.len() => Color::BrightRed,
                     "errors" => Color::Red,
                 );
+                xprintln!();
             } else {
                 let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
 
@@ -248,6 +257,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                     "`parsing` in" => Color::White,
                     duration.as_secs_f64(),
                 );
+                xprintln!();
             }
         }
 
@@ -263,30 +273,57 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
 
         context.resolver.resolve(elements);
 
-        if !context.resolver.errors.is_empty() {
-            for error in &context.resolver.errors {
-                let (message, details) = error.format();
-                xprintln!(
-                    "{}\n{}" => Color::Red,
-                    message => Color::Orange,
-                    details
-                );
-            }
-            return Err(CompilerError::ResolutionFailed(context.resolver.errors.clone()));
-        }
-
-        if context.verbose && !context.resolver.scope.all_symbols().is_empty() {
-            xprintln!(
-                "{}" => Color::Cyan,
-                format!("Symbols:\n{:#?}", context.resolver.scope.all_symbols())
-            );
-        }
+        let errors = context.resolver.errors.clone();
 
         if context.verbose {
-            println!(
-                "Resolution Took {} ns\n",
-                resolver_timer.to_nanoseconds(resolver_timer.elapsed().unwrap())
-            );
+            let symbols = context.resolver.scope.all_symbols();
+
+            let tree = symbols
+                .iter()
+                .map(|symbol| format!("{:?}", symbol))
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}" => Color::Cyan,
+                    format!("Symbols:\n{}", indent(&tree)),
+                );
+                xprintln!();
+            }
+
+            for error in &errors {
+                let (message, details) = error.format();
+                xprintln!(
+                        "{}\n{}" => Color::Red,
+                        message => Color::Orange,
+                        details
+                    );
+                xprintln!();
+            }
+
+            if !errors.is_empty() {
+                let duration = Duration::from_nanos(resolver_timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s with {} {}." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                        errors.len() => Color::BrightRed,
+                        "errors" => Color::Red,
+                    );
+                xprintln!();
+            } else {
+                let duration = Duration::from_nanos(resolver_timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                    );
+
+                xprintln!();
+            }
         }
 
         Ok(())

@@ -14,7 +14,7 @@ use {
 
         axo_parser::{
             Element, ElementKind,
-            Item, ItemKind
+            Symbol
         },
 
         axo_resolver::{
@@ -53,11 +53,11 @@ impl Resolver {
         }
     }
 
-    pub fn insert(&mut self, symbol: Item) {
+    pub fn insert(&mut self, symbol: Symbol) {
         self.scope.insert(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Element) -> Item {
+    pub fn lookup(&mut self, target: &Element) -> Option<Symbol> {
         let target_name = match target.name() {
             Some(name) => name,
             None => {
@@ -68,15 +68,13 @@ impl Resolver {
                     ),
                     target.span.clone(),
                 );
-                return Item {
-                    kind: ItemKind::Unit,
-                    span: target.span.clone(),
-                };
+                
+                return None
             }
         };
 
         let matcher = symbol_matcher();
-        let candidates: Vec<Item> = self.scope.all_symbols().iter().cloned().collect();
+        let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
 
         let suggestion = matcher.find_best_match(target, &*candidates);
 
@@ -111,7 +109,7 @@ impl Resolver {
             self.validate(target, &suggestion.candidate);
 
             if suggestion.match_type == MatchType::Exact || suggestion.score >= 0.99 {
-                return suggestion.candidate;
+                return Some(suggestion.candidate);
             }
 
             if suggestion.score > 0.4 {
@@ -131,27 +129,28 @@ impl Resolver {
                 };
 
                 self.errors.push(err);
+                
+                None
             } else {
                 dbg!();
                 self.error(
                     ErrorKind::UndefinedSymbol(target_name.clone(), None),
                     target_name.span,
                 );
+                
+                None
             }
         } else {
             self.error(
                 ErrorKind::UndefinedSymbol(target_name.clone(), None),
                 target_name.span,
             );
-        }
-
-        Item {
-            kind: ItemKind::Unit,
-            span: target.span.clone(),
+            
+            None
         }
     }
 
-    pub fn error(&mut self, error: ErrorKind, span: Span) -> Item {
+    pub fn error(&mut self, error: ErrorKind, span: Span) {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
@@ -160,11 +159,6 @@ impl Resolver {
         };
 
         self.errors.push(error);
-
-        Item {
-            kind: ItemKind::Unit,
-            span
-        }
     }
 
     pub fn resolve(&mut self, elements: Vec<Element>) {
@@ -177,13 +171,13 @@ impl Resolver {
         let Element { kind, span } = *element.clone();
 
         match kind {
-            ElementKind::Item(item) => {
-                let item = Item {
-                    kind: item,
+            ElementKind::Symbolization(symbol) => {
+                let symbol = Symbol {
+                    kind: symbol,
                     span
                 };
 
-                self.insert(item.clone());
+                self.insert(symbol.clone());
             },
 
             ElementKind::Assignment { target, .. } => {

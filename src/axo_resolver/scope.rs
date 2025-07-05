@@ -2,14 +2,14 @@
 
 use {
     crate::{
-        axo_parser::Item,
+        axo_parser::Symbol,
         hash::HashSet,
     },
 };
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    pub symbols: HashSet<Item>,
+    pub symbols: HashSet<Symbol>,
     pub parent: Option<Box<Scope>>,
 }
 
@@ -36,17 +36,17 @@ impl Scope {
         self.parent.take().map(|boxed| *boxed)
     }
 
-    pub fn insert(&mut self, symbol: Item) {
+    pub fn insert(&mut self, symbol: Symbol) {
         self.symbols.remove(&symbol);
         self.symbols.insert(symbol);
     }
 
-    pub fn contains_local(&self, symbol: &Item) -> bool {
+    pub fn contains_local(&self, symbol: &Symbol) -> bool {
         self.symbols.contains(symbol)
     }
 
     // Stack-safe version using iteration instead of recursion
-    pub fn contains(&self, symbol: &Item) -> bool {
+    pub fn contains(&self, symbol: &Symbol) -> bool {
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -60,7 +60,7 @@ impl Scope {
     }
 
     // Stack-safe version using iteration instead of recursion
-    pub fn all_symbols(&self) -> HashSet<Item> {
+    pub fn all_symbols(&self) -> HashSet<Symbol> {
         let mut all_symbols = HashSet::new();
         let mut current = Some(self);
 
@@ -73,7 +73,7 @@ impl Scope {
     }
 
     // Stack-safe version using iteration instead of recursion
-    pub fn find(&self, symbol: &Item) -> Option<Item> {
+    pub fn find(&self, symbol: &Symbol) -> Option<Symbol> {
         let mut current = Some(self);
 
         while let Some(scope) = current {
