@@ -13,7 +13,7 @@ use {
         axo_form::{
             form::{Form, FormKind},
             former::Former,
-            pattern::Pattern,
+            pattern::Classifier,
         },
         axo_cursor::{
             Peekable, Position,
@@ -155,10 +155,10 @@ impl Scanner {
         }
     }
 
-    fn line_comment() -> Pattern<Character, Token, ScanError> {
-        Pattern::sequence([
-            Pattern::sequence([Pattern::literal('/'), Pattern::literal('/')]).with_ignore(),
-            Pattern::repeat(Pattern::predicate(|c: &Character| *c != '\n'), 0, None),
+    fn line_comment() -> Classifier<Character, Token, ScanError> {
+        Classifier::sequence([
+            Classifier::sequence([Classifier::literal('/'), Classifier::literal('/')]).with_ignore(),
+            Classifier::repeat(Classifier::predicate(|c: &Character| *c != '\n'), 0, None),
         ])
         .with_transform(|_, form| {
             let content: String = form.inputs().into_iter().collect();
@@ -170,17 +170,17 @@ impl Scanner {
         })
     }
 
-    fn multiline_comment() -> Pattern<Character, Token, ScanError> {
-        Pattern::sequence([
-            Pattern::sequence([Pattern::literal('/'), Pattern::literal('*')]).with_ignore(),
-            Pattern::repeat(
-                Pattern::negate(
-                    Pattern::sequence([Pattern::literal('*'), Pattern::literal('/')]).with_ignore(),
+    fn multiline_comment() -> Classifier<Character, Token, ScanError> {
+        Classifier::sequence([
+            Classifier::sequence([Classifier::literal('/'), Classifier::literal('*')]).with_ignore(),
+            Classifier::repeat(
+                Classifier::negate(
+                    Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore(),
                 ),
                 0,
                 None,
             ),
-            Pattern::sequence([Pattern::literal('*'), Pattern::literal('/')]).with_ignore(),
+            Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore(),
         ])
         .with_transform(|_, form: Form<Character, Token, ScanError>| {
             let content: String = form.inputs().into_iter().collect();
@@ -192,17 +192,17 @@ impl Scanner {
         })
     }
 
-    fn hex_number() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('0'),
-                Pattern::alternative([Pattern::literal('x'), Pattern::literal('X')]),
-                Pattern::repeat(
-                    Pattern::alternative([
-                        Pattern::predicate(|c: &Character| {
+    fn hex_number() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('0'),
+                Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
+                Classifier::repeat(
+                    Classifier::alternative([
+                        Classifier::predicate(|c: &Character| {
                             c.is_alphanumeric()
                         }),
-                        Pattern::literal('_').with_ignore(),
+                        Classifier::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -221,15 +221,15 @@ impl Scanner {
         )
     }
 
-    fn binary_number() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('0'),
-                Pattern::alternative([Pattern::literal('b'), Pattern::literal('B')]),
-                Pattern::repeat(
-                    Pattern::alternative([
-                        Pattern::predicate(|c: &Character| *c == '0' || *c == '1'),
-                        Pattern::literal('_').with_ignore(),
+    fn binary_number() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('0'),
+                Classifier::alternative([Classifier::literal('b'), Classifier::literal('B')]),
+                Classifier::repeat(
+                    Classifier::alternative([
+                        Classifier::predicate(|c: &Character| *c == '0' || *c == '1'),
+                        Classifier::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -247,15 +247,15 @@ impl Scanner {
         )
     }
 
-    fn octal_number() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('0'),
-                Pattern::alternative([Pattern::literal('o'), Pattern::literal('O')]),
-                Pattern::repeat(
-                    Pattern::alternative([
-                        Pattern::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
-                        Pattern::literal('_').with_ignore(),
+    fn octal_number() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('0'),
+                Classifier::alternative([Classifier::literal('o'), Classifier::literal('O')]),
+                Classifier::repeat(
+                    Classifier::alternative([
+                        Classifier::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
+                        Classifier::literal('_').with_ignore(),
                     ]),
                     1,
                     None,
@@ -273,33 +273,33 @@ impl Scanner {
         )
     }
 
-    fn decimal_number() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|c: &Character| c.is_numeric()),
-                Pattern::repeat(
-                    Pattern::alternative([
-                        Pattern::predicate(|c: &Character| c.is_numeric()),
-                        Pattern::literal('_').with_ignore(),
+    fn decimal_number() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|c: &Character| c.is_numeric()),
+                Classifier::repeat(
+                    Classifier::alternative([
+                        Classifier::predicate(|c: &Character| c.is_numeric()),
+                        Classifier::literal('_').with_ignore(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::optional(Pattern::sequence([
-                    Pattern::literal('.'),
-                    Pattern::repeat(
-                        Pattern::alternative([
-                            Pattern::predicate(|c: &Character| c.is_numeric()),
-                            Pattern::literal('_').with_ignore(),
+                Classifier::optional(Classifier::sequence([
+                    Classifier::literal('.'),
+                    Classifier::repeat(
+                        Classifier::alternative([
+                            Classifier::predicate(|c: &Character| c.is_numeric()),
+                            Classifier::literal('_').with_ignore(),
                         ]),
                         0,
                         None,
                     ),
                 ])),
-                Pattern::optional(Pattern::sequence([
-                    Pattern::predicate(|c: &Character| *c == 'e' || *c == 'E'),
-                    Pattern::optional(Pattern::predicate(|c: &Character| *c == '+' || *c == '-')),
-                    Pattern::repeat(Pattern::predicate(|c: &Character| c.is_numeric()), 1, None),
+                Classifier::optional(Classifier::sequence([
+                    Classifier::predicate(|c: &Character| *c == 'e' || *c == 'E'),
+                    Classifier::optional(Classifier::predicate(|c: &Character| *c == '+' || *c == '-')),
+                    Classifier::repeat(Classifier::predicate(|c: &Character| c.is_numeric()), 1, None),
                 ])),
             ]),
             |_, form| {
@@ -325,8 +325,8 @@ impl Scanner {
         )
     }
 
-    fn number() -> Pattern<Character, Token, ScanError> {
-        Pattern::alternative([
+    fn number() -> Classifier<Character, Token, ScanError> {
+        Classifier::alternative([
             Self::hex_number(),
             Self::binary_number(),
             Self::octal_number(),
@@ -334,12 +334,12 @@ impl Scanner {
         ])
     }
 
-    fn identifier() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
-                Pattern::repeat(
-                    Pattern::predicate(|c: &Character| c.is_alphabetic() || c.is_numeric() || *c == '_'),
+    fn identifier() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
+                Classifier::repeat(
+                    Classifier::predicate(|c: &Character| c.is_alphabetic() || c.is_numeric() || *c == '_'),
                     0,
                     None,
                 ),
@@ -355,19 +355,19 @@ impl Scanner {
         )
     }
 
-    fn quoted_string() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('"'),
-                Pattern::repeat(
-                    Pattern::alternative([
-                        Pattern::sequence([Pattern::literal('\\'), Pattern::predicate(|_| true)]),
-                        Pattern::predicate(|c: &Character| *c != '"' && *c != '\\' && *c != '\n'),
+    fn quoted_string() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('"'),
+                Classifier::repeat(
+                    Classifier::alternative([
+                        Classifier::sequence([Classifier::literal('\\'), Classifier::predicate(|_| true)]),
+                        Classifier::predicate(|c: &Character| *c != '"' && *c != '\\' && *c != '\n'),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::literal('"'),
+                Classifier::literal('"'),
             ]),
             |_, form| {
                 let mut content = String::new();
@@ -486,12 +486,12 @@ impl Scanner {
         )
     }
 
-    fn backtick_string() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('`'),
-                Pattern::repeat(Pattern::predicate(|c: &Character| *c != '`'), 0, None),
-                Pattern::literal('`'),
+    fn backtick_string() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('`'),
+                Classifier::repeat(Classifier::predicate(|c: &Character| *c != '`'), 0, None),
+                Classifier::literal('`'),
             ]),
             |_, form| {
                 let content: String = form.inputs().into_iter().collect();
@@ -501,15 +501,15 @@ impl Scanner {
         )
     }
 
-    fn character() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::literal('\''),
-                Pattern::alternative([
-                    Pattern::sequence([Pattern::literal('\\'), Pattern::predicate(|_| true)]),
-                    Pattern::predicate(|c: &Character| *c != '\'' && *c != '\\'),
+    fn character() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::literal('\''),
+                Classifier::alternative([
+                    Classifier::sequence([Classifier::literal('\\'), Classifier::predicate(|_| true)]),
+                    Classifier::predicate(|c: &Character| *c != '\'' && *c != '\\'),
                 ]),
-                Pattern::literal('\''),
+                Classifier::literal('\''),
             ]),
             |_, form| {
                 let flat_chars = form.inputs();
@@ -601,9 +601,9 @@ impl Scanner {
         )
     }
 
-    fn operator() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::repeat(Pattern::predicate(|c: &Character| c.is_operator()), 1, None),
+    fn operator() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::repeat(Classifier::predicate(|c: &Character| c.is_operator()), 1, None),
             |_, form| {
                 let operator: String = form.inputs().into_iter().collect();
 
@@ -615,10 +615,11 @@ impl Scanner {
         )
     }
 
-    fn punctuation() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::predicate(|c: &Character| c.is_punctuation()),
+    fn punctuation() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
+                println!("form: {:?}", form);
                 let punctuation: String = form.inputs().into_iter().collect();
 
                 Ok(Token::new(
@@ -629,10 +630,10 @@ impl Scanner {
         )
     }
 
-    fn whitespace() -> Pattern<Character, Token, ScanError> {
-        Pattern::transform(
-            Pattern::repeat(
-                Pattern::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
+    fn whitespace() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::repeat(
+                Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
                 1,
                 None,
             ),
@@ -656,13 +657,13 @@ impl Scanner {
         )
     }
 
-    fn fallback() -> Pattern<Character, Token, ScanError> {
-        Pattern::anything().with_ignore()
+    fn fallback() -> Classifier<Character, Token, ScanError> {
+        Classifier::anything().with_ignore()
     }
 
-    pub fn pattern() -> Pattern<Character, Token, ScanError> {
-        Pattern::repeat(
-            Pattern::alternative([
+    pub fn pattern() -> Classifier<Character, Token, ScanError> {
+        Classifier::repeat(
+            Classifier::alternative([
                 Self::whitespace(),
                 Self::line_comment(),
                 Self::multiline_comment(),

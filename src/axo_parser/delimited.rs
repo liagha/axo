@@ -2,25 +2,25 @@ use {
     super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
         axo_cursor::{Span, Spanned},
-        axo_form::{order::Order, form::Form, pattern::Pattern},
+        axo_form::{order::Order, form::Form, pattern::Classifier},
         axo_scanner::{PunctuationKind, Token, TokenKind},
         thread::Arc,
     },
 };
 
 impl Parser {
-    pub fn bundle() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn bundle() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::required(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::required(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
                             Order::failure(|_, form| {
@@ -32,13 +32,13 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
                     Order::failure(|_, form| {
@@ -59,18 +59,18 @@ impl Parser {
         )
     }
 
-    pub fn scope() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn scope() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::required(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::required(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
                             Order::failure(|_, form| {
@@ -82,13 +82,13 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
                     Order::failure(|_, form| {
@@ -109,17 +109,17 @@ impl Parser {
         )
     }
 
-    pub fn group() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn group() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 }),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::order(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::order(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
                             Order::trigger(
@@ -134,13 +134,13 @@ impl Parser {
                                 }),
                             ),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
                     Order::failure(|_, form| {
@@ -161,18 +161,18 @@ impl Parser {
         )
     }
 
-    pub fn sequence() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn sequence() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 })
                 .with_ignore(),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::order(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::order(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
                             Order::trigger(
@@ -187,13 +187,13 @@ impl Parser {
                                 }),
                             ),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
                     Order::failure(|_, form| {
@@ -214,18 +214,18 @@ impl Parser {
         )
     }
 
-    pub fn collection() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn collection() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::required(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::required(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
                             Order::failure(|_, form| {
@@ -237,13 +237,13 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
                     Order::failure(|_, form| {
@@ -264,18 +264,18 @@ impl Parser {
         )
     }
 
-    pub fn series() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn series() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
-                Pattern::lazy(Self::element).as_optional(),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::required(
-                            Pattern::predicate(|token: &Token| {
+                Classifier::lazy(Self::element).as_optional(),
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::required(
+                            Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
                             Order::failure(|_, form| {
@@ -287,13 +287,13 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Pattern::lazy(Self::element).as_optional(),
+                        Classifier::lazy(Self::element).as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Pattern::required(
-                    Pattern::predicate(|token: &Token| {
+                Classifier::required(
+                    Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
                     Order::failure(|_, form| {
@@ -314,8 +314,8 @@ impl Parser {
         )
     }
 
-    pub fn delimited() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([
+    pub fn delimited() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([
             Self::bundle(),
             Self::scope(),
             Self::group(),

@@ -1,8 +1,7 @@
 use {
     super::{
-        pattern::{Pattern, PatternKind},
+        pattern::Classifier,
         form::{Form, FormKind},
-        order::Pulse,
     },
     crate::{
         axo_cursor::{
@@ -14,10 +13,12 @@ use {
         hash::Hash,
     },
 };
+use crate::axo_form::pattern::Source;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Record {
     Aligned,
+    Skipped,
     Failed,
     Blank,
 }
@@ -26,6 +27,11 @@ impl Record {
     #[inline]
     pub fn is_aligned(&self) -> bool {
         matches!(self, &Record::Aligned)
+    }
+
+    #[inline]
+    pub fn is_skipped(&self) -> bool {
+        matches!(self, &Record::Skipped)
     }
 
     #[inline]
@@ -49,6 +55,11 @@ impl Record {
     }
 
     #[inline]
+    pub fn skip(&mut self) {
+        *self = Record::Skipped;
+    }
+
+    #[inline]
     pub fn fail(&mut self) {
         *self = Record::Failed;
     }
@@ -68,10 +79,9 @@ where
 {
     pub marker: usize,
     pub position: Position,
-    pub stack: Vec<Draft<Input, Output, Failure>>,
     pub consumed: Vec<Input>,
     pub record: Record,
-    pub pattern: Pattern<Input, Output, Failure>,
+    pub classifier: Classifier<Input, Output, Failure>,
     pub form: Form<Input, Output, Failure>,
 }
 
@@ -82,463 +92,24 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     #[inline]
-    pub fn new(index: usize, position: Position, pattern: Pattern<Input, Output, Failure>) -> Self {
+    pub fn new(index: usize, position: Position, pattern: Classifier<Input, Output, Failure>) -> Self {
         Self {
             marker: index,
             position,
-            stack: Vec::new(),
             consumed: Vec::new(),
             record: Record::Blank,
-            pattern,
+            classifier: pattern,
             form: Form::new(FormKind::Blank, Span::point(position)),
         }
     }
 
-    pub fn forge(&mut self) {
-        if self.stack.len() == 0 {
-            self.form = Form::blank(Span::point(self.position));
-        } else if self.stack.len() == 1 {
-            self.form = self.stack[0].clone().form;
-        } else {
-            let forms = self.stack.iter().map(|draft| draft.form.clone()).collect::<Vec<_>>();
-            self.form = Form::multiple(forms);
-        }
-    }
+    pub fn build(&mut self, source: &mut dyn Source<Input>) {
+        let pattern = self.classifier.pattern.clone();
+        let order = self.classifier.order.clone();
 
-    pub fn build<Source>(&mut self, source: &mut Source)
-    where
-        Source: Peekable<Input> + Marked,
-    {
-        match self.pattern.kind.clone() {
-            PatternKind::Identical { value, align, miss } => {
-                if let Some(peek) = source.get(self.marker).cloned() {
-                    if value.eq(&peek) {
-                        let pulses = align.execute(source, self);
+        pattern.build(source, self);
 
-                        for pulse in pulses {
-                            match pulse {
-                                Pulse::Forge => {
-                                    self.forge()
-                                },
-                                Pulse::Imitate => {
-                                    self.form = Form::input(peek.clone())
-                                },
-                                Pulse::Feast => {
-                                    source.next(&mut self.marker, &mut self.position);
-                                    self.consumed.push(peek.clone());
-                                }
-                                Pulse::Align => self.record.align(),
-                                Pulse::Ignore => {
-                                    self.form = Form::blank(Span::point(self.position));
-                                },
-                                Pulse::Fail => self.record.fail(),
-                                Pulse::Pardon => self.record.empty(),
-                                _ => {}
-                            }
-                        }
-                    } else {
-                        miss.execute(source, self);
-                    }
-                } else {
-                    miss.execute(source, self);
-                }
-            }
-
-            PatternKind::Reject { pattern, align, miss } => {
-                if let Some(peek) = source.get(self.marker).cloned() {
-                    let mut draft = Draft::new(self.marker, self.position, *pattern);
-                    draft.build(source);
-
-                    if !draft.record.is_aligned() {
-                        let pulses = align.execute(source, self);
-
-                        for pulse in pulses {
-                            match pulse {
-                                
-                                Pulse::Forge => {
-                                    self.forge()
-                                },
-                                Pulse::Imitate => {
-                                    self.form = Form::input(peek.clone())
-                                },
-                                Pulse::Feast => {
-                                    source.next(&mut self.marker, &mut self.position);
-                                    self.consumed.push(peek.clone());
-                                }
-                                Pulse::Align => self.record.align(),
-                                Pulse::Ignore => {
-                                    self.form = Form::blank(Span::point(self.position));
-                                },
-                                Pulse::Fail => self.record.fail(),
-                                Pulse::Pardon => self.record.empty(),
-                                _ => {}
-                            }
-                        }
-                    } else {
-                        miss.execute(source, self);
-                    }
-                } else {
-                    miss.execute(source, self);
-                }
-            }
-
-            PatternKind::Predicate { function, align, miss } => {
-                if let Some(peek) = source.get(self.marker).cloned() {
-                    let predicate = function(&peek);
-
-                    if predicate {
-                        let pulses = align.execute(source, self);
-
-                        for pulse in pulses {
-                            match pulse {
-                                
-                                Pulse::Forge => {
-                                    self.forge()
-                                },
-                                Pulse::Imitate => {
-                                    self.form = Form::input(peek.clone())
-                                },
-                                Pulse::Feast => {
-                                    source.next(&mut self.marker, &mut self.position);
-                                    self.consumed.push(peek.clone());
-                                }
-                                Pulse::Align => self.record.align(),
-                                Pulse::Ignore => {
-                                    self.form = Form::blank(Span::point(self.position));
-                                },
-                                Pulse::Fail => self.record.fail(),
-                                Pulse::Pardon => self.record.empty(),
-                                _ => {}
-                            }
-                        }
-                    } else {
-                        miss.execute(source, self);
-                    }
-                } else {
-                    miss.execute(source, self);
-                }
-            }
-
-            PatternKind::Alternative { patterns, order, finish } => {
-                'outer : for pattern in patterns {
-                    let mut child = Draft::new(self.marker, self.position, pattern);
-                    child.build(source);
-
-                    let pulses = order.execute(source, &mut child);
-
-                    for pulse in pulses {
-                        match pulse {
-                            
-                            Pulse::Terminate => break 'outer,
-                            Pulse::Proceed => continue 'outer,
-                            Pulse::Forge => {
-                                self.forge()
-                            },
-                            Pulse::Imitate => {
-                                self.form = child.form.clone();
-                            },
-                            Pulse::Inject => {
-                                self.stack.push(child.clone())
-                            },
-                            Pulse::Feast => {
-                                self.marker = child.marker;
-                                self.position = child.position;
-                                self.consumed = child.consumed.clone();
-                            }
-                            Pulse::Align => self.record.align(),
-                            Pulse::Ignore => {
-                                child.form = Form::blank(Span::point(self.position));
-                            },
-                            Pulse::Fail => self.record.fail(),
-                            Pulse::Pardon => self.record.empty(),
-                        }
-                    }
-                }
-
-                let pulses = finish.execute(source, self);
-
-                for pulse in pulses {
-                    match pulse {
-                        
-                        Pulse::Forge => {
-                            self.forge()
-                        },
-                        Pulse::Imitate => {
-                            if let Some(fallback) = self.stack.first() {
-                                self.form = fallback.form.clone();
-                            }
-                        },
-                        Pulse::Feast => {
-                            if let Some(fallback) = self.stack.first() {
-                                self.marker = fallback.marker;
-                                self.position = fallback.position;
-                                self.consumed = fallback.consumed.clone();
-                            }
-                        }
-                        Pulse::Align => self.record.align(),
-                        Pulse::Ignore => {
-                            self.form = Form::blank(Span::point(self.position));
-                        },
-                        Pulse::Fail => self.record.fail(),
-                        Pulse::Pardon => self.record.empty(),
-                        _ => {}
-                    }
-                }
-            }
-
-            PatternKind::Deferred { function, order } => {
-                let resolved = function();
-
-                let mut child = Draft::new(self.marker, self.position, resolved);
-                child.build(source);
-
-                let pulses = order.execute(source, &mut child);
-
-                for pulse in pulses {
-                    match pulse {
-                        
-                        Pulse::Forge => {
-                            self.forge()
-                        },
-                        Pulse::Imitate => {
-                            self.marker = child.marker;
-                            self.position = child.position;
-                            self.consumed = child.consumed.clone();
-                            self.record = child.record;
-                            self.form = child.form.clone();
-                        },
-                        Pulse::Inject => {
-                            self.stack.push(child.clone())
-                        },
-                        Pulse::Feast => {
-                            self.marker = child.marker;
-                            self.position = child.position;
-                            self.consumed = child.consumed.clone();
-                        }
-                        Pulse::Align => self.record.align(),
-                        Pulse::Ignore => {
-                            self.form = Form::blank(Span::point(self.position));
-                        },
-                        Pulse::Fail => self.record.fail(),
-                        Pulse::Pardon => self.record.empty(),
-                        _ => {}
-                    }
-                }
-            }
-
-            PatternKind::Wrapper { pattern, order } => {
-                let mut child = Draft::new(self.marker, self.position, *pattern);
-                child.build(source);
-
-                let pulses = order.execute(source, &mut child);
-
-                for pulse in pulses {
-                    match pulse {
-                        
-                        Pulse::Forge => {
-                            self.forge()
-                        },
-                        Pulse::Imitate => {
-                            self.marker = child.marker;
-                            self.position = child.position;
-                            self.consumed = child.consumed.clone();
-                            self.record = child.record.clone();
-                            self.form = child.form.clone();
-                        },
-                        Pulse::Inject => {
-                            self.stack.push(child.clone())
-                        },
-                        Pulse::Feast => {
-                            self.marker = child.marker;
-                            self.position = child.position;
-                            self.consumed = child.consumed.clone();
-                        }
-                        Pulse::Align => self.record.align(),
-                        Pulse::Ignore => {
-                            self.form = Form::blank(Span::point(self.position));
-                        },
-                        Pulse::Fail => self.record.fail(),
-                        Pulse::Pardon => self.record.empty(),
-                        _ => {}
-                    }
-                }
-            }
-
-            PatternKind::Sequence { patterns, order, finish } => {
-                'outer : for pattern in patterns {
-                    let mut child = Draft::new(self.marker, self.position, pattern);
-                    child.build(source);
-
-                    if child.marker == self.marker {
-                        break;
-                    }
-
-                    let pulses = order.execute(source, &mut child);
-
-                    for pulse in pulses {
-                        match pulse {
-                            
-                            Pulse::Terminate => break 'outer,
-                            Pulse::Proceed => continue 'outer,
-                            Pulse::Forge => {
-                                self.forge()
-                            },
-                            Pulse::Imitate => {
-                                self.form = child.form.clone();
-                            },
-                            Pulse::Inject => {
-                                self.stack.push(child.clone())
-                            },
-                            Pulse::Feast => {
-                                self.marker = child.marker;
-                                self.position = child.position;
-                                self.consumed = child.consumed.clone();
-                            }
-                            Pulse::Align => self.record.align(),
-                            Pulse::Ignore => {
-                                child.form = Form::blank(Span::point(self.position));
-                            },
-                            Pulse::Fail => self.record.fail(),
-                            Pulse::Pardon => self.record.empty(),
-                        }
-                    }
-                }
-
-                let pulses = finish.execute(source, self);
-
-                for pulse in pulses {
-                    match pulse {
-                        
-                        Pulse::Forge => {
-                            self.forge()
-                        },
-                        _ => {}
-                    }
-                }
-            }
-
-            PatternKind::Repetition {
-                pattern,
-                minimum,
-                maximum,
-                order, lack, exceed, finish,
-            } => {
-                let mut index = self.marker;
-                let mut position = self.position;
-                let mut consumed = Vec::new();
-
-                'outer : while source.peek_ahead(index).is_some() {
-                    let mut child = Draft::new(index, position, *pattern.clone());
-                    child.build(source);
-
-                    if child.marker == index {
-                        break;
-                    }
-
-                    let pulses = order.execute(source, &mut child);
-
-                    for pulse in pulses {
-                        match pulse {
-                            
-                            Pulse::Terminate => break 'outer,
-                            Pulse::Proceed => continue 'outer,
-                            Pulse::Forge => {
-                                self.forge()
-                            },
-                            Pulse::Imitate => {
-                                self.form = child.form.clone();
-                            },
-                            Pulse::Inject => {
-                                self.stack.push(child.clone())
-                            },
-                            Pulse::Feast => {
-                                index = child.marker;
-                                position = child.position;
-                                consumed.extend(child.consumed.clone());
-                            }
-                            Pulse::Align => self.record.align(),
-                            Pulse::Ignore => {
-                                self.form = Form::blank(Span::point(self.position));
-                            },
-                            Pulse::Fail => self.record.fail(),
-                            Pulse::Pardon => self.record.empty(),
-                        }
-                    }
-
-                    if let Some(max) = maximum {
-                        if self.stack.len() >= max {
-                            let pulses = exceed.execute(source, &mut child);
-
-                            for pulse in pulses {
-                                match pulse {
-                                    
-                                    Pulse::Terminate => break 'outer,
-                                    Pulse::Proceed => continue 'outer,
-                                    Pulse::Forge => {
-                                        self.forge()
-                                    },
-                                    Pulse::Imitate => {
-                                        self.form = child.form.clone();
-                                    },
-                                    Pulse::Inject => {
-                                        self.stack.push(child.clone())
-                                    },
-                                    Pulse::Feast => {
-                                        index = child.marker;
-                                        position = child.position;
-                                        consumed.extend(child.consumed.clone());
-                                    }
-                                    Pulse::Align => self.record.align(),
-                                    Pulse::Ignore => {
-                                        self.form = Form::blank(Span::point(self.position));
-                                    },
-                                    Pulse::Fail => self.record.fail(),
-                                    Pulse::Pardon => self.record.empty(),
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if self.stack.len() >= minimum {
-                    let pulses = finish.execute(source, self);
-
-                    for pulse in pulses {
-                        match pulse {
-                            
-                            Pulse::Forge => {
-                                self.forge()
-                            },
-                            Pulse::Feast => {
-                                self.marker = index;
-                                self.position = position;
-                                self.consumed = consumed.clone();
-                            }
-                            _ => {}
-                        }
-                    }
-                } else {
-                    let pulses = lack.execute(source, self);
-
-                    for pulse in pulses {
-                        match pulse {
-                            
-                            Pulse::Forge => {
-                                self.forge()
-                            },
-                            Pulse::Feast => {
-                                self.marker = index;
-                                self.position = position;
-                                self.consumed = consumed.clone();
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Some(order) = &self.pattern.order.clone() {
+        if let Some(order) = order {
             order.execute(source, self);
         }
     }
@@ -550,8 +121,8 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn strain(&mut self, pattern: Pattern<Input, Output, Failure>);
-    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure>;
+    fn strain(&mut self, pattern: Classifier<Input, Output, Failure>);
+    fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
 impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
@@ -561,7 +132,7 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn strain(&mut self, pattern: Pattern<Input, Output, Failure>) {
+    fn strain(&mut self, pattern: Classifier<Input, Output, Failure>) {
         let mut inputs = Vec::with_capacity(self.len());
         let mut index = 0;
         let mut position = self.position();
@@ -584,7 +155,7 @@ where
         *self.input_mut() = inputs;
     }
 
-    fn form(&mut self, pattern: Pattern<Input, Output, Failure>) -> Form<Input, Output, Failure> {
+    fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), pattern);
 
         draft.build(self);

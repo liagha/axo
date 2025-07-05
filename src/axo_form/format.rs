@@ -2,7 +2,7 @@ use {
     super::{
         order::Order,
         form::{Form, FormKind},
-        pattern::PatternKind,
+        pattern::Classifier,
     },
     crate::{
         hash::Hash,
@@ -12,6 +12,18 @@ use {
         axo_cursor::Spanned,
     },
 };
+
+impl<Input, Output, Failure> Debug for Classifier<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "Todo")
+    }
+}
+
 
 impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
 where
@@ -44,53 +56,6 @@ where
     }
 }
 
-impl<Input, Output, Failure> Debug for PatternKind<Input, Output, Failure>
-where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            PatternKind::Deferred { function, .. } => {
-                write!(f, "Lazy({:?})", function.type_id())
-            }
-            PatternKind::Identical { value, .. } => {
-                write!(f, "Identical({:?})", value.type_id())
-            }
-            PatternKind::Alternative { patterns, .. } => {
-                write!(f, "Alternative({:?})", patterns)
-            }
-            PatternKind::Sequence { patterns, .. } => {
-                write!(f, "Sequence({:?})", patterns)
-            }
-            PatternKind::Repetition {
-                pattern,
-                minimum,
-                maximum,
-                ..
-            } => {
-                write!(f, "Repeat({:?}", pattern)?;
-
-                if *minimum != 0 {
-                    write!(f, ", {}", minimum)?;
-                }
-
-                if let Some(maximum) = maximum {
-                    write!(f, "-{}", maximum)?;
-                }
-
-                write!(f, ")")
-            }
-            PatternKind::Predicate { .. } => write!(f, "Predicate"),
-            PatternKind::Reject { pattern, .. } => write!(f, "Reject({:?})", pattern),
-            PatternKind::Wrapper { pattern, .. } => {
-                write!(f, "Wrap({:?})", pattern)
-            }
-        }
-    }
-}
-
 impl<Input, Output, Failure> Debug for Order<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -99,15 +64,17 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Order::Yawn => write!(f, "Yawn"),
             Order::Convert(function) => write!(f, "Map({:?})", function.type_id()),
             Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
             Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
             Order::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
             Order::Capture(identifier) => write!(f, "Capture({:?})", identifier),
+            Order::Ignore => write!(f, "Ignore"),
+            Order::Skip => write!(f, "Skip"),
             Order::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
-            Order::Inspect(inspector) => write!(f, "Inspect({:?})", inspector.type_id()),
-            Order::Pulse(pulse) => write!(f, "{:?}", pulse),
+            Order::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
+            Order::Remove => write!(f, "Remove"),
+            Order::Pardon => write!(f, "Pardon"),
         }
     }
 }

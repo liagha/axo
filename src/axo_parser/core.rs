@@ -6,7 +6,7 @@ use {
             order::Order,
             form::{Form, FormKind},
             former::Former,
-            pattern::Pattern,
+            pattern::Classifier,
         },
         axo_parser::{Item, ItemKind},
         axo_scanner::{PunctuationKind, Token, TokenKind},
@@ -19,9 +19,9 @@ use crate::artifact::Artifact;
 impl Parser {
     // Basic Token Patterns
 
-    pub fn identifier() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
+    pub fn identifier() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
             |_, form| {
                 let input = form.inputs()[0].clone();
 
@@ -38,9 +38,9 @@ impl Parser {
         )
     }
 
-    pub fn literal() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::predicate(|token: &Token| {
+    pub fn literal() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::predicate(|token: &Token| {
                 matches!(
                     token.kind,
                     TokenKind::String(_)
@@ -64,12 +64,12 @@ impl Parser {
         )
     }
 
-    pub fn token() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::identifier(), Self::literal()])
+    pub fn token() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Self::identifier(), Self::literal()])
     }
 
-    pub fn whitespace() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Pattern::predicate(
+    pub fn whitespace() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Classifier::predicate(
             |token: &Token| {
                 matches!(
                     token.kind,
@@ -85,16 +85,16 @@ impl Parser {
 
     // Primary Elements
 
-    pub fn primary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::delimited(), Self::token()])
+    pub fn primary() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Self::delimited(), Self::token()])
     }
 
     // Unary Operations
 
-    pub fn prefixed() -> Pattern<Token, Element, ParseError> {
-        Pattern::order(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn prefixed() -> Classifier<Token, Element, ParseError> {
+        Classifier::order(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
                         operator.is_prefix()
                     } else {
@@ -124,15 +124,15 @@ impl Parser {
         )
     }
 
-    pub fn postfixed() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
+    pub fn postfixed() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
                 Self::primary(),
-                Pattern::alternative([
+                Classifier::alternative([
                     //Self::group(),
                     //Self::collection(),
                     //Self::bundle(),
-                    Pattern::predicate(|token: &Token| {
+                    Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
                             operator.is_postfix()
                         } else {
@@ -195,8 +195,8 @@ impl Parser {
         )
     }
 
-    pub fn unary() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([
+    pub fn unary() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([
             Self::prefixed(),
             Self::postfixed(),
             Self::primary(),
@@ -205,16 +205,16 @@ impl Parser {
 
     // Binary Operations
 
-    pub fn binary(minimum: u8) -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::alternative([
+    pub fn binary(minimum: u8) -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::alternative([
                     Self::statement(),
                     Self::unary(),
                 ]),
-                Pattern::repeat(
-                    Pattern::sequence([
-                        Pattern::predicate(move |token: &Token| {
+                Classifier::repeat(
+                    Classifier::sequence([
+                        Classifier::predicate(move |token: &Token| {
                             if let TokenKind::Operator(operator) = &token.kind {
                                 if let Some(precedence) = operator.precedence() {
                                     precedence >= minimum
@@ -225,7 +225,7 @@ impl Parser {
                                 false
                             }
                         }),
-                        Pattern::alternative([
+                        Classifier::alternative([
                             Self::statement(),
                             Self::unary(),
                         ])
@@ -311,16 +311,16 @@ impl Parser {
 
     // Expressions
 
-    pub fn expression(minimum: u8) -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
+    pub fn expression(minimum: u8) -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
     }
 
     // Statements
 
-    pub fn conditional() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn conditional() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "if"
                     } else {
@@ -328,18 +328,18 @@ impl Parser {
                     }
                 })
                     .with_ignore(),
-                Pattern::required(
-                    Pattern::lazy(|| Self::element()),
+                Classifier::required(
+                    Classifier::lazy(|| Self::element()),
                     Order::failure(|_, form| {
                         ParseError::new(ErrorKind::ExpectedCondition, form.span)
                     }),
                 ),
-                Pattern::required(
-                    Pattern::lazy(|| Self::element()),
+                Classifier::required(
+                    Classifier::lazy(|| Self::element()),
                     Order::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
                 ),
-                Pattern::optional(Pattern::sequence([
-                    Pattern::predicate(|token: &Token| {
+                Classifier::optional(Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
                         if let TokenKind::Identifier(identifier) = &token.kind {
                             identifier == "else"
                         } else {
@@ -347,7 +347,7 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Pattern::lazy(|| Self::element()),
+                    Classifier::lazy(|| Self::element()),
                 ])),
             ]),
             |_, form| {
@@ -380,11 +380,11 @@ impl Parser {
         )
     }
 
-    pub fn cycle() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::alternative([
-                Pattern::sequence([
-                    Pattern::predicate(|token: &Token| {
+    pub fn cycle() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::alternative([
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
                         if let TokenKind::Identifier(identifier) = &token.kind {
                             identifier == "loop"
                         } else {
@@ -392,15 +392,15 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Pattern::required(
-                        Pattern::lazy(|| Self::element()),
+                    Classifier::required(
+                        Classifier::lazy(|| Self::element()),
                         Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
                 ]),
-                Pattern::sequence([
-                    Pattern::predicate(|token: &Token| {
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
                         if let TokenKind::Identifier(identifier) = &token.kind {
                             identifier == "while"
                         } else {
@@ -408,14 +408,14 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Pattern::required(
-                        Pattern::lazy(|| Self::element()),
+                    Classifier::required(
+                        Classifier::lazy(|| Self::element()),
                         Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedCondition, form.span)
                         }),
                     ),
-                    Pattern::required(
-                        Pattern::lazy(|| Self::element()),
+                    Classifier::required(
+                        Classifier::lazy(|| Self::element()),
                         Order::failure(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
@@ -453,10 +453,10 @@ impl Parser {
         )
     }
 
-    pub fn variable() -> Pattern<Token, Element, ParseError> {
-        Pattern::transform(
-            Pattern::sequence([
-                Pattern::predicate(|token: &Token| {
+    pub fn variable() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "var"
                     } else {
@@ -464,7 +464,7 @@ impl Parser {
                     }
                 })
                     .with_ignore(),
-                Pattern::lazy(Self::element),
+                Classifier::lazy(Self::element),
             ]),
             move |_, _| {
                 Ok(Element::new(
@@ -475,22 +475,22 @@ impl Parser {
         )
     }
 
-    pub fn statement() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([Self::conditional(), Self::cycle(), Self::variable()])
+    pub fn statement() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Self::conditional(), Self::cycle(), Self::variable()])
     }
 
     // Top-Level Elements
 
-    pub fn element() -> Pattern<Token, Element, ParseError> {
-        Pattern::alternative([
+    pub fn element() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([
             Self::statement(),
             Self::expression(0)
         ])
     }
 
-    pub fn fallback() -> Pattern<Token, Element, ParseError> {
-        Pattern::order(
-            Pattern::predicate(|_token| true),
+    pub fn fallback() -> Classifier<Token, Element, ParseError> {
+        Classifier::order(
+            Classifier::predicate(|_token| true),
             Order::failure(
                 |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
@@ -503,9 +503,9 @@ impl Parser {
     }
 
     /// Main parser entry point
-    pub fn parser() -> Pattern<Token, Element, ParseError> {
-        Pattern::repeat(
-            Pattern::alternative([
+    pub fn parser() -> Classifier<Token, Element, ParseError> {
+        Classifier::repeat(
+            Classifier::alternative([
                 Self::element(),
                 Self::fallback()
             ]),

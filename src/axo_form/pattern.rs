@@ -1,395 +1,560 @@
 use {
     super::{
         order::Order,
-        form::Form,
-        former::Record,
-        helper::{
-            Evaluator,
-            Predicate,
-        },
+        form::{Form},
+        former::Draft,
     },
     crate::{
+        artifact::Artifact,
         hash::Hash,
         format::Debug,
-        artifact::Artifact,
         compiler::Context,
-        thread::{
-            Arc,
-        },
+        thread::{Arc, Mutex},
         axo_cursor::{
-            Spanned,
+            Spanned, Peekable, Span,
         },
+        compiler::Marked,
     },
 };
-use crate::axo_form::order::Pulse;
 
-#[derive(Clone)]
-pub enum PatternKind<Input, Output, Failure>
+// Create a combined trait for Source requirements
+pub trait Source<Input>: Peekable<Input> + Marked
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    Alternative {
-        patterns: Vec<Pattern<Input, Output, Failure>>,
-        order: Order<Input, Output, Failure>,
-        finish: Order<Input, Output, Failure>,
-    },
-
-    Predicate {
-        function: Predicate<Input>,
-        align: Order<Input, Output, Failure>,
-        miss: Order<Input, Output, Failure>,
-    },
-
-    Deferred {
-        function: Evaluator<Input, Output, Failure>,
-        order: Order<Input, Output, Failure>,
-    },
-
-    Reject {
-        pattern: Box<Pattern<Input, Output, Failure>>,
-        align: Order<Input, Output, Failure>,
-        miss: Order<Input, Output, Failure>,
-    },
-
-    Identical {
-        value: Arc<dyn PartialEq<Input>>,
-        align: Order<Input, Output, Failure>,
-        miss: Order<Input, Output, Failure>,
-    },
-
-    Repetition {
-        pattern: Box<Pattern<Input, Output, Failure>>,
-        minimum: usize,
-        maximum: Option<usize>,
-        order: Order<Input, Output, Failure>,
-        lack: Order<Input, Output, Failure>,
-        exceed: Order<Input, Output, Failure>,
-        finish: Order<Input, Output, Failure>,
-    },
-
-    Sequence {
-        patterns: Vec<Pattern<Input, Output, Failure>>,
-        order: Order<Input, Output, Failure>,
-        finish: Order<Input, Output, Failure>,
-    },
-
-    Wrapper {
-        pattern: Box<Pattern<Input, Output, Failure>>,
-        order: Order<Input, Output, Failure>,
-    },
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Pattern<Input, Output, Failure>
+// Blanket implementation for any type that satisfies both traits
+impl<T, Input> Source<Input> for T
+where
+    T: Peekable<Input> + Marked,
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+}
+
+// Solution 2: Use boxed trait object for source
+pub trait Pattern<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    pub kind: PatternKind<Input, Output, Failure>,
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>);
+}
+
+#[derive(Clone)]
+pub struct Identical<Input> {
+    pub value: Arc<dyn PartialEq<Input> + Send + Sync>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Identical<Input>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = source.get(draft.marker).cloned() {
+            if self.value.eq(&peek) {
+                source.next(&mut draft.marker, &mut draft.position);
+                draft.consumed.push(peek.clone());
+                draft.record.align();
+                draft.form = Form::input(peek);
+            } else {
+                draft.record.empty();
+            }
+        } else {
+            draft.record.empty();
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Reject<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Reject<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = source.get(draft.marker).cloned() {
+            let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+            inner_draft.build(source);
+
+            if !inner_draft.record.is_aligned() {
+                source.next(&mut draft.marker, &mut draft.position);
+                draft.consumed.push(peek.clone());
+                draft.record.align();
+                draft.form = Form::input(peek);
+            } else {
+                draft.record.empty();
+            }
+        } else {
+            draft.record.empty();
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Predicate<Input> {
+    pub function: Arc<dyn Fn(&Input) -> bool + Send + Sync>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Predicate<Input>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = source.get(draft.marker).cloned() {
+            let predicate = (self.function)(&peek);
+
+            if predicate {
+                source.next(&mut draft.marker, &mut draft.position);
+                draft.consumed.push(peek.clone());
+                draft.record.align();
+                draft.form = Form::input(peek);
+            } else {
+                draft.record.empty();
+            }
+        } else {
+            draft.record.empty();
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Alternative<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub patterns: Vec<Classifier<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut fallback = None;
+
+        for pattern in &self.patterns {
+            let mut inner_draft = Draft::new(draft.marker, draft.position, pattern.clone());
+            inner_draft.build(source);
+
+            match inner_draft.record {
+                super::former::Record::Aligned => {
+                    draft.marker = inner_draft.marker;
+                    draft.position = inner_draft.position;
+                    draft.consumed = inner_draft.consumed;
+                    draft.record.align();
+                    draft.form = inner_draft.form;
+                    return;
+                }
+                super::former::Record::Skipped => {
+                    draft.marker = inner_draft.marker;
+                    draft.position = inner_draft.position;
+                }
+                super::former::Record::Failed => {
+                    if fallback.is_none() {
+                        fallback = Some(inner_draft);
+                    }
+                }
+                super::former::Record::Blank => {
+                    continue;
+                }
+            }
+        }
+
+        if let Some(fallback) = fallback {
+            draft.marker = fallback.marker;
+            draft.position = fallback.position;
+            draft.consumed = fallback.consumed;
+            draft.record.fail();
+            draft.form = fallback.form;
+        } else {
+            draft.record.empty();
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Deferred<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub function: Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Deferred<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let resolved = (self.function)();
+        let mut inner_draft = Draft::new(draft.marker, draft.position, resolved);
+        inner_draft.build(source);
+
+        draft.marker = inner_draft.marker;
+        draft.position = inner_draft.position;
+        draft.consumed = inner_draft.consumed;
+        draft.record = inner_draft.record;
+        draft.form = inner_draft.form;
+    }
+}
+
+#[derive(Clone)]
+pub struct Optional<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Optional<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+        inner_draft.build(source);
+
+        if inner_draft.record.is_effected() {
+            draft.marker = inner_draft.marker;
+            draft.position = inner_draft.position;
+            draft.consumed = inner_draft.consumed;
+            draft.form = inner_draft.form;
+        }
+
+        draft.record.align();
+    }
+}
+
+#[derive(Clone)]
+pub struct Wrapper<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Wrapper<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut inner_draft = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
+        inner_draft.build(source);
+
+        draft.marker = inner_draft.marker;
+        draft.position = inner_draft.position;
+        draft.consumed = inner_draft.consumed;
+        draft.record = inner_draft.record;
+        draft.form = inner_draft.form;
+    }
+}
+
+#[derive(Clone)]
+pub struct Sequence<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub patterns: Vec<Classifier<Input, Output, Failure>>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Sequence<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut index = draft.marker;
+        let mut position = draft.position;
+        let mut consumed = Vec::new();
+        let mut forms = Vec::with_capacity(self.patterns.len());
+
+        for pattern in &self.patterns {
+            let mut child = Draft::new(index, position, pattern.clone());
+            child.build(source);
+
+            match child.record {
+                super::former::Record::Aligned => {
+                    draft.record.align();
+                    index = child.marker;
+                    position = child.position;
+                    consumed.extend(child.consumed);
+                    forms.push(child.form);
+                }
+                super::former::Record::Failed => {
+                    draft.record.fail();
+                    index = child.marker;
+                    position = child.position;
+                    consumed.extend(child.consumed);
+                    forms.push(child.form);
+                    break;
+                }
+                super::former::Record::Blank => {
+                    draft.record.empty();
+                    break;
+                }
+                super::former::Record::Skipped => {}
+            }
+        }
+
+        draft.marker = index;
+        draft.position = position;
+
+        if forms.is_empty() {
+            draft.consumed.clear();
+            draft.form = Form::blank(Span::point(draft.position));
+        } else {
+            draft.consumed = consumed;
+            draft.form = Form::multiple(forms);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Repetition<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+    pub minimum: usize,
+    pub maximum: Option<usize>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Repetition<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut index = draft.marker;
+        let mut position = draft.position;
+        let mut consumed = Vec::new();
+        let mut forms = Vec::new();
+
+        while source.peek_ahead(index).is_some() {
+            let mut child = Draft::new(index, position, self.pattern.as_ref().clone());
+            child.build(source);
+
+            if child.marker == index {
+                break;
+            }
+
+            match child.record {
+                super::former::Record::Aligned | super::former::Record::Failed => {
+                    index = child.marker;
+                    position = child.position;
+                    consumed.extend(child.consumed);
+                    forms.push(child.form);
+                }
+                super::former::Record::Skipped => {}
+                super::former::Record::Blank => {
+                    break;
+                }
+            }
+
+            if let Some(max) = self.maximum {
+                if forms.len() >= max {
+                    break;
+                }
+            }
+        }
+
+        if forms.len() >= self.minimum {
+            draft.marker = index;
+            draft.position = position;
+            draft.consumed = consumed;
+            draft.record.align();
+
+            if forms.is_empty() {
+                draft.form = Form::blank(Span::point(draft.position));
+            } else {
+                draft.form = Form::multiple(forms);
+            }
+        } else {
+            draft.record.empty();
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Classifier<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Arc<dyn Pattern<Input, Output, Failure>>,
     pub order: Option<Order<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure>
+impl<Input, Output, Failure> Classifier<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    #[inline]
-    pub fn literal(value: impl PartialEq<Input> + 'static) -> Self {
+    pub fn new(pattern: Arc<dyn Pattern<Input, Output, Failure>>) -> Self {
         Self {
-            kind: PatternKind::Identical {
-                value: Arc::new(value),
-                align: Order::multiple([
-                    Order::Pulse(Pulse::Feast),
-                    Order::Pulse(Pulse::Imitate),
-                    Order::Pulse(Pulse::Align)
-                ]),
-                miss: Order::Pulse(Pulse::Pardon),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn negate(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Reject {
-                pattern: pattern.into(),
-                align: Order::multiple([
-                    Order::Pulse(Pulse::Feast),
-                    Order::Pulse(Pulse::Imitate),
-                    Order::Pulse(Pulse::Align),
-                ]),
-                miss: Order::Pulse(Pulse::Pardon),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn predicate<F>(predicate: F) -> Self
-    where
-        F: Fn(&Input) -> bool + Send + Sync + 'static,
-    {
-        Self {
-            kind: PatternKind::Predicate {
-                function: Arc::new(predicate),
-                align: Order::multiple([
-                    Order::Pulse(Pulse::Feast),
-                    Order::Pulse(Pulse::Imitate),
-                    Order::Pulse(Pulse::Align),
-                ]),
-                miss: Order::Pulse(Pulse::Pardon),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn alternative(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Alternative {
-                patterns: patterns.into(),
-                order: Order::inspect(|draft| {
-                    match draft.record {
-                        Record::Aligned => Order::multiple([
-                            Order::Pulse(Pulse::Feast),
-                            Order::Pulse(Pulse::Imitate),
-                            Order::Pulse(Pulse::Align),
-                            Order::Pulse(Pulse::Terminate),
-                        ]),
-                        Record::Failed => Order::Pulse(Pulse::Inject),
-                        Record::Blank => Order::Pulse(Pulse::Proceed),
-                    }
-                }),
-                finish: Order::inspect(|draft| {
-                    if !draft.stack.is_empty() {
-                        Order::multiple([
-                            Order::Pulse(Pulse::Feast),
-                            Order::Pulse(Pulse::Imitate),
-                            Order::Pulse(Pulse::Fail),
-                        ])
-                    } else {
-                        Order::Pulse(Pulse::Pardon)
-                    }
-                })
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn lazy<F>(factory: F) -> Self
-    where
-        F: Fn() -> Pattern<Input, Output, Failure> + Send + Sync + 'static,
-    {
-        Self {
-            kind: PatternKind::Deferred {
-                function: Arc::new(factory),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn optional(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::multiple([
-                    Order::inspect(|draft| {
-                        match draft.record {
-                            Record::Aligned | Record::Failed => Order::Pulse(Pulse::Imitate),
-                            Record::Blank => Order::Yawn,
-                        }
-                    }),
-                    Order::Pulse(Pulse::Align)
-                ]),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn sequence(patterns: impl Into<Vec<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Sequence {
-                patterns: patterns.into(),
-                order: Order::inspect(|draft| {
-                    match draft.record {
-                        Record::Aligned => Order::multiple([
-                            Order::Pulse(Pulse::Feast),
-                            Order::Pulse(Pulse::Inject),
-                            Order::Pulse(Pulse::Align),
-                            Order::Pulse(Pulse::Proceed),
-                        ]),
-                        Record::Failed => Order::multiple([
-                            Order::Pulse(Pulse::Feast),
-                            Order::Pulse(Pulse::Inject),
-                            Order::Pulse(Pulse::Fail),
-                            Order::Pulse(Pulse::Terminate),
-                        ]),
-                        Record::Blank => Order::multiple([
-                            Order::Pulse(Pulse::Pardon),
-                            Order::Pulse(Pulse::Terminate),
-                        ]),
-                    }
-                }),
-                finish: Order::multiple([
-                    Order::Pulse(Pulse::Forge),
-                ]),
-            },
-            order: None,
-        }
-    }
-
-    #[inline]
-    pub fn repeat(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        minimum: usize,
-        maximum: Option<usize>,
-    ) -> Self {
-        Self {
-            kind: PatternKind::Repetition {
-                pattern: pattern.into(),
-                minimum,
-                maximum,
-                order: Order::inspect(|draft| {
-                    match draft.record {
-                        Record::Aligned | Record::Failed => Order::multiple([
-                            Order::Pulse(Pulse::Feast),
-                            Order::Pulse(Pulse::Inject),
-                        ]),
-                        Record::Blank => Order::Pulse(Pulse::Terminate),
-                    }
-                }),
-                lack: Order::Pulse(Pulse::Pardon),
-                exceed: Order::Pulse(Pulse::Terminate),
-                finish: Order::multiple([
-                    Order::Pulse(Pulse::Feast),
-                    Order::Pulse(Pulse::Forge),
-                    Order::Pulse(Pulse::Align),
-                ]),
-            },
+            pattern,
             order: None,
         }
     }
 
     #[inline]
     pub fn order(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        classifier: impl Into<Box<Classifier<Input, Output, Failure>>>,
         order: Order<Input, Output, Failure>,
     ) -> Self {
         Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
+            pattern: Arc::new(Wrapper {
+                pattern: classifier.into()
+            }),
             order: Some(order),
         }
     }
 
-    #[inline]
+    pub fn with_order(mut self, order: Order<Input, Output, Failure>) -> Self {
+        self.order = Some(order);
+        self
+    }
+
+    pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'static) -> Self {
+        Self::new(Arc::new(Identical {
+            value: Arc::new(value),
+        }))
+    }
+
+    pub fn alternative(patterns: impl Into<Vec<Self>>) -> Self {
+        Self::new(Arc::new(Alternative { patterns: patterns.into() }))
+    }
+
+    pub fn sequence(patterns: impl Into<Vec<Self>>) -> Self {
+        Self::new(Arc::new(Sequence { patterns: patterns.into() }))
+    }
+
+    pub fn optional(pattern: Self) -> Self {
+        Self::new(Arc::new(Optional {
+            pattern: Box::new(pattern),
+        }))
+    }
+
+    pub fn repeat(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
+        Self::new(Arc::new(Repetition {
+            pattern: Box::new(pattern),
+            minimum,
+            maximum,
+        }))
+    }
+
+    pub fn predicate<F>(predicate: F) -> Self
+    where
+        F: Fn(&Input) -> bool + Send + Sync + 'static,
+    {
+        Self::new(Arc::new(Predicate {
+            function: Arc::new(predicate),
+        }))
+    }
+
+    pub fn negate(pattern: Self) -> Self {
+        Self::new(Arc::new(Reject {
+            pattern: Box::new(pattern),
+        }))
+    }
+
+    pub fn wrapper(pattern: Self) -> Self {
+        Self::new(Arc::new(Wrapper {
+            pattern: Box::new(pattern),
+        }))
+    }
+
+    pub fn lazy<F>(factory: F) -> Self
+    where
+        F: Fn() -> Self + Send + Sync + 'static,
+    {
+        Self::new(Arc::new(Deferred {
+            function: Arc::new(factory),
+        }))
+    }
+
     pub fn anything() -> Self {
         Self::predicate(|_| true)
     }
 
-    #[inline]
     pub fn nothing() -> Self {
         Self::predicate(|_| false)
     }
 
-    #[inline]
-    pub fn capture(
-        identifier: Artifact,
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-    ) -> Self {
-        Self {
-            kind: pattern.into().kind,
-            order: Some(Order::Capture(identifier)),
-        }
+    pub fn capture(self, identifier: Artifact) -> Self {
+        self.with_order(Order::Capture(identifier))
     }
 
-    #[inline]
-    pub fn required(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        error_order: Order<Input, Output, Failure>,
-    ) -> Self {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: Some(Order::trigger(
-                Order::Yawn,
-                error_order,
-            )),
-        }
-    }
-
-    #[inline]
-    pub fn transform<T>(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        transform: T,
-    ) -> Self
+    pub fn transform<T>(self, transform: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
         + Send
         + Sync
         + 'static,
     {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: Some(Order::map(transform)),
-        }
+        self.with_order(Order::Convert(Arc::new(Mutex::new(transform))))
     }
 
-    #[inline]
-    pub fn ignore(pattern: impl Into<Box<Pattern<Input, Output, Failure>>>) -> Self {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: Some(Order::ignore()),
-        }
-    }
-
-    #[inline]
     pub fn conditional(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
+        self,
         found: Order<Input, Output, Failure>,
         missing: Order<Input, Output, Failure>,
     ) -> Self {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: Some(Order::trigger(found, missing)),
-        }
+        self.with_order(Order::Trigger {
+            found: Box::new(found),
+            missing: Box::new(missing),
+        })
     }
 
-    #[inline]
-    pub fn with_order(
-        pattern: impl Into<Box<Pattern<Input, Output, Failure>>>,
-        order: Order<Input, Output, Failure>,
-    ) -> Self {
-        Self {
-            kind: PatternKind::Wrapper {
-                pattern: pattern.into(),
-                order: Order::Pulse(Pulse::Imitate),
-            },
-            order: Some(order),
-        }
+    pub fn required(self, order: Order<Input, Output, Failure>) -> Self {
+        self.conditional(Order::perform(|| {}), order)
+    }
+
+    pub fn as_optional(&self) -> Self {
+        Self::optional(self.clone())
+    }
+
+    pub fn as_repeat(&self, min: usize, max: Option<usize>) -> Self {
+        Self::repeat(self.clone(), min, max)
     }
 
     #[inline]
@@ -400,18 +565,10 @@ where
 
     #[inline]
     pub fn with_ignore(mut self) -> Self {
-        self.order = Some(Order::ignore());
+        self.order = Some(Order::Ignore);
         self
     }
 
-    #[inline]
-    pub fn with_error<F>(mut self, function: F) -> Self 
-    where 
-        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static
-    {
-        self.order = Some(Order::failure(function));
-        self
-    }
 
     #[inline]
     pub fn with_conditional(
@@ -419,7 +576,10 @@ where
         found: Order<Input, Output, Failure>,
         missing: Order<Input, Output, Failure>,
     ) -> Self {
-        self.order = Some(Order::trigger(found, missing));
+        self.order = Some(Order::Trigger {
+            found: Box::new(found),
+            missing: Box::new(missing),
+        });
         self
     }
 
@@ -431,37 +591,7 @@ where
         + Sync
         + 'static,
     {
-        self.order = Some(Order::map(transform));
+        self.order = Some(Order::Convert(Arc::new(Mutex::new(transform))));
         self
-    }
-
-    #[inline]
-    pub fn with_perform<T>(mut self, executor: T) -> Self
-    where
-        T: FnMut() + Send + Sync + 'static,
-    {
-        self.order = Some(Order::perform(executor));
-        self
-    }
-
-    #[inline]
-    pub fn as_optional(&self) -> Self {
-        Self::optional(Box::new(self.clone()))
-    }
-
-    #[inline]
-    pub fn as_repeat(&self, min: usize, max: Option<usize>) -> Self {
-        Self::repeat(Box::new(self.clone()), min, max)
-    }
-
-    #[inline]
-    pub fn expect(self, error_message: &'static str) -> Self
-    where
-        Failure: From<&'static str>,
-    {
-        self.with_conditional(
-            Order::Pulse(Pulse::Ignore),
-            Order::failure(move |_ctx, _form| Failure::from(error_message))
-        )
     }
 }

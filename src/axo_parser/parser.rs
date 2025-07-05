@@ -7,7 +7,7 @@ use {
         hash::Hash,
         axo_cursor::{Peekable, Position, Span},
         axo_form::{
-            pattern::Pattern,
+            pattern::Classifier,
             form::FormKind,
             former::Former,
         },
@@ -101,9 +101,9 @@ impl Parser {
         }
     }
 
-    pub fn strainer() -> Pattern<Token, Element, ParseError> {
-        Pattern::repeat(
-            Pattern::predicate(|token: &Token| {
+    pub fn strainer() -> Classifier<Token, Element, ParseError> {
+        Classifier::repeat(
+            Classifier::predicate(|token: &Token| {
                 !matches!(token.kind, 
                     TokenKind::Punctuation(PunctuationKind::Newline)
                     | TokenKind::Punctuation(PunctuationKind::Tab)
