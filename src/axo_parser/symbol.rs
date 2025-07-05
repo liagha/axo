@@ -37,11 +37,11 @@ pub enum SymbolKind {
         value: Option<Box<Element>>,
         ty: Option<Box<Element>>,
     },
-    Formed {
+    Formation {
         identifier: Artifact,
         form: Form<Artifact, Artifact, Artifact>,
     },
-    Implement {
+    Implementation {
         element: Box<Element>,
         body: Box<Element>
     },

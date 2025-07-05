@@ -103,7 +103,7 @@ where
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::Formed {
+                    SymbolKind::Formation {
                         identifier: identifier.clone(),
                         form: artifact,
                     },

@@ -18,8 +18,8 @@ impl Display for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SymbolKind::Inclusion { target } => write!(f, "use {}", target),
-            SymbolKind::Formed { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
-            SymbolKind::Implement { element, body} => write!(f, "impl ({}) {}", element, body),
+            SymbolKind::Formation { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
+            SymbolKind::Implementation { element, body} => write!(f, "impl ({}) {}", element, body),
             SymbolKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
             SymbolKind::Variable { target, value, mutable, ty } => {
                 if *mutable {
@@ -70,8 +70,8 @@ impl Debug for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SymbolKind::Inclusion { target } => write!(f, "Inclusion({:?})", target),
-            SymbolKind::Formed { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
-            SymbolKind::Implement { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
+            SymbolKind::Formation { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
+            SymbolKind::Implementation { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
             SymbolKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
             SymbolKind::Variable { target, value, mutable, ty } => {
                 let kind = if *mutable { "Variable" } else { "Constant" };

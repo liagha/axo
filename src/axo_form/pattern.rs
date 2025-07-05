@@ -2,8 +2,7 @@ use {
     super::{
         order::Order,
         form::{Form},
-        former::Draft,
-        helper::Source,
+        former::{Draft, Composer},
     },
     crate::{
         artifact::Artifact,
@@ -23,7 +22,7 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>);
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>);
 }
 
 #[derive(Clone)]
@@ -37,11 +36,11 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        if let Some(peek) = source.get(draft.marker).cloned() {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = composer.source.get(draft.marker).cloned() {
             if self.value.eq(&peek) {
                 draft.align();
-                source.next(&mut draft.marker, &mut draft.position);
+                composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
@@ -69,14 +68,14 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        if let Some(peek) = source.get(draft.marker).cloned() {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = composer.source.get(draft.marker).cloned() {
             let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-            child.build(source);
+            composer.build(&mut child);
 
             if !child.is_aligned() {
                 draft.align();
-                source.next(&mut draft.marker, &mut draft.position);
+                composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
@@ -99,13 +98,13 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
-        if let Some(peek) = source.get(draft.marker).cloned() {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
+        if let Some(peek) = composer.source.get(draft.marker).cloned() {
             let predicate = (self.function)(&peek);
 
             if predicate {
                 draft.align();
-                source.next(&mut draft.marker, &mut draft.position);
+                composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
@@ -133,13 +132,13 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut best_child: Option<Draft<Input, Output, Failure>> = None;
         let mut best_score = i8::MIN;
 
         for pattern in &self.patterns {
             let mut child = Draft::new(draft.marker, draft.position, pattern.clone());
-            child.build(source);
+            composer.build(&mut child);
 
             if child.record > best_score {
                 best_score = child.record;
@@ -179,10 +178,10 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let resolved = (self.function)();
         let mut child = Draft::new(draft.marker, draft.position, resolved);
-        child.build(source);
+        composer.build(&mut child);
 
         draft.marker = child.marker;
         draft.position = child.position;
@@ -208,9 +207,9 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-        child.build(source);
+        composer.build(&mut child);
 
         if child.is_effected() {
             draft.marker = child.marker;
@@ -239,9 +238,9 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-        child.build(source);
+        composer.build(&mut child);
 
         draft.marker = child.marker;
         draft.position = child.position;
@@ -268,9 +267,9 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
-        child.build(source);
+        composer.build(&mut child);
 
         draft.marker = child.marker;
         draft.position = child.position;
@@ -303,7 +302,7 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
         let mut position = draft.position;
         let mut consumed = Vec::new();
@@ -311,7 +310,7 @@ where
 
         for pattern in &self.patterns {
             let mut child = Draft::new(index, position, pattern.clone());
-            child.build(source);
+            composer.build(&mut child);
 
             match child.record {
                 1 => {
@@ -367,15 +366,15 @@ where
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
-    fn build(&self, source: &mut dyn Source<Input>, draft: &mut Draft<Input, Output, Failure>) {
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
         let mut position = draft.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
 
-        while source.peek_ahead(index).is_some() {
+        while composer.source.peek_ahead(index).is_some() {
             let mut child = Draft::new(index, position, self.pattern.as_ref().clone());
-            child.build(source);
+            composer.build(&mut child);
 
             if child.marker == index {
                 break;

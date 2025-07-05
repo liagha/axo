@@ -249,10 +249,10 @@ impl PartialEq for SymbolKind {
         match (self, other) {
             (SymbolKind::Inclusion { target: t1 }, SymbolKind::Inclusion { target: t2 }) => t1 == t2,
             (
-                SymbolKind::Implement { element: e1, body: b1 },
-                SymbolKind::Implement { element: e2, body: b2 },
+                SymbolKind::Implementation { element: e1, body: b1 },
+                SymbolKind::Implementation { element: e2, body: b2 },
             ) => e1 == e2 && b1 == b2,
-            (SymbolKind::Formed { identifier: i1, .. }, SymbolKind::Formed { identifier: i2, .. }) => {
+            (SymbolKind::Formation { identifier: i1, .. }, SymbolKind::Formation { identifier: i2, .. }) => {
                 i1 == i2
             },
             (
@@ -325,11 +325,11 @@ impl Hash for SymbolKind {
                 discriminant(self).hash(state);
                 target.hash(state);
             }
-            SymbolKind::Formed { identifier, .. } => {
+            SymbolKind::Formation { identifier, .. } => {
                 discriminant(self).hash(state);
                 identifier.hash(state);
             }
-            SymbolKind::Implement { element, body } => {
+            SymbolKind::Implementation { element, body } => {
                 discriminant(self).hash(state);
                 element.hash(state);
                 body.hash(state);
@@ -377,11 +377,11 @@ impl Clone for SymbolKind {
     fn clone(&self) -> Self {
         match self {
             SymbolKind::Inclusion { target } => SymbolKind::Inclusion { target: target.clone() },
-            SymbolKind::Formed { identifier, form } => SymbolKind::Formed {
+            SymbolKind::Formation { identifier, form } => SymbolKind::Formation {
                 identifier: identifier.clone(),
                 form: form.clone(),
             },
-            SymbolKind::Implement { element, body } => SymbolKind::Implement {
+            SymbolKind::Implementation { element, body } => SymbolKind::Implementation {
                 element: element.clone(),
                 body: body.clone(),
             },

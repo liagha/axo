@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use {
     super::{
         helper::Source,
@@ -14,6 +15,41 @@ use {
         hash::Hash,
     },
 };
+
+pub struct Composer<'c, Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub source: &'c mut dyn Source<Input>,
+    pub _phantom: PhantomData<(Input, Output, Failure)>,
+}
+
+impl <'c, Input, Output, Failure> Composer<'c, Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub fn new(source: &'c mut (dyn Source<Input> + 'c)) -> Composer<'c, Input, Output, Failure> {
+        Self {
+            source,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn build(&mut self, draft: &mut Draft<Input, Output, Failure>) {
+        let pattern = draft.classifier.pattern.clone();
+        let order = draft.classifier.order.clone();
+
+        pattern.build(self, draft);
+
+        if let Some(order) = order {
+            order.execute(self.source, draft);
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Draft<Input, Output, Failure>
@@ -85,17 +121,6 @@ where
     pub fn empty(&mut self) {
         self.record = -1;
     }
-
-    pub fn build(&mut self, source: &mut dyn Source<Input>) {
-        let pattern = self.classifier.pattern.clone();
-        let order = self.classifier.order.clone();
-
-        pattern.build(source, self);
-
-        if let Some(order) = order {
-            order.execute(source, self);
-        }
-    }
 }
 
 pub trait Former<Input, Output, Failure>: Peekable<Input> + Marked
@@ -120,14 +145,20 @@ where
         let mut index = 0;
         let mut position = self.position();
 
-        while self.get(index).is_some() {
+        loop {
+            let mut composer = Composer::new(self);
+
+            // Check if we have more items to process
+            if composer.source.get(index).is_none() {
+                break;
+            }
+
             let mut draft = Draft::new(index, position, pattern.clone());
-            draft.build(self);
+            composer.build(&mut draft);
 
             if draft.is_aligned() {
                 index = draft.marker + 1;
                 position = draft.position;
-
                 inputs.extend(draft.consumed);
             } else {
                 index = draft.marker + 1;
@@ -140,8 +171,9 @@ where
 
     fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), pattern);
+        let mut composer = Composer::new(self);
 
-        draft.build(self);
+        composer.build(&mut draft);
 
         if draft.is_effected() {
             self.set_index(draft.marker);
