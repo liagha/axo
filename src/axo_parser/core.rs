@@ -164,29 +164,29 @@ impl Parser {
                         );
                     } else if let Some(element) = postfix.unwrap_output() {
                         match element.kind {
-                            ElementKind::Group(_) => {
+                            ElementKind::Group(elements) => {
                                 unary = Element::new(
                                     ElementKind::Invoke {
                                         target: unary.into(),
-                                        parameters: element.into(),
+                                        arguments: elements,
                                     },
                                     span,
                                 )
                             }
-                            ElementKind::Collection(_) => {
+                            ElementKind::Collection(elements) => {
                                 unary = Element::new(
                                     ElementKind::Index {
                                         element: unary.into(),
-                                        index: element.into(),
+                                        indexes: elements,
                                     },
                                     span,
                                 )
                             }
-                            ElementKind::Bundle(_) => {
+                            ElementKind::Bundle(elements) => {
                                 unary = Element::new(
                                     ElementKind::Constructor {
                                         name: unary.into(),
-                                        body: element.into(),
+                                        fields: elements,
                                     },
                                     span,
                                 )

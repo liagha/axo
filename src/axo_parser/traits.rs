@@ -58,7 +58,7 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 elements.hash(state);
             }
-            ElementKind::Constructor { name, body } => {
+            ElementKind::Constructor { name, fields: body } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
@@ -83,12 +83,12 @@ impl Hash for ElementKind {
                 label.hash(state);
                 element.hash(state);
             }
-            ElementKind::Index { element, index } => {
+            ElementKind::Index { element, indexes } => {
                 discriminant(self).hash(state);
                 element.hash(state);
-                index.hash(state);
+                indexes.hash(state);
             }
-            ElementKind::Invoke { target, parameters } => {
+            ElementKind::Invoke { target, arguments: parameters } => {
                 discriminant(self).hash(state);
                 target.hash(state);
                 parameters.hash(state);
@@ -175,8 +175,8 @@ impl PartialEq for ElementKind {
             (ElementKind::Group(a), ElementKind::Group(b)) => a == b,
             (ElementKind::Collection(a), ElementKind::Collection(b)) => a == b,
             (ElementKind::Bundle(a), ElementKind::Bundle(b)) => a == b,
-            (ElementKind::Constructor { name: a_name, body: a_body },
-                ElementKind::Constructor { name: b_name, body: b_body }) => a_name == b_name && a_body == b_body,
+            (ElementKind::Constructor { name: a_name, fields: a_body },
+                ElementKind::Constructor { name: b_name, fields: b_body }) => a_name == b_name && a_body == b_body,
 
             // Operations
             (ElementKind::Binary { left: a_left, operator: a_op, right: a_right },
@@ -191,10 +191,10 @@ impl PartialEq for ElementKind {
             // Access Expressions
             (ElementKind::Labeled { label: a_label, element: a_expr },
                 ElementKind::Labeled { label: b_label, element: b_expr }) => a_label == b_label && a_expr == b_expr,
-            (ElementKind::Index { element: a_expr, index: a_index },
-                ElementKind::Index { element: b_expr, index: b_index }) => a_expr == b_expr && a_index == b_index,
-            (ElementKind::Invoke { target: a_target, parameters: a_params },
-                ElementKind::Invoke { target: b_target, parameters: b_params }) => {
+            (ElementKind::Index { element: a_expr, indexes: a_index },
+                ElementKind::Index { element: b_expr, indexes: b_index }) => a_expr == b_expr && a_index == b_index,
+            (ElementKind::Invoke { target: a_target, arguments: a_params },
+                ElementKind::Invoke { target: b_target, arguments: b_params }) => {
                 a_target == b_target && a_params == b_params
             },
             (ElementKind::Path { tree: a_tree }, ElementKind::Path { tree: b_tree }) => a_tree == b_tree,

@@ -145,7 +145,7 @@ pub enum ElementKind {
         /// The collection or object being indexed
         element: Box<Element>,
         /// The index expression
-        index: Box<Element>,
+        indexes: Vec<Element>,
     },
 
     /// Function or method invocation: `target(parameters...)`
@@ -155,7 +155,7 @@ pub enum ElementKind {
         /// The function or method being called
         target: Box<Element>,
         /// The list of arguments passed to the function
-        parameters: Box<Element>,
+        arguments: Vec<Element>,
     },
 
     /// Constructor call for creating instances: `Type { fields... }`
@@ -165,7 +165,7 @@ pub enum ElementKind {
         /// The type or constructor name
         name: Box<Element>,
         /// The constructor body (typically field initializations)
-        body: Box<Element>,
+        fields: Vec<Element>,
     },
 
     /// Namespace or module path: `module::submodule::item`

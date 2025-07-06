@@ -104,10 +104,10 @@ impl Debug for ElementKind {
             ElementKind::Labeled { label: element, element: ty } => {
                 write!(f, "Labeled({:?}: {:?})", element, ty)
             },
-            ElementKind::Index { element, index } => {
-                write!(f, "Index({:?}[{:?}])", element, index)
+            ElementKind::Index { element, indexes } => {
+                write!(f, "Index({:?}[{:?}])", element, indexes)
             },
-            ElementKind::Invoke { target, parameters } => {
+            ElementKind::Invoke { target, arguments: parameters } => {
                 write!(f, "Invoke({:?}({:?}))", target, parameters)
             },
             ElementKind::Member { object, member} => {
@@ -143,7 +143,7 @@ impl Debug for ElementKind {
             ElementKind::Assignment { target, value } => {
                 write!(f, "Assignment({:?} = {:?})", target, value)
             },
-            ElementKind::Constructor { name, body } => {
+            ElementKind::Constructor { name, fields: body } => {
                 write!(f, "Constructor({:?} | {:?})", name, body)
             },
 

@@ -1,0 +1,6 @@
+struct Test {
+    a: 3,
+    b: 4
+}
+
+Test { a: 3 }

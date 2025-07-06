@@ -1,17 +1,17 @@
 use {
+    super::{
+        error::ErrorKind,
+        brand::Branded,
+        assessor::symbol_matcher,
+        scope::Scope,
+        ResolveError,
+    },
     crate::{
         axo_cursor::Span,
         axo_error::{Action, Hint},
         axo_parser::{Element, ElementKind, Symbol},
-        axo_resolver::{
-            error::ErrorKind,
-            matcher::{symbol_matcher, Labeled},
-            scope::Scope,
-            ResolveError,
-        },
         memory::replace,
     },
-    matchete::MatchType,
 };
 
 #[derive(Clone, Debug)]
@@ -51,10 +51,10 @@ impl Resolver {
             }
         };
 
-        let matcher = symbol_matcher();
+        let assessor = symbol_matcher();
         let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
 
-        let suggestion = matcher.find_best_match(target, &*candidates);
+        let suggestion = assessor.champion(target, &*candidates);
 
         if let Some(suggestion) = suggestion {
             let found = suggestion
@@ -63,21 +63,21 @@ impl Resolver {
                 .map(|name| name.to_string())
                 .unwrap_or(suggestion.candidate.to_string());
 
-            self.validate(target, &suggestion.candidate);
+            println!("{:?}", suggestion);
 
-            if suggestion.match_type == MatchType::Exact || suggestion.score >= 0.99 {
+            if suggestion.resemblance >= 0.9 {
                 return Some(suggestion.candidate);
             }
 
-            if suggestion.score > 0.4 {
+            if suggestion.resemblance > 0.4 {
                 let err = ResolveError {
                     kind: ErrorKind::UndefinedSymbol(target_name.clone()),
                     span: target_name.span,
                     note: None,
                     hints: vec![Hint {
                         message: format!(
-                            "replace with `{}` | similarity: ({:?} | {:.2})",
-                            found, suggestion.match_type, suggestion.score
+                            "replace with `{}` | similarity: ({:.2})",
+                            found, suggestion.resemblance
                         ),
                         action: vec![Action::Replace(found, target.span.clone())],
                     }],
