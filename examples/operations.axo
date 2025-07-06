@@ -1,0 +1,148 @@
+// Basic Precedence Tests
+
+a.b.c
+x::y::z
+obj.method().field
+namespace::class::member
+
+a : b : c
+type : annotation
+key : value
+
+a ** b ** c
+x ^^ y ^^ z
+base ** exponent
+
+a * b / c % d
+x // y %% z
+factor * divisor / quotient % remainder
+
+a + b - c + d
+x - y + z - w
+sum + difference - total
+
+a..b
+x..=y
+start...end
+1..10
+0..=100
+
+a < b > c
+x <= y >= z
+left < right
+min <= value >= max
+
+a == b != c
+x == y
+result != expected
+
+a & b ^ c | d
+x && y
+mask & value ^ toggle | flags
+
+a || b
+x in y
+result = value
+a := b
+x += y
+z *= w
+flag &&= condition
+result ||= default
+value ?= fallback
+
+a + b * c - d / e
+x ** y + z * w
+base ** power + factor * multiplier - divisor / quotient
+
+a < b + c * d
+x <= y ** z
+min < value + offset * scale
+
+a & b | c && d || e
+mask & value | flags && condition || default
+x ^ y & z | w && p || q
+
+result = a + b * c
+total := x ** y + z
+counter += value * multiplier
+flags |= mask & filter
+condition &&= test == expected
+
+start + 1..end - 1
+base * factor..limit / divisor
+min + offset..=max - buffer
+
+a - b - c    // ((a - b) - c)
+x / y / z    // ((x / y) / z)
+a < b < c    // ((a < b) < c)
+
+a ** b ** c  // (a ** (b ** c))
+x ^^ y ^^ z  // (x ^^ (y ^^ z))
+a = b = c    // (a = (b = c))
+
+a + b * c ** d - e / f % g
+result = base ** power + factor * multiplier - divisor / quotient % remainder
+
+obj.method(arg1, arg2).field + other.value * multiplier
+instance::class::method().result >= threshold
+
+start..end contains value && flag
+min + offset..=max - buffer includes target
+
+counter += step * multiplier
+flags |= mask & ~clear_bits
+result &&= condition == expected_value
+total *= factor ** exponent
+range ..= limit - buffer
+
+a
++b
+-c
+!d
+
+(a + b) * c
+a * (b + c)
+(x ** y) + z
+x ** (y + z)
+
+a == b == c
+x != y != z
+min <= value <= max
+
+a = b := c += d
+x ||= y &&= z
+result ?= default = fallback
+
+area = length * width
+circumference = 2 * pi * radius
+discriminant = b ** 2 - 4 * a * c
+distance = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+
+is_valid = age >= 18 && has_license && !suspended
+can_access = user.role == "admin" || user.permissions.contains("read")
+in_range = min <= value && value <= max
+
+masked = value & 0xFF
+flags = FLAG_A | FLAG_B & ~FLAG_C
+
+indices = 0..array.length
+slice = data[start..end]
+subset = collection.filter(item => item.value > threshold)
+
+x = y = z = 0
+result := temp += increment
+flags |= new_flag & mask
+condition &&= test_function(param)
+
+((((a + b) * c) - d) / e) ** f
+result = base ** (power + (factor * (multiplier - (divisor / quotient))))
+
+a.b::c ** d * e / f % g + h - i..j <= k >= l == m != n & o ^ p | q && r || s = t := u += v
+
+a + b * c - d / e + f * g - h / i
+x ** y + z ** w - p * q + r / s
+
+result = a + b * c >= d && e || f
+total := (base ** power + offset) * multiplier - adjustment
+flags |= (mask & filter) ^ toggle_bits
+condition &&= (test == expected) || (fallback != null)

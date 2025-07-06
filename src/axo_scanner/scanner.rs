@@ -279,14 +279,18 @@ impl Scanner {
     fn decimal_number() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.is_numeric()),
-                Classifier::repeat(
-                    Classifier::alternative([
+                Classifier::optional(
+                    Classifier::sequence([
                         Classifier::predicate(|c: &Character| c.is_numeric()),
-                        Classifier::literal('_').with_ignore(),
-                    ]),
-                    0,
-                    None,
+                        Classifier::repeat(
+                            Classifier::alternative([
+                                Classifier::predicate(|c: &Character| c.is_numeric()),
+                                Classifier::literal('_').with_ignore(),
+                            ]),
+                            0,
+                            None,
+                        ),
+                    ])
                 ),
                 Classifier::optional(Classifier::sequence([
                     Classifier::literal('.'),
@@ -295,7 +299,7 @@ impl Scanner {
                             Classifier::predicate(|c: &Character| c.is_numeric()),
                             Classifier::literal('_').with_ignore(),
                         ]),
-                        0,
+                        1,
                         None,
                     ),
                 ])),

@@ -112,12 +112,14 @@ impl Parser {
                 let mut unary = operand.clone();
 
                 for prefix in prefixes {
+                    let span = Span::mix(&prefix.span, &unary.span);
+
                     unary = Element::new(
                         ElementKind::Unary {
                             operand: unary.into(),
                             operator: prefix,
                         },
-                        Span::default(),
+                        span,
                     );
                 }
 
@@ -150,13 +152,15 @@ impl Parser {
                 let mut unary = operand.clone();
 
                 for postfix in postfixes {
+                    let span = Span::mix(&unary.span, &postfix.span);
+
                     if let Some(token) = postfix.unwrap_input() {
                         unary = Element::new(
                             ElementKind::Unary {
                                 operand: unary.into(),
                                 operator: token,
                             },
-                            Span::default(),
+                            span,
                         );
                     } else if let Some(element) = postfix.unwrap_output() {
                         match element.kind {
@@ -166,7 +170,7 @@ impl Parser {
                                         target: unary.into(),
                                         parameters: element.into(),
                                     },
-                                    Span::default(),
+                                    span,
                                 )
                             }
                             ElementKind::Collection(_) => {
@@ -175,7 +179,7 @@ impl Parser {
                                         element: unary.into(),
                                         index: element.into(),
                                     },
-                                    Span::default(),
+                                    span,
                                 )
                             }
                             ElementKind::Bundle(_) => {
@@ -184,7 +188,7 @@ impl Parser {
                                         name: unary.into(),
                                         body: element.into(),
                                     },
-                                    Span::default(),
+                                    span,
                                 )
                             }
                             _ => {}
@@ -208,7 +212,7 @@ impl Parser {
 
     // Binary Operations
 
-    pub fn binary(minimum: u8) -> Classifier<Token, Element, ParseError> {
+    pub fn binary() -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::alternative([
@@ -219,8 +223,8 @@ impl Parser {
                     Classifier::sequence([
                         Classifier::predicate(move |token: &Token| {
                             if let TokenKind::Operator(operator) = &token.kind {
-                                if let Some(precedence) = operator.precedence() {
-                                    precedence >= minimum
+                                if let Some(_) = operator.precedence() {
+                                    true
                                 } else {
                                     false
                                 }
@@ -257,7 +261,7 @@ impl Parser {
                     }
                 }
 
-                left = Self::climb(left, pairs, minimum);
+                left = Self::climb(left, pairs, 0);
                 Ok(left)
             },
         )
@@ -314,8 +318,8 @@ impl Parser {
 
     // Expressions
 
-    pub fn expression(minimum: u8) -> Classifier<Token, Element, ParseError> {
-        Classifier::alternative([Self::binary(minimum), Self::unary(), Self::primary()])
+    pub fn expression() -> Classifier<Token, Element, ParseError> {
+        Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
     }
 
     // Statements
@@ -541,7 +545,7 @@ impl Parser {
     pub fn element() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
             Self::statement(),
-            Self::expression(0)
+            Self::expression()
         ])
     }
 

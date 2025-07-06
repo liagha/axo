@@ -132,7 +132,6 @@ impl Resolver {
                 
                 None
             } else {
-                dbg!();
                 self.error(
                     ErrorKind::UndefinedSymbol(target_name.clone(), None),
                     target_name.span,

@@ -144,11 +144,9 @@ where
         let mut inputs = Vec::with_capacity(self.len());
         let mut index = 0;
         let mut position = self.position();
+        let mut composer = Composer::new(self);
 
         loop {
-            let mut composer = Composer::new(self);
-
-            // Check if we have more items to process
             if composer.source.get(index).is_none() {
                 break;
             }
