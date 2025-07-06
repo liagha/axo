@@ -336,7 +336,7 @@ impl Element {
                 }
                 // Variable declaration: target := value
                 [OperatorKind::Colon, OperatorKind::Equal] => {
-                    let symbol = SymbolKind::Variable {
+                    let symbol = SymbolKind::Binding {
                         target: left.clone(),
                         value: Some(right.clone()),
                         ty: None,

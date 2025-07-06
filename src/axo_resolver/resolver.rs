@@ -1,31 +1,17 @@
 use {
-    matchete::MatchType,
-
     crate::{
-        memory::replace,
-
-        axo_error::{
-            Action, Hint
-        },
-
-        axo_scanner::{
-            Token, TokenKind,
-        },
-
-        axo_parser::{
-            Element, ElementKind,
-            Symbol
-        },
-
+        axo_cursor::Span,
+        axo_error::{Action, Hint},
+        axo_parser::{Element, ElementKind, Symbol},
         axo_resolver::{
-            ResolveError,
             error::ErrorKind,
             matcher::{symbol_matcher, Labeled},
             scope::Scope,
+            ResolveError,
         },
-
-        axo_cursor::Span,
+        memory::replace,
     },
+    matchete::MatchType,
 };
 
 #[derive(Clone, Debug)]
@@ -61,15 +47,7 @@ impl Resolver {
         let target_name = match target.name() {
             Some(name) => name,
             None => {
-                self.error(
-                    ErrorKind::UndefinedSymbol(
-                        Token::new(TokenKind::Identifier("unnamed".to_string()), target.span.clone()),
-                        None
-                    ),
-                    target.span.clone(),
-                );
-                
-                return None
+                unreachable!()
             }
         };
 
@@ -78,33 +56,12 @@ impl Resolver {
 
         let suggestion = matcher.find_best_match(target, &*candidates);
 
-        /*{
-            for candidate in candidates.clone() {
-                println!(
-                    "Looked Up `{:?}`:",
-                    target,
-                );
-
-                println!(
-                    "\t`{:?}` | Score: {:?}",
-                    candidate,
-                    matcher.analyze(target, &candidate).score
-                );
-
-                println!();
-            }
-
-            if let Some(suggestion) = suggestion.clone() {
-                println!("Best Match: `{:?}` | Score: {}", suggestion.candidate, suggestion.score);
-
-                println!();
-            }
-        }*/
-
         if let Some(suggestion) = suggestion {
-            let found = suggestion.candidate.name().map(|name| name.to_string()).unwrap_or(suggestion.candidate.to_string());
-
-
+            let found = suggestion
+                .candidate
+                .name()
+                .map(|name| name.to_string())
+                .unwrap_or(suggestion.candidate.to_string());
 
             self.validate(target, &suggestion.candidate);
 
@@ -114,37 +71,35 @@ impl Resolver {
 
             if suggestion.score > 0.4 {
                 let err = ResolveError {
-                    kind: ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                    kind: ErrorKind::UndefinedSymbol(target_name.clone()),
                     span: target_name.span,
                     note: None,
-                    hints: vec![
-                        Hint {
-                            message: format!("replace with `{}` | similarity: ({:?} | {:.2})",
-                                             found, suggestion.match_type, suggestion.score),
-                            action: vec![
-                                Action::Replace(found, target.span.clone()),
-                            ],
-                        }
-                    ],
+                    hints: vec![Hint {
+                        message: format!(
+                            "replace with `{}` | similarity: ({:?} | {:.2})",
+                            found, suggestion.match_type, suggestion.score
+                        ),
+                        action: vec![Action::Replace(found, target.span.clone())],
+                    }],
                 };
 
                 self.errors.push(err);
-                
+
                 None
             } else {
                 self.error(
-                    ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                    ErrorKind::UndefinedSymbol(target_name.clone()),
                     target_name.span,
                 );
-                
+
                 None
             }
         } else {
             self.error(
-                ErrorKind::UndefinedSymbol(target_name.clone(), None),
+                ErrorKind::UndefinedSymbol(target_name.clone()),
                 target_name.span,
             );
-            
+
             None
         }
     }
@@ -171,53 +126,59 @@ impl Resolver {
 
         match kind {
             ElementKind::Symbolization(symbol) => {
-                let symbol = Symbol {
-                    kind: symbol,
-                    span
-                };
+                let symbol = Symbol { kind: symbol, span };
 
                 self.insert(symbol.clone());
-            },
+            }
 
             ElementKind::Assignment { target, .. } => {
                 self.lookup(&target);
-            },
+            }
 
             ElementKind::Scope(body) => {
                 self.push_scope();
                 self.resolve(body);
                 self.pop_scope();
-            },
+            }
 
             ElementKind::Identifier(_) => {
                 self.lookup(&element);
-            },
+            }
 
-            ElementKind::Constructor { .. } | ElementKind::Invoke { .. } | ElementKind::Index { .. } => {
+            ElementKind::Constructor { .. }
+            | ElementKind::Invoke { .. }
+            | ElementKind::Index { .. } => {
                 self.lookup(&element);
-            },
+            }
 
-            ElementKind::Group(elements) | ElementKind::Collection(elements) | ElementKind::Bundle(elements) => {
+            ElementKind::Group(elements)
+            | ElementKind::Collection(elements)
+            | ElementKind::Bundle(elements) => {
                 for element in elements {
                     self.resolve_element(element.into());
                 }
-            },
+            }
 
             ElementKind::Binary { left, right, .. } => {
                 self.resolve_element(left);
                 self.resolve_element(right);
-            },
+            }
 
-            ElementKind::Unary { operand, .. } => {
-                self.resolve_element(operand)
-            },
+            ElementKind::Unary { operand, .. } => self.resolve_element(operand),
 
-            ElementKind::Labeled { label, element: value } => {
+            ElementKind::Labeled {
+                label,
+                element: value,
+            } => {
                 self.resolve_element(label);
                 self.resolve_element(value);
-            },
+            }
 
-            ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
+            ElementKind::Conditional {
+                condition,
+                then: then_branch,
+                alternate: else_branch,
+            } => {
                 self.resolve_element(condition);
 
                 self.push_scope();
@@ -229,15 +190,18 @@ impl Resolver {
                     self.resolve_element(else_branch);
                     self.pop_scope();
                 }
-            },
+            }
 
-            ElementKind::Match { target: clause, body } => {
+            ElementKind::Match {
+                target: clause,
+                body,
+            } => {
                 self.resolve_element(clause);
 
                 self.push_scope();
                 self.resolve_element(body);
                 self.pop_scope();
-            },
+            }
 
             ElementKind::Cycle { condition, body } => {
                 if let Some(condition) = condition {
@@ -247,7 +211,7 @@ impl Resolver {
                 self.push_scope();
                 self.resolve_element(body);
                 self.pop_scope();
-            },
+            }
 
             ElementKind::Iterate { clause, body } => {
                 self.resolve_element(clause);
@@ -255,16 +219,15 @@ impl Resolver {
                 self.push_scope();
                 self.resolve_element(body);
                 self.pop_scope();
-            },
+            }
 
             ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Skip(value) => {
                 if let Some(value) = value {
                     self.resolve_element(value);
                 }
-            },
-
-            _ => {
             }
+
+            _ => {}
         }
     }
 }

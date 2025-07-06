@@ -14,66 +14,14 @@ use {
     },
 };
 
-impl Display for SymbolKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            SymbolKind::Inclusion { target } => write!(f, "use {}", target),
-            SymbolKind::Formation { identifier, form } => write!(f, "formed({:?}, {})", identifier, form),
-            SymbolKind::Implementation { element, body} => write!(f, "impl ({}) {}", element, body),
-            SymbolKind::Trait{ name, body } => write!(f, "trait ({}) {}", name, body),
-            SymbolKind::Variable { target, value, mutable, ty } => {
-                if *mutable {
-                    write!(f, "var {}", target)?;
-                } else { 
-                    write!(f, "const {}", target)?;
-                }
-
-                if let Some(ty) = ty {
-                    write!(f, " : {}", ty)?;
-                }
-
-                if let Some(value) = value {
-                    write!(f, " = {}", value)?;
-                }
-
-                Ok(())
-            },
-            SymbolKind::Structure { name, fields} => {
-                let fields = fields.iter().map(|field| field.to_string()).collect::<Vec<_>>().join(", ");
-
-                write!(f, "struct ({}) {}", name, fields)
-            },
-            SymbolKind::Enumeration { name, body} => write!(f, "enum ({}) {}", name, body),
-            SymbolKind::Function { name, parameters, body} => {
-                let params = parameters.iter().map(|param| param.to_string()).collect::<Vec<_>>().join(", ");
-
-                write!(f, "fn {}({}) {}", name, params, body)
-            },
-            SymbolKind::Field { name, value, ty } => {
-                write!(f, "{}", name)?;
-
-                if let Some(ty) = ty {
-                    write!(f, " : {}", ty)?;
-                }
-
-                if let Some(value) = value {
-                    write!(f, " = {}", value)
-                } else {
-                    write!(f, "")
-                }
-            },
-        }
-    }
-}
-
 impl Debug for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SymbolKind::Inclusion { target } => write!(f, "Inclusion({:?})", target),
             SymbolKind::Formation { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
             SymbolKind::Implementation { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
-            SymbolKind::Trait { name, body} => write!(f, "Trait({:?} {:?})", name, body),
-            SymbolKind::Variable { target, value, mutable, ty } => {
+            SymbolKind::Interface { name, body} => write!(f, "Trait({:?} {:?})", name, body),
+            SymbolKind::Binding { target, value, mutable, ty } => {
                 let kind = if *mutable { "Variable" } else { "Constant" };
                 write!(f, "{}({:?}", kind, target)?;
 
@@ -88,21 +36,8 @@ impl Debug for SymbolKind {
                 write!(f, ")")
             },
             SymbolKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
-            SymbolKind::Enumeration { name, body } => write!(f, "Enum({:?} | {:?})", name, body),
+            SymbolKind::Enumeration { name, variants } => write!(f, "Enumeration({:?} | {:?})", name, variants),
             SymbolKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
-            SymbolKind::Field { name, value, ty } => {
-                write!(f, "Field({:?}", name)?;
-
-                if let Some(ty) = ty {
-                    write!(f, " : {:?}", ty)?;
-                }
-
-                if let Some(value) = value {
-                    write!(f, " = {:?}", value)?;
-                }
-
-                write!(f, ")")
-            },
         }
     }
 }
@@ -115,131 +50,19 @@ impl Debug for Element {
 
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.kind)
+        write!(f, "{:?}", self.kind)
     }
 }
 
 impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "{:?} | {:#?}", self.kind, self.span)
     }
 }
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.kind)
-    }
-}
-
-impl Display for ElementKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            ElementKind::Literal(token) => write!(f, "{}", token),
-            ElementKind::Identifier(ident) => write!(f, "{}", ident),
-            
-            ElementKind::Procedural(element) => {
-                write!(f, "procedural {}", element)
-            }
-
-            ElementKind::Collection(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
-
-                write!(f, "[{}]", elems.join(", "))
-            }
-            ElementKind::Series(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
-
-                write!(f, "[{}]", elems.join("; "))
-            }
-            ElementKind::Group(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
-
-                write!(f, "({})", elems.join(", "))
-            }
-            ElementKind::Sequence(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
-
-                write!(f, "({})", elems.join("; "))
-            }
-            ElementKind::Bundle(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| e.to_string()).collect();
-
-                write!(f, "{{{}}}", elems.join(", "))
-            }
-
-            ElementKind::Binary { left, operator, right } => write!(f, "({} {} {})", left, operator, right),
-            ElementKind::Unary { operator, operand: element } => write!(f, "({}{})", operator, element),
-
-            ElementKind::Labeled { label: element, element: ty } => write!(f, "{}: {}", element, ty),
-            ElementKind::Index { element, index } => write!(f, "{}[{}]", element, index),
-            ElementKind::Invoke { target, parameters } => {
-                write!(f, "{}{}", target, parameters)
-            }
-            ElementKind::Member { object, member } => write!(f, "{}.{}", object, member),
-
-            ElementKind::Scope(stmts) => {
-                if stmts.is_empty() {
-                    write!(f, "{{}}")
-                } else {
-                    let stmts_str: Vec<String> = stmts.iter().map(|e| indent(&e.to_string())).collect();
-                    write!(f, "{{\n{}\n}}", stmts_str.join("\n"))
-                }
-            }
-            ElementKind::Match { target, body } => write!(f, "match {} {}\n", target, body),
-            ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
-                write!(f, "if {} {}\n", condition, then_branch)?;
-
-                if let Some(else_expr) = else_branch {
-                    write!(f, " else {}\n", else_expr)?;
-                }
-
-                Ok(())
-            }
-            ElementKind::Cycle { condition, body } => {
-                if let Some(condition) = condition {
-                    write!(f, "while {} {}\n", condition, body)
-                } else {
-                    write!(f, "loop {}", body)
-                }
-            },
-            ElementKind::Iterate { clause, body} => write!(f, "for {} {}\n", clause, body),
-
-            ElementKind::Symbolization(symbol) => write!(f, "{}", symbol),
-            ElementKind::Assignment { target, value} => write!(f, "{} = {}", target, value),
-            ElementKind::Constructor { name, body } => {
-                write!(f, "{} {}", name, body)
-            }
-
-            ElementKind::Return(element) => {
-                write!(f, "return")?;
-
-                if let Some(element) = element {
-                    write!(f, " {}", element)?;
-                }
-
-                Ok(())
-            }
-            ElementKind::Break(element) => {
-                write!(f, "break")?;
-
-                if let Some(element) = element {
-                    write!(f, " {}", element)?;
-                }
-
-                Ok(())
-            }
-            ElementKind::Skip(element) => {
-                write!(f, "continue")?;
-
-                if let Some(element) = element {
-                    write!(f, " {}", element)?;
-                }
-
-                Ok(())
-            }
-
-            ElementKind::Path { tree } => write!(f, "{}", tree),
-        }
+        write!(f, "{:?}", self.kind)
     }
 }
 

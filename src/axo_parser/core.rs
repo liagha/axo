@@ -486,7 +486,7 @@ impl Parser {
 
                 Ok(Element::new(
                     ElementKind::Symbolization(
-                        SymbolKind::Variable {
+                        SymbolKind::Binding {
                             target: target.into(),
                             value,
                             ty: None,
@@ -517,8 +517,8 @@ impl Parser {
 
                 let name = outputs[0].clone();
 
-                let fields = if let ElementKind::Bundle(fields) = outputs[1].kind.clone() {
-                    fields
+                let fields = if let ElementKind::Bundle(elements) = outputs[1].kind.clone() {
+                    elements
                 } else {
                     unreachable!()
                 };
@@ -527,7 +527,44 @@ impl Parser {
                     ElementKind::Symbolization(
                         SymbolKind::Structure {
                             name: name.into(),
-                            fields: fields.into(),
+                            fields,
+                        }
+                    ),
+                    outputs.span()
+                ))
+            }
+        )
+    }
+
+    pub fn enumeration() -> Classifier<Token, Element, ParseError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
+                    if let TokenKind::Identifier(identifier) = &token.kind {
+                        identifier == "enum"
+                    } else {
+                        false
+                    }
+                }),
+                Self::token(),
+                Self::bundle(),
+            ]),
+            |_, form| {
+                let outputs = form.outputs().clone();
+
+                let name = outputs[0].clone();
+
+                let variants = if let ElementKind::Bundle(elements) = outputs[1].kind.clone() {
+                    elements
+                } else {
+                    unreachable!()
+                };
+
+                Ok(Element::new(
+                    ElementKind::Symbolization(
+                        SymbolKind::Enumeration {
+                            name: name.into(),
+                            variants,
                         }
                     ),
                     outputs.span()
@@ -552,6 +589,7 @@ impl Parser {
     pub fn symbolization() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
             Self::structure(),
+            Self::enumeration(),
             Self::variable(),
         ])
     }

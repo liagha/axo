@@ -11,7 +11,7 @@ use {
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind {
-    UndefinedSymbol(Token, Option<String>),
+    UndefinedSymbol(Token),
     ParameterMismatch {
         expected: usize,
         found: usize,
@@ -29,12 +29,8 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ErrorKind::UndefinedSymbol(name, suggestion) => {
-                write!(f, "undefined symbol: `{}`", name)?;
-                if let Some(suggest) = suggestion {
-                    write!(f, ", did you mean `{}`?", suggest)?;
-                }
-                Ok(())
+            ErrorKind::UndefinedSymbol(name) => {
+                write!(f, "undefined symbol: `{}`", name)
             },
             ErrorKind::ParameterMismatch { expected, found } => {
                 write!(f, "parameter mismatch: expected {}, found {}", expected, found)

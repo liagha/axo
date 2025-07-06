@@ -32,11 +32,6 @@ pub enum SymbolKind {
     Inclusion {
         target: Box<Element> 
     },
-    Field {
-        name: Box<Element>,
-        value: Option<Box<Element>>,
-        ty: Option<Box<Element>>,
-    },
     Formation {
         identifier: Artifact,
         form: Form<Artifact, Artifact, Artifact>,
@@ -45,11 +40,11 @@ pub enum SymbolKind {
         element: Box<Element>,
         body: Box<Element>
     },
-    Trait {
+    Interface {
         name: Box<Element>,
         body: Box<Element>
     },
-    Variable {
+    Binding {
         target: Box<Element>,
         value: Option<Box<Element>>,
         ty: Option<Box<Element>>,
@@ -57,11 +52,11 @@ pub enum SymbolKind {
     },
     Structure {
         name: Box<Element>,
-        fields: Vec<Element>
+        fields: Vec<Element>,
     },
     Enumeration {
         name: Box<Element>,
-        body: Box<Element>,
+        variants: Vec<Element>,
     },
     Function {
         name: Box<Element>,

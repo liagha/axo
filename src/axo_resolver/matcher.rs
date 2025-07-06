@@ -255,9 +255,8 @@ impl Labeled<Token> for Symbol {
 impl Labeled<Token> for SymbolKind {
     fn name(&self) -> Option<Token> {
         match self {
-            SymbolKind::Trait { name, .. } => name.name(),
-            SymbolKind::Variable { target, .. } => target.name(),
-            SymbolKind::Field { name, .. } => name.name(),
+            SymbolKind::Interface { name, .. } => name.name(),
+            SymbolKind::Binding { target, .. } => target.name(),
             SymbolKind::Structure { name, .. } => name.name(),
             SymbolKind::Enumeration { name, .. } => name.name(),
             SymbolKind::Function { name, .. } => name.name(),
@@ -516,7 +515,7 @@ impl SimilarityMetric<Element, Symbol> for ContextualRelevanceMetric {
         match &query.kind {
             ElementKind::Identifier(_) => {
                 match &candidate.kind {
-                    SymbolKind::Variable { .. } => self.context_weight,
+                    SymbolKind::Binding { .. } => self.context_weight,
                     SymbolKind::Function { .. } => self.context_weight - 0.1,
                     SymbolKind::Structure { .. } => self.context_weight - 0.2,
                     SymbolKind::Enumeration { .. } => self.context_weight - 0.2,
@@ -624,7 +623,7 @@ impl SimilarityMetric<Element, Symbol> for PartialIdentifierMetric {
 impl PartialEq<Symbol> for Element {
     fn eq(&self, other: &Symbol) -> bool {
         match (&self.kind, &other.kind) {
-            (ElementKind::Identifier(ident), SymbolKind::Variable { target, .. }) => {
+            (ElementKind::Identifier(ident), SymbolKind::Binding { target, .. }) => {
                 if let Element { kind: ElementKind::Identifier(target_ident), .. } = *target.clone() {
                     ident == &target_ident
                 } else {
@@ -666,9 +665,9 @@ impl SimilarityMetric<Element, Symbol> for SymbolTypeMetric {
     fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
             (ElementKind::Invoke { .. }, SymbolKind::Function { .. }) => 0.98,
-            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Binding { .. }) => 0.0,
 
-            (ElementKind::Identifier(_), SymbolKind::Variable { .. }) => 0.95,
+            (ElementKind::Identifier(_), SymbolKind::Binding { .. }) => 0.95,
             (ElementKind::Identifier(_), SymbolKind::Function { .. }) => 0.9,
             (ElementKind::Identifier(_), SymbolKind::Structure { .. }) => 0.8,
             (ElementKind::Identifier(_), SymbolKind::Enumeration { .. }) => 0.75,
@@ -694,7 +693,7 @@ impl SimilarityMetric<Element, Symbol> for SymbolTypeMetric {
 impl SimilarityMetric<Element, Symbol> for TokenSimilarityMetric {
     fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => return 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Binding { .. }) => return 0.0,
             (ElementKind::Invoke { .. }, SymbolKind::Function { .. }) => {},
             (ElementKind::Identifier(_), _) => {},
             (ElementKind::Constructor { .. }, SymbolKind::Structure { .. } | SymbolKind::Enumeration { .. }) => {},
@@ -720,7 +719,7 @@ impl SimilarityMetric<Element, Symbol> for TokenSimilarityMetric {
 impl SimilarityMetric<Element, Symbol> for EditDistanceMetric {
     fn calculate(&self, query: &Element, candidate: &Symbol) -> f64 {
         match (&query.kind, &candidate.kind) {
-            (ElementKind::Invoke { .. }, SymbolKind::Variable { .. }) => return 0.0,
+            (ElementKind::Invoke { .. }, SymbolKind::Binding { .. }) => return 0.0,
             _ => {},
         }
 

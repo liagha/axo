@@ -256,17 +256,17 @@ impl PartialEq for SymbolKind {
                 i1 == i2
             },
             (
-                SymbolKind::Trait { name: n1, body: b1 },
-                SymbolKind::Trait { name: n2, body: b2 },
+                SymbolKind::Interface { name: n1, body: b1 },
+                SymbolKind::Interface { name: n2, body: b2 },
             ) => n1 == n2 && b1 == b2,
             (
-                SymbolKind::Variable {
+                SymbolKind::Binding {
                     target: t1,
                     value: _v1,
                     ty: _ty1,
                     mutable: _m1,
                 },
-                SymbolKind::Variable {
+                SymbolKind::Binding {
                     target: t2,
                     value: _v2,
                     ty: _ty2,
@@ -275,18 +275,6 @@ impl PartialEq for SymbolKind {
             ) => {
                 t1 == t2
             },
-            (
-                SymbolKind::Field {
-                    name: n1,
-                    value: v1,
-                    ty: ty1,
-                },
-                SymbolKind::Field {
-                    name: n2,
-                    value: v2,
-                    ty: ty2,
-                },
-            ) => n1 == n2 && v1 == v2 && ty1 == ty2,
             (
                 SymbolKind::Structure {
                     name: n1,
@@ -298,9 +286,9 @@ impl PartialEq for SymbolKind {
                 },
             ) => n1 == n2 && f1 == f2,
             (
-                SymbolKind::Enumeration { name: n1, body: b1 },
-                SymbolKind::Enumeration { name: n2, body: b2 },
-            ) => n1 == n2 && b1 == b2,
+                SymbolKind::Enumeration { name: n1, variants: v1 },
+                SymbolKind::Enumeration { name: n2, variants: v2 },
+            ) => n1 == n2 && v1 == v2,
             (
                 SymbolKind::Function {
                     name: n1,
@@ -334,30 +322,24 @@ impl Hash for SymbolKind {
                 element.hash(state);
                 body.hash(state);
             }
-            SymbolKind::Trait { name, body } => {
+            SymbolKind::Interface { name, body } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 body.hash(state);
             }
-            SymbolKind::Variable { target, .. } => {
+            SymbolKind::Binding { target, .. } => {
                 discriminant(self).hash(state);
                 target.hash(state);
-            }
-            SymbolKind::Field { name, value, ty } => {
-                discriminant(self).hash(state);
-                name.hash(state);
-                value.hash(state);
-                ty.hash(state);
             }
             SymbolKind::Structure { name, fields } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 fields.hash(state);
             }
-            SymbolKind::Enumeration { name, body } => {
+            SymbolKind::Enumeration { name, variants } => {
                 discriminant(self).hash(state);
                 name.hash(state);
-                body.hash(state);
+                variants.hash(state);
             }
             SymbolKind::Function {
                 name,
@@ -385,28 +367,23 @@ impl Clone for SymbolKind {
                 element: element.clone(),
                 body: body.clone(),
             },
-            SymbolKind::Trait { name, body } => SymbolKind::Trait {
+            SymbolKind::Interface { name, body } => SymbolKind::Interface {
                 name: name.clone(),
                 body: body.clone(),
             },
-            SymbolKind::Variable { target, value, ty, mutable } => SymbolKind::Variable {
+            SymbolKind::Binding { target, value, ty, mutable } => SymbolKind::Binding {
                 target: target.clone(),
                 value: value.clone(),
                 ty: ty.clone(),
                 mutable: *mutable,
             },
-            SymbolKind::Field { name, value, ty } => SymbolKind::Field {
-                name: name.clone(),
-                value: value.clone(),
-                ty: ty.clone(),
-            },
             SymbolKind::Structure { name, fields } => SymbolKind::Structure {
                 name: name.clone(),
                 fields: fields.clone(),
             },
-            SymbolKind::Enumeration { name, body } => SymbolKind::Enumeration {
+            SymbolKind::Enumeration { name, variants } => SymbolKind::Enumeration {
                 name: name.clone(),
-                body: body.clone(),
+                variants: variants.clone(),
             },
             SymbolKind::Function { name, parameters, body } => SymbolKind::Function {
                 name: name.clone(),
