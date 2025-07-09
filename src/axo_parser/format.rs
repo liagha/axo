@@ -21,6 +21,19 @@ impl Debug for SymbolKind {
             SymbolKind::Formation { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
             SymbolKind::Implementation { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
             SymbolKind::Interface { name, body} => write!(f, "Trait({:?} {:?})", name, body),
+            SymbolKind::Slot { target, value, ty } => {
+                write!(f, "Slot({:?}", target)?;
+
+                if let Some(ty) = ty {
+                    write!(f, " : {:?}", ty)?;
+                }
+
+                if let Some(value) = value {
+                    write!(f, " = {:?}", value)?;
+                }
+
+                write!(f, ")")
+            },
             SymbolKind::Binding { target, value, mutable, ty } => {
                 let kind = if *mutable { "Variable" } else { "Constant" };
                 write!(f, "{}({:?}", kind, target)?;
@@ -104,7 +117,7 @@ impl Debug for ElementKind {
             ElementKind::Labeled { label: element, element: ty } => {
                 write!(f, "Labeled({:?}: {:?})", element, ty)
             },
-            ElementKind::Index { element, indexes } => {
+            ElementKind::Index { target: element, indexes } => {
                 write!(f, "Index({:?}[{:?}])", element, indexes)
             },
             ElementKind::Invoke { target, arguments: parameters } => {

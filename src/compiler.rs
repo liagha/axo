@@ -272,7 +272,7 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
     fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
         let resolver_timer = Timer::new(TIMERSOURCE);
 
-        context.resolver.resolve(elements);
+        context.resolver.settle(elements);
 
         let errors = context.resolver.errors.clone();
 

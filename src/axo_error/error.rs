@@ -114,6 +114,10 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
                     }
                 }
             }
+
+            for hint in &self.hints {
+                details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
+            }
         }
 
         (messages, details)

@@ -14,11 +14,11 @@ use {
 
 /// Trait for extracting a meaningful name token from various AST elements
 pub trait Branded<L> {
-    fn name(&self) -> Option<L>;
+    fn brand(&self) -> Option<L>;
 }
 
 impl Branded<Token> for Element {
-    fn name(&self) -> Option<Token> {
+    fn brand(&self) -> Option<Token> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(Token {
                 kind: literal.clone(),
@@ -28,32 +28,32 @@ impl Branded<Token> for Element {
                 kind: TokenKind::Identifier(identifier.clone()),
                 span: self.span,
             }),
-            ElementKind::Constructor { name, .. } => name.name(),
-            ElementKind::Labeled { label, .. } => label.name(),
-            ElementKind::Index { element, .. } => element.name(),
-            ElementKind::Invoke { target, .. } => target.name(),
-            ElementKind::Member { object, .. } => object.name(),
-            ElementKind::Symbolization(symbol) => symbol.name(),
-            ElementKind::Assignment { target, .. } => target.name(),
+            ElementKind::Constructor { name, .. } => name.brand(),
+            ElementKind::Labeled { label, .. } => label.brand(),
+            ElementKind::Index { target: element, .. } => element.brand(),
+            ElementKind::Invoke { target, .. } => target.brand(),
+            ElementKind::Member { object, .. } => object.brand(),
+            ElementKind::Symbolization(symbol) => symbol.brand(),
+            ElementKind::Assignment { target, .. } => target.brand(),
             _ => None,
         }
     }
 }
 
 impl Branded<Token> for Symbol {
-    fn name(&self) -> Option<Token> {
-        self.kind.name()
+    fn brand(&self) -> Option<Token> {
+        self.kind.brand()
     }
 }
 
 impl Branded<Token> for SymbolKind {
-    fn name(&self) -> Option<Token> {
+    fn brand(&self) -> Option<Token> {
         match self {
-            SymbolKind::Interface { name, .. } => name.name(),
-            SymbolKind::Binding { target, .. } => target.name(),
-            SymbolKind::Structure { name, .. } => name.name(),
-            SymbolKind::Enumeration { name, .. } => name.name(),
-            SymbolKind::Function { name, .. } => name.name(),
+            SymbolKind::Interface { name, .. } => name.brand(),
+            SymbolKind::Binding { target, .. } => target.brand(),
+            SymbolKind::Structure { name, .. } => name.brand(),
+            SymbolKind::Enumeration { name, .. } => name.brand(),
+            SymbolKind::Function { name, .. } => name.brand(),
             _ => None,
         }
     }

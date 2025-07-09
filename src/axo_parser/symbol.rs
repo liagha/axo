@@ -22,7 +22,6 @@ use {
     }
 };
 
-#[derive(Clone)]
 pub struct Symbol {
     pub kind: SymbolKind,
     pub span: Span,
@@ -43,6 +42,11 @@ pub enum SymbolKind {
     Interface {
         name: Box<Element>,
         body: Box<Element>
+    },
+    Slot {
+        target: Box<Element>,
+        value: Option<Box<Element>>,
+        ty: Option<Box<Element>>,
     },
     Binding {
         target: Box<Element>,

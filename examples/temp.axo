@@ -3,4 +3,4 @@ struct Test {
     b: 4
 }
 
-Test { a: 3 }
+Tes { a: 3 }

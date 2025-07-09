@@ -22,7 +22,6 @@ use {
 /// An `Element` is the fundamental building block of the AST, containing
 /// both the semantic information about what the element represents (`kind`)
 /// and its location in the source code (`span`).
-#[derive(Eq, Clone)]
 pub struct Element {
     /// The semantic type and data of this element
     pub kind: ElementKind,
@@ -34,7 +33,6 @@ pub struct Element {
 ///
 /// This enum encompasses all possible syntactic constructs in the language,
 /// from primitive literals to complex control flow structures.
-#[derive(Eq, Clone)]
 pub enum ElementKind {
     /// A literal value such as a string, number, or character
     ///
@@ -143,7 +141,7 @@ pub enum ElementKind {
     /// Used to access elements by position in arrays, maps, or other collections.
     Index {
         /// The collection or object being indexed
-        element: Box<Element>,
+        target: Box<Element>,
         /// The index expression
         indexes: Vec<Element>,
     },

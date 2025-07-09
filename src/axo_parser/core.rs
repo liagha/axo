@@ -176,7 +176,7 @@ impl Parser {
                             ElementKind::Collection(elements) => {
                                 unary = Element::new(
                                     ElementKind::Index {
-                                        element: unary.into(),
+                                        target: unary.into(),
                                         indexes: elements,
                                     },
                                     span,

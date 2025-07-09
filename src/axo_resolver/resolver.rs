@@ -1,15 +1,25 @@
 use {
     super::{
-        error::ErrorKind,
-        brand::Branded,
-        assessor::symbol_matcher,
-        scope::Scope,
+        error::{
+            ErrorKind,
+        },
+        matcher::{
+            symbol_matcher,
+        },
+        scope::{
+            Scope,
+        },
         ResolveError,
     },
     crate::{
-        axo_cursor::Span,
-        axo_error::{Action, Hint},
-        axo_parser::{Element, ElementKind, Symbol},
+        axo_cursor::{
+            Span,
+        },
+        axo_parser::{
+            Element, ElementKind,
+            Symbol
+        },
+        format::Debug,
         memory::replace,
     },
 };
@@ -44,64 +54,12 @@ impl Resolver {
     }
 
     pub fn lookup(&mut self, target: &Element) -> Option<Symbol> {
-        let target_name = match target.name() {
-            Some(name) => name,
-            None => {
-                unreachable!()
-            }
-        };
-
-        let assessor = symbol_matcher();
+        let mut assessor = symbol_matcher();
         let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
+        let champion = assessor.champion(target, &candidates);
+        self.errors.extend(assessor.errors);
 
-        let suggestion = assessor.champion(target, &*candidates);
-
-        if let Some(suggestion) = suggestion {
-            let found = suggestion
-                .candidate
-                .name()
-                .map(|name| name.to_string())
-                .unwrap_or(suggestion.candidate.to_string());
-
-            println!("{:?}", suggestion);
-
-            if suggestion.resemblance >= 0.9 {
-                return Some(suggestion.candidate);
-            }
-
-            if suggestion.resemblance > 0.4 {
-                let err = ResolveError {
-                    kind: ErrorKind::UndefinedSymbol(target_name.clone()),
-                    span: target_name.span,
-                    note: None,
-                    hints: vec![Hint {
-                        message: format!(
-                            "replace with `{}` | similarity: ({:.2})",
-                            found, suggestion.resemblance
-                        ),
-                        action: vec![Action::Replace(found, target.span.clone())],
-                    }],
-                };
-
-                self.errors.push(err);
-
-                None
-            } else {
-                self.error(
-                    ErrorKind::UndefinedSymbol(target_name.clone()),
-                    target_name.span,
-                );
-
-                None
-            }
-        } else {
-            self.error(
-                ErrorKind::UndefinedSymbol(target_name.clone()),
-                target_name.span,
-            );
-
-            None
-        }
+        champion.map(|profile| profile.candidate)
     }
 
     pub fn error(&mut self, error: ErrorKind, span: Span) {
@@ -111,23 +69,21 @@ impl Resolver {
             note: None,
             hints: vec![],
         };
-
         self.errors.push(error);
     }
 
-    pub fn resolve(&mut self, elements: Vec<Element>) {
+    pub fn settle(&mut self, elements: Vec<Element>) {
         for element in elements {
-            self.resolve_element(element.into());
+            self.resolve(element.into());
         }
     }
 
-    pub fn resolve_element(&mut self, element: Box<Element>) {
+    pub fn resolve(&mut self, element: Box<Element>) {
         let Element { kind, span } = *element.clone();
 
         match kind {
             ElementKind::Symbolization(symbol) => {
                 let symbol = Symbol { kind: symbol, span };
-
                 self.insert(symbol.clone());
             }
 
@@ -137,7 +93,7 @@ impl Resolver {
 
             ElementKind::Scope(body) => {
                 self.push_scope();
-                self.resolve(body);
+                self.settle(body);
                 self.pop_scope();
             }
 
@@ -155,23 +111,23 @@ impl Resolver {
             | ElementKind::Collection(elements)
             | ElementKind::Bundle(elements) => {
                 for element in elements {
-                    self.resolve_element(element.into());
+                    self.resolve(element.into());
                 }
             }
 
             ElementKind::Binary { left, right, .. } => {
-                self.resolve_element(left);
-                self.resolve_element(right);
+                self.resolve(left);
+                self.resolve(right);
             }
 
-            ElementKind::Unary { operand, .. } => self.resolve_element(operand),
+            ElementKind::Unary { operand, .. } => self.resolve(operand),
 
             ElementKind::Labeled {
                 label,
                 element: value,
             } => {
-                self.resolve_element(label);
-                self.resolve_element(value);
+                self.resolve(label);
+                self.resolve(value);
             }
 
             ElementKind::Conditional {
@@ -179,15 +135,13 @@ impl Resolver {
                 then: then_branch,
                 alternate: else_branch,
             } => {
-                self.resolve_element(condition);
-
+                self.resolve(condition);
                 self.push_scope();
-                self.resolve_element(then_branch);
+                self.resolve(then_branch);
                 self.pop_scope();
-
                 if let Some(else_branch) = else_branch {
                     self.push_scope();
-                    self.resolve_element(else_branch);
+                    self.resolve(else_branch);
                     self.pop_scope();
                 }
             }
@@ -196,34 +150,34 @@ impl Resolver {
                 target: clause,
                 body,
             } => {
-                self.resolve_element(clause);
-
+                self.resolve(clause);
                 self.push_scope();
-                self.resolve_element(body);
+                self.resolve(body);
                 self.pop_scope();
             }
 
             ElementKind::Cycle { condition, body } => {
                 if let Some(condition) = condition {
-                    self.resolve_element(condition);
+                    self.resolve(condition);
                 }
-
                 self.push_scope();
-                self.resolve_element(body);
+                self.resolve(body);
                 self.pop_scope();
             }
 
             ElementKind::Iterate { clause, body } => {
-                self.resolve_element(clause);
+                self.resolve(clause);
 
-                self.push_scope();
-                self.resolve_element(body);
+                let parent = replace(&mut self.scope, Scope::new());
+                self.scope.set_parent(parent);
+
+                self.resolve(body);
                 self.pop_scope();
             }
 
             ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Skip(value) => {
                 if let Some(value) = value {
-                    self.resolve_element(value);
+                    self.resolve(value);
                 }
             }
 
