@@ -3,6 +3,7 @@ mod matcher;
 mod resolver;
 mod error;
 mod brand;
+mod hint;
 
 use {
     crate::{
@@ -14,5 +15,6 @@ use {
 };
 
 pub use resolver::Resolver;
+use crate::axo_resolver::hint::ResolveHint;
 
-pub type ResolveError = Error<ErrorKind>;
+pub type ResolveError = Error<ErrorKind, String, ResolveHint>;

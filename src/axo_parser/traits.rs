@@ -399,8 +399,8 @@ impl PartialEq for SymbolKind {
                 SymbolKind::Binding { target: t2, value: v2, ty: ty2, mutable: m2 },
             ) => t1 == t2 && v1 == v2 && ty1 == ty2 && m1 == m2,
             (
-                SymbolKind::Structure { name: n1, fields: f1 },
-                SymbolKind::Structure { name: n2, fields: f2 },
+                SymbolKind::Structure { name: n1, entries: f1 },
+                SymbolKind::Structure { name: n2, entries: f2 },
             ) => n1 == n2 && f1 == f2,
             (
                 SymbolKind::Enumeration { name: n1, variants: v1 },
@@ -450,7 +450,7 @@ impl Hash for SymbolKind {
                 ty.hash(state);
                 mutable.hash(state);
             }
-            SymbolKind::Structure { name, fields } => {
+            SymbolKind::Structure { name, entries: fields } => {
                 discriminant(self).hash(state);
                 name.hash(state);
                 fields.hash(state);
@@ -497,9 +497,9 @@ impl Clone for SymbolKind {
                 ty: ty.clone(),
                 mutable: *mutable,
             },
-            SymbolKind::Structure { name, fields } => SymbolKind::Structure {
+            SymbolKind::Structure { name, entries: fields } => SymbolKind::Structure {
                 name: name.clone(),
-                fields: fields.clone(),
+                entries: fields.clone(),
             },
             SymbolKind::Enumeration { name, variants } => SymbolKind::Enumeration {
                 name: name.clone(),

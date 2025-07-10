@@ -48,7 +48,7 @@ impl Debug for SymbolKind {
 
                 write!(f, ")")
             },
-            SymbolKind::Structure { name, fields } => write!(f, "Structure({:?} | {:?})", name, fields),
+            SymbolKind::Structure { name, entries: fields } => write!(f, "Structure({:?} | {:?})", name, fields),
             SymbolKind::Enumeration { name, variants } => write!(f, "Enumeration({:?} | {:?})", name, variants),
             SymbolKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
         }

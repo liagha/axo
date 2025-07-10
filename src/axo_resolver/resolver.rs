@@ -57,9 +57,10 @@ impl Resolver {
         let mut assessor = symbol_matcher();
         let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
         let champion = assessor.champion(target, &candidates);
+        println!("{:?}", champion);
         self.errors.extend(assessor.errors);
 
-        champion.map(|profile| profile.candidate)
+        champion.map(|candidate| candidate)
     }
 
     pub fn error(&mut self, error: ErrorKind, span: Span) {

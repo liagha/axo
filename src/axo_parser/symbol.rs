@@ -56,7 +56,7 @@ pub enum SymbolKind {
     },
     Structure {
         name: Box<Element>,
-        fields: Vec<Element>,
+        entries: Vec<Element>,
     },
     Enumeration {
         name: Box<Element>,

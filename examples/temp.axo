@@ -1,6 +1,1 @@
-struct Test {
-    a: 3,
-    b: 4
-}
-
-Tes { a: 3 }
+a : int = 4
