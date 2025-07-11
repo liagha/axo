@@ -57,28 +57,26 @@ where
     {
         match self {
             Order::Convert(transform) => {
-                if !draft.is_aligned() {
-                    return;
-                }
+                if draft.is_aligned() {
+                    let result = if let Ok(mut guard) = transform.lock() {
+                        let result = guard(source.context_mut(), draft.form.clone());
+                        drop(guard);
+                        result
+                    } else {
+                        return;
+                    };
 
-                let result = if let Ok(mut guard) = transform.lock() {
-                    let result = guard(source.context_mut(), draft.form.clone());
-                    drop(guard);
-                    result
-                } else {
-                    return;
-                };
+                    let span = draft.form.span.clone();
 
-                let span = draft.form.span.clone();
-
-                match result {
-                    Ok(output) => {
-                        let mapped = Form::new(FormKind::Output(output), span);
-                        draft.form = mapped;
-                    }
-                    Err(error) => {
-                        draft.form = Form::new(FormKind::Failure(error), span);
-                        draft.fail();
+                    match result {
+                        Ok(output) => {
+                            let mapped = Form::new(FormKind::Output(output), span);
+                            draft.form = mapped;
+                        }
+                        Err(error) => {
+                            draft.form = Form::new(FormKind::Failure(error), span);
+                            draft.fail();
+                        }
                     }
                 }
             }
@@ -90,36 +88,33 @@ where
             }
 
             Order::Capture(identifier) => {
-                if !draft.is_aligned() {
-                    return;
+                if draft.is_aligned() {
+                    let resolver = &mut source.context_mut().resolver;
+
+                    let artifact = draft.form.clone().map(
+                        |input| Artifact::new(input),
+                        |output| Artifact::new(output),
+                        |error| Artifact::new(error),
+                    );
+
+                    let symbol = Symbol::new(
+                        SymbolKind::Formation {
+                            identifier: identifier.clone(),
+                            form: artifact,
+                        },
+                        draft.form.span.clone(),
+                    );
+
+                    resolver.insert(symbol);
                 }
-
-                let resolver = &mut source.context_mut().resolver;
-
-                let artifact = draft.form.clone().map(
-                    |input| Artifact::new(input),
-                    |output| Artifact::new(output),
-                    |error| Artifact::new(error),
-                );
-
-                let symbol = Symbol::new(
-                    SymbolKind::Formation {
-                        identifier: identifier.clone(),
-                        form: artifact,
-                    },
-                    draft.form.span.clone(),
-                );
-
-                resolver.insert(symbol);
             }
 
             Order::Ignore => {
-                if !draft.is_aligned() {
-                    return;
+                if draft.is_aligned() {
+                    let span = draft.form.span.clone();
+                    draft.ignore();
+                    draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
                 }
-
-                let span = draft.form.span.clone();
-                draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
             }
 
             Order::Skip => {
@@ -132,13 +127,11 @@ where
             }
 
             Order::Perform(executor) => {
-                if !draft.is_aligned() {
-                    return;
-                }
-
-                if let Ok(mut guard) = executor.lock() {
-                    guard();
-                    drop(guard);
+                if draft.is_aligned() {
+                    if let Ok(mut guard) = executor.lock() {
+                        guard();
+                        drop(guard);
+                    }
                 }
             }
 

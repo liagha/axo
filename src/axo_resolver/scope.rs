@@ -45,7 +45,6 @@ impl Scope {
         self.symbols.contains(symbol)
     }
 
-    // Stack-safe version using iteration instead of recursion
     pub fn contains(&self, symbol: &Symbol) -> bool {
         let mut current = Some(self);
 
@@ -59,7 +58,6 @@ impl Scope {
         false
     }
 
-    // Stack-safe version using iteration instead of recursion
     pub fn all_symbols(&self) -> HashSet<Symbol> {
         let mut all_symbols = HashSet::new();
         let mut current = Some(self);
@@ -72,7 +70,6 @@ impl Scope {
         all_symbols
     }
 
-    // Stack-safe version using iteration instead of recursion
     pub fn find(&self, symbol: &Symbol) -> Option<Symbol> {
         let mut current = Some(self);
 

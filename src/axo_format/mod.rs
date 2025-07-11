@@ -32,8 +32,6 @@ pub fn format_tokens(tokens: &[Token]) -> String {
     tokens
         .iter()
         .enumerate()
-        //.filter(|(_, token)|
-        //    token.kind != TokenKind::Punctuation(PunctuationKind::Space))
         .map(|(i, token)| {
             let token_str = match token.kind {
                 TokenKind::Punctuation(PunctuationKind::Newline) => format!(

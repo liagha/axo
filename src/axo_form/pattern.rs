@@ -328,6 +328,10 @@ where
                     forms.push(child.form);
                     break;
                 }
+                -2 => {
+                    index = child.marker;
+                    position = child.position; 
+                }
                 _ => {
                     draft.empty();
                     break;
@@ -386,6 +390,10 @@ where
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
+                }
+                -2 => {
+                    index = child.marker;
+                    position = child.position;
                 }
                 _ => {
                     break;

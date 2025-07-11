@@ -124,15 +124,15 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
     fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
         let score = match (query.kind.clone(), candidate.kind.clone()) {
             (
-                ElementKind::Invoke { arguments, .. },
-                SymbolKind::Function { name: candidate_name, parameters, .. }
+                ElementKind::Invoke(invoke),
+                SymbolKind::Function(function)
             ) => {
-                if arguments.len() == parameters.len() {
+                if invoke.get_arguments().len() == function.get_parameters().len() {
                     1.0
                 } else {
                     return Err(
                         ResolveError {
-                            kind: ErrorKind::SlotMismatch { candidate: candidate_name.brand().unwrap() },
+                            kind: ErrorKind::SlotMismatch { candidate: function.get_name().brand().unwrap() },
                             span: query.span.clone(),
                             hints: vec![],
                             note: None,
@@ -141,15 +141,15 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
                 }
             }
             (
-                ElementKind::Constructor { fields, .. },
-                SymbolKind::Structure { name, entries }
+                ElementKind::Construct(construct),
+                SymbolKind::Structure(structure)
             ) => {
-                if fields.len() == entries.len() {
+                if construct.get_fields().len() == structure.get_fields().len() {
                     1.0
                 } else {
                     return Err(
                         ResolveError {
-                            kind: ErrorKind::SlotMismatch { candidate: name.brand().unwrap() },
+                            kind: ErrorKind::SlotMismatch { candidate: structure.get_name().brand().unwrap() },
                             span: query.span.clone(),
                             hints: vec![],
                             note: None,

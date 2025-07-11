@@ -57,7 +57,6 @@ impl Resolver {
         let mut assessor = symbol_matcher();
         let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
         let champion = assessor.champion(target, &candidates);
-        println!("{:?}", champion);
         self.errors.extend(assessor.errors);
 
         champion.map(|candidate| candidate)
@@ -75,26 +74,26 @@ impl Resolver {
 
     pub fn settle(&mut self, elements: Vec<Element>) {
         for element in elements {
-            self.resolve(element.into());
+            self.resolve(&element.into());
         }
     }
 
-    pub fn resolve(&mut self, element: Box<Element>) {
+    pub fn resolve(&mut self, element: &Box<Element>) {
         let Element { kind, span } = *element.clone();
 
         match kind {
-            ElementKind::Symbolization(symbol) => {
+            ElementKind::Symbolize(symbol) => {
                 let symbol = Symbol { kind: symbol, span };
                 self.insert(symbol.clone());
             }
 
-            ElementKind::Assignment { target, .. } => {
-                self.lookup(&target);
+            ElementKind::Assign(assign) => {
+                self.lookup(assign.get_target());
             }
 
             ElementKind::Scope(body) => {
                 self.push_scope();
-                self.settle(body);
+                self.settle(body.items);
                 self.pop_scope();
             }
 
@@ -102,83 +101,82 @@ impl Resolver {
                 self.lookup(&element);
             }
 
-            ElementKind::Constructor { .. }
+            ElementKind::Construct { .. }
             | ElementKind::Invoke { .. }
             | ElementKind::Index { .. } => {
                 self.lookup(&element);
             }
 
-            ElementKind::Group(elements)
-            | ElementKind::Collection(elements)
-            | ElementKind::Bundle(elements) => {
-                for element in elements {
-                    self.resolve(element.into());
+            ElementKind::Group(group) => {
+                for element in group.items {
+                    self.resolve(&element.into());
+                }
+            }
+            ElementKind::Collection(collection) => {
+                for element in collection.items {
+                    self.resolve(&element.into());
+                }
+            }
+            ElementKind::Bundle(bundle) => {
+                for element in bundle.items {
+                    self.resolve(&element.into());
                 }
             }
 
-            ElementKind::Binary { left, right, .. } => {
-                self.resolve(left);
-                self.resolve(right);
+            ElementKind::Binary(binary) => {
+                self.resolve(binary.get_left());
+                self.resolve(binary.get_right());
             }
 
-            ElementKind::Unary { operand, .. } => self.resolve(operand),
+            ElementKind::Unary(unary) => self.resolve(&unary.get_operand()),
 
-            ElementKind::Labeled {
-                label,
-                element: value,
-            } => {
-                self.resolve(label);
-                self.resolve(value);
+            ElementKind::Label(label) => {
+                self.resolve(label.get_label());
+                self.resolve(label.get_element());
             }
 
-            ElementKind::Conditional {
-                condition,
-                then: then_branch,
-                alternate: else_branch,
-            } => {
-                self.resolve(condition);
+            ElementKind::Conditioned(conditioned) => {
+                self.resolve(conditioned.get_condition());
                 self.push_scope();
-                self.resolve(then_branch);
+                self.resolve(conditioned.get_then());
                 self.pop_scope();
-                if let Some(else_branch) = else_branch {
+
+                if let Some(alternate) = conditioned.get_alternate() {
                     self.push_scope();
-                    self.resolve(else_branch);
+                    self.resolve(alternate);
                     self.pop_scope();
                 }
             }
 
-            ElementKind::Match {
-                target: clause,
-                body,
-            } => {
-                self.resolve(clause);
+            ElementKind::Map(map) => {
+                self.resolve(map.get_target());
                 self.push_scope();
-                self.resolve(body);
+                self.resolve(map.get_body());
                 self.pop_scope();
             }
 
-            ElementKind::Cycle { condition, body } => {
-                if let Some(condition) = condition {
+            ElementKind::Repeat(repeat) => {
+                if let Some(condition) = repeat.get_condition() {
                     self.resolve(condition);
                 }
                 self.push_scope();
-                self.resolve(body);
+                self.resolve(repeat.get_body());
                 self.pop_scope();
             }
 
-            ElementKind::Iterate { clause, body } => {
-                self.resolve(clause);
+            ElementKind::Walk(walk) => {
+                self.resolve(walk.get_clause());
 
                 let parent = replace(&mut self.scope, Scope::new());
                 self.scope.set_parent(parent);
 
-                self.resolve(body);
+                self.resolve(walk.get_body());
                 self.pop_scope();
             }
 
-            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Skip(value) => {
+            ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
                 if let Some(value) = value {
-                    self.resolve(value);
+                    self.resolve(&value);
                 }
             }
 

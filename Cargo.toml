@@ -8,7 +8,8 @@ broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
 matchete = { path = "../matchete" }
 log = { version = "0.4.27"}
-chrono = "0.4.41"
+derive_more = { version = "2.0.1", features = ["unwrap"] }
+chrono = { version = "0.4.41" }
 # inkwell = { path = "inkwell", version = "0.5.0", features = ["default", "llvm18-0"] }
 
 [profile.dev]

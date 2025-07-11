@@ -4,6 +4,11 @@ use {
         axo_cursor::{Span, Spanned},
         axo_form::{order::Order, form::Form, pattern::Classifier},
         axo_scanner::{PunctuationKind, Token, TokenKind},
+        axo_schema::{
+            Group, Sequence,
+            Collection, Series,
+            Bundle, Scope,
+        },
         thread::Arc,
     },
 };
@@ -54,7 +59,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Bundle(elements), form.span))
+                Ok(Element::new(ElementKind::Bundle(Bundle::new(elements)), form.span))
             },
         )
     }
@@ -104,7 +109,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Scope(elements), form.span))
+                Ok(Element::new(ElementKind::Scope(Scope::new(elements)), form.span))
             },
         )
     }
@@ -156,7 +161,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Group(elements), form.span))
+                Ok(Element::new(ElementKind::Group(Group::new(elements)), form.span))
             },
         )
     }
@@ -209,7 +214,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Group(elements), form.span))
+                Ok(Element::new(ElementKind::Sequence(Sequence::new(elements)), form.span))
             },
         )
     }
@@ -259,7 +264,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Collection(elements), form.span))
+                Ok(Element::new(ElementKind::Collection(Collection::new(elements)), form.span))
             },
         )
     }
@@ -309,7 +314,7 @@ impl Parser {
             move |_, form| {
                 let elements = form.outputs();
 
-                Ok(Element::new(ElementKind::Series(elements), form.span))
+                Ok(Element::new(ElementKind::Series(Series::new(elements)), form.span))
             },
         )
     }

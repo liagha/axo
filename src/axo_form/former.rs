@@ -87,6 +87,7 @@ where
     /// Aligned = 1
     /// Failed = 0
     /// Blank = -1
+    /// Ignore = -2
     #[inline]
     pub fn is_aligned(&self) -> bool {
         matches!(self.record, 1)
@@ -108,6 +109,11 @@ where
     }
 
     #[inline]
+    pub fn is_ignored(&self) -> bool {
+        matches!(self.record, -2)
+    }
+
+    #[inline]
     pub fn align(&mut self) {
         self.record = 1;
     }
@@ -120,6 +126,11 @@ where
     #[inline]
     pub fn empty(&mut self) {
         self.record = -1;
+    }
+
+    #[inline]
+    pub fn ignore(&mut self) {
+        self.record = -2;
     }
 }
 

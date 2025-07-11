@@ -4,12 +4,12 @@ use {
             Debug, Display,
             Formatter, Result
         },
-        
+
         axo_parser::{
             symbol::Symbol,
             Element, ElementKind, SymbolKind
         },
-        
+
         axo_format::indent,
     },
 };
@@ -17,40 +17,27 @@ use {
 impl Debug for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            SymbolKind::Inclusion { target } => write!(f, "Inclusion({:?})", target),
+            SymbolKind::Inclusion(inclusion) => write!(f, "Inclusion({:?})", inclusion.get_target()),
             SymbolKind::Formation { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
-            SymbolKind::Implementation { element, body } => write!(f, "Implement({:?} => {:?})", element, body),
-            SymbolKind::Interface { name, body} => write!(f, "Trait({:?} {:?})", name, body),
-            SymbolKind::Slot { target, value, ty } => {
-                write!(f, "Slot({:?}", target)?;
+            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} => {:?})", implementation.get_target(), implementation.get_body()),
+            SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_body()),
+            SymbolKind::Binding(binding) => {
+                let kind = if binding.is_mutable() { "Variable" } else { "Constant" };
+                write!(f, "{}({:?}", kind, binding.get_target())?;
 
-                if let Some(ty) = ty {
+                if let Some(ty) = binding.get_type() {
                     write!(f, " : {:?}", ty)?;
                 }
 
-                if let Some(value) = value {
+                if let Some(value) = binding.get_value() {
                     write!(f, " = {:?}", value)?;
                 }
 
                 write!(f, ")")
             },
-            SymbolKind::Binding { target, value, mutable, ty } => {
-                let kind = if *mutable { "Variable" } else { "Constant" };
-                write!(f, "{}({:?}", kind, target)?;
-
-                if let Some(ty) = ty {
-                    write!(f, " : {:?}", ty)?;
-                }
-
-                if let Some(value) = value {
-                    write!(f, " = {:?}", value)?;
-                }
-
-                write!(f, ")")
-            },
-            SymbolKind::Structure { name, entries: fields } => write!(f, "Structure({:?} | {:?})", name, fields),
-            SymbolKind::Enumeration { name, variants } => write!(f, "Enumeration({:?} | {:?})", name, variants),
-            SymbolKind::Function { name, parameters, body } => write!(f, "Function({:?}({:?}) {:?})", name, parameters, body),
+            SymbolKind::Structure(structure) => write!(f, "Structure({:?} | {:?})", structure.get_name(), structure.get_fields()),
+            SymbolKind::Enumeration(enumeration) => write!(f, "Enumeration({:?} | {:?})", enumeration.get_name(), enumeration.get_variants()),
+            SymbolKind::Function(function) => write!(f, "Function({:?}({:?}) {:?})", function.get_name(), function.get_parameters(), function.get_body()),
         }
     }
 }
@@ -91,78 +78,78 @@ impl Debug for ElementKind {
             ElementKind::Procedural(element) => {
                 write!(f, "Procedural({:?})", element)
             }
-            ElementKind::Series(elements) => {
-                write!(f, "Series({:?})", elements)
+            ElementKind::Series(series) => {
+                write!(f, "Series({:?})", series.items)
             }
-            ElementKind::Collection(elements) => {
-                write!(f, "Collection({:?})", elements)
+            ElementKind::Collection(collection) => {
+                write!(f, "Collection({:?})", collection.items)
             },
-            ElementKind::Group(elements) => {
-                write!(f, "Group({:?})", elements)
+            ElementKind::Group(group) => {
+                write!(f, "Group({:?})", group.items)
             },
-            ElementKind::Sequence(elements) => {
-                write!(f, "Sequence({:?})", elements)
+            ElementKind::Sequence(sequence) => {
+                write!(f, "Sequence({:?})", sequence.items)
             }
-            ElementKind::Bundle(elements) => {
-                write!(f, "Bundle({:?})", elements)
-            }
-
-            ElementKind::Binary { left, operator, right } => {
-                write!(f, "Binary({:?} {:?} {:?})", left, operator, right)
-            }
-            ElementKind::Unary { operator, operand: element } => {
-                write!(f, "Unary({:?} {:?})", operator, element)
+            ElementKind::Bundle(bundle) => {
+                write!(f, "Bundle({:?})", bundle.items)
+            },
+            ElementKind::Scope(scope) => {
+                write!(f, "Block({:#?})", scope.items)
             },
 
-            ElementKind::Labeled { label: element, element: ty } => {
-                write!(f, "Labeled({:?}: {:?})", element, ty)
-            },
-            ElementKind::Index { target: element, indexes } => {
-                write!(f, "Index({:?}[{:?}])", element, indexes)
-            },
-            ElementKind::Invoke { target, arguments: parameters } => {
-                write!(f, "Invoke({:?}({:?}))", target, parameters)
-            },
-            ElementKind::Member { object, member} => {
-                write!(f, "Member({:?}.{:?})", object, member)
+            ElementKind::Binary(binary) => {
+                write!(f, "Binary({:?} {:?} {:?})", binary.get_left(), binary.get_operator(), binary.get_right())
+            }
+            ElementKind::Unary(unary) => {
+                write!(f, "Unary({:?} {:?})", unary.get_operator(), unary.get_operand())
             },
 
-            ElementKind::Match { target, body } => {
-                write!(f, "Match({:?} => {:?})", target, body)
+            ElementKind::Label(label) => {
+                write!(f, "Labeled({:?}: {:?})", label.get_label(), label.get_element())
             },
-            ElementKind::Conditional { condition, then: then_branch, alternate: else_branch } => {
-                write!(f, "Conditional({:?} | Then: {:?}", condition, then_branch)?;
+            ElementKind::Index(index) => {
+                write!(f, "Index({:?}[{:?}])", index.get_target(), index.get_indexes())
+            },
+            ElementKind::Invoke(invoke) => {
+                write!(f, "Invoke({:?}({:?}))", invoke.get_target(), invoke.get_arguments())
+            },
+            ElementKind::Access(access) => {
+                write!(f, "Member({:?}.{:?})", access.get_object(), access.get_member())
+            },
 
-                if let Some(else_expr) = else_branch {
+            ElementKind::Map(map) => {
+                write!(f, "Match({:?} => {:?})", map.get_target(), map.get_body())
+            },
+            ElementKind::Conditioned(cond) => {
+                write!(f, "Conditional({:?} | Then: {:?}", cond.get_condition(), cond.get_then())?;
+
+                if let Some(else_expr) = cond.get_alternate() {
                     write!(f, " | Else: {:?}", else_expr)?;
                 }
 
                 write!(f, ")")
             }
-            ElementKind::Cycle { condition, body } => {
-                if let Some(condition) = condition {
-                    write!(f, "While({:?} | {:?})", condition, body)
+            ElementKind::Repeat(repeat) => {
+                if let Some(condition) = repeat.get_condition() {
+                    write!(f, "While({:?} | {:?})", condition, repeat.get_body())
                 } else {
-                    write!(f, "Loop({:?})", body)
+                    write!(f, "Loop({:?})", repeat.get_body())
                 }
             },
-            ElementKind::Iterate { clause, body } => {
-                write!(f, "For({:?} in {:?})", clause, body)
-            },
-            ElementKind::Scope(stmts) => {
-                write!(f, "Block({:#?})", stmts)
+            ElementKind::Walk(walk) => {
+                write!(f, "For({:?} in {:?})", walk.get_clause(), walk.get_body())
             },
 
-            ElementKind::Assignment { target, value } => {
-                write!(f, "Assignment({:?} = {:?})", target, value)
+            ElementKind::Assign(assign) => {
+                write!(f, "Assignment({:?} = {:?})", assign.get_target(), assign.get_value())
             },
-            ElementKind::Constructor { name, fields: body } => {
-                write!(f, "Constructor({:?} | {:?})", name, body)
+            ElementKind::Construct(construct) => {
+                write!(f, "Constructor({:?} | {:?})", construct.get_target(), construct.get_fields())
             },
 
-            ElementKind::Symbolization(symbol) => write!(f, "+ {:?}", symbol),
+            ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),
 
-            ElementKind::Return(element) => {
+            ElementKind::Produce(element) => {
                 write!(f, "Return")?;
 
                 if let Some(element) = element {
@@ -171,7 +158,7 @@ impl Debug for ElementKind {
 
                 Ok(())
             }
-            ElementKind::Break(element) => {
+            ElementKind::Abort(element) => {
                 write!(f, "Break")?;
 
                 if let Some(element) = element {
@@ -180,7 +167,7 @@ impl Debug for ElementKind {
 
                 Ok(())
             }
-            ElementKind::Skip(element) => {
+            ElementKind::Pass(element) => {
                 write!(f, "Continue")?;
 
                 if let Some(element) = element {
@@ -190,7 +177,7 @@ impl Debug for ElementKind {
                 Ok(())
             }
 
-            ElementKind::Path { tree } => write!(f, "Path({:?})", tree),
+            ElementKind::Locate(tree) => write!(f, "Path({:?})", tree),
         }
     }
 }

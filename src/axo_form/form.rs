@@ -102,6 +102,20 @@ where
         result
     }
 
+    pub fn get_input(&self) -> Option<Input> {
+        match self.kind.clone() {
+            FormKind::Input(input) => Some(input.clone()),
+            _ => None
+        }
+    }
+
+    pub fn get_output(&self) -> Option<Output> {
+        match self.kind.clone() {
+            FormKind::Output(output) => Some(output.clone()),
+            _ => None
+        }
+    }
+
     pub fn unwrap(&self) -> Vec<Form<Input, Output, Failure>> {
         match self.kind.clone() {
             FormKind::Multiple(forms) => forms,
@@ -109,17 +123,19 @@ where
         }
     }
 
-    pub fn unwrap_input(&self) -> Option<Input> {
+    #[track_caller]
+    pub fn unwrap_input(&self) -> Input {
         match self.kind.clone() {
-            FormKind::Input(input) => Some(input.clone()),
-            _ => None
+            FormKind::Input(input) => input.clone(),
+            _ => panic!("the form isn't an input!")
         }
     }
 
-    pub fn unwrap_output(&self) -> Option<Output> {
+    #[track_caller]
+    pub fn unwrap_output(&self) -> Output {
         match self.kind.clone() {
-            FormKind::Output(output) => Some(output.clone()),
-            _ => None
+            FormKind::Output(output) => output.clone(),
+            _ => panic!("the form isn't an output!")
         }
     }
 

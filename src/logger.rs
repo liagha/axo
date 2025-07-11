@@ -86,7 +86,6 @@ impl Logger {
     pub fn init(self) -> Result<(), SetLoggerError> {
         let level = self.level;
 
-        // Convert to static reference using Box::leak
         let logger: &'static Logger = Box::leak(Box::new(self));
         log::set_logger(logger)?;
         log::set_max_level(level.to_level_filter());

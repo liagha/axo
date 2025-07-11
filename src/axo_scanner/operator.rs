@@ -10,7 +10,6 @@ use {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum OperatorKind {
-    // Single character operators (sorted alphabetically)
     At,                      // @ (annotation or pattern binding)
     Ampersand,               // & (bitwise AND or reference)
     Backslash,               // \ (escape character)
@@ -61,7 +60,6 @@ impl OperatorKind {
 
     pub fn precedence(&self) -> Option<u8> {
         match self.as_slice() {
-            // Single operators
             [Dot] => Some(10),
             [Colon] => Some(9),
             [Star] | [Slash] | [Percent] => Some(6),
@@ -70,7 +68,6 @@ impl OperatorKind {
             [Ampersand] | [Caret] | [Pipe] => Some(1),
             [In] | [Equal] => Some(0),
 
-            // Composite operators
             [Colon, Colon] => Some(10),
             [Star, Star] | [Caret, Caret] => Some(7),
             [Slash, Slash] | [Percent, Percent] => Some(6),
@@ -94,7 +91,6 @@ impl OperatorKind {
             | [Pipe, Pipe, Equal]
             | [QuestionMark, Equal] => Some(0),
 
-            // Arrows
             [Minus, RightAngle]
             | [LeftAngle, Minus]
             | [Equal, RightAngle]
@@ -135,7 +131,7 @@ impl OperatorKind {
         }
     }
 
-    pub fn is_postfix(&self) -> bool {
+    pub fn is_suffix(&self) -> bool {
         matches!(self.as_slice(), [Plus, Plus] | [Minus, Minus])
     }
 
@@ -189,10 +185,9 @@ impl Display for OperatorKind {
             Backtick => write!(f, "`"),
             Underscore => write!(f, "_"),
             Composite(ops) => {
-                // Handle composite operators
                 let mut result = String::new();
+                
                 for op in ops {
-                    // Recursively format each operator in the composite
                     write!(result, "{}", op)?;
                 }
                 write!(f, "{}", result)
@@ -306,7 +301,6 @@ impl Operator for str {
 
     fn to_operator(&self) -> OperatorKind {
         match self {
-            // Single character operators
             "@" => At,
             "&" => Ampersand,
             "\\" => Backslash,

@@ -14,6 +14,7 @@ mod logger;
 mod timer;
 mod artifact;
 mod axo_checker;
+mod axo_schema;
 
 use core::time::Duration;
 use broccli::{xprintln, Color};

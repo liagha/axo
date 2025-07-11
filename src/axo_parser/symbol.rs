@@ -8,6 +8,18 @@ use {
 
         axo_form::form::Form,
 
+        axo_schema::{
+            Group, Sequence,
+            Collection, Series,
+            Bundle, Scope,
+            Binary, Unary,
+            Index, Invoke, Construct,
+            Structure, Enumeration,
+            Binding, Function, Interface, Implementation, Formation, Inclusion,
+            Conditioned, Repeat, Walk, Map,
+            Label, Access, Assign,
+        },
+
         axo_scanner::{
             Token, TokenKind,
             PunctuationKind,
@@ -19,7 +31,7 @@ use {
             ParseError, Parser
         },
         axo_cursor::Span,
-    }
+    },
 };
 
 pub struct Symbol {
@@ -28,45 +40,17 @@ pub struct Symbol {
 }
 
 pub enum SymbolKind {
-    Inclusion {
-        target: Box<Element> 
-    },
     Formation {
         identifier: Artifact,
         form: Form<Artifact, Artifact, Artifact>,
     },
-    Implementation {
-        element: Box<Element>,
-        body: Box<Element>
-    },
-    Interface {
-        name: Box<Element>,
-        body: Box<Element>
-    },
-    Slot {
-        target: Box<Element>,
-        value: Option<Box<Element>>,
-        ty: Option<Box<Element>>,
-    },
-    Binding {
-        target: Box<Element>,
-        value: Option<Box<Element>>,
-        ty: Option<Box<Element>>,
-        mutable: bool,
-    },
-    Structure {
-        name: Box<Element>,
-        entries: Vec<Element>,
-    },
-    Enumeration {
-        name: Box<Element>,
-        variants: Vec<Element>,
-    },
-    Function {
-        name: Box<Element>,
-        parameters: Vec<Element>,
-        body: Box<Element>
-    },
+    Inclusion(Inclusion<Box<Element>>),
+    Implementation(Implementation<Box<Element>, Box<Element>>),
+    Interface(Interface<Box<Element>, Box<Element>>),
+    Binding(Binding<Box<Element>, Box<Element>, Box<Element>>),
+    Structure(Structure<Box<Element>, Element>),
+    Enumeration(Enumeration<Box<Element>, Element>),
+    Function(Function<Box<Element>, Element, Box<Element>>),
 }
 
 impl Symbol {

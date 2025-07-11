@@ -104,7 +104,7 @@ impl Parser {
     pub fn strainer() -> Classifier<Token, Element, ParseError> {
         Classifier::repeat(
             Classifier::predicate(|token: &Token| {
-                !matches!(token.kind, 
+                !matches!(token.kind,
                     TokenKind::Punctuation(PunctuationKind::Newline)
                     | TokenKind::Punctuation(PunctuationKind::Tab)
                     | TokenKind::Punctuation(PunctuationKind::Space)
