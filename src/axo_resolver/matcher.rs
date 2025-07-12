@@ -54,6 +54,7 @@ pub fn aligner() -> Assessor<String, String, ()> {
         .dimension(Sequential::default(), 0.06)
         .dimension(Jaro::default(), 0.05)
         .dimension(Cosine::default(), 0.04)
+        .scheme(Scheme::Additive)
 }
 
 impl Resembler<Token, Token, ()> for Aligner {
@@ -110,29 +111,28 @@ impl Resembler<Element, Symbol, ResolveError> for Aligner {
 #[derive(Debug)]
 struct Affinity {
     shaping: f64,
-    slotting: f64,
+    binding: f64,
 
 }
 
 impl Affinity {
     fn new() -> Self {
-        Affinity { shaping: 0.75, slotting: 0.25 }
+        Affinity { shaping: 0.75, binding: 0.25 }
     }
 }
 
 impl Resembler<Element, Symbol, ResolveError> for Affinity {
     fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
-        let score = match (query.kind.clone(), candidate.kind.clone()) {
-            (
-                ElementKind::Invoke(invoke),
-                SymbolKind::Function(function)
-            ) => {
+        let mut score = 0.0;
+
+        match (query.kind.clone(), candidate.kind.clone()) {
+            (ElementKind::Invoke(invoke), SymbolKind::Function(function)) => {
                 if invoke.get_arguments().len() == function.get_parameters().len() {
-                    1.0
+                    score += self.binding;
                 } else {
                     return Err(
                         ResolveError {
-                            kind: ErrorKind::SlotMismatch { candidate: function.get_name().brand().unwrap() },
+                            kind: ErrorKind::BindMismatch { candidate: function.get_name().brand().unwrap() },
                             span: query.span.clone(),
                             hints: vec![],
                             note: None,
@@ -140,16 +140,13 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
                     )
                 }
             }
-            (
-                ElementKind::Construct(construct),
-                SymbolKind::Structure(structure)
-            ) => {
+            (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
                 if construct.get_fields().len() == structure.get_fields().len() {
-                    1.0
+                    score += 1.0;
                 } else {
                     return Err(
                         ResolveError {
-                            kind: ErrorKind::SlotMismatch { candidate: structure.get_name().brand().unwrap() },
+                            kind: ErrorKind::BindMismatch { candidate: structure.get_name().brand().unwrap() },
                             span: query.span.clone(),
                             hints: vec![],
                             note: None,
@@ -157,9 +154,7 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
                     )
                 }
             }
-            _ => {
-                0.0
-            }
+            _ => {}
         };
 
         Ok(Resemblance::from(score))

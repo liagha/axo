@@ -16,18 +16,11 @@ pub enum ErrorKind {
     NumberParse(ParseNumberError),
     CharParseError(CharParseError),
     StringParseError(CharParseError),
-    UnterminatedChar,
-    UnterminatedDoubleQuoteString,
-    UnterminatedBackTickString,
-    UnterminatedCommentBlock,
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum CharParseError {
-    InvalidToken(String),
-    EmptyCharLiteral,
     InvalidEscapeSequence,
-    InvalidCharLiteral,
     UnterminatedEscapeSequence,
 }
 
@@ -50,18 +43,6 @@ impl Display for ErrorKind {
             ErrorKind::StringParseError(e) => {
                 write!(f, "failed to parse string literal: `{}`.", e)
             }
-            ErrorKind::UnterminatedChar => {
-                write!(f, "unterminated character literal.")
-            }
-            ErrorKind::UnterminatedBackTickString => {
-                write!(f, "unterminated backtick string literal.")
-            }
-            ErrorKind::UnterminatedDoubleQuoteString => {
-                write!(f, "unterminated double quote string literal.")
-            }
-            ErrorKind::UnterminatedCommentBlock => {
-                write!(f, "unterminated comment block.")
-            }
         }
     }
 }
@@ -69,17 +50,8 @@ impl Display for ErrorKind {
 impl Display for CharParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            CharParseError::InvalidToken(str) => {
-                write!(f, "invalid token: `{}`", str)
-            }
-            CharParseError::EmptyCharLiteral => {
-                write!(f, "empty character literal")
-            }
             CharParseError::InvalidEscapeSequence => {
                 write!(f, "invalid escape sequence")
-            }
-            CharParseError::InvalidCharLiteral => {
-                write!(f, "invalid character literal")
             }
             CharParseError::UnterminatedEscapeSequence => {
                 write!(f, "unterminated escape sequence")

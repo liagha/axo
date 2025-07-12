@@ -1,1 +1,5 @@
-const a : int = 4
+struct TestForMe {
+    var a: int = 4
+}
+
+TestFor { a: 4 }

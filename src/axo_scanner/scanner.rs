@@ -11,7 +11,7 @@ use {
             Context, Marked,
         },
         axo_text::{
-            parser,  
+            parser,
         },
         axo_form::{
             form::{Form, FormKind},
@@ -20,7 +20,6 @@ use {
         },
         axo_cursor::{
             Peekable, Position,
-            Span,
         },
     },
 };
@@ -41,15 +40,11 @@ impl Peekable<Character> for Scanner {
     }
 
     fn peek_ahead(&self, n: usize) -> Option<&Character> {
-        let current = self.index + n;
-
-        self.get(current)
+        self.get(self.index + n)
     }
 
     fn peek_behind(&self, n: usize) -> Option<&Character> {
-        let current = self.index - n;
-
-        self.get(current)
+        self.index.checked_sub(n).and_then(|idx| self.get(idx))
     }
 
     fn restore(&mut self) {
@@ -61,20 +56,17 @@ impl Peekable<Character> for Scanner {
     }
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Character> {
-        if let Some(ch) = self.get(*index) {
-            if *ch == '\n' {
-                position.line += 1;
-                position.column = 1;
-            } else {
-                position.column += 1;
-            }
+        let ch = self.get(*index)?;
 
-            *index += 1;
-
-            return Some(*ch);
+        if *ch == '\n' {
+            position.line += 1;
+            position.column = 1;
+        } else {
+            position.column += 1;
         }
 
-        None
+        *index += 1;
+        Some(*ch)
     }
 
     fn input(&self) -> &Vec<Character> {
@@ -86,7 +78,7 @@ impl Peekable<Character> for Scanner {
     }
 
     fn position(&self) -> Position {
-        self.position.clone()
+        self.position
     }
 
     fn position_mut(&mut self) -> &mut Position {
@@ -103,49 +95,9 @@ impl Peekable<Character> for Scanner {
 }
 
 impl Scanner {
-    pub fn inspect(start: Position, input: Vec<char>) -> Vec<Character> {
-        let mut position = start;
-        let mut characters = Vec::new();
-
-        for char in input {
-            let character = match char {
-                '\n' => {
-                    let start = position;
-                    position.add_line(1);
-                    position.set_column(1);
-                        
-                    Character {
-                        value: char,
-                        span: Span {
-                            start,
-                            end: position,
-                        }
-                    }
-                }
-                char => {
-                    let start = position;
-                    position.add_column(1);
-                    
-                    Character {
-                        value: char,
-                        span: Span {
-                            start,
-                            end: position,
-                        }
-                    }
-                }
-            };
-
-            characters.push(character);
-        }
-
-        characters
-    }
-
     pub fn new(context: Context, input: String, file: &'static str) -> Scanner {
         let start = Position::new(file);
         let chars: Vec<char> = input.chars().collect();
-
         let characters = Self::inspect(start, chars);
 
         Scanner {
@@ -158,53 +110,14 @@ impl Scanner {
         }
     }
 
-    fn line_comment() -> Classifier<Character, Token, ScanError> {
-        Classifier::sequence([
-            Classifier::sequence([Classifier::literal('/'), Classifier::literal('/')]).with_ignore(),
-            Classifier::repeat(Classifier::predicate(|c: &Character| *c != '\n'), 0, None),
-        ])
-        .with_transform(|_, form| {
-            let content: String = form.inputs().into_iter().collect();
-
-            Ok(Token::new(
-                TokenKind::Comment(content.trim().to_string()),
-                form.span,
-            ))
-        })
-    }
-
-    fn multiline_comment() -> Classifier<Character, Token, ScanError> {
-        Classifier::sequence([
-            Classifier::sequence([Classifier::literal('/'), Classifier::literal('*')]).with_ignore(),
-            Classifier::repeat(
-                Classifier::negate(
-                    Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore(),
-                ),
-                0,
-                None,
-            ),
-            Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore(),
-        ])
-        .with_transform(|_, form: Form<Character, Token, ScanError>| {
-            let content: String = form.inputs().into_iter().collect();
-
-            Ok(Token::new(
-                TokenKind::Comment(content.trim().to_string()),
-                form.span,
-            ))
-        })
-    }
-
-    fn hex_number() -> Classifier<Character, Token, ScanError> {
+    fn hexadecimal() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::literal('0'),
                 Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
                 Classifier::repeat(
                     Classifier::alternative([
-                        Classifier::predicate(|c: &Character| {
-                            c.is_alphanumeric()
-                        }),
+                        Classifier::predicate(|c: &Character| c.is_alphanumeric()),
                         Classifier::literal('_').with_ignore(),
                     ]),
                     1,
@@ -213,25 +126,23 @@ impl Scanner {
             ]),
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
-
                 let parser = parser::<i128>();
 
-                match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
-                }
+                parser.parse(&number)
+                    .map(|num| Token::new(TokenKind::Integer(num), form.span))
+                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
             },
         )
     }
 
-    fn binary_number() -> Classifier<Character, Token, ScanError> {
+    fn binary() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::literal('0'),
                 Classifier::alternative([Classifier::literal('b'), Classifier::literal('B')]),
                 Classifier::repeat(
                     Classifier::alternative([
-                        Classifier::predicate(|c: &Character| *c == '0' || *c == '1'),
+                        Classifier::predicate(|c: &Character| matches!(c.value, '0' | '1')),
                         Classifier::literal('_').with_ignore(),
                     ]),
                     1,
@@ -240,17 +151,16 @@ impl Scanner {
             ]),
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
-
                 let parser = parser::<i128>();
-                match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
-                }
+
+                parser.parse(&number)
+                    .map(|num| Token::new(TokenKind::Integer(num), form.span))
+                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
             },
         )
     }
 
-    fn octal_number() -> Classifier<Character, Token, ScanError> {
+    fn octal() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -266,17 +176,16 @@ impl Scanner {
             ]),
             |_, form| {
                 let number: String = form.inputs().into_iter().collect();
-
                 let parser = parser::<i128>();
-                match parser.parse(&number) {
-                    Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                    Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
-                }
+
+                parser.parse(&number)
+                    .map(|num| Token::new(TokenKind::Integer(num), form.span))
+                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
             },
         )
     }
 
-    fn decimal_number() -> Classifier<Character, Token, ScanError> {
+    fn decimal() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::optional(
@@ -304,8 +213,8 @@ impl Scanner {
                     ),
                 ])),
                 Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|c: &Character| *c == 'e' || *c == 'E'),
-                    Classifier::optional(Classifier::predicate(|c: &Character| *c == '+' || *c == '-')),
+                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
+                    Classifier::optional(Classifier::predicate(|c: &Character| matches!(c.value, '+' | '-'))),
                     Classifier::repeat(Classifier::predicate(|c: &Character| c.is_numeric()), 1, None),
                 ])),
             ]),
@@ -314,19 +223,14 @@ impl Scanner {
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
-                    match parser.parse(&number) {
-                        Ok(num) => Ok(Token::new(
-                            TokenKind::Float(FloatLiteral::from(num)),
-                            form.span,
-                        )),
-                        Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
-                    }
+                    parser.parse(&number)
+                        .map(|num| Token::new(TokenKind::Float(FloatLiteral::from(num)), form.span))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
                 } else {
                     let parser = parser::<i128>();
-                    match parser.parse(&number) {
-                        Ok(num) => Ok(Token::new(TokenKind::Integer(num), form.span)),
-                        Err(e) => Err(ScanError::new(ErrorKind::NumberParse(e), form.span)),
-                    }
+                    parser.parse(&number)
+                        .map(|num| Token::new(TokenKind::Integer(num), form.span))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
                 }
             },
         )
@@ -334,42 +238,21 @@ impl Scanner {
 
     fn number() -> Classifier<Character, Token, ScanError> {
         Classifier::alternative([
-            Self::hex_number(),
-            Self::binary_number(),
-            Self::octal_number(),
-            Self::decimal_number(),
+            Self::hexadecimal(),
+            Self::binary(),
+            Self::octal(),
+            Self::decimal(),
         ])
     }
 
-    fn identifier() -> Classifier<Character, Token, ScanError> {
-        Classifier::transform(
-            Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
-                Classifier::repeat(
-                    Classifier::predicate(|c: &Character| c.is_alphabetic() || c.is_numeric() || *c == '_'),
-                    0,
-                    None,
-                ),
-            ]),
-            |_, form| {
-                let identifier: String = form.inputs().into_iter().collect();
-
-                Ok(Token::new(
-                    TokenKind::from_str(&identifier).unwrap_or(TokenKind::Identifier(identifier)),
-                    form.span,
-                ))
-            },
-        )
-    }
-
-    fn quoted_string() -> Classifier<Character, Token, ScanError> {
+    fn string() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::literal('"'),
                 Classifier::repeat(
                     Classifier::alternative([
                         Classifier::sequence([Classifier::literal('\\'), Classifier::predicate(|_| true)]),
-                        Classifier::predicate(|c: &Character| *c != '"' && *c != '\\' && *c != '\n'),
+                        Classifier::predicate(|c: &Character| !matches!(c.value, '"' | '\\' | '\n')),
                     ]),
                     0,
                     None,
@@ -379,7 +262,6 @@ impl Scanner {
             |_, form| {
                 let mut content = String::new();
                 let mut i = 1;
-
                 let flat_chars = form.inputs();
 
                 while i < flat_chars.len() - 1 {
@@ -387,8 +269,8 @@ impl Scanner {
                     if c == '\\' {
                         i += 1;
                         if i < flat_chars.len() - 1 {
-                            let escaped_c = flat_chars[i].value;
-                            content.push(match escaped_c {
+                            let escaped = flat_chars[i].value;
+                            content.push(match escaped {
                                 'n' => '\n',
                                 'r' => '\r',
                                 't' => '\t',
@@ -400,23 +282,19 @@ impl Scanner {
                                     let mut hex = String::new();
                                     for _ in 0..2 {
                                         if i < flat_chars.len() - 1 {
-                                            let hex_c = flat_chars[i];
-                                            if hex_c.is_digit(16) {
-                                                hex.push(hex_c.value);
+                                            let hex_char = flat_chars[i];
+                                            if hex_char.is_digit(16) {
+                                                hex.push(hex_char.value);
                                                 i += 1;
                                             } else {
                                                 return Err(ScanError::new(
-                                                    ErrorKind::StringParseError(
-                                                        CharParseError::InvalidEscapeSequence,
-                                                    ),
+                                                    ErrorKind::StringParseError(CharParseError::InvalidEscapeSequence),
                                                     form.span,
                                                 ));
                                             }
                                         } else {
                                             return Err(ScanError::new(
-                                                ErrorKind::StringParseError(
-                                                    CharParseError::UnterminatedEscapeSequence,
-                                                ),
+                                                ErrorKind::StringParseError(CharParseError::UnterminatedEscapeSequence),
                                                 form.span,
                                             ));
                                         }
@@ -429,58 +307,32 @@ impl Scanner {
                                 }
                                 'u' => {
                                     i += 1;
-                                    if i < flat_chars.len() - 1 {
-                                        if flat_chars[i] == '{' {
+                                    if i < flat_chars.len() - 1 && flat_chars[i] == '{' {
+                                        i += 1;
+                                        let mut hex = String::new();
+                                        while i < flat_chars.len() - 1 && flat_chars[i] != '}' {
+                                            hex.push(flat_chars[i].value);
                                             i += 1;
-                                            let mut hex = String::new();
-                                            while i < flat_chars.len() - 1 {
-                                                let hex_c = flat_chars[i];
-                                                if hex_c == '}' {
-                                                    break;
-                                                }
-                                                hex.push(hex_c.value);
-                                                i += 1;
-                                            }
-                                            if i < flat_chars.len() - 1 {
-                                                if flat_chars[i] == '}' {
-                                                    u32::from_str_radix(&hex, 16)
-                                                        .ok()
-                                                        .and_then(from_u32)
-                                                        .unwrap_or('\0')
-                                                } else {
-                                                    return Err(ScanError::new(
-                                                        ErrorKind::StringParseError(
-                                                            CharParseError::InvalidEscapeSequence,
-                                                        ),
-                                                        form.span,
-                                                    ));
-                                                }
-                                            } else {
-                                                return Err(ScanError::new(
-                                                    ErrorKind::StringParseError(
-                                                        CharParseError::UnterminatedEscapeSequence,
-                                                    ),
-                                                    form.span,
-                                                ));
-                                            }
+                                        }
+                                        if i < flat_chars.len() - 1 && flat_chars[i] == '}' {
+                                            u32::from_str_radix(&hex, 16)
+                                                .ok()
+                                                .and_then(from_u32)
+                                                .unwrap_or('\0')
                                         } else {
                                             return Err(ScanError::new(
-                                                ErrorKind::StringParseError(
-                                                    CharParseError::InvalidEscapeSequence,
-                                                ),
+                                                ErrorKind::StringParseError(CharParseError::UnterminatedEscapeSequence),
                                                 form.span,
                                             ));
                                         }
                                     } else {
                                         return Err(ScanError::new(
-                                            ErrorKind::StringParseError(
-                                                CharParseError::UnterminatedEscapeSequence,
-                                            ),
+                                            ErrorKind::StringParseError(CharParseError::InvalidEscapeSequence),
                                             form.span,
                                         ));
                                     }
                                 }
-                                _ => escaped_c,
+                                c => c,
                             });
                         }
                     } else {
@@ -493,16 +345,19 @@ impl Scanner {
         )
     }
 
-    fn backtick_string() -> Classifier<Character, Token, ScanError> {
+    fn backtick() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::literal('`'),
-                Classifier::repeat(Classifier::predicate(|c: &Character| *c != '`'), 0, None),
+                Classifier::repeat(
+                    Classifier::predicate(|c: &Character| *c != '`'),
+                    0,
+                    None
+                ),
                 Classifier::literal('`'),
             ]),
             |_, form| {
                 let content: String = form.inputs().into_iter().collect();
-
                 Ok(Token::new(TokenKind::String(content), form.span))
             },
         )
@@ -514,19 +369,12 @@ impl Scanner {
                 Classifier::literal('\''),
                 Classifier::alternative([
                     Classifier::sequence([Classifier::literal('\\'), Classifier::predicate(|_| true)]),
-                    Classifier::predicate(|c: &Character| *c != '\'' && *c != '\\'),
+                    Classifier::predicate(|c: &Character| !matches!(c.value, '\'' | '\\')),
                 ]),
                 Classifier::literal('\''),
             ]),
             |_, form| {
                 let flat_chars = form.inputs();
-
-                if flat_chars.len() < 3 {
-                    return Err(ScanError::new(
-                        ErrorKind::CharParseError(CharParseError::EmptyCharLiteral),
-                        form.span,
-                    ));
-                }
 
                 let ch = if flat_chars[1] == '\\' {
                     if flat_chars.len() < 4 {
@@ -535,8 +383,8 @@ impl Scanner {
                             form.span,
                         ));
                     }
-                    let escaped_c = flat_chars[2].value;
-                    match escaped_c {
+                    let escaped = flat_chars[2].value;
+                    match escaped {
                         'n' => '\n',
                         'r' => '\r',
                         't' => '\t',
@@ -546,9 +394,7 @@ impl Scanner {
                         'x' => {
                             if flat_chars.len() < 6 {
                                 return Err(ScanError::new(
-                                    ErrorKind::CharParseError(
-                                        CharParseError::UnterminatedEscapeSequence,
-                                    ),
+                                    ErrorKind::CharParseError(CharParseError::UnterminatedEscapeSequence),
                                     form.span,
                                 ));
                             }
@@ -562,9 +408,7 @@ impl Scanner {
                                     .unwrap_or('\0')
                             } else {
                                 return Err(ScanError::new(
-                                    ErrorKind::CharParseError(
-                                        CharParseError::InvalidEscapeSequence,
-                                    ),
+                                    ErrorKind::CharParseError(CharParseError::InvalidEscapeSequence),
                                     form.span,
                                 ));
                             }
@@ -572,9 +416,7 @@ impl Scanner {
                         'u' => {
                             if flat_chars.len() < 5 || flat_chars[3] != '{' {
                                 return Err(ScanError::new(
-                                    ErrorKind::CharParseError(
-                                        CharParseError::InvalidEscapeSequence,
-                                    ),
+                                    ErrorKind::CharParseError(CharParseError::InvalidEscapeSequence),
                                     form.span,
                                 ));
                             }
@@ -586,9 +428,7 @@ impl Scanner {
                             }
                             if i >= flat_chars.len() || flat_chars[i] != '}' {
                                 return Err(ScanError::new(
-                                    ErrorKind::CharParseError(
-                                        CharParseError::UnterminatedEscapeSequence,
-                                    ),
+                                    ErrorKind::CharParseError(CharParseError::UnterminatedEscapeSequence),
                                     form.span,
                                 ));
                             }
@@ -597,7 +437,7 @@ impl Scanner {
                                 .and_then(from_u32)
                                 .unwrap_or('\0')
                         }
-                        _ => escaped_c,
+                        c => c,
                     }
                 } else {
                     flat_chars[1].value
@@ -608,12 +448,35 @@ impl Scanner {
         )
     }
 
+    fn identifier() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
+                Classifier::repeat(
+                    Classifier::predicate(|c: &Character| c.is_alphanumeric() || *c == '_'),
+                    0,
+                    None,
+                ),
+            ]),
+            |_, form| {
+                let identifier: String = form.inputs().into_iter().collect();
+                Ok(Token::new(
+                    TokenKind::from_str(&identifier).unwrap_or(TokenKind::Identifier(identifier)),
+                    form.span,
+                ))
+            },
+        )
+    }
+
     fn operator() -> Classifier<Character, Token, ScanError> {
         Classifier::transform(
-            Classifier::repeat(Classifier::predicate(|c: &Character| c.is_operator()), 1, None),
+            Classifier::repeat(
+                Classifier::predicate(|c: &Character| c.is_operator()),
+                1,
+                None
+            ),
             |_, form| {
                 let operator: String = form.inputs().into_iter().collect();
-
                 Ok(Token::new(
                     TokenKind::Operator(operator.to_operator()),
                     form.span,
@@ -627,7 +490,6 @@ impl Scanner {
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
                 let punctuation: String = form.inputs().into_iter().collect();
-
                 Ok(Token::new(
                     TokenKind::Punctuation(punctuation.to_punctuation()),
                     form.span,
@@ -645,20 +507,47 @@ impl Scanner {
             ),
             |_, form| {
                 let whitespace: String = form.inputs().into_iter().collect();
+                let kind = match whitespace.len() {
+                    1 => TokenKind::Punctuation(PunctuationKind::Space),
+                    len => TokenKind::Punctuation(PunctuationKind::Indentation(len)),
+                };
 
-                if whitespace.len() == 1 {
-                    Ok(Token::new(
-                        TokenKind::Punctuation(PunctuationKind::Space),
-                        form.span,
-                    ))
-                } else if whitespace.len() > 1 {
-                    Ok(Token::new(
-                        TokenKind::Punctuation(PunctuationKind::Indentation(whitespace.len())),
-                        form.span,
-                    ))
-                } else {
-                    unreachable!()
-                }
+                Ok(Token::new(kind, form.span))
+            },
+        )
+    }
+
+    fn comment() -> Classifier<Character, Token, ScanError> {
+        Classifier::transform(
+            Classifier::sequence([
+                Classifier::alternative([
+                    Classifier::sequence([
+                        Classifier::sequence([Classifier::literal('/'), Classifier::literal('/')]).with_ignore(),
+                        Classifier::repeat(
+                            Classifier::predicate(|c: &Character| *c != '\n'),
+                            0,
+                            None
+                        ),
+                    ]),
+                    Classifier::sequence([
+                        Classifier::sequence([Classifier::literal('/'), Classifier::literal('*')]).with_ignore(),
+                        Classifier::repeat(
+                            Classifier::negate(
+                                Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore()
+                            ),
+                            0,
+                            None,
+                        ),
+                        Classifier::sequence([Classifier::literal('*'), Classifier::literal('/')]).with_ignore(),
+                    ])
+                ])
+            ]),
+            |_, form| {
+                let content: String = form.inputs().into_iter().collect();
+                Ok(Token::new(
+                    TokenKind::Comment(content.trim().to_string()),
+                    form.span,
+                ))
             },
         )
     }
@@ -671,12 +560,11 @@ impl Scanner {
         Classifier::repeat(
             Classifier::alternative([
                 Self::whitespace(),
-                Self::line_comment(),
-                Self::multiline_comment(),
+                Self::comment(),
                 Self::identifier(),
                 Self::number(),
-                Self::quoted_string(),
-                Self::backtick_string(),
+                Self::string(),
+                Self::backtick(),
                 Self::character(),
                 Self::operator(),
                 Self::punctuation(),
@@ -693,42 +581,23 @@ impl Scanner {
 
         while self.peek().is_some() {
             let form = self.form(Self::pattern());
-
-            match form.kind {
-                FormKind::Output(token) => {
-                    tokens.push(token);
-                }
-
-                FormKind::Multiple(multi) => {
-                    for item in multi {
-                        match item.kind {
-                            FormKind::Output(token) => {
-                                tokens.push(token);
-                            }
-                            FormKind::Multiple(sub_multi) => {
-                                for sub_item in sub_multi {
-                                    if let FormKind::Output(token) = sub_item.kind {
-                                        tokens.push(token);
-                                    }
-                                }
-                            }
-                            FormKind::Failure(err) => {
-                                errors.push(err);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                FormKind::Failure(err) => {
-                    errors.push(err);
-                }
-
-                FormKind::Blank | FormKind::Input(_) => {}
-            }
+            self.process_form(form, &mut tokens, &mut errors);
         }
 
         (tokens, errors)
+    }
+
+    fn process_form(&self, form: Form<Character, Token, ScanError>, tokens: &mut Vec<Token>, errors: &mut Vec<ScanError>) {
+        match form.kind {
+            FormKind::Output(token) => tokens.push(token),
+            FormKind::Multiple(multi) => {
+                for item in multi {
+                    self.process_form(item, tokens, errors);
+                }
+            }
+            FormKind::Failure(err) => errors.push(err),
+            FormKind::Blank | FormKind::Input(_) => {}
+        }
     }
 }
 

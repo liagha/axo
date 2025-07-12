@@ -14,14 +14,14 @@ use {
 };
 
 impl Parser {
-    pub fn bundle() -> Classifier<Token, Element, ParseError> {
+    pub fn bundle(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::required(
@@ -37,7 +37,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -64,14 +64,14 @@ impl Parser {
         )
     }
 
-    pub fn scope() -> Classifier<Token, Element, ParseError> {
+    pub fn scope(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::required(
@@ -87,7 +87,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -114,13 +114,13 @@ impl Parser {
         )
     }
 
-    pub fn group() -> Classifier<Token, Element, ParseError> {
+    pub fn group(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 }),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::ordered(
@@ -139,7 +139,7 @@ impl Parser {
                                 }),
                             ),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -166,14 +166,14 @@ impl Parser {
         )
     }
 
-    pub fn sequence() -> Classifier<Token, Element, ParseError> {
+    pub fn sequence(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 })
                 .with_ignore(),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::ordered(
@@ -192,7 +192,7 @@ impl Parser {
                                 }),
                             ),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -219,14 +219,14 @@ impl Parser {
         )
     }
 
-    pub fn collection() -> Classifier<Token, Element, ParseError> {
+    pub fn collection(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::required(
@@ -242,7 +242,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -269,14 +269,14 @@ impl Parser {
         )
     }
 
-    pub fn series() -> Classifier<Token, Element, ParseError> {
+    pub fn series(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
-                Classifier::lazy(Self::element).as_optional(),
+                item.as_optional(),
                 Classifier::repeat(
                     Classifier::sequence([
                         Classifier::required(
@@ -292,7 +292,7 @@ impl Parser {
                                 )
                             }),
                         ),
-                        Classifier::lazy(Self::element).as_optional(),
+                        item.as_optional(),
                     ]),
                     0,
                     None,
@@ -321,12 +321,12 @@ impl Parser {
 
     pub fn delimited() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
-            Self::bundle(),
-            Self::scope(),
-            Self::group(),
-            Self::sequence(),
-            Self::collection(),
-            Self::series(),
+            Self::bundle(Classifier::lazy(Self::element)),
+            Self::scope(Classifier::lazy(Self::element)),
+            Self::group(Classifier::lazy(Self::element)),
+            Self::sequence(Classifier::lazy(Self::element)),
+            Self::collection(Classifier::lazy(Self::element)),
+            Self::series(Classifier::lazy(Self::element)),
         ])
     }
 }

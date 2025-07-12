@@ -1,6 +1,9 @@
 use {
     crate::{
-        axo_cursor::Span,
+        axo_cursor::{Span, Position},
+        axo_scanner::{
+            Scanner,
+        },
         is_alphabetic, is_numeric, is_white_space, is_alphanumeric
     },
 };
@@ -58,5 +61,46 @@ impl PartialEq<Character> for char {
 impl FromIterator<Character> for String {
     fn from_iter<I: IntoIterator<Item = Character>>(iter: I) -> Self {
         iter.into_iter().map(|character| character.value).collect()
+    }
+}
+
+impl Scanner {
+    pub fn inspect(start: Position, input: Vec<char>) -> Vec<Character> {
+        let mut position = start;
+        let mut characters = Vec::new();
+
+        for char in input {
+            let character = match char {
+                '\n' => {
+                    let start = position;
+                    position.add_line(1);
+                    position.set_column(1);
+
+                    Character {
+                        value: char,
+                        span: Span {
+                            start,
+                            end: position,
+                        }
+                    }
+                }
+                char => {
+                    let start = position;
+                    position.add_column(1);
+
+                    Character {
+                        value: char,
+                        span: Span {
+                            start,
+                            end: position,
+                        }
+                    }
+                }
+            };
+
+            characters.push(character);
+        }
+
+        characters
     }
 }

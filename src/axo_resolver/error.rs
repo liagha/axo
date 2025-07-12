@@ -14,7 +14,7 @@ pub enum ErrorKind {
     UndefinedSymbol {
         query: Token,
     },
-    SlotMismatch {
+    BindMismatch {
         candidate: Token,
     },
 }
@@ -25,7 +25,7 @@ impl Display for ErrorKind {
             ErrorKind::UndefinedSymbol { query } => {
                 write!(f, "undefined symbol: `{}`", query)
             },
-            ErrorKind::SlotMismatch { candidate } => {
+            ErrorKind::BindMismatch { candidate } => {
                 write!(f, "slots of `{}` aren't matched correctly.", candidate)
             }
         }

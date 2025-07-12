@@ -13,6 +13,9 @@ use {
             Peekable,
             Spanned,
         },
+        axo_schema::{
+            Formation
+        },
         axo_parser::{Symbol, SymbolKind},
         compiler::{Context, Marked},
         format::Debug,
@@ -98,10 +101,7 @@ where
                     );
 
                     let symbol = Symbol::new(
-                        SymbolKind::Formation {
-                            identifier: identifier.clone(),
-                            form: artifact,
-                        },
+                        SymbolKind::Formation(Formation::new(identifier.clone(), artifact)),
                         draft.form.span.clone(),
                     );
 

@@ -6,9 +6,11 @@ use {
     },
     
     OperatorKind::*,
+
+    derive_more::Unwrap,
 };
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Unwrap)]
 pub enum OperatorKind {
     At,                      // @ (annotation or pattern binding)
     Ampersand,               // & (bitwise AND or reference)

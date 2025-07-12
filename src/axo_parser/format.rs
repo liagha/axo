@@ -18,7 +18,7 @@ impl Debug for SymbolKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SymbolKind::Inclusion(inclusion) => write!(f, "Inclusion({:?})", inclusion.get_target()),
-            SymbolKind::Formation { identifier, form } => write!(f, "Formed({:?}: {:?})", identifier, form),
+            SymbolKind::Formation(formation) => write!(f, "Formed({:?}: {:?})", formation.get_identifier(), formation.get_form()),
             SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} => {:?})", implementation.get_target(), implementation.get_body()),
             SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_body()),
             SymbolKind::Binding(binding) => {

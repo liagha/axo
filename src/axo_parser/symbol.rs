@@ -1,4 +1,5 @@
 use {
+    derive_more::Unwrap,
     crate::{
         artifact::Artifact,
 
@@ -39,11 +40,10 @@ pub struct Symbol {
     pub span: Span,
 }
 
+
+#[derive(Unwrap)]
 pub enum SymbolKind {
-    Formation {
-        identifier: Artifact,
-        form: Form<Artifact, Artifact, Artifact>,
-    },
+    Formation(Formation),
     Inclusion(Inclusion<Box<Element>>),
     Implementation(Implementation<Box<Element>, Box<Element>>),
     Interface(Interface<Box<Element>, Box<Element>>),

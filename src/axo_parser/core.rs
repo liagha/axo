@@ -2,31 +2,25 @@ use {
     super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
         axo_cursor::Span,
+        axo_cursor::Spanned,
         axo_form::{
-            order::Order,
-            form::{Form, FormKind},
+            form::Form,
             former::Former,
+            order::Order,
             pattern::Classifier,
         },
+        axo_parser::SymbolKind,
+        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         axo_schema::{
-            Group, Sequence,
-            Collection, Series,
-            Bundle, Scope,
-            Binary, Unary,
-            Index, Invoke, Construct,
-            Conditioned, Repeat, Walk, Map,
-            Structure, Enumeration,
-            Binding, Function, Interface, Implementation, Formation, Inclusion,
-            Label, Access, Assign,
+            Access, Assign,
+            Binary, Binding, Conditioned,
+            Construct, Enumeration,
+            Index, Invoke,
+            Label,
+            Repeat, Structure, Unary,
         },
-        axo_parser::{Symbol, SymbolKind},
-        axo_scanner::{Token, TokenKind, OperatorKind, PunctuationKind},
-        axo_cursor::Spanned,
-        artifact::Artifact,
         tree::{Node, Tree},
-        thread::Arc,
     },
-    log::trace,
 };
 
 impl Parser {
@@ -45,6 +39,8 @@ impl Parser {
     pub fn literal() -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::predicate(|token: &Token| {
+                let kind = crate::memory::discriminant(&token.kind);
+
                 matches!(
                     token.kind,
                     TokenKind::String(_)
@@ -125,9 +121,9 @@ impl Parser {
             Classifier::sequence([
                 Self::primary(),
                 Classifier::alternative([
-                    Self::group(),
-                    Self::collection(),
-                    Self::bundle(),
+                    Self::group(Classifier::lazy(Self::element)),
+                    Self::collection(Classifier::lazy(Self::element)),
+                    Self::bundle(Classifier::lazy(Self::element)),
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
                             operator.is_suffix()
@@ -314,7 +310,7 @@ impl Parser {
                 Classifier::lazy(|| Self::unary()),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Operator(op) = &token.kind {
-                        if let Some(OperatorKind::Composite(compound)) = op.as_slice().first() {
+                        if let OperatorKind::Composite(compound) = op {
                             OperatorKind::Composite(compound.clone()).decompound().is_some()
                         } else {
                             false
@@ -328,33 +324,30 @@ impl Parser {
             |_, form| {
                 let sequence = form.unwrap();
                 let target = sequence[0].unwrap_output();
-                let operator = sequence[1].unwrap_input();
+                let raw = sequence[1].unwrap_input();
+                let operator = raw.kind.unwrap_operator();
                 let value = sequence[2].unwrap_output();
                 let span = Span::mix(&target.span, &value.span);
 
-                if let TokenKind::Operator(op) = &operator.kind {
-                    if let Some(OperatorKind::Composite(compound)) = op.as_slice().first() {
-                        if let Some(base_op) = OperatorKind::Composite(compound.clone()).decompound() {
-                            let operation_token = Token {
-                                kind: TokenKind::Operator(base_op),
-                                span: operator.span.clone(),
-                            };
+                if let Some(base) = operator.decompound() {
+                    let operation = Token {
+                        kind: TokenKind::Operator(base),
+                        span: raw.span.clone(),
+                    };
 
-                            let operation = Element::new(
-                                ElementKind::Binary(Binary::new(
-                                    target.clone().into(),
-                                    operation_token,
-                                    value.into())
-                                ),
-                                span.clone(),
-                            );
+                    let right = Element::new(
+                        ElementKind::Binary(Binary::new(
+                            target.clone().into(),
+                            operation,
+                            value.into())
+                        ),
+                        span.clone(),
+                    );
 
-                            return Ok(Element::new(
-                                ElementKind::Assign(Assign::new(target.into(), operation.into())),
-                                span,
-                            ));
-                        }
-                    }
+                    return Ok(Element::new(
+                        ElementKind::Assign(Assign::new(target.into(), right.into())),
+                        span,
+                    ));
                 }
 
                 unreachable!()
@@ -692,7 +685,7 @@ impl Parser {
                     }
                 }),
                 Self::token(),
-                Self::bundle(),
+                Self::bundle(Self::variable()),
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();
@@ -721,7 +714,7 @@ impl Parser {
                     }
                 }),
                 Self::token(),
-                Self::bundle(),
+                Self::bundle(Classifier::lazy(Self::element)),
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();
