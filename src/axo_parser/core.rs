@@ -31,7 +31,9 @@ impl Parser {
                 let input = form.inputs()[0].clone();
                 let identifier = input.kind.unwrap_identifier();
 
-                Ok(Element::new(ElementKind::Identifier(identifier), input.span))
+                Ok(Form::output(
+                    Element::new(ElementKind::Identifier(identifier), input.span)
+                ))
             },
         )
     }
@@ -39,8 +41,6 @@ impl Parser {
     pub fn literal() -> Classifier<Token, Element, ParseError> {
         Classifier::transform(
             Classifier::predicate(|token: &Token| {
-                let kind = crate::memory::discriminant(&token.kind);
-
                 matches!(
                     token.kind,
                     TokenKind::String(_)
@@ -53,7 +53,9 @@ impl Parser {
             |_, form| {
                 let input = form.inputs()[0].clone();
 
-                Ok(Element::new(ElementKind::Literal(input.kind), input.span))
+                Ok(Form::output(
+                    Element::new(ElementKind::Literal(input.kind), input.span)
+                ))
             },
         )
     }
@@ -111,7 +113,7 @@ impl Parser {
                     );
                 }
 
-                Ok(unary)
+                Ok(Form::output(unary))
             })
         )
     }
@@ -172,7 +174,7 @@ impl Parser {
                     }
                 }
 
-                Ok(unary)
+                Ok(Form::output(unary))
             },
         )
     }
@@ -201,9 +203,11 @@ impl Parser {
                 let member = sequence[1].unwrap_output();
                 let span = Span::mix(&object.span, &member.span);
 
-                Ok(Element::new(
-                    ElementKind::Access(Access::new(object.into(), member.into())),
-                    span,
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Access(Access::new(object.into(), member.into())),
+                        span,
+                    )
                 ))
             },
         )
@@ -224,9 +228,11 @@ impl Parser {
                 let element = sequence[1].unwrap_output();
                 let span = Span::mix(&label.span, &element.span);
 
-                Ok(Element::new(
-                    ElementKind::Label(Label::new(label.into(), element.into())),
-                    span,
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Label(Label::new(label.into(), element.into())),
+                        span,
+                    )
                 ))
             },
         )
@@ -247,9 +253,11 @@ impl Parser {
                 let value = sequence[1].unwrap_output();
                 let span = Span::mix(&target.span, &value.span);
 
-                Ok(Element::new(
-                    ElementKind::Assign(Assign::new(target.into(), value.into())),
-                    span,
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Assign(Assign::new(target.into(), value.into())),
+                        span,
+                    )
                 ))
             },
         )
@@ -299,7 +307,9 @@ impl Parser {
                     }
                 };
 
-                Ok(Element::new(kind, span))
+                Ok(Form::output(
+                    Element::new(kind, span)
+                ))
             },
         )
     }
@@ -344,9 +354,11 @@ impl Parser {
                         span.clone(),
                     );
 
-                    return Ok(Element::new(
-                        ElementKind::Assign(Assign::new(target.into(), right.into())),
-                        span,
+                    return Ok(Form::output(
+                        Element::new(
+                            ElementKind::Assign(Assign::new(target.into(), right.into())),
+                            span,
+                        )
                     ));
                 }
 
@@ -412,7 +424,8 @@ impl Parser {
                     }
 
                     left = Self::climb(left, pairs, 0);
-                    Ok(left)
+
+                    Ok(Form::output(left))
                 },
             )
         ])
@@ -507,15 +520,19 @@ impl Parser {
 
                 if let Some(alternate) = sequence.get(2).cloned() {
                     let span = condition.span.mix(&alternate.span);
-                    Ok(Element::new(
-                        ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), Some(alternate.into()))),
-                        span,
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), Some(alternate.into()))),
+                            span,
+                        )
                     ))
                 } else {
                     let span = condition.span.mix(&then.span);
-                    Ok(Element::new(
-                        ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), None)),
-                        span,
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), None)),
+                            span,
+                        )
                     ))
                 }
             },
@@ -570,17 +587,21 @@ impl Parser {
                 if sequence.len() == 1 {
                     let body = sequence[0].clone();
                     let span = body.span.clone();
-                    Ok(Element::new(
-                        ElementKind::Repeat(Repeat::new(None, body.into())),
-                        span,
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Repeat(Repeat::new(None, body.into())),
+                            span,
+                        )
                     ))
                 } else if sequence.len() == 2 {
                     let condition = sequence[0].clone();
                     let body = sequence[1].clone();
                     let span = condition.span.mix(&body.span);
-                    Ok(Element::new(
-                        ElementKind::Repeat(Repeat::new(Some(condition.into()), body.into())),
-                        span,
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Repeat(Repeat::new(Some(condition.into()), body.into())),
+                            span,
+                        )
                     ))
                 } else {
                     unreachable!()
@@ -666,9 +687,11 @@ impl Parser {
 
                 let symbol = SymbolKind::Binding(Binding::new(target.into(), value, ty, mutable));
 
-                Ok(Element::new(
-                    ElementKind::Symbolize(symbol),
-                    span,
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Symbolize(symbol),
+                        span,
+                    )
                 ))
             },
         )
@@ -693,11 +716,13 @@ impl Parser {
                 let name = outputs[0].clone();
                 let body = outputs[1].clone().kind.unwrap_bundle();
 
-                Ok(Element::new(
-                    ElementKind::Symbolize(
-                        SymbolKind::Structure(Structure::new(name.into(), body.items)),                    
-                    ),
-                    outputs.span()
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Symbolize(
+                            SymbolKind::Structure(Structure::new(name.into(), body.items)),
+                        ),
+                        outputs.span()
+                    )
                 ))
             }
         )
@@ -723,11 +748,13 @@ impl Parser {
 
                 let body = outputs[1].clone().kind.unwrap_bundle();
 
-                Ok(Element::new(
-                    ElementKind::Symbolize(
-                        SymbolKind::Enumeration(Enumeration::new(name.into(), body.items)),
-                    ),
-                    outputs.span()
+                Ok(Form::output(
+                    Element::new(
+                        ElementKind::Symbolize(
+                            SymbolKind::Enumeration(Enumeration::new(name.into(), body.items)),
+                        ),
+                        outputs.span()
+                    )
                 ))
             }
         )

@@ -545,7 +545,7 @@ where
 
     pub fn transform<T>(self, transform: T) -> Self
     where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
+        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
         + Send
         + Sync
         + 'static,
@@ -605,7 +605,7 @@ where
     #[inline]
     pub fn with_transform<T>(mut self, transform: T) -> Self
     where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
+        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
         + Send
         + Sync
         + 'static,

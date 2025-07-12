@@ -1,0 +1,6 @@
+"Hello\nWorld!\tThis is a test string with simple escapes: \\, \", \', \0"
+"Hexadecimal: \x41, Octal: \077"
+"Unicode BMP: \u0041, Unicode Emoji: \u{1F600}"
+"Invalid escapes: \z, \xG1"
+"Incomplete Unicode: \u12, Out-of-range Unicode: \u{110000}"
+"Ends with backslash: \\"

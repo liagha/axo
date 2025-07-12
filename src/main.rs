@@ -78,6 +78,16 @@ pub mod character {
     pub use core::char::{
         from_u32, from_u32_unchecked, MAX
     };
+
+    pub fn parse_radix_u32(s: &str, radix: u32) -> Option<u32> {
+        let mut accum = 0u32;
+        for c in s.chars() {
+            let d = c.to_digit(radix)?;
+            accum = accum.checked_mul(radix)?
+                .checked_add(d)?;
+        }
+        Some(accum)
+    }
 }
 
 pub mod any {

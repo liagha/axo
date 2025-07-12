@@ -72,8 +72,7 @@ where
                     let span = draft.form.span.clone();
 
                     match result {
-                        Ok(output) => {
-                            let mapped = Form::new(FormKind::Output(output), span);
+                        Ok(mapped) => {
                             draft.form = mapped;
                         }
                         Err(error) => {
@@ -179,7 +178,7 @@ where
     #[inline]
     pub fn map<T>(transformer: T) -> Self
     where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Output, Failure>
+        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
         + Send
         + Sync
         + 'static,

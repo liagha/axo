@@ -5,6 +5,7 @@ mod scanner;
 mod format;
 pub mod error;
 mod character;
+mod escape;
 
 pub use {
     scanner::Scanner,
