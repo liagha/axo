@@ -3,140 +3,8 @@ use crate::axo_form::order::Order;
 use crate::axo_form::pattern::Classifier;
 use crate::axo_scanner::{Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind};
 use crate::axo_scanner::error::{CharacterError, ErrorKind};
-use crate::parser;
 
 impl Scanner {
-    fn number() -> Classifier<Character, Token, ScanError> {
-        Classifier::alternative([
-            Self::hexadecimal(),
-            Self::binary(),
-            Self::octal(),
-            Self::decimal(),
-        ])
-    }
-
-    fn hexadecimal() -> Classifier<Character, Token, ScanError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| c.is_alphanumeric()),
-                        Classifier::literal('_').with_ignore(),
-                    ]),
-                    1,
-                    None,
-                ),
-            ]),
-            |_, form| {
-                let number: String = form.inputs().into_iter().collect();
-                let parser = parser::<i128>();
-
-                parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
-            },
-        )
-    }
-
-    fn binary() -> Classifier<Character, Token, ScanError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('b'), Classifier::literal('B')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| matches!(c.value, '0' | '1')),
-                        Classifier::literal('_').with_ignore(),
-                    ]),
-                    1,
-                    None,
-                ),
-            ]),
-            |_, form| {
-                let number: String = form.inputs().into_iter().collect();
-                let parser = parser::<i128>();
-
-                parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
-            },
-        )
-    }
-
-    fn octal() -> Classifier<Character, Token, ScanError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::literal('0'),
-                Classifier::alternative([Classifier::literal('o'), Classifier::literal('O')]),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| ('0'..='7').contains(&c.value)),
-                        Classifier::literal('_').with_ignore(),
-                    ]),
-                    1,
-                    None,
-                ),
-            ]),
-            |_, form| {
-                let number: String = form.inputs().into_iter().collect();
-                let parser = parser::<i128>();
-
-                parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
-            },
-        )
-    }
-
-    fn decimal() -> Classifier<Character, Token, ScanError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.is_numeric()),
-                Classifier::persistence(
-                    Classifier::alternative([
-                        Classifier::predicate(|c: &Character| c.is_numeric()),
-                        Classifier::literal('_').with_ignore(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::literal('.'),
-                    Classifier::persistence(
-                        Classifier::alternative([
-                            Classifier::predicate(|c: &Character| c.is_numeric()),
-                            Classifier::literal('_').with_ignore(),
-                        ]),
-                        1,
-                        None,
-                    ),
-                ])),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
-                    Classifier::optional(Classifier::predicate(|c: &Character| matches!(c.value, '+' | '-'))),
-                    Classifier::persistence(Classifier::predicate(|c: &Character| c.is_numeric()), 1, None),
-                ])),
-            ]),
-            |_, form| {
-                let number: String = form.inputs().into_iter().collect();
-
-                if number.contains('.') || number.to_lowercase().contains('e') {
-                    let parser = parser::<f64>();
-                    parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), form.span)))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
-                } else {
-                    let parser = parser::<i128>();
-                    parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
-                }
-            },
-        )
-    }
-
     fn string() -> Classifier<Character, Token, ScanError> {
         Classifier::sequence([
             Classifier::literal('"'),
@@ -150,12 +18,7 @@ impl Scanner {
             ),
             Classifier::literal('"'),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
-            let content: String = inputs.iter()
-                .skip(1)
-                .take(inputs.len() - 2)
-                .map(|c| c.value)
-                .collect();
+            let content: String = form.inputs().into_iter().collect();
 
             Ok(Form::output(Token::new(TokenKind::String(content), form.span)))
         })
@@ -165,11 +28,10 @@ impl Scanner {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('`'),
-                Classifier::persistence(
-                    Classifier::predicate(|c: &Character| *c != '`'),
-                    0,
-                    None
-                ),
+                Classifier::alternative([
+                    Classifier::predicate(|c: &Character| !matches!(c.value, '`' | '\\')),
+                    Self::escape_sequence(),
+                ]),
                 Classifier::literal('`'),
             ]),
             |_, form| {
@@ -183,8 +45,8 @@ impl Scanner {
         Classifier::sequence([
             Classifier::literal('\''),
             Classifier::alternative([
-                Self::escape_sequence(),
                 Classifier::predicate(|c: &Character| !matches!(c.value, '\'' | '\\')),
+                Self::escape_sequence(),
             ]),
             Classifier::literal('\''),
         ]).with_transform(|_, form| {

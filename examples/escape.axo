@@ -1,6 +1,75 @@
+// Basic escape sequences
 "Hello\nWorld!\tThis is a test string with simple escapes: \\, \", \', \0"
+
+// Hexadecimal and octal escapes
 "Hexadecimal: \x41, Octal: \077"
+
+// Unicode escapes
 "Unicode BMP: \u0041, Unicode Emoji: \u{1F600}"
-"Invalid escapes: \z, \xG1"
-"Incomplete Unicode: \u12, Out-of-range Unicode: \u{110000}"
+
+// Additional common escape sequences
+"Carriage return: \r, Form feed: \f, Vertical tab: \v"
+"Bell/Alert: \a, Backspace: \b"
+
+// More hexadecimal examples
+"Hex lowercase: \x61\x62\x63, Hex uppercase: \X41\X42\X43"
+"Hex edge cases: \x00, \x7F, \xFF"
+
+// More octal examples  
+"Octal digits: \001, \123, \377"
+"Octal zero-padded: \000, \007, \010"
+
+// Extended Unicode examples
+"Unicode symbols: \u{2603}, \u{2764}, \u{1F4A9}"
+"Unicode CJK: \u{4E2D}, \u{6587}, \u{65E5}"
+"Unicode mathematical: \u{2200}, \u{2203}, \u{221E}"
+"Unicode arrows: \u{2190}, \u{2192}, \u{21D2}"
+"Unicode currency: \u{00A3}, \u{00A5}, \u{20AC}"
+
+// Invalid/problematic escape sequences
+"Invalid escapes: \z, \xG1, \q, \9"
+"Incomplete hex: \x1, \x"
+"Incomplete octal: \1, \12"
+"Incomplete Unicode: \u12, \u{12"
+"Out-of-range Unicode: \u{110000}, \u{FFFFFF}"
+"Malformed Unicode: \u{}, \u{GGGG}"
+
+// Edge cases
+"Empty Unicode: \u{0}"
+"Max valid Unicode: \u{10FFFF}"
+"Surrogate pairs (invalid): \u{D800}, \u{DFFF}"
+
+// Combinations and complex cases
+"Mixed: \x41\u{0042}\103 spells ABC"
+"Escaped backslash before escape: \\\\n vs \\n"
+"Multiple escapes: \n\n\t\t\r\r"
+
+// String continuation and line endings
+"Line continuation: \
+this continues"
+"CRLF ending: \r\n"
+"Mixed line endings: \n\r\n\r"
+
+// Control characters
+"Control chars: \x01\x02\x03\x1F"
+"DEL character: \x7F"
+
+// String ending edge cases
 "Ends with backslash: \\"
+"Ends with valid escape: \n"
+"Ends with incomplete escape: \x"
+"Ends with Unicode: \u{41}"
+
+// Nested quotes and complex escaping
+"Nested quotes: \"He said 'Hello' to me\""
+"Triple nested: \"She said \\\"It's fine\\\" to him\""
+
+// Special whitespace characters
+"Non-breaking space: \u{00A0}"
+"Em space: \u{2003}, En space: \u{2002}"
+"Thin space: \u{2009}, Hair space: \u{200A}"
+"Zero-width space: \u{200B}"
+
+// Format-related escapes (if applicable)
+"Format specifiers: \{}, \{{literal}}"
+"Printf-style: \%d, \%s, \%\%"

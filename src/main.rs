@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+extern crate core;
 
 mod axo_data;
 mod axo_error;
@@ -79,14 +80,40 @@ pub mod character {
         from_u32, from_u32_unchecked, MAX
     };
 
-    pub fn parse_radix_u32(s: &str, radix: u32) -> Option<u32> {
-        let mut accum = 0u32;
-        for c in s.chars() {
-            let d = c.to_digit(radix)?;
-            accum = accum.checked_mul(radix)?
-                .checked_add(d)?;
+    use num_traits::PrimInt;
+
+    pub fn parse_radix<T: PrimInt>(input: &str, radix: T) -> Option<T> {
+        if input.is_empty() {
+            return None;
         }
-        Some(accum)
+
+        let radix_u8 = radix.to_u8()?;
+
+        if radix_u8 < 2 || radix_u8 > 36 {
+            return None;
+        }
+
+        let mut accumulator = T::zero();
+
+        for &byte in input.as_bytes() {
+            let value = match byte {
+                b'0'..=b'9' => byte - b'0',
+                b'a'..=b'z' => byte - b'a' + 10,
+                b'A'..=b'Z' => byte - b'A' + 10,
+                _ => return None,
+            };
+
+            if value >= radix_u8 {
+                return None;
+            }
+
+            let digit = T::from(value).unwrap();
+
+            accumulator = accumulator.checked_mul(&radix)?
+                .checked_add(&digit)?;
+        }
+
+        Some(accumulator)
     }
 }
 
