@@ -117,10 +117,7 @@ impl Debug for ElementKind {
                 write!(f, "Member({:?}.{:?})", access.get_object(), access.get_member())
             },
 
-            ElementKind::Map(map) => {
-                write!(f, "Match({:?} => {:?})", map.get_target(), map.get_body())
-            },
-            ElementKind::Conditioned(cond) => {
+            ElementKind::Conditional(cond) => {
                 write!(f, "Conditional({:?} | Then: {:?}", cond.get_condition(), cond.get_then())?;
 
                 if let Some(else_expr) = cond.get_alternate() {
@@ -136,7 +133,7 @@ impl Debug for ElementKind {
                     write!(f, "Loop({:?})", repeat.get_body())
                 }
             },
-            ElementKind::Walk(walk) => {
+            ElementKind::Iterate(walk) => {
                 write!(f, "For({:?} in {:?})", walk.get_clause(), walk.get_body())
             },
 
@@ -177,7 +174,7 @@ impl Debug for ElementKind {
                 Ok(())
             }
 
-            ElementKind::Locate(tree) => write!(f, "Path({:?})", tree),
+            ElementKind::Domain(tree) => write!(f, "Path({:?})", tree),
         }
     }
 }

@@ -84,10 +84,16 @@ where
         }
     }
 
+    /// Panic = Maximum
     /// Aligned = 1
     /// Failed = 0
     /// Blank = -1
     /// Ignore = -2
+    #[inline]
+    pub fn is_panicked(&self) -> bool {
+        matches!(self.record, 120)
+    }
+
     #[inline]
     pub fn is_aligned(&self) -> bool {
         matches!(self.record, 1)
@@ -111,6 +117,11 @@ where
     #[inline]
     pub fn is_ignored(&self) -> bool {
         matches!(self.record, -2)
+    }
+
+    #[inline]
+    pub fn panic(&mut self) {
+        self.record = 120;
     }
 
     #[inline]

@@ -64,17 +64,18 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Order::Convert(function) => write!(f, "Map({:?})", function.type_id()),
-            Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
-            Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
-            Order::Trigger { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
+            Order::Align => write!(f, "Align"),
+            Order::Branch { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
             Order::Capture(identifier) => write!(f, "Capture({:?})", identifier),
+            Order::Fail(function) => write!(f, "Failure({:?})", function.type_id()),
             Order::Ignore => write!(f, "Ignore"),
-            Order::Skip => write!(f, "Skip"),
-            Order::Failure(function) => write!(f, "Failure({:?})", function.type_id()),
-            Order::Tweak(function) => write!(f, "Tweak({:?})", function.type_id()),
-            Order::Remove => write!(f, "Remove"),
+            Order::Inspect(inspector) => write!(f, "Inspector({:?})", inspector.type_id()),
+            Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
+            Order::Panic(function) => write!(f, "Panic({:?})", function.type_id()),
             Order::Pardon => write!(f, "Pardon"),
+            Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
+            Order::Skip => write!(f, "Skip"),
+            Order::Transform(function) => write!(f, "Map({:?})", function.type_id()),
         }
     }
 }

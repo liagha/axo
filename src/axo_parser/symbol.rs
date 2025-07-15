@@ -17,7 +17,7 @@ use {
             Index, Invoke, Construct,
             Structure, Enumeration,
             Binding, Function, Interface, Implementation, Formation, Inclusion,
-            Conditioned, Repeat, Walk, Map,
+            Conditional, Repeat, Iterate,
             Label, Access, Assign,
         },
 

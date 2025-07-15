@@ -6,6 +6,7 @@ mod format;
 pub mod error;
 mod character;
 mod escape;
+mod core;
 
 pub use {
     scanner::Scanner,

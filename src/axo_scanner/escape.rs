@@ -4,12 +4,10 @@ use {
             form::{Form, FormKind},
             pattern::Classifier,
         },
-
         axo_scanner::{
             Character, ScanError, Token, ErrorKind, Scanner,
             error::{CharacterError, EscapeError},
         },
-        
         character::{parse_radix_u32, from_u32},
     }
 };
@@ -19,21 +17,11 @@ impl Scanner {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::predicate(|c: &Character| {
-                matches!(
-                c.value,
-                '\\'
-                | '"'
-                | '\''
-                | 'a'
-                | 'b'
-                | 'e'
-                | 'f'
-                | 'n'
-                | 'r'
-                | 't'
-                | 'v'
-                | '0'
-            )
+                match c.value {
+                    '\\' | '"' | '\'' | 'a' | 'b' | 'e' | 'f' | 'n' | 'r' | 't' | 'v' | '0' => true,
+                    c if c.is_alphanumeric() => { true }
+                    _ => false,
+                }
             })
         ]).with_transform(|_, form| {
             let escape = form.inputs()[1];
@@ -51,7 +39,13 @@ impl Scanner {
                 't' => '\t',
                 'v' => '\x0B',
                 '0' => '\0',
-                _ => unreachable!()
+                _ => {
+                    eprintln!("Invalid escape character: {}", escape.value);
+                    return Err(ScanError::new(
+                        ErrorKind::InvalidEscape(EscapeError::Invalid),
+                        form.span,
+                    ));
+                }
             };
 
             Ok(Form::new(FormKind::Input(Character::new(escaped, form.span)), form.span))
@@ -61,10 +55,8 @@ impl Scanner {
     pub fn octal_escape() -> Classifier<Character, Token, ScanError> {
         Classifier::sequence([
             Classifier::literal('\\'),
-            Classifier::repeat(
-                Classifier::predicate(|c: &Character| {
-                    c.value.is_digit(8)
-                }),
+            Classifier::persistence(
+                Classifier::predicate(|c: &Character| c.value.is_digit(8)),
                 1,
                 Some(3),
             ),
@@ -73,28 +65,35 @@ impl Scanner {
 
             match parse_radix_u32(&digits, 8) {
                 Some(code_point) => {
+                    if code_point > 255 {
+                        eprintln!("Octal escape out of range: {}", code_point);
+                        return Err(ScanError::new(
+                            ErrorKind::InvalidEscape(EscapeError::OutOfRange),
+                            form.span,
+                        ));
+                    }
+
                     match from_u32(code_point) {
                         Some(ch) => Ok(Form::new(
                             FormKind::Input(Character::new(ch, form.span)),
                             form.span,
                         )),
                         None => {
-                            let err = if code_point > 0x10FFFF {
-                                ErrorKind::InvalidCharacter(CharacterError::OutOfRange)
-                            } else if (0xD800..=0xDFFF).contains(&code_point) {
-                                ErrorKind::InvalidCharacter(CharacterError::Surrogate)
-                            } else {
-                                ErrorKind::InvalidEscape(EscapeError::Invalid)
-                            };
-
-                            Err(ScanError::new(err, form.span))
+                            eprintln!("Invalid octal escape: {}", code_point);
+                            Err(ScanError::new(
+                                ErrorKind::InvalidEscape(EscapeError::Invalid),
+                                form.span,
+                            ))
                         }
                     }
                 }
-                None => Err(ScanError::new(
-                    ErrorKind::InvalidEscape(EscapeError::Overflow),
-                    form.span,
-                )),
+                None => {
+                    eprintln!("Octal escape overflow: {}", digits);
+                    Err(ScanError::new(
+                        ErrorKind::InvalidEscape(EscapeError::Overflow),
+                        form.span,
+                    ))
+                }
             }
         })
     }
@@ -103,11 +102,9 @@ impl Scanner {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::literal('x'),
-            Classifier::repeat(
-                Classifier::predicate(|c: &Character| {
-                    c.value.is_digit(16)
-                }),
-                2,
+            Classifier::persistence(
+                Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
+                1,
                 Some(2),
             ),
         ]).with_transform(|_, form| {
@@ -115,21 +112,35 @@ impl Scanner {
 
             match u32::from_str_radix(&hex_digits, 16) {
                 Ok(code_point) => {
+                    if code_point > 255 {
+                        eprintln!("Hex escape out of range: {}", code_point);
+                        return Err(ScanError::new(
+                            ErrorKind::InvalidEscape(EscapeError::OutOfRange),
+                            form.span,
+                        ));
+                    }
+
                     match from_u32(code_point) {
                         Some(ch) => Ok(Form::new(
                             FormKind::Input(Character::new(ch, form.span)),
                             form.span
                         )),
-                        None => Err(ScanError::new(
-                            ErrorKind::InvalidEscape(EscapeError::Invalid),
-                            form.span,
-                        )),
+                        None => {
+                            eprintln!("Invalid hex escape: {}", hex_digits);
+                            Err(ScanError::new(
+                                ErrorKind::InvalidEscape(EscapeError::Invalid),
+                                form.span,
+                            ))
+                        }
                     }
                 }
-                Err(_) => Err(ScanError::new(
-                    ErrorKind::InvalidEscape(EscapeError::Invalid),
-                    form.span,
-                )),
+                Err(_) => {
+                    eprintln!("Invalid hex digits: {}", hex_digits);
+                    Err(ScanError::new(
+                        ErrorKind::InvalidEscape(EscapeError::Invalid),
+                        form.span,
+                    ))
+                }
             }
         })
     }
@@ -139,7 +150,7 @@ impl Scanner {
             Classifier::literal('\\'),
             Classifier::literal('u'),
             Classifier::literal('{'),
-            Classifier::repeat(
+            Classifier::persistence(
                 Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
                 1,
                 Some(6),
@@ -149,11 +160,12 @@ impl Scanner {
             let inputs = form.inputs();
             let hex_digits: String = inputs.iter()
                 .skip(3)
-                .take_while(|c| c.value != '}')
+                .take(inputs.len() - 4)
                 .map(|c| c.value)
                 .collect();
 
             if hex_digits.is_empty() {
+                eprintln!("Empty unicode escape");
                 return Err(ScanError::new(
                     ErrorKind::InvalidEscape(EscapeError::Empty),
                     form.span,
@@ -169,20 +181,68 @@ impl Scanner {
                         )),
                         None => {
                             let err = if code_point > 0x10FFFF {
+                                eprintln!("Unicode escape out of range: {}", code_point);
                                 ErrorKind::InvalidCharacter(CharacterError::OutOfRange)
                             } else if (0xD800..=0xDFFF).contains(&code_point) {
+                                eprintln!("Unicode escape in surrogate range: {}", code_point);
                                 ErrorKind::InvalidCharacter(CharacterError::Surrogate)
                             } else {
+                                eprintln!("Invalid unicode escape: {}", code_point);
                                 ErrorKind::InvalidEscape(EscapeError::Invalid)
                             };
                             Err(ScanError::new(err, form.span))
                         }
                     }
                 }
-                Err(_) => Err(ScanError::new(
-                    ErrorKind::InvalidEscape(EscapeError::Invalid),
-                    form.span,
-                )),
+                Err(_) => {
+                    eprintln!("Invalid unicode hex digits: {}", hex_digits);
+                    Err(ScanError::new(
+                        ErrorKind::InvalidEscape(EscapeError::Invalid),
+                        form.span,
+                    ))
+                }
+            }
+        })
+    }
+
+    pub fn unicode_escape_simple() -> Classifier<Character, Token, ScanError> {
+        Classifier::sequence([
+            Classifier::literal('\\'),
+            Classifier::literal('u'),
+            Classifier::persistence(
+                Classifier::predicate(|c: &Character| c.value.is_ascii_hexdigit()),
+                4,
+                Some(4),
+            ),
+        ]).with_transform(|_, form| {
+            let hex_digits: String = form.inputs().iter().skip(2).map(|c| c.value).collect();
+
+            match u32::from_str_radix(&hex_digits, 16) {
+                Ok(code_point) => {
+                    match from_u32(code_point) {
+                        Some(ch) => Ok(Form::new(
+                            FormKind::Input(Character::new(ch, form.span)),
+                            form.span
+                        )),
+                        None => {
+                            let err = if (0xD800..=0xDFFF).contains(&code_point) {
+                                eprintln!("Simple unicode escape in surrogate range: {}", code_point);
+                                ErrorKind::InvalidCharacter(CharacterError::Surrogate)
+                            } else {
+                                eprintln!("Invalid simple unicode escape: {}", code_point);
+                                ErrorKind::InvalidEscape(EscapeError::Invalid)
+                            };
+                            Err(ScanError::new(err, form.span))
+                        }
+                    }
+                }
+                Err(_) => {
+                    eprintln!("Invalid simple unicode hex digits: {}", hex_digits);
+                    Err(ScanError::new(
+                        ErrorKind::InvalidEscape(EscapeError::Invalid),
+                        form.span,
+                    ))
+                }
             }
         })
     }
@@ -190,6 +250,7 @@ impl Scanner {
     pub fn escape_sequence() -> Classifier<Character, Token, ScanError> {
         Classifier::alternative([
             Self::unicode_escape(),
+            Self::unicode_escape_simple(),
             Self::hex_escape(),
             Self::octal_escape(),
             Self::simple_escape(),

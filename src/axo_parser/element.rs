@@ -18,7 +18,7 @@ use {
             Bundle, Scope,
             Binary, Unary,
             Index, Invoke, Construct,
-            Conditioned, Repeat, Walk, Map,
+            Conditional, Repeat, Iterate,
             Label, Access, Assign,
         },
 
@@ -70,15 +70,13 @@ pub enum ElementKind {
 
     Construct(Construct<Box<Element>, Element>),
 
-    Locate(Tree<Box<Element>>),
+    Domain(Tree<Box<Element>>),
 
-    Conditioned(Conditioned<Box<Element>, Box<Element>, Box<Element>>),
+    Conditional(Conditional<Box<Element>, Box<Element>, Box<Element>>),
 
     Repeat(Repeat<Box<Element>, Box<Element>>),
 
-    Walk(Walk<Box<Element>, Box<Element>>),
-
-    Map(Map<Box<Element>, Box<Element>>),
+    Iterate(Iterate<Box<Element>, Box<Element>>),
 
     Symbolize(SymbolKind),
 

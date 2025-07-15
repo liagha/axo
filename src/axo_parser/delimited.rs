@@ -15,20 +15,20 @@ use {
 
 impl Parser {
     pub fn bundle(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::required(
+                        Classifier::with_fallback(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Order::failure(|_, form| {
+                            Order::fail(|_, form| {
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
@@ -42,11 +42,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBrace,
@@ -67,20 +67,20 @@ impl Parser {
     }
 
     pub fn scope(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
                 })
                 .with_ignore(),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::required(
+                        Classifier::with_fallback(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Order::failure(|_, form| {
+                            Order::fail(|_, form| {
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
@@ -94,11 +94,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(
                                 TokenKind::Punctuation(PunctuationKind::LeftBrace),
@@ -119,21 +119,21 @@ impl Parser {
     }
 
     pub fn group(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 }),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::ordered(
+                        Classifier::with_order(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Order::trigger(
+                            Order::branch(
                                 Order::ignore(),
-                                Order::failure(|_, form| {
+                                Order::fail(|_, form| {
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Comma,
@@ -148,11 +148,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
@@ -173,22 +173,22 @@ impl Parser {
     }
 
     pub fn sequence(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
                 })
                 .with_ignore(),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::ordered(
+                        Classifier::with_order(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Order::trigger(
+                            Order::branch(
                                 Order::ignore(),
-                                Order::failure(|_, form| {
+                                Order::fail(|_, form| {
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Semicolon,
@@ -203,11 +203,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
@@ -228,20 +228,20 @@ impl Parser {
     }
 
     pub fn collection(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::required(
+                        Classifier::with_fallback(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Order::failure(|_, form| {
+                            Order::fail(|_, form| {
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
@@ -255,11 +255,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,
@@ -280,20 +280,20 @@ impl Parser {
     }
 
     pub fn series(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
                 })
                 .with_ignore(),
                 item.as_optional(),
-                Classifier::repeat(
+                Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::required(
+                        Classifier::with_fallback(
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Order::failure(|_, form| {
+                            Order::fail(|_, form| {
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
@@ -307,11 +307,11 @@ impl Parser {
                     0,
                     None,
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,

@@ -5,17 +5,14 @@ use {
 
     crate::{
         axo_scanner::{
-            ScanError,
             Scanner,
             Token,
         },
         axo_parser::{
             Element,
-            ParseError,
             Parser,
         },
         axo_resolver::{
-            ResolveError,
             Resolver,
         },
         file::{
@@ -48,9 +45,6 @@ pub trait Marked {
 pub enum CompilerError {
     PathRequired,
     FileReadError(Error),
-    ScanningFailed(Vec<ScanError>),
-    ParsingFailed(Vec<ParseError>),
-    ResolutionFailed(Vec<ResolveError>),
     ArgumentParsing(String),
     HelpRequested,
 }
@@ -60,9 +54,6 @@ impl Display for CompilerError {
         match self {
             CompilerError::PathRequired => write!(formatter, "No input file specified"),
             CompilerError::FileReadError(error) => write!(formatter, "Failed to read file: {}", error),
-            CompilerError::ScanningFailed(_) => write!(formatter, "Scanning failed with errors"),
-            CompilerError::ParsingFailed(_) => write!(formatter, "Parsing failed with errors"),
-            CompilerError::ResolutionFailed(_) => write!(formatter, "Resolution failed with errors"),
             CompilerError::ArgumentParsing(msg) => write!(formatter, "{}", msg),
             CompilerError::HelpRequested => Ok(()),
         }
@@ -124,9 +115,9 @@ impl Compiler {
             pipeline!(
                 context,
                 (),
-                ScannerStage,
-                ParserStage,
-                ResolverStage
+                ScannerStage
+                //ParserStage,
+                //ResolverStage
             ).map(|_| ())
         })
     }
@@ -164,25 +155,22 @@ impl Stage<(), Vec<Token>> for ScannerStage {
         let mut scanner = Scanner::new(context.clone(), context.content.clone(), context.path);
         let (tokens, errors) = scanner.scan();
 
-        if !errors.is_empty() {
-            for error in &errors {
-                let (message, details) = error.format();
-                xprintln!(
-                    "{}\n{}" => Color::Red,
-                    message => Color::Orange,
-                    details
-                );
-                xprintln!();
-            }
-            return Err(CompilerError::ScanningFailed(errors));
-        }
-
         if context.verbose {
             xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
             xprintln!();
 
             if !errors.is_empty() {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
+
+                for error in &errors {
+                    let (message, details) = error.format();
+                    xprintln!(
+                    "{}\n{}" => Color::Red,
+                    message => Color::Orange,
+                    details
+                );
+                    xprintln!();
+                }
 
                 xprintln!(
                     "Finished {} {}s with {} {}." => Color::Green,

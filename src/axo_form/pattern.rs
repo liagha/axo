@@ -124,6 +124,7 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub patterns: Vec<Classifier<Input, Output, Failure>>,
+    pub perfection: Vec<i8>
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure>
@@ -133,31 +134,37 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
-        let mut best_child: Option<Draft<Input, Output, Failure>> = None;
-        let mut best_score = i8::MIN;
+        let mut best: Option<Draft<Input, Output, Failure>> = None;
 
         for pattern in &self.patterns {
             let mut child = Draft::new(draft.marker, draft.position, pattern.clone());
             composer.build(&mut child);
 
-            if child.record > best_score {
-                best_score = child.record;
-                best_child = Some(child);
+            match &best {
+                None => {
+                    best = Some(child)
+                },
+                Some(champion) => {
+                    if child.record > champion.record {
+                        best = Some(child);
 
-                if best_score == 1 {
-                    break;
+                        if self.perfection.contains(&best.as_ref().unwrap().record) {
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        if let Some(best) = best_child {
-            draft.record = best.record;
-            draft.marker = best.marker;
-            draft.position = best.position;
-            draft.consumed = best.consumed;
-            draft.form = best.form;
-        } else {
-            draft.empty();
+        match best {
+            Some(champion) => {
+                draft.record = champion.record;
+                draft.marker = champion.marker;
+                draft.position = champion.position;
+                draft.consumed = champion.consumed;
+                draft.form = champion.form;
+            }
+            None => draft.empty(),
         }
     }
 }
@@ -314,14 +321,14 @@ where
 
             match child.record {
                 1 => {
-                    draft.align();
+                    draft.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                0 => {
-                    draft.fail();
+                120 | 0 => {
+                    draft.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
@@ -330,10 +337,10 @@ where
                 }
                 -2 => {
                     index = child.marker;
-                    position = child.position; 
+                    position = child.position;
                 }
                 _ => {
-                    draft.empty();
+                    draft.record = child.record;
                     break;
                 }
             }
@@ -353,7 +360,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct Repetition<Input, Output, Failure>
+pub struct Persistence<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -364,7 +371,7 @@ where
     pub maximum: Option<usize>,
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Repetition<Input, Output, Failure>
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Persistence<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
     Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -385,7 +392,7 @@ where
             }
 
             match child.record {
-                1 | 0 => {
+                120 | 1 | 0 => {
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
@@ -425,6 +432,85 @@ where
 }
 
 #[derive(Clone)]
+pub struct Repetition<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    pub pattern: Box<Classifier<Input, Output, Failure>>,
+    pub minimum: usize,
+    pub maximum: Option<usize>,
+}
+
+impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Repetition<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
+        let mut index = draft.marker;
+        let mut position = draft.position;
+        let mut consumed = Vec::new();
+        let mut forms = Vec::new();
+
+        while composer.source.peek_ahead(index).is_some() {
+            let mut child = Draft::new(index, position, self.pattern.as_ref().clone());
+            composer.build(&mut child);
+
+            if child.marker == index {
+                break;
+            }
+
+            match child.record {
+                1 => {
+                    draft.record = child.record;
+                    index = child.marker;
+                    position = child.position;
+                    consumed.extend(child.consumed);
+                    forms.push(child.form);
+                }
+                120 | 0 => {
+                    draft.record = child.record;
+                    index = child.marker;
+                    position = child.position;
+                    consumed.extend(child.consumed);
+                    forms.push(child.form);
+                    break;
+                }
+                -2 => {
+                    index = child.marker;
+                    position = child.position;
+                }
+                _ => {
+                    draft.record = child.record;
+                    break;
+                }
+            }
+
+            if let Some(max) = self.maximum {
+                if forms.len() >= max {
+                    break;
+                }
+            }
+        }
+
+        if forms.len() >= self.minimum {
+            draft.marker = index;
+            draft.position = position;
+            draft.consumed = consumed;
+
+            if forms.is_empty() {
+                draft.form = Form::blank(Span::point(draft.position));
+            } else {
+                draft.form = Form::multiple(forms);
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Classifier<Input, Output, Failure>
 where
     Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
@@ -448,24 +534,6 @@ where
         }
     }
 
-    #[inline]
-    pub fn ordered(
-        classifier: impl Into<Box<Classifier<Input, Output, Failure>>>,
-        order: Order<Input, Output, Failure>,
-    ) -> Self {
-        Self {
-            pattern: Arc::new(Wrapper {
-                pattern: classifier.into()
-            }),
-            order: Some(order),
-        }
-    }
-
-    pub fn with_order(mut self, order: Order<Input, Output, Failure>) -> Self {
-        self.order = Some(order);
-        self
-    }
-
     pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'static) -> Self {
         Self::new(Arc::new(Literal {
             value: Arc::new(value),
@@ -477,7 +545,7 @@ where
             pattern: Box::new(pattern),
         }))
     }
-    
+
     pub fn predicate<F>(predicate: F) -> Self
     where
         F: Fn(&Input) -> bool + Send + Sync + 'static,
@@ -488,7 +556,11 @@ where
     }
 
     pub fn alternative(patterns: impl Into<Vec<Self>>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into() }))
+        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![1] }))
+    }
+
+    pub fn choice(patterns: impl Into<Vec<Self>>, perfection: Vec<i8>) -> Self {
+        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection }))
     }
 
     pub fn sequence(patterns: impl Into<Vec<Self>>) -> Self {
@@ -501,7 +573,15 @@ where
         }))
     }
 
-    pub fn repeat(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
+    pub fn persistence(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
+        Self::new(Arc::new(Persistence {
+            pattern: Box::new(pattern),
+            minimum,
+            maximum,
+        }))
+    }
+
+    pub fn repetition(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
         Self::new(Arc::new(Repetition {
             pattern: Box::new(pattern),
             minimum,
@@ -539,78 +619,89 @@ where
         Self::predicate(|_| false)
     }
 
-    pub fn capture(self, identifier: Artifact) -> Self {
+    pub fn with_order(mut self, order: Order<Input, Output, Failure>) -> Self {
+        self.order = Some(order);
+        self
+    }
+
+    pub fn with_align(self) -> Self {
+        self.with_order(Order::Align)
+    }
+
+    pub fn with_branch(self, found: Order<Input, Output, Failure>, missing: Order<Input, Output, Failure>) -> Self {
+        self.with_order(Order::Branch {
+            found: Box::new(found),
+            missing: Box::new(missing),
+        })
+    }
+
+    pub fn with_capture(self, identifier: Artifact) -> Self {
         self.with_order(Order::Capture(identifier))
     }
 
-    pub fn transform<T>(self, transform: T) -> Self
+    pub fn with_fail<F>(self, emitter: F) -> Self
+    where
+        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+    {
+        self.with_order(Order::Fail(Arc::new(emitter)))
+    }
+
+    pub fn with_ignore(self) -> Self {
+        self.with_order(Order::Ignore)
+    }
+    
+    pub fn with_inspect<I>(self, inspector: I) -> Self
+    where
+        I: Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync + 'static
+    {
+        self.with_order(Order::Inspect(Arc::new(inspector)))
+    }
+
+    pub fn with_multiple(self, orders: Vec<Order<Input, Output, Failure>>) -> Self {
+        self.with_order(Order::Multiple(orders))
+    }
+
+    pub fn with_panic<F>(self, emitter: F) -> Self
+    where
+        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+    {
+        self.with_order(Order::Panic(Arc::new(emitter)))
+    }
+
+    pub fn with_pardon(self) -> Self {
+        self.with_order(Order::Pardon)
+    }
+
+    pub fn with_perform<F>(self, executor: F) -> Self
+    where
+        F: FnMut() + Send + Sync + 'static,
+    {
+        self.with_order(Order::Perform(Arc::new(Mutex::new(executor))))
+    }
+
+    pub fn with_skip(self) -> Self {
+        self.with_order(Order::Skip)
+    }
+
+    pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
         + Send
         + Sync
         + 'static,
     {
-        self.with_order(Order::Convert(Arc::new(Mutex::new(transform))))
+        self.with_order(Order::Transform(Arc::new(Mutex::new(transform))))
     }
 
-    pub fn conditional(
-        self,
-        found: Order<Input, Output, Failure>,
-        missing: Order<Input, Output, Failure>,
-    ) -> Self {
-        self.with_order(Order::Trigger {
-            found: Box::new(found),
-            missing: Box::new(missing),
-        })
-    }
-
-    pub fn required(self, order: Order<Input, Output, Failure>) -> Self {
-        self.conditional(Order::perform(|| {}), order)
+    pub fn with_fallback(self, order: Order<Input, Output, Failure>) -> Self {
+        self.with_branch(Order::Perform(Arc::new(Mutex::new(|| {}))), order)
     }
 
     pub fn as_optional(&self) -> Self {
         Self::optional(self.clone())
     }
 
-    pub fn as_repeat(&self, min: usize, max: Option<usize>) -> Self {
-        Self::repeat(self.clone(), min, max)
-    }
-
-    #[inline]
-    pub fn with_action(mut self, order: Order<Input, Output, Failure>) -> Self {
-        self.order = Some(order);
-        self
-    }
-
-    #[inline]
-    pub fn with_ignore(mut self) -> Self {
-        self.order = Some(Order::Ignore);
-        self
-    }
-
-
-    #[inline]
-    pub fn with_conditional(
-        mut self,
-        found: Order<Input, Output, Failure>,
-        missing: Order<Input, Output, Failure>,
-    ) -> Self {
-        self.order = Some(Order::Trigger {
-            found: Box::new(found),
-            missing: Box::new(missing),
-        });
-        self
-    }
-
-    #[inline]
-    pub fn with_transform<T>(mut self, transform: T) -> Self
-    where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
-        + Send
-        + Sync
-        + 'static,
-    {
-        self.order = Some(Order::Convert(Arc::new(Mutex::new(transform))));
-        self
+    pub fn as_persistence(&self, min: usize, max: Option<usize>) -> Self {
+        Self::persistence(self.clone(), min, max)
     }
 }

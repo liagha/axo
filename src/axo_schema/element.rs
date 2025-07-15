@@ -66,7 +66,7 @@ pub struct Construct<Target, Field> {
 }
 
 #[derive(Eq)]
-pub struct Conditioned<Condition, Then, Alternate> {
+pub struct Conditional<Condition, Then, Alternate> {
     condition: Condition,
     then: Then,
     alternate: Option<Alternate>,
@@ -79,14 +79,8 @@ pub struct Repeat<Condition, Body> {
 }
 
 #[derive(Eq)]
-pub struct Walk<Clause, Body> {
+pub struct Iterate<Clause, Body> {
     clause: Clause,
-    body: Body,
-}
-
-#[derive(Eq)]
-pub struct Map<Target, Body> {
-    target: Target,
     body: Body,
 }
 
@@ -340,10 +334,10 @@ impl<Target, Field> Construct<Target, Field> {
     }
 }
 
-impl<Condition, Then, Alternate> Conditioned<Condition, Then, Alternate> {
+impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
     #[inline]
     pub fn new(condition: Condition, then: Then, alternate: Option<Alternate>) -> Self {
-        Conditioned {
+        Conditional {
             condition,
             then,
             alternate,
@@ -378,29 +372,14 @@ impl<Condition, Body> Repeat<Condition, Body> {
     }
 }
 
-impl<Clause, Body> Walk<Clause, Body> {
+impl<Clause, Body> Iterate<Clause, Body> {
     #[inline]
     pub fn new(clause: Clause, body: Body) -> Self {
-        Walk { clause, body }
+        Iterate { clause, body }
     }
     #[inline]
     pub fn get_clause(&self) -> &Clause {
         &self.clause
-    }
-    #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
-    }
-}
-
-impl<Target, Body> Map<Target, Body> {
-    #[inline]
-    pub fn new(target: Target, body: Body) -> Self {
-        Map { target, body }
-    }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
     }
     #[inline]
     pub fn get_body(&self) -> &Body {
@@ -526,7 +505,7 @@ impl<Target: Hash, Field: Hash> Hash for Construct<Target, Field> {
 }
 
 impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
-    for Conditioned<Condition, Then, Alternate>
+    for Conditional<Condition, Then, Alternate>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_condition().hash(state);
@@ -542,16 +521,9 @@ impl<Condition: Hash, Body: Hash> Hash for Repeat<Condition, Body> {
     }
 }
 
-impl<Clause: Hash, Body: Hash> Hash for Walk<Clause, Body> {
+impl<Clause: Hash, Body: Hash> Hash for Iterate<Clause, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_clause().hash(state);
-        self.get_body().hash(state);
-    }
-}
-
-impl<Target: Hash, Body: Hash> Hash for Map<Target, Body> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
         self.get_body().hash(state);
     }
 }
@@ -648,7 +620,7 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Construct<Target, Field>
 }
 
 impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
-    for Conditioned<Condition, Then, Alternate>
+    for Conditional<Condition, Then, Alternate>
 {
     fn eq(&self, other: &Self) -> bool {
         self.get_condition() == other.get_condition()
@@ -663,15 +635,9 @@ impl<Condition: PartialEq, Body: PartialEq> PartialEq for Repeat<Condition, Body
     }
 }
 
-impl<Clause: PartialEq, Body: PartialEq> PartialEq for Walk<Clause, Body> {
+impl<Clause: PartialEq, Body: PartialEq> PartialEq for Iterate<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
         self.get_clause() == other.get_clause() && self.get_body() == other.get_body()
-    }
-}
-
-impl<Target: PartialEq, Body: PartialEq> PartialEq for Map<Target, Body> {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_body() == other.get_body()
     }
 }
 
@@ -764,10 +730,10 @@ impl<Target: Clone, Field: Clone> Clone for Construct<Target, Field> {
 }
 
 impl<Condition: Clone, Then: Clone, Alternate: Clone> Clone
-    for Conditioned<Condition, Then, Alternate>
+    for Conditional<Condition, Then, Alternate>
 {
     fn clone(&self) -> Self {
-        Conditioned::new(
+        Conditional::new(
             self.get_condition().clone(),
             self.get_then().clone(),
             self.get_alternate().cloned(),
@@ -781,15 +747,9 @@ impl<Condition: Clone, Body: Clone> Clone for Repeat<Condition, Body> {
     }
 }
 
-impl<Clause: Clone, Body: Clone> Clone for Walk<Clause, Body> {
+impl<Clause: Clone, Body: Clone> Clone for Iterate<Clause, Body> {
     fn clone(&self) -> Self {
-        Walk::new(self.get_clause().clone(), self.get_body().clone())
-    }
-}
-
-impl<Target: Clone, Body: Clone> Clone for Map<Target, Body> {
-    fn clone(&self) -> Self {
-        Map::new(self.get_target().clone(), self.get_body().clone())
+        Iterate::new(self.get_clause().clone(), self.get_body().clone())
     }
 }
 

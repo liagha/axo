@@ -22,7 +22,7 @@ pub mod helper {
             compiler::{Context, Marked},
             format::Debug,
             axo_cursor::{
-                Position, Peekable, Spanned
+                Peekable, Spanned
             },
         },
     };
@@ -56,7 +56,5 @@ pub mod helper {
     pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
     pub type Inspector<Input, Output, Failure> = Arc<dyn Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync>;
     pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-    pub type Shifter = Arc<dyn Fn(&mut usize, &mut Position)>;
     pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
-    pub type Tweaker<Input, Output, Failure> = Arc<dyn Fn(&mut Draft<Input, Output, Failure>) + Send + Sync>;
 }

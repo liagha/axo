@@ -135,7 +135,7 @@ impl Resolver {
                 self.resolve(label.get_element());
             }
 
-            ElementKind::Conditioned(conditioned) => {
+            ElementKind::Conditional(conditioned) => {
                 self.resolve(conditioned.get_condition());
                 self.push_scope();
                 self.resolve(conditioned.get_then());
@@ -148,13 +148,6 @@ impl Resolver {
                 }
             }
 
-            ElementKind::Map(map) => {
-                self.resolve(map.get_target());
-                self.push_scope();
-                self.resolve(map.get_body());
-                self.pop_scope();
-            }
-
             ElementKind::Repeat(repeat) => {
                 if let Some(condition) = repeat.get_condition() {
                     self.resolve(condition);
@@ -164,7 +157,7 @@ impl Resolver {
                 self.pop_scope();
             }
 
-            ElementKind::Walk(walk) => {
+            ElementKind::Iterate(walk) => {
                 self.resolve(walk.get_clause());
 
                 let parent = replace(&mut self.scope, Scope::new());

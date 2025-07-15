@@ -91,12 +91,12 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 invoke.hash(state);
             }
-            ElementKind::Locate(tree) => {
+            ElementKind::Domain(tree) => {
                 discriminant(self).hash(state);
                 tree.hash(state);
             }
 
-            ElementKind::Conditioned(conditioned) => {
+            ElementKind::Conditional(conditioned) => {
                 discriminant(self).hash(state);
                 conditioned.hash(state);
             }
@@ -104,13 +104,9 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 repeat.hash(state);
             }
-            ElementKind::Walk(walk) => {
+            ElementKind::Iterate(walk) => {
                 discriminant(self).hash(state);
                 walk.hash(state);
-            }
-            ElementKind::Map(map) => {
-                discriminant(self).hash(state);
-                map.hash(state);
             }
 
             ElementKind::Symbolize(symbol) => {
@@ -166,12 +162,11 @@ impl PartialEq for ElementKind {
             (ElementKind::Access(a), ElementKind::Access(b)) => a == b,
             (ElementKind::Index(a), ElementKind::Index(b)) => a == b,
             (ElementKind::Invoke(a), ElementKind::Invoke(b)) => a == b,
-            (ElementKind::Locate(a), ElementKind::Locate(b)) => a == b,
+            (ElementKind::Domain(a), ElementKind::Domain(b)) => a == b,
 
-            (ElementKind::Conditioned(a), ElementKind::Conditioned(b)) => a == b,
+            (ElementKind::Conditional(a), ElementKind::Conditional(b)) => a == b,
             (ElementKind::Repeat(a), ElementKind::Repeat(b)) => a == b,
-            (ElementKind::Walk(a), ElementKind::Walk(b)) => a == b,
-            (ElementKind::Map(a), ElementKind::Map(b)) => a == b,
+            (ElementKind::Iterate(a), ElementKind::Iterate(b)) => a == b,
 
             (ElementKind::Symbolize(a), ElementKind::Symbolize(b)) => a == b,
             (ElementKind::Assign(a), ElementKind::Assign(b)) => a == b,
@@ -216,12 +211,11 @@ impl Clone for ElementKind {
             ElementKind::Access(access) => ElementKind::Access(access.clone()),
             ElementKind::Index(index) => ElementKind::Index(index.clone()),
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
-            ElementKind::Locate(tree) => ElementKind::Locate(tree.clone()),
+            ElementKind::Domain(tree) => ElementKind::Domain(tree.clone()),
 
-            ElementKind::Conditioned(conditioned) => ElementKind::Conditioned(conditioned.clone()),
+            ElementKind::Conditional(conditioned) => ElementKind::Conditional(conditioned.clone()),
             ElementKind::Repeat(repeat) => ElementKind::Repeat(repeat.clone()),
-            ElementKind::Walk(walk) => ElementKind::Walk(walk.clone()),
-            ElementKind::Map(map) => ElementKind::Map(map.clone()),
+            ElementKind::Iterate(walk) => ElementKind::Iterate(walk.clone()),
 
             ElementKind::Symbolize(symbol) => ElementKind::Symbolize(symbol.clone()),
             ElementKind::Assign(assign) => ElementKind::Assign(assign.clone()),

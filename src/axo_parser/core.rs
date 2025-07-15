@@ -13,7 +13,7 @@ use {
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         axo_schema::{
             Access, Assign,
-            Binary, Binding, Conditioned,
+            Binary, Binding, Conditional,
             Construct, Enumeration,
             Index, Invoke,
             Label,
@@ -25,7 +25,7 @@ use {
 
 impl Parser {
     pub fn identifier() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
             |_, form| {
                 let input = form.inputs()[0].clone();
@@ -39,7 +39,7 @@ impl Parser {
     }
 
     pub fn literal() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
                 matches!(
                     token.kind,
@@ -84,7 +84,7 @@ impl Parser {
     }
 
     pub fn prefixed() -> Classifier<Token, Element, ParseError> {
-        Classifier::ordered(
+        Classifier::with_order(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
@@ -92,11 +92,10 @@ impl Parser {
                     } else {
                         false
                     }
-                })
-                    .as_repeat(1, None),
+                }),
                 Self::primary(),
             ]),
-            Order::map(|_, form: Form<Token, Element, ParseError>| {
+            Order::convert(|_, form: Form<Token, Element, ParseError>| {
                 let prefixes = form.inputs();
                 let operand = form.outputs()[0].clone();
                 let mut unary = operand.clone();
@@ -119,21 +118,25 @@ impl Parser {
     }
 
     pub fn suffixed() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Self::primary(),
-                Classifier::alternative([
-                    Self::group(Classifier::lazy(Self::element)),
-                    Self::collection(Classifier::lazy(Self::element)),
-                    Self::bundle(Classifier::lazy(Self::element)),
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Operator(operator) = &token.kind {
-                            operator.is_suffix()
-                        } else {
-                            false
-                        }
-                    })
-                ]).as_repeat(1, None),
+                Classifier::repetition(
+                    Classifier::alternative([
+                        Self::group(Classifier::lazy(Self::element)),
+                        Self::collection(Classifier::lazy(Self::element)),
+                        Self::bundle(Classifier::lazy(Self::element)),
+                        Classifier::predicate(|token: &Token| {
+                            if let TokenKind::Operator(operator) = &token.kind {
+                                operator.is_suffix()
+                            } else {
+                                false
+                            }
+                        })
+                    ]),
+                    0,
+                    None
+                ),
             ]),
             |_, form| {
                 let sequence = form.unwrap().clone();
@@ -189,7 +192,7 @@ impl Parser {
     }
 
     pub fn access() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::lazy(|| Self::primary()),
                 Classifier::predicate(|token: &Token| {
@@ -214,7 +217,7 @@ impl Parser {
     }
 
     pub fn label() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::lazy(|| Self::primary()),
                 Classifier::predicate(|token: &Token| {
@@ -239,7 +242,7 @@ impl Parser {
     }
 
     pub fn assign() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::lazy(|| Self::unary()),
                 Classifier::predicate(|token: &Token| {
@@ -265,7 +268,7 @@ impl Parser {
 
 
     pub fn locate() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::lazy(|| Self::primary()),
                 Classifier::predicate(|token: &Token| {
@@ -280,7 +283,7 @@ impl Parser {
                 let span = Span::mix(&left.span, &right.span);
 
                 let kind = match &left.kind {
-                    ElementKind::Locate(tree) => {
+                    ElementKind::Domain(tree) => {
                         let mut new_tree = tree.clone();
 
                         if let Some(root) = new_tree.root_mut() {
@@ -294,7 +297,7 @@ impl Parser {
                             current.add_value(right.into());
                         }
 
-                        ElementKind::Locate(new_tree)
+                        ElementKind::Domain(new_tree)
                     }
                     _ => {
                         let node = Node::with_children(
@@ -303,7 +306,7 @@ impl Parser {
                         );
 
                         let tree = Tree::with_root_node(node);
-                        ElementKind::Locate(tree)
+                        ElementKind::Domain(tree)
                     }
                 };
 
@@ -315,7 +318,7 @@ impl Parser {
     }
 
     pub fn compound() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::lazy(|| Self::unary()),
                 Classifier::predicate(|token: &Token| {
@@ -375,13 +378,13 @@ impl Parser {
             Self::variable(),
             Self::locate(),
             Self::compound(),
-            Classifier::transform(
+            Classifier::with_transform(
                 Classifier::sequence([
                     Classifier::alternative([
                         Self::statement(),
                         Self::unary(),
                     ]),
-                    Classifier::repeat(
+                    Classifier::repetition(
                         Classifier::sequence([
                             Classifier::predicate(move |token: &Token| {
                                 if let TokenKind::Operator(operator) = &token.kind {
@@ -481,7 +484,7 @@ impl Parser {
     }
 
     pub fn conditional() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
@@ -491,15 +494,15 @@ impl Parser {
                     }
                 })
                     .with_ignore(),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::lazy(|| Self::element()),
-                    Order::failure(|_, form| {
+                    Order::fail(|_, form| {
                         ParseError::new(ErrorKind::ExpectedCondition, form.span)
                     }),
                 ),
-                Classifier::required(
+                Classifier::with_fallback(
                     Classifier::lazy(|| Self::element()),
-                    Order::failure(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
+                    Order::fail(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
                 ),
                 Classifier::optional(Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -522,7 +525,7 @@ impl Parser {
                     let span = condition.span.mix(&alternate.span);
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), Some(alternate.into()))),
+                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), Some(alternate.into()))),
                             span,
                         )
                     ))
@@ -530,7 +533,7 @@ impl Parser {
                     let span = condition.span.mix(&then.span);
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Conditioned(Conditioned::new(condition.into(), then.into(), None)),
+                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), None)),
                             span,
                         )
                     ))
@@ -540,7 +543,7 @@ impl Parser {
     }
 
     pub fn cycle() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::alternative([
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -551,9 +554,9 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Classifier::required(
+                    Classifier::with_fallback(
                         Classifier::lazy(|| Self::element()),
-                        Order::failure(|_, form| {
+                        Order::fail(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
@@ -567,15 +570,15 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Classifier::required(
+                    Classifier::with_fallback(
                         Classifier::lazy(|| Self::element()),
-                        Order::failure(|_, form| {
+                        Order::fail(|_, form| {
                             ParseError::new(ErrorKind::ExpectedCondition, form.span)
                         }),
                     ),
-                    Classifier::required(
+                    Classifier::with_fallback(
                         Classifier::lazy(|| Self::element()),
-                        Order::failure(|_, form| {
+                        Order::fail(|_, form| {
                             ParseError::new(ErrorKind::ExpectedBody, form.span)
                         }),
                     ),
@@ -611,7 +614,7 @@ impl Parser {
     }
 
     pub fn variable() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
@@ -621,7 +624,7 @@ impl Parser {
                     }
                 }),
                 Classifier::lazy(|| Self::primary()),
-                Classifier::repeat(
+                Classifier::repetition(
                     Classifier::alternative([
                         Classifier::sequence([
                             Classifier::predicate(|token: &Token| {
@@ -696,9 +699,9 @@ impl Parser {
             },
         )
     }
-    
+
     pub fn structure() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
@@ -729,7 +732,7 @@ impl Parser {
     }
 
     pub fn enumeration() -> Classifier<Token, Element, ParseError> {
-        Classifier::transform(
+        Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
@@ -780,9 +783,9 @@ impl Parser {
     }
 
     pub fn fallback() -> Classifier<Token, Element, ParseError> {
-        Classifier::ordered(
+        Classifier::with_order(
             Classifier::predicate(|_token| true),
-            Order::failure(
+            Order::fail(
                 |_, form: Form<Token, Element, ParseError>| {
                     ParseError::new(
                         ErrorKind::UnexpectedToken(form.unwrap_input().kind),
@@ -794,7 +797,7 @@ impl Parser {
     }
 
     pub fn parser() -> Classifier<Token, Element, ParseError> {
-        Classifier::repeat(
+        Classifier::repetition(
             Classifier::alternative([
                 Self::symbolization(),
                 Self::element(),

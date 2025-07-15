@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use {
     super::{error::ErrorKind, Element, ElementKind, SymbolKind, ParseError},
     crate::{
@@ -102,7 +100,7 @@ impl Parser {
     }
 
     pub fn strainer() -> Classifier<Token, Element, ParseError> {
-        Classifier::repeat(
+        Classifier::persistence(
             Classifier::predicate(|token: &Token| {
                 !matches!(token.kind,
                     TokenKind::Punctuation(PunctuationKind::Newline)
