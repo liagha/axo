@@ -14,15 +14,16 @@ pub struct Formation {
 }
 
 #[derive(Eq)]
-pub struct Implementation<Target, Body> {
+pub struct Implementation<Target, Interface, Member> {
     target: Target,
-    body: Body,
+    interface: Option<Interface>,
+    members: Vec<Member>,
 }
 
 #[derive(Eq)]
-pub struct Interface<Target, Body> {
+pub struct Interface<Target, Member> {
     target: Target,
-    body: Body,
+    members: Vec<Member>,
 }
 
 #[derive(Eq)]
@@ -46,13 +47,13 @@ pub struct Enumeration<Name, Variant> {
 }
 
 #[derive(Eq)]
-pub struct Function<Name, Parameter, Body> {
+pub struct Method<Name, Parameter, Body, Output> {
     name: Name,
     parameters: Vec<Parameter>,
     body: Body,
+    output: Output,
 }
 
-// Method implementations
 impl<Target> Inclusion<Target> {
     #[inline]
     pub fn new(target: Target) -> Self {
@@ -82,10 +83,15 @@ impl Formation {
     }
 }
 
-impl<Target, Body> Implementation<Target, Body> {
+impl<Target, Interface, Member> Implementation<Target, Interface, Member> {
     #[inline]
-    pub fn new(target: Target, body: Body) -> Self {
-        Implementation { target, body }
+    pub fn new(target: Target, interface: Option<Interface>, members: Vec<Member>) -> Self {
+        Implementation { interface, target, members }
+    }
+
+    #[inline]
+    pub fn get_interface(&self) -> &Option<Interface> {
+        &self.interface
     }
 
     #[inline]
@@ -94,15 +100,15 @@ impl<Target, Body> Implementation<Target, Body> {
     }
 
     #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
+    pub fn get_members(&self) -> &Vec<Member> {
+        &self.members
     }
 }
 
-impl<Target, Body> Interface<Target, Body> {
+impl<Target, Member> Interface<Target, Member> {
     #[inline]
-    pub fn new(target: Target, body: Body) -> Self {
-        Interface { target, body }
+    pub fn new(target: Target, members: Vec<Member>) -> Self {
+        Interface { target, members }
     }
 
     #[inline]
@@ -111,8 +117,8 @@ impl<Target, Body> Interface<Target, Body> {
     }
 
     #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
+    pub fn get_members(&self) -> &Vec<Member> {
+        &self.members
     }
 }
 
@@ -207,10 +213,10 @@ impl<Name, Variant> Enumeration<Name, Variant> {
     }
 }
 
-impl<Name, Parameter, Body> Function<Name, Parameter, Body> {
+impl<Name, Parameter, Body, Output> Method<Name, Parameter, Body, Output> {
     #[inline]
-    pub fn new(name: Name, parameters: Vec<Parameter>, body: Body) -> Self {
-        Function { name, parameters, body }
+    pub fn new(name: Name, parameters: Vec<Parameter>, body: Body, output: Output) -> Self {
+        Method { name, parameters, body, output }
     }
 
     #[inline]
@@ -231,6 +237,11 @@ impl<Name, Parameter, Body> Function<Name, Parameter, Body> {
     #[inline]
     pub fn get_body(&self) -> &Body {
         &self.body
+    }
+
+    #[inline]
+    pub fn get_output(&self) -> &Output {
+        &self.output
     }
 
     #[inline]
@@ -258,17 +269,17 @@ impl Hash for Formation {
     }
 }
 
-impl<Target: Hash, Body: Hash> Hash for Implementation<Target, Body> {
+impl<Interface: Hash, Target: Hash, Member: Hash> Hash for Implementation<Target, Interface, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
-        self.get_body().hash(state);
+        self.get_members().hash(state);
     }
 }
 
-impl<Target: Hash, Body: Hash> Hash for Interface<Target, Body> {
+impl<Target: Hash, Member: Hash> Hash for Interface<Target, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
-        self.get_body().hash(state);
+        self.get_members().hash(state);
     }
 }
 
@@ -295,11 +306,12 @@ impl<Name: Hash, Variant: Hash> Hash for Enumeration<Name, Variant> {
     }
 }
 
-impl<Name: Hash, Parameter: Hash, Body: Hash> Hash for Function<Name, Parameter, Body> {
+impl<Name: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash for Method<Name, Parameter, Body, Output> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_name().hash(state);
         self.get_parameters().hash(state);
         self.get_body().hash(state);
+        self.get_output().hash(state);
     }
 }
 
@@ -317,15 +329,15 @@ impl PartialEq for Formation {
     }
 }
 
-impl<Target: PartialEq, Body: PartialEq> PartialEq for Implementation<Target, Body> {
+impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq for Implementation<Target, Interface, Member> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_body() == other.get_body()
+        self.get_target() == other.get_target() && self.get_members() == other.get_members()
     }
 }
 
-impl<Target: PartialEq, Body: PartialEq> PartialEq for Interface<Target, Body> {
+impl<Target: PartialEq, Member: PartialEq> PartialEq for Interface<Target, Member> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_body() == other.get_body()
+        self.get_target() == other.get_target() && self.get_members() == other.get_members()
     }
 }
 
@@ -350,11 +362,12 @@ impl<Name: PartialEq, Variant: PartialEq> PartialEq for Enumeration<Name, Varian
     }
 }
 
-impl<Name: PartialEq, Parameter: PartialEq, Body: PartialEq> PartialEq for Function<Name, Parameter, Body> {
+impl<Name: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq for Method<Name, Parameter, Body, Output> {
     fn eq(&self, other: &Self) -> bool {
         self.get_name() == other.get_name()
             && self.get_parameters() == other.get_parameters()
             && self.get_body() == other.get_body()
+            && self.get_output() == other.get_output()
     }
 }
 
@@ -371,15 +384,15 @@ impl Clone for Formation {
     }
 }
 
-impl<Target: Clone, Body: Clone> Clone for Implementation<Target, Body> {
+impl<Interface: Clone, Target: Clone, Member: Clone> Clone for Implementation<Target, Interface, Member> {
     fn clone(&self) -> Self {
-        Implementation::new(self.get_target().clone(), self.get_body().clone())
+        Implementation::new(self.get_target().clone(), self.get_interface().clone(), self.get_members().clone())
     }
 }
 
-impl<Target: Clone, Body: Clone> Clone for Interface<Target, Body> {
+impl<Target: Clone, Member: Clone> Clone for Interface<Target, Member> {
     fn clone(&self) -> Self {
-        Interface::new(self.get_target().clone(), self.get_body().clone())
+        Interface::new(self.get_target().clone(), self.get_members().clone())
     }
 }
 
@@ -406,12 +419,13 @@ impl<Name: Clone, Variant: Clone> Clone for Enumeration<Name, Variant> {
     }
 }
 
-impl<Name: Clone, Parameter: Clone, Body: Clone> Clone for Function<Name, Parameter, Body> {
+impl<Name: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Method<Name, Parameter, Body, Output> {
     fn clone(&self) -> Self {
-        Function::new(
+        Method::new(
             self.get_name().clone(),
             self.get_parameters().clone(),
             self.get_body().clone(),
+            self.get_output().clone()
         )
     }
 }

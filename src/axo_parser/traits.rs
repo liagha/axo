@@ -57,9 +57,9 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 bundle.hash(state);
             }
-            ElementKind::Scope(scope) => {
+            ElementKind::Block(block) => {
                 discriminant(self).hash(state);
-                scope.hash(state);
+                block.hash(state);
             }
             ElementKind::Construct(construct) => {
                 discriminant(self).hash(state);
@@ -152,7 +152,7 @@ impl PartialEq for ElementKind {
             (ElementKind::Collection(a), ElementKind::Collection(b)) => a == b,
             (ElementKind::Series(a), ElementKind::Series(b)) => a == b,
             (ElementKind::Bundle(a), ElementKind::Bundle(b)) => a == b,
-            (ElementKind::Scope(a), ElementKind::Scope(b)) => a == b,
+            (ElementKind::Block(a), ElementKind::Block(b)) => a == b,
             (ElementKind::Construct(a), ElementKind::Construct(b)) => a == b,
 
             (ElementKind::Binary(a), ElementKind::Binary(b)) => a == b,
@@ -201,7 +201,7 @@ impl Clone for ElementKind {
             ElementKind::Collection(collection) => ElementKind::Collection(collection.clone()),
             ElementKind::Series(series) => ElementKind::Series(series.clone()),
             ElementKind::Bundle(bundle) => ElementKind::Bundle(bundle.clone()),
-            ElementKind::Scope(scope) => ElementKind::Scope(scope.clone()),
+            ElementKind::Block(block) => ElementKind::Block(block.clone()),
             ElementKind::Construct(construct) => ElementKind::Construct(construct.clone()),
 
             ElementKind::Binary(binary) => ElementKind::Binary(binary.clone()),
@@ -268,7 +268,7 @@ impl Hash for SymbolKind {
                 discriminant(self).hash(state);
                 enumeration.hash(state);
             }
-            SymbolKind::Function(function) => {
+            SymbolKind::Method(function) => {
                 discriminant(self).hash(state);
                 function.hash(state);
             }
@@ -292,7 +292,7 @@ impl PartialEq for SymbolKind {
             (SymbolKind::Binding(a), SymbolKind::Binding(b)) => a == b,
             (SymbolKind::Structure(a), SymbolKind::Structure(b)) => a == b,
             (SymbolKind::Enumeration(a), SymbolKind::Enumeration(b)) => a == b,
-            (SymbolKind::Function(a), SymbolKind::Function(b)) => a == b,
+            (SymbolKind::Method(a), SymbolKind::Method(b)) => a == b,
             _ => false,
         }
     }
@@ -303,6 +303,7 @@ impl Clone for Symbol {
         Symbol {
             kind: self.kind.clone(),
             span: self.span.clone(),
+            members: self.members.clone(),
         }
     }
 }
@@ -317,7 +318,7 @@ impl Clone for SymbolKind {
             SymbolKind::Binding(binding) => SymbolKind::Binding(binding.clone()),
             SymbolKind::Structure(structure) => SymbolKind::Structure(structure.clone()),
             SymbolKind::Enumeration(enumeration) => SymbolKind::Enumeration(enumeration.clone()),
-            SymbolKind::Function(function) => SymbolKind::Function(function.clone()),
+            SymbolKind::Method(function) => SymbolKind::Method(function.clone()),
         }
     }
 }

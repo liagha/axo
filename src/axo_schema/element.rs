@@ -1,8 +1,13 @@
 use {
     crate::{
-        hash::{Hash, Hasher},
+        hash::{Hash, Hasher}
     }
 };
+
+#[derive(Eq)]
+pub struct Procedural<Body> {
+    pub body: Body,
+}
 
 #[derive(Eq)]
 pub struct Group<Item> {
@@ -30,7 +35,7 @@ pub struct Bundle<Item> {
 }
 
 #[derive(Eq)]
-pub struct Scope<Item> {
+pub struct Block<Item> {
     pub items: Vec<Item>,
 }
 
@@ -91,15 +96,32 @@ pub struct Label<Value, Element> {
 }
 
 #[derive(Eq)]
-pub struct Access<Object, Member> {
+pub struct Access<Object, Target> {
     object: Object,
-    member: Member,
+    target: Target,
 }
 
 #[derive(Eq)]
 pub struct Assign<Target, Value> {
     target: Target,
     value: Value,
+}
+
+impl<Body> Procedural<Body> {
+    #[inline]
+    pub fn new(body: Body) -> Self {
+        Procedural { body }
+    }
+
+    #[inline]
+    pub fn get_body(&self) -> &Body {
+        &self.body
+    }
+
+    #[inline]
+    pub fn get_body_mut(&mut self) -> &mut Body {
+        &mut self.body
+    }
 }
 
 impl<Item> Group<Item> {
@@ -217,10 +239,10 @@ impl<Item> Bundle<Item> {
     }
 }
 
-impl<Item> Scope<Item> {
+impl<Item> Block<Item> {
     #[inline]
     pub fn new(items: Vec<Item>) -> Self {
-        Scope { items }
+        Block { items }
     }
     #[inline]
     pub fn get(&self, index: usize) -> Option<&Item> {
@@ -402,18 +424,18 @@ impl<Value, Element> Label<Value, Element> {
     }
 }
 
-impl<Object, Member> Access<Object, Member> {
+impl<Object, Target> Access<Object, Target> {
     #[inline]
-    pub fn new(object: Object, member: Member) -> Self {
-        Access { object, member }
+    pub fn new(object: Object, target: Target) -> Self {
+        Access { object, target }
     }
     #[inline]
     pub fn get_object(&self) -> &Object {
         &self.object
     }
     #[inline]
-    pub fn get_member(&self) -> &Member {
-        &self.member
+    pub fn get_target(&self) -> &Target {
+        &self.target
     }
 }
 
@@ -429,6 +451,12 @@ impl<Target, Value> Assign<Target, Value> {
     #[inline]
     pub fn get_value(&self) -> &Value {
         &self.value
+    }
+}
+
+impl<Body: Hash> Hash for Procedural<Body> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.body.hash(state);
     }
 }
 
@@ -462,7 +490,7 @@ impl<Item: Hash> Hash for Bundle<Item> {
     }
 }
 
-impl<Item: Hash> Hash for Scope<Item> {
+impl<Item: Hash> Hash for Block<Item> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.items.hash(state);
     }
@@ -538,7 +566,7 @@ impl<Value: Hash, Element: Hash> Hash for Label<Value, Element> {
 impl<Object: Hash, Member: Hash> Hash for Access<Object, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_object().hash(state);
-        self.get_member().hash(state);
+        self.get_target().hash(state);
     }
 }
 
@@ -546,6 +574,12 @@ impl<Target: Hash, Value: Hash> Hash for Assign<Target, Value> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
         self.get_value().hash(state);
+    }
+}
+
+impl<Body: PartialEq> PartialEq for Procedural<Body> {
+    fn eq(&self, other: &Self) -> bool {
+        self.body == other.body
     }
 }
 
@@ -579,7 +613,7 @@ impl<Item: PartialEq> PartialEq for Bundle<Item> {
     }
 }
 
-impl<Item: PartialEq> PartialEq for Scope<Item> {
+impl<Item: PartialEq> PartialEq for Block<Item> {
     fn eq(&self, other: &Self) -> bool {
         self.items == other.items
     }
@@ -649,13 +683,19 @@ impl<Value: PartialEq, Element: PartialEq> PartialEq for Label<Value, Element> {
 
 impl<Object: PartialEq, Member: PartialEq> PartialEq for Access<Object, Member> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_object() == other.get_object() && self.get_member() == other.get_member()
+        self.get_object() == other.get_object() && self.get_target() == other.get_target()
     }
 }
 
 impl<Target: PartialEq, Value: PartialEq> PartialEq for Assign<Target, Value> {
     fn eq(&self, other: &Self) -> bool {
         self.get_target() == other.get_target() && self.get_value() == other.get_value()
+    }
+}
+
+impl<Body: Clone> Clone for Procedural<Body> {
+    fn clone(&self) -> Self {
+        Procedural::new(self.body.clone())
     }
 }
 
@@ -689,9 +729,9 @@ impl<Item: Clone> Clone for Bundle<Item> {
     }
 }
 
-impl<Item: Clone> Clone for Scope<Item> {
+impl<Item: Clone> Clone for Block<Item> {
     fn clone(&self) -> Self {
-        Scope::new(self.items.clone())
+        Block::new(self.items.clone())
     }
 }
 
@@ -761,7 +801,7 @@ impl<Value: Clone, Element: Clone> Clone for Label<Value, Element> {
 
 impl<Object: Clone, Member: Clone> Clone for Access<Object, Member> {
     fn clone(&self) -> Self {
-        Access::new(self.get_object().clone(), self.get_member().clone())
+        Access::new(self.get_object().clone(), self.get_target().clone())
     }
 }
 

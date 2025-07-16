@@ -1,1 +1,10 @@
-"test \u{1F4A9}"
+func fuck() {
+
+}
+
+impl test {
+   func fuck() {
+
+   }
+
+}

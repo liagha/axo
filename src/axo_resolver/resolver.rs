@@ -23,6 +23,7 @@ use {
         memory::replace,
     },
 };
+use crate::axo_parser::SymbolKind;
 
 #[derive(Clone, Debug)]
 pub struct Resolver {
@@ -55,11 +56,11 @@ impl Resolver {
 
     pub fn lookup(&mut self, target: &Element) -> Option<Symbol> {
         let mut assessor = symbol_matcher();
-        let candidates: Vec<Symbol> = self.scope.all_symbols().iter().cloned().collect();
+        let candidates: Vec<Symbol> = self.scope.gather().iter().cloned().collect();
         let champion = assessor.champion(target, &candidates);
         self.errors.extend(assessor.errors);
 
-        champion.map(|candidate| candidate)
+        champion.map(|champion| champion)
     }
 
     pub fn error(&mut self, error: ErrorKind, span: Span) {
@@ -79,11 +80,10 @@ impl Resolver {
     }
 
     pub fn resolve(&mut self, element: &Box<Element>) {
-        let Element { kind, span } = *element.clone();
+        let Element { kind, .. } = *element.clone();
 
         match kind {
             ElementKind::Symbolize(symbol) => {
-                let symbol = Symbol { kind: symbol, span };
                 self.insert(symbol.clone());
             }
 
@@ -91,7 +91,7 @@ impl Resolver {
                 self.lookup(assign.get_target());
             }
 
-            ElementKind::Scope(body) => {
+            ElementKind::Block(body) => {
                 self.push_scope();
                 self.settle(body.items);
                 self.pop_scope();
@@ -174,6 +174,19 @@ impl Resolver {
             }
 
             _ => {}
+        }
+    }
+
+    pub fn symbolize(&mut self, symbol: Symbol) {
+        match symbol.kind {
+            SymbolKind::Formation(_) => {}
+            SymbolKind::Inclusion(_) => {}
+            SymbolKind::Implementation(_) => {}
+            SymbolKind::Interface(_) => {}
+            SymbolKind::Binding(_) => {}
+            SymbolKind::Structure(_) => {}
+            SymbolKind::Enumeration(_) => {}
+            SymbolKind::Method(_) => {}
         }
     }
 }

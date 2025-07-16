@@ -1,5 +1,10 @@
 use {
-    derive_more::with_trait::Unwrap,
+    derive_ctor::{
+        ctor,
+    },
+    derive_more::{
+        IsVariant, Unwrap,
+    },
     
     super::{
         OperatorKind, PunctuationKind
@@ -18,7 +23,7 @@ pub struct Token {
     pub span: Span,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Unwrap)]
+#[derive(ctor, Clone, Eq, Hash, PartialEq, IsVariant, Unwrap)]
 pub enum TokenKind {
     Float(FloatLiteral),
     Integer(i128),

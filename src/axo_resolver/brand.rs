@@ -50,7 +50,7 @@ impl Branded<Token> for SymbolKind {
             SymbolKind::Binding(binding) => binding.get_target().brand(),
             SymbolKind::Structure(structure) => structure.get_name().brand(),
             SymbolKind::Enumeration(enumeration) => enumeration.get_name().brand(),
-            SymbolKind::Function(function) => function.get_name().brand(),
+            SymbolKind::Method(function) => function.get_name().brand(),
             _ => None,
         }
     }

@@ -12,33 +12,32 @@ use {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Unwrap)]
 pub enum OperatorKind {
-    At,                      // @ (annotation or pattern binding)
-    Ampersand,               // & (bitwise AND or reference)
-    Backslash,               // \ (escape character)
-    Caret,                   // ^ (bitwise XOR)
-    Colon,                   // : (type annotation or key-value separator)
-    Dollar,                  // $ (template literal or macro)
-    Dot,                     // . (member access)
-    DoubleQuote,             // " (string delimiter)
-    Equal,                   // = (assignment)
-    Exclamation,             // ! (logical NOT)
-    RightAngle,              // > (greater than comparison)
-    Hash,                    // # (attribute or preprocessor)
-    LeftAngle,               // < (less than comparison)
-    Minus,                   // - (subtraction or negation)
-    Percent,                 // % (modulo)
-    Pipe,                    // | (bitwise OR)
-    Plus,                    // + (addition)
-    QuestionMark,            // ? (optional or error handling)
-    SingleQuote,             // ' (character literal delimiter)
-    Slash,                   // / (division)
-    Star,                    // * (multiplication or pointer/reference)
-    Tilde,                   // ~ (bitwise NOT or unary negation)
-    Underscore,              // _ (wildcard or ignored value)
-    Backtick,                // ` (raw string or template literal)
+    At,                     
+    Ampersand,              
+    Backslash,              
+    Caret,                  
+    Colon,                  
+    Dollar,                 
+    Dot,                    
+    DoubleQuote,             
+    Equal,                   
+    Exclamation,             
+    RightAngle,              
+    Hash,                    
+    LeftAngle,               
+    Minus,                   
+    Percent,                 
+    Pipe,                    
+    Plus,                    
+    QuestionMark,            
+    SingleQuote,             
+    Slash,                   
+    Star,                    
+    Tilde,                  
+    Underscore,            
+    Backtick,             
 
-    // Word operators
-    In,                      // in (used in for-loops and iterators)
+    In, 
 
     Composite(Vec<OperatorKind>),
 }

@@ -122,7 +122,7 @@ pub mod any {
 }
 
 pub mod operations {
-    pub use core::ops::{Add, Div, Mul, Neg, Range, Rem, Sub};
+    pub use core::ops::{Add, Div, Mul, Neg, Range, Rem, Sub, Deref, DerefMut};
 }
 
 pub mod architecture {

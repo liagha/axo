@@ -41,10 +41,6 @@ impl Scope {
         self.symbols.insert(symbol);
     }
 
-    pub fn contains_local(&self, symbol: &Symbol) -> bool {
-        self.symbols.contains(symbol)
-    }
-
     pub fn contains(&self, symbol: &Symbol) -> bool {
         let mut current = Some(self);
 
@@ -57,26 +53,31 @@ impl Scope {
 
         false
     }
+    
+    pub fn symbols(&self) -> &HashSet<Symbol> {
+        &self.symbols
+    }
 
-    pub fn all_symbols(&self) -> HashSet<Symbol> {
-        let mut all_symbols = HashSet::new();
+    pub fn gather(&self) -> HashSet<Symbol> {
+        let mut symbols = HashSet::new();
         let mut current = Some(self);
 
         while let Some(scope) = current {
-            all_symbols.extend(scope.symbols.iter().cloned());
+            symbols.extend(scope.symbols.iter().cloned());
             current = scope.parent.as_deref();
         }
 
-        all_symbols
+        symbols
     }
 
-    pub fn find(&self, symbol: &Symbol) -> Option<Symbol> {
+    pub fn get(&self, symbol: &Symbol) -> Option<Symbol> {
         let mut current = Some(self);
 
         while let Some(scope) = current {
             if let Some(found) = scope.symbols.get(symbol) {
                 return Some(found.clone());
             }
+
             current = scope.parent.as_deref();
         }
 

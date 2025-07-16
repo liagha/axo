@@ -7,7 +7,7 @@ use {
         axo_schema::{
             Group, Sequence,
             Collection, Series,
-            Bundle, Scope,
+            Bundle, Block,
         },
         thread::Arc,
     },
@@ -60,13 +60,13 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Bundle(Bundle::new(elements)), form.span)
+                    Element::new(ElementKind::bundle(Bundle::new(elements)), form.span)
                 ))
             },
         )
     }
 
-    pub fn scope(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn block(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -112,7 +112,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Scope(Scope::new(elements)), form.span)
+                    Element::new(ElementKind::block(Block::new(elements)), form.span)
                 ))
             },
         )
@@ -166,7 +166,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Group(Group::new(elements)), form.span)
+                    Element::new(ElementKind::group(Group::new(elements)), form.span)
                 ))
             },
         )
@@ -221,7 +221,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Sequence(Sequence::new(elements)), form.span)
+                    Element::new(ElementKind::sequence(Sequence::new(elements)), form.span)
                 ))
             },
         )
@@ -273,7 +273,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Collection(Collection::new(elements)), form.span)
+                    Element::new(ElementKind::collection(Collection::new(elements)), form.span)
                 ))
             },
         )
@@ -325,7 +325,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::Series(Series::new(elements)), form.span)
+                    Element::new(ElementKind::series(Series::new(elements)), form.span)
                 ))
             },
         )
@@ -334,7 +334,7 @@ impl Parser {
     pub fn delimited() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
             Self::bundle(Classifier::lazy(Self::element)),
-            Self::scope(Classifier::lazy(Self::element)),
+            Self::block(Classifier::lazy(Self::element)),
             Self::group(Classifier::lazy(Self::element)),
             Self::sequence(Classifier::lazy(Self::element)),
             Self::collection(Classifier::lazy(Self::element)),

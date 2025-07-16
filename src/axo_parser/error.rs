@@ -3,12 +3,15 @@ use {
         Color, TextStyle
     },
     
+    super::{
+        Element,
+    },
+    
     crate::{
         format::{Debug, Display, Formatter, Result},
         axo_scanner::{
             TokenKind, Token, PunctuationKind
         },
-        axo_parser::Element,
     }
 };
 

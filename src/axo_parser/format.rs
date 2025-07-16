@@ -1,13 +1,13 @@
 use {
+    super::{
+        symbol::Symbol,
+        Element, ElementKind, SymbolKind
+    },
+    
     crate::{
         format::{
             Debug, Display,
             Formatter, Result
-        },
-
-        axo_parser::{
-            symbol::Symbol,
-            Element, ElementKind, SymbolKind
         },
 
         axo_format::indent,
@@ -19,8 +19,8 @@ impl Debug for SymbolKind {
         match self {
             SymbolKind::Inclusion(inclusion) => write!(f, "Inclusion({:?})", inclusion.get_target()),
             SymbolKind::Formation(formation) => write!(f, "Formed({:?}: {:?})", formation.get_identifier(), formation.get_form()),
-            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} => {:?})", implementation.get_target(), implementation.get_body()),
-            SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_body()),
+            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} => {:?})", implementation.get_target(), implementation.get_members()),
+            SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_members()),
             SymbolKind::Binding(binding) => {
                 let kind = if binding.is_mutable() { "Variable" } else { "Constant" };
                 write!(f, "{}({:?}", kind, binding.get_target())?;
@@ -37,7 +37,7 @@ impl Debug for SymbolKind {
             },
             SymbolKind::Structure(structure) => write!(f, "Structure({:?} | {:?})", structure.get_name(), structure.get_fields()),
             SymbolKind::Enumeration(enumeration) => write!(f, "Enumeration({:?} | {:?})", enumeration.get_name(), enumeration.get_variants()),
-            SymbolKind::Function(function) => write!(f, "Function({:?}({:?}) {:?})", function.get_name(), function.get_parameters(), function.get_body()),
+            SymbolKind::Method(function) => write!(f, "Function({:?}({:?}) {:?})", function.get_name(), function.get_parameters(), function.get_body()),
         }
     }
 }
@@ -75,8 +75,8 @@ impl Debug for ElementKind {
             ElementKind::Identifier(identifier) => {
                 write!(f, "Identifier({})", identifier)
             },
-            ElementKind::Procedural(element) => {
-                write!(f, "Procedural({:?})", element)
+            ElementKind::Procedural(procedural) => {
+                write!(f, "Procedural({:?})", procedural.get_body())
             }
             ElementKind::Series(series) => {
                 write!(f, "Series({:?})", series.items)
@@ -93,9 +93,9 @@ impl Debug for ElementKind {
             ElementKind::Bundle(bundle) => {
                 write!(f, "Bundle({:?})", bundle.items)
             },
-            ElementKind::Scope(scope) => {
-                write!(f, "Block({:#?})", scope.items)
-            },
+            ElementKind::Block(block) => {
+                write!(f, "Block({:#?})", block.items)
+            }
 
             ElementKind::Binary(binary) => {
                 write!(f, "Binary({:?} {:?} {:?})", binary.get_left(), binary.get_operator(), binary.get_right())
@@ -114,7 +114,7 @@ impl Debug for ElementKind {
                 write!(f, "Invoke({:?}({:?}))", invoke.get_target(), invoke.get_arguments())
             },
             ElementKind::Access(access) => {
-                write!(f, "Member({:?}.{:?})", access.get_object(), access.get_member())
+                write!(f, "Access({:?}.{:?})", access.get_object(), access.get_target())
             },
 
             ElementKind::Conditional(cond) => {

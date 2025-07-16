@@ -2,6 +2,7 @@ use {
     crate::{
         hash::Hash,
         format::Debug,
+        operations::{Deref, DerefMut},
         axo_cursor::{
             Span, Spanned,
         },
@@ -279,5 +280,29 @@ where
         };
 
         Form::new(mapped, self.span)
+    }
+}
+
+impl<Input, Output, Failure> Deref for Form<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    type Target = FormKind<Input, Output, Failure>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
+    }
+}
+
+impl<Input, Output, Failure> DerefMut for Form<Input, Output, Failure>
+where
+    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.kind
     }
 }

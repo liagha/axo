@@ -1,21 +1,31 @@
 use {
     derive_more::{
-        with_trait::Unwrap
+        with_trait::{
+            IsVariant, Unwrap,
+        }
+    },
+
+    derive_ctor::{
+        ctor
     },
 
     super::{
-        SymbolKind, ParseError,
+        Symbol, ParseError,
     },
 
     crate::{
+        operations::{
+            Deref, DerefMut
+        },
         axo_data::tree::{
             Node, Tree
         },
 
         axo_schema::{
+            Procedural,
             Group, Sequence,
             Collection, Series,
-            Bundle, Scope,
+            Bundle, Block,
             Binary, Unary,
             Index, Invoke, Construct,
             Conditional, Repeat, Iterate,
@@ -36,13 +46,13 @@ pub struct Element {
     pub span: Span,
 }
 
-#[derive(Unwrap)]
+#[derive(ctor, IsVariant, Unwrap)]
 pub enum ElementKind {
     Literal(TokenKind),
 
     Identifier(String),
 
-    Procedural(Box<Element>),
+    Procedural(Procedural<Box<Element>>),
 
     Group(Group<Element>),
 
@@ -54,7 +64,7 @@ pub enum ElementKind {
 
     Bundle(Bundle<Element>),
 
-    Scope(Scope<Element>),
+    Block(Block<Element>),
 
     Unary(Unary<Token, Box<Element>>),
 
@@ -78,7 +88,7 @@ pub enum ElementKind {
 
     Iterate(Iterate<Box<Element>, Box<Element>>),
 
-    Symbolize(SymbolKind),
+    Symbolize(Symbol),
 
     Assign(Assign<Box<Element>, Box<Element>>),
 
@@ -92,5 +102,19 @@ pub enum ElementKind {
 impl Element {
     pub fn new(kind: ElementKind, span: Span) -> Element {
         Element { kind, span }
+    }
+}
+
+impl Deref for Element {
+    type Target = ElementKind;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
+    }
+}
+
+impl DerefMut for Element {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.kind
     }
 }

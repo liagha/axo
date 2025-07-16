@@ -115,9 +115,9 @@ impl Compiler {
             pipeline!(
                 context,
                 (),
-                ScannerStage
-                //ParserStage,
-                //ResolverStage
+                ScannerStage,
+                ParserStage,
+                ResolverStage
             ).map(|_| ())
         })
     }
@@ -265,7 +265,7 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
         let errors = context.resolver.errors.clone();
 
         if context.verbose {
-            let symbols = context.resolver.scope.all_symbols();
+            let symbols = context.resolver.scope.symbols();
 
             let tree = symbols
                 .iter()
