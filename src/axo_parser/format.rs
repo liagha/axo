@@ -19,7 +19,7 @@ impl Debug for SymbolKind {
         match self {
             SymbolKind::Inclusion(inclusion) => write!(f, "Inclusion({:?})", inclusion.get_target()),
             SymbolKind::Formation(formation) => write!(f, "Formed({:?}: {:?})", formation.get_identifier(), formation.get_form()),
-            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} => {:?})", implementation.get_target(), implementation.get_members()),
+            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} for {:?} => {:?})", implementation.get_interface(), implementation.get_target(), implementation.get_members()),
             SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_members()),
             SymbolKind::Binding(binding) => {
                 let kind = if binding.is_mutable() { "Variable" } else { "Constant" };
@@ -173,8 +173,6 @@ impl Debug for ElementKind {
 
                 Ok(())
             }
-
-            ElementKind::Domain(tree) => write!(f, "Path({:?})", tree),
         }
     }
 }

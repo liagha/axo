@@ -6,8 +6,9 @@ use {
         ParseError, Parser
     },
     crate::{
-        axo_cursor::Span,
-        axo_cursor::Spanned,
+        axo_cursor::{
+            Span,
+        },
         axo_form::{
             form::Form,
             former::Former,
@@ -23,7 +24,6 @@ use {
             Label,
             Repeat, Structure, Unary,
         },
-        tree::{Node, Tree},
     },
 };
 
@@ -271,56 +271,6 @@ impl Parser {
     }
 
 
-    pub fn locate() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::lazy(|| Self::primary()),
-                Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(ref op) if op.as_slice() == [OperatorKind::Colon, OperatorKind::Colon])
-                }),
-                Classifier::lazy(|| Self::primary()),
-            ]),
-            |_, form| {
-                let sequence = form.unwrap();
-                let left = sequence[0].unwrap_output();
-                let right = sequence[2].unwrap_output();
-                let span = Span::mix(&left.span, &right.span);
-
-                let kind = match &left.kind {
-                    ElementKind::Domain(tree) => {
-                        let mut new_tree = tree.clone();
-
-                        if let Some(root) = new_tree.root_mut() {
-                            let mut current = root;
-
-                            while current.has_children() {
-                                let last_idx = current.child_count() - 1;
-                                current = current.get_child_mut(last_idx).unwrap();
-                            }
-
-                            current.add_value(right.into());
-                        }
-
-                        ElementKind::Domain(new_tree)
-                    }
-                    _ => {
-                        let node = Node::with_children(
-                            left.into(),
-                            vec![Node::new(right.into())],
-                        );
-
-                        let tree = Tree::with_root_node(node);
-                        ElementKind::Domain(tree)
-                    }
-                };
-
-                Ok(Form::output(
-                    Element::new(kind, span)
-                ))
-            },
-        )
-    }
-
     pub fn compound() -> Classifier<Token, Element, ParseError> {
         Classifier::with_transform(
             Classifier::sequence([
@@ -380,7 +330,6 @@ impl Parser {
             Self::assign(),
             Self::label(),
             Self::binding(),
-            Self::locate(),
             Self::compound(),
             Classifier::with_transform(
                 Classifier::sequence([

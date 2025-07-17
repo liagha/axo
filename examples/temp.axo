@@ -2,7 +2,7 @@ func fuck() {
 
 }
 
-impl test {
+impl test : test {
    func fuck() {
 
    }

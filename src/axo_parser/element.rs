@@ -80,8 +80,6 @@ pub enum ElementKind {
 
     Construct(Construct<Box<Element>, Element>),
 
-    Domain(Tree<Box<Element>>),
-
     Conditional(Conditional<Box<Element>, Box<Element>, Box<Element>>),
 
     Repeat(Repeat<Box<Element>, Box<Element>>),

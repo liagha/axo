@@ -128,9 +128,9 @@ impl Parser {
                             outputs.span()
                         )
                     ))
-                } else {
-                    let target = outputs[2].clone();
-                    let body = outputs[3].clone().kind.unwrap_bundle();
+                } else if outputs.len() == 3 {
+                    let target = outputs[1].clone();
+                    let body = outputs[2].clone().kind.unwrap_block();
                     let members = body.items.iter().map(|item| {
                         Symbol {
                             kind: item.kind.clone().unwrap_symbolize().clone().kind,
@@ -151,6 +151,8 @@ impl Parser {
                             outputs.span()
                         )
                     ))
+                } else {
+                    unreachable!()
                 }
             },
         )

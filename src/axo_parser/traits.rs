@@ -91,10 +91,6 @@ impl Hash for ElementKind {
                 discriminant(self).hash(state);
                 invoke.hash(state);
             }
-            ElementKind::Domain(tree) => {
-                discriminant(self).hash(state);
-                tree.hash(state);
-            }
 
             ElementKind::Conditional(conditioned) => {
                 discriminant(self).hash(state);
@@ -162,7 +158,6 @@ impl PartialEq for ElementKind {
             (ElementKind::Access(a), ElementKind::Access(b)) => a == b,
             (ElementKind::Index(a), ElementKind::Index(b)) => a == b,
             (ElementKind::Invoke(a), ElementKind::Invoke(b)) => a == b,
-            (ElementKind::Domain(a), ElementKind::Domain(b)) => a == b,
 
             (ElementKind::Conditional(a), ElementKind::Conditional(b)) => a == b,
             (ElementKind::Repeat(a), ElementKind::Repeat(b)) => a == b,
@@ -211,7 +206,6 @@ impl Clone for ElementKind {
             ElementKind::Access(access) => ElementKind::Access(access.clone()),
             ElementKind::Index(index) => ElementKind::Index(index.clone()),
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
-            ElementKind::Domain(tree) => ElementKind::Domain(tree.clone()),
 
             ElementKind::Conditional(conditioned) => ElementKind::Conditional(conditioned.clone()),
             ElementKind::Repeat(repeat) => ElementKind::Repeat(repeat.clone()),

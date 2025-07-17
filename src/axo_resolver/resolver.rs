@@ -17,13 +17,12 @@ use {
         },
         axo_parser::{
             Element, ElementKind,
-            Symbol
+            Symbol, SymbolKind,
         },
         format::Debug,
         memory::replace,
     },
 };
-use crate::axo_parser::SymbolKind;
 
 #[derive(Clone, Debug)]
 pub struct Resolver {
