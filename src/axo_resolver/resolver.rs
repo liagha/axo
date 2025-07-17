@@ -23,6 +23,7 @@ use {
         memory::replace,
     },
 };
+use crate::axo_schema::Interface;
 
 #[derive(Clone, Debug)]
 pub struct Resolver {
@@ -53,9 +54,8 @@ impl Resolver {
         self.scope.insert(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Element) -> Option<Symbol> {
+    pub fn lookup(&mut self, target: &Element, candidates: Vec<Symbol>) -> Option<Symbol> {
         let mut assessor = symbol_matcher();
-        let candidates: Vec<Symbol> = self.scope.gather().iter().cloned().collect();
         let champion = assessor.champion(target, &candidates);
         self.errors.extend(assessor.errors);
 
@@ -80,14 +80,15 @@ impl Resolver {
 
     pub fn resolve(&mut self, element: &Box<Element>) {
         let Element { kind, .. } = *element.clone();
+        let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
 
         match kind {
             ElementKind::Symbolize(symbol) => {
-                self.insert(symbol.clone());
+                self.symbolize(symbol);
             }
 
             ElementKind::Assign(assign) => {
-                self.lookup(assign.get_target());
+                self.lookup(assign.get_target(), symbols);
             }
 
             ElementKind::Block(body) => {
@@ -97,13 +98,13 @@ impl Resolver {
             }
 
             ElementKind::Identifier(_) => {
-                self.lookup(&element);
+                self.lookup(&element, symbols);
             }
 
             ElementKind::Construct { .. }
             | ElementKind::Invoke { .. }
             | ElementKind::Index { .. } => {
-                self.lookup(&element);
+                self.lookup(&element, symbols);
             }
 
             ElementKind::Group(group) => {
@@ -166,6 +167,14 @@ impl Resolver {
                 self.pop_scope();
             }
 
+            ElementKind::Access(access) => {
+                let target = self.lookup(access.get_target(), symbols);
+
+                if let Some(target) = target {
+                    self.lookup(access.get_object(), target.members);
+                }
+            }
+
             ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
                 if let Some(value) = value {
                     self.resolve(&value);
@@ -177,15 +186,42 @@ impl Resolver {
     }
 
     pub fn symbolize(&mut self, symbol: Symbol) {
+        let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
+
         match symbol.kind {
             SymbolKind::Formation(_) => {}
             SymbolKind::Inclusion(_) => {}
-            SymbolKind::Implementation(_) => {}
+            SymbolKind::Implementation(implementation) => {
+                if let Some(mut target) = self.lookup(implementation.get_target(), symbols) {
+                    if let Some(interface) = implementation.get_interface() {
+                        self.scope.remove(&target);
+
+                        let member = Symbol::new(SymbolKind::interface(Interface::new(interface.clone(), implementation.get_members().clone())), symbol.span);
+                        target.members.push(member);
+                        println!("new: {target:?}");
+                        self.scope.insert(target);
+                    } else {
+                        self.scope.remove(&target);
+
+                        target.members.extend(implementation.get_members().clone());
+                        println!("new: {target:?}");
+                        self.scope.insert(target);
+                    }
+                }
+
+                println!("f");
+            }
             SymbolKind::Interface(_) => {}
             SymbolKind::Binding(_) => {}
-            SymbolKind::Structure(_) => {}
-            SymbolKind::Enumeration(_) => {}
-            SymbolKind::Method(_) => {}
+            SymbolKind::Structure(_) => {
+                self.scope.insert(symbol);
+            }
+            SymbolKind::Enumeration(_) => {
+                self.scope.insert(symbol);
+            }
+            SymbolKind::Method(_) => {
+                self.scope.insert(symbol);
+            }
         }
     }
 }

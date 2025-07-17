@@ -269,7 +269,9 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
 
             let tree = symbols
                 .iter()
-                .map(|symbol| format!("{:?}", symbol))
+                .map(|symbol| {
+                    format!("{:?}", symbol)
+                })
                 .collect::<Vec<String>>()
                 .join("\n");
 

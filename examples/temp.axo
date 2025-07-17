@@ -1,10 +1,11 @@
-func fuck() {
+struct MyStruct {
 
 }
 
-impl test : test {
-   func fuck() {
+impl MyStruct {
+    func fuck() {
 
-   }
-
+    }
 }
+
+MyStruct.fuck()

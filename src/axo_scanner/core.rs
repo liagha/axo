@@ -178,7 +178,7 @@ impl Scanner {
 
     pub fn pattern() -> Classifier<Character, Token, ScanError> {
         Classifier::persistence(
-            Classifier::choice([
+            Classifier::alternative([
                 Self::whitespace(),
                 Self::comment(),
                 Self::identifier(),
@@ -190,7 +190,7 @@ impl Scanner {
                 Self::operator(),
                 Self::punctuation(),
                 Self::fallback(),
-            ], vec![1, 0]),
+            ]),
             0,
             None,
         )

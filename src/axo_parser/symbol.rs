@@ -51,8 +51,8 @@ pub struct Symbol {
 pub enum SymbolKind {
     Formation(Formation),
     Inclusion(Inclusion<Box<Element>>),
-    Implementation(Implementation<Box<Element>, Box<Element>, Box<Symbol>>),
-    Interface(Interface<Box<Element>, Box<Element>>),
+    Implementation(Implementation<Box<Element>, Box<Element>, Symbol>),
+    Interface(Interface<Box<Element>, Symbol>),
     Binding(Binding<Box<Element>, Box<Element>, Box<Element>>),
     Structure(Structure<Box<Element>, Symbol>),
     Enumeration(Enumeration<Box<Element>, Element>),
@@ -169,25 +169,7 @@ impl Parser {
                         false
                     }
                 }),
-                Classifier::lazy(|| Self::primary()),
-                Classifier::repetition(
-                    Classifier::alternative([
-                        Classifier::sequence([
-                            Classifier::predicate(|token: &Token| {
-                                matches!(token.kind, TokenKind::Operator(ref op) if op == &OperatorKind::Colon)
-                            }),
-                            Classifier::lazy(|| Self::element()),
-                        ]),
-                        Classifier::sequence([
-                            Classifier::predicate(|token: &Token| {
-                                matches!(token.kind, TokenKind::Operator(ref op) if op == &OperatorKind::Equal)
-                            }),
-                            Classifier::lazy(|| Self::element()),
-                        ]),
-                    ]),
-                    0,
-                    None,
-                ),
+                Classifier::lazy(Self::element),
             ]),
             |_, form| {
                 let sequence = form.unwrap();
@@ -199,36 +181,32 @@ impl Parser {
                     false
                 };
 
-                let target = sequence[1].unwrap_output();
-                let operations = sequence[2].unwrap();
+                let body = sequence[1].unwrap_output();
 
-                let mut ty : Option<Box<Element>> = None;
-                let mut value : Option<Box<Element>> = None;
-
-                for operation in operations {
-                    let op_sequence = operation.unwrap();
-                    if op_sequence.len() >= 2 {
-                        let operator = op_sequence[0].unwrap_input();
-                        let operand = op_sequence[1].unwrap_output();
-
-                        if let TokenKind::Operator(op) = &operator.kind {
-                            match op {
-                                OperatorKind::Colon => {
-                                    ty = Some(operand.into());
-                                }
-                                OperatorKind::Equal => {
-                                    value = Some(operand.into());
-                                }
-                                _ => {}
+                let symbol = match body.kind {
+                    ElementKind::Assign(assign) => {
+                        if let ElementKind::Label(label) = assign.get_target().kind.clone() {
+                            Symbol {
+                                kind: SymbolKind::Binding(Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), mutable)),
+                                span: form.span.clone(),
+                                members: vec![],
+                            }
+                        } else {
+                            Symbol {
+                                kind: SymbolKind::Binding(Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, mutable)),
+                                span: form.span.clone(),
+                                members: vec![],
                             }
                         }
                     }
-                }
 
-                let symbol = Symbol {
-                    kind: SymbolKind::Binding(Binding::new(target.into(), value, ty, mutable)),
-                    span: form.span.clone(),
-                    members: vec![],
+                    _ => {
+                        Symbol {
+                            kind: SymbolKind::binding(Binding::new(body.into(), None, None, mutable)),
+                            span: form.span.clone(),
+                            members: vec![],
+                        }
+                    }
                 };
 
                 Ok(Form::output(

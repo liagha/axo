@@ -4,6 +4,7 @@ use {
     crate::{
         axo_parser::Symbol,
         hash::HashSet,
+        operations::{Deref, DerefMut,},
     },
 };
 
@@ -82,5 +83,19 @@ impl Scope {
         }
 
         None
+    }
+}
+
+impl Deref for Scope {
+    type Target = HashSet<Symbol>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.symbols
+    }
+}
+
+impl DerefMut for Scope {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.symbols
     }
 }

@@ -124,7 +124,8 @@ where
     Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
 {
     pub patterns: Vec<Classifier<Input, Output, Failure>>,
-    pub perfection: Vec<i8>
+    pub perfection: Vec<i8>,
+    pub blacklist: Vec<i8>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure>
@@ -139,6 +140,10 @@ where
         for pattern in &self.patterns {
             let mut child = Draft::new(draft.marker, draft.position, pattern.clone());
             composer.build(&mut child);
+
+            if self.blacklist.contains(&child.record) {
+                continue;
+            }
 
             match &best {
                 None => {
@@ -223,9 +228,10 @@ where
             draft.position = child.position;
             draft.consumed = child.consumed;
             draft.form = child.form;
+            draft.align();
+        } else {
+            draft.ignore();
         }
-
-        draft.align();
     }
 }
 
@@ -556,11 +562,11 @@ where
     }
 
     pub fn alternative(patterns: impl Into<Vec<Self>>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![1] }))
+        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![1], blacklist: vec![-1] }))
     }
 
     pub fn choice(patterns: impl Into<Vec<Self>>, perfection: Vec<i8>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection }))
+        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection, blacklist: vec![] }))
     }
 
     pub fn sequence(patterns: impl Into<Vec<Self>>) -> Self {

@@ -56,13 +56,13 @@ impl Display for Element {
 
 impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?} | {:#?}", self.kind, self.span)
+        write!(f, "{:?} | {:#?}\n{}", self.kind, self.span, indent(&format!("{:#?}", self.members)))
     }
 }
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "{:?}\n{}", self.kind, indent(&format!("{:#?}", self.members)))
     }
 }
 

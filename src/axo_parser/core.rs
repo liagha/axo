@@ -1,6 +1,6 @@
 use {
     super::{
-        error::ErrorKind, 
+        error::ErrorKind,
         Element, ElementKind,
         SymbolKind,
         ParseError, Parser
@@ -195,142 +195,8 @@ impl Parser {
         ])
     }
 
-    pub fn access() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::lazy(|| Self::primary()),
-                Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(ref op) if op == &OperatorKind::Dot)
-                }).with_ignore(),
-                Classifier::lazy(|| Self::primary()),
-            ]),
-            |_, form| {
-                let sequence = form.unwrap();
-                let object = sequence[0].unwrap_output();
-                let target = sequence[1].unwrap_output();
-                let span = Span::mix(&object.span, &target.span);
-
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::access(Access::new(object.into(), target.into())),
-                        span,
-                    )
-                ))
-            },
-        )
-    }
-
-    pub fn label() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::lazy(|| Self::primary()),
-                Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(ref op) if op.as_slice() == [OperatorKind::Colon])
-                }).with_ignore(),
-                Classifier::lazy(|| Self::element()),
-            ]),
-            |_, form| {
-                let sequence = form.unwrap();
-                let label = sequence[0].unwrap_output();
-                let element = sequence[1].unwrap_output();
-                let span = Span::mix(&label.span, &element.span);
-
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::label(Label::new(label.into(), element.into())),
-                        span,
-                    )
-                ))
-            },
-        )
-    }
-
-    pub fn assign() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::lazy(|| Self::unary()),
-                Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(ref op) if op.as_slice() == [OperatorKind::Equal])
-                }).with_ignore(),
-                Classifier::lazy(|| Self::element()),
-            ]),
-            |_, form| {
-                let sequence = form.unwrap();
-                let target = sequence[0].unwrap_output();
-                let value = sequence[1].unwrap_output();
-                let span = Span::mix(&target.span, &value.span);
-
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::Assign(Assign::new(target.into(), value.into())),
-                        span,
-                    )
-                ))
-            },
-        )
-    }
-
-
-    pub fn compound() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::lazy(|| Self::unary()),
-                Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Operator(op) = &token.kind {
-                        if let OperatorKind::Composite(compound) = op {
-                            OperatorKind::Composite(compound.clone()).decompound().is_some()
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }),
-                Classifier::lazy(|| Self::element()),
-            ]),
-            |_, form| {
-                let sequence = form.unwrap();
-                let target = sequence[0].unwrap_output();
-                let raw = sequence[1].unwrap_input();
-                let operator = raw.kind.unwrap_operator();
-                let value = sequence[2].unwrap_output();
-                let span = Span::mix(&target.span, &value.span);
-
-                if let Some(base) = operator.decompound() {
-                    let operation = Token {
-                        kind: TokenKind::Operator(base),
-                        span: raw.span.clone(),
-                    };
-
-                    let right = Element::new(
-                        ElementKind::Binary(Binary::new(
-                            target.clone().into(),
-                            operation,
-                            value.into())
-                        ),
-                        span.clone(),
-                    );
-
-                    return Ok(Form::output(
-                        Element::new(
-                            ElementKind::Assign(Assign::new(target.into(), right.into())),
-                            span,
-                        )
-                    ));
-                }
-
-                unreachable!()
-            },
-        )
-    }
-
     pub fn binary() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
-            Self::access(),
-            Self::assign(),
-            Self::label(),
-            Self::binding(),
-            Self::compound(),
             Classifier::with_transform(
                 Classifier::sequence([
                     Classifier::alternative([
@@ -421,10 +287,32 @@ impl Parser {
             let end = right.span.end.clone();
             let span = Span::new(start, end);
 
-            left = Element::new(
-                ElementKind::Binary(Binary::new(left.into(), operator.clone(), right.into())),
-                span,
-            );
+            match &operator.kind {
+                TokenKind::Operator(OperatorKind::Dot) => {
+                    left = Element::new(
+                        ElementKind::Access(Access::new(left.into(), right.into())),
+                        span,
+                    );
+                }
+                TokenKind::Operator(OperatorKind::Equal) => {
+                    left = Element::new(
+                        ElementKind::Assign(Assign::new(left.into(), right.into())),
+                        span,
+                    );
+                }
+                TokenKind::Operator(OperatorKind::Colon) => {
+                    left = Element::new(
+                        ElementKind::Label(Label::new(left.into(), right.into())),
+                        span,
+                    );
+                }
+                _ => {
+                    left = Element::new(
+                        ElementKind::Binary(Binary::new(left.into(), operator.clone(), right.into())),
+                        span,
+                    );
+                }
+            }
 
             current = lookahead;
         }
