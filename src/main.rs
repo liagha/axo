@@ -80,7 +80,7 @@ pub mod character {
         from_u32, from_u32_unchecked, MAX
     };
 
-    use num_traits::PrimInt;
+    use crate::axo_data::PrimInt;
 
     pub fn parse_radix<T: PrimInt>(input: &str, radix: T) -> Option<T> {
         if input.is_empty() {
