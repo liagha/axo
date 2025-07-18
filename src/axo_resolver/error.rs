@@ -23,10 +23,10 @@ impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::UndefinedSymbol { query } => {
-                write!(f, "undefined symbol: `{}`.", query)
+                write!(f, "undefined symbol: `{:?}`.", query)
             },
             ErrorKind::BindMismatch { candidate } => {
-                write!(f, "slots of `{}` aren't matched correctly.", candidate)
+                write!(f, "slots of `{:?}` aren't matched correctly.", candidate)
             }
         }
     }

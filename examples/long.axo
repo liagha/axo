@@ -14,149 +14,10060 @@ e = x <= y;
 f = z && (x == 42);
 g = !z || (y != 3.14);
 
-while (5 + x) {
-    x = x + 7;
+if 4 + x {
+    x - 4;
 }
 
-if x > 4 {
-    x = x - 10;
-} else {
-    x = x + 10;
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
 }
 
-while (x < 10) {
-    x = 10;
+index[test[4]] {
+    x: 5
 }
 
-ch = 'a';
-str = "Hello, world!";
+test::444
 
-range = 1..10;
+fn test[3] x = 5
 
-fn fibonacci(n) {
-    if (n <= 1) {
-        return n;
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2);
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
 }
 
-print(result);
+x += 3;
 
-var numbers = [1, 2, 3, 4, 5];
-var sum = 0;
-
-for i + 1 {
-    var sum = numbers[i];
+async test x {
+    print(x)
 }
 
-var test[2] = 43;
-x *= 4;
+3 + 4 > 3 + 5
 
-if (x > 10) {
-    x = x - 10;
-} else {
-    x = x + 10;
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
 }
 
-for i > 5 {
-    sum += numbers[i];
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
 }
 
-while x > 2 {
-    test = 4;
+index[test[4]] {
+    x: 5
 }
 
-var test = Test { x = 3, y = 5, };
+test::444
 
-struct Test {
-    name: String,
-    age: i32,
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
 }
 
-var n = p.name;
+x += 3;
 
-var test = (2, 3);
-
-fn add(a, b) a + b;
-
-(a, b, c) = (1,2,3);
-
-while x > 4 x + 3;
-
-x = if x > 0 {
-    5;
-} else {
-    6;
+async test x {
+    print(x)
 }
 
-var x : i32 = 3;
+3 + 4 > 3 + 5
 
-3 + 3 * 6;
+x : 4 = 5
 
-3;
+1e10
+0b11111
+2.5e-3
+0xAF
 
-while 5 > x > 2 x = 5;
-{
-    test = 3;
-    x %= 4;
+use test::x::t;
 
-    {
-        {
-            test = 4;
-        }
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
 
-        fuck *= 5;
-        print("shit");
-    }
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
 
-    a = 's';
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
 }
 
-5 + 5 * 5;
+x -> y
+y -> x;
 
-for i in 5 {
-    sum += numbers[i];
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
 }
 
-var test = Test { x = 3, y = 5, };
-
-while x > 0 x = 5;
-
-var x = if (test > 2) { 5; } else { 6; }
-
-!-test;
-
-enum Test {
-    name: String,
-    age: i32
+index[test[4]] {
+    x: 5
 }
 
-5 + !-5 - -!66
+test::444
 
-test(2, 4)
+fn test[3] x = 5
 
-//test comment
+macro test x = 4
 
-/* test block comment */
-
-/*
-test
-block
-*/
-
-if x > 3 x = 4
-
-fn test x = 4;
-
-(5 + 5) * 5
-
-"test"(x: string, y: i32)
-
-fn test(x, ...) {
-    fn test_inside(y) y + 4
-
-    4.. .6
+match x {
+    x -> 5,
+    y => 6,
 }
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
+
+if 4 + x {
+    x - 4;
+}
+
+x -> y
+y -> x;
+
+(x + 2){ x: 4 }
+
+index[5];
+
+test(t);
+
+if x = test[3] {
+    are
+}
+
+index[test[4]] {
+    x: 5
+}
+
+test::444
+
+fn test[3] x = 5
+
+macro test x = 4
+
+match x {
+    x -> 5,
+    y => 6,
+}
+
+x += 3;
+
+async test x {
+    print(x)
+}
+
+3 + 4 > 3 + 5
+
+x : 4 = 5
+
+1e10
+0b11111
+2.5e-3
+0xAF
+use test::x::t;
+
+salam = 42;
+y = 3.14;
+z = true;
+w = 1000_000_000;
+
+a = x + y * 2;
+b = (x - y) / 2;
+c = x % 5;
+d = x > y;
+e = x <= y;
+
+f = z && (x == 42);
+g = !z || (y != 3.14);
 
 if 4 + x {
     x - 4;

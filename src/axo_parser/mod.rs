@@ -7,6 +7,7 @@ mod element;
 mod core;
 mod delimited;
 pub mod error;
+mod statement;
 
 pub use {
     element::{Element, ElementKind},

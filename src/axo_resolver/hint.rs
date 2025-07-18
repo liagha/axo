@@ -14,7 +14,7 @@ impl Display for ResolveHint {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             ResolveHint::SimilarBrand { candidate, effective } => {
-                write!(f, "did you mean `{}`? they {:?}.", candidate, effective.lock().unwrap())
+                write!(f, "did you mean `{:?}`? they {:?}.", candidate, effective.lock().unwrap())
             }
 
             ResolveHint::Parameter => {

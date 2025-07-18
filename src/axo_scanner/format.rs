@@ -1,7 +1,7 @@
 use {
     crate::{
         axo_scanner::{Token, TokenKind},
-        format::{Debug, Display, Formatter, Result},
+        format::{Debug, Formatter, Result},
     }
 };
 
@@ -18,12 +18,6 @@ impl Debug for TokenKind {
             TokenKind::Character(char) => write!(f, "Char('{}')", char),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
         }
-    }
-}
-
-impl Display for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.kind)
     }
 }
 

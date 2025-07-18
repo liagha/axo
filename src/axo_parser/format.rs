@@ -48,21 +48,9 @@ impl Debug for Element {
     }
 }
 
-impl Display for Element {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.kind)
-    }
-}
-
 impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?} | {:#?}\n{}", self.kind, self.span, indent(&format!("{:#?}", self.members)))
-    }
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}\n{}", self.kind, indent(&format!("{:#?}", self.members)))
     }
 }
 

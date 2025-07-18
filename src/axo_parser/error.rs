@@ -19,8 +19,6 @@ use {
 pub enum ErrorKind {
     ExpectedCondition,
     ExpectedBody,
-    PatternError,
-    DanglingElse,
     MissingSeparator(TokenKind),
     UnclosedDelimiter(TokenKind),
     UnexpectedPunctuation,
@@ -33,10 +31,6 @@ impl Display for ErrorKind {
             ErrorKind::ExpectedCondition => write!(f, "expected condition."),
             ErrorKind::UnexpectedPunctuation => write!(f, "unexpected punctuation."),
             ErrorKind::ExpectedBody => write!(f, "expected body."),
-            ErrorKind::PatternError => write!(f, "invalid pattern syntax"),
-            ErrorKind::DanglingElse => {
-                write!(f, "can't have an else without conditional.")
-            }
             ErrorKind::MissingSeparator(kind) => {
                 write!(f, "expected separator `{:?}`.", kind)
             }

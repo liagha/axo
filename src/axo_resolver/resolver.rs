@@ -168,10 +168,10 @@ impl Resolver {
             }
 
             ElementKind::Access(access) => {
-                let target = self.lookup(access.get_target(), symbols);
+                let target = self.lookup(access.get_object(), symbols);
 
                 if let Some(target) = target {
-                    self.lookup(access.get_object(), target.members);
+                    self.lookup(access.get_target(), target.members);
                 }
             }
 
@@ -198,18 +198,14 @@ impl Resolver {
 
                         let member = Symbol::new(SymbolKind::interface(Interface::new(interface.clone(), implementation.get_members().clone())), symbol.span);
                         target.members.push(member);
-                        println!("new: {target:?}");
                         self.scope.insert(target);
                     } else {
                         self.scope.remove(&target);
 
                         target.members.extend(implementation.get_members().clone());
-                        println!("new: {target:?}");
                         self.scope.insert(target);
                     }
                 }
-
-                println!("f");
             }
             SymbolKind::Interface(_) => {}
             SymbolKind::Binding(_) => {}

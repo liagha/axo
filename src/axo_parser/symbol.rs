@@ -99,7 +99,7 @@ impl Parser {
                         Self::token(),
                     ])
                 ),
-                Self::block(Classifier::lazy(Self::symbolization))
+                Self::block(Classifier::deferred(Self::symbolization))
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();
@@ -169,7 +169,7 @@ impl Parser {
                         false
                     }
                 }),
-                Classifier::lazy(Self::element),
+                Classifier::deferred(Self::element),
             ]),
             |_, form| {
                 let sequence = form.unwrap();
@@ -230,7 +230,7 @@ impl Parser {
                     }
                 }),
                 Self::token(),
-                Self::bundle(Classifier::lazy(Self::symbolization)),
+                Self::bundle(Classifier::deferred(Self::symbolization)),
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();
@@ -272,7 +272,7 @@ impl Parser {
                     }
                 }),
                 Self::token(),
-                Self::bundle(Classifier::lazy(Self::element)),
+                Self::bundle(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();
@@ -308,8 +308,8 @@ impl Parser {
                     }
                 }),
                 Self::token(),
-                Self::group(Classifier::lazy(Self::symbolization)),
-                Self::block(Classifier::lazy(Self::element)),
+                Self::group(Classifier::deferred(Self::symbolization)),
+                Self::block(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
                 let outputs = form.outputs().clone();

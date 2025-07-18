@@ -333,12 +333,12 @@ impl Parser {
 
     pub fn delimited() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
-            Self::bundle(Classifier::lazy(Self::element)),
-            Self::block(Classifier::lazy(Self::element)),
-            Self::group(Classifier::lazy(Self::element)),
-            Self::sequence(Classifier::lazy(Self::element)),
-            Self::collection(Classifier::lazy(Self::element)),
-            Self::series(Classifier::lazy(Self::element)),
+            Self::bundle(Classifier::deferred(Self::element)),
+            Self::block(Classifier::deferred(Self::element)),
+            Self::group(Classifier::deferred(Self::element)),
+            Self::sequence(Classifier::deferred(Self::element)),
+            Self::collection(Classifier::deferred(Self::element)),
+            Self::series(Classifier::deferred(Self::element)),
         ])
     }
 }

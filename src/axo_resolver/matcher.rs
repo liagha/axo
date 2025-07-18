@@ -175,7 +175,7 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.kind.clone()) {
-            (ElementKind::Identifier(_), SymbolKind::Binding(_)) => {
+            (ElementKind::Identifier(_), _) => {
                 score += self.shaping;
 
                 score += self.binding;

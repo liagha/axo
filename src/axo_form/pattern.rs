@@ -147,17 +147,17 @@ where
 
             match &best {
                 None => {
-                    best = Some(child)
+                    best = Some(child.clone())
                 },
                 Some(champion) => {
                     if child.record > champion.record {
-                        best = Some(child);
-
-                        if self.perfection.contains(&best.as_ref().unwrap().record) {
-                            break;
-                        }
+                        best = Some(child.clone());
                     }
                 }
+            }
+
+            if self.perfection.contains(&child.record) {
+                break;
             }
         }
 
@@ -562,7 +562,7 @@ where
     }
 
     pub fn alternative(patterns: impl Into<Vec<Self>>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![1], blacklist: vec![-1] }))
+        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![120, 1], blacklist: vec![-1] }))
     }
 
     pub fn choice(patterns: impl Into<Vec<Self>>, perfection: Vec<i8>) -> Self {
@@ -608,7 +608,7 @@ where
         }))
     }
 
-    pub fn lazy<F>(factory: F) -> Self
+    pub fn deferred<F>(factory: F) -> Self
     where
         F: Fn() -> Self + Send + Sync + 'static,
     {

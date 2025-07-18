@@ -30,7 +30,13 @@ use {
 impl Parser {
     pub fn identifier() -> Classifier<Token, Element, ParseError> {
         Classifier::with_transform(
-            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Identifier(_))),
+            Classifier::predicate(|token: &Token| {
+                if let TokenKind::Identifier(identifier) = &token.kind {
+                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl"].contains(&identifier.as_str())
+                } else {
+                    false
+                }
+            }),
             |_, form| {
                 let input = form.inputs()[0].clone();
                 let identifier = input.kind.unwrap_identifier();
@@ -127,9 +133,9 @@ impl Parser {
                 Self::primary(),
                 Classifier::repetition(
                     Classifier::alternative([
-                        Self::group(Classifier::lazy(Self::element)),
-                        Self::collection(Classifier::lazy(Self::element)),
-                        Self::bundle(Classifier::lazy(Self::element)),
+                        Self::group(Classifier::deferred(Self::element)),
+                        Self::collection(Classifier::deferred(Self::element)),
+                        Self::bundle(Classifier::deferred(Self::element)),
                         Classifier::predicate(|token: &Token| {
                             if let TokenKind::Operator(operator) = &token.kind {
                                 operator.is_suffix()
@@ -322,142 +328,6 @@ impl Parser {
 
     pub fn expression() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
-    }
-
-    pub fn conditional() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "if"
-                    } else {
-                        false
-                    }
-                })
-                    .with_ignore(),
-                Classifier::with_fallback(
-                    Classifier::lazy(|| Self::element()),
-                    Order::fail(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedCondition, form.span)
-                    }),
-                ),
-                Classifier::with_fallback(
-                    Classifier::lazy(|| Self::element()),
-                    Order::fail(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
-                ),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Identifier(identifier) = &token.kind {
-                            identifier == "else"
-                        } else {
-                            false
-                        }
-                    })
-                        .with_ignore(),
-                    Classifier::lazy(|| Self::element()),
-                ])),
-            ]),
-            |_, form| {
-                let sequence = form.outputs();
-                let condition = sequence[0].clone();
-                let then = sequence[1].clone();
-
-                if let Some(alternate) = sequence.get(2).cloned() {
-                    let span = condition.span.mix(&alternate.span);
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), Some(alternate.into()))),
-                            span,
-                        )
-                    ))
-                } else {
-                    let span = condition.span.mix(&then.span);
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), None)),
-                            span,
-                        )
-                    ))
-                }
-            },
-        )
-    }
-
-    pub fn cycle() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_transform(
-            Classifier::alternative([
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Identifier(identifier) = &token.kind {
-                            identifier == "loop"
-                        } else {
-                            false
-                        }
-                    })
-                        .with_ignore(),
-                    Classifier::with_fallback(
-                        Classifier::lazy(|| Self::element()),
-                        Order::fail(|_, form| {
-                            ParseError::new(ErrorKind::ExpectedBody, form.span)
-                        }),
-                    ),
-                ]),
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Identifier(identifier) = &token.kind {
-                            identifier == "while"
-                        } else {
-                            false
-                        }
-                    })
-                        .with_ignore(),
-                    Classifier::with_fallback(
-                        Classifier::lazy(|| Self::element()),
-                        Order::fail(|_, form| {
-                            ParseError::new(ErrorKind::ExpectedCondition, form.span)
-                        }),
-                    ),
-                    Classifier::with_fallback(
-                        Classifier::lazy(|| Self::element()),
-                        Order::fail(|_, form| {
-                            ParseError::new(ErrorKind::ExpectedBody, form.span)
-                        }),
-                    ),
-                ]),
-            ]),
-            |_, form| {
-                let sequence = form.outputs();
-
-                if sequence.len() == 1 {
-                    let body = sequence[0].clone();
-                    let span = body.span.clone();
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Repeat(Repeat::new(None, body.into())),
-                            span,
-                        )
-                    ))
-                } else if sequence.len() == 2 {
-                    let condition = sequence[0].clone();
-                    let body = sequence[1].clone();
-                    let span = condition.span.mix(&body.span);
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Repeat(Repeat::new(Some(condition.into()), body.into())),
-                            span,
-                        )
-                    ))
-                } else {
-                    unreachable!()
-                }
-            },
-        )
-    }
-
-
-
-    pub fn statement() -> Classifier<Token, Element, ParseError> {
-        Classifier::alternative([Self::conditional(), Self::cycle(), Self::binding()])
     }
 
     pub fn element() -> Classifier<Token, Element, ParseError> {
