@@ -1,3 +1,4 @@
+use crate::axo_cursor::Spanned;
 use crate::axo_form::form::Form;
 use crate::axo_form::order::Order;
 use crate::axo_form::pattern::Classifier;
@@ -18,9 +19,10 @@ impl Scanner {
             ),
             Classifier::literal('"'),
         ]).with_transform(|_, form| {
-            let content: String = form.inputs().into_iter().collect();
+            let inputs = form.inputs();
+            let content = inputs.clone().into_iter().collect::<String>();
 
-            Ok(Form::output(Token::new(TokenKind::String(content), form.span)))
+            Ok(Form::output(Token::new(TokenKind::String(content), inputs.span())))
         })
     }
 
@@ -35,8 +37,10 @@ impl Scanner {
                 Classifier::literal('`'),
             ]),
             |_, form| {
-                let content: String = form.inputs().into_iter().collect();
-                Ok(Form::output(Token::new(TokenKind::String(content), form.span)))
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
+
+                Ok(Form::output(Token::new(TokenKind::String(content), inputs.span())))
             },
         )
     }
@@ -51,8 +55,9 @@ impl Scanner {
             Classifier::literal('\''),
         ]).with_transform(|_, form| {
             let inputs = form.inputs();
-            let ch = inputs[1].value;
-            Ok(Form::output(Token::new(TokenKind::Character(ch), form.span)))
+            let ch = inputs[1];
+
+            Ok(Form::output(Token::new(TokenKind::Character(ch.value), ch.span)))
         })
     }
 
@@ -67,11 +72,13 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let identifier: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
+
                 Ok(Form::output(
                     Token::new(
-                        TokenKind::from_str(&identifier).unwrap_or(TokenKind::Identifier(identifier)),
-                        form.span,
+                        TokenKind::from_str(&content).unwrap_or(TokenKind::Identifier(content)),
+                        inputs.span(),
                     )
                 ))
             },
@@ -86,11 +93,13 @@ impl Scanner {
                 None
             ),
             |_, form| {
-                let operator: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
+
                 Ok(Form::output(
                     Token::new(
-                        TokenKind::Operator(operator.to_operator()),
-                        form.span,
+                        TokenKind::Operator(content.to_operator()),
+                        inputs.span(),
                     )
                 ))
             },
@@ -101,11 +110,13 @@ impl Scanner {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
-                let punctuation: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
+
                 Ok(Form::output(
                     Token::new(
-                        TokenKind::Punctuation(punctuation.to_punctuation()),
-                        form.span,
+                        TokenKind::Punctuation(content.to_punctuation()),
+                        inputs.span(),
                     )
                 ))
             },
@@ -120,13 +131,15 @@ impl Scanner {
                 None,
             ),
             |_, form| {
-                let whitespace: String = form.inputs().into_iter().collect();
-                let kind = match whitespace.len() {
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
+
+                let kind = match content.len() {
                     1 => TokenKind::Punctuation(PunctuationKind::Space),
                     len => TokenKind::Punctuation(PunctuationKind::Indentation(len)),
                 };
 
-                Ok(Form::output(Token::new(kind, form.span)))
+                Ok(Form::output(Token::new(kind, inputs.span())))
             },
         )
     }
@@ -157,9 +170,10 @@ impl Scanner {
                 ])
             ]),
             |_, form| {
-                let content: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let content = inputs.clone().into_iter().collect::<String>();
 
-                Ok(Form::output(Token::new(TokenKind::Comment(content), form.span)))
+                Ok(Form::output(Token::new(TokenKind::Comment(content), inputs.span())))
             },
         )
     }
@@ -167,10 +181,12 @@ impl Scanner {
     fn fallback() -> Classifier<Character, Token, ScanError> {
         Classifier::with_order(
             Classifier::anything(),
-            Order::fail(|_, form: Form<Character, Token, ScanError>| {
+            Order::fail(|_, form| {
+                let ch : Character = form.unwrap_input();
+
                 ScanError::new(
-                    ErrorKind::InvalidCharacter(CharacterError::Unexpected(form.inputs()[0].value)),
-                    form.span,
+                    ErrorKind::InvalidCharacter(CharacterError::Unexpected(ch.value)),
+                    ch.span,
                 )
             }),
         )

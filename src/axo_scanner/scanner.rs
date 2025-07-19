@@ -8,7 +8,7 @@ use {
             Context, Marked,
         },
         axo_form::{
-            form::{FormKind},
+            form::{Form},
             former::Former,
         },
         axo_cursor::{
@@ -111,16 +111,16 @@ impl Scanner {
             let forms = self.form(Self::pattern()).expand();
 
             for form in forms {
-                match form.kind {
-                    FormKind::Output(element) => {
+                match form {
+                    Form::Output(element) => {
                         tokens.push(element);
                     }
 
-                    FormKind::Failure(error) => {
+                    Form::Failure(error) => {
                         errors.push(error);
                     }
 
-                    FormKind::Multiple(_) | FormKind::Blank | FormKind::Input(_) => {}
+                    Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
                 }
             }
         }

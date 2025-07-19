@@ -6,7 +6,7 @@ use {
         axo_cursor::{Peekable, Position, Span},
         axo_form::{
             pattern::Classifier,
-            form::FormKind,
+            form::Form,
             former::Former,
         },
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -126,16 +126,16 @@ impl Parser {
             let forms = self.form(Self::parser()).expand();
 
             for form in forms {
-                match form.kind {
-                    FormKind::Output(element) => {
+                match form {
+                    Form::Output(element) => {
                         elements.push(element);
                     }
 
-                    FormKind::Failure(error) => {
+                    Form::Failure(error) => {
                         errors.push(error);
                     }
 
-                    FormKind::Multiple(_) | FormKind::Blank | FormKind::Input(_) => {}
+                    Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
                 }
             }
         }

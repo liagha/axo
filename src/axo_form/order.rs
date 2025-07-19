@@ -1,6 +1,6 @@
 use {
     super::{
-        form::{Form, FormKind},
+        form::{Form},
         former::Draft,
         helper::{
             Emitter, Executor,
@@ -11,7 +11,7 @@ use {
         artifact::Artifact,
         axo_cursor::{
             Peekable,
-            Spanned,
+            Span,
         },
         axo_schema::{
             Formation
@@ -27,9 +27,9 @@ use {
 #[derive(Clone)]
 pub enum Order<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     Align,
     Branch {
@@ -50,9 +50,9 @@ where
 
 impl<Input, Output, Failure> Order<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     #[inline]
     pub fn execute<Source>(&self, source: &mut Source, draft: &mut Draft<Input, Output, Failure>)
@@ -88,7 +88,7 @@ where
 
                     let symbol = Symbol::new(
                         SymbolKind::Formation(Formation::new(identifier.clone(), artifact)),
-                        draft.form.span.clone(),
+                        Span::default(),
                     );
 
                     resolver.insert(symbol);
@@ -96,20 +96,17 @@ where
             }
 
             Order::Fail(function) => {
-                let span = draft.form.span.clone();
-
                 let failure = function(source.context_mut(), draft.form.clone());
 
-                let form = Form::new(FormKind::Failure(failure), span);
+                let form = Form::Failure(failure);
                 draft.fail();
                 draft.form = form;
             }
 
             Order::Ignore => {
                 if draft.is_aligned() {
-                    let span = draft.form.span.clone();
                     draft.ignore();
-                    draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
+                    draft.form = Form::<Input, Output, Failure>::Blank;
                 }
             }
             
@@ -126,11 +123,9 @@ where
             }
 
             Order::Panic(function) => {
-                let span = draft.form.span.clone();
-
                 let failure = function(source.context_mut(), draft.form.clone());
 
-                let form = Form::new(FormKind::Failure(failure), span);
+                let form = Form::Failure(failure);
                 draft.panic();
                 draft.form = form;
             }
@@ -150,10 +145,8 @@ where
 
             Order::Skip => {
                 if draft.is_aligned() {
-                    let span = draft.form.span.clone();
-
                     draft.empty();
-                    draft.form = Form::new(FormKind::<Input, Output, Failure>::Blank, span);
+                    draft.form = Form::<Input, Output, Failure>::Blank;
                 }
             }
 
@@ -167,15 +160,13 @@ where
                         return;
                     };
 
-                    let span = draft.form.span.clone();
-
                     match result {
                         Ok(mapped) => {
                             draft.form = mapped;
                         }
                         Err(error) => {
                             draft.fail();
-                            draft.form = Form::new(FormKind::Failure(error), span);
+                            draft.form = Form::Failure(error);
                         }
                     }
                 }

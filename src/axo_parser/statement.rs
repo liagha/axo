@@ -1,3 +1,4 @@
+use crate::axo_cursor::{Span, Spanned};
 use crate::axo_form::form::Form;
 use crate::axo_form::order::Order;
 use crate::axo_form::pattern::Classifier;
@@ -16,17 +17,22 @@ impl Parser {
                     } else {
                         false
                     }
-                })
-                    .with_ignore(),
+                }),
                 Classifier::with_fallback(
                     Classifier::deferred(|| Self::element()),
-                    Order::fail(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedCondition, form.span)
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.unwrap_input().span();
+
+                        ParseError::new(ErrorKind::ExpectedCondition, span)
                     }),
                 ),
                 Classifier::with_fallback(
                     Classifier::deferred(|| Self::element()),
-                    Order::fail(|_, form| ParseError::new(ErrorKind::ExpectedBody, form.span)),
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.unwrap_input().span();
+
+                        ParseError::new(ErrorKind::ExpectedBody, span)
+                    }),
                 ),
                 Classifier::optional(Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -37,16 +43,19 @@ impl Parser {
                         }
                     })
                         .with_ignore(),
-                    Classifier::deferred(|| Self::element()),
+                    Classifier::deferred(Self::element),
                 ])),
             ]),
             |_, form| {
-                let sequence = form.outputs();
-                let condition = sequence[0].clone();
-                let then = sequence[1].clone();
+                let sequence = form.unwrap();
+                let keyword = sequence[0].unwrap_input();
+                let condition = sequence[1].unwrap_output();
+                let then = sequence[2].unwrap_output();
 
-                if let Some(alternate) = sequence.get(2).cloned() {
-                    let span = condition.span.mix(&alternate.span);
+                if let Some(alternate) = sequence.get(3).cloned() {
+                    let alternate = alternate.unwrap_output();
+                    let span = Span::mix(&keyword.span(), &alternate.span());
+
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Conditional(Conditional::new(condition.into(), then.into(), Some(alternate.into()))),
@@ -55,6 +64,7 @@ impl Parser {
                     ))
                 } else {
                     let span = condition.span.mix(&then.span);
+
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Conditional(Conditional::new(condition.into(), then.into(), None)),
@@ -77,13 +87,17 @@ impl Parser {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedCondition, form.span)
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.unwrap_input().span();
+
+                        ParseError::new(ErrorKind::ExpectedCondition, span)
                     })
                 ),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedBody, form.span)
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.unwrap_input().span();
+
+                        ParseError::new(ErrorKind::ExpectedBody, span)
                     })
                 )
             ]),
@@ -96,18 +110,22 @@ impl Parser {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form| {
-                        ParseError::new(ErrorKind::ExpectedBody, form.span)
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.unwrap_input().span();
+
+                        ParseError::new(ErrorKind::ExpectedBody, span)
                     })
                 ),
             ]),
         ], vec![1, 0]).with_transform(
             |_, form| {
-                let sequence = form.outputs();
+                let sequence = form.unwrap();
+                let keyword = sequence[0].unwrap_input();
 
                 if sequence.len() == 1 {
-                    let body = sequence[0].clone();
-                    let span = body.span.clone();
+                    let body = sequence[0].unwrap_output();
+                    let span = Span::mix(&keyword.span(), &body.span());
+
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Repeat(Repeat::new(None, body.into())),
@@ -115,9 +133,10 @@ impl Parser {
                         )
                     ))
                 } else if sequence.len() == 2 {
-                    let condition = sequence[0].clone();
-                    let body = sequence[1].clone();
-                    let span = condition.span.mix(&body.span);
+                    let condition = sequence[0].unwrap_output();
+                    let body = sequence[1].unwrap_output();
+                    let span = Span::mix(&keyword.span, &body.span);
+
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Repeat(Repeat::new(Some(condition.into()), body.into())),

@@ -28,12 +28,14 @@ impl Parser {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Order::fail(|_, form| {
+                            Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                let span = form.inputs().span();
+
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
                                     )),
-                                    form.span,
+                                    span,
                                 )
                             }),
                         ),
@@ -46,12 +48,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBrace,
                             )),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -60,7 +64,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::bundle(Bundle::new(elements)), form.span)
+                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), elements.span())
                 ))
             },
         )
@@ -80,12 +84,14 @@ impl Parser {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Order::fail(|_, form| {
+                            Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                let span = form.inputs().span();
+
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
                                     )),
-                                    form.span,
+                                    span,
                                 )
                             }),
                         ),
@@ -98,12 +104,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(
                                 TokenKind::Punctuation(PunctuationKind::LeftBrace),
                             ),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -112,7 +120,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::block(Block::new(elements)), form.span)
+                    Element::new(ElementKind::block(Block::new(elements.clone())), elements.span())
                 ))
             },
         )
@@ -133,12 +141,14 @@ impl Parser {
                             }),
                             Order::branch(
                                 Order::ignore(),
-                                Order::fail(|_, form| {
+                                Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                    let span = form.inputs().span();
+
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Comma,
                                         )),
-                                        form.span,
+                                        span,
                                     )
                                 }),
                             ),
@@ -152,12 +162,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+                        
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
                             )),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -166,7 +178,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::group(Group::new(elements)), form.span)
+                    Element::new(ElementKind::group(Group::new(elements.clone())), elements.span())
                 ))
             },
         )
@@ -188,12 +200,14 @@ impl Parser {
                             }),
                             Order::branch(
                                 Order::ignore(),
-                                Order::fail(|_, form| {
+                                Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                    let span = form.inputs().span();
+
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Semicolon,
                                         )),
-                                        form.span,
+                                        span,
                                     )
                                 }),
                             ),
@@ -207,12 +221,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
                             )),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -221,7 +237,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::sequence(Sequence::new(elements)), form.span)
+                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), elements.span())
                 ))
             },
         )
@@ -241,12 +257,14 @@ impl Parser {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Order::fail(|_, form| {
+                            Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                let span = form.inputs().span();
+
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
                                     )),
-                                    form.span,
+                                    span,
                                 )
                             }),
                         ),
@@ -259,12 +277,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,
                             )),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -273,7 +293,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::collection(Collection::new(elements)), form.span)
+                    Element::new(ElementKind::collection(Collection::new(elements.clone())), elements.span())
                 ))
             },
         )
@@ -293,12 +313,14 @@ impl Parser {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Order::fail(|_, form| {
+                            Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                                let span = form.inputs().span();
+
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
                                     )),
-                                    form.span,
+                                    span,
                                 )
                             }),
                         ),
@@ -311,12 +333,14 @@ impl Parser {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Order::fail(|_, form| {
+                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                        let span = form.inputs().span();
+
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,
                             )),
-                            form.span,
+                            span,
                         )
                     }),
                 ),
@@ -325,7 +349,7 @@ impl Parser {
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::series(Series::new(elements)), form.span)
+                    Element::new(ElementKind::series(Series::new(elements.clone())), elements.span())
                 ))
             },
         )

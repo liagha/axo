@@ -1,7 +1,7 @@
 use {
     super::{
         order::Order,
-        form::{Form, FormKind},
+        form::{Form},
         pattern::Classifier,
     },
     crate::{
@@ -9,15 +9,14 @@ use {
         any::{Any},
         vector::Show,
         format::{Debug, Display, Formatter, Result},
-        axo_cursor::Spanned,
     },
 };
 
 impl<Input, Output, Failure> Debug for Classifier<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "Todo")
@@ -27,29 +26,29 @@ where
 
 impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self.kind.clone() {
-            FormKind::Blank => {
-                write!(f, "Empty | {:?}", self.span)
+        match self.clone() {
+            Form::Blank => {
+                write!(f, "Blank")
             }
 
-            FormKind::Input(input) => {
+            Form::Input(input) => {
                 write!(f, "Input({:?})", input)
             }
 
-            FormKind::Output(output) => {
+            Form::Output(output) => {
                 write!(f, "Output({:?})", output)
             }
 
-            FormKind::Multiple(forms) => {
+            Form::Multiple(forms) => {
                 write!(f, "Multiple({})", forms.format())
             }
 
-            FormKind::Failure(error) => {
+            Form::Failure(error) => {
                 write!(f, "Failure({:?})", error)
             }
         }
@@ -58,9 +57,9 @@ where
 
 impl<Input, Output, Failure> Debug for Order<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {

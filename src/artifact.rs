@@ -4,13 +4,10 @@ use {
         format::Debug,
         any::{Any, TypeId},
         hash::{Hash, Hasher},
-        axo_cursor::{
-            Span, Spanned,
-        },
     },
 };
 
-pub trait Asset: Spanned + Any + Send + Sync + Debug {
+pub trait Asset: Any + Send + Sync + Debug {
     fn dyn_hash(&self, state: &mut dyn Hasher);
     fn dyn_eq(&self, other: &dyn Asset) -> bool;
     fn as_any(&self) -> &dyn Any;
@@ -18,7 +15,7 @@ pub trait Asset: Spanned + Any + Send + Sync + Debug {
 
 impl<T> Asset for T
 where
-    T: Spanned + Any + Send + Sync + Debug + Hash + PartialEq + 'static
+    T: Any + Send + Sync + Debug + Hash + PartialEq + 'static
 {
     fn dyn_hash(&self, mut state: &mut dyn Hasher) {
         self.hash(&mut state);
@@ -45,7 +42,7 @@ pub struct Artifact {
 }
 
 impl Artifact {
-    pub fn new<T: Spanned + Any + Send + Sync + Debug + Hash + PartialEq + 'static>(value: T) -> Self {
+    pub fn new<T: Any + Send + Sync + Debug + Hash + PartialEq + 'static>(value: T) -> Self {
         Self {
             inner: Arc::new(value),
         }
@@ -53,12 +50,6 @@ impl Artifact {
 
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         self.inner.as_any().downcast_ref()
-    }
-}
-
-impl Spanned for Artifact {
-    fn span(&self) -> Span {
-        self.inner.span()
     }
 }
 

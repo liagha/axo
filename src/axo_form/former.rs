@@ -2,12 +2,11 @@ use {
     super::{
         helper::Source,
         pattern::Classifier,
-        form::{Form, FormKind},
+        form::{Form},
     },
     crate::{
         axo_cursor::{
             Position, Peekable,
-            Span, Spanned,
         },
         marker::PhantomData,
         compiler::Marked,
@@ -18,9 +17,9 @@ use {
 
 pub struct Composer<'c, Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub source: &'c mut dyn Source<Input>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
@@ -28,9 +27,9 @@ where
 
 impl <'c, Input, Output, Failure> Composer<'c, Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub fn new(source: &'c mut (dyn Source<Input> + 'c)) -> Composer<'c, Input, Output, Failure> {
         Self {
@@ -54,9 +53,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Draft<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub marker: usize,
     pub position: Position,
@@ -68,9 +67,9 @@ where
 
 impl<Input, Output, Failure> Draft<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     #[inline]
     pub fn new(index: usize, position: Position, pattern: Classifier<Input, Output, Failure>) -> Self {
@@ -80,7 +79,7 @@ where
             consumed: Vec::new(),
             record: -1,
             classifier: pattern,
-            form: Form::new(FormKind::Blank, Span::point(position)),
+            form: Form::Blank,
         }
     }
 
@@ -147,9 +146,9 @@ where
 
 pub trait Former<Input, Output, Failure>: Peekable<Input> + Marked
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn strain(&mut self, pattern: Classifier<Input, Output, Failure>);
     fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
@@ -158,9 +157,9 @@ where
 impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
 where
     Source: Peekable<Input> + Marked,
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn strain(&mut self, pattern: Classifier<Input, Output, Failure>) {
         let mut inputs = Vec::with_capacity(self.len());

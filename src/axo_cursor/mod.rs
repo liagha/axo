@@ -70,18 +70,6 @@ impl Spanned for Span {
     }
 }
 
-impl<Input, Output, Failure> Spanned for Form<Input, Output, Failure>
-where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-{
-    fn span(&self) -> Span {
-        self.span.clone()
-    }
-}
-
-
 impl<Item: Spanned> Spanned for Vec<Item> {
     fn span(&self) -> Span {
         if self.len() >= 2 {

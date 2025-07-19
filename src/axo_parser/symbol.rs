@@ -102,26 +102,28 @@ impl Parser {
                 Self::block(Classifier::deferred(Self::symbolization))
             ]),
             |_, form| {
+                let keyword = form.inputs()[0].clone();
                 let outputs = form.outputs().clone();
 
                 let name = outputs[0].clone();
 
                 if outputs.len() == 2 {
-                    let body = outputs[1].clone().kind.unwrap_block();
-                    let members = body.items.iter().map(|item| {
+                    let body = outputs[1].clone();
+                    let members = body.kind.clone().unwrap_block().items.iter().map(|item| {
                         Symbol {
                             kind: item.kind.clone().unwrap_symbolize().clone().kind,
                             span: item.span,
                             members: vec![]
                         }.into()
                     }).collect::<Vec<_>>();
+                    let span = Span::mix(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol {
                                     kind: SymbolKind::Implementation(Implementation::new(name.into(), None, members)),
-                                    span: form.span,
+                                    span,
                                     members: vec![],
                                 },
                             ),
@@ -138,13 +140,14 @@ impl Parser {
                             members: vec![]
                         }.into()
                     }).collect::<Vec<_>>();
+                    let span = Span::mix(&keyword.span(), &members.span());
 
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol {
                                     kind: SymbolKind::Implementation(Implementation::new(name.into(), Some(target.into()), members)),
-                                    span: form.span,
+                                    span,
                                     members: vec![],
                                 },
                             ),
@@ -183,18 +186,20 @@ impl Parser {
 
                 let body = sequence[1].unwrap_output();
 
+                let span = Span::mix(&keyword.span(), &body.span());
+
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
                         if let ElementKind::Label(label) = assign.get_target().kind.clone() {
                             Symbol {
                                 kind: SymbolKind::Binding(Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), mutable)),
-                                span: form.span.clone(),
+                                span,
                                 members: vec![],
                             }
                         } else {
                             Symbol {
                                 kind: SymbolKind::Binding(Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, mutable)),
-                                span: form.span.clone(),
+                                span,
                                 members: vec![],
                             }
                         }
@@ -203,7 +208,7 @@ impl Parser {
                     _ => {
                         Symbol {
                             kind: SymbolKind::binding(Binding::new(body.into(), None, None, mutable)),
-                            span: form.span.clone(),
+                            span,
                             members: vec![],
                         }
                     }
@@ -212,7 +217,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(symbol),
-                        form.span,
+                        span,
                     )
                 ))
             },
@@ -233,28 +238,30 @@ impl Parser {
                 Self::bundle(Classifier::deferred(Self::symbolization)),
             ]),
             |_, form| {
-                let outputs = form.outputs().clone();
+                let sequence = form.unwrap();
+                let keyword = sequence[0].unwrap_input();
+                let name = sequence[1].unwrap_output();
+                let body = sequence[2].unwrap_output();
 
-                let name = outputs[0].clone();
-                let body = outputs[1].clone().kind.unwrap_bundle();
-                let fields = body.items.iter().map(|item| {
+                let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
                     Symbol {
                         kind: item.kind.clone().unwrap_symbolize().clone().kind,
                         span: item.span,
                         members: vec![]
                     }
                 }).collect::<Vec<_>>();
+                let span = Span::mix(&keyword.span(), &body.span());
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol {
                                 kind: SymbolKind::Structure(Structure::new(name.into(), fields)),
-                                span: form.span,
+                                span,
                                 members: vec![],
                             },
                         ),
-                        outputs.span()
+                        span,
                     )
                 ))
             }
@@ -275,22 +282,23 @@ impl Parser {
                 Self::bundle(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
-                let outputs = form.outputs().clone();
-
-                let name = outputs[0].clone();
-
-                let body = outputs[1].clone().kind.unwrap_bundle();
+                let sequence = form.unwrap();
+                let keyword = sequence[0].unwrap_input();
+                let name = sequence[1].unwrap_output();
+                let body = sequence[2].unwrap_output();
+                let span = Span::mix(&keyword.span(), &body.span());
+                let items = body.kind.unwrap_bundle().items;
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol {
-                                kind: SymbolKind::Enumeration(Enumeration::new(name.into(), body.items)),
-                                span: form.span,
+                                kind: SymbolKind::Enumeration(Enumeration::new(name.into(), items)),
+                                span,
                                 members: vec![],
                             },
                         ),
-                        outputs.span()
+                        span,
                     )
                 ))
             }
@@ -312,11 +320,13 @@ impl Parser {
                 Self::block(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
-                let outputs = form.outputs().clone();
+                let sequence = form.unwrap();
+                let keyword = sequence[0].unwrap_input();
+                let name = sequence[1].unwrap_output();
+                let invoke = sequence[1].unwrap_output();
+                let body = sequence[3].unwrap_output();
 
-                let name = outputs[0].clone();
-                let invoke = outputs[1].clone().kind.unwrap_group().items;
-                let parameters = invoke.iter().map(|parameter| {
+                let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
                     Symbol {
                         kind: parameter.kind.clone().unwrap_symbolize().kind,
                         span: parameter.span,
@@ -324,18 +334,18 @@ impl Parser {
                     }
                 }).collect::<Vec<_>>();
 
-                let body = outputs[2].clone();
+                let span = Span::mix(&keyword.span(), &body.span());
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol {
                                 kind: SymbolKind::Method(Method::new(name.into(), parameters, body.into(), None)),
-                                span: form.span,
+                                span,
                                 members: vec![],
                             }
                         ),
-                        outputs.span()
+                        span,
                     )
                 ))
             }

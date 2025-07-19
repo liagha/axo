@@ -22,20 +22,20 @@ pub mod helper {
             compiler::{Context, Marked},
             format::Debug,
             axo_cursor::{
-                Peekable, Spanned
+                Peekable,
             },
         },
     };
 
     pub trait Source<Input>: Peekable<Input> + Marked
     where
-        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     {}
 
     impl<Target, Input> Source<Input> for Target
     where
         Target: Peekable<Input> + Marked,
-        Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+        Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     {}
 
     pub fn fingerprint<T: ?Sized + 'static>(ptr: &T, state: &mut impl Hasher) {

@@ -10,17 +10,14 @@ use {
         format::Debug,
         compiler::Context,
         thread::{Arc, Mutex},
-        axo_cursor::{
-            Spanned, Span,
-        },
     },
 };
 
 pub trait Pattern<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>);
 }
@@ -32,9 +29,9 @@ pub struct Literal<Input> {
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Literal<Input>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -55,18 +52,18 @@ where
 #[derive(Clone)]
 pub struct Negate<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Negate<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -94,9 +91,9 @@ pub struct Predicate<Input> {
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Predicate<Input>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -119,9 +116,9 @@ where
 #[derive(Clone)]
 pub struct Alternative<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub patterns: Vec<Classifier<Input, Output, Failure>>,
     pub perfection: Vec<i8>,
@@ -130,9 +127,9 @@ where
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut best: Option<Draft<Input, Output, Failure>> = None;
@@ -177,18 +174,18 @@ where
 #[derive(Clone)]
 pub struct Deferred<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub function: Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Deferred<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let resolved = (self.function)();
@@ -206,18 +203,18 @@ where
 #[derive(Clone)]
 pub struct Optional<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Optional<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
@@ -238,18 +235,18 @@ where
 #[derive(Clone)]
 pub struct Wrapper<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Wrapper<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
@@ -266,9 +263,9 @@ where
 #[derive(Clone)]
 pub struct Ranked<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
     pub precedence: i8,
@@ -276,9 +273,9 @@ where
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Ranked<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.pattern.as_ref().clone());
@@ -302,18 +299,18 @@ where
 #[derive(Clone)]
 pub struct Sequence<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub patterns: Vec<Classifier<Input, Output, Failure>>,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Sequence<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -354,23 +351,17 @@ where
 
         draft.marker = index;
         draft.position = position;
-
-        if forms.is_empty() {
-            draft.consumed.clear();
-            draft.form = Form::blank(Span::point(draft.position));
-        } else {
-            draft.consumed = consumed;
-            draft.form = Form::multiple(forms);
-        }
+        draft.consumed = consumed;
+        draft.form = Form::multiple(forms);
     }
 }
 
 #[derive(Clone)]
 pub struct Persistence<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
     pub minimum: usize,
@@ -379,9 +370,9 @@ where
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Persistence<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -425,12 +416,7 @@ where
             draft.marker = index;
             draft.position = position;
             draft.consumed = consumed;
-
-            if forms.is_empty() {
-                draft.form = Form::blank(Span::point(draft.position));
-            } else {
-                draft.form = Form::multiple(forms);
-            }
+            draft.form = Form::multiple(forms);
         } else {
             draft.empty();
         }
@@ -440,9 +426,9 @@ where
 #[derive(Clone)]
 pub struct Repetition<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
     pub minimum: usize,
@@ -451,9 +437,9 @@ where
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Repetition<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -507,11 +493,7 @@ where
             draft.position = position;
             draft.consumed = consumed;
 
-            if forms.is_empty() {
-                draft.form = Form::blank(Span::point(draft.position));
-            } else {
-                draft.form = Form::multiple(forms);
-            }
+            draft.form = Form::multiple(forms);
         }
     }
 }
@@ -519,9 +501,9 @@ where
 #[derive(Clone)]
 pub struct Classifier<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Arc<dyn Pattern<Input, Output, Failure>>,
     pub order: Option<Order<Input, Output, Failure>>,
@@ -529,9 +511,9 @@ where
 
 impl<Input, Output, Failure> Classifier<Input, Output, Failure>
 where
-    Input: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Output: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
-    Failure: Spanned + Clone + Hash + Eq + PartialEq + Debug + Send + Sync + 'static,
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub fn new(pattern: Arc<dyn Pattern<Input, Output, Failure>>) -> Self {
         Self {

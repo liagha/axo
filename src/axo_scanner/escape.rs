@@ -1,7 +1,7 @@
 use {
     crate::{
         axo_form::{
-            form::{Form, FormKind},
+            form::{Form},
             pattern::Classifier,
         },
         axo_scanner::{
@@ -11,6 +11,7 @@ use {
         character::{parse_radix, from_u32},
     }
 };
+use crate::axo_cursor::Spanned;
 
 impl Scanner {
     pub fn simple_escape() -> Classifier<Character, Token, ScanError> {
@@ -24,7 +25,8 @@ impl Scanner {
                 }
             })
         ]).with_transform(|_, form| {
-            let escape = form.inputs()[1];
+            let inputs = form.inputs();
+            let escape = inputs[1];
 
             let escaped = match escape.value {
                 '\\' => '\\',
@@ -42,12 +44,12 @@ impl Scanner {
                 _ => {
                     return Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        form.span,
+                        inputs.span(),
                     ));
                 }
             };
 
-            Ok(Form::new(FormKind::Input(Character::new(escaped, form.span)), form.span))
+            Ok(Form::Input(Character::new(escaped, inputs.span())))
         })
     }
 
@@ -60,26 +62,24 @@ impl Scanner {
                 Some(3),
             ),
         ]).with_transform(|_, form| {
-            let digits: String = form.inputs().iter().skip(1).map(|c| c.value).collect();
+            let inputs = form.inputs();
+            let digits: String = inputs.iter().skip(1).map(|c| c.value).collect();
 
             match parse_radix(&digits, 8) {
                 Some(code_point) => {
                     if code_point > 255 {
                         return Err(ScanError::new(
                             ErrorKind::InvalidEscape(EscapeError::OutOfRange),
-                            form.span,
+                            inputs.span(),
                         ));
                     }
 
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::new(
-                            FormKind::Input(Character::new(ch, form.span)),
-                            form.span,
-                        )),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
                         None => {
                             Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
-                                form.span,
+                                inputs.span(),
                             ))
                         }
                     }
@@ -87,7 +87,7 @@ impl Scanner {
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Overflow),
-                        form.span,
+                        inputs.span(),
                     ))
                 }
             }
@@ -107,26 +107,24 @@ impl Scanner {
                 Some(2),
             ),
         ]).with_transform(|_, form| {
-            let hex_digits: String = form.inputs().iter().skip(2).map(|c| c.value).collect();
+            let inputs = form.inputs();
+            let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
 
-            match parse_radix(&hex_digits, 16) {
+            match parse_radix(&digits, 16) {
                 Some(code_point) => {
                     if code_point > 255 {
                         return Err(ScanError::new(
                             ErrorKind::InvalidEscape(EscapeError::OutOfRange),
-                            form.span,
+                            inputs.span(),
                         ));
                     }
 
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::new(
-                            FormKind::Input(Character::new(ch, form.span)),
-                            form.span
-                        )),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
                         None => {
                             Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
-                                form.span,
+                                inputs.span(),
                             ))
                         }
                     }
@@ -134,7 +132,7 @@ impl Scanner {
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        form.span,
+                        inputs.span(),
                     ))
                 }
             }
@@ -157,26 +155,23 @@ impl Scanner {
             Classifier::literal('}'),
         ]).with_transform(|_, form| {
             let inputs = form.inputs();
-            let hex_digits: String = inputs.iter()
+            let digits: String = inputs.iter()
                 .skip(3)
                 .take(inputs.len() - 4)
                 .map(|c| c.value)
                 .collect();
 
-            if hex_digits.is_empty() {
+            if digits.is_empty() {
                 return Err(ScanError::new(
                     ErrorKind::InvalidEscape(EscapeError::Empty),
-                    form.span,
+                    inputs.span(),
                 ));
             }
 
-            match parse_radix(&hex_digits, 16) {
+            match parse_radix(&digits, 16) {
                 Some(code_point) => {
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::new(
-                            FormKind::Input(Character::new(ch, form.span)),
-                            form.span
-                        )),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
                         None => {
                             let err = if code_point > 0x10FFFF {
                                 ErrorKind::InvalidCharacter(CharacterError::OutOfRange)
@@ -185,14 +180,14 @@ impl Scanner {
                             } else {
                                 ErrorKind::InvalidEscape(EscapeError::Invalid)
                             };
-                            Err(ScanError::new(err, form.span))
+                            Err(ScanError::new(err, inputs.span()))
                         }
                     }
                 }
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        form.span,
+                        inputs.span(),
                     ))
                 }
             }
@@ -212,29 +207,27 @@ impl Scanner {
                 Some(4),
             ),
         ]).with_transform(|_, form| {
-            let hex_digits: String = form.inputs().iter().skip(2).map(|c| c.value).collect();
+            let inputs = form.inputs();
+            let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
 
-            match parse_radix(&hex_digits, 16) {
+            match parse_radix(&digits, 16) {
                 Some(code_point) => {
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::new(
-                            FormKind::Input(Character::new(ch, form.span)),
-                            form.span
-                        )),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
                         None => {
                             let err = if (0xD800..=0xDFFF).contains(&code_point) {
                                 ErrorKind::InvalidCharacter(CharacterError::Surrogate)
                             } else {
                                 ErrorKind::InvalidEscape(EscapeError::Invalid)
                             };
-                            Err(ScanError::new(err, form.span))
+                            Err(ScanError::new(err, inputs.span()))
                         }
                     }
                 }
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        form.span,
+                        inputs.span(),
                     ))
                 }
             }

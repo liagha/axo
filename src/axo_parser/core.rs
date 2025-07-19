@@ -155,14 +155,16 @@ impl Parser {
                 let mut unary = operand.clone();
 
                 for suffix in suffixes {
-                    let span = Span::mix(&unary.span, &suffix.span);
-
                     if let Some(token) = suffix.get_input() {
+                        let span = Span::mix(&unary.span, &token.span);
+
                         unary = Element::new(
                             ElementKind::Unary(Unary::new(token, unary.into())),
                             span,
                         );
                     } else if let Some(element) = suffix.get_output() {
+                        let span = Span::mix(&unary.span, &element.span);
+
                         match element.kind {
                             ElementKind::Group(group) => {
                                 unary = Element::new(
@@ -339,12 +341,14 @@ impl Parser {
 
     pub fn fallback() -> Classifier<Token, Element, ParseError> {
         Classifier::with_order(
-            Classifier::predicate(|_token| true),
+            Classifier::anything(),
             Order::fail(
                 |_, form: Form<Token, Element, ParseError>| {
+                    let token = form.unwrap_input();
+
                     ParseError::new(
                         ErrorKind::UnexpectedToken(form.unwrap_input().kind),
-                        form.span,
+                        token.span,
                     )
                 },
             ),

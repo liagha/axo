@@ -1,3 +1,4 @@
+use crate::axo_cursor::Spanned;
 use crate::axo_form::form::Form;
 use crate::axo_form::pattern::Classifier;
 use crate::axo_scanner::{Character, ScanError, Scanner, Token, TokenKind};
@@ -29,12 +30,13 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let number: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
+                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), inputs.span()))
             },
         )
     }
@@ -54,12 +56,13 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let number: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
+                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), inputs.span()))
             },
         )
     }
@@ -79,12 +82,13 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let number: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
+                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
             },
         )
     }
@@ -119,18 +123,19 @@ impl Scanner {
                 ])),
             ]),
             |_, form| {
-                let number: String = form.inputs().into_iter().collect();
+                let inputs = form.inputs();
+                let number: String = inputs.clone().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
                     parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), form.span)))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
+                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), inputs.span())))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
                 } else {
                     let parser = parser::<i128>();
                     parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), form.span)))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), form.span))
+                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
                 }
             },
         )
