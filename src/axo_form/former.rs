@@ -1,4 +1,14 @@
+pub mod record {
+    pub const PANICKED: i8 = 120;
+    pub const ALIGNED: i8 = 1;
+    pub const FAILED: i8 = 0;
+    pub const BLANK: i8 = -1;
+    pub const IGNORED: i8 = -2;
+}
+
 use {
+    record::*,
+
     super::{
         helper::Source,
         pattern::Classifier,
@@ -65,6 +75,7 @@ where
     pub form: Form<Input, Output, Failure>,
 }
 
+
 impl<Input, Output, Failure> Draft<Input, Output, Failure>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
@@ -72,75 +83,70 @@ where
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     #[inline]
-    pub fn new(index: usize, position: Position, pattern: Classifier<Input, Output, Failure>) -> Self {
+    pub const fn new(index: usize, position: Position, pattern: Classifier<Input, Output, Failure>) -> Self {
         Self {
             marker: index,
             position,
             consumed: Vec::new(),
-            record: -1,
+            record: BLANK,
             classifier: pattern,
             form: Form::Blank,
         }
     }
 
-    /// Panic = Maximum
-    /// Aligned = 1
-    /// Failed = 0
-    /// Blank = -1
-    /// Ignore = -2
     #[inline]
-    pub fn is_panicked(&self) -> bool {
-        matches!(self.record, 120)
+    pub const fn is_panicked(&self) -> bool {
+        self.record == PANICKED
     }
 
     #[inline]
-    pub fn is_aligned(&self) -> bool {
-        matches!(self.record, 1)
+    pub const fn is_aligned(&self) -> bool {
+        self.record == ALIGNED
     }
 
     #[inline]
-    pub fn is_failed(&self) -> bool {
-        matches!(self.record, 0)
+    pub const fn is_failed(&self) -> bool {
+        self.record == FAILED
     }
 
     #[inline]
-    pub fn is_effected(&self) -> bool {
-        matches!(self.record, 1 | 0)
+    pub const fn is_effected(&self) -> bool {
+        matches!(self.record, ALIGNED | FAILED)
     }
 
     #[inline]
-    pub fn is_blank(&self) -> bool {
-        matches!(self.record, -1)
+    pub const fn is_blank(&self) -> bool {
+        self.record == BLANK
     }
 
     #[inline]
-    pub fn is_ignored(&self) -> bool {
-        matches!(self.record, -2)
+    pub const fn is_ignored(&self) -> bool {
+        self.record == IGNORED
     }
 
     #[inline]
-    pub fn panic(&mut self) {
-        self.record = 120;
+    pub const fn panic(&mut self) {
+        self.record = PANICKED;
     }
 
     #[inline]
-    pub fn align(&mut self) {
-        self.record = 1;
+    pub const fn align(&mut self) {
+        self.record = ALIGNED;
     }
 
     #[inline]
-    pub fn fail(&mut self) {
-        self.record = 0;
+    pub const fn fail(&mut self) {
+        self.record = FAILED;
     }
 
     #[inline]
-    pub fn empty(&mut self) {
-        self.record = -1;
+    pub const fn empty(&mut self) {
+        self.record = BLANK;
     }
 
     #[inline]
-    pub fn ignore(&mut self) {
-        self.record = -2;
+    pub const fn ignore(&mut self) {
+        self.record = IGNORED;
     }
 }
 

@@ -2,7 +2,7 @@ use {
     super::{
         order::Order,
         form::{Form},
-        former::{Draft, Composer},
+        former::{record, Draft, Composer},
     },
     crate::{
         artifact::Artifact,
@@ -114,18 +114,18 @@ where
 }
 
 #[derive(Clone)]
-pub struct Alternative<Input, Output, Failure>
+pub struct Alternative<Input, Output, Failure, const SIZE: usize>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    pub patterns: Vec<Classifier<Input, Output, Failure>>,
+    pub patterns: [Classifier<Input, Output, Failure>; SIZE],
     pub perfection: Vec<i8>,
     pub blacklist: Vec<i8>,
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure>
+impl<Input, Output, Failure, const SIZE: usize> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure, SIZE>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
@@ -287,9 +287,9 @@ where
         draft.form = child.form.clone();
 
         if child.is_aligned() {
-            draft.record = self.precedence.max(1);
+            draft.record = self.precedence.max(record::ALIGNED);
         } else if child.is_failed() {
-            draft.record = self.precedence.min(0);
+            draft.record = self.precedence.min(record::FAILED);
         } else {
             draft.record = child.record;
         }
@@ -297,16 +297,16 @@ where
 }
 
 #[derive(Clone)]
-pub struct Sequence<Input, Output, Failure>
+pub struct Sequence<Input, Output, Failure, const SIZE: usize>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    pub patterns: Vec<Classifier<Input, Output, Failure>>,
+    pub patterns: [Classifier<Input, Output, Failure>; SIZE],
 }
 
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Sequence<Input, Output, Failure>
+impl<Input, Output, Failure, const SIZE: usize> Pattern<Input, Output, Failure> for Sequence<Input, Output, Failure, SIZE>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
@@ -316,21 +316,21 @@ where
         let mut index = draft.marker;
         let mut position = draft.position;
         let mut consumed = Vec::new();
-        let mut forms = Vec::with_capacity(self.patterns.len());
+        let mut forms = Vec::with_capacity(SIZE);
 
         for pattern in &self.patterns {
             let mut child = Draft::new(index, position, pattern.clone());
             composer.build(&mut child);
 
             match child.record {
-                1 => {
+                record::ALIGNED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                120 | 0 => {
+                record::PANICKED | record::FAILED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
@@ -338,7 +338,7 @@ where
                     forms.push(child.form);
                     break;
                 }
-                -2 => {
+                record::IGNORED => {
                     index = child.marker;
                     position = child.position;
                 }
@@ -389,13 +389,13 @@ where
             }
 
             match child.record {
-                120 | 1 | 0 => {
+                record::PANICKED | record::ALIGNED | record::FAILED => {
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                -2 => {
+                record::IGNORED => {
                     index = child.marker;
                     position = child.position;
                 }
@@ -456,14 +456,14 @@ where
             }
 
             match child.record {
-                1 => {
+                record::ALIGNED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                120 | 0 => {
+                record::PANICKED | record::FAILED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
@@ -471,7 +471,7 @@ where
                     forms.push(child.form);
                     break;
                 }
-                -2 => {
+                record::IGNORED => {
                     index = child.marker;
                     position = child.position;
                 }
@@ -515,7 +515,7 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    pub fn new(pattern: Arc<dyn Pattern<Input, Output, Failure>>) -> Self {
+    pub const fn new(pattern: Arc<dyn Pattern<Input, Output, Failure>>) -> Self {
         Self {
             pattern,
             order: None,
@@ -543,16 +543,24 @@ where
         }))
     }
 
-    pub fn alternative(patterns: impl Into<Vec<Self>>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection: vec![120, 1], blacklist: vec![-1] }))
+    pub fn alternative<const SIZE: usize>(patterns: [Self; SIZE]) -> Self {
+        Self::new(Arc::new(Alternative {
+            patterns,
+            perfection: vec![record::PANICKED, record::ALIGNED],
+            blacklist: vec![record::BLANK]
+        }))
     }
 
-    pub fn choice(patterns: impl Into<Vec<Self>>, perfection: Vec<i8>) -> Self {
-        Self::new(Arc::new(Alternative { patterns: patterns.into(), perfection, blacklist: vec![] }))
+    pub fn choice<const SIZE: usize>(patterns: [Self; SIZE], perfection: Vec<i8>) -> Self {
+        Self::new(Arc::new(Alternative {
+            patterns,
+            perfection,
+            blacklist: vec![]
+        }))
     }
 
-    pub fn sequence(patterns: impl Into<Vec<Self>>) -> Self {
-        Self::new(Arc::new(Sequence { patterns: patterns.into() }))
+    pub fn sequence<const SIZE: usize>(patterns: [Self; SIZE]) -> Self {
+        Self::new(Arc::new(Sequence { patterns }))
     }
 
     pub fn optional(pattern: Self) -> Self {
@@ -599,10 +607,12 @@ where
         }))
     }
 
+    #[inline]
     pub fn anything() -> Self {
         Self::predicate(|_| true)
     }
 
+    #[inline]
     pub fn nothing() -> Self {
         Self::predicate(|_| false)
     }
@@ -637,7 +647,7 @@ where
     pub fn with_ignore(self) -> Self {
         self.with_order(Order::Ignore)
     }
-    
+
     pub fn with_inspect<I>(self, inspector: I) -> Self
     where
         I: Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync + 'static
