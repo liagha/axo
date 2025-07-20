@@ -41,6 +41,7 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
+    #[inline(always)]
     pub fn new(source: &'c mut (dyn Source<Input> + 'c)) -> Composer<'c, Input, Output, Failure> {
         Self {
             source,
@@ -48,6 +49,7 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn build(&mut self, draft: &mut Draft<Input, Output, Failure>) {
         let pattern = draft.classifier.pattern.clone();
         let order = draft.classifier.order.clone();
@@ -82,69 +84,69 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    #[inline]
-    pub const fn new(index: usize, position: Position, pattern: Classifier<Input, Output, Failure>) -> Self {
+    #[inline(always)]
+    pub const fn new(index: usize, position: Position, classifier: Classifier<Input, Output, Failure>) -> Self {
         Self {
             marker: index,
             position,
             consumed: Vec::new(),
             record: BLANK,
-            classifier: pattern,
+            classifier,
             form: Form::Blank,
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_panicked(&self) -> bool {
         self.record == PANICKED
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_aligned(&self) -> bool {
         self.record == ALIGNED
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_failed(&self) -> bool {
         self.record == FAILED
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_effected(&self) -> bool {
         matches!(self.record, ALIGNED | FAILED)
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_blank(&self) -> bool {
         self.record == BLANK
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn is_ignored(&self) -> bool {
         self.record == IGNORED
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn panic(&mut self) {
         self.record = PANICKED;
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn align(&mut self) {
         self.record = ALIGNED;
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn fail(&mut self) {
         self.record = FAILED;
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn empty(&mut self) {
         self.record = BLANK;
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn ignore(&mut self) {
         self.record = IGNORED;
     }

@@ -607,12 +607,12 @@ where
         }))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn anything() -> Self {
         Self::predicate(|_| true)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn nothing() -> Self {
         Self::predicate(|_| false)
     }

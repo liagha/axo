@@ -19,8 +19,7 @@ impl Parser {
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                })
-                .with_ignore(),
+                }),
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
@@ -61,10 +60,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let braces = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), braces.span())
                 ))
             },
         )
@@ -75,8 +75,7 @@ impl Parser {
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                })
-                .with_ignore(),
+                }),
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
@@ -117,10 +116,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let braces = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::block(Block::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::block(Block::new(elements.clone())), braces.span())
                 ))
             },
         )
@@ -175,10 +175,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let parentheses = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::group(Group::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::group(Group::new(elements.clone())), parentheses.span())
                 ))
             },
         )
@@ -189,8 +190,7 @@ impl Parser {
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
-                })
-                .with_ignore(),
+                }),
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
@@ -234,10 +234,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let parentheses = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), parentheses.span())
                 ))
             },
         )
@@ -248,8 +249,7 @@ impl Parser {
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                })
-                .with_ignore(),
+                }),
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
@@ -290,10 +290,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let brackets = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::collection(Collection::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::collection(Collection::new(elements.clone())), brackets.span())
                 ))
             },
         )
@@ -346,10 +347,11 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
+                let brackets = form.inputs();
                 let elements = form.outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::series(Series::new(elements.clone())), elements.span())
+                    Element::new(ElementKind::series(Series::new(elements.clone())), brackets.span())
                 ))
             },
         )

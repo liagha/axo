@@ -19,6 +19,17 @@ where
     Failure(Failure),
 }
 
+impl<Input, Output, Failure> Default for Form<Input, Output, Failure>
+where
+    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+{
+    fn default() -> Self {
+        Self::Blank
+    }
+}
+
 impl<Input, Output, Failure> Form<Input, Output, Failure>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,

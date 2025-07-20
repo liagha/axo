@@ -110,6 +110,7 @@ impl Span {
     }
 
     #[inline]
+    #[track_caller]
     pub fn mix(&self, other: &Span) -> Span {
         if self.start.location != other.start.location {
             panic!("cannot mix spans from `{}` with `{}`", self.start.location, other.start.location);

@@ -323,7 +323,7 @@ impl Parser {
                 let sequence = form.unwrap();
                 let keyword = sequence[0].unwrap_input();
                 let name = sequence[1].unwrap_output();
-                let invoke = sequence[1].unwrap_output();
+                let invoke = sequence[2].unwrap_output();
                 let body = sequence[3].unwrap_output();
 
                 let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
