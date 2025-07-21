@@ -102,8 +102,8 @@ impl Parser {
                 Self::block(Classifier::deferred(Self::symbolization))
             ]),
             |_, form| {
-                let keyword = form.inputs()[0].clone();
-                let outputs = form.outputs().clone();
+                let keyword = form.collect_inputs()[0].clone();
+                let outputs = form.collect_outputs().clone();
 
                 let name = outputs[0].clone();
 
@@ -116,7 +116,7 @@ impl Parser {
                             members: vec![]
                         }.into()
                     }).collect::<Vec<_>>();
-                    let span = Span::mix(&keyword.span(), &body.span());
+                    let span = Span::merge(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
@@ -140,7 +140,7 @@ impl Parser {
                             members: vec![]
                         }.into()
                     }).collect::<Vec<_>>();
-                    let span = Span::mix(&keyword.span(), &members.span());
+                    let span = Span::merge(&keyword.span(), &members.span());
 
                     Ok(Form::output(
                         Element::new(
@@ -175,7 +175,7 @@ impl Parser {
                 Classifier::deferred(Self::element),
             ]),
             |_, form| {
-                let sequence = form.unwrap();
+                let sequence = form.as_forms();
 
                 let keyword = sequence[0].unwrap_input();
                 let mutable = if let TokenKind::Identifier(identifier) = &keyword.kind {
@@ -184,9 +184,9 @@ impl Parser {
                     false
                 };
 
-                let body = sequence[1].unwrap_output();
+                let body = sequence[1].unwrap_output().clone();
 
-                let span = Span::mix(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
@@ -238,19 +238,19 @@ impl Parser {
                 Self::bundle(Classifier::deferred(Self::symbolization)),
             ]),
             |_, form| {
-                let sequence = form.unwrap();
-                let keyword = sequence[0].unwrap_input();
-                let name = sequence[1].unwrap_output();
-                let body = sequence[2].unwrap_output();
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let body = sequence[2].unwrap_output().clone();
 
                 let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
                     Symbol {
                         kind: item.kind.clone().unwrap_symbolize().clone().kind,
-                        span: item.span,
+                        span: item.span(),
                         members: vec![]
                     }
                 }).collect::<Vec<_>>();
-                let span = Span::mix(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 Ok(Form::output(
                     Element::new(
@@ -282,11 +282,11 @@ impl Parser {
                 Self::bundle(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
-                let sequence = form.unwrap();
-                let keyword = sequence[0].unwrap_input();
-                let name = sequence[1].unwrap_output();
-                let body = sequence[2].unwrap_output();
-                let span = Span::mix(&keyword.span(), &body.span());
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let body = sequence[2].unwrap_output().clone();
+                let span = Span::merge(&keyword.span(), &body.span());
                 let items = body.kind.unwrap_bundle().items;
 
                 Ok(Form::output(
@@ -320,21 +320,21 @@ impl Parser {
                 Self::block(Classifier::deferred(Self::element)),
             ]),
             |_, form| {
-                let sequence = form.unwrap();
-                let keyword = sequence[0].unwrap_input();
-                let name = sequence[1].unwrap_output();
-                let invoke = sequence[2].unwrap_output();
-                let body = sequence[3].unwrap_output();
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let invoke = sequence[2].unwrap_output().clone();
+                let body = sequence[3].unwrap_output().clone();
 
                 let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
                     Symbol {
                         kind: parameter.kind.clone().unwrap_symbolize().kind,
-                        span: parameter.span,
+                        span: parameter.span(),
                         members: vec![]
                     }
                 }).collect::<Vec<_>>();
 
-                let span = Span::mix(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 Ok(Form::output(
                     Element::new(

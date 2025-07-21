@@ -19,7 +19,7 @@ where
 {
     fn dyn_hash(&self, mut state: &mut dyn Hasher) {
         self.hash(&mut state);
-        
+
         TypeId::of::<T>().hash(&mut state);
     }
 

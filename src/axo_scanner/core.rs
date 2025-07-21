@@ -19,7 +19,7 @@ impl Scanner {
             ),
             Classifier::literal('"'),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let content = inputs.clone().into_iter().collect::<String>();
 
             Ok(Form::output(Token::new(TokenKind::String(content), inputs.span())))
@@ -37,7 +37,7 @@ impl Scanner {
                 Classifier::literal('`'),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 Ok(Form::output(Token::new(TokenKind::String(content), inputs.span())))
@@ -54,7 +54,7 @@ impl Scanner {
             ]),
             Classifier::literal('\''),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let ch = inputs[1];
 
             Ok(Form::output(Token::new(TokenKind::Character(ch.value), ch.span)))
@@ -72,7 +72,7 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 Ok(Form::output(
@@ -93,7 +93,7 @@ impl Scanner {
                 None
             ),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 Ok(Form::output(
@@ -110,7 +110,7 @@ impl Scanner {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 Ok(Form::output(
@@ -131,7 +131,7 @@ impl Scanner {
                 None,
             ),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 let kind = match content.len() {
@@ -170,7 +170,7 @@ impl Scanner {
                 ])
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
                 Ok(Form::output(Token::new(TokenKind::Comment(content), inputs.span())))
@@ -182,7 +182,7 @@ impl Scanner {
         Classifier::with_order(
             Classifier::anything(),
             Order::fail(|_, form| {
-                let ch : Character = form.unwrap_input();
+                let ch : &Character = form.unwrap_input();
 
                 ScanError::new(
                     ErrorKind::InvalidCharacter(CharacterError::Unexpected(ch.value)),

@@ -7,7 +7,7 @@ use {
     },
     crate::{
         axo_cursor::{
-            Span,
+            Span, Spanned,
         },
         axo_form::{
             form::Form,
@@ -38,7 +38,7 @@ impl Parser {
                 }
             }),
             |_, form| {
-                let input = form.inputs()[0].clone();
+                let input = form.collect_inputs()[0].clone();
                 let identifier = input.kind.unwrap_identifier();
 
                 Ok(Form::output(
@@ -61,7 +61,7 @@ impl Parser {
                 )
             }),
             |_, form| {
-                let input = form.inputs()[0].clone();
+                let input = form.collect_inputs()[0].clone();
 
                 Ok(Form::output(
                     Element::new(ElementKind::literal(input.kind), input.span)
@@ -106,16 +106,16 @@ impl Parser {
                 Self::primary(),
             ]),
             Order::convert(|_, form: Form<Token, Element, ParseError>| {
-                let prefixes = form.inputs();
-                let operand = form.outputs()[0].clone();
+                let prefixes = form.collect_inputs();
+                let operand = form.collect_outputs()[0].clone();
                 let mut unary = operand.clone();
 
                 for prefix in prefixes {
-                    let span = Span::mix(&prefix.span, &unary.span);
+                    let span = Span::merge(&prefix.span(), &unary.span());
 
                     unary = Element::new(
                         ElementKind::unary(Unary::new(
-                            prefix,
+                            prefix.clone(),
                             unary.into(),
                         )),
                         span,
@@ -149,21 +149,21 @@ impl Parser {
                 ),
             ]),
             |_, form| {
-                let sequence = form.unwrap().clone();
+                let sequence = form.as_forms();
                 let operand = sequence[0].unwrap_output();
-                let suffixes = sequence[1].unwrap();
+                let suffixes = sequence[1].as_forms();
                 let mut unary = operand.clone();
 
                 for suffix in suffixes {
                     if let Some(token) = suffix.get_input() {
-                        let span = Span::mix(&unary.span, &token.span);
+                        let span = Span::merge(&unary.span(), &token.span());
 
                         unary = Element::new(
                             ElementKind::Unary(Unary::new(token, unary.into())),
                             span,
                         );
                     } else if let Some(element) = suffix.get_output() {
-                        let span = Span::mix(&unary.span, &element.span);
+                        let span = Span::merge(&unary.span(), &element.span());
 
                         match element.kind {
                             ElementKind::Group(group) => {
@@ -234,16 +234,16 @@ impl Parser {
                     ),
                 ]),
                 move |_, form| {
-                    let sequence = form.unwrap();
-                    let mut left = sequence[0].unwrap_output();
-                    let operations = sequence[1].unwrap();
+                    let sequence = form.as_forms();
+                    let mut left = sequence[0].unwrap_output().clone();
+                    let operations = sequence[1].as_forms();
                     let mut pairs = Vec::new();
 
                     for operation in operations {
-                        let sequence = operation.unwrap();
+                        let sequence = operation.as_forms();
                         if sequence.len() >= 2 {
-                            let operator = sequence[0].unwrap_input();
-                            let operand = sequence[1].unwrap_output();
+                            let operator = sequence[0].unwrap_input().clone();
+                            let operand = sequence[1].unwrap_output().clone();
                             let precedence = if let TokenKind::Operator(op) = &operator.kind {
                                 op.precedence().unwrap_or(0)
                             } else {
@@ -291,8 +291,8 @@ impl Parser {
                 }
             }
 
-            let start = left.span.start.clone();
-            let end = right.span.end.clone();
+            let start = left.span().start.clone();
+            let end = right.span().end.clone();
             let span = Span::new(start, end);
 
             match &operator.kind {
@@ -347,7 +347,7 @@ impl Parser {
                     let token = form.unwrap_input();
 
                     ParseError::new(
-                        ErrorKind::UnexpectedToken(form.unwrap_input().kind),
+                        ErrorKind::UnexpectedToken(form.unwrap_input().clone().kind),
                         token.span,
                     )
                 },

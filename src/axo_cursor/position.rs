@@ -26,11 +26,7 @@ pub struct Position {
 
 impl Default for Position {
     fn default() -> Self {
-        Self {
-            line: 1,
-            column: 1,
-            location: Location::Void,
-        }
+        Self::void()
     }
 }
 
@@ -41,6 +37,15 @@ impl Position {
             line: 1,
             column: 1,
             location: Location::File(file),
+        }
+    }
+
+    #[inline]
+    pub fn void() -> Self {
+        Self {
+            line: 1,
+            column: 1,
+            location: Location::Void,
         }
     }
     
@@ -77,53 +82,47 @@ impl Position {
     pub fn swap_line(&self, line: usize) -> Self {
         Self {
             line,
-            column: self.column,
-            location: self.location
+            ..*self
         }
     }
 
     #[inline]
     pub fn swap_column(&self, column: usize) -> Self {
         Self {
-            line: self.line,
             column,
-            location: self.location
+            ..*self
         }
     }
 
     #[inline]
     pub fn swap_path(&self, path: &'static str) -> Self {
         Self {
-            line: self.line,
-            column: self.column,
             location: Location::File(path),
+            ..*self
         }
     }
 
     #[inline]
     pub fn swap_location(&self, location: Location) -> Self {
         Self {
-            line: self.line,
-            column: self.column,
             location,
+            ..*self
         }
     }
 
     #[inline]
-    pub fn join_line(&self, amount: usize) -> Self {
+    pub fn advance_line(&self, amount: usize) -> Self {
         Self {
             line: self.line + amount,
-            column: self.column,
-            location: self.location,
+            ..*self
         }
     }
 
     #[inline]
     pub fn join_column(&self, amount: usize) -> Self {
         Self {
-            line: self.line,
             column: self.column + amount,
-            location: self.location,
+            ..*self
         }
     }
 

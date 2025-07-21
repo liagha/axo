@@ -47,14 +47,14 @@ impl Parser {
                 ])),
             ]),
             |_, form| {
-                let sequence = form.unwrap();
+                let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
-                let condition = sequence[1].unwrap_output();
-                let then = sequence[2].unwrap_output();
+                let condition = sequence[1].unwrap_output().clone();
+                let then = sequence[2].unwrap_output().clone();
 
                 if let Some(alternate) = sequence.get(3).cloned() {
-                    let alternate = alternate.unwrap_output();
-                    let span = Span::mix(&keyword.span(), &alternate.span());
+                    let alternate = alternate.unwrap_output().clone();
+                    let span = Span::merge(&keyword.span(), &alternate.span());
 
                     Ok(Form::output(
                         Element::new(
@@ -63,7 +63,7 @@ impl Parser {
                         )
                     ))
                 } else {
-                    let span = condition.span.mix(&then.span);
+                    let span = condition.span().merge(&then.span());
 
                     Ok(Form::output(
                         Element::new(
@@ -119,12 +119,12 @@ impl Parser {
             ]),
         ], vec![1, 0]).with_transform(
             |_, form| {
-                let sequence = form.unwrap();
+                let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
                 if sequence.len() == 1 {
-                    let body = sequence[0].unwrap_output();
-                    let span = Span::mix(&keyword.span(), &body.span());
+                    let body = sequence[0].unwrap_output().clone();
+                    let span = Span::merge(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
@@ -133,9 +133,9 @@ impl Parser {
                         )
                     ))
                 } else if sequence.len() == 2 {
-                    let condition = sequence[0].unwrap_output();
-                    let body = sequence[1].unwrap_output();
-                    let span = Span::mix(&keyword.span, &body.span);
+                    let condition = sequence[0].unwrap_output().clone();
+                    let body = sequence[1].unwrap_output().clone();
+                    let span = Span::merge(&keyword.span, &body.span);
 
                     Ok(Form::output(
                         Element::new(

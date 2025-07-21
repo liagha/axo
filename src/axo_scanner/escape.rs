@@ -25,7 +25,7 @@ impl Scanner {
                 }
             })
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let escape = inputs[1];
 
             let escaped = match escape.value {
@@ -62,7 +62,7 @@ impl Scanner {
                 Some(3),
             ),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let digits: String = inputs.iter().skip(1).map(|c| c.value).collect();
 
             match parse_radix(&digits, 8) {
@@ -107,7 +107,7 @@ impl Scanner {
                 Some(2),
             ),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
 
             match parse_radix(&digits, 16) {
@@ -154,7 +154,7 @@ impl Scanner {
             ),
             Classifier::literal('}'),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let digits: String = inputs.iter()
                 .skip(3)
                 .take(inputs.len() - 4)
@@ -207,7 +207,7 @@ impl Scanner {
                 Some(4),
             ),
         ]).with_transform(|_, form| {
-            let inputs = form.inputs();
+            let inputs = form.collect_inputs();
             let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
 
             match parse_radix(&digits, 16) {

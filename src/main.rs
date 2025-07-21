@@ -117,6 +117,10 @@ pub mod character {
     }
 }
 
+pub mod reference {
+    pub use std::rc::Rc;
+}
+
 pub mod any {
     pub use core::any::{Any, TypeId};
 }

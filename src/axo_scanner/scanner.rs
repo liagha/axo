@@ -108,7 +108,7 @@ impl Scanner {
         let mut errors = Vec::new();
 
         while self.peek().is_some() {
-            let forms = self.form(Self::pattern()).expand();
+            let forms = self.form(Self::pattern()).flatten();
 
             for form in forms {
                 match form {

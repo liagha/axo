@@ -10,8 +10,6 @@ use {
         hash::{
             Hash, Hasher
         },
-
-        axo_data::tree::Tree,
     },
 };
 

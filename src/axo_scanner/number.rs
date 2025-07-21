@@ -30,7 +30,7 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
@@ -56,7 +56,7 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
@@ -82,7 +82,7 @@ impl Scanner {
                 ),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
 
@@ -123,7 +123,7 @@ impl Scanner {
                 ])),
             ]),
             |_, form| {
-                let inputs = form.inputs();
+                let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {

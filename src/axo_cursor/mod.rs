@@ -54,7 +54,7 @@ impl Spanned for Element {
 
 impl Spanned for Symbol {
     fn span(&self) -> Span {
-        self.span.clone()
+        self.span
     }
 }
 
@@ -66,21 +66,60 @@ impl<E: Display> Spanned for Error<E> {
 
 impl Spanned for Span {
     fn span(&self) -> Span {
-        self.clone()
+        *self
     }
 }
 
-impl<Item: Spanned> Spanned for Vec<Item> {
+impl<T: Spanned> Spanned for &T {
     fn span(&self) -> Span {
-        if self.len() >= 2 {
-            let start = self.first().unwrap().span();
-            let end = self.last().unwrap().span();
+        (*self).span()
+    }
+}
 
-            Span::mix(&start, &end)
-        } else if self.len() == 1 {
-            self[0].span()
-        } else {
-            Span::default()
+impl<T: Spanned> Spanned for &mut T {
+    fn span(&self) -> Span {
+        (**self).span()
+    }
+}
+
+impl<T: Spanned> Spanned for Box<T> {
+    fn span(&self) -> Span {
+        self.as_ref().span()
+    }
+}
+
+fn span_from_slice<T: Spanned>(items: &[T]) -> Span {
+    match items.len() {
+        0 => Span::default(),
+        1 => items[0].span(),
+        _ => {
+            let start = items.first().unwrap().span();
+            let end = items.last().unwrap().span();
+            start.merge(&end)
         }
+    }
+}
+
+impl<T: Spanned> Spanned for Vec<T> {
+    fn span(&self) -> Span {
+        span_from_slice(self.as_slice())
+    }
+}
+
+impl<T: Spanned> Spanned for &[T] {
+    fn span(&self) -> Span {
+        span_from_slice(self)
+    }
+}
+
+impl<T: Spanned> Spanned for Box<[T]> {
+    fn span(&self) -> Span {
+        span_from_slice(self.as_ref())
+    }
+}
+
+impl<T: Spanned, const N: usize> Spanned for [T; N] {
+    fn span(&self) -> Span {
+        span_from_slice(self.as_slice())
     }
 }

@@ -123,7 +123,7 @@ impl Parser {
         self.strain(Self::strainer());
         
         while self.peek().is_some() {
-            let forms = self.form(Self::parser()).expand();
+            let forms = self.form(Self::parser()).flatten();
 
             for form in forms {
                 match form {

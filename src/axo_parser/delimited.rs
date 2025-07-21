@@ -28,7 +28,7 @@ impl Parser {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
                             Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.inputs().span();
+                                let span = form.collect_inputs().span();
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -48,7 +48,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -60,8 +60,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let braces = form.inputs();
-                let elements = form.outputs();
+                let braces = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::bundle(Bundle::new(elements.clone())), braces.span())
@@ -84,7 +84,7 @@ impl Parser {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
                             Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.inputs().span();
+                                let span = form.collect_inputs().span();
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -104,7 +104,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(
@@ -116,8 +116,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let braces = form.inputs();
-                let elements = form.outputs();
+                let braces = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::block(Block::new(elements.clone())), braces.span())
@@ -142,7 +142,7 @@ impl Parser {
                             Order::branch(
                                 Order::ignore(),
                                 Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                    let span = form.inputs().span();
+                                    let span = form.collect_inputs().span();
 
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -163,7 +163,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
                         
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -175,8 +175,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let parentheses = form.inputs();
-                let elements = form.outputs();
+                let parentheses = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::group(Group::new(elements.clone())), parentheses.span())
@@ -201,7 +201,7 @@ impl Parser {
                             Order::branch(
                                 Order::ignore(),
                                 Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                    let span = form.inputs().span();
+                                    let span = form.collect_inputs().span();
 
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -222,7 +222,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -234,8 +234,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let parentheses = form.inputs();
-                let elements = form.outputs();
+                let parentheses = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::sequence(Sequence::new(elements.clone())), parentheses.span())
@@ -258,7 +258,7 @@ impl Parser {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
                             Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.inputs().span();
+                                let span = form.collect_inputs().span();
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -278,7 +278,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -290,8 +290,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let brackets = form.inputs();
-                let elements = form.outputs();
+                let brackets = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::collection(Collection::new(elements.clone())), brackets.span())
@@ -315,7 +315,7 @@ impl Parser {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
                             Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.inputs().span();
+                                let span = form.collect_inputs().span();
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -335,7 +335,7 @@ impl Parser {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.inputs().span();
+                        let span = form.collect_inputs().span();
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -347,8 +347,8 @@ impl Parser {
                 ),
             ]),
             move |_, form| {
-                let brackets = form.inputs();
-                let elements = form.outputs();
+                let brackets = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 Ok(Form::output(
                     Element::new(ElementKind::series(Series::new(elements.clone())), brackets.span())

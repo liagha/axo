@@ -1,5 +1,6 @@
 use {
     crate::{
+        slice,
         hash::Hash,
         format::Debug,
     }
@@ -36,18 +37,22 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
+    #[inline(always)]
     pub fn blank() -> Self {
         Form::Blank
     }
 
+    #[inline(always)]
     pub fn input(input: Input) -> Self {
         Form::Input(input.clone())
     }
 
+    #[inline(always)]
     pub fn output(output: Output) -> Self {
         Form::Output(output.clone())
     }
 
+    #[inline(always)]
     pub fn multiple(forms: Vec<Form<Input, Output, Failure>>) -> Self {
         if forms.is_empty() {
             Form::Blank
@@ -56,6 +61,12 @@ where
         }
     }
 
+    #[inline(always)]
+    pub fn failure(failure: Failure) -> Self {
+        Form::Failure(failure)
+    }
+
+    #[inline(always)]
     pub fn get_input(&self) -> Option<Input> {
         match self.clone() {
             Form::Input(input) => Some(input.clone()),
@@ -63,6 +74,7 @@ where
         }
     }
 
+    #[inline(always)]
     pub fn get_output(&self) -> Option<Output> {
         match self.clone() {
             Form::Output(output) => Some(output.clone()),
@@ -70,139 +82,143 @@ where
         }
     }
 
-    pub fn unwrap(&self) -> Vec<Form<Input, Output, Failure>> {
-        match self.clone() {
-            Form::Multiple(forms) => forms,
-            _ => vec![self.clone()],
+    #[inline(always)]
+    pub fn get_failure(&self) -> Option<&Failure> {
+        match self {
+            Form::Failure(failure) => Some(failure),
+            _ => None
+        }
+    }
+
+    #[inline]
+    pub fn is_blank(&self) -> bool {
+        matches!(self, Form::Blank)
+    }
+
+    #[inline]
+    pub fn is_input(&self) -> bool {
+        matches!(self, Form::Input(_))
+    }
+
+    #[inline]
+    pub fn is_output(&self) -> bool {
+        matches!(self, Form::Output(_))
+    }
+
+    #[inline]
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Form::Failure(_))
+    }
+
+    #[inline]
+    pub fn is_multiple(&self) -> bool {
+        matches!(self, Form::Multiple(_))
+    }
+
+    #[inline(always)]
+    pub fn as_forms(&self) -> &[Form<Input, Output, Failure>] {
+        match self {
+            Form::Multiple(forms) => forms.as_slice(),
+            _ => slice::from_ref(self),
         }
     }
 
     #[track_caller]
-    pub fn unwrap_input(&self) -> Input {
-        match self.clone() {
-            Form::Input(input) => input.clone(),
-            _ => panic!("the form isn't an input!")
+    pub fn unwrap_input(&self) -> &Input {
+        match self {
+            Form::Input(input) => input,
+            _ => panic!("called `Form::unwrap_input()` on a non-Input value")
         }
     }
 
     #[track_caller]
-    pub fn unwrap_output(&self) -> Output {
-        match self.clone() {
-            Form::Output(output) => output.clone(),
-            _ => panic!("the form isn't an output!")
+    pub fn unwrap_output(&self) -> &Output {
+        match self {
+            Form::Output(output) => output,
+            _ => panic!("called `Form::unwrap_output()` on a non-Output value")
         }
     }
 
-    pub fn expand(&self) -> Vec<Form<Input, Output, Failure>> {
-        let mut expanded: Vec<Form<Input, Output, Failure>> = Vec::new();
+    #[track_caller]
+    pub fn unwrap_failure(&self) -> &Failure {
+        match self {
+            Form::Failure(failure) => failure,
+            _ => panic!("called `Form::unwrap_failure()` on a non-Failure value")
+        }
+    }
 
+    pub fn flatten(&self) -> Vec<Form<Input, Output, Failure>> {
+        let mut result = Vec::new();
+        self.flatten_into(&mut result);
+        result
+    }
+
+    fn flatten_into(&self, result: &mut Vec<Form<Input, Output, Failure>>) {
         match self {
             Form::Multiple(forms) => {
-                expanded.extend(Self::expand_forms(forms.clone()));
+                for form in forms {
+                    form.flatten_into(result);
+                }
             }
-
-            form => {
-                expanded.push(form.clone());
-            }
+            form => result.push(form.clone()),
         }
-
-        expanded
     }
 
-    pub fn inputs(&self) -> Vec<Input> {
-        let mut inputs: Vec<Input> = Vec::new();
-
-        for form in self.unwrap() {
-            match form {
-                Form::Input(input) => {
-                    inputs.push(input);
-                }
-                Form::Multiple(sub) => {
-                    let sub = Self::expand_inputs(sub);
-                    inputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
+    pub fn collect_inputs(&self) -> Vec<Input> {
+        let mut inputs = Vec::new();
+        self.collect_inputs_into(&mut inputs);
         inputs
     }
 
-    pub fn outputs(&self) -> Vec<Output> {
-        let mut outputs: Vec<Output> = Vec::new();
-
-        for form in self.unwrap() {
-            match form {
-                Form::Output(output) => {
-                    outputs.push(output);
+    fn collect_inputs_into(&self, inputs: &mut Vec<Input>) {
+        match self {
+            Form::Input(input) => inputs.push(input.clone()),
+            Form::Multiple(forms) => {
+                for form in forms {
+                    form.collect_inputs_into(inputs);
                 }
-                Form::Multiple(sub) => {
-                    let sub = Self::expand_outputs(sub);
-                    outputs.extend(sub);
-                }
-                _ => {}
             }
+            _ => {}
         }
+    }
 
+    pub fn collect_outputs(&self) -> Vec<Output> {
+        let mut outputs = Vec::new();
+        self.collect_outputs_into(&mut outputs);
         outputs
     }
 
-    pub fn expand_forms(forms: Vec<Form<Input, Output, Failure>>) -> Vec<Form<Input, Output, Failure>> {
-        let mut expanded: Vec<Form<Input, Output, Failure>> = Vec::new();
-
-        for form in forms {
-            match form {
-                Form::Multiple(sub) => {
-                    let sub = Self::expand_forms(sub);
-                    expanded.extend(sub);
-                }
-                form => {
-                    expanded.push(form)
+    fn collect_outputs_into(&self, outputs: &mut Vec<Output>) {
+        match self {
+            Form::Output(output) => outputs.push(output.clone()),
+            Form::Multiple(forms) => {
+                for form in forms {
+                    form.collect_outputs_into(outputs);
                 }
             }
+            _ => {}
         }
-
-        expanded
     }
 
-    pub fn expand_inputs(forms: Vec<Form<Input, Output, Failure>>) -> Vec<Input> {
-        let mut inputs: Vec<Input> = Vec::new();
+    pub fn collect_failures(&self) -> Vec<Failure> {
+        let mut failures = Vec::new();
+        self.collect_failures_into(&mut failures);
+        failures
+    }
 
-        for form in forms {
-            match form {
-                Form::Input(input) => {
-                    inputs.push(input);
+    fn collect_failures_into(&self, failures: &mut Vec<Failure>) {
+        match self {
+            Form::Failure(failure) => failures.push(failure.clone()),
+            Form::Multiple(forms) => {
+                for form in forms {
+                    form.collect_failures_into(failures);
                 }
-                Form::Multiple(sub) => {
-                    let sub = Self::expand_inputs(sub);
-                    inputs.extend(sub);
-                }
-                _ => {}
             }
+            _ => {}
         }
-
-        inputs
     }
 
-    pub fn expand_outputs(forms: Vec<Form<Input, Output, Failure>>) -> Vec<Output> {
-        let mut outputs: Vec<Output> = Vec::new();
-
-        for form in forms {
-            match form {
-                Form::Output(output) => {
-                    outputs.push(output);
-                }
-                Form::Multiple(sub) => {
-                    let sub = Self::expand_outputs(sub);
-                    outputs.extend(sub);
-                }
-                _ => {}
-            }
-        }
-
-        outputs
-    }
-
+    #[inline(always)]
     pub fn map<MappedI, MappedO, MappedF, F, G, H>(
         self,
         input_mapper: F,
@@ -226,7 +242,7 @@ where
                     .into_iter()
                     .map(|form| form.map(input_mapper.clone(), output_mapper.clone(), error_mapper.clone()))
                     .collect();
-                
+
                 Form::Multiple(forms)
             }
             Form::Failure(error) => Form::Failure(error_mapper(error)),

@@ -17,10 +17,6 @@ use {
         operations::{
             Deref, DerefMut
         },
-        axo_data::tree::{
-            Node, Tree
-        },
-
         axo_schema::{
             Procedural,
             Group, Sequence,
