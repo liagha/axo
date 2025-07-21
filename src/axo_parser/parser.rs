@@ -13,6 +13,7 @@ use {
         compiler::{Context, Marked},
     },
 };
+use crate::axo_cursor::Location;
 
 #[derive(Clone)]
 pub struct Parser {
@@ -88,12 +89,12 @@ impl Peekable<Token> for Parser {
 }
 
 impl Parser {
-    pub fn new(context: Context, tokens: Vec<Token>, file: &'static str) -> Self {
+    pub fn new(context: Context, tokens: Vec<Token>, location: Location) -> Self {
         Parser {
             context,
             input: tokens,
             index: 0,
-            position: Position::new(file),
+            position: Position::new(location),
             output: Vec::new(),
             errors: Vec::new(),
         }

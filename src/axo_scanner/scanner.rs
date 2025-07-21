@@ -16,6 +16,7 @@ use {
         },
     },
 };
+use crate::axo_cursor::Location;
 
 #[derive(Clone)]
 pub struct Scanner {
@@ -88,16 +89,16 @@ impl Peekable<Character> for Scanner {
 }
 
 impl Scanner {
-    pub fn new(context: Context, input: String, file: &'static str) -> Scanner {
-        let start = Position::new(file);
+    pub fn new(context: Context, input: String, location: Location) -> Scanner {
+        let position = Position::new(location);
         let chars: Vec<char> = input.chars().collect();
-        let characters = Self::inspect(start, chars);
+        let characters = Self::inspect(position, chars);
 
         Scanner {
             context,
             input: characters,
             index: 0,
-            position: Position::new(file),
+            position,
             output: Vec::new(),
             errors: Vec::new(),
         }

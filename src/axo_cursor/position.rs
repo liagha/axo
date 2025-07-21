@@ -32,11 +32,11 @@ impl Default for Position {
 
 impl Position {
     #[inline]
-    pub fn new(file: &'static str) -> Self {
+    pub fn new(location: Location) -> Self {
         Self {
             line: 1,
             column: 1,
-            location: Location::File(file),
+            location,
         }
     }
 

@@ -18,8 +18,8 @@ pub fn indent(string: &String) -> String {
         .join("\n")
 }
 
-pub fn print_usage(program: &str) {
-    println!("Usage: {} [OPTIONS] <file.axo>", program);
+pub fn print_usage() {
+    println!("Usage: axo [OPTIONS] <file.axo>");
     println!("Options:");
     println!("  -v, --verbose   Enable verbose output");
     println!("  -t, --tokens    Show scanner tokens");

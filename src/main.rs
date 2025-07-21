@@ -33,6 +33,11 @@ use {
     },
     log::Level,
 };
+use crate::axo_cursor::Location;
+use crate::axo_parser::{Element, ElementKind, Parser};
+use crate::axo_scanner::{OperatorKind, Scanner, Token, TokenKind};
+use crate::axo_schema::Binary;
+use crate::compiler::Context;
 
 #[cfg(target_arch = "x86_64")]
 pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
@@ -220,33 +225,101 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
 }
 
 fn parse_arguments() -> Result<(&'static str, bool), CompilerError> {
-    let args: Vec<String> = environment::args().collect();
-
     let mut path = String::new();
     let mut verbose = false;
+    let args = environment::args().into_iter().skip(1).collect::<Vec<String>>().join(" ");
 
-    for arg in args.clone() {
-        match arg.as_str() {
-            "-v" | "--verbose" => verbose = true,
-            "-h" | "--help" => {
-                print_usage(&args[0]);
-                return Err(CompilerError::HelpRequested);
-            }
-            flag => {
-                if flag.starts_with('-') {
-                    let error_msg = format!("Unknown option: {}", flag);
-                    eprintln!("{}", error_msg);
-                    print_usage(&args[0]);
-                    return Err(CompilerError::ArgumentParsing(error_msg));
+    let mut scanner = Scanner::new(Context::new(Location::Void), args, Location::Void);
+    let (tokens, errors) = scanner.scan();
+
+    if !errors.is_empty() {
+        println!("errors: {:?}", errors);
+
+        Err(CompilerError::ArgumentParsing("fucked".to_string()))
+    } else {
+        let mut parser = Parser::new(Context::new(Location::Void), tokens, Location::Void);
+        let (elements, errors) = parser.parse();
+
+        if !errors.is_empty() {
+            println!("errors: {:?}", errors);
+
+            Err(CompilerError::ArgumentParsing("fucked".to_string()))
+        } else {
+            for (i, element) in elements.iter().enumerate() {
+                match element.kind.clone() {
+                    ElementKind::Unary(unary) => {
+                        if unary.get_operator().kind ==
+                            TokenKind::Operator(
+                                OperatorKind::Composite(
+                                    vec![
+                                        OperatorKind::Minus, OperatorKind::Minus
+                                    ]))
+                        {
+                            if unary.get_operand().kind ==
+                                ElementKind::Identifier("verbose".to_string())
+                            || unary.get_operand().kind ==
+                                ElementKind::Identifier("v".to_string())
+
+                            {
+                                verbose = true;
+                            }
+
+                            if unary.get_operand().kind ==
+                                ElementKind::Identifier("help".to_string())
+                                || unary.get_operand().kind ==
+                                ElementKind::Identifier("h".to_string())
+
+                            {
+                                print_usage();
+                                return Err(CompilerError::HelpRequested);
+                            }
+
+                            if unary.get_operand().kind ==
+                                ElementKind::Identifier("path".to_string())
+                                || unary.get_operand().kind ==
+                                ElementKind::Identifier("p".to_string())
+
+                            {
+                                if let Some(target) = elements.get(i + 1) {
+                                    path = elem(target.clone());
+                                }
+                            }
+                        }
+                    }
+
+                    _ => {}
                 }
-                path = flag.to_string();
             }
+
+            Ok((path.leak(), verbose))
         }
     }
+}
 
-    if path.is_empty() {
-        return Err(CompilerError::PathRequired);
+fn directed(input: Binary<Box<Element>, Token, Box<Element>>) -> String {
+    let left = elem(*input.get_left().clone());
+
+    let right = elem(*input.get_right().clone());
+
+    format!("{}/{}", left, right)
+}
+
+fn elem(input: Element) -> String {
+    match input.kind.clone() {
+        ElementKind::Binary(binary) => {
+            directed(binary)
+        }
+
+        ElementKind::Access(access) => {
+            format!("{}.{}", elem(*access.get_object().clone()), elem(*access.get_target().clone()))
+        }
+
+        ElementKind::Identifier(identifier) => {
+            identifier
+        }
+
+        _ => {
+            "".to_string()
+        }
     }
-    
-    Ok((path.leak(), verbose))
 }

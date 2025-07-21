@@ -29,6 +29,7 @@ use {
         Timer, TIMERSOURCE,
     }
 };
+use crate::axo_cursor::Location;
 
 pub trait Marked {
     fn context(&self) -> &Context;
@@ -64,16 +65,14 @@ impl Display for CompilerError {
 pub struct Context {
     pub verbose: bool,
     pub resolver: Resolver,
-    pub path: &'static str,
-    pub content: String,
+    pub location: Location,
 }
 
 impl Context {
-    pub fn new(file_path: &'static str, content: String) -> Self {
+    pub fn new(location: Location) -> Self {
         Context {
             verbose: false,
-            path: file_path,
-            content,
+            location,
             resolver: Resolver::new(),
         }
     }
@@ -101,10 +100,8 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(path: &'static str, verbose: bool) -> Result<Self, CompilerError> {
-        let content = read_to_string(&path)
-            .map_err(CompilerError::FileReadError)?;
 
-        let mut context = Context::new(path, content);
+        let mut context = Context::new(Location::File(path));
         context.verbose = verbose;
 
         Ok(Compiler { context })
@@ -115,7 +112,7 @@ impl Compiler {
             pipeline!(
                 context,
                 (),
-                ScannerStage,
+                Scanning,
                 ParserStage,
                 ResolverStage
             ).map(|_| ())
@@ -129,30 +126,28 @@ impl Compiler {
         xprintln!(
             "{} {}" => Color::Blue,
             "Compiling" => Color::Blue,
-            self.context.path
+            self.context.location
         );
         xprintln!();
-
-        if self.context.verbose {
-            xprintln!(
-                "{}:\n{}" => Color::Magenta,
-                self.context.path,
-                indent(&self.context.content) => Color::BrightMagenta
-            );
-            xprintln!();
-        }
 
         build_pipeline(&mut self.context)
     }
 }
 
-pub struct ScannerStage;
+pub struct Scanning;
 
-impl Stage<(), Vec<Token>> for ScannerStage {
+impl Stage<(), Vec<Token>> for Scanning {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
         let scanner_timer = Timer::new(TIMERSOURCE);
 
-        let mut scanner = Scanner::new(context.clone(), context.content.clone(), context.path);
+        let content = if let Location::File(path) = context.location {
+            read_to_string(&path)
+                .map_err(CompilerError::FileReadError)?
+        } else {
+            "".to_string()
+        };
+
+        let mut scanner = Scanner::new(context.clone(), content, context.location);
         let (tokens, errors) = scanner.scan();
 
         if context.verbose {
@@ -202,7 +197,7 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
         let parser_timer = Timer::new(TIMERSOURCE);
 
-        let mut parser = Parser::new(context.clone(), tokens, context.path);
+        let mut parser = Parser::new(context.clone(), tokens, context.location);
         let (elements, errors) = parser.parse();
 
         if context.verbose {
