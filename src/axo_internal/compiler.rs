@@ -26,7 +26,7 @@ use {
         },
         format_tokens,
         indent,
-        Timer, TIMERSOURCE,
+        Timer, TIMER,
     }
 };
 use crate::axo_cursor::Location;
@@ -138,7 +138,7 @@ pub struct Scanning;
 
 impl Stage<(), Vec<Token>> for Scanning {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
-        let scanner_timer = Timer::new(TIMERSOURCE);
+        let scanner_timer = Timer::new(TIMER);
 
         let content = if let Location::File(path) = context.location {
             read_to_string(&path)
@@ -195,7 +195,7 @@ pub struct ParserStage;
 
 impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
-        let parser_timer = Timer::new(TIMERSOURCE);
+        let parser_timer = Timer::new(TIMER);
 
         let mut parser = Parser::new(context.clone(), tokens, context.location);
         let (elements, errors) = parser.parse();
@@ -253,7 +253,7 @@ pub struct ResolverStage;
 
 impl Stage<Vec<Element>, ()> for ResolverStage {
     fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
-        let resolver_timer = Timer::new(TIMERSOURCE);
+        let resolver_timer = Timer::new(TIMER);
 
         context.resolver.settle(elements);
 

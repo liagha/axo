@@ -1,6 +1,6 @@
 use {
     super::{
-        form::{Form},
+        form::Form,
         former::Draft,
         helper::{
             Emitter, Executor,
@@ -8,21 +8,15 @@ use {
         },
     },
     crate::{
-        artifact::Artifact,
         axo_cursor::{
             Peekable,
-            Span,
         },
-        axo_schema::{
-            Formation
-        },
-        axo_parser::{Symbol, SymbolKind},
-        compiler::{Context, Marked},
         format::Debug,
         hash::Hash,
         thread::{Arc, Mutex},
     }
 };
+use crate::axo_internal::compiler::{Context, Marked};
 
 #[derive(Clone)]
 pub enum Order<Input, Output, Failure>
@@ -36,7 +30,6 @@ where
         found: Box<Order<Input, Output, Failure>>,
         missing: Box<Order<Input, Output, Failure>>,
     },
-    Capture(Artifact),
     Fail(Emitter<Input, Output, Failure>),
     Ignore,
     Inspect(Inspector<Input, Output, Failure>),
@@ -75,25 +68,6 @@ where
 
                 chosen.execute(source, draft);
             },
-
-            Order::Capture(identifier) => {
-                if draft.is_aligned() {
-                    let resolver = &mut source.context_mut().resolver;
-
-                    let artifact = draft.form.clone().map(
-                        |input| Artifact::new(input),
-                        |output| Artifact::new(output),
-                        |error| Artifact::new(error),
-                    );
-
-                    let symbol = Symbol::new(
-                        SymbolKind::Formation(Formation::new(identifier.clone(), artifact)),
-                        Span::default(),
-                    );
-
-                    resolver.insert(symbol);
-                }
-            }
 
             Order::Fail(function) => {
                 let failure = function(source.context_mut(), draft.form.clone());
@@ -174,10 +148,6 @@ where
         }
     }
 
-    pub fn capture(artifact: Artifact) -> Self {
-        Self::Capture(artifact)
-    }
-
     pub fn convert<T>(transformer: T) -> Self
     where
         T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync + 'static
@@ -238,10 +208,6 @@ where
 
     pub fn then(self, next: Self) -> Self {
         Self::chain(vec![self, next])
-    }
-
-    pub fn with_capture(self, artifact: Artifact) -> Self {
-        self.then(Self::capture(artifact))
     }
 
     pub fn with_ignore(self) -> Self {

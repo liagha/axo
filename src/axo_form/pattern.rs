@@ -1,17 +1,16 @@
 use {
     super::{
+        form::Form,
+        former::{record, Composer, Draft},
         order::Order,
-        form::{Form},
-        former::{record, Draft, Composer},
     },
     crate::{
-        artifact::Artifact,
-        hash::Hash,
         format::Debug,
-        compiler::Context,
+        hash::Hash,
         thread::{Arc, Mutex},
     },
 };
+use crate::axo_internal::compiler::Context;
 
 pub trait Pattern<Input, Output, Failure>
 where
@@ -631,10 +630,6 @@ where
             found: Box::new(found),
             missing: Box::new(missing),
         })
-    }
-
-    pub fn with_capture(self, identifier: Artifact) -> Self {
-        self.with_order(Order::Capture(identifier))
     }
 
     pub fn with_fail<F>(self, emitter: F) -> Self

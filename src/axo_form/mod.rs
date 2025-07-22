@@ -10,22 +10,20 @@ pub mod former;
 pub mod helper {
     use {
         super::{
-            order::Order,
             form::Form,
             former::Draft,
+            order::Order,
             pattern::Classifier,
         },
         crate::{
             any::TypeId,
+            axo_cursor::Peekable,
+            format::Debug,
             hash::{Hash, Hasher},
             thread::{Arc, Mutex},
-            compiler::{Context, Marked},
-            format::Debug,
-            axo_cursor::{
-                Peekable,
-            },
         },
     };
+    use crate::axo_internal::compiler::{Context, Marked};
 
     pub trait Source<Input>: Peekable<Input> + Marked
     where

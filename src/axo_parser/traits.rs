@@ -232,10 +232,6 @@ impl Hash for Symbol {
 impl Hash for SymbolKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            SymbolKind::Formation(formation) => {
-                discriminant(self).hash(state);
-                formation.hash(state);
-            }
             SymbolKind::Inclusion(inclusion) => {
                 discriminant(self).hash(state);
                 inclusion.hash(state);
@@ -277,7 +273,6 @@ impl PartialEq for Symbol {
 impl PartialEq for SymbolKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (SymbolKind::Formation(f1), SymbolKind::Formation(f2)) => f1 == f2,
             (SymbolKind::Inclusion(a), SymbolKind::Inclusion(b)) => a == b,
             (SymbolKind::Implementation(a), SymbolKind::Implementation(b)) => a == b,
             (SymbolKind::Interface(a), SymbolKind::Interface(b)) => a == b,
@@ -303,7 +298,6 @@ impl Clone for Symbol {
 impl Clone for SymbolKind {
     fn clone(&self) -> Self {
         match self {
-            SymbolKind::Formation(formation) => SymbolKind::Formation(formation.clone()),
             SymbolKind::Inclusion(inclusion) => SymbolKind::Inclusion(inclusion.clone()),
             SymbolKind::Implementation(implementation) => SymbolKind::Implementation(implementation.clone()),
             SymbolKind::Interface(interface) => SymbolKind::Interface(interface.clone()),

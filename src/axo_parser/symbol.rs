@@ -1,55 +1,41 @@
 use {
-    derive_ctor::ctor,
-    derive_more::{
-        IsVariant, Unwrap,
-    },
     super::{
-        error::ErrorKind,
         Element, ElementKind,
         ParseError, Parser
     },
     crate::{
-        artifact::Artifact,
-        operations::{Deref, DerefMut},
-        hash::{
-            Hash, Hasher
-        },
-        axo_form::{
-            pattern::Classifier,
-            form::Form,
-        },
-        axo_schema::{
-            Group, Sequence,
-            Collection, Series,
-            Bundle, Block,
-            Binary, Unary,
-            Index, Invoke, Construct,
-            Structure, Enumeration,
-            Binding, Method, Interface, Implementation, Formation, Inclusion,
-            Conditional, Repeat, Iterate,
-            Label, Access, Assign,
-        },
-        axo_scanner::{
-            Token, TokenKind,
-            PunctuationKind,
-            OperatorKind,
-        },
         axo_cursor::{
             Span, Spanned,
         },
+        axo_form::{
+            form::Form,
+            pattern::Classifier,
+        },
+        axo_scanner::{
+            OperatorKind, Token
+            ,
+            TokenKind,
+        },
+        axo_schema::{
+            Binding, Enumeration,
+            Implementation, Inclusion, Interface, Method, Structure
+        },
+        hash::Hash,
+        operations::{Deref, DerefMut},
+    },
+    derive_ctor::ctor,
+    derive_more::{
+        IsVariant, Unwrap,
     },
 };
-
 pub struct Symbol {
     pub kind: SymbolKind,
     pub span: Span,
     pub members: Vec<Symbol>,
 }
 
-
 #[derive(ctor, IsVariant, Unwrap)]
 pub enum SymbolKind {
-    Formation(Formation),
     Inclusion(Inclusion<Box<Element>>),
     Implementation(Implementation<Box<Element>, Box<Element>, Symbol>),
     Interface(Interface<Box<Element>, Symbol>),

@@ -1,16 +1,9 @@
-use crate::artifact::Artifact;
 use crate::axo_form::form::Form;
 use crate::hash::{Hash, Hasher};
 
 #[derive(Eq)]
 pub struct Inclusion<Target> {
     target: Target,
-}
-
-#[derive(Eq)]
-pub struct Formation {
-    identifier: Artifact,
-    form: Form<Artifact, Artifact, Artifact>,
 }
 
 #[derive(Eq)]
@@ -63,23 +56,6 @@ impl<Target> Inclusion<Target> {
     #[inline]
     pub fn get_target(&self) -> &Target {
         &self.target
-    }
-}
-
-impl Formation {
-    #[inline]
-    pub fn new(identifier: Artifact, form: Form<Artifact, Artifact, Artifact>) -> Self {
-        Formation { identifier, form }
-    }
-
-    #[inline]
-    pub fn get_identifier(&self) -> &Artifact {
-        &self.identifier
-    }
-
-    #[inline]
-    pub fn get_form(&self) -> &Form<Artifact, Artifact, Artifact> {
-        &self.form
     }
 }
 
@@ -255,17 +231,9 @@ impl<Name, Parameter, Body, Output> Method<Name, Parameter, Body, Output> {
     }
 }
 
-// Hash implementations
 impl<Target: Hash> Hash for Inclusion<Target> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
-    }
-}
-
-impl Hash for Formation {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_identifier().hash(state);
-        self.get_form().hash(state);
     }
 }
 
@@ -322,13 +290,6 @@ impl<Target: PartialEq> PartialEq for Inclusion<Target> {
     }
 }
 
-impl PartialEq for Formation {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_identifier() == other.get_identifier()
-            && self.get_form() == other.get_form()
-    }
-}
-
 impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq for Implementation<Target, Interface, Member> {
     fn eq(&self, other: &Self) -> bool {
         self.get_target() == other.get_target() && self.get_members() == other.get_members()
@@ -375,12 +336,6 @@ impl<Name: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> 
 impl<Target: Clone> Clone for Inclusion<Target> {
     fn clone(&self) -> Self {
         Inclusion::new(self.get_target().clone())
-    }
-}
-
-impl Clone for Formation {
-    fn clone(&self) -> Self {
-        Formation::new(self.get_identifier().clone(), self.get_form().clone())
     }
 }
 

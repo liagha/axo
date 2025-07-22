@@ -65,7 +65,6 @@ where
         match self {
             Order::Align => write!(f, "Align"),
             Order::Branch { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
-            Order::Capture(identifier) => write!(f, "Capture({:?})", identifier),
             Order::Fail(function) => write!(f, "Failure({:?})", function.type_id()),
             Order::Ignore => write!(f, "Ignore"),
             Order::Inspect(inspector) => write!(f, "Inspector({:?})", inspector.type_id()),

@@ -4,19 +4,19 @@ use {
         ScanError, Token,
     },
     crate::{
-        compiler::{
-            Context, Marked,
-        },
-        axo_form::{
-            form::{Form},
-            former::Former,
-        },
         axo_cursor::{
             Peekable, Position,
+        },
+        axo_form::{
+            form::Form,
+            former::Former,
         },
     },
 };
 use crate::axo_cursor::Location;
+use crate::axo_internal::compiler::{
+    Context, Marked,
+};
 
 #[derive(Clone)]
 pub struct Scanner {

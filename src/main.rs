@@ -1,49 +1,58 @@
 #![allow(dead_code)]
 extern crate core;
 
+mod axo_checker;
+mod axo_cursor;
 mod axo_data;
 mod axo_error;
 mod axo_form;
 mod axo_format;
-mod axo_scanner;
+mod axo_initial;
+mod axo_internal;
 mod axo_parser;
 mod axo_resolver;
-mod axo_text;
-mod axo_cursor;
-mod compiler;
-mod logger;
-mod timer;
-mod artifact;
-mod axo_checker;
+mod axo_scanner;
 mod axo_schema;
+mod axo_text;
 
-use core::time::Duration;
-use broccli::{xprintln, Color};
 pub use {
     axo_data::*,
     axo_format::*,
     axo_text::*,
-    compiler::{Compiler, CompilerError},
-    timer::{TimeSource, Timer},
+    axo_internal::*,
 };
 
 use {
-    crate::{
-        logger::{LogInfo, LogPlan, Logger},
+    axo_cursor::{
+        Location
     },
+    axo_parser::{Element, ElementKind, Parser},
+    axo_scanner::{OperatorKind, Scanner, Token, TokenKind},
+    axo_schema::{
+        Binary
+    },
+    axo_internal::{
+        compiler::{
+            Context,
+            Compiler,
+            CompilerError,
+        },
+        logger::{LogInfo, LogPlan, Logger},
+        timer::{
+            Timer,
+            TimeSource,
+        },
+    },
+    broccli::{xprintln, Color},
+    core::time::Duration,
     log::Level,
 };
-use crate::axo_cursor::Location;
-use crate::axo_parser::{Element, ElementKind, Parser};
-use crate::axo_scanner::{OperatorKind, Scanner, Token, TokenKind};
-use crate::axo_schema::Binary;
-use crate::compiler::Context;
 
 #[cfg(target_arch = "x86_64")]
-pub const TIMERSOURCE: timer::CPUCycleSource = timer::CPUCycleSource;
+pub const TIMER: timer::CPUCycleSource = timer::CPUCycleSource;
 
 #[cfg(target_arch = "aarch64")]
-pub const TIMERSOURCE: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
+pub const TIMER: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub mod data {
     //pub use std::collections::VecDeque;
@@ -67,17 +76,16 @@ pub mod thread {
 }
 
 pub mod memory {
-    pub use core::mem::{discriminant, drop, replace, swap};
+    pub use core::mem::{discriminant, replace};
 }
 
 pub mod compare {
-    pub use core::cmp::{max, min, Ordering, PartialEq};
+    pub use core::cmp::{Ordering, PartialEq};
 }
 
 pub mod hash {
     pub use core::hash::{Hash, Hasher};
-    pub use hashish::{HashMap, HashSet};
-    pub use std::collections::hash_map::DefaultHasher;
+    pub use hashish::HashSet;
 }
 
 pub mod character {
@@ -122,16 +130,14 @@ pub mod character {
     }
 }
 
-pub mod reference {
-    pub use std::rc::Rc;
-}
+pub mod reference {}
 
 pub mod any {
     pub use core::any::{Any, TypeId};
 }
 
 pub mod operations {
-    pub use core::ops::{Add, Div, Mul, Neg, Range, Rem, Sub, Deref, DerefMut};
+    pub use core::ops::{Add, Deref, DerefMut, Div, Mul, Neg, Range, Rem, Sub};
 }
 
 pub mod architecture {
@@ -147,15 +153,13 @@ pub mod string {
 }
 
 pub mod slice {
-    pub use core::slice::{
-        from_ref,
-    };
+    pub use core::slice::from_ref;
 }
 
 pub mod format {
     pub use core::fmt::{
         Debug, Display,
-        Formatter, Result, 
+        Formatter, Result,
         Write
     };
 }
@@ -168,7 +172,7 @@ fn main() {
 
     println!();
 
-    let main_timer = Timer::new(TIMERSOURCE);
+    let main_timer = Timer::new(TIMER);
 
     match run_application(main_timer) {
         Ok(()) => {}
@@ -193,7 +197,7 @@ fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerErr
         );
     }
 
-    let timer = Timer::new(TIMERSOURCE);
+    let timer = Timer::new(TIMER);
 
     let mut compiler = Compiler::new(path, verbose)?;
 

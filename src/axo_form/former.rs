@@ -7,23 +7,22 @@ pub mod record {
 }
 
 use {
-    record::*,
-
     super::{
+        form::Form,
         helper::Source,
         pattern::Classifier,
-        form::{Form},
     },
     crate::{
         axo_cursor::{
-            Position, Peekable,
+            Peekable, Position,
         },
-        marker::PhantomData,
-        compiler::Marked,
         format::Debug,
         hash::Hash,
+        marker::PhantomData,
     },
+    record::*,
 };
+use crate::axo_internal::compiler::Marked;
 
 pub struct Composer<'c, Input, Output, Failure>
 where

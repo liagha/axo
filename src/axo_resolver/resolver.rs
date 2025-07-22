@@ -189,7 +189,6 @@ impl Resolver {
         let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
 
         match symbol.kind {
-            SymbolKind::Formation(_) => {}
             SymbolKind::Inclusion(_) => {}
             SymbolKind::Implementation(implementation) => {
                 if let Some(mut target) = self.lookup(implementation.get_target(), symbols) {

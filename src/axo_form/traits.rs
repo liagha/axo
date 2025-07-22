@@ -40,41 +40,37 @@ where
                 found.hash(state);
                 missing.hash(state);
             }
-            Order::Capture(identifier) => {
-                2u8.hash(state);
-                identifier.hash(state);
-            }
             Order::Fail(emitter) => {
-                3u8.hash(state);
+                2u8.hash(state);
                 fingerprint(emitter.as_ref(), state);
             }
             Order::Ignore => {
-                4u8.hash(state);
+                3u8.hash(state);
             }
             Order::Inspect(inspector) => {
-                5u8.hash(state);
+                4u8.hash(state);
                 fingerprint(inspector.as_ref(), state);
             }
             Order::Multiple(actions) => {
-                6u8.hash(state);
+                5u8.hash(state);
                 actions.hash(state);
             }
             Order::Panic(emitter) => {
-                7u8.hash(state);
+                6u8.hash(state);
                 fingerprint(emitter.as_ref(), state);
             }
             Order::Pardon => {
-                8u8.hash(state);
+                7u8.hash(state);
             }
             Order::Perform(executor) => {
-                9u8.hash(state);
+                8u8.hash(state);
                 fingerprint(executor.as_ref(), state);
             }
             Order::Skip => {
-                10u8.hash(state);
+                9u8.hash(state);
             }
             Order::Transform(transformer) => {
-                11u8.hash(state);
+                10u8.hash(state);
                 fingerprint(transformer.as_ref(), state);
             }
         }
@@ -93,7 +89,6 @@ where
             (Order::Branch { found: f1, missing: m1 }, Order::Branch { found: f2, missing: m2 }) => {
                 f1 == f2 && m1 == m2
             }
-            (Order::Capture(id1), Order::Capture(id2)) => id1 == id2,
             (Order::Fail(f1), Order::Fail(f2)) => identicality(f1.as_ref(), f2.as_ref()),
             (Order::Ignore, Order::Ignore) => true,
             (Order::Inspect(i1), Order::Inspect(i2)) => identicality(i1.as_ref(), i2.as_ref()),

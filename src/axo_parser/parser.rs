@@ -1,19 +1,18 @@
 use {
-    super::{error::ErrorKind, Element, ElementKind, SymbolKind, ParseError},
+    super::{Element, ParseError},
     crate::{
-        format::Debug,
-        hash::Hash,
-        axo_cursor::{Peekable, Position, Span},
+        axo_cursor::{Peekable, Position},
         axo_form::{
-            pattern::Classifier,
             form::Form,
             former::Former,
+            pattern::Classifier,
         },
-        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
-        compiler::{Context, Marked},
+        axo_scanner::{PunctuationKind, Token, TokenKind},
+        hash::Hash,
     },
 };
 use crate::axo_cursor::Location;
+use crate::axo_internal::compiler::{Context, Marked};
 
 #[derive(Clone)]
 pub struct Parser {
