@@ -1,13 +1,13 @@
-mod token;
+mod character;
+mod core;
+mod escape;
+mod format;
+mod number;
 mod operator;
 mod punctuation;
 mod scanner;
-mod format;
-pub mod error;
-mod character;
-mod escape;
-mod core;
-mod number;
+mod token;
+mod error;
 
 pub use {
     scanner::Scanner,

@@ -116,10 +116,7 @@ impl Parser {
         )
     }
 
-    pub fn parse(&mut self) -> (Vec<Element>, Vec<ParseError>) {
-        let mut elements = Vec::new();
-        let mut errors = Vec::new();
-
+    pub fn parse(&mut self) {
         self.strain(Self::strainer());
         
         while self.peek().is_some() {
@@ -127,20 +124,18 @@ impl Parser {
 
             for form in forms {
                 match form {
-                    Form::Output(element) => {
-                        elements.push(element);
+                    Form::Output(output) => {
+                        self.output.push(output);
                     }
 
-                    Form::Failure(error) => {
-                        errors.push(error);
+                    Form::Failure(failure) => {
+                        self.errors.push(failure);
                     }
 
                     Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
                 }
             }
         }
-
-        (elements, errors)
     }
 }
 

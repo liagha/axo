@@ -23,28 +23,16 @@ pub use {
 };
 
 use {
-    axo_cursor::{
-        Location
-    },
-    axo_parser::{Element, ElementKind, Parser},
-    axo_scanner::{OperatorKind, Scanner, Token, TokenKind},
-    axo_schema::{
-        Binary
-    },
     axo_internal::{
         compiler::{
-            Context,
             Compiler,
             CompilerError,
         },
         logger::{LogInfo, LogPlan, Logger},
         timer::{
             Timer,
-            TimeSource,
         },
     },
-    broccli::{xprintln, Color},
-    core::time::Duration,
     log::Level,
 };
 
@@ -172,9 +160,7 @@ fn main() {
 
     println!();
 
-    let main_timer = Timer::new(TIMER);
-
-    match run_application(main_timer) {
+    match run_application() {
         Ok(()) => {}
         Err(CompilerError::HelpRequested) => {}
         Err(e) => {
@@ -183,147 +169,10 @@ fn main() {
     }
 }
 
-fn run_application(main_timer: Timer<impl TimeSource>) -> Result<(), CompilerError> {
-    let (path, verbose) = parse_arguments()?;
-
-    if verbose {
-        let duration = Duration::from_nanos(main_timer.elapsed().unwrap());
-
-        xprintln!(
-            "Finished {} {} {}s." => Color::Blue,
-            "`examining`" => Color::White,
-            "in",
-            duration.as_secs_f64(),
-        );
-    }
-
-    let timer = Timer::new(TIMER);
-
-    let mut compiler = Compiler::new(path, verbose)?;
-
-    if verbose {
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-        xprintln!(
-            "  Finished {} {} {}s." => Color::Blue,
-            "`analyzing`" => Color::White,
-            "in",
-            duration.as_secs_f64(),
-        );
-    }
+fn run_application() -> Result<(), CompilerError> {
+    let mut compiler = Compiler::new()?;
 
     compiler.compile()?;
 
-    if verbose {
-        let duration = Duration::from_nanos(main_timer.elapsed().unwrap());
-
-        xprintln!(
-            "Finished {} {} {}s." => Color::Blue,
-            "`compiling`" => Color::White,
-            "in",
-            duration.as_secs_f64(),
-        );
-    }
-
     Ok(())
-}
-
-fn parse_arguments() -> Result<(&'static str, bool), CompilerError> {
-    let mut path = String::new();
-    let mut verbose = false;
-    let args = environment::args().into_iter().skip(1).collect::<Vec<String>>().join(" ");
-
-    let mut scanner = Scanner::new(Context::new(Location::Void), args, Location::Void);
-    let (tokens, errors) = scanner.scan();
-
-    if !errors.is_empty() {
-        println!("errors: {:?}", errors);
-
-        Err(CompilerError::ArgumentParsing("fucked".to_string()))
-    } else {
-        let mut parser = Parser::new(Context::new(Location::Void), tokens, Location::Void);
-        let (elements, errors) = parser.parse();
-
-        if !errors.is_empty() {
-            println!("errors: {:?}", errors);
-
-            Err(CompilerError::ArgumentParsing("fucked".to_string()))
-        } else {
-            for (i, element) in elements.iter().enumerate() {
-                match element.kind.clone() {
-                    ElementKind::Unary(unary) => {
-                        if unary.get_operator().kind ==
-                            TokenKind::Operator(
-                                OperatorKind::Composite(
-                                    vec![
-                                        OperatorKind::Minus, OperatorKind::Minus
-                                    ]))
-                        {
-                            if unary.get_operand().kind ==
-                                ElementKind::Identifier("verbose".to_string())
-                            || unary.get_operand().kind ==
-                                ElementKind::Identifier("v".to_string())
-
-                            {
-                                verbose = true;
-                            }
-
-                            if unary.get_operand().kind ==
-                                ElementKind::Identifier("help".to_string())
-                                || unary.get_operand().kind ==
-                                ElementKind::Identifier("h".to_string())
-
-                            {
-                                print_usage();
-                                return Err(CompilerError::HelpRequested);
-                            }
-
-                            if unary.get_operand().kind ==
-                                ElementKind::Identifier("path".to_string())
-                                || unary.get_operand().kind ==
-                                ElementKind::Identifier("p".to_string())
-
-                            {
-                                if let Some(target) = elements.get(i + 1) {
-                                    path = elem(target.clone());
-                                }
-                            }
-                        }
-                    }
-
-                    _ => {}
-                }
-            }
-
-            Ok((path.leak(), verbose))
-        }
-    }
-}
-
-fn directed(input: Binary<Box<Element>, Token, Box<Element>>) -> String {
-    let left = elem(*input.get_left().clone());
-
-    let right = elem(*input.get_right().clone());
-
-    format!("{}/{}", left, right)
-}
-
-fn elem(input: Element) -> String {
-    match input.kind.clone() {
-        ElementKind::Binary(binary) => {
-            directed(binary)
-        }
-
-        ElementKind::Access(access) => {
-            format!("{}.{}", elem(*access.get_object().clone()), elem(*access.get_target().clone()))
-        }
-
-        ElementKind::Identifier(identifier) => {
-            identifier
-        }
-
-        _ => {
-            "".to_string()
-        }
-    }
 }

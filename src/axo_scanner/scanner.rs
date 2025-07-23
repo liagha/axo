@@ -104,29 +104,24 @@ impl Scanner {
         }
     }
 
-    pub fn scan(&mut self) -> (Vec<Token>, Vec<ScanError>) {
-        let mut tokens = Vec::new();
-        let mut errors = Vec::new();
-
+    pub fn scan(&mut self) {
         while self.peek().is_some() {
             let forms = self.form(Self::pattern()).flatten();
 
             for form in forms {
                 match form {
-                    Form::Output(element) => {
-                        tokens.push(element);
+                    Form::Output(output) => {
+                        self.output.push(output);
                     }
 
-                    Form::Failure(error) => {
-                        errors.push(error);
+                    Form::Failure(failure) => {
+                        self.errors.push(failure);
                     }
 
                     Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
                 }
             }
         }
-
-        (tokens, errors)
     }
 }
 

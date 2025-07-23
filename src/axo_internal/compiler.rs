@@ -1,3 +1,4 @@
+use hashish::HashSet;
 use {
     broccli::{xprintln, Color},
 
@@ -30,6 +31,8 @@ use {
     }
 };
 use crate::axo_cursor::Location;
+use crate::axo_initial::initializer::{Initializer, Preference};
+use crate::environment;
 
 pub trait Marked {
     fn context(&self) -> &Context;
@@ -63,18 +66,34 @@ impl Display for CompilerError {
 
 #[derive(Clone)]
 pub struct Context {
-    pub verbose: bool,
     pub resolver: Resolver,
-    pub location: Location,
+    pub preferences: HashSet<Preference>
 }
 
 impl Context {
-    pub fn new(location: Location) -> Self {
+    pub fn new() -> Self {
         Context {
-            verbose: false,
-            location,
             resolver: Resolver::new(),
+            preferences: HashSet::new(),
         }
+    }
+
+    pub fn get_verbosity(&self) -> Option<bool> {
+        self.preferences
+            .iter()
+            .find_map(|p| match p {
+                Preference::Verbosity(v) => Some(*v),
+                _ => None,
+            })
+    }
+
+    pub fn get_path(&self) -> Option<String> {
+        self.preferences
+            .iter()
+            .find_map(|p| match p {
+                Preference::Path(path) => Some(path.clone()),
+                _ => None,
+            })
     }
 }
 
@@ -99,10 +118,8 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(path: &'static str, verbose: bool) -> Result<Self, CompilerError> {
-
-        let mut context = Context::new(Location::File(path));
-        context.verbose = verbose;
+    pub fn new() -> Result<Self, CompilerError> {
+        let context = Context::new();
 
         Ok(Compiler { context })
     }
@@ -112,9 +129,10 @@ impl Compiler {
             pipeline!(
                 context,
                 (),
+                Initializing,
                 Scanning,
-                ParserStage,
-                ResolverStage
+                Parsing,
+                Resolving
             ).map(|_| ())
         })
     }
@@ -123,14 +141,23 @@ impl Compiler {
     where
         Function: FnOnce(&mut Context) -> Result<Type, CompilerError>,
     {
-        xprintln!(
-            "{} {}" => Color::Blue,
-            "Compiling" => Color::Blue,
-            self.context.location
-        );
-        xprintln!();
-
         build_pipeline(&mut self.context)
+    }
+}
+
+pub struct Initializing;
+
+impl Stage<(), ()> for Initializing {
+    fn execute(&mut self, context: &mut Context, _input: ()) -> Result<(), CompilerError> {
+        let input = environment::args().skip(1).collect::<Vec<String>>().join(" ");
+        let mut scanner = Scanner::new(context.clone(), input, Location::Void);
+        scanner.scan();
+        let mut initializer = Initializer::new(context.clone(), scanner.output, Location::Void);
+        initializer.initialize();
+
+        context.preferences.extend(initializer.output);
+
+        Ok(())
     }
 }
 
@@ -140,24 +167,27 @@ impl Stage<(), Vec<Token>> for Scanning {
     fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
         let scanner_timer = Timer::new(TIMER);
 
-        let content = if let Location::File(path) = context.location {
+        let location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let verbosity = context.get_verbosity().unwrap_or(false);
+
+        let content = if let Location::File(path) = location {
             read_to_string(&path)
                 .map_err(CompilerError::FileReadError)?
         } else {
             "".to_string()
         };
 
-        let mut scanner = Scanner::new(context.clone(), content, context.location);
-        let (tokens, errors) = scanner.scan();
+        let mut scanner = Scanner::new(context.clone(), content, location);
+        scanner.scan();
 
-        if context.verbose {
-            xprintln!("Tokens:\n{}", indent(&format_tokens(&tokens)));
+        if verbosity {
+            xprintln!("Tokens:\n{}", indent(&format_tokens(&scanner.output)));
             xprintln!();
 
-            if !errors.is_empty() {
+            if !scanner.errors.is_empty() {
                 let duration = Duration::from_nanos(scanner_timer.elapsed().unwrap());
 
-                for error in &errors {
+                for error in &scanner.errors {
                     let (message, details) = error.format();
                     xprintln!(
                     "{}\n{}" => Color::Red,
@@ -171,7 +201,7 @@ impl Stage<(), Vec<Token>> for Scanning {
                     "Finished {} {}s with {} {}." => Color::Green,
                     "`scanning` in" => Color::White,
                     duration.as_secs_f64(),
-                    errors.len() => Color::BrightRed,
+                    scanner.errors.len() => Color::BrightRed,
                     "errors" => Color::Red,
                 );
                 xprintln!();
@@ -187,21 +217,24 @@ impl Stage<(), Vec<Token>> for Scanning {
             }
         }
 
-        Ok(tokens)
+        Ok(scanner.output)
     }
 }
 
-pub struct ParserStage;
+pub struct Parsing;
 
-impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
+impl Stage<Vec<Token>, Vec<Element>> for Parsing {
     fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
-        let parser_timer = Timer::new(TIMER);
+        let timer = Timer::new(TIMER);
 
-        let mut parser = Parser::new(context.clone(), tokens, context.location);
-        let (elements, errors) = parser.parse();
+        let location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let verbosity = context.get_verbosity().unwrap_or(false);
 
-        if context.verbose {
-            let tree = elements
+        let mut parser = Parser::new(context.clone(), tokens, location);
+        parser.parse();
+
+        if verbosity {
+            let tree = parser.output
                 .iter()
                 .map(|element| format!("{:?}", element))
                 .collect::<Vec<String>>()
@@ -212,10 +245,10 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                 xprintln!();
             }
 
-            if !errors.is_empty() {
-                let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
+            if !parser.errors.is_empty() {
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
-                for error in &errors {
+                for error in &parser.errors {
                     let (message, details) = error.format();
                     xprintln!(
                         "{}\n{}" => Color::Red,
@@ -229,12 +262,12 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
                     "Finished {} {}s with {} {}." => Color::Green,
                     "`parsing` in" => Color::White,
                     duration.as_secs_f64(),
-                    errors.len() => Color::BrightRed,
+                    parser.errors.len() => Color::BrightRed,
                     "errors" => Color::Red,
                 );
                 xprintln!();
             } else {
-                let duration = Duration::from_nanos(parser_timer.elapsed().unwrap());
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
                 xprintln!(
                     "Finished {} {}s." => Color::Green,
@@ -245,21 +278,23 @@ impl Stage<Vec<Token>, Vec<Element>> for ParserStage {
             }
         }
 
-        Ok(elements)
+        Ok(parser.output)
     }
 }
 
-pub struct ResolverStage;
+pub struct Resolving;
 
-impl Stage<Vec<Element>, ()> for ResolverStage {
+impl Stage<Vec<Element>, ()> for Resolving {
     fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
-        let resolver_timer = Timer::new(TIMER);
+        let timer = Timer::new(TIMER);
+        let _location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let verbosity = context.get_verbosity().unwrap_or(false);
 
         context.resolver.settle(elements);
 
         let errors = context.resolver.errors.clone();
 
-        if context.verbose {
+        if verbosity {
             let symbols = context.resolver.scope.symbols();
 
             let tree = symbols
@@ -289,7 +324,7 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
             }
 
             if !errors.is_empty() {
-                let duration = Duration::from_nanos(resolver_timer.elapsed().unwrap());
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
                 xprintln!(
                         "Finished {} {}s with {} {}." => Color::Green,
@@ -300,7 +335,7 @@ impl Stage<Vec<Element>, ()> for ResolverStage {
                     );
                 xprintln!();
             } else {
-                let duration = Duration::from_nanos(resolver_timer.elapsed().unwrap());
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
                 xprintln!(
                         "Finished {} {}s." => Color::Green,
