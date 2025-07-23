@@ -10,11 +10,14 @@ use {
         axo_error::Error,
         axo_resolver::{
             error::ErrorKind,
+            hint::ResolveHint,
         },
     },
 };
 
-pub use resolver::Resolver;
-use crate::axo_resolver::hint::ResolveHint;
+pub use {
+    resolver::Resolver,
+    brand::Branded,
+};
 
 pub type ResolveError = Error<ErrorKind, String, ResolveHint>;

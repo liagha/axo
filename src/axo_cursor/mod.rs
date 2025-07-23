@@ -52,12 +52,6 @@ impl Spanned for Element {
     }
 }
 
-impl Spanned for Symbol {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl<E: Display> Spanned for Error<E> {
     fn span(&self) -> Span {
         self.span

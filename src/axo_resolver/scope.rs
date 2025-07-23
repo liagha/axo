@@ -2,15 +2,14 @@
 
 use {
     crate::{
-        axo_parser::Symbol,
         hash::HashSet,
-        operations::{Deref, DerefMut,},
+        axo_parser::DynSymbol,
     },
 };
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    pub symbols: HashSet<Symbol>,
+    pub symbols: HashSet<DynSymbol>,
     pub parent: Option<Box<Scope>>,
 }
 
@@ -37,12 +36,12 @@ impl Scope {
         self.parent.take().map(|boxed| *boxed)
     }
 
-    pub fn insert(&mut self, symbol: Symbol) {
+    pub fn insert(&mut self, symbol: DynSymbol) {
         self.symbols.remove(&symbol);
         self.symbols.insert(symbol);
     }
 
-    pub fn contains(&self, symbol: &Symbol) -> bool {
+    pub fn contains(&self, symbol: &DynSymbol) -> bool {
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -55,11 +54,11 @@ impl Scope {
         false
     }
     
-    pub fn symbols(&self) -> &HashSet<Symbol> {
+    pub fn symbols(&self) -> &HashSet<DynSymbol> {
         &self.symbols
     }
 
-    pub fn gather(&self) -> HashSet<Symbol> {
+    pub fn gather(&self) -> HashSet<DynSymbol> {
         let mut symbols = HashSet::new();
         let mut current = Some(self);
 
@@ -71,7 +70,7 @@ impl Scope {
         symbols
     }
 
-    pub fn get(&self, symbol: &Symbol) -> Option<Symbol> {
+    pub fn get(&self, symbol: &DynSymbol) -> Option<DynSymbol> {
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -83,19 +82,5 @@ impl Scope {
         }
 
         None
-    }
-}
-
-impl Deref for Scope {
-    type Target = HashSet<Symbol>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.symbols
-    }
-}
-
-impl DerefMut for Scope {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.symbols
     }
 }

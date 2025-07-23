@@ -36,6 +36,7 @@ use {
         axo_cursor::Span,
     }
 };
+use crate::axo_parser::symbol::DynSymbol;
 
 pub struct Element {
     pub kind: ElementKind,
@@ -82,7 +83,7 @@ pub enum ElementKind {
 
     Iterate(Iterate<Box<Element>, Box<Element>>),
 
-    Symbolize(Symbol),
+    Symbolize(DynSymbol),
 
     Assign(Assign<Box<Element>, Box<Element>>),
 

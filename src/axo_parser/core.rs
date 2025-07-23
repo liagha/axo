@@ -2,7 +2,6 @@ use {
     super::{
         error::ErrorKind,
         Element, ElementKind,
-        SymbolKind,
         ParseError, Parser
     },
     crate::{

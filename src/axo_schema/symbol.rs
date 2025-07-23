@@ -1,24 +1,28 @@
-use crate::hash::{Hash, Hasher};
+use {
+    crate::{
+        hash::{Hash, Hasher},
+    },
+};
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Inclusion<Target> {
     target: Target,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Implementation<Target, Interface, Member> {
     target: Target,
     interface: Option<Interface>,
     members: Vec<Member>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Interface<Target, Member> {
     target: Target,
     members: Vec<Member>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Binding<Target, Value, Type> {
     target: Target,
     value: Option<Value>,
@@ -26,21 +30,21 @@ pub struct Binding<Target, Value, Type> {
     mutable: bool,
 }
 
-#[derive(Eq)]
-pub struct Structure<Name, Field> {
-    name: Name,
+#[derive(Debug, Eq)]
+pub struct Structure<Target, Field> {
+    target: Target,
     fields: Vec<Field>,
 }
 
-#[derive(Eq)]
-pub struct Enumeration<Name, Variant> {
-    name: Name,
+#[derive(Debug, Eq)]
+pub struct Enumeration<Target, Variant> {
+    target: Target,
     variants: Vec<Variant>,
 }
 
-#[derive(Eq)]
-pub struct Method<Name, Parameter, Body, Output> {
-    name: Name,
+#[derive(Debug, Eq)]
+pub struct Method<Target, Parameter, Body, Output> {
+    target: Target,
     parameters: Vec<Parameter>,
     body: Body,
     output: Output,
@@ -124,15 +128,15 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
     }
 }
 
-impl<Name, Field> Structure<Name, Field> {
+impl<Target, Field> Structure<Target, Field> {
     #[inline]
-    pub fn new(name: Name, fields: Vec<Field>) -> Self {
-        Structure { name, fields }
+    pub fn new(target: Target, fields: Vec<Field>) -> Self {
+        Structure { target, fields }
     }
 
     #[inline]
-    pub fn get_name(&self) -> &Name {
-        &self.name
+    pub fn get_target(&self) -> &Target {
+        &self.target
     }
 
     #[inline]
@@ -156,15 +160,15 @@ impl<Name, Field> Structure<Name, Field> {
     }
 }
 
-impl<Name, Variant> Enumeration<Name, Variant> {
+impl<Target, Variant> Enumeration<Target, Variant> {
     #[inline]
-    pub fn new(name: Name, variants: Vec<Variant>) -> Self {
-        Enumeration { name, variants }
+    pub fn new(target: Target, variants: Vec<Variant>) -> Self {
+        Enumeration { target, variants }
     }
 
     #[inline]
-    pub fn get_name(&self) -> &Name {
-        &self.name
+    pub fn get_target(&self) -> &Target {
+        &self.target
     }
 
     #[inline]
@@ -188,15 +192,15 @@ impl<Name, Variant> Enumeration<Name, Variant> {
     }
 }
 
-impl<Name, Parameter, Body, Output> Method<Name, Parameter, Body, Output> {
+impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     #[inline]
-    pub fn new(name: Name, parameters: Vec<Parameter>, body: Body, output: Output) -> Self {
-        Method { name, parameters, body, output }
+    pub fn new(target: Target, parameters: Vec<Parameter>, body: Body, output: Output) -> Self {
+        Method { target, parameters, body, output }
     }
 
     #[inline]
-    pub fn get_name(&self) -> &Name {
-        &self.name
+    pub fn get_target(&self) -> &Target {
+        &self.target
     }
 
     #[inline]
@@ -259,23 +263,23 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
     }
 }
 
-impl<Name: Hash, Field: Hash> Hash for Structure<Name, Field> {
+impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_name().hash(state);
+        self.get_target().hash(state);
         self.get_fields().hash(state);
     }
 }
 
-impl<Name: Hash, Variant: Hash> Hash for Enumeration<Name, Variant> {
+impl<Target: Hash, Variant: Hash> Hash for Enumeration<Target, Variant> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_name().hash(state);
+        self.get_target().hash(state);
         self.get_variants().hash(state);
     }
 }
 
-impl<Name: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash for Method<Name, Parameter, Body, Output> {
+impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash for Method<Target, Parameter, Body, Output> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_name().hash(state);
+        self.get_target().hash(state);
         self.get_parameters().hash(state);
         self.get_body().hash(state);
         self.get_output().hash(state);
@@ -310,21 +314,21 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq for Binding
     }
 }
 
-impl<Name: PartialEq, Field: PartialEq> PartialEq for Structure<Name, Field> {
+impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_name() == other.get_name() && self.get_fields() == other.get_fields()
+        self.get_target() == other.get_target() && self.get_fields() == other.get_fields()
     }
 }
 
-impl<Name: PartialEq, Variant: PartialEq> PartialEq for Enumeration<Name, Variant> {
+impl<Target: PartialEq, Variant: PartialEq> PartialEq for Enumeration<Target, Variant> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_name() == other.get_name() && self.get_variants() == other.get_variants()
+        self.get_target() == other.get_target() && self.get_variants() == other.get_variants()
     }
 }
 
-impl<Name: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq for Method<Name, Parameter, Body, Output> {
+impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq for Method<Target, Parameter, Body, Output> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_name() == other.get_name()
+        self.get_target() == other.get_target()
             && self.get_parameters() == other.get_parameters()
             && self.get_body() == other.get_body()
             && self.get_output() == other.get_output()
@@ -361,22 +365,22 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
     }
 }
 
-impl<Name: Clone, Field: Clone> Clone for Structure<Name, Field> {
+impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
     fn clone(&self) -> Self {
-        Structure::new(self.get_name().clone(), self.get_fields().clone())
+        Structure::new(self.get_target().clone(), self.get_fields().clone())
     }
 }
 
-impl<Name: Clone, Variant: Clone> Clone for Enumeration<Name, Variant> {
+impl<Target: Clone, Variant: Clone> Clone for Enumeration<Target, Variant> {
     fn clone(&self) -> Self {
-        Enumeration::new(self.get_name().clone(), self.get_variants().clone())
+        Enumeration::new(self.get_target().clone(), self.get_variants().clone())
     }
 }
 
-impl<Name: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Method<Name, Parameter, Body, Output> {
+impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Method<Target, Parameter, Body, Output> {
     fn clone(&self) -> Self {
         Method::new(
-            self.get_name().clone(),
+            self.get_target().clone(),
             self.get_parameters().clone(),
             self.get_body().clone(),
             self.get_output().clone()

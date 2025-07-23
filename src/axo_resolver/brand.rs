@@ -5,7 +5,6 @@ use {
         },
         axo_parser::{
             Element, ElementKind, 
-            Symbol, SymbolKind
         }
     }
 };
@@ -32,25 +31,6 @@ impl Branded<Token> for Element {
             ElementKind::Access(access) => access.get_object().brand(),
             ElementKind::Symbolize(symbol) => symbol.brand(),
             ElementKind::Assign(assign) => assign.get_target().brand(),
-            _ => None,
-        }
-    }
-}
-
-impl Branded<Token> for Symbol {
-    fn brand(&self) -> Option<Token> {
-        self.kind.brand()
-    }
-}
-
-impl Branded<Token> for SymbolKind {
-    fn brand(&self) -> Option<Token> {
-        match self {
-            SymbolKind::Interface(interface) => interface.get_target().brand(),
-            SymbolKind::Binding(binding) => binding.get_target().brand(),
-            SymbolKind::Structure(structure) => structure.get_name().brand(),
-            SymbolKind::Enumeration(enumeration) => enumeration.get_name().brand(),
-            SymbolKind::Method(function) => function.get_name().brand(),
             _ => None,
         }
     }

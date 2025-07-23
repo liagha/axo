@@ -1,7 +1,7 @@
 use {
     super::{
         Element, ElementKind,
-        Symbol, SymbolKind
+        Symbol,
     },
 
     crate::{
@@ -222,93 +222,3 @@ impl Clone for ElementKind {
 impl Eq for Element {}
 
 impl Eq for ElementKind {}
-
-impl Hash for Symbol {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
-    }
-}
-
-impl Hash for SymbolKind {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            SymbolKind::Inclusion(inclusion) => {
-                discriminant(self).hash(state);
-                inclusion.hash(state);
-            }
-            SymbolKind::Implementation(implementation) => {
-                discriminant(self).hash(state);
-                implementation.hash(state);
-            }
-            SymbolKind::Interface(interface) => {
-                discriminant(self).hash(state);
-                interface.hash(state);
-            }
-            SymbolKind::Binding(binding) => {
-                discriminant(self).hash(state);
-                binding.hash(state);
-            }
-            SymbolKind::Structure(structure) => {
-                discriminant(self).hash(state);
-                structure.hash(state);
-            }
-            SymbolKind::Enumeration(enumeration) => {
-                discriminant(self).hash(state);
-                enumeration.hash(state);
-            }
-            SymbolKind::Method(function) => {
-                discriminant(self).hash(state);
-                function.hash(state);
-            }
-        }
-    }
-}
-
-impl PartialEq for Symbol {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
-    }
-}
-
-impl PartialEq for SymbolKind {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (SymbolKind::Inclusion(a), SymbolKind::Inclusion(b)) => a == b,
-            (SymbolKind::Implementation(a), SymbolKind::Implementation(b)) => a == b,
-            (SymbolKind::Interface(a), SymbolKind::Interface(b)) => a == b,
-            (SymbolKind::Binding(a), SymbolKind::Binding(b)) => a == b,
-            (SymbolKind::Structure(a), SymbolKind::Structure(b)) => a == b,
-            (SymbolKind::Enumeration(a), SymbolKind::Enumeration(b)) => a == b,
-            (SymbolKind::Method(a), SymbolKind::Method(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl Clone for Symbol {
-    fn clone(&self) -> Self {
-        Symbol {
-            kind: self.kind.clone(),
-            span: self.span.clone(),
-            members: self.members.clone(),
-        }
-    }
-}
-
-impl Clone for SymbolKind {
-    fn clone(&self) -> Self {
-        match self {
-            SymbolKind::Inclusion(inclusion) => SymbolKind::Inclusion(inclusion.clone()),
-            SymbolKind::Implementation(implementation) => SymbolKind::Implementation(implementation.clone()),
-            SymbolKind::Interface(interface) => SymbolKind::Interface(interface.clone()),
-            SymbolKind::Binding(binding) => SymbolKind::Binding(binding.clone()),
-            SymbolKind::Structure(structure) => SymbolKind::Structure(structure.clone()),
-            SymbolKind::Enumeration(enumeration) => SymbolKind::Enumeration(enumeration.clone()),
-            SymbolKind::Method(function) => SymbolKind::Method(function.clone()),
-        }
-    }
-}
-
-impl Eq for Symbol {}
-
-impl Eq for SymbolKind {}

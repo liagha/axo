@@ -1,4 +1,6 @@
 use {
+    dynemit::eq::DynEq,
+
     super::{
         error::{
             ErrorKind,
@@ -17,13 +19,16 @@ use {
         },
         axo_parser::{
             Element, ElementKind,
-            Symbol, SymbolKind,
+            DynSymbol,
+        },
+        axo_schema::{
+            Enumeration, Implementation,
+            Interface, Method, Structure
         },
         format::Debug,
         memory::replace,
     },
 };
-use crate::axo_schema::Interface;
 
 #[derive(Clone, Debug)]
 pub struct Resolver {
@@ -50,11 +55,11 @@ impl Resolver {
         }
     }
 
-    pub fn insert(&mut self, symbol: Symbol) {
+    pub fn insert(&mut self, symbol: DynSymbol) {
         self.scope.insert(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Element, candidates: Vec<Symbol>) -> Option<Symbol> {
+    pub fn lookup(&mut self, target: &Element, candidates: Vec<DynSymbol>) -> Option<DynSymbol> {
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, &candidates);
         self.errors.extend(assessor.errors);
@@ -168,11 +173,11 @@ impl Resolver {
             }
 
             ElementKind::Access(access) => {
-                let target = self.lookup(access.get_object(), symbols);
+                let _target = self.lookup(access.get_object(), symbols);
 
-                if let Some(target) = target {
+                /*if let Some(target) = target {
                     self.lookup(access.get_target(), target.members);
-                }
+                }*/
             }
 
             ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
@@ -185,38 +190,32 @@ impl Resolver {
         }
     }
 
-    pub fn symbolize(&mut self, symbol: Symbol) {
+    pub fn symbolize(&mut self, symbol: DynSymbol) {
         let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
 
-        match symbol.kind {
-            SymbolKind::Inclusion(_) => {}
-            SymbolKind::Implementation(implementation) => {
-                if let Some(mut target) = self.lookup(implementation.get_target(), symbols) {
-                    if let Some(interface) = implementation.get_interface() {
-                        self.scope.remove(&target);
+        if let Some(implementation) = symbol.as_any().downcast_ref::<Implementation<Box<Element>, Box<Element>, DynSymbol>>() {
+            if let Some(target) = self.lookup(implementation.get_target(), symbols) {
+                if let Some(interface) = implementation.get_interface() {
+                    self.scope.symbols.remove(&target);
 
-                        let member = Symbol::new(SymbolKind::interface(Interface::new(interface.clone(), implementation.get_members().clone())), symbol.span);
-                        target.members.push(member);
-                        self.scope.insert(target);
-                    } else {
-                        self.scope.remove(&target);
+                    let _member = Interface::new(interface.clone(), implementation.get_members().clone());
+                    //target.members.push(member);
+                    self.scope.insert(target);
+                } else {
+                    self.scope.symbols.remove(&target);
 
-                        target.members.extend(implementation.get_members().clone());
-                        self.scope.insert(target);
-                    }
+                    //target.members.extend(implementation.get_members().clone());
+                    self.scope.insert(target);
                 }
             }
-            SymbolKind::Interface(_) => {}
-            SymbolKind::Binding(_) => {}
-            SymbolKind::Structure(_) => {
-                self.scope.insert(symbol);
-            }
-            SymbolKind::Enumeration(_) => {
-                self.scope.insert(symbol);
-            }
-            SymbolKind::Method(_) => {
-                self.scope.insert(symbol);
-            }
+        }
+
+        if let Some(_) = symbol.as_any().downcast_ref::<Structure<Box<Element>, DynSymbol>>() {
+            self.scope.insert(symbol.clone());
+        } else if let Some(_) = symbol.as_any().downcast_ref::<Enumeration<Box<Element>, Element>>() {
+            self.scope.insert(symbol.clone());
+        } else if let Some(_) = symbol.as_any().downcast_ref::<Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>>>() {
+            self.scope.insert(symbol.clone());
         }
     }
 }

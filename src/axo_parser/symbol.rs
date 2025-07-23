@@ -1,4 +1,12 @@
 use {
+    dynemit::{
+        clone::DynClone,
+        eq::DynEq,
+        hash::DynHash,
+        clone_trait_object, 
+        eq_trait_object, 
+        hash_trait_object,
+    },
     super::{
         Element, ElementKind,
         ParseError, Parser
@@ -21,6 +29,7 @@ use {
             Implementation, Inclusion, Interface, Method, Structure
         },
         hash::Hash,
+        format::Debug,
         operations::{Deref, DerefMut},
     },
     derive_ctor::ctor,
@@ -28,26 +37,64 @@ use {
         IsVariant, Unwrap,
     },
 };
-pub struct Symbol {
-    pub kind: SymbolKind,
-    pub span: Span,
-    pub members: Vec<Symbol>,
+use crate::axo_resolver::Branded;
+
+pub trait Symbol: Branded<Token> + DynClone + DynEq + DynHash + Debug + Send + Sync {}
+
+clone_trait_object!(Symbol);
+eq_trait_object!(Symbol);
+hash_trait_object!(Symbol);
+
+pub type DynSymbol = Box<dyn Symbol>;
+
+impl Symbol for Inclusion<Box<Element>> {}
+impl Symbol for Implementation<Box<Element>, Box<Element>, DynSymbol> {}
+impl Symbol for Interface<Box<Element>, DynSymbol> {}
+impl Symbol for Binding<Box<Element>, Box<Element>, Box<Element>> {}
+impl Symbol for Structure<Box<Element>, DynSymbol> {}
+impl Symbol for Enumeration<Box<Element>, Element> {}
+impl Symbol for Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>> {}
+
+
+impl Branded<Token> for Inclusion<Box<Element>> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
 }
 
-#[derive(ctor, IsVariant, Unwrap)]
-pub enum SymbolKind {
-    Inclusion(Inclusion<Box<Element>>),
-    Implementation(Implementation<Box<Element>, Box<Element>, Symbol>),
-    Interface(Interface<Box<Element>, Symbol>),
-    Binding(Binding<Box<Element>, Box<Element>, Box<Element>>),
-    Structure(Structure<Box<Element>, Symbol>),
-    Enumeration(Enumeration<Box<Element>, Element>),
-    Method(Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>),
+impl Branded<Token> for Implementation<Box<Element>, Box<Element>, DynSymbol> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
 }
 
-impl Symbol {
-    pub fn new(kind: SymbolKind, span: Span) -> Symbol {
-        Symbol { kind, span, members: vec![] }
+impl Branded<Token> for Interface<Box<Element>, DynSymbol> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
+}
+
+impl Branded<Token> for Binding<Box<Element>, Box<Element>, Box<Element>> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
+}
+
+impl Branded<Token> for Structure<Box<Element>, DynSymbol> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
+}
+
+impl Branded<Token> for Enumeration<Box<Element>, Element> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
+    }
+}
+
+impl Branded<Token> for Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>> {
+    fn brand(&self) -> Option<Token> {
+        self.get_target().clone().brand()
     }
 }
 
@@ -96,48 +143,31 @@ impl Parser {
                 if outputs.len() == 2 {
                     let body = outputs[1].clone();
                     let members = body.kind.clone().unwrap_block().items.iter().map(|item| {
-                        Symbol {
-                            kind: item.kind.clone().unwrap_symbolize().clone().kind,
-                            span: item.span,
-                            members: vec![]
-                        }.into()
+                        item.kind.clone().unwrap_symbolize()
                     }).collect::<Vec<_>>();
-                    let span = Span::merge(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol {
-                                    kind: SymbolKind::Implementation(Implementation::new(name.into(), None, members)),
-                                    span,
-                                    members: vec![],
-                                },
+                                Box::new(Implementation::new(name.into(), None, members)),
                             ),
                             outputs.span()
                         )
                     ))
                 } else if outputs.len() == 3 {
                     let target = outputs[1].clone();
-                    let body = outputs[2].clone().kind.unwrap_block();
-                    let members = body.items.iter().map(|item| {
-                        Symbol {
-                            kind: item.kind.clone().unwrap_symbolize().clone().kind,
-                            span: item.span,
-                            members: vec![]
-                        }.into()
+                    let body = outputs[2].clone();
+                    let members = <ElementKind as Clone>::clone(&body).unwrap_block().clone().items.iter().map(|item| {
+                        item.kind.clone().unwrap_symbolize()
                     }).collect::<Vec<_>>();
-                    let span = Span::merge(&keyword.span(), &members.span());
+                    let span = Span::merge(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol {
-                                    kind: SymbolKind::Implementation(Implementation::new(name.into(), Some(target.into()), members)),
-                                    span,
-                                    members: vec![],
-                                },
+                                Box::new(Implementation::new(name.into(), Some(target.into()), members)),
                             ),
-                            outputs.span()
+                            span
                         )
                     ))
                 } else {
@@ -145,7 +175,6 @@ impl Parser {
                 }
             },
         )
-
     }
     
     pub fn binding() -> Classifier<Token, Element, ParseError> {
@@ -177,32 +206,20 @@ impl Parser {
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
                         if let ElementKind::Label(label) = assign.get_target().kind.clone() {
-                            Symbol {
-                                kind: SymbolKind::Binding(Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), mutable)),
-                                span,
-                                members: vec![],
-                            }
+                            Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), mutable)
                         } else {
-                            Symbol {
-                                kind: SymbolKind::Binding(Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, mutable)),
-                                span,
-                                members: vec![],
-                            }
+                            Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, mutable)
                         }
                     }
 
                     _ => {
-                        Symbol {
-                            kind: SymbolKind::binding(Binding::new(body.into(), None, None, mutable)),
-                            span,
-                            members: vec![],
-                        }
+                        Binding::new(body.into(), None, None, mutable)
                     }
                 };
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(symbol),
+                        ElementKind::Symbolize(Box::new(symbol)),
                         span,
                     )
                 ))
@@ -230,22 +247,14 @@ impl Parser {
                 let body = sequence[2].unwrap_output().clone();
 
                 let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
-                    Symbol {
-                        kind: item.kind.clone().unwrap_symbolize().clone().kind,
-                        span: item.span(),
-                        members: vec![]
-                    }
+                    item.kind.clone().unwrap_symbolize().clone()
                 }).collect::<Vec<_>>();
                 let span = Span::merge(&keyword.span(), &body.span());
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol {
-                                kind: SymbolKind::Structure(Structure::new(name.into(), fields)),
-                                span,
-                                members: vec![],
-                            },
+                            Box::new(Structure::new(name.into(), fields))
                         ),
                         span,
                     )
@@ -278,11 +287,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol {
-                                kind: SymbolKind::Enumeration(Enumeration::new(name.into(), items)),
-                                span,
-                                members: vec![],
-                            },
+                            Box::new(Enumeration::new(name.into(), items))
                         ),
                         span,
                     )
@@ -313,11 +318,7 @@ impl Parser {
                 let body = sequence[3].unwrap_output().clone();
 
                 let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
-                    Symbol {
-                        kind: parameter.kind.clone().unwrap_symbolize().kind,
-                        span: parameter.span(),
-                        members: vec![]
-                    }
+                    parameter.kind.clone().unwrap_symbolize()
                 }).collect::<Vec<_>>();
 
                 let span = Span::merge(&keyword.span(), &body.span());
@@ -325,30 +326,12 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol {
-                                kind: SymbolKind::Method(Method::new(name.into(), parameters, body.into(), None)),
-                                span,
-                                members: vec![],
-                            }
+                            Box::new(Method::new(name.into(), parameters, body.into(), None))
                         ),
                         span,
                     )
                 ))
             }
         )
-    }
-}
-
-impl Deref for Symbol {
-    type Target = SymbolKind;
-
-    fn deref(&self) -> &Self::Target {
-        &self.kind
-    }
-}
-
-impl DerefMut for Symbol {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.kind
     }
 }

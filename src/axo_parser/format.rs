@@ -1,7 +1,7 @@
 use {
     super::{
         symbol::Symbol,
-        Element, ElementKind, SymbolKind
+        Element, ElementKind, 
     },
     
     crate::{
@@ -14,42 +14,9 @@ use {
     },
 };
 
-impl Debug for SymbolKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            SymbolKind::Inclusion(inclusion) => write!(f, "Inclusion({:?})", inclusion.get_target()),
-            SymbolKind::Implementation(implementation) => write!(f, "Implement({:?} for {:?} => {:?})", implementation.get_interface(), implementation.get_target(), implementation.get_members()),
-            SymbolKind::Interface(interface) => write!(f, "Trait({:?} {:?})", interface.get_target(), interface.get_members()),
-            SymbolKind::Binding(binding) => {
-                let kind = if binding.is_mutable() { "Variable" } else { "Constant" };
-                write!(f, "{}({:?}", kind, binding.get_target())?;
-
-                if let Some(ty) = binding.get_type() {
-                    write!(f, " : {:?}", ty)?;
-                }
-
-                if let Some(value) = binding.get_value() {
-                    write!(f, " = {:?}", value)?;
-                }
-
-                write!(f, ")")
-            },
-            SymbolKind::Structure(structure) => write!(f, "Structure({:?} | {:?})", structure.get_name(), structure.get_fields()),
-            SymbolKind::Enumeration(enumeration) => write!(f, "Enumeration({:?} | {:?})", enumeration.get_name(), enumeration.get_variants()),
-            SymbolKind::Method(function) => write!(f, "Function({:?}({:?}) {:?})", function.get_name(), function.get_parameters(), function.get_body()),
-        }
-    }
-}
-
 impl Debug for Element {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?} | {:#?}", self.kind, self.span)
-    }
-}
-
-impl Debug for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?} | {:#?}\n{}", self.kind, self.span, indent(&format!("{:#?}", self.members)))
     }
 }
 
