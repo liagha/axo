@@ -72,9 +72,8 @@ where
             Order::Fail(function) => {
                 let failure = function(source.context_mut(), draft.form.clone());
 
-                let form = Form::Failure(failure);
                 draft.fail();
-                draft.form = form;
+                draft.form = Form::Failure(failure);
             }
 
             Order::Ignore => {

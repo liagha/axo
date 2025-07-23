@@ -1,10 +1,14 @@
-use hashish::HashSet;
 use {
     broccli::{xprintln, Color},
+    hashish::HashSet,
 
     core::time::Duration,
 
     crate::{
+        axo_cursor::Location,
+        axo_initial::{
+            initializer::{Initializer, Preference},
+        },
         axo_scanner::{
             Scanner,
             Token,
@@ -25,14 +29,12 @@ use {
             Debug, Display,
             Formatter,
         },
+        environment,
         format_tokens,
         indent,
         Timer, TIMER,
     }
 };
-use crate::axo_cursor::Location;
-use crate::axo_initial::initializer::{Initializer, Preference};
-use crate::environment;
 
 pub trait Marked {
     fn context(&self) -> &Context;
@@ -228,6 +230,7 @@ impl Stage<Vec<Token>, Vec<Element>> for Parsing {
         let timer = Timer::new(TIMER);
 
         let location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+
         let verbosity = context.get_verbosity().unwrap_or(false);
 
         let mut parser = Parser::new(context.clone(), tokens, location);

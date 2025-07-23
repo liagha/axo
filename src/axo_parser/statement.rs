@@ -19,7 +19,7 @@ impl Parser {
                     }
                 }),
                 Classifier::with_fallback(
-                    Classifier::deferred(|| Self::element()),
+                    Classifier::deferred(Self::element),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
@@ -27,7 +27,7 @@ impl Parser {
                     }),
                 ),
                 Classifier::with_fallback(
-                    Classifier::deferred(|| Self::element()),
+                    Classifier::deferred(Self::element),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 

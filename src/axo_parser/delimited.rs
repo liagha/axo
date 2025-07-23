@@ -49,6 +49,7 @@ impl Parser {
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.collect_inputs().span();
+                        println!("{:?}", span);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
