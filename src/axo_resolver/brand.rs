@@ -4,16 +4,13 @@ use {
             Token, TokenKind
         },
         axo_parser::{
-            Element, ElementKind, 
+            Element, ElementKind,
+            Symbolic,
         }
     }
 };
 
-pub trait Branded<L> {
-    fn brand(&self) -> Option<L>;
-}
-
-impl Branded<Token> for Element {
+impl Symbolic for Element {
     fn brand(&self) -> Option<Token> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(Token {

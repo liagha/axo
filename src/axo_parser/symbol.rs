@@ -1,3 +1,4 @@
+use std::any::Any;
 use {
     dynemit::{
         clone::DynClone,
@@ -28,8 +29,8 @@ use {
             Binding, Enumeration,
             Implementation, Inclusion, Interface, Method, Structure
         },
-        hash::Hash,
-        format::Debug,
+        hash::{Hash, Hasher},
+        format::{Debug, Formatter},
         operations::{Deref, DerefMut},
     },
     derive_ctor::ctor,
@@ -37,62 +38,108 @@ use {
         IsVariant, Unwrap,
     },
 };
-use crate::axo_resolver::Branded;
 
-pub trait Symbol: Branded<Token> + DynClone + DynEq + DynHash + Debug + Send + Sync {}
+pub trait Symbolic: DynClone + DynEq + DynHash + Debug + Send + Sync {
+    fn brand(&self) -> Option<Token>;
+}
 
-clone_trait_object!(Symbol);
-eq_trait_object!(Symbol);
-hash_trait_object!(Symbol);
+clone_trait_object!(Symbolic);
+eq_trait_object!(Symbolic);
+hash_trait_object!(Symbolic);
 
-pub type DynSymbol = Box<dyn Symbol>;
+pub struct Symbol {
+    pub value: Box<dyn Symbolic>,
+    pub span: Span,
+    pub members: Vec<Box<dyn Symbolic>>,
+}
 
-impl Symbol for Inclusion<Box<Element>> {}
-impl Symbol for Implementation<Box<Element>, Box<Element>, DynSymbol> {}
-impl Symbol for Interface<Box<Element>, DynSymbol> {}
-impl Symbol for Binding<Box<Element>, Box<Element>, Box<Element>> {}
-impl Symbol for Structure<Box<Element>, DynSymbol> {}
-impl Symbol for Enumeration<Box<Element>, Element> {}
-impl Symbol for Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>> {}
+impl Symbol {
+    pub fn new(value: impl Symbolic, span: Span) -> Self {
+        Self {
+            value: Box::new(value),
+            span,
+            members: Vec::new(),
+        }
+    }
 
+    pub fn as_any(&self) -> &dyn Any {
+        (*self.value).as_any()
+    }
+}
 
-impl Branded<Token> for Inclusion<Box<Element>> {
+impl Clone for Symbol {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            span: self.span.clone(),
+            members: self.members.clone(),
+        }
+    }
+}
+
+impl Debug for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::format::Result {
+        write!(f, "{:?}", self.value)
+    }
+}
+
+impl Eq for Symbol {}
+
+impl Hash for Symbol {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
+impl PartialEq for Symbol {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl Symbolic for Symbol {
+    fn brand(&self) -> Option<Token> {
+        self.value.brand()
+    }
+}
+
+impl Symbolic for Inclusion<Box<Element>> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Implementation<Box<Element>, Box<Element>, DynSymbol> {
+impl Symbolic for Implementation<Box<Element>, Box<Element>, Symbol> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Interface<Box<Element>, DynSymbol> {
+impl Symbolic for Interface<Box<Element>, Symbol> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Binding<Box<Element>, Box<Element>, Box<Element>> {
+impl Symbolic for Binding<Box<Element>, Box<Element>, Box<Element>> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Structure<Box<Element>, DynSymbol> {
+impl Symbolic for Structure<Box<Element>, Symbol> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Enumeration<Box<Element>, Element> {
+impl Symbolic for Enumeration<Box<Element>, Element> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
 }
 
-impl Branded<Token> for Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>> {
+impl Symbolic for Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>> {
     fn brand(&self) -> Option<Token> {
         self.get_target().clone().brand()
     }
@@ -113,21 +160,13 @@ impl Parser {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "impl"
-                    } else {
-                        false
-                    }
+                    token.kind == TokenKind::Identifier("impl".to_string())
                 }),
                 Self::token(),
                 Classifier::optional(
                     Classifier::sequence([
                         Classifier::predicate(|token: &Token| {
-                            if let TokenKind::Operator(operator) = &token.kind {
-                                *operator == OperatorKind::Colon
-                            } else {
-                                false
-                            }
+                            matches!(token.kind, TokenKind::Operator(OperatorKind::Colon))
                         }),
                         Self::token(),
                     ])
@@ -137,7 +176,6 @@ impl Parser {
             |_, form| {
                 let keyword = form.collect_inputs()[0].clone();
                 let outputs = form.collect_outputs().clone();
-
                 let name = outputs[0].clone();
 
                 if outputs.len() == 2 {
@@ -145,13 +183,14 @@ impl Parser {
                     let members = body.kind.clone().unwrap_block().items.iter().map(|item| {
                         item.kind.clone().unwrap_symbolize()
                     }).collect::<Vec<_>>();
+                    let span = Span::merge(&keyword.span(), &body.span());
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Symbolize(
-                                Box::new(Implementation::new(name.into(), None, members)),
+                            ElementKind::symbolize(
+                                Symbol::new(Implementation::new(name.into(), None, members), span),
                             ),
-                            outputs.span()
+                            span
                         )
                     ))
                 } else if outputs.len() == 3 {
@@ -164,8 +203,8 @@ impl Parser {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Symbolize(
-                                Box::new(Implementation::new(name.into(), Some(target.into()), members)),
+                            ElementKind::symbolize(
+                                Symbol::new(Implementation::new(name.into(), Some(target.into()), members), span),
                             ),
                             span
                         )
@@ -181,26 +220,16 @@ impl Parser {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "var" || identifier == "const"
-                    } else {
-                        false
-                    }
+                    token.kind == TokenKind::Identifier("var".to_string())
+                        || token.kind == TokenKind::Identifier("const".to_string())
                 }),
                 Classifier::deferred(Self::element),
             ]),
             |_, form| {
                 let sequence = form.as_forms();
-
                 let keyword = sequence[0].unwrap_input();
-                let mutable = if let TokenKind::Identifier(identifier) = &keyword.kind {
-                    identifier == "var"
-                } else {
-                    false
-                };
-
+                let mutable = keyword.kind == TokenKind::Identifier("var".to_string());
                 let body = sequence[1].unwrap_output().clone();
-
                 let span = Span::merge(&keyword.span(), &body.span());
 
                 let symbol = match body.kind {
@@ -219,7 +248,7 @@ impl Parser {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(Box::new(symbol)),
+                        ElementKind::symbolize(Symbol::new(symbol, span)),
                         span,
                     )
                 ))
@@ -231,11 +260,7 @@ impl Parser {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "struct"
-                    } else {
-                        false
-                    }
+                    token.kind == TokenKind::Identifier("struct".to_string())
                 }),
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::symbolization)),
@@ -253,8 +278,8 @@ impl Parser {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(
-                            Box::new(Structure::new(name.into(), fields))
+                        ElementKind::symbolize(
+                            Symbol::new(Structure::new(name.into(), fields), span),
                         ),
                         span,
                     )
@@ -267,11 +292,7 @@ impl Parser {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "enum"
-                    } else {
-                        false
-                    }
+                    token.kind == TokenKind::Identifier("enum".to_string())
                 }),
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::element)),
@@ -287,7 +308,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Box::new(Enumeration::new(name.into(), items))
+                            Symbol::new(Enumeration::new(name.into(), items), span)
                         ),
                         span,
                     )
@@ -300,11 +321,7 @@ impl Parser {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "func"
-                    } else {
-                        false
-                    }
+                    token.kind == TokenKind::Identifier("func".to_string())
                 }),
                 Self::token(),
                 Self::group(Classifier::deferred(Self::symbolization)),
@@ -326,7 +343,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Box::new(Method::new(name.into(), parameters, body.into(), None))
+                            Symbol::new(Method::new(name.into(), parameters, body.into(), None), span)
                         ),
                         span,
                     )

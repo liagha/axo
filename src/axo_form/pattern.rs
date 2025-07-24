@@ -10,7 +10,7 @@ use {
         thread::{Arc, Mutex},
     },
 };
-use crate::axo_internal::compiler::Context;
+use crate::axo_internal::compiler::Registry;
 
 pub trait Pattern<Input, Output, Failure>
 where
@@ -634,7 +634,7 @@ where
 
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
     {
         self.with_order(Order::Fail(Arc::new(emitter)))
     }
@@ -656,7 +656,7 @@ where
 
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
     {
         self.with_order(Order::Panic(Arc::new(emitter)))
     }
@@ -678,7 +678,7 @@ where
 
     pub fn with_transform<T>(self, transform: T) -> Self
     where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
+        T: FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure>
         + Send
         + Sync
         + 'static,

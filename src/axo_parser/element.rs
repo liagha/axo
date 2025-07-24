@@ -10,7 +10,7 @@ use {
     },
 
     super::{
-        Symbol, ParseError,
+        Symbolic, ParseError,
     },
 
     crate::{
@@ -36,7 +36,7 @@ use {
         axo_cursor::Span,
     }
 };
-use crate::axo_parser::symbol::DynSymbol;
+use crate::axo_parser::symbol::Symbol;
 
 pub struct Element {
     pub kind: ElementKind,
@@ -83,7 +83,7 @@ pub enum ElementKind {
 
     Iterate(Iterate<Box<Element>, Box<Element>>),
 
-    Symbolize(DynSymbol),
+    Symbolize(Symbol),
 
     Assign(Assign<Box<Element>, Box<Element>>),
 

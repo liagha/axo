@@ -12,12 +12,26 @@ use {
     broccli::{Color, TextStyle}
 };
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Error<K, N = String, H = String> where K: Display, N: Display, H: Display {
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct Error<K, N = String, H = String> 
+where K: Display, N: Display, H: Display 
+{
     pub kind: K,
     pub span: Span,
     pub note: Option<N>,
     pub hints: Vec<Hint<H>>,
+}
+
+impl<K, N, H> crate::error::Error for Error<K, N, H>
+where K: Display, N: Display, H: Display 
+{}
+
+impl<K: Display, N: Display, H: Display > Debug for Error<K, N, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let (msg, details) = self.format();
+
+        write!(f, "{} \n {}", msg, details)
+    }
 }
 
 impl<K: Display, N: Display, H: Display > Display for Error<K, N, H> {

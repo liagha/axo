@@ -16,7 +16,7 @@ use {
         thread::{Arc, Mutex},
     }
 };
-use crate::axo_internal::compiler::{Context, Marked};
+use crate::axo_internal::compiler::{Registry, Marked};
 
 #[derive(Clone)]
 pub enum Order<Input, Output, Failure>
@@ -70,7 +70,7 @@ where
             },
 
             Order::Fail(function) => {
-                let failure = function(source.context_mut(), draft.form.clone());
+                let failure = function(source.registry_mut(), draft.form.clone());
 
                 draft.fail();
                 draft.form = Form::Failure(failure);
@@ -96,7 +96,7 @@ where
             }
 
             Order::Panic(function) => {
-                let failure = function(source.context_mut(), draft.form.clone());
+                let failure = function(source.registry_mut(), draft.form.clone());
 
                 let form = Form::Failure(failure);
                 draft.panic();
@@ -126,7 +126,7 @@ where
             Order::Transform(transform) => {
                 if draft.is_aligned() {
                     let result = if let Ok(mut guard) = transform.lock() {
-                        let result = guard(source.context_mut(), draft.form.clone());
+                        let result = guard(source.registry_mut(), draft.form.clone());
                         drop(guard);
                         result
                     } else {
@@ -149,21 +149,21 @@ where
 
     pub fn convert<T>(transformer: T) -> Self
     where
-        T: FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync + 'static
+        T: FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync + 'static
     {
         Self::Transform(Arc::new(Mutex::new(transformer)))
     }
 
     pub fn fail<T>(emitter: T) -> Self
     where
-        T: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+        T: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
     {
         Self::Fail(Arc::new(emitter))
     }
 
     pub fn panic<T>(emitter: T) -> Self
     where
-        T: Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
+        T: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'static,
     {
         Self::Panic(Arc::new(emitter))
     }

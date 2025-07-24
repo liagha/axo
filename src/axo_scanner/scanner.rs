@@ -15,12 +15,12 @@ use {
 };
 use crate::axo_cursor::Location;
 use crate::axo_internal::compiler::{
-    Context, Marked,
+    Registry, Marked,
 };
 
 #[derive(Clone)]
 pub struct Scanner {
-    pub context: Context,
+    pub registry: Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Character>,
@@ -89,13 +89,13 @@ impl Peekable<Character> for Scanner {
 }
 
 impl Scanner {
-    pub fn new(context: Context, input: String, location: Location) -> Scanner {
+    pub fn new(registry: Registry, input: String, location: Location) -> Scanner {
         let position = Position::new(location);
         let chars: Vec<char> = input.chars().collect();
         let characters = Self::inspect(position, chars);
 
         Scanner {
-            context,
+            registry,
             input: characters,
             index: 0,
             position,
@@ -126,11 +126,11 @@ impl Scanner {
 }
 
 impl Marked for Scanner {
-    fn context(&self) -> &Context {
-        &self.context
+    fn registry(&self) -> &Registry {
+        &self.registry
     }
 
-    fn context_mut(&mut self) -> &mut Context {
-        &mut self.context
+    fn registry_mut(&mut self) -> &mut Registry {
+        &mut self.registry
     }
 }

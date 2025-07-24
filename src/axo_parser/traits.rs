@@ -1,7 +1,7 @@
 use {
     super::{
         Element, ElementKind,
-        Symbol,
+        Symbolic,
     },
 
     crate::{

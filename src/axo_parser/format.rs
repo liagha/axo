@@ -1,6 +1,6 @@
 use {
     super::{
-        symbol::Symbol,
+        symbol::Symbolic,
         Element, ElementKind, 
     },
     

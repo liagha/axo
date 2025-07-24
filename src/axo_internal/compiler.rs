@@ -1,20 +1,24 @@
 use {
     broccli::{xprintln, Color},
-    hashish::HashSet,
-
     core::time::Duration,
 
     crate::{
-        axo_cursor::Location,
+        axo_cursor::{
+            Location, Span,
+        },
         axo_initial::{
-            initializer::{Initializer, Preference},
+            initializer::{
+                Preference,
+                Initializer,
+            },
         },
         axo_scanner::{
             Scanner,
             Token,
         },
         axo_parser::{
-            Element,
+            Element, ElementKind,
+            Symbol,
             Parser,
         },
         axo_resolver::{
@@ -22,12 +26,6 @@ use {
         },
         file::{
             read_to_string,
-            Error,
-        },
-        format::{
-            self,
-            Debug, Display,
-            Formatter,
         },
         environment,
         format_tokens,
@@ -37,127 +35,220 @@ use {
 };
 
 pub trait Marked {
-    fn context(&self) -> &Context;
-    fn context_mut(&mut self) -> &mut Context;
+    fn registry(&self) -> &Registry;
+    fn registry_mut(&mut self) -> &mut Registry;
     fn resolver(&self) -> &Resolver {
-        &self.context().resolver
+        &self.registry().resolver
     }
     fn resolver_mut(&mut self) -> &mut Resolver {
-        &mut self.context_mut().resolver
-    }
-}
-
-#[derive(Debug)]
-pub enum CompilerError {
-    PathRequired,
-    FileReadError(Error),
-    ArgumentParsing(String),
-    HelpRequested,
-}
-
-impl Display for CompilerError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> format::Result {
-        match self {
-            CompilerError::PathRequired => write!(formatter, "No input file specified"),
-            CompilerError::FileReadError(error) => write!(formatter, "Failed to read file: {}", error),
-            CompilerError::ArgumentParsing(msg) => write!(formatter, "{}", msg),
-            CompilerError::HelpRequested => Ok(()),
-        }
+        &mut self.registry_mut().resolver
     }
 }
 
 #[derive(Clone)]
-pub struct Context {
+pub struct Registry {
     pub resolver: Resolver,
-    pub preferences: HashSet<Preference>
 }
 
-impl Context {
+impl Registry {
     pub fn new() -> Self {
-        Context {
+        Registry {
             resolver: Resolver::new(),
-            preferences: HashSet::new(),
         }
     }
 
-    pub fn get_verbosity(&self) -> Option<bool> {
-        self.preferences
-            .iter()
-            .find_map(|p| match p {
-                Preference::Verbosity(v) => Some(*v),
-                _ => None,
-            })
+    pub fn get_verbosity(&mut self) -> Option<bool> {
+        let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default());
+
+        let found = self.resolver.get(&identifier);
+
+        if let Some(symbol) = found {
+            if let Some(preference) = symbol.as_any().downcast_ref::<Preference>() {
+                if let Preference::Verbosity(verbosity) = preference {
+                    Some(*verbosity)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
-    pub fn get_path(&self) -> Option<String> {
-        self.preferences
-            .iter()
-            .find_map(|p| match p {
-                Preference::Path(path) => Some(path.clone()),
-                _ => None,
-            })
+    pub fn get_path(&mut self) -> Option<String> {
+        let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default());
+
+        let found = self.resolver.get(&identifier);
+
+        if let Some(symbol) = found {
+            if let Some(preference) = symbol.as_any().downcast_ref::<Preference>() {
+                if let Preference::Path(path) = preference {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
 pub trait Stage<Input, Output> {
-    fn execute(&mut self, context: &mut Context, input: Input) -> Result<Output, CompilerError>;
+    fn execute(&mut self, registry: &mut Registry, input: Input) -> Result<Output, Box<dyn crate::error::Error>>;
 }
 
 macro_rules! pipeline {
-    ($context:expr, $input:expr, $stage:expr) => {
-        $stage.execute($context, $input)
+    ($registry:expr, $input:expr, $stage:expr) => {
+        $stage.execute($registry, $input)
     };
-    ($context:expr, $input:expr, $stage:expr, $($remaining:expr),+) => {
-        match $stage.execute($context, $input) {
-            Ok(output) => pipeline!($context, output, $($remaining),+),
+    ($registry:expr, $input:expr, $stage:expr, $($remaining:expr),+) => {
+        match $stage.execute($registry, $input) {
+            Ok(output) => pipeline!($registry, output, $($remaining),+),
             Err(error) => Err(error),
         }
     };
 }
 
 pub struct Compiler {
-    pub context: Context,
+    pub registry: Registry,
 }
 
 impl Compiler {
-    pub fn new() -> Result<Self, CompilerError> {
-        let context = Context::new();
+    pub fn new() -> Self  {
+        let registry = Registry::new();
 
-        Ok(Compiler { context })
+        Compiler { registry }
     }
 
-    pub fn compile(&mut self) -> Result<(), CompilerError> {
-        self.compile_with(|context| {
+    pub fn compile(&mut self) -> Result<(), Box<dyn crate::error::Error>> {
+        let timer = Timer::new(TIMER);
+
+        let result = self.compile_with(|registry| {
             pipeline!(
-                context,
+                registry,
                 (),
                 Initializing,
                 Scanning,
                 Parsing,
                 Resolving
             ).map(|_| ())
-        })
+        });
+
+        let verbosity = self.registry.get_verbosity().unwrap_or(false);
+
+        if verbosity {
+            match &result {
+                Ok(_) => {
+                    let duration = Duration::from_nanos(timer.elapsed().unwrap());
+                    xprintln!(
+                        "Finished {} {}s." => Color::Green,
+                        "`compilation` in" => Color::White,
+                        duration.as_secs_f64(),
+                    );
+                    xprintln!();
+                }
+                Err(_) => {
+                    let duration = Duration::from_nanos(timer.elapsed().unwrap());
+                    xprintln!(
+                        "Finished {} {}s with {}." => Color::Green,
+                        "`compilation` in" => Color::White,
+                        duration.as_secs_f64(),
+                        "errors" => Color::Red,
+                    );
+                    xprintln!();
+                }
+            }
+        }
+
+        result
     }
 
-    pub fn compile_with<Function, Type>(&mut self, build_pipeline: Function) -> Result<Type, CompilerError>
+    pub fn compile_with<Function, Type>(&mut self, build_pipeline: Function) -> Result<Type, Box<dyn crate::error::Error>>
     where
-        Function: FnOnce(&mut Context) -> Result<Type, CompilerError>,
+        Function: FnOnce(&mut Registry) -> Result<Type, Box<dyn crate::error::Error>>,
     {
-        build_pipeline(&mut self.context)
+        let result = build_pipeline(&mut self.registry);
+
+        result
     }
 }
 
 pub struct Initializing;
 
 impl Stage<(), ()> for Initializing {
-    fn execute(&mut self, context: &mut Context, _input: ()) -> Result<(), CompilerError> {
+    fn execute(&mut self, registry: &mut Registry, _input: ()) -> Result<(), Box<dyn crate::error::Error>> {
+        let timer = Timer::new(TIMER);
+        let verbosity = registry.get_verbosity().unwrap_or(false);
+
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`initializing`" => Color::White,
+            );
+            xprintln!();
+        }
+
         let input = environment::args().skip(1).collect::<Vec<String>>().join(" ");
-        let mut scanner = Scanner::new(context.clone(), input, Location::Void);
+        let mut scanner = Scanner::new(registry.clone(), input, Location::Void);
         scanner.scan();
-        let mut initializer = Initializer::new(context.clone(), scanner.output, Location::Void);
+        let mut initializer = Initializer::new(registry.clone(), scanner.output, Location::Void);
         initializer.initialize();
 
-        context.preferences.extend(initializer.output);
+        let preferences = initializer.output.iter().map(|preference| {
+            Symbol::new(preference.clone(), Span::default())
+        }).collect::<Vec<Symbol>>();
+
+        registry.resolver.extend(preferences);
+
+        if verbosity {
+            let preferences_tree = initializer.output
+                .iter()
+                .map(|preference| format!("{:?}", preference))
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !preferences_tree.is_empty() {
+                xprintln!("Preferences:\n{}" => Color::Magenta, indent(&preferences_tree));
+                xprintln!();
+            }
+
+            if !initializer.errors.is_empty() {
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                for error in &initializer.errors {
+                    let (message, details) = error.format();
+                    xprintln!(
+                        "{}\n{}" => Color::Red,
+                        message => Color::Orange,
+                        details
+                    );
+                    xprintln!();
+                }
+
+                xprintln!(
+                    "Finished {} {}s with {} {}." => Color::Green,
+                    "`initializing` in" => Color::White,
+                    duration.as_secs_f64(),
+                    initializer.errors.len() => Color::BrightRed,
+                    "errors" => Color::Red,
+                );
+                xprintln!();
+            } else {
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                xprintln!(
+                    "Finished {} {}s." => Color::Green,
+                    "`initializing` in" => Color::White,
+                    duration.as_secs_f64(),
+                );
+                xprintln!();
+            }
+        }
 
         Ok(())
     }
@@ -166,20 +257,27 @@ impl Stage<(), ()> for Initializing {
 pub struct Scanning;
 
 impl Stage<(), Vec<Token>> for Scanning {
-    fn execute(&mut self, context: &mut Context, _input: ()) -> Result<Vec<Token>, CompilerError> {
+    fn execute(&mut self, registry: &mut Registry, _input: ()) -> Result<Vec<Token>, Box<dyn crate::error::Error>> {
         let scanner_timer = Timer::new(TIMER);
 
-        let location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
-        let verbosity = context.get_verbosity().unwrap_or(false);
+        let location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let verbosity = registry.get_verbosity().unwrap_or(false);
+
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`scanning`" => Color::White,
+            );
+            xprintln!();
+        }
 
         let content = if let Location::File(path) = location {
-            read_to_string(&path)
-                .map_err(CompilerError::FileReadError)?
+            read_to_string(&path).expect("")
         } else {
             "".to_string()
         };
 
-        let mut scanner = Scanner::new(context.clone(), content, location);
+        let mut scanner = Scanner::new(registry.clone(), content, location);
         scanner.scan();
 
         if verbosity {
@@ -226,14 +324,22 @@ impl Stage<(), Vec<Token>> for Scanning {
 pub struct Parsing;
 
 impl Stage<Vec<Token>, Vec<Element>> for Parsing {
-    fn execute(&mut self, context: &mut Context, tokens: Vec<Token>) -> Result<Vec<Element>, CompilerError> {
+    fn execute(&mut self, registry: &mut Registry, tokens: Vec<Token>) -> Result<Vec<Element>, Box<dyn crate::error::Error>> {
         let timer = Timer::new(TIMER);
 
-        let location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
 
-        let verbosity = context.get_verbosity().unwrap_or(false);
+        let verbosity = registry.get_verbosity().unwrap_or(false);
 
-        let mut parser = Parser::new(context.clone(), tokens, location);
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`parsing`" => Color::White,
+            );
+            xprintln!();
+        }
+
+        let mut parser = Parser::new(registry.clone(), tokens, location);
         parser.parse();
 
         if verbosity {
@@ -288,17 +394,25 @@ impl Stage<Vec<Token>, Vec<Element>> for Parsing {
 pub struct Resolving;
 
 impl Stage<Vec<Element>, ()> for Resolving {
-    fn execute(&mut self, context: &mut Context, elements: Vec<Element>) -> Result<(), CompilerError> {
+    fn execute(&mut self, registry: &mut Registry, elements: Vec<Element>) -> Result<(), Box<dyn crate::error::Error>> {
         let timer = Timer::new(TIMER);
-        let _location = context.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
-        let verbosity = context.get_verbosity().unwrap_or(false);
-
-        context.resolver.settle(elements);
-
-        let errors = context.resolver.errors.clone();
+        let _location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let verbosity = registry.get_verbosity().unwrap_or(false);
 
         if verbosity {
-            let symbols = context.resolver.scope.symbols();
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`resolving`" => Color::White,
+            );
+            xprintln!();
+        }
+
+        registry.resolver.process(elements);
+
+        let errors = registry.resolver.errors.clone();
+
+        if verbosity {
+            let symbols = registry.resolver.scope.all();
 
             let tree = symbols
                 .iter()
@@ -316,17 +430,17 @@ impl Stage<Vec<Element>, ()> for Resolving {
                 xprintln!();
             }
 
-            for error in &errors {
-                let (message, details) = error.format();
-                xprintln!(
+            if !errors.is_empty() {
+                for error in &errors {
+                    let (message, details) = error.format();
+                    xprintln!(
                         "{}\n{}" => Color::Red,
                         message => Color::Orange,
                         details
                     );
-                xprintln!();
-            }
+                    xprintln!();
+                }
 
-            if !errors.is_empty() {
                 let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
                 xprintln!(

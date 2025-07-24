@@ -1,17 +1,16 @@
 use {
-    dynemit::{
-        eq::DynEq,
-    },
-    
     super::{
-        brand::Branded,
         hint::ResolveHint,
     },
     crate::{
         axo_scanner::{
             Token, TokenKind,
         },
-        axo_parser::{Element, ElementKind},
+        axo_parser::{
+            Element, ElementKind,
+            Symbol, Symbolic,
+        },
+        axo_schema::{Method, Structure},
         axo_error::Hint,
         axo_resolver::{
             ResolveError,
@@ -20,17 +19,15 @@ use {
             },
         },
 
+        operations::Range,
         float::FloatLiteral,
     },
-    core::ops::Range,
     matchete::{
         Scheme,
         Resembler, Resemblance, Assessor,
         string::*,
     },
 };
-use crate::axo_parser::DynSymbol;
-use crate::axo_schema::{Method, Structure};
 
 #[derive(Debug)]
 pub struct Aligner {
@@ -120,8 +117,8 @@ impl Resembler<Token, Token, ()> for Aligner {
     }
 }
 
-impl Resembler<Element, DynSymbol, ResolveError> for Aligner {
-    fn resemblance(&mut self, query: &Element, candidate: &DynSymbol) -> Result<Resemblance, ResolveError> {
+impl Resembler<Element, Symbol, ResolveError> for Aligner {
+    fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
@@ -176,8 +173,8 @@ impl Affinity {
     }
 }
 
-impl Resembler<Element, DynSymbol, ResolveError> for Affinity {
-    fn resemblance(&mut self, query: &Element, candidate: &DynSymbol) -> Result<Resemblance, ResolveError> {
+impl Resembler<Element, Symbol, ResolveError> for Affinity {
+    fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.clone()) {
@@ -188,7 +185,7 @@ impl Resembler<Element, DynSymbol, ResolveError> for Affinity {
             }
 
             (ElementKind::Invoke(invoke), candidate) => {
-                if let Some(method) = candidate.as_any().downcast_ref::<Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>>>() {
+                if let Some(method) = candidate.as_any().downcast_ref::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
                     score += self.shaping;
 
                     if invoke.get_arguments().len() == method.get_parameters().len() {
@@ -206,7 +203,7 @@ impl Resembler<Element, DynSymbol, ResolveError> for Affinity {
                 }
             }
             (ElementKind::Construct(construct), candidate) => {
-                if let Some(structure) = candidate.as_any().downcast_ref::<Structure<Box<Element>, DynSymbol>>() {
+                if let Some(structure) = candidate.as_any().downcast_ref::<Structure<Box<Element>, Symbol>>() {
                     score += self.shaping;
 
                     if construct.get_fields().len() == structure.get_fields().len() {
@@ -230,8 +227,8 @@ impl Resembler<Element, DynSymbol, ResolveError> for Affinity {
     }
 }
 
-pub fn symbol_matcher() -> Assessor<Element, DynSymbol, ResolveError> {
-    Assessor::<Element, DynSymbol, ResolveError>::new()
+pub fn symbol_matcher() -> Assessor<Element, Symbol, ResolveError> {
+    Assessor::<Element, Symbol, ResolveError>::new()
         .floor(0.65)
         .dimension(Aligner::new(), 0.75)
         .dimension(Affinity::new(), 0.25)

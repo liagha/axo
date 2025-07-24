@@ -12,11 +12,11 @@ use {
     },
 };
 use crate::axo_cursor::Location;
-use crate::axo_internal::compiler::{Context, Marked};
+use crate::axo_internal::compiler::{Registry, Marked};
 
 #[derive(Clone)]
 pub struct Parser {
-    pub context: Context,
+    pub registry: Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Token>,
@@ -88,9 +88,9 @@ impl Peekable<Token> for Parser {
 }
 
 impl Parser {
-    pub fn new(context: Context, tokens: Vec<Token>, location: Location) -> Self {
+    pub fn new(registry: Registry, tokens: Vec<Token>, location: Location) -> Self {
         Parser {
-            context,
+            registry,
             input: tokens,
             index: 0,
             position: Position::new(location),
@@ -140,11 +140,11 @@ impl Parser {
 }
 
 impl Marked for Parser {
-    fn context(&self) -> &Context {
-        &self.context
+    fn registry(&self) -> &Registry {
+        &self.registry
     }
 
-    fn context_mut(&mut self) -> &mut Context {
-        &mut self.context
+    fn registry_mut(&mut self) -> &mut Registry {
+        &mut self.registry
     }
 }

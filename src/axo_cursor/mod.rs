@@ -16,7 +16,7 @@ use {
             form::Form
         },
         axo_parser::{
-            Element, Symbol
+            Element, Symbolic
         },
         axo_scanner::{
             Character, Token

@@ -11,7 +11,7 @@ mod statement;
 
 pub use {
     element::{Element, ElementKind},
-    symbol::{Symbol, DynSymbol},
+    symbol::{Symbolic, Symbol},
     parser::Parser
 };
 

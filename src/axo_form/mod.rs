@@ -23,7 +23,7 @@ pub mod helper {
             thread::{Arc, Mutex},
         },
     };
-    use crate::axo_internal::compiler::{Context, Marked};
+    use crate::axo_internal::compiler::{Registry, Marked};
 
     pub trait Source<Input>: Peekable<Input> + Marked
     where
@@ -49,10 +49,10 @@ pub mod helper {
         ptr1 as *const T as *const () == ptr2 as *const U as *const ()
     }
 
-    pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Context, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
+    pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
     pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>;
     pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
     pub type Inspector<Input, Output, Failure> = Arc<dyn Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync>;
     pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-    pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Context, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
+    pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
 }

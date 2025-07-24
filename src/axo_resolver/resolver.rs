@@ -1,6 +1,4 @@
 use {
-    dynemit::eq::DynEq,
-
     super::{
         error::{
             ErrorKind,
@@ -19,7 +17,7 @@ use {
         },
         axo_parser::{
             Element, ElementKind,
-            DynSymbol,
+            Symbol,
         },
         axo_schema::{
             Enumeration, Implementation,
@@ -44,30 +42,39 @@ impl Resolver {
         }
     }
 
-    pub fn push_scope(&mut self) {
-        let parent_scope = replace(&mut self.scope, Scope::new());
-        self.scope.set_parent(parent_scope);
+    pub fn enter(&mut self) {
+        let parent_scope = replace(&mut self.scope, Scope::child());
+        self.scope.attach(parent_scope);
     }
 
-    pub fn pop_scope(&mut self) {
-        if let Some(parent) = self.scope.take_parent() {
+    pub fn exit(&mut self) {
+        if let Some(parent) = self.scope.detach() {
             self.scope = parent;
         }
     }
 
-    pub fn insert(&mut self, symbol: DynSymbol) {
-        self.scope.insert(symbol);
+    pub fn define(&mut self, symbol: Symbol) {
+        self.scope.add(symbol);
     }
 
-    pub fn lookup(&mut self, target: &Element, candidates: Vec<DynSymbol>) -> Option<DynSymbol> {
+    pub fn get(&mut self, target: &Element) -> Option<Symbol> {
+        let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, &candidates);
         self.errors.extend(assessor.errors);
 
-        champion.map(|champion| champion)
+        champion
     }
 
-    pub fn error(&mut self, error: ErrorKind, span: Span) {
+    pub fn lookup(&mut self, target: &Element, candidates: Vec<Symbol>) -> Option<Symbol> {
+        let mut assessor = symbol_matcher();
+        let champion = assessor.champion(target, &candidates);
+        self.errors.extend(assessor.errors);
+
+        champion
+    }
+
+    pub fn fail(&mut self, error: ErrorKind, span: Span) {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
@@ -77,15 +84,14 @@ impl Resolver {
         self.errors.push(error);
     }
 
-    pub fn settle(&mut self, elements: Vec<Element>) {
+    pub fn process(&mut self, elements: Vec<Element>) {
         for element in elements {
             self.resolve(&element.into());
         }
     }
 
-    pub fn resolve(&mut self, element: &Box<Element>) {
-        let Element { kind, .. } = *element.clone();
-        let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
+    pub fn resolve(&mut self, element: &Element) {
+        let Element { kind, .. } = element.clone();
 
         match kind {
             ElementKind::Symbolize(symbol) => {
@@ -93,23 +99,23 @@ impl Resolver {
             }
 
             ElementKind::Assign(assign) => {
-                self.lookup(assign.get_target(), symbols);
+                self.get(assign.get_target());
             }
 
             ElementKind::Block(body) => {
-                self.push_scope();
-                self.settle(body.items);
-                self.pop_scope();
+                self.enter();
+                self.process(body.items);
+                self.exit();
             }
 
             ElementKind::Identifier(_) => {
-                self.lookup(&element, symbols);
+                self.get(&element);
             }
 
             ElementKind::Construct { .. }
             | ElementKind::Invoke { .. }
             | ElementKind::Index { .. } => {
-                self.lookup(&element, symbols);
+                self.get(&element);
             }
 
             ElementKind::Group(group) => {
@@ -142,14 +148,14 @@ impl Resolver {
 
             ElementKind::Conditional(conditioned) => {
                 self.resolve(conditioned.get_condition());
-                self.push_scope();
+                self.enter();
                 self.resolve(conditioned.get_then());
-                self.pop_scope();
+                self.exit();
 
                 if let Some(alternate) = conditioned.get_alternate() {
-                    self.push_scope();
+                    self.enter();
                     self.resolve(alternate);
-                    self.pop_scope();
+                    self.exit();
                 }
             }
 
@@ -157,27 +163,24 @@ impl Resolver {
                 if let Some(condition) = repeat.get_condition() {
                     self.resolve(condition);
                 }
-                self.push_scope();
+                self.enter();
                 self.resolve(repeat.get_body());
-                self.pop_scope();
+                self.exit();
             }
 
             ElementKind::Iterate(walk) => {
                 self.resolve(walk.get_clause());
 
-                let parent = replace(&mut self.scope, Scope::new());
-                self.scope.set_parent(parent);
+                let parent = replace(&mut self.scope, Scope::child());
+                self.scope.attach(parent);
 
                 self.resolve(walk.get_body());
-                self.pop_scope();
+                self.exit();
             }
 
             ElementKind::Access(access) => {
-                let _target = self.lookup(access.get_object(), symbols);
-
-                /*if let Some(target) = target {
-                    self.lookup(access.get_target(), target.members);
-                }*/
+                let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
+                let _target = self.lookup(access.get_object(), candidates);
             }
 
             ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
@@ -190,32 +193,157 @@ impl Resolver {
         }
     }
 
-    pub fn symbolize(&mut self, symbol: DynSymbol) {
-        let symbols = self.scope.gather().iter().cloned().collect::<Vec<_>>();
-
-        if let Some(implementation) = symbol.as_any().downcast_ref::<Implementation<Box<Element>, Box<Element>, DynSymbol>>() {
-            if let Some(target) = self.lookup(implementation.get_target(), symbols) {
+    pub fn symbolize(&mut self, symbol: Symbol) {
+        if let Some(implementation) = symbol.as_any().downcast_ref::<Implementation<Box<Element>, Box<Element>, Symbol>>() {
+            let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
+            if let Some(target) = self.lookup(implementation.get_target(), candidates) {
                 if let Some(interface) = implementation.get_interface() {
-                    self.scope.symbols.remove(&target);
+                    self.scope.remove(&target);
 
                     let _member = Interface::new(interface.clone(), implementation.get_members().clone());
-                    //target.members.push(member);
-                    self.scope.insert(target);
+                    self.scope.add(target);
                 } else {
-                    self.scope.symbols.remove(&target);
-
-                    //target.members.extend(implementation.get_members().clone());
-                    self.scope.insert(target);
+                    self.scope.remove(&target);
+                    self.scope.add(target);
                 }
             }
         }
 
-        if let Some(_) = symbol.as_any().downcast_ref::<Structure<Box<Element>, DynSymbol>>() {
-            self.scope.insert(symbol.clone());
+        if let Some(_) = symbol.as_any().downcast_ref::<Structure<Box<Element>, Symbol>>() {
+            self.scope.add(symbol.clone());
         } else if let Some(_) = symbol.as_any().downcast_ref::<Enumeration<Box<Element>, Element>>() {
-            self.scope.insert(symbol.clone());
-        } else if let Some(_) = symbol.as_any().downcast_ref::<Method<Box<Element>, DynSymbol, Box<Element>, Option<Box<Element>>>>() {
-            self.scope.insert(symbol.clone());
+            self.scope.add(symbol.clone());
+        } else if let Some(_) = symbol.as_any().downcast_ref::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
+            self.scope.add(symbol.clone());
+        }
+    }
+
+    pub fn extend(&mut self, symbols: Vec<Symbol>) {
+        self.scope.extend(symbols);
+    }
+
+    pub fn merge(&mut self, other: Resolver) {
+        self.scope.merge(&other.scope);
+        self.errors.extend(other.errors);
+    }
+
+    pub fn collect(&mut self, elements: Vec<Element>) -> Vec<Option<Symbol>> {
+        elements.iter().map(|e| self.get(e)).collect()
+    }
+
+    pub fn batch(&mut self, symbols: Vec<Symbol>) {
+        for symbol in symbols {
+            self.define(symbol);
+        }
+    }
+
+    pub fn purge(&mut self, symbol: &Symbol) -> bool {
+        self.scope.remove(symbol)
+    }
+
+    pub fn replace(&mut self, old: &Symbol, new: Symbol) -> bool {
+        self.scope.replace(old, new)
+    }
+
+    pub fn clear(&mut self) {
+        self.scope.clear();
+        self.errors.clear();
+    }
+
+    pub fn reset(&mut self) {
+        self.scope = Scope::new();
+        self.errors.clear();
+    }
+
+    pub fn snapshot(&self) -> Resolver {
+        self.clone()
+    }
+
+    pub fn restore(&mut self, snapshot: Resolver) {
+        *self = snapshot;
+    }
+
+    pub fn isolate(&mut self) {
+        self.scope.isolate();
+    }
+
+    pub fn depth(&self) -> usize {
+        self.scope.depth()
+    }
+
+    pub fn symbols(&self) -> Vec<Symbol> {
+        self.scope.flatten()
+    }
+
+    pub fn visible(&self, symbol: &Symbol) -> bool {
+        self.scope.visible(symbol)
+    }
+
+    pub fn shadow(&mut self, symbol: Symbol) {
+        self.scope.shadow(symbol);
+    }
+
+    pub fn nested(&self) -> bool {
+        self.scope.nested()
+    }
+
+    pub fn toplevel(&self) -> bool {
+        self.scope.toplevel()
+    }
+
+    pub fn check(&mut self, elements: Vec<Element>) -> bool {
+        let initial_errors = self.errors.len();
+        self.process(elements);
+        self.errors.len() == initial_errors
+    }
+
+    pub fn validate(&mut self, element: &Element) -> bool {
+        let initial_errors = self.errors.len();
+        self.resolve(element);
+        self.errors.len() == initial_errors
+    }
+
+    pub fn succeed(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    pub fn failed(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn count(&self) -> usize {
+        self.scope.count()
+    }
+
+    pub fn empty(&self) -> bool {
+        self.scope.empty()
+    }
+
+    pub fn cascade(&self) -> Vec<Vec<Symbol>> {
+        self.scope.cascade().into_iter().map(|set| set.into_iter().collect()).collect()
+    }
+
+    pub fn filter<F>(&mut self, predicate: F)
+    where
+        F: FnMut(&Symbol) -> bool,
+    {
+        self.scope.retain(predicate);
+    }
+
+    pub fn search<F>(&self, predicate: F) -> Vec<Symbol>
+    where
+        F: Fn(&Symbol) -> bool,
+    {
+        self.scope.filter(predicate).into_iter().collect()
+    }
+
+    pub fn traverse<F>(&mut self, elements: Vec<Element>, visitor: F)
+    where
+        F: Fn(&Element, &mut Resolver),
+    {
+        for element in elements {
+            visitor(&element, self);
+            self.resolve(&element.into());
         }
     }
 }

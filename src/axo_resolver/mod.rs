@@ -17,7 +17,6 @@ use {
 
 pub use {
     resolver::Resolver,
-    brand::Branded,
 };
 
 pub type ResolveError = Error<ErrorKind, String, ResolveHint>;

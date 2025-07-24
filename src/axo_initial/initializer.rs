@@ -1,16 +1,16 @@
 use crate::format::Debug;
-use crate::axo_cursor::{Location, Peekable, Position};
+use crate::axo_cursor::{Location, Peekable, Position, Span};
 use crate::axo_form::form::Form;
 use crate::axo_form::former::Former;
 use crate::axo_form::pattern::Classifier;
 use crate::axo_initial::InitialError;
-use crate::axo_parser::{Element, ParseError};
+use crate::axo_parser::{Element, ParseError, Symbolic};
 use crate::axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::compiler::{Context, Marked};
+use crate::compiler::{Registry, Marked};
 use crate::hash::Hash;
 
 pub struct Initializer {
-    pub context: Context,
+    pub registry: Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Token>,
@@ -22,6 +22,21 @@ pub struct Initializer {
 pub enum Preference {
     Verbosity(bool),
     Path(String),
+}
+
+impl Symbolic for Preference {
+    fn brand(&self) -> Option<Token> {
+        let label = match self {
+            Preference::Verbosity(_) => {
+                "Verbosity".to_string()
+            }
+            Preference::Path(_) => {
+                "Path".to_string()
+            }
+        };
+
+        Some(Token::new(TokenKind::Identifier(label), Span::default()))
+    }
 }
 
 impl Peekable<Token> for Initializer {
@@ -83,9 +98,9 @@ impl Peekable<Token> for Initializer {
 }
 
 impl Initializer {
-    pub fn new(context: Context, tokens: Vec<Token>, location: Location) -> Self {
+    pub fn new(registry: Registry, tokens: Vec<Token>, location: Location) -> Self {
         Initializer {
-            context,
+            registry,
             input: tokens,
             index: 0,
             position: Position::new(location),
@@ -252,11 +267,11 @@ impl Initializer {
 }
 
 impl Marked for Initializer {
-    fn context(&self) -> &Context {
-        &self.context
+    fn registry(&self) -> &Registry {
+        &self.registry
     }
 
-    fn context_mut(&mut self) -> &mut Context {
-        &mut self.context
+    fn registry_mut(&mut self) -> &mut Registry {
+        &mut self.registry
     }
 }

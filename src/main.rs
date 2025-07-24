@@ -26,7 +26,6 @@ use {
     axo_internal::{
         compiler::{
             Compiler,
-            CompilerError,
         },
         logger::{LogInfo, LogPlan, Logger},
         timer::{
@@ -44,6 +43,10 @@ pub const TIMER: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
 pub mod data {
     //pub use std::collections::VecDeque;
+}
+
+pub mod error {
+    pub use core::error::Error;
 }
 
 pub mod file {
@@ -162,15 +165,14 @@ fn main() {
 
     match run_application() {
         Ok(()) => {}
-        Err(CompilerError::HelpRequested) => {}
         Err(e) => {
             eprintln!("{}", e);
         }
     }
 }
 
-fn run_application() -> Result<(), CompilerError> {
-    let mut compiler = Compiler::new()?;
+fn run_application() -> Result<(), Box<dyn error::Error>> {
+    let mut compiler = Compiler::new();
 
     compiler.compile()?;
 
