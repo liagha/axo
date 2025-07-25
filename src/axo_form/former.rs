@@ -1,9 +1,11 @@
 pub mod record {
-    pub const PANICKED: i8 = 120;
-    pub const ALIGNED: i8 = 1;
-    pub const FAILED: i8 = 0;
-    pub const BLANK: i8 = -1;
-    pub const IGNORED: i8 = -2;
+    pub type Record = i8;
+
+    pub const PANICKED: Record = Record::MAX;
+    pub const ALIGNED: Record = 1;
+    pub const FAILED: Record = 0;
+    pub const BLANK: Record = -1;
+    pub const IGNORED: Record = -2;
 }
 
 use {
@@ -16,13 +18,15 @@ use {
         axo_cursor::{
             Peekable, Position,
         },
+        axo_internal::{
+            compiler::Marked,
+        },
         format::Debug,
         hash::Hash,
         marker::PhantomData,
     },
     record::*,
 };
-use crate::axo_internal::compiler::Marked;
 
 pub struct Composer<'c, Input, Output, Failure>
 where
@@ -157,7 +161,6 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    fn strain(&mut self, pattern: Classifier<Input, Output, Failure>);
     fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
@@ -168,33 +171,6 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    fn strain(&mut self, pattern: Classifier<Input, Output, Failure>) {
-        let mut inputs = Vec::with_capacity(self.len());
-        let mut index = 0;
-        let mut position = self.position();
-        let mut composer = Composer::new(self);
-
-        loop {
-            if composer.source.get(index).is_none() {
-                break;
-            }
-
-            let mut draft = Draft::new(index, position, pattern.clone());
-            composer.build(&mut draft);
-
-            if draft.is_aligned() {
-                index = draft.marker + 1;
-                position = draft.position;
-                inputs.extend(draft.consumed);
-            } else {
-                index = draft.marker + 1;
-                position = draft.position;
-            }
-        }
-
-        *self.input_mut() = inputs;
-    }
-
     fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), pattern);
         let mut composer = Composer::new(self);

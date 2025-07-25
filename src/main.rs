@@ -51,7 +51,7 @@ pub mod error {
 
 pub mod file {
     pub use std::fs::read_to_string;
-    pub use std::io::Error;
+    //pub use std::io::Error;
 }
 
 pub mod io {
@@ -161,20 +161,7 @@ fn main() {
     let logger = Logger::new(Level::max(), plan);
     logger.init().expect("fuck");
 
-    println!();
-
-    match run_application() {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("{}", e);
-        }
-    }
-}
-
-fn run_application() -> Result<(), Box<dyn error::Error>> {
     let mut compiler = Compiler::new();
 
-    compiler.compile()?;
-
-    Ok(())
+    compiler.compile();
 }

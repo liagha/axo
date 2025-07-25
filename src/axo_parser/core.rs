@@ -114,8 +114,8 @@ impl Parser {
 
                     unary = Element::new(
                         ElementKind::unary(Unary::new(
-                            prefix.clone(),
-                            unary.into(),
+                            prefix,
+                            Box::new(unary),
                         )),
                         span,
                     );
@@ -167,19 +167,19 @@ impl Parser {
                         match element.kind {
                             ElementKind::Group(group) => {
                                 unary = Element::new(
-                                    ElementKind::invoke(Invoke::new(unary.into(), group.items)),
+                                    ElementKind::invoke(Invoke::new(Box::new(unary), group.items)),
                                     span,
                                 )
                             }
                             ElementKind::Collection(collection) => {
                                 unary = Element::new(
-                                    ElementKind::index(Index::new(unary.into(), collection.items)),
+                                    ElementKind::index(Index::new(Box::new(unary), collection.items)),
                                     span,
                                 )
                             }
                             ElementKind::Bundle(bundle) => {
                                 unary = Element::new(
-                                    ElementKind::construct(Construct::new(unary.into(), bundle.items)),
+                                    ElementKind::construct(Construct::new(Box::new(unary), bundle.items)),
                                     span,
                                 )
                             }
@@ -297,25 +297,25 @@ impl Parser {
             match &operator.kind {
                 TokenKind::Operator(OperatorKind::Dot) => {
                     left = Element::new(
-                        ElementKind::Access(Access::new(left.into(), right.into())),
+                        ElementKind::Access(Access::new(Box::new(left), Box::new(right))),
                         span,
                     );
                 }
                 TokenKind::Operator(OperatorKind::Equal) => {
                     left = Element::new(
-                        ElementKind::Assign(Assign::new(left.into(), right.into())),
+                        ElementKind::Assign(Assign::new(Box::new(left), Box::new(right))),
                         span,
                     );
                 }
                 TokenKind::Operator(OperatorKind::Colon) => {
                     left = Element::new(
-                        ElementKind::Label(Label::new(left.into(), right.into())),
+                        ElementKind::Label(Label::new(Box::new(left), Box::new(right))),
                         span,
                     );
                 }
                 _ => {
                     left = Element::new(
-                        ElementKind::Binary(Binary::new(left.into(), operator.clone(), right.into())),
+                        ElementKind::Binary(Binary::new(Box::new(left), operator.clone(), Box::new(right))),
                         span,
                     );
                 }

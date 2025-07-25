@@ -210,8 +210,8 @@ impl Initializer {
         )
     }
 
-    pub fn strainer() -> Classifier<Token, Element, ParseError> {
-        Classifier::persistence(
+    pub fn strainer(length: usize) -> Classifier<Token, Element, ParseError> {
+        Classifier::continuous(
             Classifier::predicate(|token: &Token| {
                 !matches!(token.kind,
                     TokenKind::Punctuation(PunctuationKind::Newline)
@@ -223,7 +223,7 @@ impl Initializer {
                 )
             }),
             0,
-            None
+            Some(length)
         )
     }
 
@@ -244,7 +244,16 @@ impl Initializer {
     }
 
     pub fn initialize(&mut self) {
-        self.strain(Self::strainer());
+        self.input = self.input.iter().cloned().filter(|token| {
+            !matches!(token.kind,
+                    TokenKind::Punctuation(PunctuationKind::Newline)
+                    | TokenKind::Punctuation(PunctuationKind::Tab)
+                    | TokenKind::Punctuation(PunctuationKind::Space)
+                    | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                    | TokenKind::Punctuation(PunctuationKind::Semicolon)
+                    | TokenKind::Comment(_)
+                )
+        }).collect::<Vec<_>>();
 
         while self.peek().is_some() {
             let forms = self.form(Self::classifier()).flatten();

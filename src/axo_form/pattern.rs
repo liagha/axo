@@ -1,16 +1,18 @@
 use {
     super::{
         form::Form,
-        former::{record, Composer, Draft},
+        former::{record::*, Composer, Draft},
         order::Order,
     },
     crate::{
+        axo_internal::{
+            compiler::Registry,
+        },
         format::Debug,
         hash::Hash,
         thread::{Arc, Mutex},
     },
 };
-use crate::axo_internal::compiler::Registry;
 
 pub trait Pattern<Input, Output, Failure>
 where
@@ -120,8 +122,8 @@ where
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub patterns: [Classifier<Input, Output, Failure>; SIZE],
-    pub perfection: Vec<i8>,
-    pub blacklist: Vec<i8>,
+    pub perfection: Vec<Record>,
+    pub blacklist: Vec<Record>,
 }
 
 impl<Input, Output, Failure, const SIZE: usize> Pattern<Input, Output, Failure> for Alternative<Input, Output, Failure, SIZE>
@@ -267,7 +269,7 @@ where
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
     pub pattern: Box<Classifier<Input, Output, Failure>>,
-    pub precedence: i8,
+    pub precedence: Record,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Ranked<Input, Output, Failure>
@@ -286,9 +288,9 @@ where
         draft.form = child.form.clone();
 
         if child.is_aligned() {
-            draft.record = self.precedence.max(record::ALIGNED);
+            draft.record = self.precedence.max(ALIGNED);
         } else if child.is_failed() {
-            draft.record = self.precedence.min(record::FAILED);
+            draft.record = self.precedence.min(FAILED);
         } else {
             draft.record = child.record;
         }
@@ -322,14 +324,14 @@ where
             composer.build(&mut child);
 
             match child.record {
-                record::ALIGNED => {
+                ALIGNED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                record::PANICKED | record::FAILED => {
+                PANICKED | FAILED => {
                     draft.record = child.record;
                     index = child.marker;
                     position = child.position;
@@ -337,7 +339,7 @@ where
                     forms.push(child.form);
                     break;
                 }
-                record::IGNORED => {
+                IGNORED => {
                     index = child.marker;
                     position = child.position;
                 }
@@ -356,73 +358,6 @@ where
 }
 
 #[derive(Clone)]
-pub struct Persistence<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
-    pub pattern: Box<Classifier<Input, Output, Failure>>,
-    pub minimum: usize,
-    pub maximum: Option<usize>,
-}
-
-impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Persistence<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
-    fn build(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
-        let mut index = draft.marker;
-        let mut position = draft.position;
-        let mut consumed = Vec::new();
-        let mut forms = Vec::new();
-
-        while composer.source.peek_ahead(index).is_some() {
-            let mut child = Draft::new(index, position, self.pattern.as_ref().clone());
-            composer.build(&mut child);
-
-            if child.marker == index {
-                break;
-            }
-
-            match child.record {
-                record::PANICKED | record::ALIGNED | record::FAILED => {
-                    index = child.marker;
-                    position = child.position;
-                    consumed.extend(child.consumed);
-                    forms.push(child.form);
-                }
-                record::IGNORED => {
-                    index = child.marker;
-                    position = child.position;
-                }
-                _ => {
-                    break;
-                }
-            }
-
-            if let Some(max) = self.maximum {
-                if forms.len() >= max {
-                    break;
-                }
-            }
-        }
-
-        if forms.len() >= self.minimum {
-            draft.align();
-            draft.marker = index;
-            draft.position = position;
-            draft.consumed = consumed;
-            draft.form = Form::multiple(forms);
-        } else {
-            draft.empty();
-        }
-    }
-}
-
-#[derive(Clone)]
 pub struct Repetition<Input, Output, Failure>
 where
     Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
@@ -432,6 +367,12 @@ where
     pub pattern: Box<Classifier<Input, Output, Failure>>,
     pub minimum: usize,
     pub maximum: Option<usize>,
+    pub update: Vec<Record>,
+    pub accept: Vec<Record>,
+    pub consume: Vec<Record>,
+    pub halt: Vec<Record>,
+    pub align_on_success: bool,
+    pub empty_on_failure: bool,
 }
 
 impl<Input, Output, Failure> Pattern<Input, Output, Failure> for Repetition<Input, Output, Failure>
@@ -454,30 +395,22 @@ where
                 break;
             }
 
-            match child.record {
-                record::ALIGNED => {
-                    draft.record = child.record;
-                    index = child.marker;
-                    position = child.position;
-                    consumed.extend(child.consumed);
-                    forms.push(child.form);
-                }
-                record::PANICKED | record::FAILED => {
-                    draft.record = child.record;
-                    index = child.marker;
-                    position = child.position;
-                    consumed.extend(child.consumed);
-                    forms.push(child.form);
-                    break;
-                }
-                record::IGNORED => {
-                    index = child.marker;
-                    position = child.position;
-                }
-                _ => {
-                    draft.record = child.record;
-                    break;
-                }
+            if self.update.contains(&child.record) {
+                draft.record = child.record;
+            }
+
+            if self.accept.contains(&child.record) {
+                index = child.marker;
+                position = child.position;
+            }
+
+            if self.consume.contains(&child.record) {
+                consumed.extend(child.consumed);
+                forms.push(child.form);
+            }
+
+            if self.halt.contains(&child.record) {
+                break;
             }
 
             if let Some(max) = self.maximum {
@@ -488,11 +421,17 @@ where
         }
 
         if forms.len() >= self.minimum {
+            if self.align_on_success {
+                draft.align();
+            }
             draft.marker = index;
             draft.position = position;
             draft.consumed = consumed;
-
             draft.form = Form::multiple(forms);
+        } else {
+            if self.empty_on_failure {
+                draft.empty();
+            }
         }
     }
 }
@@ -545,12 +484,12 @@ where
     pub fn alternative<const SIZE: usize>(patterns: [Self; SIZE]) -> Self {
         Self::new(Arc::new(Alternative {
             patterns,
-            perfection: vec![record::PANICKED, record::ALIGNED],
-            blacklist: vec![record::BLANK]
+            perfection: vec![PANICKED, ALIGNED],
+            blacklist: vec![BLANK]
         }))
     }
 
-    pub fn choice<const SIZE: usize>(patterns: [Self; SIZE], perfection: Vec<i8>) -> Self {
+    pub fn choice<const SIZE: usize>(patterns: [Self; SIZE], perfection: Vec<Record>) -> Self {
         Self::new(Arc::new(Alternative {
             patterns,
             perfection,
@@ -569,10 +508,16 @@ where
     }
 
     pub fn persistence(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
-        Self::new(Arc::new(Persistence {
+        Self::new(Arc::new(Repetition {
             pattern: Box::new(pattern),
             minimum,
             maximum,
+            update: vec![],
+            accept: vec![PANICKED, ALIGNED, FAILED, IGNORED],
+            consume: vec![PANICKED, ALIGNED, FAILED],
+            halt: vec![],
+            align_on_success: true,
+            empty_on_failure: true,
         }))
     }
 
@@ -581,6 +526,26 @@ where
             pattern: Box::new(pattern),
             minimum,
             maximum,
+            update: vec![ALIGNED, PANICKED, FAILED],
+            accept: vec![ALIGNED, PANICKED, FAILED, IGNORED],
+            consume: vec![ALIGNED, PANICKED, FAILED],
+            halt: vec![PANICKED, FAILED],
+            align_on_success: false,
+            empty_on_failure: false,
+        }))
+    }
+
+    pub fn continuous(pattern: Self, minimum: usize, maximum: Option<usize>) -> Self {
+        Self::new(Arc::new(Repetition {
+            pattern: Box::new(pattern),
+            minimum,
+            maximum,
+            update: vec![ALIGNED, FAILED, PANICKED, IGNORED],
+            accept: vec![ALIGNED, FAILED, PANICKED, IGNORED],
+            consume: vec![ALIGNED, FAILED, PANICKED, IGNORED],
+            halt: vec![],
+            align_on_success: false,
+            empty_on_failure: false,
         }))
     }
 
@@ -590,7 +555,7 @@ where
         }))
     }
 
-    pub fn ranked(pattern: Self, precedence: i8) -> Self {
+    pub fn ranked(pattern: Self, precedence: Record) -> Self {
         Self::new(Arc::new(Ranked {
             pattern: Box::new(pattern),
             precedence,

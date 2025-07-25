@@ -99,19 +99,17 @@ impl Registry {
 }
 
 pub trait Stage<Input, Output> {
-    fn execute(&mut self, registry: &mut Registry, input: Input) -> Result<Output, Box<dyn crate::error::Error>>;
+    fn execute(&mut self, registry: &mut Registry, input: Input) -> Output;
 }
 
 macro_rules! pipeline {
-    ($registry:expr, $input:expr, $stage:expr) => {
+    ($registry:expr, $input:expr, $stage:expr) => {{
         $stage.execute($registry, $input)
-    };
-    ($registry:expr, $input:expr, $stage:expr, $($remaining:expr),+) => {
-        match $stage.execute($registry, $input) {
-            Ok(output) => pipeline!($registry, output, $($remaining),+),
-            Err(error) => Err(error),
-        }
-    };
+    }};
+    ($registry:expr, $input:expr, $stage:expr, $($remaining:expr),+) => {{
+        let output = $stage.execute($registry, $input);
+        pipeline!($registry, output, $($remaining),+)
+    }};
 }
 
 pub struct Compiler {
@@ -125,7 +123,7 @@ impl Compiler {
         Compiler { registry }
     }
 
-    pub fn compile(&mut self) -> Result<(), Box<dyn crate::error::Error>> {
+    pub fn compile(&mut self) -> () {
         let timer = Timer::new(TIMER);
 
         let result = self.compile_with(|registry| {
@@ -136,41 +134,27 @@ impl Compiler {
                 Scanning,
                 Parsing,
                 Resolving
-            ).map(|_| ())
+            )
         });
 
         let verbosity = self.registry.get_verbosity().unwrap_or(false);
 
         if verbosity {
-            match &result {
-                Ok(_) => {
-                    let duration = Duration::from_nanos(timer.elapsed().unwrap());
-                    xprintln!(
-                        "Finished {} {}s." => Color::Green,
-                        "`compilation` in" => Color::White,
-                        duration.as_secs_f64(),
-                    );
-                    xprintln!();
-                }
-                Err(_) => {
-                    let duration = Duration::from_nanos(timer.elapsed().unwrap());
-                    xprintln!(
-                        "Finished {} {}s with {}." => Color::Green,
-                        "`compilation` in" => Color::White,
-                        duration.as_secs_f64(),
-                        "errors" => Color::Red,
-                    );
-                    xprintln!();
-                }
-            }
+            let duration = Duration::from_nanos(timer.elapsed().unwrap());
+            xprintln!(
+                "Finished {} {}s." => Color::Green,
+                "`compilation` in" => Color::White,
+                duration.as_secs_f64(),
+            );
+            xprintln!();
         }
 
         result
     }
 
-    pub fn compile_with<Function, Type>(&mut self, build_pipeline: Function) -> Result<Type, Box<dyn crate::error::Error>>
+    pub fn compile_with<Function, Type>(&mut self, build_pipeline: Function) -> Type
     where
-        Function: FnOnce(&mut Registry) -> Result<Type, Box<dyn crate::error::Error>>,
+        Function: FnOnce(&mut Registry) -> Type,
     {
         let result = build_pipeline(&mut self.registry);
 
@@ -181,7 +165,7 @@ impl Compiler {
 pub struct Initializing;
 
 impl Stage<(), ()> for Initializing {
-    fn execute(&mut self, registry: &mut Registry, _input: ()) -> Result<(), Box<dyn crate::error::Error>> {
+    fn execute(&mut self, registry: &mut Registry, _input: ()) -> () {
         let timer = Timer::new(TIMER);
         let verbosity = registry.get_verbosity().unwrap_or(false);
 
@@ -250,14 +234,14 @@ impl Stage<(), ()> for Initializing {
             }
         }
 
-        Ok(())
+        ()
     }
 }
 
 pub struct Scanning;
 
 impl Stage<(), Vec<Token>> for Scanning {
-    fn execute(&mut self, registry: &mut Registry, _input: ()) -> Result<Vec<Token>, Box<dyn crate::error::Error>> {
+    fn execute(&mut self, registry: &mut Registry, _input: ()) -> Vec<Token> {
         let scanner_timer = Timer::new(TIMER);
 
         let location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
@@ -317,14 +301,14 @@ impl Stage<(), Vec<Token>> for Scanning {
             }
         }
 
-        Ok(scanner.output)
+        scanner.output
     }
 }
 
 pub struct Parsing;
 
 impl Stage<Vec<Token>, Vec<Element>> for Parsing {
-    fn execute(&mut self, registry: &mut Registry, tokens: Vec<Token>) -> Result<Vec<Element>, Box<dyn crate::error::Error>> {
+    fn execute(&mut self, registry: &mut Registry, tokens: Vec<Token>) -> Vec<Element> {
         let timer = Timer::new(TIMER);
 
         let location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
@@ -387,14 +371,14 @@ impl Stage<Vec<Token>, Vec<Element>> for Parsing {
             }
         }
 
-        Ok(parser.output)
+        parser.output
     }
 }
 
 pub struct Resolving;
 
 impl Stage<Vec<Element>, ()> for Resolving {
-    fn execute(&mut self, registry: &mut Registry, elements: Vec<Element>) -> Result<(), Box<dyn crate::error::Error>> {
+    fn execute(&mut self, registry: &mut Registry, elements: Vec<Element>) -> () {
         let timer = Timer::new(TIMER);
         let _location = registry.get_path().map_or(Location::Void, |path| { Location::File(path.leak()) });
         let verbosity = registry.get_verbosity().unwrap_or(false);
@@ -464,6 +448,6 @@ impl Stage<Vec<Element>, ()> for Resolving {
             }
         }
 
-        Ok(())
+        ()
     }
 }

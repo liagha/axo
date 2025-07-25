@@ -58,7 +58,7 @@ impl Parser {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), Some(alternate.into()))),
+                            ElementKind::Conditional(Conditional::new(Box::new(condition), Box::new(then), Some(alternate.into()))),
                             span,
                         )
                     ))
@@ -67,7 +67,7 @@ impl Parser {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Conditional(Conditional::new(condition.into(), then.into(), None)),
+                            ElementKind::Conditional(Conditional::new(Box::new(condition), Box::new(then), None)),
                             span,
                         )
                     ))

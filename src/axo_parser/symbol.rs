@@ -188,7 +188,7 @@ impl Parser {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::symbolize(
-                                Symbol::new(Implementation::new(name.into(), None, members), span),
+                                Symbol::new(Implementation::new(Box::new(name), None, members), span),
                             ),
                             span
                         )
@@ -204,7 +204,7 @@ impl Parser {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::symbolize(
-                                Symbol::new(Implementation::new(name.into(), Some(target.into()), members), span),
+                                Symbol::new(Implementation::new(Box::new(name), Some(target.into()), members), span),
                             ),
                             span
                         )
@@ -242,7 +242,7 @@ impl Parser {
                     }
 
                     _ => {
-                        Binding::new(body.into(), None, None, mutable)
+                        Binding::new(Box::new(body), None, None, mutable)
                     }
                 };
 
@@ -279,7 +279,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::symbolize(
-                            Symbol::new(Structure::new(name.into(), fields), span),
+                            Symbol::new(Structure::new(Box::new(name), fields), span),
                         ),
                         span,
                     )
@@ -308,7 +308,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(Enumeration::new(name.into(), items), span)
+                            Symbol::new(Enumeration::new(Box::new(name), items), span)
                         ),
                         span,
                     )
@@ -343,7 +343,7 @@ impl Parser {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(Method::new(name.into(), parameters, body.into(), None), span)
+                            Symbol::new(Method::new(Box::new(name), parameters, Box::new(body), None), span)
                         ),
                         span,
                     )
