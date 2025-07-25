@@ -6,16 +6,18 @@ use {
     crate::{
         axo_cursor::{
             Peekable, Position,
+            Location,
+        },
+        axo_internal::{
+            compiler::{
+                Registry, Marked,
+            },
         },
         axo_form::{
             form::Form,
             former::Former,
         },
     },
-};
-use crate::axo_cursor::Location;
-use crate::axo_internal::compiler::{
-    Registry, Marked,
 };
 
 #[derive(Clone)]
@@ -39,14 +41,6 @@ impl Peekable<Character> for Scanner {
 
     fn peek_behind(&self, n: usize) -> Option<&Character> {
         self.index.checked_sub(n).and_then(|idx| self.get(idx))
-    }
-
-    fn restore(&mut self) {
-        self.set_position(Position {
-            line: 1,
-            column: 1,
-            location: self.position.location,
-        })
     }
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Character> {

@@ -1,5 +1,11 @@
-use crate::format::{Debug, Display, Formatter};
-use crate::axo_parser::ParseError;
+use {
+    crate::{
+        axo_parser::ParseError,
+        format::{
+            Debug, Display, Formatter,
+        },
+    }
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {

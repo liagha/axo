@@ -1,14 +1,13 @@
 pub mod alphabetic;
-pub use alphabetic::{is_alphabetic, Alphabetic};
-
-pub mod white_space;
-pub use white_space::{is_white_space, WhiteSpace};
-
+pub mod whitespace;
 pub mod alphanumeric;
-pub use alphanumeric::is_alphanumeric;
-
 pub mod control;
-pub use control::is_control;
-
 pub mod numeric;
-pub use numeric::is_numeric;
+
+pub use {
+    alphabetic::{is_alphabetic, Alphabetic},
+    alphanumeric::is_alphanumeric,
+    control::is_control,
+    numeric::is_numeric,
+    whitespace::{is_whitespace, WhiteSpace},
+};

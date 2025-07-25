@@ -1,11 +1,19 @@
-use crate::axo_cursor::{Span, Spanned};
-use crate::axo_form::form::Form;
-use crate::axo_form::order::Order;
-use crate::axo_form::pattern::Classifier;
-use crate::axo_parser::{Element, ElementKind, ParseError, Parser};
-use crate::axo_parser::error::ErrorKind;
-use crate::axo_scanner::{Token, TokenKind};
-use crate::axo_schema::{Conditional, Repeat};
+use {
+    super::{
+        Element, ElementKind, ParseError, Parser,
+        error::ErrorKind,
+    },
+    crate::{
+        axo_cursor::{Span, Spanned},
+        axo_form::{
+            form::Form,
+            order::Order,
+            pattern::Classifier,
+        },
+        axo_scanner::{Token, TokenKind},
+        axo_schema::{Conditional, Repeat},
+    }
+};
 
 impl Parser {
     pub fn conditional() -> Classifier<Token, Element, ParseError> {

@@ -10,7 +10,7 @@ use {
     },
 
     super::{
-        Symbolic, ParseError,
+        Symbolic, Symbol, ParseError,
     },
 
     crate::{
@@ -36,7 +36,6 @@ use {
         axo_cursor::Span,
     }
 };
-use crate::axo_parser::symbol::Symbol;
 
 pub struct Element {
     pub kind: ElementKind,

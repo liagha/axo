@@ -4,7 +4,7 @@ use {
         axo_scanner::{
             Scanner,
         },
-        is_alphabetic, is_numeric, is_white_space, is_alphanumeric
+        is_alphabetic, is_numeric, is_whitespace, is_alphanumeric
     },
 };
 
@@ -36,7 +36,7 @@ impl Character {
     }
 
     pub fn is_whitespace(&self) -> bool {
-        is_white_space(self.value)
+        is_whitespace(self.value)
     }
 }
 

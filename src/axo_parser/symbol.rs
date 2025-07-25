@@ -1,4 +1,3 @@
-use std::any::Any;
 use {
     dynemit::{
         clone::DynClone,
@@ -29,6 +28,7 @@ use {
             Binding, Enumeration,
             Implementation, Inclusion, Interface, Method, Structure
         },
+        any::Any,
         hash::{Hash, Hasher},
         format::{Debug, Formatter},
         operations::{Deref, DerefMut},

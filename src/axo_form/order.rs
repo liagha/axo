@@ -11,12 +11,16 @@ use {
         axo_cursor::{
             Peekable,
         },
+        axo_internal::{
+            compiler::{
+                Registry, Marked,
+            },
+        },
         format::Debug,
         hash::Hash,
         thread::{Arc, Mutex},
     }
 };
-use crate::axo_internal::compiler::{Registry, Marked};
 
 #[derive(Clone)]
 pub enum Order<Input, Output, Failure>

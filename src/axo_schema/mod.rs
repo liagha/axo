@@ -1,5 +1,7 @@
 mod element;
 mod symbol;
 
-pub use element::*;
-pub use symbol::*;
+pub use {
+    element::*,
+    symbol::*,
+};

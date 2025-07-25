@@ -1,9 +1,19 @@
-use crate::axo_cursor::Spanned;
-use crate::axo_form::form::Form;
-use crate::axo_form::order::Order;
-use crate::axo_form::pattern::Classifier;
-use crate::axo_scanner::{Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind};
-use crate::axo_scanner::error::{CharacterError, ErrorKind};
+use {
+    super::{
+        Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind,
+        error::{CharacterError, ErrorKind},
+    },
+    crate::{
+        axo_cursor::{
+            Spanned,
+        },
+        axo_form::{
+            form::Form,
+            order::Order,
+            pattern::Classifier,
+        },
+    }
+};
 
 impl Scanner {
     fn string() -> Classifier<Character, Token, ScanError> {

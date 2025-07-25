@@ -3,16 +3,16 @@
 use {
     crate::{
         axo_schema::{
-            Procedural,
-            Group, Sequence,
-            Collection, Series,
-            Bundle, Block,
             Binary, Unary,
-            Index, Invoke, Construct,
+            Bundle, Block,
+            Collection, Series,
             Conditional, Repeat, Iterate,
+            Group, Sequence,
+            Index, Invoke, Construct,
             Label, Access, Assign,
-            Structure, Enumeration,
             Method,
+            Procedural,
+            Structure, Enumeration,
         }
     }
 };

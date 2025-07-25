@@ -1,17 +1,19 @@
 use {
+    super::{
+        Character, ScanError, Token, ErrorKind, Scanner,
+        error::{CharacterError, EscapeError},
+    },
     crate::{
+        axo_cursor::{
+            Spanned,
+        },
         axo_form::{
             form::{Form},
             pattern::Classifier,
         },
-        axo_scanner::{
-            Character, ScanError, Token, ErrorKind, Scanner,
-            error::{CharacterError, EscapeError},
-        },
         character::{parse_radix, from_u32},
     }
 };
-use crate::axo_cursor::Spanned;
 
 impl Scanner {
     pub fn simple_escape() -> Classifier<Character, Token, ScanError> {

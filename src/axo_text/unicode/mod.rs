@@ -5,7 +5,11 @@ mod property;
 mod common;
 mod range;
 
-pub use property::*;
-pub use common::*;
-pub use range::*;
-use category::*;
+pub use {
+    common::*,
+    property::*,
+    range::*,
+};
+use {
+    category::*,
+};

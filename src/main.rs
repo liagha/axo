@@ -18,8 +18,8 @@ mod axo_text;
 pub use {
     axo_data::*,
     axo_format::*,
-    axo_text::*,
     axo_internal::*,
+    axo_text::*,
 };
 
 use {
@@ -46,42 +46,90 @@ pub mod data {
 }
 
 pub mod error {
-    pub use core::error::Error;
+    pub use {
+        core::{
+            error::Error,
+        }
+    };
 }
 
 pub mod file {
-    pub use std::fs::read_to_string;
+    pub use {
+        std::{
+            fs::{
+                read_to_string,
+            },
+        },
+    };
     //pub use std::io::Error;
 }
 
 pub mod io {
-    pub use std::io::{stdout, Write};
+    pub use {
+        std::{
+            io::{
+                stdout, Write
+            },
+        },
+    };
 }
 
 pub mod environment {
-    pub use std::env::args;
+    pub use {
+        std::{
+            env::args,
+        },
+    };
 }
 
 pub mod thread {
-    pub use std::sync::{Arc, Mutex};
+    pub use {
+        std::{
+            sync::{
+                Arc, Mutex
+            },
+        },
+    };
 }
 
 pub mod memory {
-    pub use core::mem::{discriminant, replace};
+    pub use {
+        core::{
+            mem::{
+                discriminant, replace
+            },
+        }
+    };
 }
 
 pub mod compare {
-    pub use core::cmp::{Ordering, PartialEq};
+    pub use {
+        core::{
+            cmp::{
+                Ordering, PartialEq
+            },
+        }
+    };
 }
 
 pub mod hash {
-    pub use core::hash::{Hash, Hasher};
-    pub use hashish::HashSet;
+    pub use {
+        core::{
+            hash::{
+                Hash, Hasher,
+            },
+        },
+        hashish::HashSet,
+    };
 }
 
 pub mod character {
-    pub use core::char::{
-        from_u32, from_u32_unchecked, MAX
+    pub use {
+        core::{
+            char::{
+                from_u32, from_u32_unchecked, MAX,
+            }
+        },
     };
 
     use crate::axo_data::PrimInt;
@@ -124,34 +172,66 @@ pub mod character {
 pub mod reference {}
 
 pub mod any {
-    pub use core::any::{Any, TypeId};
+    pub use {
+        core::{
+            any::{
+                Any, TypeId,
+            },
+        }
+    };
 }
 
 pub mod operations {
-    pub use core::ops::{Add, Deref, DerefMut, Div, Mul, Neg, Range, Rem, Sub};
+    pub use {
+        core::{
+            ops::{
+                Add, Deref, DerefMut, Div, Mul, Neg, Range, Rem, Sub,
+            },
+        },
+    };
 }
 
 pub mod architecture {
-    pub use core::arch::asm;
+    pub use {
+        core::{
+            arch::asm,
+        },
+    };
 }
 
 pub mod marker {
-    pub use core::marker::PhantomData;
+    pub use {
+        core::{
+            marker::PhantomData,
+        },
+    };
 }
 
 pub mod string {
-    pub use core::str::FromStr;
+    pub use {
+        core::{
+            str::FromStr,
+        },
+    };
 }
 
 pub mod slice {
-    pub use core::slice::from_ref;
+    pub use {
+        core::{
+            slice::from_ref,
+        },
+    };
 }
 
 pub mod format {
-    pub use core::fmt::{
-        Debug, Display,
-        Formatter, Result,
-        Write
+    pub use {
+        core::{
+            fmt::{
+                Debug, Display,
+                Formatter, Result,
+                Write
+            },
+        },
     };
 }
 

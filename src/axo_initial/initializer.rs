@@ -1,14 +1,19 @@
-use crate::format::Debug;
-use crate::axo_cursor::{Location, Peekable, Position, Span};
-use crate::axo_form::form::Form;
-use crate::axo_form::former::Former;
-use crate::axo_form::pattern::Classifier;
-use crate::axo_initial::InitialError;
-use crate::axo_parser::{Element, ParseError, Symbolic};
-use crate::axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind};
-use crate::compiler::{Registry, Marked};
-use crate::hash::Hash;
+use {
+    crate::{
+        axo_cursor::{Location, Peekable, Position, Span},
+        axo_form::form::Form,
+        axo_form::former::Former,
+        axo_form::pattern::Classifier,
+        axo_initial::InitialError,
+        axo_parser::{Element, ParseError, Symbolic},
+        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        compiler::{Registry, Marked},
+        format::Debug,
+        hash::Hash,
+    },
+};
 
+#[derive(Clone, Debug)]
 pub struct Initializer {
     pub registry: Registry,
     pub index: usize,
@@ -53,14 +58,6 @@ impl Peekable<Token> for Initializer {
     fn peek_behind(&self, n: usize) -> Option<&Token> {
         let current = self.index - n;
         self.get(current)
-    }
-
-    fn restore(&mut self) {
-        self.set_position(Position {
-            line: 1,
-            column: 1,
-            location: self.position.location,
-        })
     }
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
@@ -211,9 +208,10 @@ impl Initializer {
     }
 
     pub fn strainer(length: usize) -> Classifier<Token, Element, ParseError> {
-        Classifier::continuous(
-            Classifier::predicate(|token: &Token| {
-                !matches!(token.kind,
+        Classifier::repetition(
+            Classifier::alternative([
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind,
                     TokenKind::Punctuation(PunctuationKind::Newline)
                     | TokenKind::Punctuation(PunctuationKind::Tab)
                     | TokenKind::Punctuation(PunctuationKind::Space)
@@ -221,7 +219,18 @@ impl Initializer {
                     | TokenKind::Punctuation(PunctuationKind::Semicolon)
                     | TokenKind::Comment(_)
                 )
-            }),
+                }).with_ignore(),
+                Classifier::predicate(|token: &Token| {
+                    !matches!(token.kind,
+                    TokenKind::Punctuation(PunctuationKind::Newline)
+                    | TokenKind::Punctuation(PunctuationKind::Tab)
+                    | TokenKind::Punctuation(PunctuationKind::Space)
+                    | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+                    | TokenKind::Punctuation(PunctuationKind::Semicolon)
+                    | TokenKind::Comment(_)
+                )
+                })
+            ]),
             0,
             Some(length)
         )
@@ -244,20 +253,17 @@ impl Initializer {
     }
 
     pub fn initialize(&mut self) {
-        self.input = self.input.iter().cloned().filter(|token| {
-            !matches!(token.kind,
-                    TokenKind::Punctuation(PunctuationKind::Newline)
-                    | TokenKind::Punctuation(PunctuationKind::Tab)
-                    | TokenKind::Punctuation(PunctuationKind::Space)
-                    | TokenKind::Punctuation(PunctuationKind::Indentation(_))
-                    | TokenKind::Punctuation(PunctuationKind::Semicolon)
-                    | TokenKind::Comment(_)
-                )
-        }).collect::<Vec<_>>();
+        let strained = self.form(Self::strainer(self.len())).collect_inputs();
+        self.input = strained;
+        self.restore();
+        println!("{self:?}");
 
         while self.peek().is_some() {
+            println!("h");
+
             let forms = self.form(Self::classifier()).flatten();
 
+            println!("forms: {:?}", forms);
             for form in forms {
                 match form {
                     Form::Output(output) => {

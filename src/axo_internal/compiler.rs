@@ -45,7 +45,7 @@ pub trait Marked {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Registry {
     pub resolver: Resolver,
 }

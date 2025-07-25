@@ -10,7 +10,13 @@ pub trait Peekable<Item: PartialEq> {
     fn peek_ahead(&self, n: usize) -> Option<&Item>;
     fn peek_behind(&self, n: usize) -> Option<&Item>;
 
-    fn restore(&mut self);
+    fn restore(&mut self) {
+        self.set_index(0);
+
+        self.set_position(
+            Position::new(self.position().location)
+        );
+    }
 
     fn advance(&mut self) -> Option<Item> {
         let mut position = self.position();

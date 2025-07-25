@@ -18,12 +18,16 @@ pub mod helper {
         crate::{
             any::TypeId,
             axo_cursor::Peekable,
+            axo_internal::{
+                compiler::{
+                    Registry, Marked
+                },
+            },
             format::Debug,
             hash::{Hash, Hasher},
             thread::{Arc, Mutex},
         },
     };
-    use crate::axo_internal::compiler::{Registry, Marked};
 
     pub trait Source<Input>: Peekable<Input> + Marked
     where

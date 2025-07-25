@@ -1,8 +1,15 @@
-use std::sync::{Arc, Mutex};
-use matchete::Resembler;
-use crate::axo_scanner::Token;
-use core::fmt::Display;
-use std::fmt::Formatter;
+use {
+    matchete::{
+        Resembler,
+    },
+    crate::{
+        axo_scanner::Token,
+        thread::{
+            Arc, Mutex,
+        },
+        format::{Display, Formatter},
+    }
+};
 
 #[derive(Clone, Debug)]
 pub enum ResolveHint {
