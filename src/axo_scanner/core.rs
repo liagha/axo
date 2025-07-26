@@ -15,7 +15,7 @@ use {
     }
 };
 
-impl Scanner {
+impl<'scanner> Scanner<'scanner> {
     fn string() -> Classifier<Character, Token, ScanError> {
         Classifier::sequence([
             Classifier::literal('"'),

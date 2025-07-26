@@ -20,9 +20,8 @@ use {
     },
 };
 
-#[derive(Clone)]
-pub struct Scanner {
-    pub registry: Registry,
+pub struct Scanner<'scanner> {
+    pub registry: &'scanner mut Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Character>,
@@ -30,7 +29,7 @@ pub struct Scanner {
     pub errors: Vec<ScanError>,
 }
 
-impl Peekable<Character> for Scanner {
+impl<'scanner> Peekable<Character> for Scanner<'scanner> {
     fn len(&self) -> usize {
         self.input.len()
     }
@@ -82,19 +81,27 @@ impl Peekable<Character> for Scanner {
     }
 }
 
-impl Scanner {
-    pub fn new(registry: Registry, input: String, location: Location) -> Scanner {
+impl<'scanner> Scanner<'scanner> {
+    pub fn new(registry: &'scanner mut Registry, location: Location) -> Scanner<'scanner> {
         let position = Position::new(location);
-        let chars: Vec<char> = input.chars().collect();
-        let characters = Self::inspect(position, chars);
 
         Scanner {
             registry,
-            input: characters,
             index: 0,
             position,
+            input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
+        }
+    }
+
+    pub fn with_input(self, input: String) -> Self {
+        let chars: Vec<char> = input.chars().collect();
+        let characters = Self::inspect(self.position, chars);
+
+        Self {
+            input: characters,
+            ..self
         }
     }
 
@@ -119,7 +126,7 @@ impl Scanner {
     }
 }
 
-impl Marked for Scanner {
+impl<'scanner> Marked for Scanner<'scanner> {
     fn registry(&self) -> &Registry {
         &self.registry
     }

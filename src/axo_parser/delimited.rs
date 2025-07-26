@@ -13,7 +13,7 @@ use {
     },
 };
 
-impl Parser {
+impl<'parser> Parser<'parser> {
     pub fn bundle(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
         Classifier::with_transform(
             Classifier::sequence([
@@ -49,7 +49,6 @@ impl Parser {
                     }),
                     Order::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.collect_inputs().span();
-                        println!("{:?}", span);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(

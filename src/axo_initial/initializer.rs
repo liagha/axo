@@ -1,21 +1,27 @@
 use {
+    super::{
+        InitialError,
+    },
     crate::{
         axo_cursor::{Location, Peekable, Position, Span},
-        axo_form::form::Form,
-        axo_form::former::Former,
-        axo_form::pattern::Classifier,
-        axo_initial::InitialError,
+        axo_form::{
+            form::Form,
+            former::Former,
+            pattern::Classifier,
+        },
         axo_parser::{Element, ParseError, Symbolic},
-        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind, Scanner},
         compiler::{Registry, Marked},
         format::Debug,
         hash::Hash,
+        environment,
     },
 };
+use crate::axo_parser::Symbol;
 
-#[derive(Clone, Debug)]
-pub struct Initializer {
-    pub registry: Registry,
+#[derive(Debug)]
+pub struct Initializer<'initializer> {
+    pub registry: &'initializer mut Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Token>,
@@ -44,7 +50,7 @@ impl Symbolic for Preference {
     }
 }
 
-impl Peekable<Token> for Initializer {
+impl<'initializer> Peekable<Token> for Initializer<'initializer> {
     #[inline]
     fn len(&self) -> usize {
         self.input.len()
@@ -94,13 +100,13 @@ impl Peekable<Token> for Initializer {
     }
 }
 
-impl Initializer {
-    pub fn new(registry: Registry, tokens: Vec<Token>, location: Location) -> Self {
+impl<'initializer> Initializer<'initializer> {
+    pub fn new(registry: &'initializer mut Registry, location: Location) -> Self {
         Initializer {
             registry,
-            input: tokens,
             index: 0,
             position: Position::new(location),
+            input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
         }
@@ -138,7 +144,6 @@ impl Initializer {
     pub fn path() -> Classifier<Token, Preference, InitialError> {
         Classifier::with_transform(
             Classifier::sequence([
-                // Match "-p"
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Operator(operator) = &token.kind {
                         *operator == OperatorKind::Minus
@@ -153,13 +158,10 @@ impl Initializer {
                         false
                     }
                 }),
-                // Match the path components
                 Classifier::sequence([
-                    // First path component (required)
                     Classifier::predicate(|token: &Token| {
                         matches!(token.kind, TokenKind::Identifier(_))
                     }),
-                    // Repeated "/component" parts
                     Classifier::repetition(
                         Classifier::sequence([
                             Classifier::predicate(|token: &Token| {
@@ -172,7 +174,6 @@ impl Initializer {
                         0,
                         None
                     ),
-                    // Optional file extension ".ext"
                     Classifier::sequence([
                         Classifier::predicate(|token: &Token| {
                             matches!(token.kind, TokenKind::Operator(OperatorKind::Dot))
@@ -253,17 +254,19 @@ impl Initializer {
     }
 
     pub fn initialize(&mut self) {
+        let input = environment::args().skip(1).collect::<Vec<String>>().join(" ");
+        let mut scanner = Scanner::new(self.registry, Location::Void).with_input(input);
+        scanner.scan();
+        self.input = scanner.output;
+        self.restore();
+
         let strained = self.form(Self::strainer(self.len())).collect_inputs();
         self.input = strained;
         self.restore();
-        println!("{self:?}");
 
         while self.peek().is_some() {
-            println!("h");
-
             let forms = self.form(Self::classifier()).flatten();
 
-            println!("forms: {:?}", forms);
             for form in forms {
                 match form {
                     Form::Output(output) => {
@@ -278,10 +281,16 @@ impl Initializer {
                 }
             }
         }
+
+        let preferences = self.output.iter().map(|preference| {
+            Symbol::new(preference.clone(), Span::default())
+        }).collect::<Vec<Symbol>>();
+
+        self.registry.resolver.extend(preferences);
     }
 }
 
-impl Marked for Initializer {
+impl<'initializer> Marked for Initializer<'initializer> {
     fn registry(&self) -> &Registry {
         &self.registry
     }

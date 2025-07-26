@@ -15,7 +15,7 @@ use {
     }
 };
 
-impl Scanner {
+impl<'scanner> Scanner<'scanner> {
     pub fn simple_escape() -> Classifier<Character, Token, ScanError> {
         Classifier::sequence([
             Classifier::literal('\\'),

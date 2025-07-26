@@ -18,7 +18,6 @@ use {
         },
         axo_parser::{
             Element, ElementKind,
-            Symbol,
             Parser,
         },
         axo_resolver::{
@@ -27,7 +26,6 @@ use {
         file::{
             read_to_string,
         },
-        environment,
         format_tokens,
         indent,
         Timer, TIMER,
@@ -45,7 +43,7 @@ pub trait Marked {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Registry {
     pub resolver: Resolver,
 }
@@ -166,73 +164,8 @@ pub struct Initializing;
 
 impl Stage<(), ()> for Initializing {
     fn execute(&mut self, registry: &mut Registry, _input: ()) -> () {
-        let timer = Timer::new(TIMER);
-        let verbosity = registry.get_verbosity().unwrap_or(false);
-
-        if verbosity {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`initializing`" => Color::White,
-            );
-            xprintln!();
-        }
-
-        let input = environment::args().skip(1).collect::<Vec<String>>().join(" ");
-        let mut scanner = Scanner::new(registry.clone(), input, Location::Void);
-        scanner.scan();
-        let mut initializer = Initializer::new(registry.clone(), scanner.output, Location::Void);
+        let mut initializer = Initializer::new(registry, Location::Void);
         initializer.initialize();
-
-        let preferences = initializer.output.iter().map(|preference| {
-            Symbol::new(preference.clone(), Span::default())
-        }).collect::<Vec<Symbol>>();
-
-        registry.resolver.extend(preferences);
-
-        if verbosity {
-            let preferences_tree = initializer.output
-                .iter()
-                .map(|preference| format!("{:?}", preference))
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            if !preferences_tree.is_empty() {
-                xprintln!("Preferences:\n{}" => Color::Magenta, indent(&preferences_tree));
-                xprintln!();
-            }
-
-            if !initializer.errors.is_empty() {
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                for error in &initializer.errors {
-                    let (message, details) = error.format();
-                    xprintln!(
-                        "{}\n{}" => Color::Red,
-                        message => Color::Orange,
-                        details
-                    );
-                    xprintln!();
-                }
-
-                xprintln!(
-                    "Finished {} {}s with {} {}." => Color::Green,
-                    "`initializing` in" => Color::White,
-                    duration.as_secs_f64(),
-                    initializer.errors.len() => Color::BrightRed,
-                    "errors" => Color::Red,
-                );
-                xprintln!();
-            } else {
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                xprintln!(
-                    "Finished {} {}s." => Color::Green,
-                    "`initializing` in" => Color::White,
-                    duration.as_secs_f64(),
-                );
-                xprintln!();
-            }
-        }
 
         ()
     }
@@ -261,7 +194,7 @@ impl Stage<(), Vec<Token>> for Scanning {
             "".to_string()
         };
 
-        let mut scanner = Scanner::new(registry.clone(), content, location);
+        let mut scanner = Scanner::new(registry, location).with_input(content);
         scanner.scan();
 
         if verbosity {
@@ -323,7 +256,7 @@ impl Stage<Vec<Token>, Vec<Element>> for Parsing {
             xprintln!();
         }
 
-        let mut parser = Parser::new(registry.clone(), tokens, location);
+        let mut parser = Parser::new(registry, location).with_input(tokens);
         parser.parse();
 
         if verbosity {

@@ -21,9 +21,8 @@ use {
     },
 };
 
-#[derive(Clone)]
-pub struct Parser {
-    pub registry: Registry,
+pub struct Parser<'parser> {
+    pub registry: &'parser mut Registry,
     pub index: usize,
     pub position: Position,
     pub input: Vec<Token>,
@@ -31,7 +30,7 @@ pub struct Parser {
     pub errors: Vec<ParseError>,
 }
 
-impl Peekable<Token> for Parser {
+impl<'parser> Peekable<Token> for Parser<'parser> {
     #[inline]
     fn len(&self) -> usize {
         self.input.len()
@@ -86,15 +85,22 @@ impl Peekable<Token> for Parser {
     }
 }
 
-impl Parser {
-    pub fn new(registry: Registry, tokens: Vec<Token>, location: Location) -> Self {
+impl<'parser> Parser<'parser> {
+    pub fn new(registry: &'parser mut Registry, location: Location) -> Self {
         Parser {
             registry,
-            input: tokens,
             index: 0,
             position: Position::new(location),
+            input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
+        }
+    }
+
+    pub fn with_input(self, input: Vec<Token>) -> Self {
+        Self {
+            input,
+            ..self
         }
     }
 
@@ -152,7 +158,7 @@ impl Parser {
     }
 }
 
-impl Marked for Parser {
+impl<'parser> Marked for Parser<'parser> {
     fn registry(&self) -> &Registry {
         &self.registry
     }

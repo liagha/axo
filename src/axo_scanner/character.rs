@@ -64,7 +64,7 @@ impl FromIterator<Character> for String {
     }
 }
 
-impl Scanner {
+impl<'scanner> Scanner<'scanner> {
     pub fn inspect(start: Position, input: Vec<char>) -> Vec<Character> {
         let mut position = start;
         let mut characters = Vec::new();

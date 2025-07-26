@@ -145,7 +145,7 @@ impl Symbolic for Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>
     }
 }
 
-impl Parser {
+impl<'parser> Parser<'parser> {
     pub fn symbolization() -> Classifier<Token, Element, ParseError> {
         Classifier::alternative([
             Self::implementation(),

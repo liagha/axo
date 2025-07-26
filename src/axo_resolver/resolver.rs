@@ -28,9 +28,10 @@ use {
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Resolver {
     pub scope: Scope,
+    pub input: Vec<Element>,
     pub errors: Vec<ResolveError>,
 }
 
@@ -38,8 +39,13 @@ impl Resolver {
     pub fn new() -> Self {
         Self {
             scope: Scope::new(),
+            input: Vec::new(),
             errors: Vec::new(),
         }
+    }
+
+    pub fn with_input(&mut self, input: Vec<Element>) {
+        self.input = input;
     }
 
     pub fn enter(&mut self) {
@@ -253,10 +259,6 @@ impl Resolver {
     pub fn reset(&mut self) {
         self.scope = Scope::new();
         self.errors.clear();
-    }
-
-    pub fn snapshot(&self) -> Resolver {
-        self.clone()
     }
 
     pub fn restore(&mut self, snapshot: Resolver) {

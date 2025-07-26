@@ -26,7 +26,7 @@ use {
     },
 };
 
-impl Parser {
+impl<'parser> Parser<'parser> {
     pub fn identifier() -> Classifier<Token, Element, ParseError> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
