@@ -73,11 +73,11 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
         let mut messages = String::new();
         let mut details = String::new();
 
+        messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
+
         if let Location::File(path) = self.span.start.location {
             let source = read_to_string(path).unwrap_or_default();
             let lines: Vec<&str> = source.lines().collect();
-
-            messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
             let start = self.span.start;
             let end = self.span.end;
@@ -132,6 +132,8 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
             for hint in &self.hints {
                 details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
             }
+        } else {
+            details.push_str("invalid location!")
         }
 
         (messages, details)

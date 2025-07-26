@@ -20,15 +20,13 @@ use {
             pattern::Classifier,
         },
         axo_scanner::{
-            OperatorKind, Token
-            ,
+            OperatorKind, Token,
             TokenKind,
         },
         axo_schema::{
             Binding, Enumeration,
             Implementation, Inclusion, Interface, Method, Structure
         },
-        any::Any,
         hash::{Hash, Hasher},
         format::{Debug, Formatter},
         operations::{Deref, DerefMut},
@@ -62,8 +60,8 @@ impl Symbol {
         }
     }
 
-    pub fn as_any(&self) -> &dyn Any {
-        (*self.value).as_any()
+    pub fn cast<Type: 'static>(&self) -> Option<&Type> {
+        (*self.value).as_any().downcast_ref::<Type>()
     }
 }
 

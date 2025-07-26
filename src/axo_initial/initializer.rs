@@ -286,7 +286,7 @@ impl<'initializer> Initializer<'initializer> {
             Symbol::new(preference.clone(), Span::default())
         }).collect::<Vec<Symbol>>();
 
-        self.registry.resolver.extend(preferences);
+        self.registry.resolver.extend(preferences)
     }
 }
 

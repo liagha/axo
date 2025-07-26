@@ -200,7 +200,7 @@ impl Resolver {
     }
 
     pub fn symbolize(&mut self, symbol: Symbol) {
-        if let Some(implementation) = symbol.as_any().downcast_ref::<Implementation<Box<Element>, Box<Element>, Symbol>>() {
+        if let Some(implementation) = symbol.cast::<Implementation<Box<Element>, Box<Element>, Symbol>>() {
             let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
             if let Some(target) = self.lookup(implementation.get_target(), candidates) {
                 if let Some(interface) = implementation.get_interface() {
@@ -215,11 +215,11 @@ impl Resolver {
             }
         }
 
-        if let Some(_) = symbol.as_any().downcast_ref::<Structure<Box<Element>, Symbol>>() {
+        if let Some(_) = symbol.cast::<Structure<Box<Element>, Symbol>>() {
             self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.as_any().downcast_ref::<Enumeration<Box<Element>, Element>>() {
+        } else if let Some(_) = symbol.cast::<Enumeration<Box<Element>, Element>>() {
             self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.as_any().downcast_ref::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
+        } else if let Some(_) = symbol.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
             self.scope.add(symbol.clone());
         }
     }

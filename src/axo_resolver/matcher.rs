@@ -185,7 +185,7 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
             }
 
             (ElementKind::Invoke(invoke), candidate) => {
-                if let Some(method) = candidate.as_any().downcast_ref::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
+                if let Some(method) = candidate.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
                     score += self.shaping;
 
                     if invoke.get_arguments().len() == method.get_parameters().len() {
@@ -203,7 +203,7 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
                 }
             }
             (ElementKind::Construct(construct), candidate) => {
-                if let Some(structure) = candidate.as_any().downcast_ref::<Structure<Box<Element>, Symbol>>() {
+                if let Some(structure) = candidate.cast::<Structure<Box<Element>, Symbol>>() {
                     score += self.shaping;
 
                     if construct.get_fields().len() == structure.get_fields().len() {

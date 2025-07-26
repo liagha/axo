@@ -6,7 +6,6 @@ use {
     },
     crate::{
         hash::Hash,
-        any::{Any},
         vector::Show,
         format::{Debug, Display, Formatter, Result},
     },
@@ -65,15 +64,15 @@ where
         match self {
             Order::Align => write!(f, "Align"),
             Order::Branch { found, missing } => write!(f, "Trigger({:?}, {:?})", found, missing),
-            Order::Fail(function) => write!(f, "Failure({:?})", function.type_id()),
+            Order::Fail(_) => write!(f, "Failure"),
             Order::Ignore => write!(f, "Ignore"),
-            Order::Inspect(inspector) => write!(f, "Inspector({:?})", inspector.type_id()),
+            Order::Inspect(_) => write!(f, "Inspector"),
             Order::Multiple(actions) => write!(f, "Multiple({:?})", actions),
-            Order::Panic(function) => write!(f, "Panic({:?})", function.type_id()),
+            Order::Panic(_) => write!(f, "Panic"),
             Order::Pardon => write!(f, "Pardon"),
-            Order::Perform(function) => write!(f, "Execute({:?})", function.type_id()),
+            Order::Perform(_) => write!(f, "Execute"),
             Order::Skip => write!(f, "Skip"),
-            Order::Transform(function) => write!(f, "Map({:?})", function.type_id()),
+            Order::Transform(_) => write!(f, "Map"),
         }
     }
 }

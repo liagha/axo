@@ -105,6 +105,13 @@ impl<'scanner> Scanner<'scanner> {
         }
     }
 
+    pub fn set_input(&mut self, input: String) {
+        let chars: Vec<char> = input.chars().collect();
+        let characters = Self::inspect(self.position, chars);
+
+        self.input = characters;
+    }
+
     pub fn scan(&mut self) {
         while self.peek().is_some() {
             let forms = self.form(Self::pattern()).flatten();
