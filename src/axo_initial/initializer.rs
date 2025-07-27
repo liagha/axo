@@ -7,9 +7,9 @@ use {
         axo_form::{
             form::Form,
             former::Former,
-            pattern::Classifier,
+            classifier::Classifier,
         },
-        axo_parser::{Element, ParseError, Symbolic},
+        axo_parser::{Element, ParseError, Symbolic, Symbol},
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind, Scanner},
         compiler::{Registry, Marked},
         format::Debug,
@@ -17,7 +17,6 @@ use {
         environment,
     },
 };
-use crate::axo_parser::Symbol;
 
 #[derive(Debug)]
 pub struct Initializer<'initializer> {
@@ -52,7 +51,7 @@ impl Symbolic for Preference {
 
 impl<'initializer> Peekable<Token> for Initializer<'initializer> {
     #[inline]
-    fn len(&self) -> usize {
+    fn length(&self) -> usize {
         self.input.len()
     }
 
@@ -258,11 +257,11 @@ impl<'initializer> Initializer<'initializer> {
         let mut scanner = Scanner::new(self.registry, Location::Void).with_input(input);
         scanner.scan();
         self.input = scanner.output;
-        self.restore();
+        self.reset();
 
-        let strained = self.form(Self::strainer(self.len())).collect_inputs();
+        let strained = self.form(Self::strainer(self.length())).collect_inputs();
         self.input = strained;
-        self.restore();
+        self.reset();
 
         while self.peek().is_some() {
             let forms = self.form(Self::classifier()).flatten();

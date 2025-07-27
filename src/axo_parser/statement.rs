@@ -7,8 +7,7 @@ use {
         axo_cursor::{Span, Spanned},
         axo_form::{
             form::Form,
-            order::Order,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         axo_scanner::{Token, TokenKind},
         axo_schema::{Conditional, Repeat},
@@ -28,7 +27,7 @@ impl<'parser> Parser<'parser> {
                 }),
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
-                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
@@ -36,7 +35,7 @@ impl<'parser> Parser<'parser> {
                 ),
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
-                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
@@ -95,14 +94,14 @@ impl<'parser> Parser<'parser> {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
                     })
                 ),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
@@ -118,7 +117,7 @@ impl<'parser> Parser<'parser> {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Order::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)

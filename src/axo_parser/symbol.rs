@@ -17,7 +17,7 @@ use {
         },
         axo_form::{
             form::Form,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         axo_scanner::{
             OperatorKind, Token,

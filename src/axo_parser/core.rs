@@ -11,8 +11,7 @@ use {
         axo_form::{
             form::Form,
             former::Former,
-            order::Order,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         axo_schema::{
@@ -93,18 +92,17 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn prefixed() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_order(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Operator(operator) = &token.kind {
-                        operator.is_prefix()
-                    } else {
-                        false
-                    }
-                }),
-                Self::primary(),
-            ]),
-            Order::convert(|_, form: Form<Token, Element, ParseError>| {
+        Classifier::sequence([
+            Classifier::predicate(|token: &Token| {
+                if let TokenKind::Operator(operator) = &token.kind {
+                    operator.is_prefix()
+                } else {
+                    false
+                }
+            }),
+            Self::primary(),
+        ]).with_transform(
+            |_, form: Form<Token, Element, ParseError>| {
                 let prefixes = form.collect_inputs();
                 let operand = form.collect_outputs()[0].clone();
                 let mut unary = operand.clone();
@@ -122,7 +120,7 @@ impl<'parser> Parser<'parser> {
                 }
 
                 Ok(Form::output(unary))
-            })
+            }
         )
     }
 
@@ -339,18 +337,16 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn fallback() -> Classifier<Token, Element, ParseError> {
-        Classifier::with_order(
+        Classifier::with_fail(
             Classifier::anything(),
-            Order::fail(
-                |_, form: Form<Token, Element, ParseError>| {
-                    let token = form.unwrap_input();
+            |_, form: Form<Token, Element, ParseError>| {
+                let token = form.unwrap_input();
 
-                    ParseError::new(
-                        ErrorKind::UnexpectedToken(form.unwrap_input().clone().kind),
-                        token.span,
-                    )
-                },
-            ),
+                ParseError::new(
+                    ErrorKind::UnexpectedToken(form.unwrap_input().clone().kind),
+                    token.span,
+                )
+            },
         )
     }
 

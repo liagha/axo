@@ -5,12 +5,15 @@ use {
 };
 
 pub trait Peekable<Item: PartialEq> {
-    fn len(&self) -> usize;
+    fn length(&self) -> usize;
+    fn remaining(&self) -> usize {
+        self.length() - self.index()
+    }
 
     fn peek_ahead(&self, n: usize) -> Option<&Item>;
     fn peek_behind(&self, n: usize) -> Option<&Item>;
 
-    fn restore(&mut self) {
+    fn reset(&mut self) {
         self.set_index(0);
 
         self.set_position(
@@ -35,11 +38,6 @@ pub trait Peekable<Item: PartialEq> {
 
     fn next(&self, index: &mut usize, position: &mut Position) -> Option<Item>;
 
-    fn forward(&self, index: &mut usize, position: &mut Position, amount: usize) {
-        for _ in 0..amount {
-            self.next(index, position);
-        }
-    }
 
     fn get(&self, index: usize) -> Option<&Item> {
         self.input().get(index)

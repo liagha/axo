@@ -2,7 +2,7 @@
 
 mod format;
 mod traits;
-pub mod pattern;
+pub mod classifier;
 pub mod order;
 pub mod form;
 pub mod former;
@@ -13,7 +13,7 @@ pub mod helper {
             form::Form,
             former::Draft,
             order::Order,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         crate::{
             any::TypeId,
@@ -56,7 +56,7 @@ pub mod helper {
     pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
     pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>;
     pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
-    pub type Inspector<Input, Output, Failure> = Arc<dyn Fn(Draft<Input, Output, Failure>) -> Order<Input, Output, Failure> + Send + Sync>;
+    pub type Inspector<Input, Output, Failure> = Arc<dyn Fn(Draft<Input, Output, Failure>) -> Arc<dyn Order<Input, Output, Failure>> + Send + Sync>;
     pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
     pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
 }

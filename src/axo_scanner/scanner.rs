@@ -30,7 +30,7 @@ pub struct Scanner<'scanner> {
 }
 
 impl<'scanner> Peekable<Character> for Scanner<'scanner> {
-    fn len(&self) -> usize {
+    fn length(&self) -> usize {
         self.input.len()
     }
 
@@ -114,7 +114,7 @@ impl<'scanner> Scanner<'scanner> {
 
     pub fn scan(&mut self) {
         while self.peek().is_some() {
-            let forms = self.form(Self::pattern()).flatten();
+            let forms = self.form(Self::classifier()).flatten();
 
             for form in forms {
                 match form {

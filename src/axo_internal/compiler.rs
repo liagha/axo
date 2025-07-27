@@ -19,7 +19,7 @@ use {
         },
         axo_parser::{
             Element, ElementKind,
-            Parser,
+            Parser, 
         },
         axo_resolver::{
             Resolver,
@@ -153,11 +153,11 @@ impl Compiler {
         result
     }
 
-    pub fn compile_with<Function, Type>(&mut self, build_pipeline: Function) -> Type
+    pub fn compile_with<Function, Type>(&mut self, pipeline: Function) -> Type
     where
         Function: FnOnce(&mut Self) -> Type,
     {
-        let result = build_pipeline(self);
+        let result = pipeline(self);
 
         result
     }

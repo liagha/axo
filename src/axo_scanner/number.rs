@@ -9,7 +9,7 @@ use {
         },
         axo_form::{
             form::Form,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         parser,
     }

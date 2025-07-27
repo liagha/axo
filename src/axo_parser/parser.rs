@@ -9,7 +9,7 @@ use {
         axo_form::{
             form::Form,
             former::Former,
-            pattern::Classifier,
+            classifier::Classifier,
         },
         axo_internal::compiler::{
             Registry, Marked
@@ -32,7 +32,7 @@ pub struct Parser<'parser> {
 
 impl<'parser> Peekable<Token> for Parser<'parser> {
     #[inline]
-    fn len(&self) -> usize {
+    fn length(&self) -> usize {
         self.input.len()
     }
 
@@ -138,9 +138,9 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn parse(&mut self) {
-        let strained = self.form(Self::strainer(self.len())).collect_inputs();
+        let strained = self.form(Self::strainer(self.length())).collect_inputs();
         self.input = strained;
-        self.restore();
+        self.reset();
 
         while self.peek().is_some() {
             let forms = self.form(Self::parser()).flatten();

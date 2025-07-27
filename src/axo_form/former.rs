@@ -12,7 +12,7 @@ use {
     super::{
         form::Form,
         helper::Source,
-        pattern::Classifier,
+        classifier::Classifier,
     },
     crate::{
         axo_cursor::{
@@ -54,14 +54,9 @@ where
 
     #[inline(always)]
     pub fn build(&mut self, draft: &mut Draft<Input, Output, Failure>) {
-        let pattern = draft.classifier.pattern.clone();
-        let order = draft.classifier.order.clone();
+        let classifier = draft.classifier.order.clone();
 
-        pattern.build(self, draft);
-
-        if let Some(order) = order {
-            order.execute(self.source, draft);
-        }
+        classifier.order(self, draft);
     }
 }
 
@@ -161,7 +156,7 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
+    fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
 impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
@@ -171,8 +166,8 @@ where
     Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
 {
-    fn form(&mut self, pattern: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
-        let mut draft = Draft::new(0, self.position(), pattern);
+    fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
+        let mut draft = Draft::new(0, self.position(), classifier);
         let mut composer = Composer::new(self);
 
         composer.build(&mut draft);

@@ -9,8 +9,7 @@ use {
         },
         axo_form::{
             form::Form,
-            order::Order,
-            pattern::Classifier,
+            classifier::Classifier,
         },
     }
 };
@@ -191,7 +190,7 @@ impl<'scanner> Scanner<'scanner> {
     fn fallback() -> Classifier<Character, Token, ScanError> {
         Classifier::with_order(
             Classifier::anything(),
-            Order::fail(|_, form| {
+            Classifier::fail(|_, form| {
                 let ch : &Character = form.unwrap_input();
 
                 ScanError::new(
@@ -202,7 +201,7 @@ impl<'scanner> Scanner<'scanner> {
         )
     }
 
-    pub fn pattern() -> Classifier<Character, Token, ScanError> {
+    pub fn classifier() -> Classifier<Character, Token, ScanError> {
         Classifier::persistence(
             Classifier::alternative([
                 Self::whitespace(),

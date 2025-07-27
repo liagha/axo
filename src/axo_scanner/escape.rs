@@ -9,7 +9,7 @@ use {
         },
         axo_form::{
             form::{Form},
-            pattern::Classifier,
+            classifier::Classifier,
         },
         character::{parse_radix, from_u32},
     }
