@@ -132,7 +132,7 @@ pub trait Former<Input: Formable, Output: Formable, Failure: Formable>: Source<I
 
 impl<Target, Input: Formable, Output: Formable, Failure: Formable> Former<Input, Output, Failure> for Target
 where
-    Target: Source<Input>, 
+    Target: Source<Input>,
 {
     fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), classifier);

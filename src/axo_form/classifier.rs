@@ -14,7 +14,7 @@ use {
             compiler::Registry,
         },
         thread::{
-            Arc, 
+            Arc,
         },
     },
 };

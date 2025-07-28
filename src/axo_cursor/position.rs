@@ -41,7 +41,7 @@ impl Position {
     }
 
     #[inline]
-    pub fn void() -> Self {
+    pub const fn void() -> Self {
         Self {
             line: 1,
             column: 1,
