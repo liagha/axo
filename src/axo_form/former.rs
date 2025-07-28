@@ -10,40 +10,26 @@ pub mod record {
 
 use {
     super::{
+        Formable,
+        Source,
         form::Form,
-        helper::Source,
         classifier::Classifier,
     },
     crate::{
         axo_cursor::{
-            Peekable, Position,
+            Position,
         },
-        axo_internal::{
-            compiler::Marked,
-        },
-        format::Debug,
-        hash::Hash,
         marker::PhantomData,
     },
     record::*,
 };
 
-pub struct Composer<'c, Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Composer<'c, Input: Formable, Output: Formable, Failure: Formable> {
     pub source: &'c mut dyn Source<Input>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
-impl <'c, Input, Output, Failure> Composer<'c, Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl <'c, Input: Formable, Output: Formable, Failure: Formable> Composer<'c, Input, Output, Failure> {
     #[inline(always)]
     pub fn new(source: &'c mut (dyn Source<Input> + 'c)) -> Composer<'c, Input, Output, Failure> {
         Self {
@@ -61,12 +47,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct Draft<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Draft<Input: Formable, Output: Formable, Failure: Formable> {
     pub marker: usize,
     pub position: Position,
     pub consumed: Vec<Input>,
@@ -76,12 +57,7 @@ where
 }
 
 
-impl<Input, Output, Failure> Draft<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Draft<Input, Output, Failure> {
     #[inline(always)]
     pub const fn new(index: usize, position: Position, classifier: Classifier<Input, Output, Failure>) -> Self {
         Self {
@@ -150,21 +126,13 @@ where
     }
 }
 
-pub trait Former<Input, Output, Failure>: Peekable<Input> + Marked
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub trait Former<Input: Formable, Output: Formable, Failure: Formable>: Source<Input> {
     fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
-impl<Source, Input, Output, Failure> Former<Input, Output, Failure> for Source
+impl<Target, Input: Formable, Output: Formable, Failure: Formable> Former<Input, Output, Failure> for Target
 where
-    Source: Peekable<Input> + Marked,
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+    Target: Source<Input>, 
 {
     fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), classifier);

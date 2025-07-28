@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
 mod format;
-mod traits;
 pub mod classifier;
 pub mod order;
 pub mod form;
 pub mod former;
+
+pub use helper::*;
 
 pub mod helper {
     use {
@@ -16,18 +17,26 @@ pub mod helper {
             classifier::Classifier,
         },
         crate::{
-            any::TypeId,
             axo_cursor::Peekable,
             axo_internal::{
                 compiler::{
                     Registry, Marked
                 },
             },
+            any::TypeId,
             format::Debug,
             hash::{Hash, Hasher},
             thread::{Arc, Mutex},
         },
     };
+
+    pub trait Formable:
+        Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static
+    {}
+    impl<T> Formable for T
+    where
+        T: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static
+    {}
 
     pub trait Source<Input>: Peekable<Input> + Marked
     where

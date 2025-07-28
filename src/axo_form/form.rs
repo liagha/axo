@@ -1,4 +1,7 @@
 use {
+    super::{
+        Formable,  
+    },
     crate::{
         slice,
         hash::Hash,
@@ -7,12 +10,7 @@ use {
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Form<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub enum Form<Input: Formable, Output: Formable, Failure: Formable> {
     Blank,
     Input(Input),
     Output(Output),
@@ -20,23 +18,13 @@ where
     Failure(Failure),
 }
 
-impl<Input, Output, Failure> Default for Form<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Default for Form<Input, Output, Failure> {
     fn default() -> Self {
         Self::Blank
     }
 }
 
-impl<Input, Output, Failure> Form<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, Failure> {
     #[inline(always)]
     pub fn blank() -> Self {
         Form::Blank
@@ -226,9 +214,9 @@ where
         error_mapper: H,
     ) -> Form<MappedI, MappedO, MappedF>
     where
-        MappedI: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-        MappedO: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-        MappedF: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+        MappedI: Formable,
+        MappedO: Formable,
+        MappedF: Formable,
         F: Fn(Input) -> MappedI + Clone,
         G: Fn(Output) -> MappedO + Clone,
         H: Fn(Failure) -> MappedF + Clone,

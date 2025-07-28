@@ -1,33 +1,25 @@
 use {
     super::{
-        form::{Form},
+        Formable,
+        form::{
+            Form
+        },
         classifier::Classifier,
     },
     crate::{
-        hash::Hash,
         vector::Show,
         format::{Debug, Display, Formatter, Result},
     },
 };
 
-impl<Input, Output, Failure> Debug for Classifier<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Debug for Classifier<Input, Output, Failure> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "Todo")
     }
 }
 
 
-impl<Input, Output, Failure> Display for Form<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Display for Form<Input, Output, Failure> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.clone() {
             Form::Blank => {

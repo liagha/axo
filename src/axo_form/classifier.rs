@@ -1,5 +1,6 @@
 use {
     super::{
+        Formable,
         form::Form,
         order::*,
         former::{
@@ -12,9 +13,9 @@ use {
         axo_internal::{
             compiler::Registry,
         },
-        format::Debug,
-        hash::Hash,
-        thread::{Arc},
+        thread::{
+            Arc, 
+        },
     },
 };
 
@@ -23,12 +24,7 @@ pub struct Literal<Input> {
     pub value: Arc<dyn PartialEq<Input> + Send + Sync>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Literal<Input>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Literal<Input> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -47,21 +43,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Negate<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Negate<Input: Formable, Output: Formable, Failure: Formable> {
     pub classifier: Box<Classifier<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Negate<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Negate<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -87,12 +73,7 @@ pub struct Predicate<Input> {
     pub function: Arc<dyn Fn(&Input) -> bool + Send + Sync>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Predicate<Input>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Predicate<Input> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
@@ -113,23 +94,13 @@ where
 }
 
 #[derive(Clone)]
-pub struct Alternative<Input, Output, Failure, const SIZE: usize>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Alternative<Input: Formable, Output: Formable, Failure: Formable, const SIZE: usize> {
     pub patterns: [Classifier<Input, Output, Failure>; SIZE],
     pub perfection: Vec<Record>,
     pub blacklist: Vec<Record>,
 }
 
-impl<Input, Output, Failure, const SIZE: usize> Order<Input, Output, Failure> for Alternative<Input, Output, Failure, SIZE>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable, const SIZE: usize> Order<Input, Output, Failure> for Alternative<Input, Output, Failure, SIZE> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut best: Option<Draft<Input, Output, Failure>> = None;
@@ -172,21 +143,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Deferred<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Deferred<Input: Formable, Output: Formable, Failure: Formable> {
     pub function: Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Deferred<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Deferred<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let resolved = (self.function)();
@@ -202,21 +163,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Optional<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Optional<Input: Formable, Output: Formable, Failure: Formable> {
     pub classifier: Box<Classifier<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Optional<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Optional<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
@@ -235,21 +186,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Wrapper<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Wrapper<Input: Formable, Output: Formable, Failure: Formable> {
     pub classifier: Box<Classifier<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Wrapper<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Wrapper<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
@@ -264,22 +205,12 @@ where
 }
 
 #[derive(Clone)]
-pub struct Ranked<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Ranked<Input: Formable, Output: Formable, Failure: Formable> {
     pub classifier: Box<Classifier<Input, Output, Failure>>,
     pub precedence: Record,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Ranked<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Ranked<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
@@ -301,21 +232,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Sequence<Input, Output, Failure, const SIZE: usize>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Sequence<Input: Formable, Output: Formable, Failure: Formable, const SIZE: usize> {
     pub patterns: [Classifier<Input, Output, Failure>; SIZE],
 }
 
-impl<Input, Output, Failure, const SIZE: usize> Order<Input, Output, Failure> for Sequence<Input, Output, Failure, SIZE>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable, const SIZE: usize> Order<Input, Output, Failure> for Sequence<Input, Output, Failure, SIZE> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -362,12 +283,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct Repetition<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Repetition<Input: Formable, Output: Formable, Failure: Formable> {
     pub classifier: Box<Classifier<Input, Output, Failure>>,
     pub minimum: usize,
     pub maximum: Option<usize>,
@@ -379,12 +295,7 @@ where
     pub empty_on_failure: bool,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Repetition<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Repetition<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -442,21 +353,11 @@ where
 }
 
 #[derive(Clone)]
-pub struct Classifier<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Classifier<Input: Formable, Output: Formable, Failure: Formable> {
     pub order: Arc<dyn Order<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Classifier<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Classifier<Input, Output, Failure> {
     #[inline]
     pub const fn new(classifier: Arc<dyn Order<Input, Output, Failure>>) -> Self {
         Self {

@@ -1,5 +1,6 @@
 use {
     super::{
+        Formable,
         form::Form,
         classifier::{
             Classifier,
@@ -19,50 +20,28 @@ use {
             },
         },
         thread::{Arc, Mutex},
-        format::Debug,
-        hash::Hash,
     }
 };
 
-pub trait Order<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub trait Order<Input: Formable, Output: Formable, Failure: Formable> {
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>);
 }
 
 pub struct Align;
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Align
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Align {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         draft.align();
     }
 }
 
-pub struct Branch<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Branch<Input: Formable, Output: Formable, Failure: Formable> {
     pub found: Arc<dyn Order<Input, Output, Failure>>,
     pub missing: Arc<dyn Order<Input, Output, Failure>>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Branch<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Branch<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let chosen = if draft.is_aligned() {
@@ -75,21 +54,11 @@ where
     }
 }
 
-pub struct Fail<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Fail<Input: Formable, Output: Formable, Failure: Formable> {
     pub emitter: Emitter<Input, Output, Failure>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Fail<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Fail<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
@@ -101,12 +70,7 @@ where
 
 pub struct Ignore;
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Ignore
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Ignore {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
@@ -116,21 +80,11 @@ where
     }
 }
 
-pub struct Inspect<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Inspect<Input: Formable, Output: Formable, Failure: Formable> {
     pub inspector: Inspector<Input, Output, Failure>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Inspect<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Inspect<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let order = (self.inspector)(draft.to_owned());
@@ -139,21 +93,11 @@ where
     }
 }
 
-pub struct Multiple<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Multiple<Input: Formable, Output: Formable, Failure: Formable> {
     pub orders: Vec<Arc<dyn Order<Input, Output, Failure>>>
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Multiple<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Multiple<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         for order in self.orders.iter() {
@@ -162,21 +106,11 @@ where
     }
 }
 
-pub struct Panic<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Panic<Input: Formable, Output: Formable, Failure: Formable> {
     pub emitter: Emitter<Input, Output, Failure>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Panic<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Panic<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
@@ -189,12 +123,7 @@ where
 
 pub struct Pardon;
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Pardon
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Pardon {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         draft.empty();
@@ -205,12 +134,7 @@ pub struct Perform {
     pub performer: Executor,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Perform
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Perform {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
@@ -224,12 +148,7 @@ where
 
 pub struct Skip;
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Skip
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Skip {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
@@ -239,21 +158,11 @@ where
     }
 }
 
-pub struct Transform<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+pub struct Transform<Input: Formable, Output: Formable, Failure: Formable> {
     pub transformer: Transformer<Input, Output, Failure>,
 }
 
-impl<Input, Output, Failure> Order<Input, Output, Failure> for Transform<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Transform<Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
@@ -278,12 +187,7 @@ where
     }
 }
 
-impl<Input, Output, Failure> Classifier<Input, Output, Failure>
-where
-    Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Output: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-    Failure: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
-{
+impl<Input: Formable, Output: Formable, Failure: Formable> Classifier<Input, Output, Failure> {
     #[inline]
     pub fn transform<T>(transformer: T) -> Arc<dyn Order<Input, Output, Failure>>
     where
