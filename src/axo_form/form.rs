@@ -18,12 +18,6 @@ pub enum Form<Input: Formable, Output: Formable, Failure: Formable> {
     Failure(Failure),
 }
 
-impl<Input: Formable, Output: Formable, Failure: Formable> Default for Form<Input, Output, Failure> {
-    fn default() -> Self {
-        Self::Blank
-    }
-}
-
 impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, Failure> {
     #[inline(always)]
     pub fn blank() -> Self {

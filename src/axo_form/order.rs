@@ -32,7 +32,7 @@ pub struct Align;
 impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Align {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
-        draft.align();
+        draft.set_align();
     }
 }
 
@@ -63,7 +63,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
 
-        draft.fail();
+        draft.set_fail();
         draft.form = Form::Failure(failure);
     }
 }
@@ -74,7 +74,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
-            draft.ignore();
+            draft.set_ignore();
             draft.form = Form::<Input, Output, Failure>::Blank;
         }
     }
@@ -116,7 +116,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
         let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
 
         let form = Form::Failure(failure);
-        draft.panic();
+        draft.set_panic();
         draft.form = form;
     }
 }
@@ -126,7 +126,7 @@ pub struct Pardon;
 impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, Failure> for Pardon {
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
-        draft.empty();
+        draft.set_empty();
     }
 }
 
@@ -152,7 +152,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
     #[inline]
     fn order(&self, _composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if draft.is_aligned() {
-            draft.empty();
+            draft.set_empty();
             draft.form = Form::<Input, Output, Failure>::Blank;
         }
     }
@@ -179,7 +179,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
                     draft.form = mapped;
                 }
                 Err(error) => {
-                    draft.fail();
+                    draft.set_fail();
                     draft.form = Form::Failure(error);
                 }
             }

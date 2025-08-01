@@ -15,6 +15,7 @@ use {
         thread::Arc,
     },
 };
+use crate::axo_cursor::Location;
 
 impl<'parser> Parser<'parser> {
     pub fn bundle(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
@@ -30,8 +31,8 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.collect_inputs().span();
+                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                let span = Span::default(Location::Flag);
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -50,8 +51,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -86,8 +87,8 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.collect_inputs().span();
+                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                let span = Span::default(Location::Flag);
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -106,8 +107,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(
@@ -144,8 +145,8 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::branch(
                                 Classifier::ignore(),
-                                Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                    let span = form.collect_inputs().span();
+                                Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                    let span = Span::default(Location::Flag);
 
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -165,8 +166,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
                         
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -203,8 +204,8 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::branch(
                                 Classifier::ignore(),
-                                Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                    let span = form.collect_inputs().span();
+                                Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                    let span = Span::default(Location::Flag);
 
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -224,8 +225,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -260,8 +261,8 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.collect_inputs().span();
+                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                let span = Span::default(Location::Flag);
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -280,8 +281,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
@@ -317,8 +318,8 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                                let span = form.collect_inputs().span();
+                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                let span = Span::default(Location::Flag);
 
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
@@ -337,8 +338,8 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.collect_inputs().span();
+                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                        let span = Span::default(Location::Flag);
 
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(

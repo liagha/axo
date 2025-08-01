@@ -51,11 +51,10 @@ pub struct Draft<Input: Formable, Output: Formable, Failure: Formable> {
     pub marker: usize,
     pub position: Position,
     pub consumed: Vec<Input>,
-    pub record: i8,
+    pub record: Record,
     pub classifier: Classifier<Input, Output, Failure>,
     pub form: Form<Input, Output, Failure>,
 }
-
 
 impl<Input: Formable, Output: Formable, Failure: Formable> Draft<Input, Output, Failure> {
     #[inline(always)]
@@ -101,27 +100,27 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Draft<Input, Output, 
     }
 
     #[inline(always)]
-    pub const fn panic(&mut self) {
+    pub const fn set_panic(&mut self) {
         self.record = PANICKED;
     }
 
     #[inline(always)]
-    pub const fn align(&mut self) {
+    pub const fn set_align(&mut self) {
         self.record = ALIGNED;
     }
 
     #[inline(always)]
-    pub const fn fail(&mut self) {
+    pub const fn set_fail(&mut self) {
         self.record = FAILED;
     }
 
     #[inline(always)]
-    pub const fn empty(&mut self) {
+    pub const fn set_empty(&mut self) {
         self.record = BLANK;
     }
 
     #[inline(always)]
-    pub const fn ignore(&mut self) {
+    pub const fn set_ignore(&mut self) {
         self.record = IGNORED;
     }
 }

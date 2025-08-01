@@ -5,8 +5,7 @@ use {
     
     crate::{
         format::{Display, Debug, Formatter, Result},
-        file::read_to_string,
-        axo_cursor::{Span, Location},
+        axo_cursor::{Span},
     },
 
     broccli::{Color, TextStyle}
@@ -75,65 +74,61 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
 
         messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
-        if let Location::File(path) = self.span.start.location {
-            let source = read_to_string(path).unwrap_or_default();
-            let lines: Vec<&str> = source.lines().collect();
+        let source = self.span.start.location.get_value();
+        let lines: Vec<&str> = source.lines().collect();
 
-            let start = self.span.start;
-            let end = self.span.end;
-            let surround = 3;
+        let start = self.span.start;
+        let end = self.span.end;
+        let surround = 3;
 
-            let beginning = start.line.saturating_sub(surround);
-            let finish = end.line.saturating_add(surround);
+        let beginning = start.line.saturating_sub(surround);
+        let finish = end.line.saturating_add(surround);
 
-            let max = count_digits(lines.len()) + 2;
+        let max = count_digits(lines.len()) + 2;
 
-            details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
+        details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
 
-            for index in beginning..=finish {
-                if let Some(line) = lines.get(index) {
-                    let index = index + 1;
-                    let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
+        for index in beginning..=finish {
+            if let Some(line) = lines.get(index) {
+                let index = index + 1;
+                let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
 
-                    details.push_str(&format!("{}|  {}\n", identifier, line));
+                details.push_str(&format!("{}|  {}\n", identifier, line));
 
-                    let highlighter = "^".colorize(Color::Red);
+                let highlighter = "^".colorize(Color::Red);
 
-                    if start.line == end.line {
-                        if index == start.line {
-                            if start.column == end.column {
-                                let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter);
-                                details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
-                            } else {
-                                let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(end.column - start.column));
-                                details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
-                            }
-                        }
-                    } else {
-                        let terminus = line.len();
-
-                        let highlight = if index == start.line {
-                            format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(terminus.saturating_sub(start.column) + 1))
-                        } else if start.line < index && index < end.line {
-                            format!("{}", highlighter.repeat(terminus))
-                        } else if index == end.line {
-                            format!("{}", highlighter.repeat(end.column - 1))
+                if start.line == end.line {
+                    if index == start.line {
+                        if start.column == end.column {
+                            let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter);
+                            details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
                         } else {
-                            "".to_string()
-                        };
-
-                        if !highlight.is_empty() {
+                            let highlight = format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(end.column - start.column));
                             details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
                         }
                     }
+                } else {
+                    let terminus = line.len();
+
+                    let highlight = if index == start.line {
+                        format!("{}{}", " ".repeat(start.column - 1), highlighter.repeat(terminus.saturating_sub(start.column) + 1))
+                    } else if start.line < index && index < end.line {
+                        format!("{}", highlighter.repeat(terminus))
+                    } else if index == end.line {
+                        format!("{}", highlighter.repeat(end.column - 1))
+                    } else {
+                        "".to_string()
+                    };
+
+                    if !highlight.is_empty() {
+                        details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                    }
                 }
             }
+        }
 
-            for hint in &self.hints {
-                details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
-            }
-        } else {
-            details.push_str("invalid location!")
+        for hint in &self.hints {
+            details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
         }
 
         (messages, details)

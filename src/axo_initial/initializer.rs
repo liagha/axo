@@ -3,7 +3,7 @@ use {
         InitialError,
     },
     crate::{
-        axo_cursor::{Location, Peekable, Position, Span},
+        axo_cursor::{Location, Peekable, Position, Span, Spanned},
         axo_form::{
             form::Form,
             former::Former,
@@ -14,7 +14,6 @@ use {
         compiler::{Registry, Marked},
         format::Debug,
         hash::Hash,
-        environment,
     },
 };
 
@@ -29,23 +28,27 @@ pub struct Initializer<'initializer> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Preference {
-    Verbosity(bool),
-    Path(String),
+pub struct Preference {
+    pub target: Token,
+    pub value: Token,
+    pub span: Span,
+}
+
+impl Spanned for Preference {
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+}
+
+impl Preference {
+    pub fn new(identifier: Token, value: Token) -> Self {
+        Self { target: identifier.clone(), value: value.clone(), span: Span::merge(&identifier.span(), &value.span()) }
+    }
 }
 
 impl Symbolic for Preference {
     fn brand(&self) -> Option<Token> {
-        let label = match self {
-            Preference::Verbosity(_) => {
-                "Verbosity".to_string()
-            }
-            Preference::Path(_) => {
-                "Path".to_string()
-            }
-        };
-
-        Some(Token::new(TokenKind::Identifier(label), Span::default()))
+        Some(self.target.clone())
     }
 }
 
@@ -123,20 +126,21 @@ impl<'initializer> Initializer<'initializer> {
                 } else {
                     false
                 }
-            }),
+            }).with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
-                    if identifier == "v" {
-                        true
-                    } else {
-                        false
-                    }
+                    identifier == "v" || identifier == "verbose"
                 } else {
                     false
                 }
+            }).with_transform(|_, form| {
+                let identifier = form.collect_inputs()[0].clone();
+
+                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), identifier.span())))
             })
-        ]).with_transform(|_, _form| {
-            Ok(Form::output(Preference::Verbosity(true)))
+        ]).with_transform(|_, form| {
+            let identifier = form.collect_inputs()[0].clone();
+            Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Boolean(true), identifier.span()))))
         })
     }
 
@@ -149,13 +153,17 @@ impl<'initializer> Initializer<'initializer> {
                     } else {
                         false
                     }
-                }),
+                }).with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "p"
+                        identifier == "p" || identifier == "path"
                     } else {
                         false
                     }
+                }).with_transform(|_, form| {
+                    let identifier = form.collect_inputs()[0].clone();
+
+                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), identifier.span())))
                 }),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -185,9 +193,10 @@ impl<'initializer> Initializer<'initializer> {
             ]),
             |_, form| {
                 let inputs = form.collect_inputs();
+                let identifier = inputs[0].clone();
                 let mut path = String::new();
 
-                for input in inputs.iter().skip(2) {
+                for input in inputs.iter().skip(1) {
                     match &input.kind {
                         TokenKind::Identifier(identifier) => {
                             path.push_str(identifier);
@@ -202,7 +211,7 @@ impl<'initializer> Initializer<'initializer> {
                     }
                 }
 
-                Ok(Form::output(Preference::Path(path)))
+                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), identifier.span()))))
             }
         )
     }
@@ -253,8 +262,9 @@ impl<'initializer> Initializer<'initializer> {
     }
 
     pub fn initialize(&mut self) {
-        let input = environment::args().skip(1).collect::<Vec<String>>().join(" ");
-        let mut scanner = Scanner::new(self.registry, Location::Void).with_input(input);
+        let location = Location::Flag;
+        let input = location.get_value();
+        let mut scanner = Scanner::new(self.registry, Location::Flag).with_input(input);
         scanner.scan();
         self.input = scanner.output;
         self.reset();
@@ -282,7 +292,7 @@ impl<'initializer> Initializer<'initializer> {
         }
 
         let preferences = self.output.iter().map(|preference| {
-            Symbol::new(preference.clone(), Span::default())
+            Symbol::new(preference.clone(), preference.span())
         }).collect::<Vec<Symbol>>();
 
         self.registry.resolver.extend(preferences)

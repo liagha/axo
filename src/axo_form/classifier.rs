@@ -29,15 +29,15 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
     fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
             if self.value.eq(&peek) {
-                draft.align();
+                draft.set_align();
                 composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
-                draft.empty();
+                draft.set_empty();
             }
         } else {
-            draft.empty();
+            draft.set_empty();
         }
     }
 }
@@ -55,15 +55,15 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
             composer.build(&mut child);
 
             if !child.is_aligned() {
-                draft.align();
+                draft.set_align();
                 composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
-                draft.empty();
+                draft.set_empty();
             }
         } else {
-            draft.empty();
+            draft.set_empty();
         }
     }
 }
@@ -80,15 +80,15 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
             let predicate = (self.function)(&peek);
 
             if predicate {
-                draft.align();
+                draft.set_align();
                 composer.source.next(&mut draft.marker, &mut draft.position);
                 draft.consumed.push(peek.clone());
                 draft.form = Form::input(peek);
             } else {
-                draft.empty();
+                draft.set_empty();
             }
         } else {
-            draft.empty();
+            draft.set_empty();
         }
     }
 }
@@ -137,7 +137,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable, const SIZE: usize> Or
                 draft.consumed = champion.consumed;
                 draft.form = champion.form;
             }
-            None => draft.empty(),
+            None => draft.set_empty(),
         }
     }
 }
@@ -178,9 +178,9 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
             draft.position = child.position;
             draft.consumed = child.consumed;
             draft.form = child.form;
-            draft.align();
+            draft.set_align();
         } else {
-            draft.ignore();
+            draft.set_ignore();
         }
     }
 }
@@ -338,7 +338,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
 
         if forms.len() >= self.minimum {
             if self.align_on_success {
-                draft.align();
+                draft.set_align();
             }
             draft.marker = index;
             draft.position = position;
@@ -346,7 +346,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Order<Input, Output, 
             draft.form = Form::multiple(forms);
         } else {
             if self.empty_on_failure {
-                draft.empty();
+                draft.set_empty();
             }
         }
     }

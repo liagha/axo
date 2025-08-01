@@ -1,5 +1,5 @@
 use {
-    super::{Position, Spanned},
+    super::{Position, Spanned, Location},
     crate::{
         hash::Hash,
         file, format,
@@ -25,22 +25,17 @@ pub struct Span {
     pub end: Position,
 }
 
-impl Default for Span {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            start: Position::default(),
-            end: Position::default(),
-        }
-    }
-}
-
 impl Span {
     #[inline]
     pub fn new(start: Position, end: Position) -> Self {
-        Span { start, end }
+        Self { start, end }
     }
 
+    #[inline]
+    pub fn default(location: Location) -> Self {
+        Self { start: Position::default(location), end: Position::default(location) } 
+    }
+    
     #[inline]
     pub fn point(pos: Position) -> Self {
         Self {
@@ -59,7 +54,7 @@ impl Span {
     }
 
     #[inline]
-    pub fn overlaps(&self, other: &Span) -> bool {
+    pub fn overlaps(&self, other: &Self) -> bool {
         if self.start.location != other.start.location {
             return false;
         }
@@ -72,9 +67,22 @@ impl Span {
 
     #[inline]
     #[track_caller]
-    pub fn merge(&self, other: &Span) -> Span {
+    pub fn from_slice<T: Spanned>(items: &[T]) -> Self {
+        match items.len() {
+            0 => panic!("can't create a span from an empty Slice."),
+            1 => items[0].span(),
+            _ => {
+                let start = items.first().unwrap().span();
+                let end = items.last().unwrap().span();
+                start.merge(&end)
+            }
+        }
+    }
+
+    #[inline]
+    pub fn merge(&self, other: &Self) -> Self {
         if self.start.location != other.start.location {
-            panic!("cannot mix spans from `{}` with `{}`", self.start.location, other.start.location);
+            panic!("cannot mix spans from `{}` with `{}`.", self.start.location, other.start.location);
         }
 
         let start = if self.start.cmp(&other.start) == Ordering::Less {

@@ -32,6 +32,7 @@ use {
         Timer, TIMER,
     }
 };
+use crate::axo_scanner::TokenKind;
 
 pub trait Marked {
     fn registry(&self) -> &Registry;
@@ -57,14 +58,14 @@ impl Registry {
     }
 
     pub fn get_verbosity(resolver: &mut Resolver) -> Option<bool> {
-        let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default());
+        let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default(Location::Flag));
 
         let found = resolver.get(&identifier);
 
         if let Some(symbol) = found {
             if let Some(preference) = symbol.cast::<Preference>() {
-                if let Preference::Verbosity(verbosity) = preference {
-                    Some(*verbosity)
+                if let TokenKind::Boolean(verbosity) = preference.value.kind {
+                    Some(verbosity)
                 } else {
                     None
                 }
@@ -77,13 +78,13 @@ impl Registry {
     }
 
     pub fn get_path(resolver: &mut Resolver) -> Option<String> {
-        let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default());
+        let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default(Location::Flag));
 
         let found = resolver.get(&identifier);
 
         if let Some(symbol) = found {
             if let Some(preference) = symbol.cast::<Preference>() {
-                if let Preference::Path(path) = preference {
+                if let TokenKind::Identifier(path) = preference.value.kind.clone() {
                     Some(path.clone())
                 } else {
                     None
@@ -117,7 +118,7 @@ impl Compiler {
 
         let result = self.compile_with(|compiler| {
             let location = {
-                let mut initializer = Initializer::new(&mut compiler.registry, Location::Void);
+                let mut initializer = Initializer::new(&mut compiler.registry, Location::Flag);
                 initializer.execute(())
             };
 
@@ -167,7 +168,7 @@ impl<'initializer> Stage<(), Location> for Initializer<'initializer> {
     fn execute(&mut self, _input: ()) -> Location {
         self.initialize();
 
-        Registry::get_path(&mut self.registry.resolver).map_or(Location::Void, |path| { Location::File(path.leak()) })
+        Registry::get_path(&mut self.registry.resolver).map_or(Location::Flag, |path| { Location::File(path.leak()) })
     }
 }
 
@@ -305,7 +306,7 @@ impl<'parser> Stage<Vec<Token>, Vec<Element>> for Parser<'parser> {
 impl Stage<Vec<Element>, ()> for Resolver {
     fn execute(&mut self, elements: Vec<Element>) -> () {
         let timer = Timer::new(TIMER);
-        let _location = Registry::get_path(self).map_or(Location::Void, |path| { Location::File(path.leak()) });
+        let _location = Registry::get_path(self).map_or(Location::Flag, |path| { Location::File(path.leak()) });
         let verbosity = Registry::get_verbosity(self).unwrap_or(false);
 
         if verbosity {

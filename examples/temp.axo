@@ -1,3 +1,6 @@
+struct MyStruct {
+}
+
 impl MyStruct {
     func fuck() {
 

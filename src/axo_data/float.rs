@@ -127,6 +127,10 @@ impl Display for FloatLiteral {
 }
 
 impl FloatLiteral {
+    pub fn zero(self) -> Self {
+        FloatLiteral(0.0)    
+    }
+    
     pub fn abs(self) -> Self {
         FloatLiteral(self.0.abs())
     }
@@ -249,11 +253,5 @@ impl FloatLiteral {
 
     pub fn from_bits(bits: u64) -> Self {
         FloatLiteral(f64::from_bits(bits))
-    }
-}
-
-impl Default for FloatLiteral {
-    fn default() -> Self {
-        FloatLiteral(0.0)
     }
 }

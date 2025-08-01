@@ -10,11 +10,21 @@ use {
         },
     }
 };
+use crate::environment;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Location {
     File(&'static str),
-    Void,
+    Flag,
+}
+
+impl Location {
+    pub fn get_value(&self) -> String {
+        match self {
+            Location::File(file) => read_to_string(file).unwrap_or("".to_string()),
+            Location::Flag => environment::args().skip(1).collect::<Vec<String>>().join(" "),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -22,12 +32,6 @@ pub struct Position {
     pub line: usize,
     pub column: usize,
     pub location: Location,
-}
-
-impl Default for Position {
-    fn default() -> Self {
-        Self::void()
-    }
 }
 
 impl Position {
@@ -39,16 +43,16 @@ impl Position {
             location,
         }
     }
-
+    
     #[inline]
-    pub const fn void() -> Self {
+    pub fn default(location: Location) -> Self {
         Self {
             line: 1,
             column: 1,
-            location: Location::Void,
+            location,
         }
     }
-    
+
     #[inline]
     pub fn path(line: usize, column: usize, path: &'static str) -> Self {
         Self {

@@ -31,89 +31,90 @@ pub use {
 };
 
 pub trait Spanned {
+    #[track_caller]
     fn span(&self) -> Span;
 }
 
 impl Spanned for Character {
+    #[track_caller]
     fn span(&self) -> Span {
         self.span
     }
 }
 
 impl Spanned for Token {
+    #[track_caller]
     fn span(&self) -> Span {
         self.span
     }
 }
 
 impl Spanned for Element {
+    #[track_caller]
     fn span(&self) -> Span {
         self.span
     }
 }
 
 impl<E: Display> Spanned for Error<E> {
+    #[track_caller]
     fn span(&self) -> Span {
         self.span
     }
 }
 
 impl Spanned for Span {
+    #[track_caller]
     fn span(&self) -> Span {
         *self
     }
 }
 
 impl<T: Spanned> Spanned for &T {
+    #[track_caller]
     fn span(&self) -> Span {
         (*self).span()
     }
 }
 
 impl<T: Spanned> Spanned for &mut T {
+    #[track_caller]
     fn span(&self) -> Span {
         (**self).span()
     }
 }
 
 impl<T: Spanned> Spanned for Box<T> {
+    #[track_caller]
     fn span(&self) -> Span {
         self.as_ref().span()
     }
 }
 
-fn span_from_slice<T: Spanned>(items: &[T]) -> Span {
-    match items.len() {
-        0 => Span::default(),
-        1 => items[0].span(),
-        _ => {
-            let start = items.first().unwrap().span();
-            let end = items.last().unwrap().span();
-            start.merge(&end)
-        }
-    }
-}
-
 impl<T: Spanned> Spanned for Vec<T> {
+    #[track_caller]
     fn span(&self) -> Span {
-        span_from_slice(self.as_slice())
+        Span::from_slice(self.as_slice())
     }
 }
 
 impl<T: Spanned> Spanned for &[T] {
+    #[track_caller]
     fn span(&self) -> Span {
-        span_from_slice(self)
+        Span::from_slice(self)
     }
 }
 
 impl<T: Spanned> Spanned for Box<[T]> {
+    #[track_caller]
     fn span(&self) -> Span {
-        span_from_slice(self.as_ref())
+        Span::from_slice(self.as_ref())
     }
 }
 
 impl<T: Spanned, const N: usize> Spanned for [T; N] {
+    #[track_caller]
     fn span(&self) -> Span {
-        span_from_slice(self.as_slice())
+        Span::from_slice(self.as_slice())
     }
 }

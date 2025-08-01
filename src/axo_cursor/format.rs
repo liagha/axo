@@ -14,9 +14,9 @@ use {
 
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self { 
-            Location::File(file) => write!(f, "{}", file),
-            Location::Void => write!(f, "0"),
+        match self {
+            Location::File(file) => write!(f, "File({})", file),
+            Location::Flag => write!(f, "Flag"),
         }
     }
 }
