@@ -12,7 +12,7 @@ use {
     }
 };
 
-impl Display for Location {
+impl Display for Location<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Location::File(file) => write!(f, "File({})", file),
@@ -21,13 +21,13 @@ impl Display for Location {
     }
 }
 
-impl Display for Position {
+impl Display for Position<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}:{}:{}", self.location, self.line, self.column)
     }
 }
 
-impl Debug for Span {
+impl Debug for Span<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
             if self.start.location != self.end.location {
@@ -67,7 +67,7 @@ impl Debug for Span {
 }
 
 
-impl Display for Span {
+impl Display for Span<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if self.start.location != self.end.location {
             write!(f, "{}:{}:{} - {}:{}:{}",

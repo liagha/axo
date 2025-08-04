@@ -22,33 +22,33 @@ use {
 };
 
 pub struct Parser<'parser> {
-    pub registry: &'parser mut Registry,
+    pub registry: &'parser mut Registry<'parser>,
     pub index: usize,
-    pub position: Position,
-    pub input: Vec<Token>,
-    pub output: Vec<Element>,
-    pub errors: Vec<ParseError>,
+    pub position: Position<'parser>,
+    pub input: Vec<Token<'parser>>,
+    pub output: Vec<Element<'parser>>,
+    pub errors: Vec<ParseError<'parser>>,
 }
 
-impl<'parser> Peekable<Token> for Parser<'parser> {
+impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
     #[inline]
     fn length(&self) -> usize {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Token> {
+    fn peek_ahead(&self, n: usize) -> Option<&Token<'parser>> {
         let current = self.index + n;
 
         self.get(current)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Token> {
+    fn peek_behind(&self, n: usize) -> Option<&Token<'parser>> {
         let current = self.index - n;
 
         self.get(current)
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
+    fn next(&self, index: &mut usize, position: &mut Position<'parser>) -> Option<Token<'parser>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
 
@@ -60,19 +60,19 @@ impl<'parser> Peekable<Token> for Parser<'parser> {
         None
     }
 
-    fn input(&self) -> &Vec<Token> {
+    fn input(&self) -> &Vec<Token<'parser>> {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Vec<Token> {
+    fn input_mut(&mut self) -> &mut Vec<Token<'parser>> {
         &mut self.input
     }
 
-    fn position(&self) -> Position {
+    fn position(&self) -> Position<'parser> {
         self.position.clone()
     }
 
-    fn position_mut(&mut self) -> &mut Position {
+    fn position_mut(&mut self) -> &mut Position<'parser> {
         &mut self.position
     }
 
@@ -86,7 +86,7 @@ impl<'parser> Peekable<Token> for Parser<'parser> {
 }
 
 impl<'parser> Parser<'parser> {
-    pub fn new(registry: &'parser mut Registry, location: Location) -> Self {
+    pub fn new(registry: &'parser mut Registry<'parser>, location: Location<'parser>) -> Self {
         Parser {
             registry,
             index: 0,
@@ -97,18 +97,18 @@ impl<'parser> Parser<'parser> {
         }
     }
 
-    pub fn with_input(self, input: Vec<Token>) -> Self {
+    pub fn with_input(self, input: Vec<Token<'parser>>) -> Self {
         Self {
             input,
             ..self
         }
     }
 
-    pub fn set_input(&mut self, input: Vec<Token>) {
+    pub fn set_input(&mut self, input: Vec<Token<'parser>>) {
         self.input = input;
     }
 
-    pub fn strainer(length: usize) -> Classifier<Token, Element, ParseError> {
+    pub fn strainer(length: usize) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {
@@ -162,12 +162,12 @@ impl<'parser> Parser<'parser> {
     }
 }
 
-impl<'parser> Marked for Parser<'parser> {
-    fn registry(&self) -> &Registry {
+impl<'parser> Marked<'parser> for Parser<'parser> {
+    fn registry(&self) -> &Registry<'parser> {
         &self.registry
     }
 
-    fn registry_mut(&mut self) -> &mut Registry {
+    fn registry_mut(&mut self) -> &mut Registry<'parser> {
         &mut self.registry
     }
 }

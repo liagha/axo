@@ -8,11 +8,11 @@ use {
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub enum ErrorKind {
-    ArgumentParse(ParseError),
+pub enum ErrorKind<'error> {
+    ArgumentParse(ParseError<'error>),
 }
 
-impl Display for ErrorKind {
+impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorKind::ArgumentParse(e) => {
@@ -22,7 +22,7 @@ impl Display for ErrorKind {
     }
 }
 
-impl Debug for ErrorKind {
+impl<'error> Debug for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
     }

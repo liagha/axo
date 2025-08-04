@@ -19,56 +19,56 @@ use {
 
 #[derive(Debug)]
 pub struct Initializer<'initializer> {
-    pub registry: &'initializer mut Registry,
+    pub registry: &'initializer mut Registry<'initializer>,
     pub index: usize,
-    pub position: Position,
-    pub input: Vec<Token>,
+    pub position: Position<'initializer>,
+    pub input: Vec<Token<'initializer>>,
     pub output: Vec<Preference>,
-    pub errors: Vec<InitialError>,
+    pub errors: Vec<InitialError<'initializer>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Preference {
-    pub target: Token,
-    pub value: Token,
-    pub span: Span,
+    pub target: Token<'static>,
+    pub value: Token<'static>,
+    pub span: Span<'static>,
 }
 
 impl Spanned for Preference {
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         self.span.clone()
     }
 }
 
 impl Preference {
-    pub fn new(identifier: Token, value: Token) -> Self {
-        Self { target: identifier.clone(), value: value.clone(), span: Span::merge(&identifier.span(), &value.span()) }
+    pub fn new(identifier: Token<'static>, value: Token<'static>) -> Self {
+        Self { target: identifier.clone(), value: value.clone(), span: Span::merge(&identifier.borrow_span(), &value.borrow_span()) }
     }
 }
 
 impl Symbolic for Preference {
-    fn brand(&self) -> Option<Token> {
+    fn brand(&self) -> Option<Token<'static>> {
         Some(self.target.clone())
     }
 }
 
-impl<'initializer> Peekable<Token> for Initializer<'initializer> {
+impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'initializer> {
     #[inline]
     fn length(&self) -> usize {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Token> {
+    fn peek_ahead(&self, n: usize) -> Option<&Token<'initializer>> {
         let current = self.index + n;
         self.get(current)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Token> {
+    fn peek_behind(&self, n: usize) -> Option<&Token<'initializer>> {
         let current = self.index - n;
         self.get(current)
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Token> {
+    fn next(&self, index: &mut usize, position: &mut Position<'initializer>) -> Option<Token<'initializer>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
             *index += 1;
@@ -77,19 +77,19 @@ impl<'initializer> Peekable<Token> for Initializer<'initializer> {
         None
     }
 
-    fn input(&self) -> &Vec<Token> {
+    fn input(&self) -> &Vec<Token<'initializer>> {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Vec<Token> {
+    fn input_mut(&mut self) -> &mut Vec<Token<'initializer>> {
         &mut self.input
     }
 
-    fn position(&self) -> Position {
+    fn position(&self) -> Position<'initializer> {
         self.position.clone()
     }
 
-    fn position_mut(&mut self) -> &mut Position {
+    fn position_mut(&mut self) -> &mut Position<'initializer> {
         &mut self.position
     }
 
@@ -103,7 +103,7 @@ impl<'initializer> Peekable<Token> for Initializer<'initializer> {
 }
 
 impl<'initializer> Initializer<'initializer> {
-    pub fn new(registry: &'initializer mut Registry, location: Location) -> Self {
+    pub fn new(registry: &'initializer mut Registry<'initializer>, location: Location<'initializer>) -> Self {
         Initializer {
             registry,
             index: 0,
@@ -114,7 +114,7 @@ impl<'initializer> Initializer<'initializer> {
         }
     }
 
-    pub fn verbosity() -> Classifier<Token, Preference, InitialError> {
+    pub fn verbosity() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -136,15 +136,15 @@ impl<'initializer> Initializer<'initializer> {
             }).with_transform(|_, form| {
                 let identifier = form.collect_inputs()[0].clone();
 
-                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), identifier.span())))
+                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), identifier.borrow_span())))
             })
         ]).with_transform(|_, form| {
             let identifier = form.collect_inputs()[0].clone();
-            Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Boolean(true), identifier.span()))))
+            Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Boolean(true), identifier.borrow_span()))))
         })
     }
 
-    pub fn path() -> Classifier<Token, Preference, InitialError> {
+    pub fn path() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -163,7 +163,7 @@ impl<'initializer> Initializer<'initializer> {
                 }).with_transform(|_, form| {
                     let identifier = form.collect_inputs()[0].clone();
 
-                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), identifier.span())))
+                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), identifier.borrow_span())))
                 }),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -199,7 +199,7 @@ impl<'initializer> Initializer<'initializer> {
                 for input in inputs.iter().skip(1) {
                     match &input.kind {
                         TokenKind::Identifier(identifier) => {
-                            path.push_str(identifier);
+                            path.push_str(&identifier);
                         }
                         TokenKind::Operator(OperatorKind::Slash) => {
                             path.push('/');
@@ -211,12 +211,12 @@ impl<'initializer> Initializer<'initializer> {
                     }
                 }
 
-                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), identifier.span()))))
+                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), identifier.borrow_span()))))
             }
         )
     }
 
-    pub fn strainer(length: usize) -> Classifier<Token, Element, ParseError> {
+    pub fn strainer(length: usize) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {
@@ -245,7 +245,7 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn preference() -> Classifier<Token, Preference, InitialError> {
+    pub fn preference() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
         Classifier::alternative([
             Self::path(),
             Self::verbosity(),
@@ -253,7 +253,7 @@ impl<'initializer> Initializer<'initializer> {
         ])
     }
 
-    pub fn classifier() -> Classifier<Token, Preference, InitialError> {
+    pub fn classifier() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
         Classifier::repetition(
             Self::preference(),
             0,
@@ -292,19 +292,19 @@ impl<'initializer> Initializer<'initializer> {
         }
 
         let preferences = self.output.iter().map(|preference| {
-            Symbol::new(preference.clone(), preference.span())
+            Symbol::new(preference.clone(), preference.borrow_span())
         }).collect::<Vec<Symbol>>();
 
         self.registry.resolver.extend(preferences)
     }
 }
 
-impl<'initializer> Marked for Initializer<'initializer> {
-    fn registry(&self) -> &Registry {
+impl<'initializer> Marked<'initializer> for Initializer<'initializer> {
+    fn registry(&self) -> &Registry<'initializer> {
         &self.registry
     }
 
-    fn registry_mut(&mut self) -> &mut Registry {
+    fn registry_mut(&mut self) -> &mut Registry<'initializer> {
         &mut self.registry
     }
 }

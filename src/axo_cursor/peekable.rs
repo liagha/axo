@@ -1,10 +1,11 @@
 use {
     crate::{
         axo_cursor::{Position, Span, Location},
+        axo_data::Str,
     }
 };
 
-pub trait Peekable<Item: PartialEq> {
+pub trait Peekable<'a, Item: PartialEq> {
     fn length(&self) -> usize;
     fn remaining(&self) -> usize {
         self.length() - self.index()
@@ -36,8 +37,7 @@ pub trait Peekable<Item: PartialEq> {
         result
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position) -> Option<Item>;
-
+    fn next(&self, index: &mut usize, position: &mut Position<'a>) -> Option<Item>;
 
     fn get(&self, index: usize) -> Option<&Item> {
         self.input().get(index)
@@ -46,11 +46,11 @@ pub trait Peekable<Item: PartialEq> {
     fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
         self.input_mut().get_mut(index)
     }
-    
+
     fn insert(&mut self, index: usize, item: Item) {
         self.input_mut().insert(index, item);
     }
-    
+
     fn remove(&mut self, index: usize) -> Option<Item> {
         Some(self.input_mut().remove(index))
     }
@@ -58,8 +58,8 @@ pub trait Peekable<Item: PartialEq> {
     fn input(&self) -> &Vec<Item>;
     fn input_mut(&mut self) -> &mut Vec<Item>;
 
-    fn position(&self) -> Position;
-    fn position_mut(&mut self) -> &mut Position;
+    fn position(&self) -> Position<'a>;
+    fn position_mut(&mut self) -> &mut Position<'a>;
     fn index(&self) -> usize;
     fn index_mut(&mut self) -> &mut usize;
 
@@ -75,7 +75,7 @@ pub trait Peekable<Item: PartialEq> {
         *self.index_mut() = index;
     }
 
-    fn set_position(&mut self, position: Position) {
+    fn set_position(&mut self, position: Position<'a>) {
         *self.position_mut() = position;
     }
 
@@ -87,11 +87,11 @@ pub trait Peekable<Item: PartialEq> {
         self.position_mut().column = line;
     }
 
-    fn set_path(&mut self, path: &'static str) {
+    fn set_path(&mut self, path: Str<'a>) {
         self.position_mut().location = Location::File(path);
     }
-    
-    fn set_location(&mut self, location: Location) {
+
+    fn set_location(&mut self, location: Location<'a>) {
         self.position_mut().location = location;
     }
 

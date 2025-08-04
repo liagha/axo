@@ -18,9 +18,9 @@ use {
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Token {
+pub struct Token<'token> {
     pub kind: TokenKind,
-    pub span: Span,
+    pub span: Span<'token>,
 }
 
 #[derive(ctor, Clone, Eq, Hash, PartialEq, IsVariant, Unwrap)]
@@ -36,8 +36,8 @@ pub enum TokenKind {
     Comment(String),
 }
 
-impl Token {
-    pub fn new(kind: TokenKind, span: Span) -> Self {
+impl<'token> Token<'token> {
+    pub fn new(kind: TokenKind, span: Span<'token>) -> Self {
         Self { kind, span }
     }
 }

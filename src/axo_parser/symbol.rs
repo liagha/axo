@@ -38,21 +38,21 @@ use {
 };
 
 pub trait Symbolic: DynClone + DynEq + DynHash + Debug + Send + Sync {
-    fn brand(&self) -> Option<Token>;
+    fn brand(&self) -> Option<Token<'static>>;
 }
 
 clone_trait_object!(Symbolic);
 eq_trait_object!(Symbolic);
 hash_trait_object!(Symbolic);
 
-pub struct Symbol {
+pub struct Symbol<'symbol> {
     pub value: Box<dyn Symbolic>,
-    pub span: Span,
+    pub span: Span<'symbol>,
     pub members: Vec<Box<dyn Symbolic>>,
 }
 
-impl Symbol {
-    pub fn new(value: impl Symbolic, span: Span) -> Self {
+impl<'symbol> Symbol<'symbol> {
+    pub fn new(value: impl Symbolic, span: Span<'symbol>) -> Self {
         Self {
             value: Box::new(value),
             span,
@@ -65,7 +65,7 @@ impl Symbol {
     }
 }
 
-impl Clone for Symbol {
+impl<'symbol> Clone for Symbol<'symbol> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -75,76 +75,76 @@ impl Clone for Symbol {
     }
 }
 
-impl Debug for Symbol {
+impl<'symbol> Debug for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::format::Result {
         write!(f, "{:?}", self.value)
     }
 }
 
-impl Eq for Symbol {}
+impl<'symbol> Eq for Symbol<'symbol> {}
 
-impl Hash for Symbol {
+impl<'symbol> Hash for Symbol<'symbol> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
 }
 
-impl PartialEq for Symbol {
+impl<'symbol> PartialEq for Symbol<'symbol> {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value
     }
 }
 
-impl Symbolic for Symbol {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Symbol<'static> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.value.brand()
     }
 }
 
-impl Symbolic for Inclusion<Box<Element>> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Inclusion<Box<Element<'static>>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Implementation<Box<Element>, Box<Element>, Symbol> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Interface<Box<Element>, Symbol> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Interface<Box<Element<'static>>, Symbol<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Binding<Box<Element>, Box<Element>, Box<Element>> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Structure<Box<Element>, Symbol> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Structure<Box<Element<'static>>, Symbol<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Enumeration<Box<Element>, Element> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
-impl Symbolic for Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>> {
-    fn brand(&self) -> Option<Token> {
+impl Symbolic for Method<Box<Element<'static>>, Symbol<'static>, Box<Element<'static>>, Option<Box<Element<'static>>>> {
+    fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
 }
 
 impl<'parser> Parser<'parser> {
-    pub fn symbolization() -> Classifier<Token, Element, ParseError> {
+    pub fn symbolization() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::alternative([
             Self::implementation(),
             Self::binding(),
@@ -154,7 +154,7 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    pub fn implementation() -> Classifier<Token, Element, ParseError> {
+    pub fn implementation() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -181,7 +181,7 @@ impl<'parser> Parser<'parser> {
                     let members = body.kind.clone().unwrap_block().items.iter().map(|item| {
                         item.kind.clone().unwrap_symbolize()
                     }).collect::<Vec<_>>();
-                    let span = Span::merge(&keyword.span(), &body.span());
+                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
@@ -197,7 +197,7 @@ impl<'parser> Parser<'parser> {
                     let members = <ElementKind as Clone>::clone(&body).unwrap_block().clone().items.iter().map(|item| {
                         item.kind.clone().unwrap_symbolize()
                     }).collect::<Vec<_>>();
-                    let span = Span::merge(&keyword.span(), &body.span());
+                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
@@ -214,7 +214,7 @@ impl<'parser> Parser<'parser> {
         )
     }
     
-    pub fn binding() -> Classifier<Token, Element, ParseError> {
+    pub fn binding() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -228,7 +228,7 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input();
                 let mutable = keyword.kind == TokenKind::Identifier("var".to_string());
                 let body = sequence[1].unwrap_output().clone();
-                let span = Span::merge(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
@@ -254,7 +254,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn structure() -> Classifier<Token, Element, ParseError> {
+    pub fn structure() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -272,7 +272,7 @@ impl<'parser> Parser<'parser> {
                 let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
                     item.kind.clone().unwrap_symbolize().clone()
                 }).collect::<Vec<_>>();
-                let span = Span::merge(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(
                     Element::new(
@@ -286,7 +286,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn enumeration() -> Classifier<Token, Element, ParseError> {
+    pub fn enumeration() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -300,7 +300,7 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
-                let span = Span::merge(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let items = body.kind.unwrap_bundle().items;
 
                 Ok(Form::output(
@@ -315,7 +315,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn method() -> Classifier<Token, Element, ParseError> {
+    pub fn method() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -336,7 +336,7 @@ impl<'parser> Parser<'parser> {
                     parameter.kind.clone().unwrap_symbolize()
                 }).collect::<Vec<_>>();
 
-                let span = Span::merge(&keyword.span(), &body.span());
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(
                     Element::new(

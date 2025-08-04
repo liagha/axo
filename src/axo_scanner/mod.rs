@@ -24,4 +24,4 @@ use {
     }
 };
 
-pub type ScanError = Error<ErrorKind>;
+pub type ScanError<'error> = Error<'error, ErrorKind>;

@@ -20,24 +20,24 @@ use {
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Span {
-    pub start: Position,
-    pub end: Position,
+pub struct Span<'span> {
+    pub start: Position<'span>,
+    pub end: Position<'span>,
 }
 
-impl Span {
+impl<'span> Span<'span> {
     #[inline]
-    pub fn new(start: Position, end: Position) -> Self {
+    pub fn new(start: Position<'span>, end: Position<'span>) -> Self {
         Self { start, end }
     }
 
     #[inline]
-    pub fn default(location: Location) -> Self {
+    pub fn default(location: Location<'span>) -> Self {
         Self { start: Position::default(location), end: Position::default(location) } 
     }
     
     #[inline]
-    pub fn point(pos: Position) -> Self {
+    pub fn point(pos: Position<'span>) -> Self {
         Self {
             start: pos.clone(),
             end: pos,
@@ -67,13 +67,13 @@ impl Span {
 
     #[inline]
     #[track_caller]
-    pub fn from_slice<T: Spanned>(items: &[T]) -> Self {
+    pub fn from_slice<T: Spanned>(items: &'span [T]) -> Self {
         match items.len() {
             0 => panic!("can't create a span from an empty Slice."),
-            1 => items[0].span(),
+            1 => items[0].borrow_span(),
             _ => {
-                let start = items.first().unwrap().span();
-                let end = items.last().unwrap().span();
+                let start = items.first().unwrap().borrow_span();
+                let end = items.last().unwrap().borrow_span();
                 start.merge(&end)
             }
         }

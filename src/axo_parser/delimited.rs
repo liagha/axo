@@ -18,7 +18,7 @@ use {
 use crate::axo_cursor::Location;
 
 impl<'parser> Parser<'parser> {
-    pub fn bundle(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn bundle(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -68,13 +68,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), braces.span())
+                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), braces.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn block(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn block(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -124,13 +124,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::block(Block::new(elements.clone())), braces.span())
+                    Element::new(ElementKind::block(Block::new(elements.clone())), braces.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn group(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn group(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -183,13 +183,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::group(Group::new(elements.clone())), parentheses.span())
+                    Element::new(ElementKind::group(Group::new(elements.clone())), parentheses.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn sequence(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn sequence(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -242,13 +242,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), parentheses.span())
+                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), parentheses.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn collection(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn collection(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -298,13 +298,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::collection(Collection::new(elements.clone())), brackets.span())
+                    Element::new(ElementKind::collection(Collection::new(elements.clone())), brackets.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn series(item: Classifier<Token, Element, ParseError>) -> Classifier<Token, Element, ParseError> {
+    pub fn series(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -355,13 +355,13 @@ impl<'parser> Parser<'parser> {
                 let elements = form.collect_outputs();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::series(Series::new(elements.clone())), brackets.span())
+                    Element::new(ElementKind::series(Series::new(elements.clone())), brackets.borrow_span())
                 ))
             },
         )
     }
 
-    pub fn delimited() -> Classifier<Token, Element, ParseError> {
+    pub fn delimited() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::alternative([
             Self::bundle(Classifier::deferred(Self::element)),
             Self::block(Classifier::deferred(Self::element)),

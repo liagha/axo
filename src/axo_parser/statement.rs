@@ -15,7 +15,7 @@ use {
 };
 
 impl<'parser> Parser<'parser> {
-    pub fn conditional() -> Classifier<Token, Element, ParseError> {
+    pub fn conditional() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -28,7 +28,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
                     Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().span();
+                        let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
                     }),
@@ -36,7 +36,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
                     Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().span();
+                        let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
                     }),
@@ -61,7 +61,7 @@ impl<'parser> Parser<'parser> {
 
                 if let Some(alternate) = sequence.get(3).cloned() {
                     let alternate = alternate.unwrap_output().clone();
-                    let span = Span::merge(&keyword.span(), &alternate.span());
+                    let span = Span::merge(&keyword.borrow_span(), &alternate.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
@@ -70,7 +70,7 @@ impl<'parser> Parser<'parser> {
                         )
                     ))
                 } else {
-                    let span = condition.span().merge(&then.span());
+                    let span = condition.borrow_span().merge(&then.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
@@ -83,7 +83,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn cycle() -> Classifier<Token, Element, ParseError> {
+    pub fn cycle() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::choice([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -95,14 +95,14 @@ impl<'parser> Parser<'parser> {
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
                     Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().span();
+                        let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
                     })
                 ),
                 Classifier::deferred(Self::element).with_fallback(
                     Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().span();
+                        let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
                     })
@@ -118,7 +118,7 @@ impl<'parser> Parser<'parser> {
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
                     Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().span();
+                        let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
                     })
@@ -126,12 +126,12 @@ impl<'parser> Parser<'parser> {
             ]),
         ], vec![1, 0]).with_transform(
             |_, form| {
-                let sequence = form.as_forms();
+                let sequence: &[Form<Token<'_>, Element, ParseError>] = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
                 if sequence.len() == 1 {
                     let body = sequence[0].unwrap_output().clone();
-                    let span = Span::merge(&keyword.span(), &body.span());
+                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
@@ -157,7 +157,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn statement() -> Classifier<Token, Element, ParseError> {
+    pub fn statement() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Self::conditional(), Self::cycle(), Self::binding()])
     }
 }

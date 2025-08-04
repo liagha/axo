@@ -6,12 +6,12 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub struct Scope {
-    pub symbols: HashSet<Symbol>,
-    pub parent: Option<Box<Scope>>,
+pub struct Scope<'scope> {
+    pub symbols: HashSet<Symbol<'scope>>,
+    pub parent: Option<Box<Scope<'scope>>>,
 }
 
-impl Scope {
+impl<'scope> Scope<'scope> {
     pub fn new() -> Self {
         Self {
             symbols: HashSet::new(),
@@ -23,31 +23,31 @@ impl Scope {
         Self::new()
     }
 
-    pub fn with_parent(parent: Scope) -> Self {
+    pub fn with_parent(parent: Scope<'scope>) -> Self {
         Self {
             symbols: HashSet::new(),
             parent: Some(Box::new(parent)),
         }
     }
 
-    pub fn attach(&mut self, parent: Scope) {
+    pub fn attach(&mut self, parent: Scope<'scope>) {
         self.parent = Some(Box::new(parent));
     }
 
-    pub fn detach(&mut self) -> Option<Scope> {
+    pub fn detach(&mut self) -> Option<Scope<'scope>> {
         self.parent.take().map(|boxed| *boxed)
     }
 
-    pub fn add(&mut self, symbol: Symbol) {
+    pub fn add(&mut self, symbol: Symbol<'scope>) {
         self.symbols.remove(&symbol);
         self.symbols.insert(symbol);
     }
 
-    pub fn remove(&mut self, symbol: &Symbol) -> bool {
+    pub fn remove(&mut self, symbol: &Symbol<'scope>) -> bool {
         self.symbols.remove(symbol)
     }
 
-    pub fn has(&self, symbol: &Symbol) -> bool {
+    pub fn has(&self, symbol: &Symbol<'scope>) -> bool {
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -60,7 +60,7 @@ impl Scope {
         false
     }
 
-    pub fn find(&self, symbol: &Symbol) -> Option<Symbol> {
+    pub fn find(&self, symbol: &Symbol<'scope>) -> Option<Symbol<'scope>> {
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -73,11 +73,11 @@ impl Scope {
         None
     }
 
-    pub fn local(&self) -> &HashSet<Symbol> {
+    pub fn local(&self) -> &HashSet<Symbol<'scope>> {
         &self.symbols
     }
 
-    pub fn all(&self) -> HashSet<Symbol> {
+    pub fn all(&self) -> HashSet<Symbol<'scope>> {
         let mut symbols = HashSet::new();
         let mut current = Some(self);
 
@@ -113,7 +113,7 @@ impl Scope {
         depth
     }
 
-    pub fn root(&self) -> &Scope {
+    pub fn root(&self) -> &Scope<'scope> {
         let mut current = self;
         while let Some(parent) = current.parent.as_deref() {
             current = parent;
@@ -121,23 +121,23 @@ impl Scope {
         current
     }
 
-    pub fn extend(&mut self, symbols: Vec<Symbol>) {
+    pub fn extend(&mut self, symbols: Vec<Symbol<'scope>>) {
         for symbol in symbols {
             self.add(symbol);
         }
     }
 
-    pub fn merge(&mut self, other: &Scope) {
+    pub fn merge(&mut self, other: &Scope<'scope>) {
         for symbol in &other.symbols {
             self.add(symbol.clone());
         }
     }
 
-    pub fn contains(&self, symbol: &Symbol) -> bool {
+    pub fn contains(&self, symbol: &Symbol<'scope>) -> bool {
         self.symbols.contains(symbol)
     }
 
-    pub fn replace(&mut self, old: &Symbol, new: Symbol) -> bool {
+    pub fn replace(&mut self, old: &Symbol<'scope>, new: Symbol<'scope>) -> bool {
         if self.symbols.remove(old) {
             self.symbols.insert(new);
             true
@@ -153,7 +153,7 @@ impl Scope {
         self.symbols.retain(predicate);
     }
 
-    pub fn filter<F>(&self, predicate: F) -> HashSet<Symbol>
+    pub fn filter<F>(&self, predicate: F) -> HashSet<Symbol<'scope>>
     where
         F: Fn(&Symbol) -> bool,
     {
@@ -167,7 +167,7 @@ impl Scope {
         self.symbols.iter().map(mapping).collect()
     }
 
-    pub fn ancestors(&self) -> Vec<&Scope> {
+    pub fn ancestors(&self) -> Vec<&Scope<'scope>> {
         let mut scopes = Vec::new();
         let mut current = self.parent.as_deref();
 
@@ -179,27 +179,27 @@ impl Scope {
         scopes
     }
 
-    pub fn flatten(&self) -> Vec<Symbol> {
+    pub fn flatten(&self) -> Vec<Symbol<'scope>> {
         self.all().into_iter().collect()
     }
 
-    pub fn intersect(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn intersect(&self, other: &Scope<'scope>) -> HashSet<Symbol<'scope>> {
         self.symbols.intersection(&other.symbols).cloned().collect()
     }
 
-    pub fn difference(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn difference(&self, other: &Scope<'scope>) -> HashSet<Symbol<'scope>> {
         self.symbols.difference(&other.symbols).cloned().collect()
     }
 
-    pub fn union(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn union(&self, other: &Scope<'scope>) -> HashSet<Symbol<'scope>> {
         self.symbols.union(&other.symbols).cloned().collect()
     }
 
-    pub fn visible(&self, symbol: &Symbol) -> bool {
+    pub fn visible(&self, symbol: &Symbol<'scope>) -> bool {
         self.has(symbol)
     }
 
-    pub fn shadow(&mut self, symbol: Symbol) {
+    pub fn shadow(&mut self, symbol: Symbol<'scope>) {
         self.symbols.insert(symbol);
     }
 
@@ -207,7 +207,7 @@ impl Scope {
         self.parent = None;
     }
 
-    pub fn cascade(&self) -> Vec<HashSet<Symbol>> {
+    pub fn cascade(&self) -> Vec<HashSet<Symbol<'scope>>> {
         let mut levels = Vec::new();
         let mut current = Some(self);
 

@@ -14,14 +14,14 @@ impl Debug for TokenKind {
             TokenKind::Operator(op) => write!(f, "Operator({:?})", op),
             TokenKind::Punctuation(pun) => write!(f, "Punctuation({:?})", pun),
             TokenKind::Identifier(var) => write!(f, "Identifier({})", var),
-            TokenKind::String(str) => write!(f, "String({})", str),
+            TokenKind::String(string) => write!(f, "String({})", string),
             TokenKind::Character(char) => write!(f, "Char('{}')", char),
             TokenKind::Comment(comment) => write!(f, "Comment({})", comment),
         }
     }
 }
 
-impl Debug for Token {
+impl<'token> Debug for Token<'token> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
             write!(f, "{:?}", self.kind)

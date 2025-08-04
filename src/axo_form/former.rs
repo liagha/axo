@@ -24,14 +24,14 @@ use {
     record::*,
 };
 
-pub struct Composer<'c, Input: Formable, Output: Formable, Failure: Formable> {
-    pub source: &'c mut dyn Source<Input>,
+pub struct Composer<'composer, Input: Formable, Output: Formable, Failure: Formable> {
+    pub source: &'composer mut dyn Source<'composer, Input>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
-impl <'c, Input: Formable, Output: Formable, Failure: Formable> Composer<'c, Input, Output, Failure> {
+impl <'composer, Input: Formable, Output: Formable, Failure: Formable> Composer<'composer, Input, Output, Failure> {
     #[inline(always)]
-    pub fn new(source: &'c mut (dyn Source<Input> + 'c)) -> Composer<'c, Input, Output, Failure> {
+    pub fn new(source: &'composer mut dyn Source<'composer, Input>) -> Composer<'composer, Input, Output, Failure> {
         Self {
             source,
             _phantom: PhantomData,
@@ -39,7 +39,7 @@ impl <'c, Input: Formable, Output: Formable, Failure: Formable> Composer<'c, Inp
     }
 
     #[inline(always)]
-    pub fn build(&mut self, draft: &mut Draft<Input, Output, Failure>) {
+    pub fn build(&mut self, draft: &mut Draft<'composer, Input, Output, Failure>) {
         let classifier = draft.classifier.order.clone();
 
         classifier.order(self, draft);
@@ -47,18 +47,18 @@ impl <'c, Input: Formable, Output: Formable, Failure: Formable> Composer<'c, Inp
 }
 
 #[derive(Clone, Debug)]
-pub struct Draft<Input: Formable, Output: Formable, Failure: Formable> {
+pub struct Draft<'draft, Input: Formable, Output: Formable, Failure: Formable> {
     pub marker: usize,
-    pub position: Position,
+    pub position: Position<'draft>,
     pub consumed: Vec<Input>,
     pub record: Record,
-    pub classifier: Classifier<Input, Output, Failure>,
+    pub classifier: Classifier<'draft, Input, Output, Failure>,
     pub form: Form<Input, Output, Failure>,
 }
 
-impl<Input: Formable, Output: Formable, Failure: Formable> Draft<Input, Output, Failure> {
+impl<'draft, Input: Formable, Output: Formable, Failure: Formable> Draft<'draft, Input, Output, Failure> {
     #[inline(always)]
-    pub const fn new(index: usize, position: Position, classifier: Classifier<Input, Output, Failure>) -> Self {
+    pub const fn new(index: usize, position: Position<'draft>, classifier: Classifier<'draft, Input, Output, Failure>) -> Self {
         Self {
             marker: index,
             position,
@@ -125,15 +125,15 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Draft<Input, Output, 
     }
 }
 
-pub trait Former<Input: Formable, Output: Formable, Failure: Formable>: Source<Input> {
-    fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure>;
+pub trait Former<'former, Input: Formable, Output: Formable, Failure: Formable>: Source<'former, Input> {
+    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure>;
 }
 
-impl<Target, Input: Formable, Output: Formable, Failure: Formable> Former<Input, Output, Failure> for Target
+impl<'former, Target, Input: Formable, Output: Formable, Failure: Formable> Former<'former, Input, Output, Failure> for Target
 where
-    Target: Source<Input>,
+    Target: Source<'former, Input> + 'static,
 {
-    fn form(&mut self, classifier: Classifier<Input, Output, Failure>) -> Form<Input, Output, Failure> {
+    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure> {
         let mut draft = Draft::new(0, self.position(), classifier);
         let mut composer = Composer::new(self);
 

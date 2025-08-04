@@ -8,4 +8,4 @@ use {
 pub mod initializer;
 mod error;
 
-pub type InitialError = Error<ErrorKind>;
+pub type InitialError<'error> = Error<'error, ErrorKind<'error>>;

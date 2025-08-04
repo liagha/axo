@@ -15,8 +15,8 @@ use {
     }
 };
 
-impl<'scanner> Scanner<'scanner> {
-    pub fn number() -> Classifier<Character, Token, ScanError> {
+impl Scanner<'static> {
+    pub fn number() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::alternative([
             Self::hexadecimal(),
             Self::binary(),
@@ -25,7 +25,7 @@ impl<'scanner> Scanner<'scanner> {
         ])
     }
 
-    fn hexadecimal() -> Classifier<Character, Token, ScanError> {
+    fn hexadecimal() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -39,19 +39,20 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |_, form| {
+            move |_, form| {
                 let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
+                let span = inputs.borrow_span().clone();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
-                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), inputs.span()))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
+                    .map_err(move |err| ScanError::new(ErrorKind::NumberParse(err), span))
             },
         )
     }
 
-    fn binary() -> Classifier<Character, Token, ScanError> {
+    fn binary() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -69,15 +70,16 @@ impl<'scanner> Scanner<'scanner> {
                 let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
+                let span = inputs.borrow_span().clone();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
-                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), inputs.span()))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
+                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), span))
             },
         )
     }
 
-    fn octal() -> Classifier<Character, Token, ScanError> {
+    fn octal() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -95,15 +97,16 @@ impl<'scanner> Scanner<'scanner> {
                 let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
+                let span = inputs.borrow_span().clone();
 
                 parser.parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
+                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
+                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
             },
         )
     }
 
-    fn decimal() -> Classifier<Character, Token, ScanError> {
+    fn decimal() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|c: &Character| c.is_numeric()),
@@ -135,17 +138,18 @@ impl<'scanner> Scanner<'scanner> {
             |_, form| {
                 let inputs = form.collect_inputs();
                 let number: String = inputs.clone().into_iter().collect();
+                let span = inputs.borrow_span().clone();
 
                 if number.contains('.') || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
                     parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), inputs.span())))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
+                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), span)))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
                 } else {
                     let parser = parser::<i128>();
                     parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), inputs.span())))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), inputs.span()))
+                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
+                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
                 }
             },
         )

@@ -32,89 +32,89 @@ pub use {
 
 pub trait Spanned {
     #[track_caller]
-    fn span(&self) -> Span;
+    fn borrow_span(&self) -> Span;
 }
 
-impl Spanned for Character {
+impl<'character> Spanned for Character<'character> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         self.span
     }
 }
 
-impl Spanned for Token {
+impl<'token> Spanned for Token<'token> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         self.span
     }
 }
 
-impl Spanned for Element {
+impl<'element> Spanned for Element<'element> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         self.span
     }
 }
 
-impl<E: Display> Spanned for Error<E> {
+impl<'error, E: Display> Spanned for Error<'error, E> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         self.span
     }
 }
 
-impl Spanned for Span {
+impl Spanned for Span<'_> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         *self
     }
 }
 
 impl<T: Spanned> Spanned for &T {
     #[track_caller]
-    fn span(&self) -> Span {
-        (*self).span()
+    fn borrow_span(&self) -> Span {
+        (*self).borrow_span()
     }
 }
 
 impl<T: Spanned> Spanned for &mut T {
     #[track_caller]
-    fn span(&self) -> Span {
-        (**self).span()
+    fn borrow_span(&self) -> Span {
+        (**self).borrow_span()
     }
 }
 
 impl<T: Spanned> Spanned for Box<T> {
     #[track_caller]
-    fn span(&self) -> Span {
-        self.as_ref().span()
+    fn borrow_span(&self) -> Span {
+        self.as_ref().borrow_span()
     }
 }
 
 impl<T: Spanned> Spanned for Vec<T> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         Span::from_slice(self.as_slice())
     }
 }
 
 impl<T: Spanned> Spanned for &[T] {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         Span::from_slice(self)
     }
 }
 
 impl<T: Spanned> Spanned for Box<[T]> {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         Span::from_slice(self.as_ref())
     }
 }
 
 impl<T: Spanned, const N: usize> Spanned for [T; N] {
     #[track_caller]
-    fn span(&self) -> Span {
+    fn borrow_span(&self) -> Span {
         Span::from_slice(self.as_slice())
     }
 }

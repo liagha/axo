@@ -3,7 +3,7 @@ use {
         Formable,  
     },
     crate::{
-        slice,
+        axo_data,
         hash::Hash,
         format::Debug,
     }
@@ -101,7 +101,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
     pub fn as_forms(&self) -> &[Form<Input, Output, Failure>] {
         match self {
             Form::Multiple(forms) => forms.as_slice(),
-            _ => slice::from_ref(self),
+            _ => axo_data::from_ref(self),
         }
     }
 

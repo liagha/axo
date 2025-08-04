@@ -10,42 +10,33 @@ use {
         },
     }
 };
-use crate::environment;
+use crate::{environment, Str};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Location {
-    File(&'static str),
+pub enum Location<'a> {
+    File(Str<'a>),
     Flag,
 }
 
-impl Location {
-    pub fn get_value(&self) -> String {
+impl<'a> Location<'a> {
+    pub fn get_value(&self) -> Str {
         match self {
-            Location::File(file) => read_to_string(file).unwrap_or("".to_string()),
-            Location::Flag => environment::args().skip(1).collect::<Vec<String>>().join(" "),
+            Location::File(file) => read_to_string(file.as_str().unwrap()).unwrap_or("".to_string()).into(),
+            Location::Flag => environment::args().skip(1).collect::<Vec<String>>().join(" ").into(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Position {
+pub struct Position<'position> {
     pub line: usize,
     pub column: usize,
-    pub location: Location,
+    pub location: Location<'position>,
 }
 
-impl Position {
+impl<'a> Position<'a> {
     #[inline]
-    pub fn new(location: Location) -> Self {
-        Self {
-            line: 1,
-            column: 1,
-            location,
-        }
-    }
-    
-    #[inline]
-    pub fn default(location: Location) -> Self {
+    pub fn new(location: Location<'a>) -> Self {
         Self {
             line: 1,
             column: 1,
@@ -54,14 +45,23 @@ impl Position {
     }
 
     #[inline]
-    pub fn path(line: usize, column: usize, path: &'static str) -> Self {
+    pub fn default(location: Location<'a>) -> Self {
+        Self {
+            line: 1,
+            column: 1,
+            location,
+        }
+    }
+
+    #[inline]
+    pub fn path(line: usize, column: usize, path: Str<'a>) -> Self {
         Self {
             line,
             column,
             location: Location::File(path),
         }
     }
-    
+
     #[inline]
     pub fn set_line(&mut self, line: usize) {
         self.line = line;
@@ -73,12 +73,12 @@ impl Position {
     }
 
     #[inline]
-    pub fn set_path(&mut self, path: &'static str) {
+    pub fn set_path(&mut self, path: Str<'a>) {
         self.location = Location::File(path);
     }
-    
+
     #[inline]
-    pub fn set_location(&mut self, location: Location) {
+    pub fn set_location(&mut self, location: Location<'a>) {
         self.location = location;
     }
 
@@ -99,7 +99,7 @@ impl Position {
     }
 
     #[inline]
-    pub fn swap_path(&self, path: &'static str) -> Self {
+    pub fn swap_path(&self, path: Str<'a>) -> Self {
         Self {
             location: Location::File(path),
             ..*self
@@ -107,7 +107,7 @@ impl Position {
     }
 
     #[inline]
-    pub fn swap_location(&self, location: Location) -> Self {
+    pub fn swap_location(&self, location: Location<'a>) -> Self {
         Self {
             location,
             ..*self
@@ -139,7 +139,7 @@ impl Position {
     pub fn add_column(&mut self, amount: usize) {
         self.column += amount;
     }
-    
+
     pub fn cmp(&self, other: &Self) -> Ordering {
         if self.location != other.location {
             return Ordering::Less;
@@ -152,13 +152,13 @@ impl Position {
     }
 }
 
-impl PartialOrd for Position {
+impl<'a> PartialOrd for Position<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Position {
+impl<'a> Ord for Position<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.cmp(other)
     }

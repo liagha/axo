@@ -41,10 +41,6 @@ pub const TIMER: timer::CPUCycleSource = timer::CPUCycleSource;
 #[cfg(target_arch = "aarch64")]
 pub const TIMER: timer::ARMGenericTimerSource = timer::ARMGenericTimerSource;
 
-pub mod data {
-    //pub use std::collections::VecDeque;
-}
-
 pub mod error {
     pub use {
         core::{
@@ -132,20 +128,20 @@ pub mod character {
         },
     };
 
-    use crate::axo_data::PrimInt;
+    use super::axo_data::{Number, Str};
 
-    pub fn parse_radix<T: PrimInt>(input: &str, radix: T) -> Option<T> {
+    pub fn parse_radix<T: Number>(input: Str, radix: T) -> Option<T> {
         if input.is_empty() {
             return None;
         }
 
-        let radix_u8 = radix.to_u8()?;
+        let radix_u8 = radix.into();
 
         if radix_u8 < 2 || radix_u8 > 36 {
             return None;
         }
 
-        let mut accumulator = T::zero();
+        let mut accumulator = T::default();
 
         for &byte in input.as_bytes() {
             let value = match byte {
@@ -159,10 +155,10 @@ pub mod character {
                 return None;
             }
 
-            let digit = T::from(value).unwrap();
+            let digit = T::from(value);
 
-            accumulator = accumulator.checked_mul(&radix)?
-                .checked_add(&digit)?;
+            accumulator = accumulator.mul(radix)
+                .add(digit);
         }
 
         Some(accumulator)
@@ -211,14 +207,6 @@ pub mod string {
     pub use {
         core::{
             str::FromStr,
-        },
-    };
-}
-
-pub mod slice {
-    pub use {
-        core::{
-            slice::from_ref,
         },
     };
 }

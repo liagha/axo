@@ -14,13 +14,13 @@ use {
     },
 };
 
-impl Debug for Element {
+impl<'element> Debug for Element<'element> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?} | {:#?}", self.kind, self.span)
     }
 }
 
-impl Debug for ElementKind {
+impl<'element> Debug for ElementKind<'element> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ElementKind::Literal(literal) => {

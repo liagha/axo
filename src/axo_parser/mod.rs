@@ -23,4 +23,4 @@ use {
     error::ErrorKind,
 };
 
-pub type ParseError = Error<ErrorKind>;
+pub type ParseError<'error> = Error<'error, ErrorKind>;

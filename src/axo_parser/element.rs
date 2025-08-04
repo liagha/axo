@@ -37,77 +37,77 @@ use {
     }
 };
 
-pub struct Element {
-    pub kind: ElementKind,
-    pub span: Span,
+pub struct Element<'element> {
+    pub kind: ElementKind<'element>,
+    pub span: Span<'element>,
 }
 
 #[derive(ctor, IsVariant, Unwrap)]
-pub enum ElementKind {
+pub enum ElementKind<'element> {
     Literal(TokenKind),
 
     Identifier(String),
 
-    Procedural(Procedural<Box<Element>>),
+    Procedural(Procedural<Box<Element<'element>>>),
 
-    Group(Group<Element>),
+    Group(Group<Element<'element>>),
 
-    Sequence(Sequence<Element>),
+    Sequence(Sequence<Element<'element>>),
 
-    Collection(Collection<Element>),
+    Collection(Collection<Element<'element>>),
 
-    Series(Series<Element>),
+    Series(Series<Element<'element>>),
 
-    Bundle(Bundle<Element>),
+    Bundle(Bundle<Element<'element>>),
 
-    Block(Block<Element>),
+    Block(Block<Element<'element>>),
 
-    Unary(Unary<Token, Box<Element>>),
+    Unary(Unary<Token<'element>, Box<Element<'element>>>),
 
-    Binary(Binary<Box<Element>, Token, Box<Element>>),
+    Binary(Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>),
 
-    Label(Label<Box<Element>, Box<Element>>),
+    Label(Label<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Access(Access<Box<Element>, Box<Element>>),
+    Access(Access<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Index(Index<Box<Element>, Element>),
+    Index(Index<Box<Element<'element>>, Element<'element>>),
 
-    Invoke(Invoke<Box<Element>, Element>),
+    Invoke(Invoke<Box<Element<'element>>, Element<'element>>),
 
-    Construct(Construct<Box<Element>, Element>),
+    Construct(Construct<Box<Element<'element>>, Element<'element>>),
 
-    Conditional(Conditional<Box<Element>, Box<Element>, Box<Element>>),
+    Conditional(Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>),
 
-    Repeat(Repeat<Box<Element>, Box<Element>>),
+    Repeat(Repeat<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Iterate(Iterate<Box<Element>, Box<Element>>),
+    Iterate(Iterate<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Symbolize(Symbol),
+    Symbolize(Symbol<'element>),
 
-    Assign(Assign<Box<Element>, Box<Element>>),
+    Assign(Assign<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Produce(Option<Box<Element>>),
+    Produce(Option<Box<Element<'element>>>),
 
-    Abort(Option<Box<Element>>),
+    Abort(Option<Box<Element<'element>>>),
 
-    Pass(Option<Box<Element>>),
+    Pass(Option<Box<Element<'element>>>),
 }
 
-impl Element {
-    pub fn new(kind: ElementKind, span: Span) -> Element {
+impl<'element> Element<'element> {
+    pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
         Element { kind, span }
     }
 }
 
-impl Deref for Element {
-    type Target = ElementKind;
+impl<'element> Deref for Element<'element> {
+    type Target = ElementKind<'element>;
 
     fn deref(&self) -> &Self::Target {
         &self.kind
     }
 }
 
-impl DerefMut for Element {
+impl<'element> DerefMut for Element<'element> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.kind
     }

@@ -38,14 +38,14 @@ pub mod helper {
         T: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static
     {}
 
-    pub trait Source<Input>: Peekable<Input> + Marked
+    pub trait Source<'source, Input>: Peekable<'source, Input> + Marked<'source>
     where
         Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     {}
 
-    impl<Target, Input> Source<Input> for Target
+    impl<'source, Target, Input> Source<'source, Input> for Target
     where
-        Target: Peekable<Input> + Marked,
+        Target: Peekable<'source, Input> + Marked<'source>,
         Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
     {}
 
@@ -63,9 +63,9 @@ pub mod helper {
     }
 
     pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
-    pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Classifier<Input, Output, Failure> + Send + Sync>;
+    pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Classifier<'static, Input, Output, Failure> + Send + Sync>;
     pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
-    pub type Inspector<Input, Output, Failure> = Arc<dyn Fn(Draft<Input, Output, Failure>) -> Arc<dyn Order<Input, Output, Failure>> + Send + Sync>;
+    pub type Inspector<'inspector, Input, Output, Failure> = Arc<dyn Fn(Draft<'inspector, Input, Output, Failure>) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector> + Send + Sync + 'inspector>;
     pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
     pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
 }

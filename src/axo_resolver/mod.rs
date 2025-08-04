@@ -19,4 +19,4 @@ pub use {
     resolver::Resolver,
 };
 
-pub type ResolveError = Error<ErrorKind, String, ResolveHint>;
+pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, String, ResolveHint<'error>>;

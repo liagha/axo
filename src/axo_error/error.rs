@@ -6,26 +6,27 @@ use {
     crate::{
         format::{Display, Debug, Formatter, Result},
         axo_cursor::{Span},
+        axo_data::Str,
     },
 
     broccli::{Color, TextStyle}
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Error<K, N = String, H = String> 
-where K: Display, N: Display, H: Display 
+pub struct Error<'error, K, N = String, H = String>
+where K: Display, N: Display, H: Display
 {
     pub kind: K,
-    pub span: Span,
+    pub span: Span<'error>,
     pub note: Option<N>,
     pub hints: Vec<Hint<H>>,
 }
 
-impl<K, N, H> crate::error::Error for Error<K, N, H>
-where K: Display, N: Display, H: Display 
+impl<'error, K, N, H> crate::error::Error for Error<'error, K, N, H>
+where K: Display, N: Display, H: Display
 {}
 
-impl<K: Display, N: Display, H: Display > Debug for Error<K, N, H> {
+impl<'error, K: Display, N: Display, H: Display > Debug for Error<'error, K, N, H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -33,7 +34,7 @@ impl<K: Display, N: Display, H: Display > Debug for Error<K, N, H> {
     }
 }
 
-impl<K: Display, N: Display, H: Display > Display for Error<K, N, H> {
+impl<'error, K: Display, N: Display, H: Display > Display for Error<'error, K, N, H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -41,8 +42,8 @@ impl<K: Display, N: Display, H: Display > Display for Error<K, N, H> {
     }
 }
 
-impl<K: Display, N: Display, H: Display> Error<K, N, H> {
-    pub fn new(kind: K, span: Span) -> Self {
+impl<'error, K: Display, N: Display, H: Display> Error<'error, K, N, H> {
+    pub fn new(kind: K, span: Span<'error>) -> Self {
         Self {
             kind,
             span,
@@ -75,7 +76,7 @@ impl<K: Display, N: Display, H: Display> Error<K, N, H> {
         messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
         let source = self.span.start.location.get_value();
-        let lines: Vec<&str> = source.lines().collect();
+        let lines: Vec<Str> = source.lines().map(|string| Str::from(string)).collect();
 
         let start = self.span.start;
         let end = self.span.end;

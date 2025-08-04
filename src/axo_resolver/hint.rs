@@ -12,12 +12,12 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub enum ResolveHint {
-    SimilarBrand { candidate: Token, effective: Arc<Mutex<dyn Resembler<String, String, ()>>> },
+pub enum ResolveHint<'hint> {
+    SimilarBrand { candidate: Token<'hint>, effective: Arc<Mutex<dyn Resembler<String, String, ()>>> },
     Parameter
 }
 
-impl Display for ResolveHint {
+impl<'hint> Display for ResolveHint<'hint> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             ResolveHint::SimilarBrand { candidate, effective } => {

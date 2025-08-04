@@ -12,7 +12,7 @@ use {
     },
 };
 
-impl<Input: Formable, Output: Formable, Failure: Formable> Debug for Classifier<Input, Output, Failure> {
+impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Debug for Classifier<'classifier, Input, Output, Failure> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "Todo")
     }

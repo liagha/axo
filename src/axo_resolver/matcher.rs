@@ -38,7 +38,7 @@ pub struct Aligner {
 
 impl Aligner {
     pub fn new() -> Self {
-        Aligner { assessor: aligner(), perfection: 0.95..1.1, suggestion: 0.2..0.95 }
+        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90 }
     }
 }
 
@@ -64,7 +64,7 @@ pub fn aligner() -> Assessor<String, String, ()> {
         .scheme(Scheme::Additive)
 }
 
-impl Resembler<Token, Token, ()> for Aligner {
+impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner {
     fn resemblance(&mut self, query: &Token, candidate: &Token) -> Result<Resemblance, ()> {
         match (&query.kind, &candidate.kind) {
             (TokenKind::Identifier(query), TokenKind::Identifier(candidate)) => {
@@ -117,8 +117,8 @@ impl Resembler<Token, Token, ()> for Aligner {
     }
 }
 
-impl Resembler<Element, Symbol, ResolveError> for Aligner {
-    fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
+impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
@@ -173,8 +173,8 @@ impl Affinity {
     }
 }
 
-impl Resembler<Element, Symbol, ResolveError> for Affinity {
-    fn resemblance(&mut self, query: &Element, candidate: &Symbol) -> Result<Resemblance, ResolveError> {
+impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Affinity {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.clone()) {
@@ -227,8 +227,8 @@ impl Resembler<Element, Symbol, ResolveError> for Affinity {
     }
 }
 
-pub fn symbol_matcher() -> Assessor<Element, Symbol, ResolveError> {
-    Assessor::<Element, Symbol, ResolveError>::new()
+pub fn symbol_matcher<'aligner>() -> Assessor<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> {
+    Assessor::<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>>::new()
         .floor(0.65)
         .dimension(Aligner::new(), 0.75)
         .dimension(Affinity::new(), 0.25)

@@ -13,13 +13,13 @@ use {
     },
 };
 
-impl Hash for Element {
+impl<'element> Hash for Element<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
     }
 }
 
-impl Hash for ElementKind {
+impl<'element> Hash for ElementKind<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             ElementKind::Literal(kind) => {
@@ -128,13 +128,13 @@ impl Hash for ElementKind {
     }
 }
 
-impl PartialEq for Element {
+impl<'element> PartialEq for Element<'element> {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
     }
 }
 
-impl PartialEq for ElementKind {
+impl<'element> PartialEq for ElementKind<'element> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ElementKind::Literal(a), ElementKind::Literal(b)) => a == b,
@@ -173,7 +173,7 @@ impl PartialEq for ElementKind {
     }
 }
 
-impl Clone for Element {
+impl<'element> Clone for Element<'element> {
     fn clone(&self) -> Self {
         Element {
             kind: self.kind.clone(),
@@ -182,7 +182,7 @@ impl Clone for Element {
     }
 }
 
-impl Clone for ElementKind {
+impl<'element> Clone for ElementKind<'element> {
     fn clone(&self) -> Self {
         match self {
             ElementKind::Literal(kind) => ElementKind::Literal(kind.clone()),
@@ -219,6 +219,6 @@ impl Clone for ElementKind {
     }
 }
 
-impl Eq for Element {}
+impl<'element> Eq for Element<'element> {}
 
-impl Eq for ElementKind {}
+impl<'element> Eq for ElementKind<'element> {}

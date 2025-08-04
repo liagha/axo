@@ -15,7 +15,7 @@ use {
         },
         axo_scanner::{
             Scanner,
-            Token,
+            Token, TokenKind,
         },
         axo_parser::{
             Element, ElementKind,
@@ -32,69 +32,65 @@ use {
         Timer, TIMER,
     }
 };
-use crate::axo_scanner::TokenKind;
+use crate::Str;
 
-pub trait Marked {
-    fn registry(&self) -> &Registry;
-    fn registry_mut(&mut self) -> &mut Registry;
-    fn resolver(&self) -> &Resolver {
+pub trait Marked<'marked> {
+    fn registry(&self) -> &Registry<'marked>;
+    fn registry_mut(&mut self) -> &mut Registry<'marked>;
+    fn resolver(&self) -> &Resolver<'marked> {
         &self.registry().resolver
     }
-    fn resolver_mut(&mut self) -> &mut Resolver {
+    fn resolver_mut(&mut self) -> &mut Resolver<'marked> {
         &mut self.registry_mut().resolver
     }
 }
 
 #[derive(Debug)]
-pub struct Registry {
-    pub resolver: Resolver,
+pub struct Registry<'registry> {
+    pub resolver: Resolver<'registry>,
 }
 
-impl Registry {
+impl<'registry> Registry<'registry> {
     pub fn new() -> Self {
         Registry {
             resolver: Resolver::new(),
         }
     }
 
-    pub fn get_verbosity(resolver: &mut Resolver) -> Option<bool> {
+    pub fn get_verbosity(resolver: &mut Resolver) -> bool {
         let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default(Location::Flag));
 
-        let found = resolver.get(&identifier);
+        let result = resolver.try_get(&identifier);
 
-        if let Some(symbol) = found {
-            if let Some(preference) = symbol.cast::<Preference>() {
-                if let TokenKind::Boolean(verbosity) = preference.value.kind {
-                    Some(verbosity)
-                } else {
-                    None
+        if let Ok(found) = result {
+            if let Some(symbol) = found {
+                if let Some(preference) = symbol.cast::<Preference>() {
+                    if let TokenKind::Boolean(verbosity) = preference.value.kind {
+                        return verbosity
+                    }
                 }
-            } else {
-                None
             }
-        } else {
-            None
         }
+
+        false
     }
 
-    pub fn get_path(resolver: &mut Resolver) -> Option<String> {
+    pub fn get_path(resolver: &mut Resolver) -> String {
         let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default(Location::Flag));
 
-        let found = resolver.get(&identifier);
+        let result = resolver.try_get(&identifier);
 
-        if let Some(symbol) = found {
-            if let Some(preference) = symbol.cast::<Preference>() {
-                if let TokenKind::Identifier(path) = preference.value.kind.clone() {
-                    Some(path.clone())
-                } else {
-                    None
+        if let Ok(found) = result {
+            if let Some(symbol) = found {
+                if let Some(preference) = symbol.cast::<Preference>() {
+                    if let TokenKind::Identifier(path) = preference.value.kind.clone() {
+                        return path.clone()
+                    }
                 }
-            } else {
-                None
             }
-        } else {
-            None
         }
+
+        String::new()
     }
 }
 
@@ -103,7 +99,7 @@ pub trait Stage<Input, Output> {
 }
 
 pub struct Compiler {
-    pub registry: Registry,
+    pub registry: Registry<'static>,
 }
 
 impl Compiler {
@@ -139,7 +135,7 @@ impl Compiler {
             }
         });
 
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver).unwrap_or(false);
+        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
         if verbosity {
             let duration = Duration::from_nanos(timer.elapsed().unwrap());
@@ -164,19 +160,21 @@ impl Compiler {
     }
 }
 
-impl<'initializer> Stage<(), Location> for Initializer<'initializer> {
-    fn execute(&mut self, _input: ()) -> Location {
+impl<'initializer> Stage<(), Location<'initializer>> for Initializer<'initializer> {
+    fn execute(&mut self, _input: ()) -> Location<'initializer> {
         self.initialize();
 
-        Registry::get_path(&mut self.registry.resolver).map_or(Location::Flag, |path| { Location::File(path.leak()) })
+        let path = Registry::get_path(&mut self.registry.resolver);
+
+        Location::File(Str::from(path))
     }
 }
 
-impl<'scanner> Stage<Location, Vec<Token>> for Scanner<'scanner> {
-    fn execute(&mut self, location: Location) -> Vec<Token> {
+impl<'scanner> Stage<Location<'scanner>, Vec<Token<'scanner>>> for Scanner<'scanner> {
+    fn execute(&mut self, location: Location<'scanner>) -> Vec<Token<'scanner>> {
         let timer = Timer::new(TIMER);
 
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver).unwrap_or(false);
+        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
         self.set_location(location);
 
         if verbosity {
@@ -237,11 +235,11 @@ impl<'scanner> Stage<Location, Vec<Token>> for Scanner<'scanner> {
     }
 }
 
-impl<'parser> Stage<Vec<Token>, Vec<Element>> for Parser<'parser> {
-    fn execute(&mut self, tokens: Vec<Token>) -> Vec<Element> {
+impl<'parser> Stage<Vec<Token<'parser>>, Vec<Element<'parser>>> for Parser<'parser> {
+    fn execute(&mut self, tokens: Vec<Token>) -> Vec<Element<'parser>> {
         let timer = Timer::new(TIMER);
 
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver).unwrap_or(false);
+        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
         if verbosity {
             xprintln!(
@@ -303,11 +301,10 @@ impl<'parser> Stage<Vec<Token>, Vec<Element>> for Parser<'parser> {
     }
 }
 
-impl Stage<Vec<Element>, ()> for Resolver {
+impl<'resolver> Stage<Vec<Element<'resolver>>, ()> for Resolver<'resolver> {
     fn execute(&mut self, elements: Vec<Element>) -> () {
         let timer = Timer::new(TIMER);
-        let _location = Registry::get_path(self).map_or(Location::Flag, |path| { Location::File(path.leak()) });
-        let verbosity = Registry::get_verbosity(self).unwrap_or(false);
+        let verbosity = Registry::get_verbosity(self);
 
         if verbosity {
             xprintln!(

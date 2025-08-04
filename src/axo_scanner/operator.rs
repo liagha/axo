@@ -1,6 +1,6 @@
 use {
     crate::{
-        slice,
+        axo_data,
         format::{Debug, Display, Write, Result, Formatter},
         axo_scanner::Character,
     },
@@ -55,7 +55,7 @@ impl OperatorKind {
     pub fn as_slice(&self) -> &[OperatorKind] {
         match self {
             Composite(ops) => ops.as_slice(),
-            _ => slice::from_ref(self),
+            _ => axo_data::from_ref(self),
         }
     }
 
@@ -202,7 +202,7 @@ pub trait Operator {
     fn to_operator(&self) -> OperatorKind;
 }
 
-impl Operator for Character {
+impl<'character> Operator for Character<'character> {
     fn is_operator(&self) -> bool {
         matches!(
             self.value,

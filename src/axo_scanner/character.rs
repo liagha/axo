@@ -9,13 +9,13 @@ use {
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Character {
+pub struct Character<'character> {
     pub value: char,
-    pub span: Span,
+    pub span: Span<'character>,
 }
 
-impl Character {
-    pub fn new(value: char, span: Span) -> Self {
+impl<'character> Character<'character> {
+    pub fn new(value: char, span: Span<'character>) -> Self {
         Self { value, span }
     }
     
@@ -40,26 +40,26 @@ impl Character {
     }
 }
 
-impl From<Character> for char {
+impl<'character> From<Character<'character>> for char {
     fn from(character: Character) -> Self {
         character.value
     }
 }
 
-impl PartialEq<char> for Character {
+impl<'character> PartialEq<char> for Character<'character> {
     fn eq(&self, other: &char) -> bool {
         self.value == *other
     }
 }
 
-impl PartialEq<Character> for char {
+impl<'character> PartialEq<Character<'character>> for char {
     fn eq(&self, other: &Character) -> bool {
         *self == other.value 
     }
 }
 
-impl FromIterator<Character> for String {
-    fn from_iter<I: IntoIterator<Item = Character>>(iter: I) -> Self {
+impl<'character> FromIterator<Character<'character>> for String {
+    fn from_iter<I: IntoIterator<Item = Character<'character>>>(iter: I) -> Self {
         iter.into_iter().map(|character| character.value).collect()
     }
 }

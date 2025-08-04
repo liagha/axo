@@ -14,9 +14,10 @@ use {
         character::{parse_radix, from_u32},
     }
 };
+use crate::Str;
 
-impl<'scanner> Scanner<'scanner> {
-    pub fn simple_escape() -> Classifier<Character, Token, ScanError> {
+impl Scanner<'static> {
+    pub fn simple_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::predicate(|c: &Character| {
@@ -28,6 +29,7 @@ impl<'scanner> Scanner<'scanner> {
             })
         ]).with_transform(|_, form| {
             let inputs = form.collect_inputs();
+            let span = inputs.borrow_span().clone();
             let escape = inputs[1];
 
             let escaped = match escape.value {
@@ -46,16 +48,16 @@ impl<'scanner> Scanner<'scanner> {
                 _ => {
                     return Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        inputs.span(),
+                        span,
                     ));
                 }
             };
 
-            Ok(Form::Input(Character::new(escaped, inputs.span())))
+            Ok(Form::Input(Character::new(escaped, span)))
         })
     }
 
-    pub fn octal_escape() -> Classifier<Character, Token, ScanError> {
+    pub fn octal_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::persistence(
@@ -65,23 +67,24 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ]).with_transform(|_, form| {
             let inputs = form.collect_inputs();
-            let digits: String = inputs.iter().skip(1).map(|c| c.value).collect();
+            let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
+            let span = inputs.borrow_span().clone();
 
-            match parse_radix(&digits, 8) {
+            match parse_radix(digits, 8).map(|parsed| parsed as u32) {
                 Some(code_point) => {
                     if code_point > 255 {
                         return Err(ScanError::new(
                             ErrorKind::InvalidEscape(EscapeError::OutOfRange),
-                            inputs.span(),
+                            span,
                         ));
                     }
 
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
                         None => {
                             Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
-                                inputs.span(),
+                                span,
                             ))
                         }
                     }
@@ -89,14 +92,14 @@ impl<'scanner> Scanner<'scanner> {
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Overflow),
-                        inputs.span(),
+                        span,
                     ))
                 }
             }
         })
     }
 
-    pub fn hex_escape() -> Classifier<Character, Token, ScanError> {
+    pub fn hex_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -110,23 +113,24 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ]).with_transform(|_, form| {
             let inputs = form.collect_inputs();
-            let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
+            let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
+            let span = inputs.borrow_span().clone();
 
-            match parse_radix(&digits, 16) {
+            match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                 Some(code_point) => {
                     if code_point > 255 {
                         return Err(ScanError::new(
                             ErrorKind::InvalidEscape(EscapeError::OutOfRange),
-                            inputs.span(),
+                            span,
                         ));
                     }
 
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
                         None => {
                             Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
-                                inputs.span(),
+                                span,
                             ))
                         }
                     }
@@ -134,14 +138,14 @@ impl<'scanner> Scanner<'scanner> {
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        inputs.span(),
+                        span,
                     ))
                 }
             }
         })
     }
 
-    pub fn unicode_escape() -> Classifier<Character, Token, ScanError> {
+    pub fn unicode_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -157,23 +161,24 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::literal('}'),
         ]).with_transform(|_, form| {
             let inputs = form.collect_inputs();
-            let digits: String = inputs.iter()
+            let digits: Str = inputs.iter()
                 .skip(3)
                 .take(inputs.len() - 4)
                 .map(|c| c.value)
                 .collect();
+            let span = inputs.borrow_span().clone();
 
             if digits.is_empty() {
                 return Err(ScanError::new(
                     ErrorKind::InvalidEscape(EscapeError::Empty),
-                    inputs.span(),
+                    span,
                 ));
             }
 
-            match parse_radix(&digits, 16) {
+            match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                 Some(code_point) => {
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
                         None => {
                             let err = if code_point > 0x10FFFF {
                                 ErrorKind::InvalidCharacter(CharacterError::OutOfRange)
@@ -182,21 +187,21 @@ impl<'scanner> Scanner<'scanner> {
                             } else {
                                 ErrorKind::InvalidEscape(EscapeError::Invalid)
                             };
-                            Err(ScanError::new(err, inputs.span()))
+                            Err(ScanError::new(err, span))
                         }
                     }
                 }
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        inputs.span(),
+                        span,
                     ))
                 }
             }
         })
     }
 
-    pub fn unicode_escape_simple() -> Classifier<Character, Token, ScanError> {
+    pub fn unicode_escape_simple() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -210,33 +215,34 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ]).with_transform(|_, form| {
             let inputs = form.collect_inputs();
-            let digits: String = inputs.iter().skip(2).map(|c| c.value).collect();
+            let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
+            let span = inputs.borrow_span().clone();
 
-            match parse_radix(&digits, 16) {
+            match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                 Some(code_point) => {
                     match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, inputs.span()))),
+                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
                         None => {
                             let err = if (0xD800..=0xDFFF).contains(&code_point) {
                                 ErrorKind::InvalidCharacter(CharacterError::Surrogate)
                             } else {
                                 ErrorKind::InvalidEscape(EscapeError::Invalid)
                             };
-                            Err(ScanError::new(err, inputs.span()))
+                            Err(ScanError::new(err, span))
                         }
                     }
                 }
                 None => {
                     Err(ScanError::new(
                         ErrorKind::InvalidEscape(EscapeError::Invalid),
-                        inputs.span(),
+                        span,
                     ))
                 }
             }
         })
     }
 
-    pub fn escape_sequence() -> Classifier<Character, Token, ScanError> {
+    pub fn escape_sequence() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::alternative([
             Self::unicode_escape(),
             Self::unicode_escape_simple(),
