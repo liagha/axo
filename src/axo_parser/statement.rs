@@ -14,8 +14,8 @@ use {
     }
 };
 
-impl<'parser> Parser<'parser> {
-    pub fn conditional() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+impl Parser<'static> {
+    pub fn conditional() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -83,7 +83,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn cycle() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn cycle() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::choice([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -157,7 +157,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn statement() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn statement() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::alternative([Self::conditional(), Self::cycle(), Self::binding()])
     }
 }

@@ -37,8 +37,8 @@ impl<'align, Input: Formable, Output: Formable, Failure: Formable> Order<'align,
 }
 
 pub struct Branch<'branch, Input: Formable, Output: Formable, Failure: Formable> {
-    pub found: Arc<dyn Order<'branch, Input, Output, Failure>>,
-    pub missing: Arc<dyn Order<'branch, Input, Output, Failure>>,
+    pub found: Arc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
+    pub missing: Arc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
 }
 
 impl<'branch, Input: Formable, Output: Formable, Failure: Formable> Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failure> {
@@ -86,15 +86,23 @@ pub struct Inspect<'inspector, Input: Formable, Output: Formable, Failure: Forma
 
 impl<'inspector, Input: Formable, Output: Formable, Failure: Formable> Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<Input, Output, Failure>, draft: &mut Draft<Input, Output, Failure>) {
-        let order = (self.inspector)(draft.to_owned());
+    fn order(&self, composer: &mut Composer<'inspector, Input, Output, Failure>, draft: &mut Draft<'inspector, Input, Output, Failure>) {
+        let draft_clone = Draft {
+            marker: draft.marker,
+            position: draft.position,
+            consumed: draft.consumed.clone(),
+            record: draft.record,
+            classifier: draft.classifier.clone(),
+            form: draft.form.clone(),
+        };
 
+        let order = (self.inspector)(draft_clone);
         order.order(composer, draft);
     }
 }
 
 pub struct Multiple<'multiple, Input: Formable, Output: Formable, Failure: Formable> {
-    pub orders: Vec<Arc<dyn Order<'multiple, Input, Output, Failure>>>
+    pub orders: Vec<Arc<dyn Order<'multiple, Input, Output, Failure> + 'multiple>>
 }
 
 impl<'multiple, Input: Formable, Output: Formable, Failure: Formable> Order<'multiple, Input, Output, Failure> for Multiple<'multiple, Input, Output, Failure> {
@@ -218,9 +226,9 @@ impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Classifi
     }
 
     #[inline]
-    pub fn inspect<T>(inspector: T) -> Arc<dyn Order<'classifier, Input, Output, Failure>>
+    pub fn inspect<T>(inspector: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Draft<Input, Output, Failure>) -> Arc<dyn Order<Input, Output, Failure>> + Send + Sync + 'static
+        T: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + Send + Sync + 'classifier
     {
         Arc::new(Inspect { inspector: Arc::new(inspector) })
     }

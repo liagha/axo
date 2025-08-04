@@ -5,7 +5,7 @@ use {
     }
 };
 
-pub trait Peekable<'a, Item: PartialEq> {
+pub trait Peekable<'peekable, Item: PartialEq> {
     fn length(&self) -> usize;
     fn remaining(&self) -> usize {
         self.length() - self.index()
@@ -37,7 +37,7 @@ pub trait Peekable<'a, Item: PartialEq> {
         result
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position<'a>) -> Option<Item>;
+    fn next(&self, index: &mut usize, position: &mut Position<'peekable>) -> Option<Item>;
 
     fn get(&self, index: usize) -> Option<&Item> {
         self.input().get(index)
@@ -58,8 +58,8 @@ pub trait Peekable<'a, Item: PartialEq> {
     fn input(&self) -> &Vec<Item>;
     fn input_mut(&mut self) -> &mut Vec<Item>;
 
-    fn position(&self) -> Position<'a>;
-    fn position_mut(&mut self) -> &mut Position<'a>;
+    fn position(&self) -> Position<'peekable>;
+    fn position_mut(&mut self) -> &mut Position<'peekable>;
     fn index(&self) -> usize;
     fn index_mut(&mut self) -> &mut usize;
 
@@ -75,7 +75,7 @@ pub trait Peekable<'a, Item: PartialEq> {
         *self.index_mut() = index;
     }
 
-    fn set_position(&mut self, position: Position<'a>) {
+    fn set_position(&mut self, position: Position<'peekable>) {
         *self.position_mut() = position;
     }
 
@@ -87,11 +87,11 @@ pub trait Peekable<'a, Item: PartialEq> {
         self.position_mut().column = line;
     }
 
-    fn set_path(&mut self, path: Str<'a>) {
+    fn set_path(&mut self, path: Str<'peekable>) {
         self.position_mut().location = Location::File(path);
     }
 
-    fn set_location(&mut self, location: Location<'a>) {
+    fn set_location(&mut self, location: Location<'peekable>) {
         self.position_mut().location = location;
     }
 

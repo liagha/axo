@@ -34,15 +34,25 @@ pub struct Preference {
     pub span: Span<'static>,
 }
 
-impl Spanned for Preference {
-    fn borrow_span(&self) -> Span {
+impl Spanned<'static> for Preference {
+    fn borrow_span(&self) -> Span<'static> {
         self.span.clone()
+    }
+
+    fn span(self) -> Span<'static> {
+        self.span
     }
 }
 
 impl Preference {
-    pub fn new(identifier: Token<'static>, value: Token<'static>) -> Self {
-        Self { target: identifier.clone(), value: value.clone(), span: Span::merge(&identifier.borrow_span(), &value.borrow_span()) }
+    pub fn new(target: Token<'static>, value: Token<'static>) -> Self {
+        let span = Span::merge(&target.borrow_span(), &value.borrow_span());
+
+        Self {
+            target,
+            value,
+            span
+        }
     }
 }
 
@@ -113,7 +123,9 @@ impl<'initializer> Initializer<'initializer> {
             errors: Vec::new(),
         }
     }
+}
 
+impl Initializer<'static> {
     pub fn verbosity() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -264,8 +276,11 @@ impl<'initializer> Initializer<'initializer> {
     pub fn initialize(&mut self) {
         let location = Location::Flag;
         let input = location.get_value();
-        let mut scanner = Scanner::new(self.registry, Location::Flag).with_input(input);
+
+        let mut registry = Registry::new();
+        let mut scanner = Scanner::new(&mut registry, Location::Flag).with_input(input);
         scanner.scan();
+
         self.input = scanner.output;
         self.reset();
 
@@ -275,17 +290,14 @@ impl<'initializer> Initializer<'initializer> {
 
         while self.peek().is_some() {
             let forms = self.form(Self::classifier()).flatten();
-
             for form in forms {
                 match form {
                     Form::Output(output) => {
                         self.output.push(output);
                     }
-
                     Form::Failure(failure) => {
                         self.errors.push(failure);
                     }
-
                     Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
                 }
             }
@@ -295,7 +307,7 @@ impl<'initializer> Initializer<'initializer> {
             Symbol::new(preference.clone(), preference.borrow_span())
         }).collect::<Vec<Symbol>>();
 
-        self.registry.resolver.extend(preferences)
+        self.registry.resolver.extend(preferences);
     }
 }
 

@@ -96,15 +96,17 @@ impl<'parser> Parser<'parser> {
             errors: Vec::new(),
         }
     }
+}
 
-    pub fn with_input(self, input: Vec<Token<'parser>>) -> Self {
+impl Parser<'static> {
+    pub fn with_input(self, input: Vec<Token<'static>>) -> Self {
         Self {
             input,
             ..self
         }
     }
 
-    pub fn set_input(&mut self, input: Vec<Token<'parser>>) {
+    pub fn set_input(&mut self, input: Vec<Token<'static>>) {
         self.input = input;
     }
 

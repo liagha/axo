@@ -67,7 +67,7 @@ impl<'span> Span<'span> {
 
     #[inline]
     #[track_caller]
-    pub fn from_slice<T: Spanned>(items: &'span [T]) -> Self {
+    pub fn from_slice<T: Spanned<'span>>(items: &[T]) -> Self {
         match items.len() {
             0 => panic!("can't create a span from an empty Slice."),
             1 => items[0].borrow_span(),

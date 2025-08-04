@@ -168,8 +168,10 @@ impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Classifi
 
     #[inline]
     pub fn with_order(mut self, order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>) -> Self {
-        let order = Multiple { orders: vec![self.order, order] };
-        self.order = Arc::new(order);
+        let orders = vec![self.order.clone(), order];
+        let multiple: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> = Arc::new(Multiple { orders });
+
+        self.order = multiple;
         self
     }
 
@@ -180,12 +182,9 @@ impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Classifi
 
     #[inline]
     pub fn with_branch(self, found: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>, missing: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>) -> Self {
-        self.with_order(Arc::new(
-            Branch {
-                found,
-                missing,
-            }
-        ))
+        let branch: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> = Arc::new(Branch { found, missing });
+
+        self.with_order(branch)
     }
 
     #[inline]
@@ -211,7 +210,9 @@ impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Classifi
 
     #[inline]
     pub fn with_multiple(self, orders: Vec<Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>) -> Self {
-        self.with_order(Self::multiple(orders))
+        let multiple: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> = Arc::new(Multiple { orders });
+
+        self.with_order(multiple)
     }
 
     #[inline]

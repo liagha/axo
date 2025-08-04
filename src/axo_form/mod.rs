@@ -40,13 +40,13 @@ pub mod helper {
 
     pub trait Source<'source, Input>: Peekable<'source, Input> + Marked<'source>
     where
-        Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+        Input: Formable,
     {}
 
     impl<'source, Target, Input> Source<'source, Input> for Target
     where
         Target: Peekable<'source, Input> + Marked<'source>,
-        Input: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static,
+        Input: Formable,
     {}
 
     pub fn fingerprint<T: ?Sized + 'static>(ptr: &T, state: &mut impl Hasher) {

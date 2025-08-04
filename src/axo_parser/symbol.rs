@@ -143,7 +143,7 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol<'static>, Box<Element<'st
     }
 }
 
-impl<'parser> Parser<'parser> {
+impl Parser<'static> {
     pub fn symbolization() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::alternative([
             Self::implementation(),

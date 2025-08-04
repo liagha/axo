@@ -17,7 +17,7 @@ use {
 };
 use crate::axo_cursor::Location;
 
-impl<'parser> Parser<'parser> {
+impl Parser<'static> {
     pub fn bundle(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::sequence([

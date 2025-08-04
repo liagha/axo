@@ -31,7 +31,7 @@ pub struct Composer<'composer, Input: Formable, Output: Formable, Failure: Forma
 
 impl <'composer, Input: Formable, Output: Formable, Failure: Formable> Composer<'composer, Input, Output, Failure> {
     #[inline(always)]
-    pub fn new(source: &'composer mut dyn Source<'composer, Input>) -> Composer<'composer, Input, Output, Failure> {
+    pub fn new(source: &'composer mut (dyn Source<'composer, Input> + 'composer)) -> Composer<'composer, Input, Output, Failure> {
         Self {
             source,
             _phantom: PhantomData,
@@ -131,17 +131,18 @@ pub trait Former<'former, Input: Formable, Output: Formable, Failure: Formable>:
 
 impl<'former, Target, Input: Formable, Output: Formable, Failure: Formable> Former<'former, Input, Output, Failure> for Target
 where
-    Target: Source<'former, Input> + 'static,
+    Target: Source<'former, Input>,
 {
     fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure> {
-        let mut draft = Draft::new(0, self.position(), classifier);
-        let mut composer = Composer::new(self);
+        let initial_position = self.position();
+        let mut draft = Draft::new(0, initial_position, classifier);
 
+        let mut composer = Composer::new(self);
         composer.build(&mut draft);
 
         if draft.is_effected() {
-            self.set_index(draft.marker);
-            self.set_position(draft.position);
+            composer.source.set_index(draft.marker);
+            composer.source.set_position(draft.position);
         }
 
         draft.form

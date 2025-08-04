@@ -10,7 +10,7 @@ use {
     }
 };
 
-impl<'element> Symbolic for Element<'element> {
+impl<'element: 'static> Symbolic for Element<'element> {
     fn brand(&self) -> Option<Token<'static>> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(Token {

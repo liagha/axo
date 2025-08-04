@@ -95,7 +95,9 @@ impl<'scanner> Scanner<'scanner> {
             errors: Vec::new(),
         }
     }
+}
 
+impl Scanner<'static> {
     pub fn with_input(self, input: Str) -> Self {
         let chars: Vec<char> = input.chars().collect();
         let characters = Self::inspect(self.position, chars);

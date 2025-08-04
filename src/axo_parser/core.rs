@@ -25,7 +25,7 @@ use {
     },
 };
 
-impl<'parser> Parser<'parser> {
+impl Parser<'static> {
     pub fn identifier() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
@@ -258,7 +258,7 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    fn climb(mut left: Element, pairs: Vec<(Token, Element, u8)>, threshold: u8) -> Element<'parser> {
+    fn climb(mut left: Element<'static>, pairs: Vec<(Token<'static>, Element<'static>, u8)>, threshold: u8) -> Element<'static> {
         let mut current = 0;
 
         while current < pairs.len() {
