@@ -97,7 +97,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 }
 
-impl Scanner<'static> {
+impl<'scanner> Scanner<'scanner> {
     pub fn with_input(self, input: Str) -> Self {
         let chars: Vec<char> = input.chars().collect();
         let characters = Self::inspect(self.position, chars);
@@ -116,8 +116,10 @@ impl Scanner<'static> {
     }
 
     pub fn scan(&mut self) {
+        let classifier = Self::classifier();
+
         while self.peek().is_some() {
-            let forms = self.form(Self::classifier()).flatten();
+            let forms = self.form(classifier.clone()).flatten();
 
             for form in forms {
                 match form {
@@ -129,7 +131,7 @@ impl Scanner<'static> {
                         self.errors.push(failure);
                     }
 
-                    Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
+                    _ => {}
                 }
             }
         }

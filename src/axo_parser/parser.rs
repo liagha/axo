@@ -96,9 +96,7 @@ impl<'parser> Parser<'parser> {
             errors: Vec::new(),
         }
     }
-}
 
-impl Parser<'static> {
     pub fn with_input(self, input: Vec<Token<'static>>) -> Self {
         Self {
             input,
@@ -157,7 +155,7 @@ impl Parser<'static> {
                         self.errors.push(failure);
                     }
 
-                    Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
+                    _ => {}
                 }
             }
         }

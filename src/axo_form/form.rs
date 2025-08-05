@@ -10,15 +10,16 @@ use {
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Form<Input: Formable, Output: Formable, Failure: Formable> {
+pub enum Form<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> {
     Blank,
     Input(Input),
     Output(Output),
-    Multiple(Vec<Form<Input, Output, Failure>>),
+    Multiple(Vec<Form<'form, Input, Output, Failure>>),
     Failure(Failure),
+    _Phantom(&'form ()),
 }
 
-impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, Failure> {
+impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Form<'form, Input, Output, Failure> {
     #[inline(always)]
     pub fn blank() -> Self {
         Form::Blank
@@ -35,7 +36,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
     }
 
     #[inline(always)]
-    pub fn multiple(forms: Vec<Form<Input, Output, Failure>>) -> Self {
+    pub fn multiple(forms: Vec<Form<'form, Input, Output, Failure>>) -> Self {
         if forms.is_empty() {
             Form::Blank
         } else {
@@ -98,7 +99,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
     }
 
     #[inline(always)]
-    pub fn as_forms(&self) -> &[Form<Input, Output, Failure>] {
+    pub fn as_forms(&self) -> &[Form<'form, Input, Output, Failure>] {
         match self {
             Form::Multiple(forms) => forms.as_slice(),
             _ => axo_data::from_ref(self),
@@ -129,13 +130,13 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
         }
     }
 
-    pub fn flatten(&self) -> Vec<Form<Input, Output, Failure>> {
+    pub fn flatten(&self) -> Vec<Form<'form, Input, Output, Failure>> {
         let mut result = Vec::new();
         self.flatten_into(&mut result);
         result
     }
 
-    fn flatten_into(&self, result: &mut Vec<Form<Input, Output, Failure>>) {
+    fn flatten_into(&self, result: &mut Vec<Form<'form, Input, Output, Failure>>) {
         match self {
             Form::Multiple(forms) => {
                 for form in forms {
@@ -206,11 +207,11 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
         input_mapper: F,
         output_mapper: G,
         error_mapper: H,
-    ) -> Form<MappedI, MappedO, MappedF>
+    ) -> Form<'form, MappedI, MappedO, MappedF>
     where
-        MappedI: Formable,
-        MappedO: Formable,
-        MappedF: Formable,
+        MappedI: Formable<'form>,
+        MappedO: Formable<'form>,
+        MappedF: Formable<'form>,
         F: Fn(Input) -> MappedI + Clone,
         G: Fn(Output) -> MappedO + Clone,
         H: Fn(Failure) -> MappedF + Clone,
@@ -228,6 +229,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Form<Input, Output, F
                 Form::Multiple(forms)
             }
             Form::Failure(error) => Form::Failure(error_mapper(error)),
+            Form::_Phantom(_) => unreachable!(),
         };
 
         mapped

@@ -14,8 +14,8 @@ use {
     }
 };
 
-impl Scanner<'static> {
-    fn string() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+impl<'scanner> Scanner<'scanner> {
+    fn string() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('"'),
             Classifier::repetition(
@@ -27,7 +27,7 @@ impl Scanner<'static> {
                 None,
             ),
             Classifier::literal('"'),
-        ]).with_transform(|_, form| {
+        ]).with_transform(move |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let content = inputs.clone().into_iter().collect::<String>();
 
@@ -35,7 +35,7 @@ impl Scanner<'static> {
         })
     }
 
-    fn backtick() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn backtick() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('`'),
@@ -45,7 +45,7 @@ impl Scanner<'static> {
                 ]),
                 Classifier::literal('`'),
             ]),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -54,7 +54,7 @@ impl Scanner<'static> {
         )
     }
 
-    fn character() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn character() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\''),
             Classifier::alternative([
@@ -62,7 +62,7 @@ impl Scanner<'static> {
                 Self::escape_sequence(),
             ]),
             Classifier::literal('\''),
-        ]).with_transform(|_, form| {
+        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let ch = inputs[1];
 
@@ -70,7 +70,7 @@ impl Scanner<'static> {
         })
     }
 
-    fn identifier() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn identifier() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
@@ -80,7 +80,7 @@ impl Scanner<'static> {
                     None,
                 ),
             ]),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -94,14 +94,14 @@ impl Scanner<'static> {
         )
     }
 
-    fn operator() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn operator() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::persistence(
                 Classifier::predicate(|c: &Character| c.is_operator()),
                 1,
                 None
             ),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -115,10 +115,10 @@ impl Scanner<'static> {
         )
     }
 
-    fn punctuation() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn punctuation() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -132,14 +132,14 @@ impl Scanner<'static> {
         )
     }
 
-    fn whitespace() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn whitespace() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::persistence(
                 Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
                 1,
                 None,
             ),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -153,7 +153,7 @@ impl Scanner<'static> {
         )
     }
 
-    fn comment() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn comment() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::alternative([
@@ -178,7 +178,7 @@ impl Scanner<'static> {
                     ])
                 ])
             ]),
-            |_, form| {
+            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<String>();
 
@@ -187,7 +187,7 @@ impl Scanner<'static> {
         )
     }
 
-    fn fallback() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    fn fallback() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_order(
             Classifier::anything(),
             Classifier::fail(|_, form| {
@@ -201,7 +201,7 @@ impl Scanner<'static> {
         )
     }
 
-    pub fn classifier() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn classifier() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::persistence(
             Classifier::alternative([
                 Self::whitespace(),

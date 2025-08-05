@@ -16,8 +16,8 @@ use {
 };
 use crate::Str;
 
-impl Scanner<'static> {
-    pub fn simple_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+impl<'scanner> Scanner<'scanner> {
+    pub fn simple_escape() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::predicate(|c: &Character| {
@@ -27,7 +27,7 @@ impl Scanner<'static> {
                     _ => false,
                 }
             })
-        ]).with_transform(|_, form| {
+        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let span = inputs.borrow_span().clone();
             let escape = inputs[1];
@@ -57,7 +57,7 @@ impl Scanner<'static> {
         })
     }
 
-    pub fn octal_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn octal_escape() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::persistence(
@@ -65,7 +65,7 @@ impl Scanner<'static> {
                 1,
                 Some(3),
             ),
-        ]).with_transform(|_, form| {
+        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
             let span = inputs.borrow_span().clone();
@@ -99,7 +99,7 @@ impl Scanner<'static> {
         })
     }
 
-    pub fn hex_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn hex_escape() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -111,7 +111,7 @@ impl Scanner<'static> {
                 1,
                 Some(2),
             ),
-        ]).with_transform(|_, form| {
+        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
             let span = inputs.borrow_span().clone();
@@ -145,7 +145,7 @@ impl Scanner<'static> {
         })
     }
 
-    pub fn unicode_escape() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn unicode_escape() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -159,7 +159,7 @@ impl Scanner<'static> {
                 Some(6),
             ),
             Classifier::literal('}'),
-        ]).with_transform(|_, form| {
+        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter()
                 .skip(3)
@@ -201,7 +201,7 @@ impl Scanner<'static> {
         })
     }
 
-    pub fn unicode_escape_simple() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn unicode_escape_simple() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([
@@ -213,10 +213,10 @@ impl Scanner<'static> {
                 4,
                 Some(4),
             ),
-        ]).with_transform(|_, form| {
+        ]).with_transform(move |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
-            let span = inputs.borrow_span().clone();
+            let span = inputs.span().clone();
 
             match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                 Some(code_point) => {
@@ -242,7 +242,7 @@ impl Scanner<'static> {
         })
     }
 
-    pub fn escape_sequence() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
+    pub fn escape_sequence() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::alternative([
             Self::unicode_escape(),
             Self::unicode_escape_simple(),

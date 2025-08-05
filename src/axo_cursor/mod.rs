@@ -5,6 +5,7 @@ mod format;
 mod position;
 mod peekable;
 
+use std::ops::Deref;
 use {
     crate::{
         hash::Hash,
@@ -86,98 +87,50 @@ impl<'error, E: Display> Spanned<'error> for Error<'error, E> {
     }
 }
 
-impl Spanned<'static> for Span<'static> {
+impl<'item, T: Spanned<'item>> Spanned<'item> for Vec<T> {
     #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
-        *self
-    }
-
-    #[track_caller]
-    fn span(self) -> Span<'static> {
-        self
-    }
-}
-
-impl<T: Spanned<'static>> Spanned<'_> for &T {
-    #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
-        (*self).borrow_span()
-    }
-
-    #[track_caller]
-    fn span(self) -> Span<'static> {
-        self.span()
-    }
-}
-
-impl<T: Spanned<'static>> Spanned<'static> for &mut T {
-    #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
-        (**self).borrow_span()
-    }
-
-    #[track_caller]
-    fn span(self) -> Span<'static> {
-        self.span()
-    }
-}
-
-impl<T: Spanned<'static>> Spanned<'static> for Box<T> {
-    #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
-        self.as_ref().borrow_span()
-    }
-
-    #[track_caller]
-    fn span(self) -> Span<'static> {
-        self.as_ref().span()
-    }
-}
-
-impl<T: Spanned<'static>> Spanned<'static> for Vec<T> {
-    #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
+    fn borrow_span(&self) -> Span<'item> {
         Span::from_slice(self.as_slice())
     }
 
     #[track_caller]
-    fn span(self) -> Span<'static> {
+    fn span(self) -> Span<'item> {
         Span::from_slice(self.as_slice())
     }
 }
 
-impl<T: Spanned<'static>> Spanned<'static> for &[T] {
+impl<'item, T: Spanned<'item>> Spanned<'item> for &[T] {
     #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
+    fn borrow_span(&self) -> Span<'item> {
         Span::from_slice(self)
     }
 
     #[track_caller]
-    fn span(self) -> Span<'static> {
+    fn span(self) -> Span<'item> {
         Span::from_slice(self)
     }
 }
 
-impl<T: Spanned<'static>> Spanned<'static> for Box<[T]> {
+impl<'item, T: Spanned<'item>> Spanned<'item> for Box<[T]> {
     #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
+    fn borrow_span(&self) -> Span<'item> {
         Span::from_slice(self.as_ref())
     }
 
     #[track_caller]
-    fn span(self) -> Span<'static> {
+    fn span(self) -> Span<'item> {
         self.as_ref().span()
     }
 }
 
-impl<T: Spanned<'static>, const N: usize> Spanned<'static> for [T; N] {
+impl<'item, T: Spanned<'item>, const N: usize> Spanned<'item> for [T; N] {
     #[track_caller]
-    fn borrow_span(&self) -> Span<'static> {
+    fn borrow_span(&self) -> Span<'item> {
         Span::from_slice(self.as_slice())
     }
 
     #[track_caller]
-    fn span(self) -> Span<'static> {
+    fn span(self) -> Span<'item> {
         Span::from_slice(self.as_slice())
     }
 }

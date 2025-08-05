@@ -14,8 +14,8 @@ use {
     }
 };
 
-impl Parser<'static> {
-    pub fn conditional() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+impl<'parser> Parser<'parser> {
+    pub fn conditional() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -53,7 +53,7 @@ impl Parser<'static> {
                     Classifier::deferred(Self::element),
                 ])),
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
                 let condition = sequence[1].unwrap_output().clone();
@@ -83,7 +83,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn cycle() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn cycle() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::choice([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -125,7 +125,7 @@ impl Parser<'static> {
                 ),
             ]),
         ], vec![1, 0]).with_transform(
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence: &[Form<Token<'_>, Element, ParseError>] = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
@@ -157,7 +157,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn statement() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn statement() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Self::conditional(), Self::cycle(), Self::binding()])
     }
 }

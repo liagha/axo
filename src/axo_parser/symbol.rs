@@ -143,8 +143,8 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol<'static>, Box<Element<'st
     }
 }
 
-impl Parser<'static> {
-    pub fn symbolization() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+impl<'parser> Parser<'parser> {
+    pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::implementation(),
             Self::binding(),
@@ -154,7 +154,7 @@ impl Parser<'static> {
         ])
     }
 
-    pub fn implementation() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn implementation() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -171,7 +171,7 @@ impl Parser<'static> {
                 ),
                 Self::block(Classifier::deferred(Self::symbolization))
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let keyword = form.collect_inputs()[0].clone();
                 let outputs = form.collect_outputs().clone();
                 let name = outputs[0].clone();
@@ -214,7 +214,7 @@ impl Parser<'static> {
         )
     }
     
-    pub fn binding() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn binding() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -223,7 +223,7 @@ impl Parser<'static> {
                 }),
                 Classifier::deferred(Self::element),
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
                 let mutable = keyword.kind == TokenKind::Identifier("var".to_string());
@@ -254,7 +254,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn structure() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn structure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -263,7 +263,7 @@ impl Parser<'static> {
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::symbolization)),
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
@@ -286,7 +286,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn enumeration() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -295,7 +295,7 @@ impl Parser<'static> {
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::element)),
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
@@ -315,7 +315,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn method() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn method() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -325,7 +325,7 @@ impl Parser<'static> {
                 Self::group(Classifier::deferred(Self::symbolization)),
                 Self::block(Classifier::deferred(Self::element)),
             ]),
-            |_, form| {
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();

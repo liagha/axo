@@ -15,7 +15,7 @@ use {
     }
 };
 
-impl Scanner<'static> {
+impl<'scanner> Scanner<'scanner> {
     pub fn number() -> Classifier<'static, Character<'static>, Token<'static>, ScanError<'static>> {
         Classifier::alternative([
             Self::hexadecimal(),

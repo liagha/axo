@@ -23,49 +23,36 @@ pub mod helper {
                     Registry, Marked
                 },
             },
-            any::TypeId,
             format::Debug,
-            hash::{Hash, Hasher},
+            hash::{Hash},
             thread::{Arc, Mutex},
         },
     };
 
-    pub trait Formable:
-        Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static
+    pub trait Formable<'formable>:
+        Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'formable
     {}
-    impl<T> Formable for T
+
+    impl<'formable, T> Formable<'formable> for T
     where
-        T: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static
+        T: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'formable
     {}
 
     pub trait Source<'source, Input>: Peekable<'source, Input> + Marked<'source>
     where
-        Input: Formable,
+        Input: Formable<'source>,
     {}
 
     impl<'source, Target, Input> Source<'source, Input> for Target
     where
         Target: Peekable<'source, Input> + Marked<'source>,
-        Input: Formable,
+        Input: Formable<'source>,
     {}
 
-    pub fn fingerprint<T: ?Sized + 'static>(ptr: &T, state: &mut impl Hasher) {
-        TypeId::of::<T>().hash(state);
-        (ptr as *const T as *const () as usize).hash(state);
-    }
-
-    pub fn identicality<T: ?Sized + 'static, U: ?Sized + 'static>(ptr1: &T, ptr2: &U) -> bool {
-        if TypeId::of::<T>() != TypeId::of::<U>() {
-            return false;
-        }
-
-        ptr1 as *const T as *const () == ptr2 as *const U as *const ()
-    }
-
-    pub type Emitter<Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync>;
-    pub type Evaluator<Input, Output, Failure> = Arc<dyn Fn() -> Classifier<'static, Input, Output, Failure> + Send + Sync>;
-    pub type Executor = Arc<Mutex<dyn FnMut() -> () + Send + Sync>>;
+    pub type Emitter<'emitter, Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<'emitter, Input, Output, Failure>) -> Failure + Send + Sync + 'emitter>;
+    pub type Evaluator<'evaluator, Input, Output, Failure> = Arc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + Send + Sync + 'evaluator>;
+    pub type Performer<'performer> = Arc<Mutex<dyn FnMut() -> () + Send + Sync + 'performer>>;
     pub type Inspector<'inspector, Input, Output, Failure> = Arc<dyn Fn(Draft<'inspector, Input, Output, Failure>) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector> + Send + Sync + 'inspector>;
-    pub type Predicate<Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync>;
-    pub type Transformer<Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<Input, Output, Failure>) -> Result<Form<Input, Output, Failure>, Failure> + Send + Sync>>;
+    pub type Predicate<'predicate, Input> = Arc<dyn Fn(&Input) -> bool + Send + Sync + 'predicate>;
+    pub type Transformer<'transformer, Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<'transformer, Input, Output, Failure>) -> Result<Form<'transformer, Input, Output, Failure>, Failure> + Send + Sync + 'transformer>>;
 }

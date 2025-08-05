@@ -17,8 +17,8 @@ use {
 };
 use crate::axo_cursor::Location;
 
-impl Parser<'static> {
-    pub fn bundle(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+impl<'parser> Parser<'parser> {
+    pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -74,7 +74,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn block(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn block(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -130,7 +130,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn group(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn group(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -189,7 +189,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn sequence(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn sequence(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -248,7 +248,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn collection(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn collection(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -304,7 +304,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn series(item: Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>>) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn series(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -361,7 +361,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn delimited() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::bundle(Classifier::deferred(Self::element)),
             Self::block(Classifier::deferred(Self::element)),

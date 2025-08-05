@@ -12,14 +12,14 @@ use {
     },
 };
 
-impl<'classifier, Input: Formable, Output: Formable, Failure: Formable> Debug for Classifier<'classifier, Input, Output, Failure> {
+impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, Failure: Formable<'classifier>> Debug for Classifier<'classifier, Input, Output, Failure> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "Todo")
     }
 }
 
 
-impl<Input: Formable, Output: Formable, Failure: Formable> Display for Form<Input, Output, Failure> {
+impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Display for Form<'form, Input, Output, Failure> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self.clone() {
             Form::Blank => {
@@ -41,6 +41,7 @@ impl<Input: Formable, Output: Formable, Failure: Formable> Display for Form<Inpu
             Form::Failure(error) => {
                 write!(f, "Failure({:?})", error)
             }
+            Form::_Phantom(_) => unreachable!(),
         }
     }
 }

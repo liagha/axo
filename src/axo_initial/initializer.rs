@@ -23,29 +23,29 @@ pub struct Initializer<'initializer> {
     pub index: usize,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
-    pub output: Vec<Preference>,
+    pub output: Vec<Preference<'initializer>>,
     pub errors: Vec<InitialError<'initializer>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Preference {
-    pub target: Token<'static>,
-    pub value: Token<'static>,
-    pub span: Span<'static>,
+pub struct Preference<'preference> {
+    pub target: Token<'preference>,
+    pub value: Token<'preference>,
+    pub span: Span<'preference>,
 }
 
-impl Spanned<'static> for Preference {
-    fn borrow_span(&self) -> Span<'static> {
+impl<'preference> Spanned<'preference> for Preference<'preference> {
+    fn borrow_span(&self) -> Span<'preference> {
         self.span.clone()
     }
 
-    fn span(self) -> Span<'static> {
+    fn span(self) -> Span<'preference> {
         self.span
     }
 }
 
-impl Preference {
-    pub fn new(target: Token<'static>, value: Token<'static>) -> Self {
+impl<'preference> Preference<'preference> {
+    pub fn new(target: Token<'preference>, value: Token<'preference>) -> Self {
         let span = Span::merge(&target.borrow_span(), &value.borrow_span());
 
         Self {
@@ -56,7 +56,7 @@ impl Preference {
     }
 }
 
-impl Symbolic for Preference {
+impl Symbolic for Preference<'static> {
     fn brand(&self) -> Option<Token<'static>> {
         Some(self.target.clone())
     }
@@ -123,10 +123,8 @@ impl<'initializer> Initializer<'initializer> {
             errors: Vec::new(),
         }
     }
-}
 
-impl Initializer<'static> {
-    pub fn verbosity() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
+    pub fn verbosity() -> Classifier<'initializer, Token<'initializer>, Preference<'initializer>, InitialError<'initializer>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -145,18 +143,21 @@ impl Initializer<'static> {
                 } else {
                     false
                 }
-            }).with_transform(|_, form| {
+            }).with_transform(move |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                 let identifier = form.collect_inputs()[0].clone();
+                let span = identifier.span();
 
-                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), identifier.borrow_span())))
+                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), span)))
             })
-        ]).with_transform(|_, form| {
-            let identifier = form.collect_inputs()[0].clone();
-            Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Boolean(true), identifier.borrow_span()))))
+        ]).with_transform(move |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
+            let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
+            let span: Span<'initializer> = identifier.clone().span();
+
+            Ok(Form::output(Preference::new(identifier, Token::new(TokenKind::Boolean(true), span))))
         })
     }
 
-    pub fn path() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
+    pub fn path() -> Classifier<'initializer, Token<'initializer>, Preference<'initializer>, InitialError<'initializer>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -172,10 +173,11 @@ impl Initializer<'static> {
                     } else {
                         false
                     }
-                }).with_transform(|_, form| {
+                }).with_transform(|_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                     let identifier = form.collect_inputs()[0].clone();
+                    let span = identifier.span();
 
-                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), identifier.borrow_span())))
+                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), span)))
                 }),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -203,9 +205,10 @@ impl Initializer<'static> {
                     ]).as_optional()
                 ])
             ]),
-            |_, form| {
+            |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                 let inputs = form.collect_inputs();
                 let identifier = inputs[0].clone();
+                let span = identifier.clone().span();
                 let mut path = String::new();
 
                 for input in inputs.iter().skip(1) {
@@ -223,12 +226,12 @@ impl Initializer<'static> {
                     }
                 }
 
-                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), identifier.borrow_span()))))
+                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), span))))
             }
         )
     }
 
-    pub fn strainer(length: usize) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn strainer(length: usize) -> Classifier<'initializer, Token<'initializer>, Element<'initializer>, ParseError<'initializer>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {
@@ -257,7 +260,7 @@ impl Initializer<'static> {
         )
     }
 
-    pub fn preference() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
+    pub fn preference() -> Classifier<'initializer, Token<'initializer>, Preference<'initializer>, InitialError<'initializer>> {
         Classifier::alternative([
             Self::path(),
             Self::verbosity(),
@@ -265,7 +268,7 @@ impl Initializer<'static> {
         ])
     }
 
-    pub fn classifier() -> Classifier<'static, Token<'static>, Preference, InitialError<'static>> {
+    pub fn classifier() -> Classifier<'initializer, Token<'initializer>, Preference<'initializer>, InitialError<'initializer>> {
         Classifier::repetition(
             Self::preference(),
             0,
@@ -277,8 +280,7 @@ impl Initializer<'static> {
         let location = Location::Flag;
         let input = location.get_value();
 
-        let mut registry = Registry::new();
-        let mut scanner = Scanner::new(&mut registry, Location::Flag).with_input(input);
+        let mut scanner = Scanner::new(self.registry, Location::Flag).with_input(input);
         scanner.scan();
 
         self.input = scanner.output;
@@ -298,7 +300,7 @@ impl Initializer<'static> {
                     Form::Failure(failure) => {
                         self.errors.push(failure);
                     }
-                    Form::Multiple(_) | Form::Blank | Form::Input(_) => {}
+                    _ => {}
                 }
             }
         }

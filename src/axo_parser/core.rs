@@ -25,8 +25,8 @@ use {
     },
 };
 
-impl Parser<'static> {
-    pub fn identifier() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+impl<'parser> Parser<'parser> {
+    pub fn identifier() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
@@ -46,7 +46,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn literal() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn literal() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
                 matches!(
@@ -68,11 +68,11 @@ impl Parser<'static> {
         )
     }
 
-    pub fn token() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn token() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Self::identifier(), Self::literal()])
     }
 
-    pub fn whitespace() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn whitespace() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Classifier::predicate(
             |token: &Token| {
                 matches!(
@@ -87,11 +87,11 @@ impl Parser<'static> {
         )])
     }
 
-    pub fn primary() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Self::delimited(), Self::token()])
     }
 
-    pub fn prefixed() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn prefixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -124,7 +124,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn suffixed() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn suffixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Self::primary(),
@@ -192,7 +192,7 @@ impl Parser<'static> {
     }
 
 
-    pub fn unary() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn unary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::prefixed(),
             Self::suffixed(),
@@ -200,7 +200,7 @@ impl Parser<'static> {
         ])
     }
 
-    pub fn binary() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn binary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Classifier::with_transform(
                 Classifier::sequence([
@@ -325,18 +325,18 @@ impl Parser<'static> {
         left
     }
 
-    pub fn expression() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn expression() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
     }
 
-    pub fn element() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::statement(),
             Self::expression()
         ])
     }
 
-    pub fn fallback() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn fallback() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_fail(
             Classifier::anything(),
             |_, form: Form<Token, Element, ParseError>| {
@@ -350,7 +350,7 @@ impl Parser<'static> {
         )
     }
 
-    pub fn parser() -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn parser() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::repetition(
             Classifier::alternative([
                 Self::symbolization(),
