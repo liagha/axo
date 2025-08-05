@@ -133,7 +133,7 @@ pub trait Former<'former, Input: Formable<'former>, Output: Formable<'former>, F
 
 impl<'former, Target, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> Former<'former, Input, Output, Failure> for Target
 {
-    fn form(&'former mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure>
+    fn form(&'former mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure>
     where
         Self: Source<'former, Input>,
     {

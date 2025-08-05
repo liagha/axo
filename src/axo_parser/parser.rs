@@ -97,18 +97,18 @@ impl<'parser> Parser<'parser> {
         }
     }
 
-    pub fn with_input(self, input: Vec<Token<'static>>) -> Self {
+    pub fn with_input(self, input: Vec<Token<'parser>>) -> Self {
         Self {
             input,
             ..self
         }
     }
 
-    pub fn set_input(&mut self, input: Vec<Token<'static>>) {
+    pub fn set_input(&mut self, input: Vec<Token<'parser>>) {
         self.input = input;
     }
 
-    pub fn strainer(length: usize) -> Classifier<'static, Token<'static>, Element<'static>, ParseError<'static>> {
+    pub fn strainer(length: usize) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {

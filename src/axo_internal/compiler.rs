@@ -50,14 +50,14 @@ pub struct Registry<'registry> {
     pub resolver: Resolver<'registry>,
 }
 
-impl Registry<'static> {
+impl<'registry> Registry<'registry> {
     pub fn new() -> Self {
         Registry {
             resolver: Resolver::new(),
         }
     }
 
-    pub fn get_verbosity(resolver: &mut Resolver<'static>) -> bool {
+    pub fn get_verbosity(resolver: &mut Resolver<'registry>) -> bool {
         let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default(Location::Flag));
 
         let result = resolver.try_get(&identifier);
@@ -75,7 +75,7 @@ impl Registry<'static> {
         false
     }
 
-    pub fn get_path(resolver: &mut Resolver<'static>) -> String {
+    pub fn get_path(resolver: &mut Resolver<'registry>) -> String {
         let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default(Location::Flag));
 
         let result = resolver.try_get(&identifier);
@@ -94,7 +94,7 @@ impl Registry<'static> {
     }
 }
 
-pub trait Stage<Input, Output> {
+pub trait Stage<'stage, Input, Output> {
     fn execute(&mut self, input: Input) -> Output;
 }
 
@@ -111,17 +111,22 @@ impl<'compiler> Compiler<'compiler> {
     pub fn compile(&mut self) -> () {
         let timer = Timer::new(TIMER);
 
-        let mut initializer = Initializer::new(&mut self.registry, Location::Flag);
-        let location = initializer.execute(());
+        let location = {
+            let mut initializer = Initializer::new(&mut self.registry, Location::Flag);
+            initializer.execute(())
+        };
 
-        let mut scanner = Scanner::new(&mut self.registry, location);
-        let scanned = scanner.execute(location);
+        let tokens = {
+            let mut scanner = Scanner::new(&mut self.registry, location);
+            scanner.execute(location)
+        };
 
-        let mut parser = Parser::new(&mut self.registry, location);
-        let parsed = parser.execute(scanned);
+        let elements = {
+            let mut parser = Parser::new(&mut self.registry, location);
+            parser.execute(tokens)
+        };
 
-        let resolver = &mut self.registry.resolver;
-        resolver.execute(parsed);
+        self.registry.resolver.execute(elements);
 
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
@@ -146,16 +151,16 @@ impl<'compiler> Compiler<'compiler> {
     }
 }
 
-impl Stage<(), Location<'static>> for Initializer<'static> {
-    fn execute(&mut self, _input: ()) -> Location<'static> {
+impl<'initializer> Stage<'initializer, (), Location<'initializer>> for Initializer<'initializer> {
+    fn execute(&mut self, _input: ()) -> Location<'initializer> {
         self.initialize();
         let path = Registry::get_path(&mut self.registry.resolver);
         Location::File(Str::from(path))
     }
 }
 
-impl Stage<Location<'static>, Vec<Token<'static>>> for Scanner<'static> {
-    fn execute(&mut self, location: Location<'static>) -> Vec<Token<'static>> {
+impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Scanner<'scanner> {
+    fn execute(&mut self, location: Location<'scanner>) -> Vec<Token<'scanner>> {
         let timer = Timer::new(TIMER);
 
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
@@ -219,8 +224,8 @@ impl Stage<Location<'static>, Vec<Token<'static>>> for Scanner<'static> {
     }
 }
 
-impl Stage<Vec<Token<'static>>, Vec<Element<'static>>> for Parser<'static> {
-    fn execute(&mut self, tokens: Vec<Token<'static>>) -> Vec<Element<'static>> {
+impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Parser<'parser> {
+    fn execute(&mut self, tokens: Vec<Token<'parser>>) -> Vec<Element<'parser>> {
         let timer = Timer::new(TIMER);
 
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
@@ -285,8 +290,8 @@ impl Stage<Vec<Token<'static>>, Vec<Element<'static>>> for Parser<'static> {
     }
 }
 
-impl Stage<Vec<Element<'static>>, ()> for Resolver<'static> {
-    fn execute(&mut self, elements: Vec<Element<'static>>) -> () {
+impl<'resolver> Stage<'resolver, Vec<Element<'resolver>>, ()> for Resolver<'resolver> {
+    fn execute(&mut self, elements: Vec<Element<'resolver>>) -> () {
         let timer = Timer::new(TIMER);
         let verbosity = Registry::get_verbosity(self);
 

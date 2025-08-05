@@ -57,7 +57,7 @@ impl<'preference> Preference<'preference> {
 }
 
 impl Symbolic for Preference<'static> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         Some(self.target.clone())
     }
 }
@@ -280,36 +280,41 @@ impl<'initializer> Initializer<'initializer> {
         let location = Location::Flag;
         let input = location.get_value();
 
-        let mut scanner = Scanner::new(self.registry, Location::Flag).with_input(input);
-        scanner.scan();
+        let tokens = {
+            let mut scanner = Scanner::new(&mut self.registry, Location::Flag).with_input(input);
+            scanner.scan();
+            scanner.output
+        };
 
-        self.input = scanner.output;
+        self.input = tokens;
         self.reset();
 
-        let strained = self.form(Self::strainer(self.length())).collect_inputs();
+        let strained = {
+            let length = self.length();
+            self.form(Self::strainer(length)).collect_inputs()
+        };
+
         self.input = strained;
         self.reset();
 
+        let mut preferences = Vec::new();
         while self.peek().is_some() {
             let forms = self.form(Self::classifier()).flatten();
             for form in forms {
                 match form {
-                    Form::Output(output) => {
-                        self.output.push(output);
-                    }
-                    Form::Failure(failure) => {
-                        self.errors.push(failure);
-                    }
+                    Form::Output(output) => preferences.push(output),
+                    Form::Failure(failure) => self.errors.push(failure),
                     _ => {}
                 }
             }
         }
 
-        let preferences = self.output.iter().map(|preference| {
-            Symbol::new(preference.clone(), preference.borrow_span())
+        let symbols = preferences.into_iter().map(|preference| {
+            let span = preference.borrow_span();
+            Symbol::new(preference, span)
         }).collect::<Vec<Symbol>>();
 
-        self.registry.resolver.extend(preferences);
+        self.registry.resolver.extend(symbols);
     }
 }
 

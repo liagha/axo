@@ -258,7 +258,7 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    fn climb(mut left: Element<'static>, pairs: Vec<(Token<'static>, Element<'static>, u8)>, threshold: u8) -> Element<'static> {
+    fn climb(mut left: Element<'parser>, pairs: Vec<(Token<'parser>, Element<'parser>, u8)>, threshold: u8) -> Element<'parser> {
         let mut current = 0;
 
         while current < pairs.len() {

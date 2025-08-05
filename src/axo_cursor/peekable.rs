@@ -5,7 +5,7 @@ use {
     }
 };
 
-pub trait Peekable<'peekable, Item: PartialEq> {
+pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn length(&self) -> usize;
     fn remaining(&self) -> usize {
         self.length() - self.index()

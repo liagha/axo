@@ -35,7 +35,7 @@ pub struct Resolver<'resolver> {
     pub errors: Vec<ResolveError<'resolver>>,
 }
 
-impl Resolver<'static> {
+impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
             scope: Scope::new(),
@@ -44,7 +44,7 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn with_input(&mut self, input: Vec<Element<'static>>) {
+    pub fn with_input(&mut self, input: Vec<Element<'resolver>>) {
         self.input = input;
     }
 
@@ -59,11 +59,11 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn define(&mut self, symbol: Symbol<'static>) {
+    pub fn define(&mut self, symbol: Symbol<'resolver>) {
         self.scope.add(symbol);
     }
 
-    pub fn try_get(&mut self, target: &Element<'static>) -> Result<Option<Symbol<'static>>, Vec<ResolveError<'static>>> {
+    pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Option<Symbol<'resolver>>, Vec<ResolveError<'resolver>>> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, &candidates);
@@ -79,7 +79,7 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn get(&mut self, target: &Element<'static>) -> Option<Symbol<'static>> {
+    pub fn get(&mut self, target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
         match self.try_get(target) {
             Ok(Some(symbol)) => Some(symbol),
             Ok(None) => None,
@@ -91,8 +91,8 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn lookup(&mut self, target: &Element<'static>, candidates: Vec<Symbol<'static>>) -> Option<Symbol<'static>> {
-        let mut assessor = symbol_matcher();
+    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
+        let mut assessor = symbol_matcher::<'resolver>();
         let champion = assessor.champion(target, &candidates);
 
         if let Some(champion) = champion {
@@ -104,7 +104,7 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn fail(&mut self, error: ErrorKind<'static>, span: Span<'static>) {
+    pub fn fail(&mut self, error: ErrorKind<'resolver>, span: Span<'resolver>) {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
@@ -115,13 +115,13 @@ impl Resolver<'static> {
         self.errors.push(error);
     }
 
-    pub fn process(&mut self, elements: Vec<Element<'static>>) {
+    pub fn process(&mut self, elements: Vec<Element<'resolver>>) {
         for element in elements {
             self.resolve(&element.into());
         }
     }
 
-    pub fn resolve(&mut self, element: &Element<'static>) {
+    pub fn resolve(&mut self, element: &Element<'resolver>) {
         let Element { kind, .. } = element.clone();
 
         match kind {
@@ -224,7 +224,7 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn symbolize(&mut self, symbol: Symbol<'static>) {
+    pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
         if let Some(implementation) = symbol.cast::<Implementation<Box<Element>, Box<Element>, Symbol>>() {
             let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
             if let Some(target) = self.lookup(implementation.get_target(), candidates) {
@@ -249,30 +249,30 @@ impl Resolver<'static> {
         }
     }
 
-    pub fn extend(&mut self, symbols: Vec<Symbol<'static>>) {
+    pub fn extend(&mut self, symbols: Vec<Symbol<'resolver>>) {
         self.scope.extend(symbols);
     }
 
-    pub fn merge(&mut self, other: Resolver<'static>) {
+    pub fn merge(&mut self, other: Resolver<'resolver>) {
         self.scope.merge(&other.scope);
         self.errors.extend(other.errors);
     }
 
-    pub fn collect(&mut self, elements: Vec<Element<'static>>) -> Vec<Option<Symbol<'static>>> {
+    pub fn collect(&mut self, elements: Vec<Element<'resolver>>) -> Vec<Option<Symbol<'resolver>>> {
         elements.iter().map(|e| self.get(e)).collect()
     }
 
-    pub fn batch(&mut self, symbols: Vec<Symbol<'static>>) {
+    pub fn batch(&mut self, symbols: Vec<Symbol<'resolver>>) {
         for symbol in symbols {
             self.define(symbol);
         }
     }
 
-    pub fn purge(&mut self, symbol: &Symbol<'static>) -> bool {
+    pub fn purge(&mut self, symbol: &Symbol<'resolver>) -> bool {
         self.scope.remove(symbol)
     }
 
-    pub fn replace(&mut self, old: &Symbol<'static>, new: Symbol<'static>) -> bool {
+    pub fn replace(&mut self, old: &Symbol<'resolver>, new: Symbol<'resolver>) -> bool {
         self.scope.replace(old, new)
     }
 
@@ -286,7 +286,7 @@ impl Resolver<'static> {
         self.errors.clear();
     }
 
-    pub fn restore(&mut self, snapshot: Resolver<'static>) {
+    pub fn restore(&mut self, snapshot: Resolver<'resolver>) {
         *self = snapshot;
     }
 
@@ -298,15 +298,15 @@ impl Resolver<'static> {
         self.scope.depth()
     }
 
-    pub fn symbols(&self) -> Vec<Symbol<'static>> {
+    pub fn symbols(&self) -> Vec<Symbol<'resolver>> {
         self.scope.flatten()
     }
 
-    pub fn visible(&self, symbol: &Symbol<'static>) -> bool {
+    pub fn visible(&self, symbol: &Symbol<'resolver>) -> bool {
         self.scope.visible(symbol)
     }
 
-    pub fn shadow(&mut self, symbol: Symbol<'static>) {
+    pub fn shadow(&mut self, symbol: Symbol<'resolver>) {
         self.scope.shadow(symbol);
     }
 
@@ -318,13 +318,13 @@ impl Resolver<'static> {
         self.scope.toplevel()
     }
 
-    pub fn check(&mut self, elements: Vec<Element<'static>>) -> bool {
+    pub fn check(&mut self, elements: Vec<Element<'resolver>>) -> bool {
         let initial_errors = self.errors.len();
         self.process(elements);
         self.errors.len() == initial_errors
     }
 
-    pub fn validate(&mut self, element: &Element<'static>) -> bool {
+    pub fn validate(&mut self, element: &Element<'resolver>) -> bool {
         let initial_errors = self.errors.len();
         self.resolve(element);
         self.errors.len() == initial_errors
@@ -346,7 +346,7 @@ impl Resolver<'static> {
         self.scope.empty()
     }
 
-    pub fn cascade(&self) -> Vec<Vec<Symbol<'static>>> {
+    pub fn cascade(&self) -> Vec<Vec<Symbol<'resolver>>> {
         self.scope.cascade().into_iter().map(|set| set.into_iter().collect()).collect()
     }
 
@@ -357,16 +357,16 @@ impl Resolver<'static> {
         self.scope.retain(predicate);
     }
 
-    pub fn search<F>(&self, predicate: F) -> Vec<Symbol<'static>>
+    pub fn search<F>(&self, predicate: F) -> Vec<Symbol<'resolver>>
     where
         F: Fn(&Symbol<'_>) -> bool,
     {
         self.scope.filter(predicate).into_iter().collect()
     }
 
-    pub fn traverse<F>(&mut self, elements: Vec<Element<'static>>, visitor: F)
+    pub fn traverse<F>(&mut self, elements: Vec<Element<'resolver>>, visitor: F)
     where
-        F: Fn(&Element<'static>, &mut Resolver<'static>),
+        F: Fn(&Element<'resolver>, &mut Resolver<'resolver>),
     {
         for element in elements {
             visitor(&element, self);

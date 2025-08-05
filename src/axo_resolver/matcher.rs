@@ -30,19 +30,20 @@ use {
 };
 
 #[derive(Debug)]
-pub struct Aligner {
+pub struct Aligner<'aligner> {
     pub assessor: Assessor<String, String, ()>,
     pub perfection: Range<f64>,
     pub suggestion: Range<f64>,
+    pub phantom: &'aligner ()
 }
 
-impl Aligner {
+impl<'aligner> Aligner<'aligner> {
     pub fn new() -> Self {
-        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90 }
+        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, phantom: &() }
     }
 }
 
-impl Resembler<String, String, ()> for Aligner {
+impl<'aligner> Resembler<String, String, ()> for Aligner<'aligner> {
     fn resemblance(&mut self, query: &String, candidate: &String) -> Result<Resemblance, ()> {
         self.assessor.resemblance(query, candidate)
     }
@@ -64,7 +65,7 @@ pub fn aligner() -> Assessor<String, String, ()> {
         .scheme(Scheme::Additive)
 }
 
-impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner {
+impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'aligner> {
     fn resemblance(&mut self, query: &Token, candidate: &Token) -> Result<Resemblance, ()> {
         match (&query.kind, &candidate.kind) {
             (TokenKind::Identifier(query), TokenKind::Identifier(candidate)) => {
@@ -117,8 +118,8 @@ impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner {
     }
 }
 
-impl Resembler<Element<'static>, Symbol<'static>, ResolveError<'static>> for Aligner {
-    fn resemblance(&mut self, query: &Element<'static>, candidate: &Symbol<'static>) -> Result<Resemblance, ResolveError<'static>> {
+impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner<'aligner> {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
@@ -227,8 +228,8 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     }
 }
 
-pub fn symbol_matcher() -> Assessor<Element<'static>, Symbol<'static>, ResolveError<'static>> {
-    Assessor::<Element<'static>, Symbol<'static>, ResolveError<'static>>::new()
+pub fn symbol_matcher<'matcher>() -> Assessor<Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
+    Assessor::new()
         .floor(0.65)
         .dimension(Aligner::new(), 0.75)
         .dimension(Affinity::new(), 0.25)

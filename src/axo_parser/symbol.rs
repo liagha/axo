@@ -38,7 +38,7 @@ use {
 };
 
 pub trait Symbolic: DynClone + DynEq + DynHash + Debug + Send + Sync {
-    fn brand(&self) -> Option<Token<'static>>;
+    fn brand(&self) -> Option<Token<'_>>;
 }
 
 clone_trait_object!(Symbolic);
@@ -48,7 +48,7 @@ hash_trait_object!(Symbolic);
 pub struct Symbol<'symbol> {
     pub value: Box<dyn Symbolic>,
     pub span: Span<'symbol>,
-    pub members: Vec<Box<dyn Symbolic>>,
+    pub members: Vec<Symbol<'symbol>>,
 }
 
 impl<'symbol> Symbol<'symbol> {
@@ -60,7 +60,7 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn cast<Type: 'static>(&self) -> Option<&Type> {
+    pub fn cast<Type: 'symbol + 'static>(&self) -> Option<&Type> {
         (*self.value).as_any().downcast_ref::<Type>()
     }
 }
@@ -96,49 +96,49 @@ impl<'symbol> PartialEq for Symbol<'symbol> {
 }
 
 impl Symbolic for Symbol<'static> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.value.brand()
     }
 }
 
 impl Symbolic for Inclusion<Box<Element<'static>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Interface<Box<Element<'static>>, Symbol<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Structure<Box<Element<'static>>, Symbol<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
 
 impl Symbolic for Method<Box<Element<'static>>, Symbol<'static>, Box<Element<'static>>, Option<Box<Element<'static>>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+    fn brand(&self) -> Option<Token<'_>> {
         self.get_target().clone().brand()
     }
 }
