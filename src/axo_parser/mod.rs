@@ -8,10 +8,12 @@ mod core;
 mod delimited;
 pub mod error;
 mod statement;
+mod symbolic;
 
 pub use {
     element::{Element, ElementKind},
-    symbol::{Symbolic, Symbol},
+    symbol::{Symbol},
+    symbolic::Symbolic,
     parser::Parser
 };
 

@@ -1,7 +1,7 @@
 use {
     super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
-        axo_cursor::{Span, Spanned},
+        axo_cursor::{Span, Spanned, Location},
         axo_form::{
             form::Form,
             classifier::Classifier
@@ -15,7 +15,6 @@ use {
         thread::Arc,
     },
 };
-use crate::axo_cursor::Location;
 
 impl<'parser> Parser<'parser> {
     pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {

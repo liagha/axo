@@ -2,7 +2,6 @@ pub mod scope;
 mod matcher;
 mod resolver;
 mod error;
-mod brand;
 mod hint;
 
 use {

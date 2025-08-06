@@ -9,7 +9,7 @@ use {
             former::Former,
             classifier::Classifier,
         },
-        axo_parser::{Element, ParseError, Symbolic, Symbol},
+        axo_parser::{Element, ParseError, Symbol},
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind, Scanner},
         compiler::{Registry, Marked},
         format::Debug,
@@ -53,12 +53,6 @@ impl<'preference> Preference<'preference> {
             value,
             span
         }
-    }
-}
-
-impl Symbolic for Preference<'static> {
-    fn brand(&self) -> Option<Token<'_>> {
-        Some(self.target.clone())
     }
 }
 
@@ -281,7 +275,10 @@ impl<'initializer> Initializer<'initializer> {
         let input = location.get_value();
 
         let tokens = {
-            let mut scanner = Scanner::new(&mut self.registry, Location::Flag).with_input(input);
+            let registry_ptr = self.registry as *mut Registry<'initializer>;
+            let mut scanner = unsafe {
+                Scanner::new(&mut *registry_ptr, Location::Flag).with_input(input)
+            };
             scanner.scan();
             scanner.output
         };
@@ -291,7 +288,8 @@ impl<'initializer> Initializer<'initializer> {
 
         let strained = {
             let length = self.length();
-            self.form(Self::strainer(length)).collect_inputs()
+            let classifier = Self::strainer(length);
+            self.form(classifier).collect_inputs()
         };
 
         self.input = strained;
@@ -299,7 +297,8 @@ impl<'initializer> Initializer<'initializer> {
 
         let mut preferences = Vec::new();
         while self.peek().is_some() {
-            let forms = self.form(Self::classifier()).flatten();
+            let classifier = Self::classifier();
+            let forms = self.form(classifier).flatten();
             for form in forms {
                 match form {
                     Form::Output(output) => preferences.push(output),

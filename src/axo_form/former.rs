@@ -24,14 +24,14 @@ use {
     record::*,
 };
 
-pub struct Composer<'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> {
-    pub source: &'composer mut dyn Source<'composer, Input>,
+pub struct Composer<'instance, 'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> {
+    pub source: &'instance mut dyn Source<'composer, Input>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
-impl <'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> Composer<'composer, Input, Output, Failure> {
+impl<'a, 'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> Composer<'a, 'composer, Input, Output, Failure> {
     #[inline(always)]
-    pub fn new(source: &'composer mut (dyn Source<'composer, Input> + 'composer)) -> Composer<'composer, Input, Output, Failure> {
+    pub fn new(source: &'a mut dyn Source<'composer, Input>) -> Self {
         Self {
             source,
             _phantom: PhantomData,
@@ -41,7 +41,6 @@ impl <'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failur
     #[inline(always)]
     pub fn build(&mut self, draft: &mut Draft<'composer, Input, Output, Failure>) {
         let classifier = draft.classifier.order.clone();
-
         classifier.order(self, draft);
     }
 }
@@ -126,21 +125,21 @@ impl<'draft, Input: Formable<'draft>, Output: Formable<'draft>, Failure: Formabl
 }
 
 pub trait Former<'former, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> {
-    fn form(&'former mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure>
+    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure>
     where
         Self: Source<'former, Input>;
 }
 
 impl<'former, Target, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> Former<'former, Input, Output, Failure> for Target
 {
-    fn form(&'former mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<Input, Output, Failure>
+    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure>
     where
         Self: Source<'former, Input>,
     {
         let initial = self.position();
         let mut draft = Draft::new(0, initial, classifier);
 
-        let mut composer = Composer::new(self);
+        let mut composer: Composer<'_, 'former, Input, Output, Failure> = Composer::new(self as &mut dyn Source<'former, Input>);
         composer.build(&mut draft);
 
         if draft.is_effected() {

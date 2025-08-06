@@ -272,7 +272,7 @@ pub struct Literal<'literal, Input> {
 
 impl<'literal, Input: Formable<'literal>, Output: Formable<'literal>, Failure: Formable<'literal>> Order<'literal, Input, Output, Failure> for Literal<'literal, Input> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'literal, Input, Output, Failure>, draft: &mut Draft<'literal, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'literal, Input, Output, Failure>, draft: &mut Draft<'literal, Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
             if self.value.eq(&peek) {
                 draft.set_align();
@@ -295,7 +295,7 @@ pub struct Negate<'negate, Input: Formable<'negate>, Output: Formable<'negate>, 
 
 impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Formable<'negate>> Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'negate, Input, Output, Failure>, draft: &mut Draft<'negate, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'negate, Input, Output, Failure>, draft: &mut Draft<'negate, Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
             let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
             composer.build(&mut child);
@@ -321,7 +321,7 @@ pub struct Predicate<'predicate, Input> {
 
 impl<'predicate, Input: Formable<'predicate>, Output: Formable<'predicate>, Failure: Formable<'predicate>> Order<'predicate, Input, Output, Failure> for Predicate<'predicate, Input> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'predicate, Input, Output, Failure>, draft: &mut Draft<'predicate, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'predicate, Input, Output, Failure>, draft: &mut Draft<'predicate, Input, Output, Failure>) {
         if let Some(peek) = composer.source.get(draft.marker).cloned() {
             let predicate = (self.function)(&peek);
 
@@ -348,7 +348,7 @@ pub struct Alternative<'alternative, Input: Formable<'alternative>, Output: Form
 
 impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: usize> Order<'alternative, Input, Output, Failure> for Alternative<'alternative, Input, Output, Failure, SIZE> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'alternative, Input, Output, Failure>, draft: &mut Draft<'alternative, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'alternative, Input, Output, Failure>, draft: &mut Draft<'alternative, Input, Output, Failure>) {
         let mut best: Option<Draft<'alternative, Input, Output, Failure>> = None;
 
         for classifier in &self.patterns {
@@ -395,7 +395,7 @@ pub struct Deferred<'deferred, Input: Formable<'deferred>, Output: Formable<'def
 
 impl<'deferred, Input: Formable<'deferred>, Output: Formable<'deferred>, Failure: Formable<'deferred>> Order<'deferred, Input, Output, Failure> for Deferred<'deferred, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'deferred, Input, Output, Failure>, draft: &mut Draft<'deferred, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'deferred, Input, Output, Failure>, draft: &mut Draft<'deferred, Input, Output, Failure>) {
         let resolved = (self.function)();
         let mut child = Draft::new(draft.marker, draft.position, resolved);
         composer.build(&mut child);
@@ -415,7 +415,7 @@ pub struct Optional<'optional, Input: Formable<'optional>, Output: Formable<'opt
 
 impl<'optional, Input: Formable<'optional>, Output: Formable<'optional>, Failure: Formable<'optional>> Order<'optional, Input, Output, Failure> for Optional<'optional, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'optional, Input, Output, Failure>, draft: &mut Draft<'optional, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'optional, Input, Output, Failure>, draft: &mut Draft<'optional, Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
         composer.build(&mut child);
 
@@ -438,7 +438,7 @@ pub struct Wrapper<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrappe
 
 impl<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrapper>, Failure: Formable<'wrapper>> Order<'wrapper, Input, Output, Failure> for Wrapper<'wrapper, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'wrapper, Input, Output, Failure>, draft: &mut Draft<'wrapper, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'wrapper, Input, Output, Failure>, draft: &mut Draft<'wrapper, Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
         composer.build(&mut child);
 
@@ -458,7 +458,7 @@ pub struct Ranked<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, 
 
 impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>> Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'ranked, Input, Output, Failure>, draft: &mut Draft<'ranked, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'ranked, Input, Output, Failure>, draft: &mut Draft<'ranked, Input, Output, Failure>) {
         let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
         composer.build(&mut child);
 
@@ -484,7 +484,7 @@ pub struct Sequence<'sequence, Input: Formable<'sequence>, Output: Formable<'seq
 
 impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: usize> Order<'sequence, Input, Output, Failure> for Sequence<'sequence, Input, Output, Failure, SIZE> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'sequence, Input, Output, Failure>, draft: &mut Draft<'sequence, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'sequence, Input, Output, Failure>, draft: &mut Draft<'sequence, Input, Output, Failure>) {
         let mut index = draft.marker;
         let mut position = draft.position;
         let mut consumed = Vec::new();
@@ -543,7 +543,7 @@ pub struct Repetition<'repetition, Input: Formable<'repetition>, Output: Formabl
 
 impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, Failure: Formable<'repetition>> Order<'repetition, Input, Output, Failure> for Repetition<'repetition, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'repetition, Input, Output, Failure>, draft: &mut Draft<'repetition, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Composer<'_, 'repetition, Input, Output, Failure>, draft: &mut Draft<'repetition, Input, Output, Failure>) {
         let mut index = draft.marker;
         let mut position = draft.position;
         let mut consumed = Vec::new();

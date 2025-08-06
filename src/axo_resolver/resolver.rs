@@ -91,16 +91,30 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
-        let mut assessor = symbol_matcher::<'resolver>();
+    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Result<Option<Symbol<'resolver>>, Vec<ResolveError<'resolver>>> {
+        let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, &candidates);
 
         if let Some(champion) = champion {
-            Some(champion)
+            Ok(Some(champion))
         } else {
-            self.errors.extend(assessor.errors);
+            if assessor.errors.is_empty() {
+                Ok(None)
+            } else {
+                Err(assessor.errors.clone())
+            }
+        }
+    }
 
-            None
+    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
+        match self.try_lookup(target, candidates) {
+            Ok(Some(symbol)) => Some(symbol),
+            Ok(None) => None,
+            Err(errors) => {
+                self.errors.extend(errors.clone());
+
+                None
+            }
         }
     }
 
