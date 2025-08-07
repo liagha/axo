@@ -3,8 +3,8 @@ use {
         clone::DynClone,
         eq::DynEq,
         hash::DynHash,
-        clone_trait_object, 
-        eq_trait_object, 
+        clone_trait_object,
+        eq_trait_object,
         hash_trait_object,
     },
     super::{
@@ -39,13 +39,13 @@ use {
 };
 
 pub struct Symbol<'symbol> {
-    pub value: Box<dyn Symbolic<'symbol> + 'symbol>,
+    pub value: Box<dyn Symbolic<'symbol>>,
     pub span: Span<'symbol>,
     pub members: Vec<Symbol<'symbol>>,
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: impl Symbolic<'symbol> + 'symbol, span: Span<'symbol>) -> Self {
+    pub fn new(value: impl Symbolic<'symbol> + 'static, span: Span<'symbol>) -> Self {
         Self {
             value: Box::new(value),
             span,
@@ -53,8 +53,8 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn cast<Type: 'static + 'symbol>(&self) -> Option<&Type> {
-        (*self.value).as_any().downcast_ref::<Type>()
+    pub fn cast<Type: 'static>(&self) -> Option<&Type> {
+        self.value.as_any().downcast_ref::<Type>()
     }
 }
 
@@ -84,7 +84,7 @@ impl<'symbol> Hash for Symbol<'symbol> {
 
 impl<'symbol> PartialEq for Symbol<'symbol> {
     fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
+        self.value == other.value.clone()
     }
 }
 
@@ -130,7 +130,7 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::symbolize(
+                            ElementKind::Symbolize(
                                 Symbol::new(Implementation::new(Box::new(name), None, members), span),
                             ),
                             span
@@ -146,7 +146,7 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::symbolize(
+                            ElementKind::Symbolize(
                                 Symbol::new(Implementation::new(Box::new(name), Some(target.into()), members), span),
                             ),
                             span
@@ -158,7 +158,7 @@ impl<'parser> Parser<'parser> {
             },
         )
     }
-    
+
     pub fn binding() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
@@ -191,7 +191,7 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::symbolize(Symbol::new(symbol, span)),
+                        ElementKind::Symbolize(Symbol::new(symbol, span)),
                         span,
                     )
                 ))
@@ -221,7 +221,7 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::symbolize(
+                        ElementKind::Symbolize(
                             Symbol::new(Structure::new(Box::new(name), fields), span),
                         ),
                         span,

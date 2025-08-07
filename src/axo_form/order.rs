@@ -199,7 +199,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn transform<T>(transformer: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + Send + Sync + Send + Sync + 'classifier,
+        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
     {
         Arc::new(Transform { transformer: Arc::new(Mutex::new(transformer))})
     }
@@ -207,7 +207,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn fail<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + Send + Sync + 'classifier,
+        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Fail { emitter: Arc::new(emitter) })
     }
@@ -215,7 +215,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn panic<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + Send + Sync + 'classifier,
+        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Panic { emitter: Arc::new(emitter) })
     }
@@ -228,7 +228,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn inspect<T>(inspector: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + Send + Sync + 'classifier
+        T: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + 'classifier
     {
         Arc::new(Inspect { inspector: Arc::new(inspector) })
     }
@@ -246,7 +246,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn perform<T>(executor: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: FnMut() + Send + Sync + 'classifier,
+        T: FnMut() + 'classifier,
     {
         Arc::new(Perform { performer: Arc::new(Mutex::new(executor))})
     }

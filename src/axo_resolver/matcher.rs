@@ -31,7 +31,7 @@ use {
 
 #[derive(Debug)]
 pub struct Aligner<'aligner> {
-    pub assessor: Assessor<String, String, ()>,
+    pub assessor: Assessor<'aligner, String, String, ()>,
     pub perfection: Range<f64>,
     pub suggestion: Range<f64>,
     pub phantom: &'aligner ()
@@ -49,19 +49,19 @@ impl<'aligner> Resembler<String, String, ()> for Aligner<'aligner> {
     }
 }
 
-pub fn aligner() -> Assessor<String, String, ()> {
+pub fn aligner<'aligner>() -> Assessor<'aligner, String, String, ()> {
     Assessor::new()
-        .dimension(Exact, 0.02)
-        .dimension(Relaxed, 0.02)
-        .dimension(Prefix, 0.15)
-        .dimension(Suffix, 0.14)
-        .dimension(Contains, 0.13)
-        .dimension(Keyboard::default(), 0.10)
-        .dimension(Words::default(), 0.10)
-        .dimension(Phonetic::default(), 0.07)
-        .dimension(Sequential::default(), 0.06)
-        .dimension(Jaro::default(), 0.05)
-        .dimension(Cosine::default(), 0.04)
+        .dimension(&mut Exact, 0.02)
+        .dimension(&mut Relaxed, 0.02)
+        .dimension(&mut Prefix, 0.15)
+        .dimension(&mut Suffix, 0.14)
+        .dimension(&mut Contains, 0.13)
+        .dimension(&mut Keyboard::default(), 0.10)
+        .dimension(&mut Words::default(), 0.10)
+        .dimension(&mut Phonetic::default(), 0.07)
+        .dimension(&mut Sequential::default(), 0.06)
+        .dimension(&mut Jaro::default(), 0.05)
+        .dimension(&mut Cosine::default(), 0.04)
         .scheme(Scheme::Additive)
 }
 
@@ -228,10 +228,10 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     }
 }
 
-pub fn symbol_matcher<'matcher: 'static>() -> Assessor<Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
+pub fn symbol_matcher<'matcher>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
     Assessor::new()
         .floor(0.65)
-        .dimension(Aligner::new(), 0.75)
-        .dimension(Affinity::new(), 0.25)
+        .dimension(&mut Aligner::new(), 0.75)
+        .dimension(&mut Affinity::new(), 0.25)
         .scheme(Scheme::Multiplicative)
 }

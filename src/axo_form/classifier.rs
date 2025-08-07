@@ -33,7 +33,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'classifier) -> Self {
+    pub fn literal(value: impl PartialEq<Input> + 'classifier) -> Self {
         Self::new(Arc::new(Literal {
             value: Arc::new(value),
         }))
@@ -49,7 +49,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn predicate<F>(predicate: F) -> Self
     where
-        F: Fn(&Input) -> bool + Send + Sync + 'classifier,
+        F: Fn(&Input) -> bool + 'classifier,
     {
         Self::new(Arc::new(Predicate {
             function: Arc::new(predicate),
@@ -149,7 +149,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn deferred<F>(factory: F) -> Self
     where
-        F: Fn() -> Self + Send + Sync + 'classifier,
+        F: Fn() -> Self + 'classifier,
     {
         Self::new(Arc::new(Deferred {
             function: Arc::new(factory),
@@ -190,7 +190,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'classifier,
+        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Arc::new(Fail { emitter: Arc::new(emitter) }))
     }
@@ -203,7 +203,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_inspect<I>(self, inspector: I) -> Self
     where
-        I: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + Send + Sync + 'classifier
+        I: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + 'classifier
     {
         self.with_order(Arc::new(Inspect { inspector: Arc::new(inspector) }))
     }
@@ -218,7 +218,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + Send + Sync + 'classifier,
+        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Self::panic(emitter))
     }
@@ -231,7 +231,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_perform<F>(self, executor: F) -> Self
     where
-        F: FnMut() + Send + Sync + 'classifier,
+        F: FnMut() + 'classifier,
     {
         self.with_order(Self::perform(executor))
     }
@@ -244,7 +244,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_transform<T>(self, transform: T) -> Self
     where
-        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + Send + Sync + 'classifier,
+        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
     {
         self.with_order(Self::transform(transform))
     }
@@ -267,7 +267,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
 
 #[derive(Clone)]
 pub struct Literal<'literal, Input> {
-    pub value: Arc<dyn PartialEq<Input> + Send + Sync + 'literal>,
+    pub value: Arc<dyn PartialEq<Input> + 'literal>,
 }
 
 impl<'literal, Input: Formable<'literal>, Output: Formable<'literal>, Failure: Formable<'literal>> Order<'literal, Input, Output, Failure> for Literal<'literal, Input> {
@@ -316,7 +316,7 @@ impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Form
 
 #[derive(Clone)]
 pub struct Predicate<'predicate, Input> {
-    pub function: Arc<dyn Fn(&Input) -> bool + Send + Sync + 'predicate>,
+    pub function: Arc<dyn Fn(&Input) -> bool + 'predicate>,
 }
 
 impl<'predicate, Input: Formable<'predicate>, Output: Formable<'predicate>, Failure: Formable<'predicate>> Order<'predicate, Input, Output, Failure> for Predicate<'predicate, Input> {
@@ -390,7 +390,7 @@ impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>
 
 #[derive(Clone)]
 pub struct Deferred<'deferred, Input: Formable<'deferred>, Output: Formable<'deferred>, Failure: Formable<'deferred>> {
-    pub function: Arc<dyn Fn() -> Classifier<'deferred, Input, Output, Failure> + Send + Sync + 'deferred>,
+    pub function: Arc<dyn Fn() -> Classifier<'deferred, Input, Output, Failure> + 'deferred>,
 }
 
 impl<'deferred, Input: Formable<'deferred>, Output: Formable<'deferred>, Failure: Formable<'deferred>> Order<'deferred, Input, Output, Failure> for Deferred<'deferred, Input, Output, Failure> {
