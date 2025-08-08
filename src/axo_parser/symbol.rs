@@ -54,7 +54,7 @@ impl Symbol {
     }
 
     pub fn cast<Type: 'static>(&self) -> Option<&Type> {
-        self.value.as_any().downcast_ref::<Type>()
+        self.value.as_ref().as_any().downcast_ref::<Type>()
     }
 }
 

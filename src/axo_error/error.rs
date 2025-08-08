@@ -13,7 +13,7 @@ use {
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Error<'error, K, N = String, H = String>
+pub struct Error<'error, K, N = Str<'error>, H = Str<'error>>
 where K: Display, N: Display, H: Display
 {
     pub kind: K,

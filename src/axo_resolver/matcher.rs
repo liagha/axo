@@ -30,12 +30,11 @@ pub struct Aligner<'aligner> {
     pub assessor: Assessor<'aligner, String, String, ()>,
     pub perfection: Range<f64>,
     pub suggestion: Range<f64>,
-    pub phantom: &'aligner ()
 }
 
 impl Aligner<'static> {
     pub fn new() -> Self {
-        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, phantom: &() }
+        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, }
     }
 }
 
