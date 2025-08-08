@@ -9,7 +9,7 @@ use {
             former::Former,
             classifier::Classifier,
         },
-        axo_parser::{Element, ParseError, Symbol},
+        axo_parser::{Element, ParseError, Symbol, Symbolic},
         axo_scanner::{OperatorKind, PunctuationKind, Token, TokenKind, Scanner},
         compiler::{Registry, Marked},
         format::Debug,
@@ -19,7 +19,7 @@ use {
 
 #[derive(Debug)]
 pub struct Initializer<'initializer> {
-    pub registry: &'initializer mut Registry<'initializer>,
+    pub registry: Registry<'initializer>,
     pub index: usize,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
@@ -53,6 +53,43 @@ impl<'preference> Preference<'preference> {
             value,
             span
         }
+    }
+}
+
+impl Symbolic for Preference<'static> {
+    fn brand(&self) -> Option<crate::axo_scanner::Token<'static>> {
+        Some(unsafe { std::mem::transmute(self.target.clone()) })
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any where Self: 'static {
+        self
+    }
+    
+    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+        Box::new(Self {
+            target: self.target.clone(),
+            value: self.value.clone(),
+            span: self.span.clone(),
+        })
+    }
+    
+    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Self>() {
+            self == other
+        } else {
+            false
+        }
+    }
+    
+    fn dyn_hash(&self, state: &mut dyn crate::hash::Hasher) {
+        use std::hash::Hasher;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        state.write_u64(hasher.finish());
+        
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        std::hash::Hash::hash(&self, &mut hasher);
+        state.write_u64(hasher.finish());
     }
 }
 
@@ -107,7 +144,7 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
 }
 
 impl<'initializer> Initializer<'initializer> {
-    pub fn new(registry: &'initializer mut Registry<'initializer>, location: Location<'initializer>) -> Self {
+    pub fn new(registry: Registry<'initializer>, location: Location<'initializer>) -> Self {
         Initializer {
             registry,
             index: 0,
@@ -275,10 +312,7 @@ impl<'initializer> Initializer<'initializer> {
         let input = location.get_value();
 
         let tokens = {
-            let registry_ptr = self.registry as *mut Registry<'initializer>;
-            let mut scanner = unsafe {
-                Scanner::new(&mut *registry_ptr, Location::Flag).with_input(input)
-            };
+            let mut scanner = Scanner::new(self.registry.clone(), Location::Flag).with_input(input);
             scanner.scan();
             scanner.output
         };
@@ -310,7 +344,7 @@ impl<'initializer> Initializer<'initializer> {
 
         let symbols = preferences.into_iter().map(|preference| {
             let span = preference.borrow_span();
-            Symbol::new(preference, span)
+            Symbol::new(unsafe { std::mem::transmute::<_, Preference<'static>>(preference) }, unsafe { std::mem::transmute(span) })
         }).collect::<Vec<Symbol>>();
 
         self.registry.resolver.extend(symbols);

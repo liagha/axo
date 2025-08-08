@@ -22,7 +22,7 @@ use {
 };
 
 pub struct Parser<'parser> {
-    pub registry: &'parser mut Registry<'parser>,
+    pub registry: Registry<'parser>,
     pub index: usize,
     pub position: Position<'parser>,
     pub input: Vec<Token<'parser>>,
@@ -86,7 +86,7 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
 }
 
 impl<'parser> Parser<'parser> {
-    pub fn new(registry: &'parser mut Registry<'parser>, location: Location<'parser>) -> Self {
+    pub fn new(registry: Registry<'parser>, location: Location<'parser>) -> Self {
         Parser {
             registry,
             index: 0,

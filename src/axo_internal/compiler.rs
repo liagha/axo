@@ -24,15 +24,12 @@ use {
         axo_resolver::{
             Resolver,
         },
-        file::{
-            read_to_string,
-        },
         format_tokens,
         indent,
+        Str,
         Timer, TIMER,
     }
 };
-use crate::Str;
 
 pub trait Marked<'marked> {
     fn registry(&self) -> &Registry<'marked>;
@@ -48,6 +45,14 @@ pub trait Marked<'marked> {
 #[derive(Debug)]
 pub struct Registry<'registry> {
     pub resolver: Resolver<'registry>,
+}
+
+impl Clone for Registry<'_> {
+    fn clone(&self) -> Self {
+        Self {
+            resolver: self.resolver.clone(),
+        }
+    }
 }
 
 impl<'registry> Registry<'registry> {
@@ -84,6 +89,8 @@ impl<'registry> Registry<'registry> {
             if let Some(symbol) = found {
                 if let Some(preference) = symbol.cast::<Preference>() {
                     if let TokenKind::Identifier(path) = preference.value.kind.clone() {
+                        println!("{:?}", path);
+
                         return path.clone()
                     }
                 }
@@ -112,19 +119,39 @@ impl<'compiler> Compiler<'compiler> {
         let timer = Timer::new(TIMER);
 
         let location = {
-            let mut initializer = Initializer::new(&mut self.registry, Location::Flag);
-            initializer.execute(())
+            let mut initializer = Initializer::new(self.registry.clone(), Location::Flag);
+            let result = initializer.execute(());
+            println!("1{:?}", initializer.registry);
+
+            self.registry = initializer.registry;
+            result
         };
+
+        println!("2{:?}", location);
+
+        println!("3{:?}", self.registry);
 
         let tokens = {
-            let mut scanner = Scanner::new(&mut self.registry, location);
-            scanner.execute(location)
+            let mut scanner = Scanner::new(self.registry.clone(), location);
+            let result = scanner.execute(location);
+
+            self.registry = scanner.registry;
+            result
         };
 
+        println!("4{:?}", tokens);
+
+        println!("5{:?}", self.registry);
+
         let elements = {
-            let mut parser = Parser::new(&mut self.registry, location);
-            parser.execute(tokens)
+            let mut parser = Parser::new(self.registry.clone(), location);
+            let result = parser.execute(tokens);
+            self.registry = parser.registry;
+            result
         };
+        println!("6{:?}", elements);
+
+        println!("7{:?}", self.registry);
 
         self.registry.resolver.execute(elements);
 
@@ -154,7 +181,9 @@ impl<'compiler> Compiler<'compiler> {
 impl<'initializer> Stage<'initializer, (), Location<'initializer>> for Initializer<'initializer> {
     fn execute(&mut self, _input: ()) -> Location<'initializer> {
         self.initialize();
+        println!("-{:?}", self.registry);
         let path = Registry::get_path(&mut self.registry.resolver);
+        println!("--{:?}", path);
         Location::File(Str::from(path))
     }
 }
@@ -174,13 +203,9 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Sca
             xprintln!();
         }
 
-        let content = if let Location::File(path) = location {
-            read_to_string(&path).expect("")
-        } else {
-            "".to_string()
-        };
+        let content = location.get_value();
 
-        self.set_input(content);
+        self.set_input(content.to_string());
         self.scan();
 
         if verbosity {

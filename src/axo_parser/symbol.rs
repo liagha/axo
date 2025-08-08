@@ -38,14 +38,14 @@ use {
     },
 };
 
-pub struct Symbol<'symbol> {
-    pub value: Box<dyn Symbolic<'symbol>>,
-    pub span: Span<'symbol>,
-    pub members: Vec<Symbol<'symbol>>,
+pub struct Symbol {
+    pub value: Box<dyn Symbolic>,
+    pub span: Span<'static>,
+    pub members: Vec<Symbol>,
 }
 
-impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: impl Symbolic<'symbol> + 'static, span: Span<'symbol>) -> Self {
+impl Symbol {
+    pub fn new(value: impl Symbolic + 'static, span: Span<'static>) -> Self {
         Self {
             value: Box::new(value),
             span,
@@ -58,7 +58,7 @@ impl<'symbol> Symbol<'symbol> {
     }
 }
 
-impl<'symbol> Clone for Symbol<'symbol> {
+impl Clone for Symbol {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -68,21 +68,21 @@ impl<'symbol> Clone for Symbol<'symbol> {
     }
 }
 
-impl<'symbol> Debug for Symbol<'symbol> {
+impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::format::Result {
         write!(f, "{:?}", self.value)
     }
 }
 
-impl<'symbol> Eq for Symbol<'symbol> {}
+impl Eq for Symbol {}
 
-impl<'symbol> Hash for Symbol<'symbol> {
+impl Hash for Symbol {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
 }
 
-impl<'symbol> PartialEq for Symbol<'symbol> {
+impl PartialEq for Symbol {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value.clone()
     }
@@ -131,7 +131,7 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(Implementation::new(Box::new(name), None, members), span),
+                                Symbol::new(unsafe { std::mem::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members)) }, unsafe { std::mem::transmute(span) }),
                             ),
                             span
                         )
@@ -147,7 +147,7 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(Implementation::new(Box::new(name), Some(target.into()), members), span),
+                                Symbol::new(unsafe { std::mem::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), Some(Box::new(target)), members)) }, unsafe { std::mem::transmute(span) }),
                             ),
                             span
                         )
@@ -191,7 +191,7 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(Symbol::new(symbol, span)),
+                        ElementKind::Symbolize(Symbol::new(unsafe { std::mem::transmute::<_, Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>>>(symbol) }, unsafe { std::mem::transmute(span) })),
                         span,
                     )
                 ))
@@ -222,7 +222,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(Structure::new(Box::new(name), fields), span),
+                            Symbol::new(unsafe { std::mem::transmute::<_, Structure<Box<Element<'static>>, Symbol>>(Structure::new(Box::new(name), fields)) }, unsafe { std::mem::transmute(span) }),
                         ),
                         span,
                     )
@@ -251,7 +251,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(Enumeration::new(Box::new(name), items), span)
+                            Symbol::new(unsafe { std::mem::transmute::<_, Enumeration<Box<Element<'static>>, Element<'static>>>(Enumeration::new(Box::new(name), items)) }, unsafe { std::mem::transmute(span) })
                         ),
                         span,
                     )
@@ -286,7 +286,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(Method::new(Box::new(name), parameters, Box::new(body), None), span)
+                            Symbol::new(unsafe { std::mem::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { std::mem::transmute(span) })
                         ),
                         span,
                     )

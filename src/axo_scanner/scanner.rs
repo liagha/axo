@@ -22,7 +22,7 @@ use {
 use crate::Str;
 
 pub struct Scanner<'scanner> {
-    pub registry: &'scanner mut Registry<'scanner>,
+    pub registry: Registry<'scanner>,
     pub index: usize,
     pub position: Position<'scanner>,
     pub input: Vec<Character<'scanner>>,
@@ -83,7 +83,7 @@ impl<'scanner> Peekable<'scanner, Character<'scanner>> for Scanner<'scanner> {
 }
 
 impl<'scanner> Scanner<'scanner> {
-    pub fn new(registry: &'scanner mut Registry<'scanner>, location: Location<'scanner>) -> Scanner<'scanner> {
+    pub fn new(registry: Registry<'scanner>, location: Location<'scanner>) -> Scanner<'scanner> {
         let position = Position::new(location);
 
         Scanner {

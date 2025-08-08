@@ -82,7 +82,7 @@ pub enum ElementKind<'element> {
 
     Iterate(Iterate<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Symbolize(Symbol<'element>),
+    Symbolize(Symbol),
 
     Assign(Assign<Box<Element<'element>>, Box<Element<'element>>>),
 

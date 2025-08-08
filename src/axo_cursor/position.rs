@@ -19,7 +19,7 @@ pub enum Location<'a> {
 }
 
 impl<'a> Location<'a> {
-    pub fn get_value(&self) -> Str {
+    pub fn get_value(&self) -> Str<'a> {
         match self {
             Location::File(file) => read_to_string(file.as_str().unwrap()).unwrap_or("".to_string()).into(),
             Location::Flag => environment::args().skip(1).collect::<Vec<String>>().join(" ").into(),

@@ -1,7 +1,4 @@
 use {
-    super::{
-        hint::ResolveHint,
-    },
     crate::{
         axo_scanner::{
             Token, TokenKind,
@@ -11,7 +8,6 @@ use {
             Symbol, Symbolic,
         },
         axo_schema::{Method, Structure},
-        axo_error::Hint,
         axo_resolver::{
             ResolveError,
             error::{
@@ -37,7 +33,7 @@ pub struct Aligner<'aligner> {
     pub phantom: &'aligner ()
 }
 
-impl<'aligner> Aligner<'aligner> {
+impl Aligner<'static> {
     pub fn new() -> Self {
         Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, phantom: &() }
     }
@@ -49,19 +45,19 @@ impl<'aligner> Resembler<String, String, ()> for Aligner<'aligner> {
     }
 }
 
-pub fn aligner<'aligner>() -> Assessor<'aligner, String, String, ()> {
+pub fn aligner() -> Assessor<'static, String, String, ()> {
     Assessor::new()
-        .dimension(&mut Exact, 0.02)
-        .dimension(&mut Relaxed, 0.02)
-        .dimension(&mut Prefix, 0.15)
-        .dimension(&mut Suffix, 0.14)
-        .dimension(&mut Contains, 0.13)
-        .dimension(&mut Keyboard::default(), 0.10)
-        .dimension(&mut Words::default(), 0.10)
-        .dimension(&mut Phonetic::default(), 0.07)
-        .dimension(&mut Sequential::default(), 0.06)
-        .dimension(&mut Jaro::default(), 0.05)
-        .dimension(&mut Cosine::default(), 0.04)
+        .dimension(Box::leak(Box::new(Exact)), 0.02)
+        .dimension(Box::leak(Box::new(Relaxed)), 0.02)
+        .dimension(Box::leak(Box::new(Prefix)), 0.15)
+        .dimension(Box::leak(Box::new(Suffix)), 0.14)
+        .dimension(Box::leak(Box::new(Contains)), 0.13)
+        .dimension(Box::leak(Box::new(Keyboard::default())), 0.10)
+        .dimension(Box::leak(Box::new(Words::default())), 0.10)
+        .dimension(Box::leak(Box::new(Phonetic::default())), 0.07)
+        .dimension(Box::leak(Box::new(Sequential::default())), 0.06)
+        .dimension(Box::leak(Box::new(Jaro::default())), 0.05)
+        .dimension(Box::leak(Box::new(Cosine::default())), 0.04)
         .scheme(Scheme::Additive)
 }
 
@@ -118,25 +114,19 @@ impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'alig
     }
 }
 
-impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner<'aligner> {
-    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
+impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol, ResolveError<'aligner>> for Aligner<'aligner> {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
                     if self.perfection.contains(&resemblance.to_f64()) {
                         Ok(resemblance)
                     } else if self.suggestion.contains(&resemblance.to_f64()) {
-                        let effective = self.assessor.dominant().unwrap().resembler.clone();
-                        let message = ResolveHint::SimilarBrand { candidate, effective };
-
                         Err(
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
                                 span: query.span.clone(),
-                                hints: vec![Hint {
-                                    message,
-                                    action: vec![],
-                                }],
+                                hints: vec![],
                                 note: None,
                             }
                         )
@@ -174,8 +164,8 @@ impl Affinity {
     }
 }
 
-impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Affinity {
-    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
+impl<'aligner> Resembler<Element<'aligner>, Symbol, ResolveError<'aligner>> for Affinity {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.clone()) {
@@ -228,10 +218,10 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     }
 }
 
-pub fn symbol_matcher<'matcher>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
+pub fn symbol_matcher() -> Assessor<'static, Element<'static>, Symbol, ResolveError<'static>> {
     Assessor::new()
         .floor(0.65)
-        .dimension(&mut Aligner::new(), 0.75)
-        .dimension(&mut Affinity::new(), 0.25)
+        .dimension(Box::leak(Box::new(Aligner::new())), 0.75)
+        .dimension(Box::leak(Box::new(Affinity::new())), 0.25)
         .scheme(Scheme::Multiplicative)
 }
