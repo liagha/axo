@@ -7,7 +7,6 @@ edition = "2021"
 broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
 matchete = { path = "../matchete" }
-dynemit = { path = "../dynemit" }
 log = { version = "0.4.27"}
 derive_more = { version = "2.0.1", features = ["unwrap", "index", "is_variant"] }
 derive-ctor = { version = "1.0.6", features = ["enums"] }
