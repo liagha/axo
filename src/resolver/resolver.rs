@@ -24,7 +24,7 @@ use {
             Interface, Method, Structure
         },
         format::Debug,
-        data::replace,
+        data::memory::replace,
     },
 };
 

@@ -1,11 +1,13 @@
 use {
     super::{
-        Formable,  
+        helper::Formable,  
     },
     crate::{
-        data,
-        internal::Hash,
+        data::slice,
         format::Debug,
+        internal::{
+            hash::Hash,
+        },
     }
 };
 
@@ -102,7 +104,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     pub fn as_forms(&self) -> &[Form<'form, Input, Output, Failure>] {
         match self {
             Form::Multiple(forms) => forms.as_slice(),
-            _ => data::from_ref(self),
+            _ => slice::from_ref(self),
         }
     }
 

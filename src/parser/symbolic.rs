@@ -13,11 +13,10 @@ use {
         schema::{
             Binding, Enumeration, Implementation, Inclusion, Interface, Method, Structure
         },
-        internal::{Hash, Hasher, DefaultHasher},
-        data::Any,
+        internal::hash::{Hash, Hasher, DefaultHasher},
+        data::any::Any,
     }
 };
-
 
 pub trait Symbolic: Debug + 'static {
     fn brand(&self) -> Option<Token<'static>>;

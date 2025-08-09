@@ -18,16 +18,11 @@ use {
         },
         schema::{
             Binding, Enumeration,
-            Implementation, Inclusion, Interface, Method, Structure
+            Implementation, Method, Structure
         },
-        internal::{Hash, Hasher},
+        internal::hash::{Hash, Hasher},
         format,
         format::{Debug, Formatter},
-        internal::{Deref, DerefMut},
-    },
-    derive_ctor::ctor,
-    derive_more::{
-        IsVariant, Unwrap,
     },
 };
 

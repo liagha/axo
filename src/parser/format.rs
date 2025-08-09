@@ -1,16 +1,13 @@
 use {
     super::{
-        Symbolic,
-        Element, ElementKind, 
+        Element, ElementKind,
     },
     
     crate::{
         format::{
-            Debug, Display,
+            Debug,
             Formatter, Result
         },
-
-        format::indent,
     },
 };
 

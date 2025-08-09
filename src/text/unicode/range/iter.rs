@@ -6,7 +6,7 @@ use {
     }
 };
 
-const SURROGATE_RANGE: internal::Range<u32> = 0xD800..0xE000;
+const SURROGATE_RANGE: internal::operation::Range<u32> = 0xD800..0xE000;
 
 #[derive(Clone, Debug)]
 pub struct CharIter {
@@ -37,7 +37,7 @@ impl CharIter {
     #[inline]
     #[allow(unsafe_code)]
     fn step_forward(&mut self) {
-        if self.low == data::MAX {
+        if self.low == data::character::MAX {
             self.high = '\0'
         } else {
             self.low = unsafe { forward(self.low) }
@@ -48,7 +48,7 @@ impl CharIter {
     #[allow(unsafe_code)]
     fn step_backward(&mut self) {
         if self.high == '\0' {
-            self.low = data::MAX;
+            self.low = data::character::MAX;
         } else {
             self.high = unsafe { backward(self.high) }
         }
@@ -132,7 +132,7 @@ pub unsafe fn forward(ch: char) -> char {
     if ch == BEFORE_SURROGATE {
         AFTER_SURROGATE
     } else {
-        data::from_u32_unchecked(ch as u32 + 1)
+        data::character::from_u32_unchecked(ch as u32 + 1)
     }
 }
 
@@ -142,6 +142,6 @@ pub unsafe fn backward(ch: char) -> char {
     if ch == AFTER_SURROGATE {
         BEFORE_SURROGATE
     } else {
-        data::from_u32_unchecked(ch as u32 - 1)
+        data::character::from_u32_unchecked(ch as u32 - 1)
     }
 }

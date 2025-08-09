@@ -1,10 +1,10 @@
 use {
     crate::{
-        internal::{
-            Hash, Hasher, Ordering,
-            Add, Sub, Mul, Div, Neg, Rem,
-        },
         format::{Display, Debug, Formatter, Result},
+        internal::{
+            hash::{Hash, Hasher},
+            operation::{Add, Sub, Mul, Div, Neg, Rem, Ordering}
+        },
     }
 };
 

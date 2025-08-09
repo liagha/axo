@@ -1,25 +1,19 @@
 use {
     super::{
-        Formable,
+        classifier::Classifier,
         form::Form,
-        classifier::{
-            Classifier,
-        },
-        former::{
-            Composer, Draft
-        },
-        helper::{
-            Emitter, Performer,
-            Inspector, Transformer,
-        },
+        former::{Composer, Draft},
+        helper::{Formable, Emitter, Performer, Inspector, Transformer},
     },
     crate::{
+        data::{
+            thread::{Arc, Mutex},
+        },
         internal::{
             compiler::{
                 Registry
             },
         },
-        data::{Arc, Mutex},
     }
 };
 

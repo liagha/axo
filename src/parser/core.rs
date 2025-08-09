@@ -10,17 +10,16 @@ use {
         },
         formation::{
             form::Form,
-            former::Former,
             classifier::Classifier,
         },
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         schema::{
             Access, Assign,
-            Binary, Binding, Conditional,
-            Construct, Enumeration,
+            Binary,
+            Construct,
             Index, Invoke,
             Label,
-            Repeat, Structure, Unary,
+            Unary,
         },
     },
 };

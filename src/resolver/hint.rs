@@ -4,7 +4,7 @@ use {
     },
     crate::{
         scanner::Token,
-        data::{
+        data::thread::{
             Arc, Mutex,
         },
         format::{Display, Formatter},

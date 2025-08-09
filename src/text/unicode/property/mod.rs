@@ -16,5 +16,5 @@ pub mod tables;
 
 #[doc(hidden)]
 pub(super) use {
-    crate::{format as __fmt, data as __str},
+    crate::{format as __fmt, data::string as __str},
 };

@@ -1,28 +1,15 @@
-#![allow(unused_imports)]
-
-mod span;
 mod format;
-mod position;
 mod peekable;
+mod position;
+mod span;
 
-use std::ops::Deref;
 use {
     crate::{
-        internal::Hash,
-        format::{
-            Debug, Display,
-        },
-        error::Error,
-        formation::{
-            form::Form
-        },
-        parser::{
-            Element, Symbolic
-        },
-        scanner::{
-            Character, Token
-        },
-    }
+        format::Display,
+        parser::Element,
+        reporter::Error,
+        scanner::{Character, Token},
+    },
 };
 
 pub use {

@@ -19,7 +19,7 @@ pub use {
 
 use {
     crate::{
-        error::Error,
+        reporter::Error,
         scanner::error::ErrorKind,
     }
 };

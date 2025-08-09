@@ -1,11 +1,11 @@
 use {
     crate::{
-        error::Error,
+        reporter::Error,
         initial::error::ErrorKind,
     }
 };
 
-pub mod initializer;
 mod error;
+pub mod initializer;
 
 pub type InitialError<'error> = Error<'error, ErrorKind<'error>>;

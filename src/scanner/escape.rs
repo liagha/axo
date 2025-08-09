@@ -11,8 +11,8 @@ use {
             form::{Form},
             classifier::Classifier,
         },
-        data::Str,
-        data::{parse_radix, from_u32},
+        data::string::Str,
+        data::character::{parse_radix, from_u32},
     }
 };
 

@@ -10,16 +10,17 @@ pub mod record {
 
 use {
     super::{
-        Formable,
-        Source,
-        form::Form,
         classifier::Classifier,
+        form::Form,
+        helper::{Formable, Source},
     },
     crate::{
+        data::{
+            memory::PhantomData,
+        },
         tracker::{
             Position,
         },
-        data::PhantomData,
     },
     record::*,
 };

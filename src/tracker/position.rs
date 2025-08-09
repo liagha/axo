@@ -1,12 +1,12 @@
 use {
     crate::{
+        data::string::Str,
         internal::{
-            args, read_to_string,
-            Add, Sub, Mul, Div,
-            Ordering,
+            environment::args,
+            operation::Ordering,
+            read_to_string,
         },
-        data::{Str},
-    }
+    },
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

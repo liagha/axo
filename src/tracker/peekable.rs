@@ -1,8 +1,8 @@
 use {
     crate::{
-        tracker::{Position, Span, Location},
-        data::Str,
-    }
+        data::string::Str,
+        tracker::{Location, Position},
+    },
 };
 
 pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {

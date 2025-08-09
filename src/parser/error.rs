@@ -1,17 +1,7 @@
 use {
-    broccli::{
-        Color, TextStyle
-    },
-    
-    super::{
-        Element,
-    },
-    
     crate::{
         format::{Debug, Display, Formatter, Result},
-        scanner::{
-            TokenKind, Token, PunctuationKind
-        },
+        scanner::TokenKind,
     }
 };
 

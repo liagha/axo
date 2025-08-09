@@ -1,27 +1,23 @@
-#![allow(unused_imports)]
-mod parser;
-mod symbol;
-mod format;
-mod traits;
-mod element;
 mod core;
 mod delimited;
+mod element;
 pub mod error;
+mod format;
+mod parser;
 mod statement;
+mod symbol;
 mod symbolic;
+mod traits;
 
 pub use {
     element::{Element, ElementKind},
-    symbol::{Symbol},
+    parser::Parser,
+    symbol::Symbol,
     symbolic::Symbolic,
-    parser::Parser
 };
 
 use {
-    crate::{
-        error::Error,
-    },
-    
+    crate::reporter::Error,
     error::ErrorKind,
 };
 

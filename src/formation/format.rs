@@ -1,14 +1,14 @@
 use {
     super::{
-        Formable,
-        form::{
-            Form
-        },
         classifier::Classifier,
+        form::Form,
+        helper::Formable,
     },
     crate::{
-        format::vector::Show,
-        format::{Debug, Display, Formatter, Result},
+        format::{
+            vector::Show,
+            Debug, Display, Formatter, Result
+        },
     },
 };
 

@@ -1,40 +1,16 @@
 use {
-    derive_more::{
-        with_trait::{
-            IsVariant, Unwrap,
-        }
-    },
-
-    derive_ctor::{
-        ctor
-    },
-
-    super::{
-        Symbolic, Symbol, ParseError,
-    },
-
     crate::{
-        internal::{
-            Deref, DerefMut
-        },
+        internal::operation::{Deref, DerefMut},
+        scanner::{Token, TokenKind},
         schema::{
-            Procedural,
-            Group, Sequence,
-            Collection, Series,
-            Bundle, Block,
-            Binary, Unary,
-            Index, Invoke, Construct,
-            Conditional, Repeat, Iterate,
-            Label, Access, Assign,
+            Access, Assign, Binary, Block, Bundle, Collection, Conditional, Construct, Group,
+            Index, Invoke, Iterate, Label, Procedural, Repeat, Sequence, Series, Unary,
         },
-
-        scanner::{
-            Token, TokenKind,
-            OperatorKind,
-        },
-
         tracker::Span,
-    }
+    },
+    derive_ctor::ctor,
+    derive_more::with_trait::{IsVariant, Unwrap},
+    super::Symbol,
 };
 
 pub struct Element<'element> {

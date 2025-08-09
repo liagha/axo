@@ -17,7 +17,7 @@ use {
             form::Form,
             former::Former,
         },
-        data::Str,
+        data::string::Str,
     },
 };
 

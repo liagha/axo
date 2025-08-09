@@ -4,7 +4,7 @@ extern crate core;
 mod checker;
 mod tracker;
 mod data;
-mod error;
+mod reporter;
 mod formation;
 mod format;
 mod initial;

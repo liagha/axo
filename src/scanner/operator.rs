@@ -1,6 +1,6 @@
 use {
     crate::{
-        data,
+        data::slice,
         format::{Debug, Display, Write, Result, Formatter},
         scanner::Character,
     },
@@ -55,7 +55,7 @@ impl OperatorKind {
     pub fn as_slice(&self) -> &[OperatorKind] {
         match self {
             Composite(ops) => ops.as_slice(),
-            _ => data::from_ref(self),
+            _ => slice::from_ref(self),
         }
     }
 

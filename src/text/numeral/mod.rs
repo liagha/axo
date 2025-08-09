@@ -1,7 +1,10 @@
 use {
     crate::{
         format::{self, Debug, Display, Formatter},
-        data::{FromStr, PhantomData},
+        data::{
+            string::FromStr,
+            memory::PhantomData,
+        },
     }
 };
 
@@ -37,7 +40,7 @@ impl Display for ParseNumberError {
             Self::Overflow => write!(f, "numeric overflow occurred"),
             Self::MalformedExponent => write!(f, "malformed exponent in scientific notation"),
             Self::InvalidFormat(details) => write!(f, "invalid number format: {}", details),
-            Self::TypeError(details) => write!(f, "type error: {}", details),
+            Self::TypeError(details) => write!(f, "type reporter: {}", details),
         }
     }
 }

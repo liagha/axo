@@ -4,10 +4,10 @@ use {
     },
     
     crate::{
-        error,
+        reporter,
         format::{Display, Debug, Formatter, Result},
         tracker::{Span},
-        data::Str,
+        data::string::Str,
     },
 
     broccli::{Color, TextStyle}
@@ -23,7 +23,7 @@ where K: Display, N: Display, H: Display
     pub hints: Vec<Hint<H>>,
 }
 
-impl<'error, K, N, H> error::Failure for Error<'error, K, N, H>
+impl<'error, K, N, H> reporter::Failure for Error<'error, K, N, H>
 where K: Display, N: Display, H: Display
 {}
 

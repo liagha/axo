@@ -1,7 +1,7 @@
 use {
     crate::{
         data,
-        internal::Ordering,
+        internal::operation::Ordering,
         text::unicode::CharIter,
     }
 };
@@ -41,7 +41,7 @@ impl CharRange {
     }
 
     pub fn all() -> CharRange {
-        CharRange::closed('\u{0}', data::MAX)
+        CharRange::closed('\u{0}', data::character::MAX)
     }
 
     pub fn assigned_normal_planes() -> CharRange {

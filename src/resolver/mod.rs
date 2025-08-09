@@ -6,7 +6,7 @@ mod hint;
 
 use {
     crate::{
-        error::Error,
+        reporter::Error,
         resolver::{
             error::ErrorKind,
             hint::ResolveHint,

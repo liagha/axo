@@ -1,9 +1,9 @@
 use {
     crate::{
-        parser::ParseError,
         format::{
             Debug, Display, Formatter,
         },
+        parser::ParseError,
     }
 };
 

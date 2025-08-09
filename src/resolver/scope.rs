@@ -1,6 +1,6 @@
 use {
     crate::{
-        internal::HashSet,
+        internal::hash::HashSet,
         parser::Symbol,
     },
 };

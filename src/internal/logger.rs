@@ -1,18 +1,8 @@
 use {
+    broccli::{Color, TextStyle},
     chrono::Timelike,
-    broccli::{
-        Color, TextStyle
-    },
-    log::{
-        Log, Metadata, 
-        Record, Level,
-        SetLoggerError
-    },
-    crate::{
-        internal::{
-            stdout, Write
-        },
-    }
+    log::{Level, Log, Metadata, Record, SetLoggerError},
+    crate::internal::{stdout, Write},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]

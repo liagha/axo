@@ -1,20 +1,9 @@
 use {
-    super::{Position, Spanned, Location},
-    crate::{
-        internal::{Hash, Ordering},
-        format::{
-            Debug, Display,
-        },
-        formation::{
-            form::Form,
-        },
-        scanner::{
-            Character, Token,
-        },
-        parser::{
-            Element,
-        }
+    crate::internal::{
+        hash::Hash,
+        operation::Ordering,
     },
+    super::{Location, Position, Spanned},
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]

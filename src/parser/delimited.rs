@@ -1,19 +1,14 @@
 use {
-    super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
     crate::{
-        tracker::{Span, Spanned, Location},
         formation::{
+            classifier::Classifier,
             form::Form,
-            classifier::Classifier
         },
         scanner::{PunctuationKind, Token, TokenKind},
-        schema::{
-            Group, Sequence,
-            Collection, Series,
-            Bundle, Block,
-        },
-        data::Arc,
+        schema::{Block, Bundle, Collection, Group, Sequence, Series},
+        tracker::{Location, Span, Spanned},
     },
+    super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
 };
 
 impl<'parser> Parser<'parser> {

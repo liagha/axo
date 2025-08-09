@@ -1,6 +1,6 @@
 use {
     crate::{
-        internal::Hash,
+        internal::hash::Hash,
         format::Debug
     }
 };

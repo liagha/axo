@@ -1,33 +1,16 @@
 use {
-    broccli::{xprintln, Color},
-    core::time::Duration,
-
+    broccli::{Color, xprintln},
     crate::{
-        tracker::{
-            Location, Span,
-            Peekable
-        },
-        initial::{
-            initializer::{
-                Preference,
-                Initializer,
-            },
-        },
-        scanner::{
-            Scanner,
-            Token, TokenKind,
-        },
-        parser::{
-            Element, ElementKind,
-            Parser, 
-        },
-        resolver::{
-            Resolver,
-        },
+        data::string::Str,
         format::{format_tokens, indent},
-        data::Str,
+        initial::initializer::{Initializer, Preference},
+        parser::{Element, ElementKind, Parser},
+        resolver::Resolver,
+        scanner::{Scanner, Token, TokenKind},
+        tracker::{Location, Peekable, Span},
         Timer, TIMER,
-    }
+    },
+    super::timer::Duration,
 };
 
 pub trait Marked<'marked> {

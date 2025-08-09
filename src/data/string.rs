@@ -2,18 +2,23 @@ extern crate alloc;
 
 use {
     crate::{
-        format,
+        data::{
+            slice::SliceIndex,
+            platform::{OsStr, OsString, Path, PathBuf},
+        },
         format::{
+            self,
             Display, Formatter,
         },
+        internal::{
+            operation::{Deref, Index},
+        },
     },
+};
+
+pub use {
     core::{
-        ops::{Deref, Index},
-        slice::SliceIndex,
-    },
-    std::{
-        ffi::{OsStr, OsString},
-        path::{Path, PathBuf},
+        str::FromStr,
     },
 };
 

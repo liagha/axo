@@ -1,20 +1,22 @@
 use {
     super::{
-        Formable,
         form::Form,
-        order::*,
         former::{
             record::*,
             Composer,
             Draft
         },
+        helper::Formable,
+        order::*,
     },
     crate::{
+        data::{
+            thread::{
+                Arc,
+            },
+        },
         internal::{
             compiler::Registry,
-        },
-        data::{
-            Arc,
         },
     },
 };

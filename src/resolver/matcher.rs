@@ -16,7 +16,7 @@ use {
         },
 
         data::float::FloatLiteral,
-        internal::Range,
+        internal::operation::Range,
     },
     matchete::{
         Scheme,

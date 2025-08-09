@@ -1,20 +1,20 @@
 use {
-    super::{
-        InitialError,
-    },
     crate::{
-        tracker::{Location, Peekable, Position, Span, Spanned},
+        format::Debug,
         formation::{
+            classifier::Classifier,
             form::Form,
             former::Former,
-            classifier::Classifier,
+        },
+        internal::{
+            compiler::{Marked, Registry},
+            hash::{Hash, Hasher},
         },
         parser::{Element, ParseError, Symbol, Symbolic},
-        scanner::{OperatorKind, PunctuationKind, Token, TokenKind, Scanner},
-        internal::compiler::{Registry, Marked},
-        format::Debug,
-        internal::{Hash, Hasher},
+        scanner::{OperatorKind, PunctuationKind, Scanner, Token, TokenKind},
+        tracker::{Location, Peekable, Position, Span, Spanned},
     },
+    super::InitialError,
 };
 
 #[derive(Debug)]
@@ -57,7 +57,7 @@ impl<'preference> Preference<'preference> {
 }
 
 impl Symbolic for Preference<'static> {
-    fn brand(&self) -> Option<crate::scanner::Token<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
         Some(unsafe { std::mem::transmute(self.target.clone()) })
     }
     

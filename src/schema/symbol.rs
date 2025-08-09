@@ -1,6 +1,6 @@
 use {
     crate::{
-        internal::{Hash, Hasher},
+        internal::hash::{Hash, Hasher},
     },
 };
 

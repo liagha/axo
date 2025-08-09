@@ -17,7 +17,6 @@ use {
         scanner::{
             PunctuationKind, Token, TokenKind
         },
-        internal::Hash,
     },
 };
 

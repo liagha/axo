@@ -6,6 +6,10 @@ use {
     }
 };
 
+pub use {
+    core::time::Duration,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimerError {
     AlreadyRunning,

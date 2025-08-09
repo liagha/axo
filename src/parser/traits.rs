@@ -1,13 +1,12 @@
 use {
     super::{
         Element, ElementKind,
-        Symbolic,
     },
 
     crate::{
-        data::discriminant,
+        data::memory::discriminant,
 
-        internal::{
+        internal::hash::{
             Hash, Hasher
         },
     },

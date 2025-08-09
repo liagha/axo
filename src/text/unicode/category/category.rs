@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn test_ascii() {
         for c in 0x00..(0x1F + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::Control);
         }
 
@@ -312,7 +312,7 @@ mod tests {
         assert_eq!(GC::of('/'), GC::OtherPunctuation);
 
         for c in ('0' as u32)..('9' as u32 + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::DecimalNumber);
         }
 
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(GC::of('@'), GC::OtherPunctuation);
 
         for c in ('A' as u32)..('Z' as u32 + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::UppercaseLetter);
         }
 
@@ -337,7 +337,7 @@ mod tests {
         assert_eq!(GC::of('`'), GC::ModifierSymbol);
 
         for c in ('a' as u32)..('z' as u32 + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::LowercaseLetter);
         }
 
@@ -355,7 +355,7 @@ mod tests {
         assert_eq!(GC::of('�'), GC::OtherSymbol);
 
         for &c in [0xFFEF, 0xFFFE, 0xFFFF].iter() {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::Unassigned);
         }
     }
@@ -363,17 +363,17 @@ mod tests {
     #[test]
     fn test_private_use() {
         for c in 0xF_0000..(0xF_FFFD + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::PrivateUse);
         }
 
         for c in 0x10_0000..(0x10_FFFD + 1) {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::PrivateUse);
         }
 
         for &c in [0xF_FFFE, 0xF_FFFF, 0x10_FFFE, 0x10_FFFF].iter() {
-            let c = data::from_u32(c).unwrap();
+            let c = data::character::from_u32(c).unwrap();
             assert_eq!(GC::of(c), GC::Unassigned);
         }
     }
