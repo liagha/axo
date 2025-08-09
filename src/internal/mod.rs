@@ -9,8 +9,8 @@ pub mod environment {
 pub mod hash {
     pub use {
         core::hash::{Hash, Hasher},
-        hashish::HashSet,
         std::hash::DefaultHasher,
+        hashish::HashSet,
     };
 }
 

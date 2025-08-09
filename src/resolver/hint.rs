@@ -7,7 +7,7 @@ use {
         data::thread::{
             Arc, Mutex,
         },
-        format::{Display, Formatter},
+        format::{self, Display, Formatter},
     }
 };
 
@@ -18,7 +18,7 @@ pub enum ResolveHint<'hint> {
 }
 
 impl<'hint> Display for ResolveHint<'hint> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         match self {
             ResolveHint::SimilarBrand { candidate, effective } => {
                 write!(f, "did you mean `{:?}`? they {:?}.", candidate, effective.lock().unwrap())

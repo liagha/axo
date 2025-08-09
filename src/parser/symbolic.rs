@@ -14,7 +14,10 @@ use {
             Binding, Enumeration, Implementation, Inclusion, Interface, Method, Structure
         },
         internal::hash::{Hash, Hasher, DefaultHasher},
-        data::any::Any,
+        data::{
+            any::{Any, TypeId},
+            memory,
+        },
     }
 };
 
@@ -39,21 +42,21 @@ impl Clone for Box<dyn Symbolic> {
 impl Clone for Box<dyn Symbolic + Send> {
     fn clone(&self) -> Self {
         let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { std::mem::transmute(cloned) }
+        unsafe { memory::transmute(cloned) }
     }
 }
 
 impl Clone for Box<dyn Symbolic + Sync> {
     fn clone(&self) -> Self {
         let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { std::mem::transmute(cloned) }
+        unsafe { memory::transmute(cloned) }
     }
 }
 
 impl Clone for Box<dyn Symbolic + Send + Sync> {
     fn clone(&self) -> Self {
         let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { std::mem::transmute(cloned) }
+        unsafe { memory::transmute(cloned) }
     }
 }
 
@@ -110,7 +113,6 @@ impl Hash for dyn Symbolic + Send + Sync + '_ {
     }
 }
 
-// Symbol implementation
 impl Symbolic for Symbol {
     fn brand(&self) -> Option<Token<'static>> {
         self.value.brand()
@@ -138,7 +140,7 @@ impl Symbolic for Symbol {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
@@ -147,7 +149,6 @@ impl Symbolic for Symbol {
     }
 }
 
-// Inclusion implementation
 impl Symbolic for Inclusion<Box<Element<'static>>> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -171,16 +172,15 @@ impl Symbolic for Inclusion<Box<Element<'static>>> {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Implementation implementation
 impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -204,16 +204,15 @@ impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, S
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Interface implementation
 impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -237,16 +236,15 @@ impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Binding implementation
 impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -270,16 +268,15 @@ impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Elem
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Structure implementation
 impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -303,11 +300,11 @@ impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
@@ -335,16 +332,15 @@ impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Method implementation
 impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
@@ -368,16 +364,15 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, O
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
 
-// Element implementation
 impl Symbolic for Element<'static> {
     fn brand(&self) -> Option<Token<'static>> {
         match &self.kind {
@@ -418,11 +413,11 @@ impl Symbolic for Element<'static> {
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
         let mut hasher = DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }

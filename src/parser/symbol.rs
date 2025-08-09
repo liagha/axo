@@ -21,6 +21,7 @@ use {
             Implementation, Method, Structure
         },
         internal::hash::{Hash, Hasher},
+        data::memory,
         format,
         format::{Debug, Formatter},
     },
@@ -119,7 +120,7 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { std::mem::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members)) }, unsafe { std::mem::transmute(span) }),
+                                Symbol::new(unsafe { memory::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members)) }, unsafe { memory::transmute(span) }),
                             ),
                             span
                         )
@@ -135,7 +136,7 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { std::mem::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), Some(Box::new(target)), members)) }, unsafe { std::mem::transmute(span) }),
+                                Symbol::new(unsafe { memory::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), Some(Box::new(target)), members)) }, unsafe { memory::transmute(span) }),
                             ),
                             span
                         )
@@ -179,7 +180,7 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(Symbol::new(unsafe { std::mem::transmute::<_, Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>>>(symbol) }, unsafe { std::mem::transmute(span) })),
+                        ElementKind::Symbolize(Symbol::new(unsafe { memory::transmute::<_, Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>>>(symbol) }, unsafe { memory::transmute(span) })),
                         span,
                     )
                 ))
@@ -210,7 +211,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { std::mem::transmute::<_, Structure<Box<Element<'static>>, Symbol>>(Structure::new(Box::new(name), fields)) }, unsafe { std::mem::transmute(span) }),
+                            Symbol::new(unsafe { memory::transmute::<_, Structure<Box<Element<'static>>, Symbol>>(Structure::new(Box::new(name), fields)) }, unsafe { memory::transmute(span) }),
                         ),
                         span,
                     )
@@ -239,7 +240,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { std::mem::transmute::<_, Enumeration<Box<Element<'static>>, Element<'static>>>(Enumeration::new(Box::new(name), items)) }, unsafe { std::mem::transmute(span) })
+                            Symbol::new(unsafe { memory::transmute::<_, Enumeration<Box<Element<'static>>, Element<'static>>>(Enumeration::new(Box::new(name), items)) }, unsafe { memory::transmute(span) })
                         ),
                         span,
                     )
@@ -274,7 +275,7 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { std::mem::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { std::mem::transmute(span) })
+                            Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { memory::transmute(span) })
                         ),
                         span,
                     )

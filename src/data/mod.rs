@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 pub mod float;
 pub mod string;
 
@@ -59,7 +58,8 @@ pub mod memory {
         core::{
             marker::PhantomData,
             mem::{
-                discriminant, replace
+                discriminant, replace,
+                transmute,
             },
         },
     };

@@ -1,5 +1,6 @@
 use {
     crate::{
+        data::{memory, any::{Any, TypeId}},
         format::Debug,
         formation::{
             classifier::Classifier,
@@ -8,7 +9,7 @@ use {
         },
         internal::{
             compiler::{Marked, Registry},
-            hash::{Hash, Hasher},
+            hash::{DefaultHasher, Hash, Hasher},
         },
         parser::{Element, ParseError, Symbol, Symbolic},
         scanner::{OperatorKind, PunctuationKind, Scanner, Token, TokenKind},
@@ -58,10 +59,10 @@ impl<'preference> Preference<'preference> {
 
 impl Symbolic for Preference<'static> {
     fn brand(&self) -> Option<Token<'static>> {
-        Some(unsafe { std::mem::transmute(self.target.clone()) })
+        Some(unsafe { memory::transmute(self.target.clone()) })
     }
     
-    fn as_any(&self) -> &dyn std::any::Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
     
@@ -82,13 +83,12 @@ impl Symbolic for Preference<'static> {
     }
     
     fn dyn_hash(&self, state: &mut dyn Hasher) {
-        use std::hash::Hasher;
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        std::hash::Hash::hash(&std::any::TypeId::of::<Self>(), &mut hasher);
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
         
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        std::hash::Hash::hash(&self, &mut hasher);
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
     }
 }
@@ -344,7 +344,7 @@ impl<'initializer> Initializer<'initializer> {
 
         let symbols = preferences.into_iter().map(|preference| {
             let span = preference.borrow_span();
-            Symbol::new(unsafe { std::mem::transmute::<_, Preference<'static>>(preference) }, unsafe { std::mem::transmute(span) })
+            Symbol::new(unsafe { memory::transmute::<_, Preference<'static>>(preference) }, unsafe { memory::transmute(span) })
         }).collect::<Vec<Symbol>>();
 
         self.registry.resolver.extend(symbols);

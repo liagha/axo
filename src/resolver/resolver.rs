@@ -23,6 +23,7 @@ use {
             Enumeration, Implementation,
             Interface, Method, Structure
         },
+        data::memory,
         format::Debug,
         data::memory::replace,
     },
@@ -76,7 +77,7 @@ impl<'resolver> Resolver<'resolver> {
     pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Option<Symbol>, Vec<ResolveError<'resolver>>> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
-        let champion = assessor.champion(unsafe { std::mem::transmute(target) }, &candidates);
+        let champion = assessor.champion(unsafe { memory::transmute(target) }, &candidates);
 
         if let Some(champion) = champion {
             Ok(Some(champion))
@@ -84,7 +85,7 @@ impl<'resolver> Resolver<'resolver> {
             if assessor.errors.is_empty() {
                 Ok(None)
             } else {
-                Err(unsafe { std::mem::transmute(assessor.errors.clone()) })
+                Err(unsafe { memory::transmute(assessor.errors.clone()) })
             }
         }
     }
@@ -103,7 +104,7 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol>) -> Result<Option<Symbol>, Vec<ResolveError<'resolver>>> {
         let mut assessor = symbol_matcher();
-        let champion = assessor.champion(unsafe { std::mem::transmute(target) }, &candidates);
+        let champion = assessor.champion(unsafe { memory::transmute(target) }, &candidates);
 
         if let Some(champion) = champion {
             Ok(Some(champion))
@@ -111,7 +112,7 @@ impl<'resolver> Resolver<'resolver> {
             if assessor.errors.is_empty() {
                 Ok(None)
             } else {
-                Err(unsafe { std::mem::transmute(assessor.errors.clone()) })
+                Err(unsafe { memory::transmute(assessor.errors.clone()) })
             }
         }
     }

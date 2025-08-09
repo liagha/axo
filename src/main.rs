@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-extern crate core;
+#![allow(unused)]
 
 mod checker;
 mod tracker;

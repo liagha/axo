@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod format;
 pub mod classifier;
 pub mod form;
