@@ -1,24 +1,80 @@
 use {
     broccli::{Color, xprintln},
     crate::{
-        data::string::Str,
+        data::{memory, string::Str},
         format::{format_tokens, indent},
         initial::initializer::{Initializer, Preference},
-        parser::{Element, ElementKind, Parser},
+        parser::{Element, ElementKind, Parser, Symbol},
         resolver::Resolver,
         scanner::{Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Span},
+        tracker::{Location, Peekable, Span, Spanned},
         Timer, TIMER,
     },
     super::timer::Duration,
 };
 
+pub struct Pipeline<'pipeline, T> {
+    data: T,
+    resolver: &'pipeline mut Resolver<'pipeline>,
+}
+
+impl<'pipeline, T> Pipeline<'pipeline, T> {
+    pub fn new(data: T, resolver: &'pipeline mut Resolver<'pipeline>) -> Self {
+        Self { data, resolver }
+    }
+
+    pub fn then<U, S>(mut self, mut stage: S) -> Pipeline<'pipeline, U>
+    where
+        S: PipelineStage<'pipeline, T, U>,
+    {
+        let output = stage.execute(self.resolver, self.data);
+        Pipeline {
+            data: output,
+            resolver: self.resolver,
+        }
+    }
+
+    pub fn then_with<U, F>(mut self, f: F) -> Pipeline<'pipeline, U>
+    where
+        F: FnOnce(&mut Resolver<'pipeline>, T) -> U,
+    {
+        let output = f(self.resolver, self.data);
+        Pipeline {
+            data: output,
+            resolver: self.resolver,
+        }
+    }
+
+    pub fn finish(self) -> T {
+        self.data
+    }
+
+    pub fn resolver(&mut self) -> &mut Resolver<'pipeline> {
+        self.resolver
+    }
+
+    pub fn with_resolver<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Resolver<'pipeline>) -> R,
+    {
+        f(self.resolver)
+    }
+}
+
+pub trait PipelineStage<'stage, Input, Output> {
+    fn execute(&mut self, resolver: &mut Resolver<'stage>, input: Input) -> Output;
+}
+
 pub trait Marked<'marked> {
+    #[track_caller]
     fn registry(&self) -> &Registry<'marked>;
+    #[track_caller]
     fn registry_mut(&mut self) -> &mut Registry<'marked>;
+    #[track_caller]
     fn resolver(&self) -> &Resolver<'marked> {
         &self.registry().resolver
     }
+    #[track_caller]
     fn resolver_mut(&mut self) -> &mut Resolver<'marked> {
         &mut self.registry_mut().resolver
     }
@@ -27,14 +83,6 @@ pub trait Marked<'marked> {
 #[derive(Debug)]
 pub struct Registry<'registry> {
     pub resolver: Resolver<'registry>,
-}
-
-impl Clone for Registry<'_> {
-    fn clone(&self) -> Self {
-        Self {
-            resolver: self.resolver.clone(),
-        }
-    }
 }
 
 impl<'registry> Registry<'registry> {
@@ -81,10 +129,6 @@ impl<'registry> Registry<'registry> {
     }
 }
 
-pub trait Stage<'stage, Input, Output> {
-    fn execute(&mut self, input: Input) -> Output;
-}
-
 pub struct Compiler<'compiler> {
     pub registry: Registry<'compiler>,
 }
@@ -97,33 +141,7 @@ impl<'compiler> Compiler<'compiler> {
 
     pub fn compile(&mut self) -> () {
         let timer = Timer::new(TIMER);
-
-        let location = {
-            let mut initializer = Initializer::new(self.registry.clone(), Location::Flag);
-            let result = initializer.execute(());
-
-            self.registry = initializer.registry;
-            result
-        };
-
-        let tokens = {
-            let mut scanner = Scanner::new(self.registry.clone(), location);
-            let result = scanner.execute(location);
-
-            self.registry = scanner.registry;
-            result
-        };
-
-        let elements = {
-            let mut parser = Parser::new(self.registry.clone(), location);
-            let result = parser.execute(tokens);
-            self.registry = parser.registry;
-            result
-        };
-
-        self.registry.resolver.execute(elements);
-
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+        let verbosity = self.compile_pipeline();
 
         if verbosity {
             let duration = Duration::from_nanos(timer.elapsed().unwrap());
@@ -138,6 +156,97 @@ impl<'compiler> Compiler<'compiler> {
         }
     }
 
+    fn compile_pipeline(&mut self) -> bool {
+        let mut initializer_stage = InitializerStage::new();
+        let location = initializer_stage.execute(&mut self.registry.resolver, ());
+
+        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+
+        let mut scanner = Scanner::new(location);
+        let tokens = scanner.execute_pipeline(&mut self.registry.resolver, location);
+
+        let path = Registry::get_path(&mut self.registry.resolver);
+
+        let location = if path.is_empty() {
+            Location::Flag
+        } else {
+            Location::File(Str::from(path))
+        };
+
+        let mut parser = Parser::new(location);
+        let elements = parser.execute_pipeline(&mut self.registry.resolver, tokens);
+
+        let timer = Timer::new(TIMER);
+        let resolver_verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+
+        if resolver_verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`resolving`" => Color::White,
+            );
+            xprintln!();
+        }
+
+        self.registry.resolver.process(elements);
+
+        let errors = &self.registry.resolver.errors;
+
+        if resolver_verbosity {
+            let symbols = self.registry.resolver.scope.all();
+
+            let tree = symbols
+                .iter()
+                .map(|symbol| {
+                    format!("{:?}", symbol)
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}" => Color::Cyan,
+                    format!("Symbols:\n{}", indent(&tree)),
+                );
+                xprintln!();
+            }
+
+            if !errors.is_empty() {
+                for error in errors {
+                    let (message, details) = error.format();
+                    xprintln!(
+                        "{}\n{}" => Color::Red,
+                        message => Color::Orange,
+                        details
+                    );
+                    xprintln!();
+                }
+
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s with {} {}." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                        errors.len() => Color::BrightRed,
+                        "errors" => Color::Red,
+                    );
+                xprintln!();
+            } else {
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                    );
+
+                xprintln!();
+            }
+        }
+
+        verbosity
+    }
+
     pub fn compile_with<Function, Type>(&mut self, pipeline: Function) -> Type
     where
         Function: FnOnce(&mut Self) -> Type,
@@ -145,20 +254,42 @@ impl<'compiler> Compiler<'compiler> {
         pipeline(self)
     }
 }
+pub struct InitializerStage<'init> {
+    initializer: Initializer<'init>,
+}
 
-impl<'initializer> Stage<'initializer, (), Location<'initializer>> for Initializer<'initializer> {
-    fn execute(&mut self, _input: ()) -> Location<'initializer> {
-        self.initialize();
-        let path = Registry::get_path(&mut self.registry.resolver);
+impl<'init> InitializerStage<'init> {
+    pub fn new() -> Self {
+        Self {
+            initializer: Initializer::new(Location::Flag),
+        }
+    }
+}
+
+impl<'init> PipelineStage<'init, (), Location<'init>> for InitializerStage<'init> {
+    fn execute(&mut self, resolver: &mut Resolver<'init>, _input: ()) -> Location<'init> {
+        self.initializer.initialize();
+
+        let symbols = self.initializer.output.clone().into_iter().map(|preference| {
+            let span = preference.borrow_span();
+            Symbol::new(
+                unsafe { memory::transmute::<_, Preference<'static>>(preference) },
+                unsafe { memory::transmute(span) }
+            )
+        }).collect::<Vec<Symbol>>();
+
+        resolver.extend(symbols);
+
+        let path = Registry::get_path(resolver);
         Location::File(Str::from(path))
     }
 }
 
-impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Scanner<'scanner> {
-    fn execute(&mut self, location: Location<'scanner>) -> Vec<Token<'scanner>> {
+impl<'scanner> Scanner<'scanner> {
+    pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'scanner>, location: Location<'scanner>) -> Vec<Token<'scanner>> {
         let timer = Timer::new(TIMER);
 
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+        let verbosity = Registry::get_verbosity(resolver);
         self.set_location(location);
 
         if verbosity {
@@ -215,11 +346,11 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Sca
     }
 }
 
-impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Parser<'parser> {
-    fn execute(&mut self, tokens: Vec<Token<'parser>>) -> Vec<Element<'parser>> {
+impl<'parser> Parser<'parser> {
+    pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'parser>, tokens: Vec<Token<'parser>>) -> Vec<Element<'parser>> {
         let timer = Timer::new(TIMER);
 
-        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+        let verbosity = Registry::get_verbosity(resolver);
 
         if verbosity {
             xprintln!(
@@ -278,79 +409,5 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Par
         }
 
         self.output.clone()
-    }
-}
-
-impl<'resolver> Stage<'resolver, Vec<Element<'resolver>>, ()> for Resolver<'resolver> {
-    fn execute(&mut self, elements: Vec<Element<'resolver>>) -> () {
-        let timer = Timer::new(TIMER);
-        let verbosity = Registry::get_verbosity(self);
-
-        if verbosity {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`resolving`" => Color::White,
-            );
-            xprintln!();
-        }
-
-        self.process(elements);
-
-        let errors = &self.errors;
-
-        if verbosity {
-            let symbols = self.scope.all();
-
-            let tree = symbols
-                .iter()
-                .map(|symbol| {
-                    format!("{:?}", symbol)
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}" => Color::Cyan,
-                    format!("Symbols:\n{}", indent(&tree)),
-                );
-                xprintln!();
-            }
-
-            if !errors.is_empty() {
-                for error in errors {
-                    let (message, details) = error.format();
-                    xprintln!(
-                        "{}\n{}" => Color::Red,
-                        message => Color::Orange,
-                        details
-                    );
-                    xprintln!();
-                }
-
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                xprintln!(
-                        "Finished {} {}s with {} {}." => Color::Green,
-                        "`resolving` in" => Color::White,
-                        duration.as_secs_f64(),
-                        errors.len() => Color::BrightRed,
-                        "errors" => Color::Red,
-                    );
-                xprintln!();
-            } else {
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                xprintln!(
-                        "Finished {} {}s." => Color::Green,
-                        "`resolving` in" => Color::White,
-                        duration.as_secs_f64(),
-                    );
-
-                xprintln!();
-            }
-        }
-
-        ()
     }
 }

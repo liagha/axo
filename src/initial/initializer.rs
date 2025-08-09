@@ -20,7 +20,6 @@ use {
 
 #[derive(Debug)]
 pub struct Initializer<'initializer> {
-    pub registry: Registry<'initializer>,
     pub index: usize,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
@@ -144,9 +143,8 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
 }
 
 impl<'initializer> Initializer<'initializer> {
-    pub fn new(registry: Registry<'initializer>, location: Location<'initializer>) -> Self {
+    pub fn new(location: Location<'initializer>) -> Self {
         Initializer {
-            registry,
             index: 0,
             position: Position::new(location),
             input: Vec::new(),
@@ -312,7 +310,7 @@ impl<'initializer> Initializer<'initializer> {
         let input = location.get_value();
 
         let tokens = {
-            let mut scanner = Scanner::new(self.registry.clone(), Location::Flag).with_input(input);
+            let mut scanner = Scanner::new(Location::Flag).with_input(input);
             scanner.scan();
             scanner.output
         };
@@ -330,6 +328,7 @@ impl<'initializer> Initializer<'initializer> {
         self.reset();
 
         let mut preferences = Vec::new();
+
         while self.peek().is_some() {
             let classifier = Self::classifier();
             let forms = self.form(classifier).flatten();
@@ -342,21 +341,16 @@ impl<'initializer> Initializer<'initializer> {
             }
         }
 
-        let symbols = preferences.into_iter().map(|preference| {
-            let span = preference.borrow_span();
-            Symbol::new(unsafe { memory::transmute::<_, Preference<'static>>(preference) }, unsafe { memory::transmute(span) })
-        }).collect::<Vec<Symbol>>();
-
-        self.registry.resolver.extend(symbols);
+        self.output = preferences;
     }
 }
 
 impl<'initializer> Marked<'initializer> for Initializer<'initializer> {
     fn registry(&self) -> &Registry<'initializer> {
-        &self.registry
+        todo!()
     }
 
     fn registry_mut(&mut self) -> &mut Registry<'initializer> {
-        &mut self.registry
+        todo!()
     }
 }

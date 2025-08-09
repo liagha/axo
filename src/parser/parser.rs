@@ -21,7 +21,6 @@ use {
 };
 
 pub struct Parser<'parser> {
-    pub registry: Registry<'parser>,
     pub index: usize,
     pub position: Position<'parser>,
     pub input: Vec<Token<'parser>>,
@@ -85,9 +84,8 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
 }
 
 impl<'parser> Parser<'parser> {
-    pub fn new(registry: Registry<'parser>, location: Location<'parser>) -> Self {
+    pub fn new(location: Location<'parser>) -> Self {
         Parser {
-            registry,
             index: 0,
             position: Position::new(location),
             input: Vec::new(),
@@ -163,10 +161,10 @@ impl<'parser> Parser<'parser> {
 
 impl<'parser> Marked<'parser> for Parser<'parser> {
     fn registry(&self) -> &Registry<'parser> {
-        &self.registry
+        todo!()
     }
 
     fn registry_mut(&mut self) -> &mut Registry<'parser> {
-        &mut self.registry
+        todo!()
     }
 }

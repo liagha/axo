@@ -22,7 +22,6 @@ use {
 };
 
 pub struct Scanner<'scanner> {
-    pub registry: Registry<'scanner>,
     pub index: usize,
     pub position: Position<'scanner>,
     pub input: Vec<Character<'scanner>>,
@@ -83,11 +82,10 @@ impl<'scanner> Peekable<'scanner, Character<'scanner>> for Scanner<'scanner> {
 }
 
 impl<'scanner> Scanner<'scanner> {
-    pub fn new(registry: Registry<'scanner>, location: Location<'scanner>) -> Scanner<'scanner> {
+    pub fn new(location: Location<'scanner>) -> Scanner<'scanner> {
         let position = Position::new(location);
 
         Scanner {
-            registry,
             index: 0,
             position,
             input: Vec::new(),
@@ -138,10 +136,10 @@ impl<'scanner> Scanner<'scanner> {
 
 impl<'scanner> Marked<'scanner> for Scanner<'scanner> {
     fn registry(&self) -> &Registry<'scanner> {
-        &self.registry
+        todo!()
     }
 
     fn registry_mut(&mut self) -> &mut Registry<'scanner> {
-        &mut self.registry
+        todo!()
     }
 }
