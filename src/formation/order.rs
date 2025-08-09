@@ -2,7 +2,7 @@ use {
     super::{
         classifier::Classifier,
         form::Form,
-        former::{Composer, Draft},
+        former::{Former, Draft},
         helper::{Formable, Emitter, Performer, Inspector, Transformer},
     },
     crate::{
@@ -18,14 +18,14 @@ use {
 };
 
 pub trait Order<'order, Input: Formable<'order>, Output: Formable<'order>, Failure: Formable<'order>> {
-    fn order(&self, composer: &mut Composer<'_, 'order, Input, Output, Failure>, draft: &mut Draft<'order, Input, Output, Failure>);
+    fn order(&self, composer: &mut Former<'_, 'order, Input, Output, Failure>, draft: &mut Draft<'order, Input, Output, Failure>);
 }
 
 pub struct Align;
 
 impl<'align, Input: Formable<'align>, Output: Formable<'align>, Failure: Formable<'align>> Order<'align, Input, Output, Failure> for Align {
     #[inline]
-    fn order(&self, _composer: &mut Composer<'_, 'align, Input, Output, Failure>, draft: &mut Draft<'align, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'align, Input, Output, Failure>, draft: &mut Draft<'align, Input, Output, Failure>) {
         draft.set_align();
     }
 }
@@ -37,7 +37,7 @@ pub struct Branch<'branch, Input: Formable<'branch>, Output: Formable<'branch>, 
 
 impl<'branch, Input: Formable<'branch>, Output: Formable<'branch>, Failure: Formable<'branch>> Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'branch, Input, Output, Failure>, draft: &mut Draft<'branch, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'branch, Input, Output, Failure>, draft: &mut Draft<'branch, Input, Output, Failure>) {
         let chosen = if draft.is_aligned() {
             &self.found
         } else {
@@ -54,7 +54,7 @@ pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure:
 
 impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>> Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'fail, Input, Output, Failure>, draft: &mut Draft<'fail, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'fail, Input, Output, Failure>, draft: &mut Draft<'fail, Input, Output, Failure>) {
         // Todo: Actual Registry Handling
         let failure = (self.emitter)(&mut Registry::new(), draft.form.clone());
 
@@ -67,7 +67,7 @@ pub struct Ignore;
 
 impl<'ignore, Input: Formable<'ignore>, Output: Formable<'ignore>, Failure: Formable<'ignore>> Order<'ignore, Input, Output, Failure> for Ignore {
     #[inline]
-    fn order(&self, _composer: &mut Composer<'_, 'ignore, Input, Output, Failure>, draft: &mut Draft<'ignore, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'ignore, Input, Output, Failure>, draft: &mut Draft<'ignore, Input, Output, Failure>) {
         if draft.is_aligned() {
             draft.set_ignore();
             draft.form = Form::<Input, Output, Failure>::Blank;
@@ -81,7 +81,7 @@ pub struct Inspect<'inspector, Input: Formable<'inspector>, Output: Formable<'in
 
 impl<'inspector, Input: Formable<'inspector>, Output: Formable<'inspector>, Failure: Formable<'inspector>> Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'inspector, Input, Output, Failure>, draft: &mut Draft<'inspector, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'inspector, Input, Output, Failure>, draft: &mut Draft<'inspector, Input, Output, Failure>) {
         let draft_clone = Draft {
             marker: draft.marker,
             position: draft.position,
@@ -102,7 +102,7 @@ pub struct Multiple<'multiple, Input: Formable<'multiple>, Output: Formable<'mul
 
 impl<'multiple, Input: Formable<'multiple>, Output: Formable<'multiple>, Failure: Formable<'multiple>> Order<'multiple, Input, Output, Failure> for Multiple<'multiple, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'multiple, Input, Output, Failure>, draft: &mut Draft<'multiple, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'multiple, Input, Output, Failure>, draft: &mut Draft<'multiple, Input, Output, Failure>) {
         for order in self.orders.iter() {
             order.order(composer, draft);
         }
@@ -115,7 +115,7 @@ pub struct Panic<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Fail
 
 impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>> Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'panic, Input, Output, Failure>, draft: &mut Draft<'panic, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'panic, Input, Output, Failure>, draft: &mut Draft<'panic, Input, Output, Failure>) {
         let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
 
         let form = Form::Failure(failure);
@@ -128,7 +128,7 @@ pub struct Pardon;
 
 impl<'pardon, Input: Formable<'pardon>, Output: Formable<'pardon>, Failure: Formable<'pardon>> Order<'pardon, Input, Output, Failure> for Pardon {
     #[inline]
-    fn order(&self, _composer: &mut Composer<'_, 'pardon, Input, Output, Failure>, draft: &mut Draft<'pardon, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'pardon, Input, Output, Failure>, draft: &mut Draft<'pardon, Input, Output, Failure>) {
         draft.set_empty();
     }
 }
@@ -139,7 +139,7 @@ pub struct Perform<'perform> {
 
 impl<'perform, Input: Formable<'perform>, Output: Formable<'perform>, Failure: Formable<'perform>> Order<'perform, Input, Output, Failure> for Perform<'perform> {
     #[inline]
-    fn order(&self, _composer: &mut Composer<'_, 'perform, Input, Output, Failure>, draft: &mut Draft<'perform, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'perform, Input, Output, Failure>, draft: &mut Draft<'perform, Input, Output, Failure>) {
         if draft.is_aligned() {
             if let Ok(mut guard) = self.performer.lock() {
                 guard();
@@ -153,7 +153,7 @@ pub struct Skip;
 
 impl<'skip, Input: Formable<'skip>, Output: Formable<'skip>, Failure: Formable<'skip>> Order<'skip, Input, Output, Failure> for Skip {
     #[inline]
-    fn order(&self, _composer: &mut Composer<'_, 'skip, Input, Output, Failure>, draft: &mut Draft<'skip, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'skip, Input, Output, Failure>, draft: &mut Draft<'skip, Input, Output, Failure>) {
         if draft.is_aligned() {
             draft.set_empty();
             draft.form = Form::<Input, Output, Failure>::Blank;
@@ -167,7 +167,7 @@ pub struct Transform<'transform, Input: Formable<'transform>, Output: Formable<'
 
 impl<'transform, Input: Formable<'transform>, Output: Formable<'transform>, Failure: Formable<'transform>> Order<'transform, Input, Output, Failure> for Transform<'transform, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Composer<'_, 'transform, Input, Output, Failure>, draft: &mut Draft<'transform, Input, Output, Failure>) {
+    fn order(&self, composer: &mut Former<'_, 'transform, Input, Output, Failure>, draft: &mut Draft<'transform, Input, Output, Failure>) {
         if draft.is_aligned() {
             let result = if let Ok(mut guard) = self.transformer.lock() {
                 // Todo: Actual Registry Handling

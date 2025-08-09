@@ -10,13 +10,13 @@ use {
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Location<'a> {
-    File(Str<'a>),
+pub enum Location<'location> {
+    File(Str<'location>),
     Flag,
 }
 
-impl<'a> Location<'a> {
-    pub fn get_value(&self) -> Str<'a> {
+impl<'location> Location<'location> {
+    pub fn get_value(&self) -> Str<'location> {
         match self {
             Location::File(file) => read_to_string(file.as_str().unwrap()).unwrap_or("".to_string()).into(),
             Location::Flag => args().skip(1).collect::<Vec<String>>().join(" ").into(),

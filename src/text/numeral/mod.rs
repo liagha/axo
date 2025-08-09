@@ -349,7 +349,7 @@ impl AutoNumber {
             Self::U32(v) => Ok(*v as f64),
             Self::U64(v) => Ok(*v as f64),
             Self::U128(v) => {
-                if *v > 9007199254740992u128 { 
+                if *v > 9007199254740992u128 {
                     Err(ParseNumberError::Overflow)
                 } else {
                     Ok(*v as f64)
@@ -589,7 +589,7 @@ mod tests {
         let parser = parser::<f64>();
         assert_eq!(parser.parse("123.456"), Ok(123.456));
         assert_eq!(parser.parse("-123.456"), Ok(-123.456));
-        assert_eq!(parser.parse_radix("A.B", 16), Ok(10.6875));  
+        assert_eq!(parser.parse_radix("A.B", 16), Ok(10.6875));
     }
 
     #[test]
@@ -633,7 +633,7 @@ mod tests {
 
         let int_value = parser.parse("42").unwrap();
         let float_value = parser.parse("3.14").unwrap();
-        let large_value = parser.parse("9223372036854775808").unwrap(); 
+        let large_value = parser.parse("9223372036854775808").unwrap();
 
         assert_eq!(int_value.as_int(), Ok(42));
         assert!(matches!(float_value.as_int(), Err(ParseNumberError::TypeError(_))));
@@ -641,6 +641,6 @@ mod tests {
 
         assert_eq!(int_value.as_float(), Ok(42.0));
         assert_eq!(float_value.as_float().unwrap(), 3.14);
-        assert!(matches!(parser.parse("9007199254740993").unwrap().as_float(), Ok(_))); 
+        assert!(matches!(parser.parse("9007199254740993").unwrap().as_float(), Ok(_)));
     }
 }

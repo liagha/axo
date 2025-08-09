@@ -1,15 +1,11 @@
 use {
     super::{
-        Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind,
-        error::{CharacterError, ErrorKind},
+        Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
     },
     crate::{
+        formation::{form::Form, classifier::Classifier},
         tracker::{
             Spanned,
-        },
-        formation::{
-            form::Form,
-            classifier::Classifier,
         },
     }
 };

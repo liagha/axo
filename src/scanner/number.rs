@@ -1,17 +1,11 @@
 use {
     super::{
-        Character, ScanError, Scanner, Token, TokenKind,
-        error::ErrorKind,
+        Character, ScanError, Scanner, Token, TokenKind, ErrorKind,
     },
     crate::{
-        tracker::{
-            Spanned,
-        },
-        formation::{
-            form::Form,
-            classifier::Classifier,
-        },
+        formation::{form::Form, classifier::Classifier},
         text::parser,
+        tracker::Spanned,
     }
 };
 

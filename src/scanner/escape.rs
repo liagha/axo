@@ -1,18 +1,17 @@
 use {
     super::{
-        Character, ScanError, Token, ErrorKind, Scanner,
-        error::{CharacterError, EscapeError},
+        Character, ScanError, Token, ErrorKind, Scanner, CharacterError, EscapeError,
     },
     crate::{
-        tracker::{
-            Spanned,
+        data::{
+            character::{parse_radix, from_u32},
+            string::Str,
         },
         formation::{
-            form::{Form},
             classifier::Classifier,
+            form::Form,
         },
-        data::string::Str,
-        data::character::{parse_radix, from_u32},
+        tracker::Spanned,
     }
 };
 

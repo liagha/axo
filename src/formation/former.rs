@@ -25,14 +25,14 @@ use {
     record::*,
 };
 
-pub struct Composer<'instance, 'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> {
-    pub source: &'instance mut dyn Source<'composer, Input>,
+pub struct Former<'instance, 'former, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> {
+    pub source: &'instance mut dyn Source<'former, Input>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
-impl<'a, 'composer, Input: Formable<'composer>, Output: Formable<'composer>, Failure: Formable<'composer>> Composer<'a, 'composer, Input, Output, Failure> {
+impl<'instance, 'former, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> Former<'instance, 'former, Input, Output, Failure> {
     #[inline(always)]
-    pub fn new(source: &'a mut dyn Source<'composer, Input>) -> Self {
+    pub fn new(source: &'instance mut dyn Source<'former, Input>) -> Self {
         Self {
             source,
             _phantom: PhantomData,
@@ -40,9 +40,24 @@ impl<'a, 'composer, Input: Formable<'composer>, Output: Formable<'composer>, Fai
     }
 
     #[inline(always)]
-    pub fn build(&mut self, draft: &mut Draft<'composer, Input, Output, Failure>) {
+    pub fn build(&mut self, draft: &mut Draft<'former, Input, Output, Failure>) {
         let classifier = draft.classifier.order.clone();
         classifier.order(self, draft);
+    }
+
+    #[inline(always)]
+    pub fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure> {
+        let initial = self.source.position();
+        let mut draft = Draft::new(0, initial, classifier);
+
+        self.build(&mut draft);
+
+        if draft.is_effected() {
+            self.source.set_index(draft.marker);
+            self.source.set_position(draft.position);
+        }
+
+        draft.form
     }
 }
 
@@ -122,32 +137,5 @@ impl<'draft, Input: Formable<'draft>, Output: Formable<'draft>, Failure: Formabl
     #[inline(always)]
     pub const fn set_ignore(&mut self) {
         self.record = IGNORED;
-    }
-}
-
-pub trait Former<'former, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> {
-    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure>
-    where
-        Self: Source<'former, Input>;
-}
-
-impl<'former, Target, Input: Formable<'former>, Output: Formable<'former>, Failure: Formable<'former>> Former<'former, Input, Output, Failure> for Target
-{
-    fn form(&mut self, classifier: Classifier<'former, Input, Output, Failure>) -> Form<'former, Input, Output, Failure>
-    where
-        Self: Source<'former, Input>,
-    {
-        let initial = self.position();
-        let mut draft = Draft::new(0, initial, classifier);
-
-        let mut composer: Composer<'_, 'former, Input, Output, Failure> = Composer::new(self as &mut dyn Source<'former, Input>);
-        composer.build(&mut draft);
-
-        if draft.is_effected() {
-            composer.source.set_index(draft.marker);
-            composer.source.set_position(draft.position);
-        }
-
-        draft.form
     }
 }

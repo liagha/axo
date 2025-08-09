@@ -16,9 +16,14 @@ pub use {
     symbolic::Symbolic,
 };
 
+pub(super) use {
+    error::*,  
+};
+
 use {
-    crate::reporter::Error,
-    error::ErrorKind,
+    crate::{
+        reporter::Error,
+    },
 };
 
 pub type ParseError<'error> = Error<'error, ErrorKind>;

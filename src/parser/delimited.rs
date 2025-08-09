@@ -8,7 +8,7 @@ use {
         schema::{Block, Bundle, Collection, Group, Sequence, Series},
         tracker::{Location, Span, Spanned},
     },
-    super::{error::ErrorKind, Element, ElementKind, ParseError, Parser},
+    super::{ErrorKind, Element, ElementKind, ParseError, Parser},
 };
 
 impl<'parser> Parser<'parser> {

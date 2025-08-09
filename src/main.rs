@@ -1,17 +1,26 @@
 #![allow(unused)]
 
+#[cfg(feature = "checker")]
 mod checker;
 mod tracker;
 mod data;
 mod reporter;
+#[cfg(feature = "formation")]
 mod formation;
 mod format;
+#[cfg(feature = "initial")]
 mod initial;
+#[cfg(feature = "internal")]
 mod internal;
+#[cfg(feature = "parser")]
 mod parser;
+#[cfg(feature = "resolver")]
 mod resolver;
+#[cfg(feature = "scanner")]
 mod scanner;
+#[cfg(feature = "schema")]
 mod schema;
+#[cfg(feature = "text")]
 mod text;
 
 use {

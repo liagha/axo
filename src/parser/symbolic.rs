@@ -1,11 +1,11 @@
 use {
+    super::{
+        Element, ElementKind,
+        Symbol,
+    },
     crate::{
         scanner::{
             Token, TokenKind
-        },
-        parser::{
-            Element, ElementKind,
-            Symbol,
         },
         format::{
             Debug,

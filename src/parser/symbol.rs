@@ -22,8 +22,7 @@ use {
         },
         internal::hash::{Hash, Hasher},
         data::memory,
-        format,
-        format::{Debug, Formatter},
+        format::{self, Debug, Formatter},
     },
 };
 

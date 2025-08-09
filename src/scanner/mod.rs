@@ -8,6 +8,7 @@ mod punctuation;
 mod scanner;
 mod token;
 mod error;
+mod traits;
 
 pub use {
     scanner::Scanner,
@@ -17,10 +18,13 @@ pub use {
     token::*,
 };
 
+pub(super) use {
+    error::*
+};
+
 use {
     crate::{
         reporter::Error,
-        scanner::error::ErrorKind,
     }
 };
 

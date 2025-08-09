@@ -1,13 +1,10 @@
 use {
     super::{
-        error::ErrorKind,
+        ErrorKind,
         Element, ElementKind,
-        ParseError, Parser
+        Parser, ParseError,
     },
     crate::{
-        tracker::{
-            Span, Spanned,
-        },
         formation::{
             form::Form,
             classifier::Classifier,
@@ -15,11 +12,11 @@ use {
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         schema::{
             Access, Assign,
-            Binary,
-            Construct,
-            Index, Invoke,
-            Label,
-            Unary,
+            Binary, Construct,
+            Index, Invoke, Label, Unary,
+        },
+        tracker::{
+            Span, Spanned,
         },
     },
 };

@@ -6,10 +6,8 @@ use {
             Access, Assign, Binary, Block, Bundle, Collection, Conditional, Construct, Group,
             Index, Invoke, Iterate, Label, Procedural, Repeat, Sequence, Series, Unary,
         },
-        tracker::Span,
+        tracker::{Span, Spanned},
     },
-    derive_ctor::ctor,
-    derive_more::with_trait::{IsVariant, Unwrap},
     super::Symbol,
 };
 
@@ -18,7 +16,6 @@ pub struct Element<'element> {
     pub span: Span<'element>,
 }
 
-#[derive(ctor, IsVariant, Unwrap)]
 pub enum ElementKind<'element> {
     Literal(TokenKind),
 
@@ -72,6 +69,704 @@ pub enum ElementKind<'element> {
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
         Element { kind, span }
+    }
+}
+
+impl<'element> ElementKind<'element> {
+    pub fn literal(token_kind: TokenKind) -> Self {
+        ElementKind::Literal(token_kind)
+    }
+
+    pub fn identifier(name: String) -> Self {
+        ElementKind::Identifier(name)
+    }
+
+    pub fn procedural(proc: Procedural<Box<Element<'element>>>) -> Self {
+        ElementKind::Procedural(proc)
+    }
+
+    pub fn group(group: Group<Element<'element>>) -> Self {
+        ElementKind::Group(group)
+    }
+
+    pub fn sequence(seq: Sequence<Element<'element>>) -> Self {
+        ElementKind::Sequence(seq)
+    }
+
+    pub fn collection(coll: Collection<Element<'element>>) -> Self {
+        ElementKind::Collection(coll)
+    }
+
+    pub fn series(series: Series<Element<'element>>) -> Self {
+        ElementKind::Series(series)
+    }
+
+    pub fn bundle(bundle: Bundle<Element<'element>>) -> Self {
+        ElementKind::Bundle(bundle)
+    }
+
+    pub fn block(block: Block<Element<'element>>) -> Self {
+        ElementKind::Block(block)
+    }
+
+    pub fn unary(unary: Unary<Token<'element>, Box<Element<'element>>>) -> Self {
+        ElementKind::Unary(unary)
+    }
+
+    pub fn binary(binary: Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>) -> Self {
+        ElementKind::Binary(binary)
+    }
+
+    pub fn label(label: Label<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Label(label)
+    }
+
+    pub fn access(access: Access<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Access(access)
+    }
+
+    pub fn index(index: Index<Box<Element<'element>>, Element<'element>>) -> Self {
+        ElementKind::Index(index)
+    }
+
+    pub fn invoke(invoke: Invoke<Box<Element<'element>>, Element<'element>>) -> Self {
+        ElementKind::Invoke(invoke)
+    }
+
+    pub fn construct(construct: Construct<Box<Element<'element>>, Element<'element>>) -> Self {
+        ElementKind::Construct(construct)
+    }
+
+    pub fn conditional(conditional: Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Conditional(conditional)
+    }
+
+    pub fn repeat(repeat: Repeat<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Repeat(repeat)
+    }
+
+    pub fn iterate(iterate: Iterate<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Iterate(iterate)
+    }
+
+    pub fn symbolize(symbol: Symbol) -> Self {
+        ElementKind::Symbolize(symbol)
+    }
+
+    pub fn assign(assign: Assign<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
+        ElementKind::Assign(assign)
+    }
+
+    pub fn produce(element: Option<Box<Element<'element>>>) -> Self {
+        ElementKind::Produce(element)
+    }
+
+    pub fn abort(element: Option<Box<Element<'element>>>) -> Self {
+        ElementKind::Abort(element)
+    }
+
+    pub fn pass(element: Option<Box<Element<'element>>>) -> Self {
+        ElementKind::Pass(element)
+    }
+
+    pub fn is_literal(&self) -> bool {
+        matches!(self, ElementKind::Literal(_))
+    }
+
+    pub fn is_identifier(&self) -> bool {
+        matches!(self, ElementKind::Identifier(_))
+    }
+
+    pub fn is_procedural(&self) -> bool {
+        matches!(self, ElementKind::Procedural(_))
+    }
+
+    pub fn is_group(&self) -> bool {
+        matches!(self, ElementKind::Group(_))
+    }
+
+    pub fn is_sequence(&self) -> bool {
+        matches!(self, ElementKind::Sequence(_))
+    }
+
+    pub fn is_collection(&self) -> bool {
+        matches!(self, ElementKind::Collection(_))
+    }
+
+    pub fn is_series(&self) -> bool {
+        matches!(self, ElementKind::Series(_))
+    }
+
+    pub fn is_bundle(&self) -> bool {
+        matches!(self, ElementKind::Bundle(_))
+    }
+
+    pub fn is_block(&self) -> bool {
+        matches!(self, ElementKind::Block(_))
+    }
+
+    pub fn is_unary(&self) -> bool {
+        matches!(self, ElementKind::Unary(_))
+    }
+
+    pub fn is_binary(&self) -> bool {
+        matches!(self, ElementKind::Binary(_))
+    }
+
+    pub fn is_label(&self) -> bool {
+        matches!(self, ElementKind::Label(_))
+    }
+
+    pub fn is_access(&self) -> bool {
+        matches!(self, ElementKind::Access(_))
+    }
+
+    pub fn is_index(&self) -> bool {
+        matches!(self, ElementKind::Index(_))
+    }
+
+    pub fn is_invoke(&self) -> bool {
+        matches!(self, ElementKind::Invoke(_))
+    }
+
+    pub fn is_construct(&self) -> bool {
+        matches!(self, ElementKind::Construct(_))
+    }
+
+    pub fn is_conditional(&self) -> bool {
+        matches!(self, ElementKind::Conditional(_))
+    }
+
+    pub fn is_repeat(&self) -> bool {
+        matches!(self, ElementKind::Repeat(_))
+    }
+
+    pub fn is_iterate(&self) -> bool {
+        matches!(self, ElementKind::Iterate(_))
+    }
+
+    pub fn is_symbolize(&self) -> bool {
+        matches!(self, ElementKind::Symbolize(_))
+    }
+
+    pub fn is_assign(&self) -> bool {
+        matches!(self, ElementKind::Assign(_))
+    }
+
+    pub fn is_produce(&self) -> bool {
+        matches!(self, ElementKind::Produce(_))
+    }
+
+    pub fn is_abort(&self) -> bool {
+        matches!(self, ElementKind::Abort(_))
+    }
+
+    pub fn is_pass(&self) -> bool {
+        matches!(self, ElementKind::Pass(_))
+    }
+
+    pub fn unwrap_literal(self) -> TokenKind {
+        match self {
+            ElementKind::Literal(token_kind) => token_kind,
+            _ => panic!("Called unwrap_literal on non-Literal variant"),
+        }
+    }
+
+    pub fn unwrap_identifier(self) -> String {
+        match self {
+            ElementKind::Identifier(name) => name,
+            _ => panic!("Called unwrap_identifier on non-Identifier variant"),
+        }
+    }
+
+    pub fn unwrap_procedural(self) -> Procedural<Box<Element<'element>>> {
+        match self {
+            ElementKind::Procedural(proc) => proc,
+            _ => panic!("Called unwrap_procedural on non-Procedural variant"),
+        }
+    }
+
+    pub fn unwrap_group(self) -> Group<Element<'element>> {
+        match self {
+            ElementKind::Group(group) => group,
+            _ => panic!("Called unwrap_group on non-Group variant"),
+        }
+    }
+
+    pub fn unwrap_sequence(self) -> Sequence<Element<'element>> {
+        match self {
+            ElementKind::Sequence(seq) => seq,
+            _ => panic!("Called unwrap_sequence on non-Sequence variant"),
+        }
+    }
+
+    pub fn unwrap_collection(self) -> Collection<Element<'element>> {
+        match self {
+            ElementKind::Collection(coll) => coll,
+            _ => panic!("Called unwrap_collection on non-Collection variant"),
+        }
+    }
+
+    pub fn unwrap_series(self) -> Series<Element<'element>> {
+        match self {
+            ElementKind::Series(series) => series,
+            _ => panic!("Called unwrap_series on non-Series variant"),
+        }
+    }
+
+    pub fn unwrap_bundle(self) -> Bundle<Element<'element>> {
+        match self {
+            ElementKind::Bundle(bundle) => bundle,
+            _ => panic!("Called unwrap_bundle on non-Bundle variant"),
+        }
+    }
+
+    pub fn unwrap_block(self) -> Block<Element<'element>> {
+        match self {
+            ElementKind::Block(block) => block,
+            _ => panic!("Called unwrap_block on non-Block variant"),
+        }
+    }
+
+    pub fn unwrap_unary(self) -> Unary<Token<'element>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Unary(unary) => unary,
+            _ => panic!("Called unwrap_unary on non-Unary variant"),
+        }
+    }
+
+    pub fn unwrap_binary(self) -> Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Binary(binary) => binary,
+            _ => panic!("Called unwrap_binary on non-Binary variant"),
+        }
+    }
+
+    pub fn unwrap_label(self) -> Label<Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Label(label) => label,
+            _ => panic!("Called unwrap_label on non-Label variant"),
+        }
+    }
+
+    pub fn unwrap_access(self) -> Access<Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Access(access) => access,
+            _ => panic!("Called unwrap_access on non-Access variant"),
+        }
+    }
+
+    pub fn unwrap_index(self) -> Index<Box<Element<'element>>, Element<'element>> {
+        match self {
+            ElementKind::Index(index) => index,
+            _ => panic!("Called unwrap_index on non-Index variant"),
+        }
+    }
+
+    pub fn unwrap_invoke(self) -> Invoke<Box<Element<'element>>, Element<'element>> {
+        match self {
+            ElementKind::Invoke(invoke) => invoke,
+            _ => panic!("Called unwrap_invoke on non-Invoke variant"),
+        }
+    }
+
+    pub fn unwrap_construct(self) -> Construct<Box<Element<'element>>, Element<'element>> {
+        match self {
+            ElementKind::Construct(construct) => construct,
+            _ => panic!("Called unwrap_construct on non-Construct variant"),
+        }
+    }
+
+    pub fn unwrap_conditional(self) -> Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Conditional(conditional) => conditional,
+            _ => panic!("Called unwrap_conditional on non-Conditional variant"),
+        }
+    }
+
+    pub fn unwrap_repeat(self) -> Repeat<Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Repeat(repeat) => repeat,
+            _ => panic!("Called unwrap_repeat on non-Repeat variant"),
+        }
+    }
+
+    pub fn unwrap_iterate(self) -> Iterate<Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Iterate(iterate) => iterate,
+            _ => panic!("Called unwrap_iterate on non-Iterate variant"),
+        }
+    }
+
+    pub fn unwrap_symbolize(self) -> Symbol {
+        match self {
+            ElementKind::Symbolize(symbol) => symbol,
+            _ => panic!("Called unwrap_symbolize on non-Symbolize variant"),
+        }
+    }
+
+    pub fn unwrap_assign(self) -> Assign<Box<Element<'element>>, Box<Element<'element>>> {
+        match self {
+            ElementKind::Assign(assign) => assign,
+            _ => panic!("Called unwrap_assign on non-Assign variant"),
+        }
+    }
+
+    pub fn unwrap_produce(self) -> Option<Box<Element<'element>>> {
+        match self {
+            ElementKind::Produce(element) => element,
+            _ => panic!("Called unwrap_produce on non-Produce variant"),
+        }
+    }
+
+    pub fn unwrap_abort(self) -> Option<Box<Element<'element>>> {
+        match self {
+            ElementKind::Abort(element) => element,
+            _ => panic!("Called unwrap_abort on non-Abort variant"),
+        }
+    }
+
+    pub fn unwrap_pass(self) -> Option<Box<Element<'element>>> {
+        match self {
+            ElementKind::Pass(element) => element,
+            _ => panic!("Called unwrap_pass on non-Pass variant"),
+        }
+    }
+
+    pub fn try_unwrap_literal(&self) -> Option<&TokenKind> {
+        match self {
+            ElementKind::Literal(token_kind) => Some(token_kind),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_identifier(&self) -> Option<&String> {
+        match self {
+            ElementKind::Identifier(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_procedural(&self) -> Option<&Procedural<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Procedural(proc) => Some(proc),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_group(&self) -> Option<&Group<Element<'element>>> {
+        match self {
+            ElementKind::Group(group) => Some(group),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_sequence(&self) -> Option<&Sequence<Element<'element>>> {
+        match self {
+            ElementKind::Sequence(seq) => Some(seq),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_collection(&self) -> Option<&Collection<Element<'element>>> {
+        match self {
+            ElementKind::Collection(coll) => Some(coll),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_series(&self) -> Option<&Series<Element<'element>>> {
+        match self {
+            ElementKind::Series(series) => Some(series),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_bundle(&self) -> Option<&Bundle<Element<'element>>> {
+        match self {
+            ElementKind::Bundle(bundle) => Some(bundle),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_block(&self) -> Option<&Block<Element<'element>>> {
+        match self {
+            ElementKind::Block(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_unary(&self) -> Option<&Unary<Token<'element>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Unary(unary) => Some(unary),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_binary(&self) -> Option<&Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Binary(binary) => Some(binary),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_label(&self) -> Option<&Label<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Label(label) => Some(label),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_access(&self) -> Option<&Access<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Access(access) => Some(access),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_index(&self) -> Option<&Index<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Index(index) => Some(index),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_invoke(&self) -> Option<&Invoke<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Invoke(invoke) => Some(invoke),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_construct(&self) -> Option<&Construct<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Construct(construct) => Some(construct),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_conditional(&self) -> Option<&Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Conditional(conditional) => Some(conditional),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_repeat(&self) -> Option<&Repeat<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Repeat(repeat) => Some(repeat),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_iterate(&self) -> Option<&Iterate<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Iterate(iterate) => Some(iterate),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_symbolize(&self) -> Option<&Symbol> {
+        match self {
+            ElementKind::Symbolize(symbol) => Some(symbol),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_assign(&self) -> Option<&Assign<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Assign(assign) => Some(assign),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_produce(&self) -> Option<&Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Produce(element) => Some(element),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_abort(&self) -> Option<&Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Abort(element) => Some(element),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_pass(&self) -> Option<&Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Pass(element) => Some(element),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut TokenKind> {
+        match self {
+            ElementKind::Literal(token_kind) => Some(token_kind),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_identifier_mut(&mut self) -> Option<&mut String> {
+        match self {
+            ElementKind::Identifier(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_procedural_mut(&mut self) -> Option<&mut Procedural<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Procedural(proc) => Some(proc),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_group_mut(&mut self) -> Option<&mut Group<Element<'element>>> {
+        match self {
+            ElementKind::Group(group) => Some(group),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_sequence_mut(&mut self) -> Option<&mut Sequence<Element<'element>>> {
+        match self {
+            ElementKind::Sequence(seq) => Some(seq),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_collection_mut(&mut self) -> Option<&mut Collection<Element<'element>>> {
+        match self {
+            ElementKind::Collection(coll) => Some(coll),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_series_mut(&mut self) -> Option<&mut Series<Element<'element>>> {
+        match self {
+            ElementKind::Series(series) => Some(series),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_bundle_mut(&mut self) -> Option<&mut Bundle<Element<'element>>> {
+        match self {
+            ElementKind::Bundle(bundle) => Some(bundle),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_block_mut(&mut self) -> Option<&mut Block<Element<'element>>> {
+        match self {
+            ElementKind::Block(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_unary_mut(&mut self) -> Option<&mut Unary<Token<'element>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Unary(unary) => Some(unary),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_binary_mut(&mut self) -> Option<&mut Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Binary(binary) => Some(binary),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_label_mut(&mut self) -> Option<&mut Label<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Label(label) => Some(label),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_access_mut(&mut self) -> Option<&mut Access<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Access(access) => Some(access),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_index_mut(&mut self) -> Option<&mut Index<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Index(index) => Some(index),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_invoke_mut(&mut self) -> Option<&mut Invoke<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Invoke(invoke) => Some(invoke),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Construct<Box<Element<'element>>, Element<'element>>> {
+        match self {
+            ElementKind::Construct(construct) => Some(construct),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_conditional_mut(&mut self) -> Option<&mut Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Conditional(conditional) => Some(conditional),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_repeat_mut(&mut self) -> Option<&mut Repeat<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Repeat(repeat) => Some(repeat),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_iterate_mut(&mut self) -> Option<&mut Iterate<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Iterate(iterate) => Some(iterate),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_symbolize_mut(&mut self) -> Option<&mut Symbol> {
+        match self {
+            ElementKind::Symbolize(symbol) => Some(symbol),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_assign_mut(&mut self) -> Option<&mut Assign<Box<Element<'element>>, Box<Element<'element>>>> {
+        match self {
+            ElementKind::Assign(assign) => Some(assign),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_produce_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Produce(element) => Some(element),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_abort_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Abort(element) => Some(element),
+            _ => None,
+        }
+    }
+
+    pub fn try_unwrap_pass_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
+        match self {
+            ElementKind::Pass(element) => Some(element),
+            _ => None,
+        }
     }
 }
 

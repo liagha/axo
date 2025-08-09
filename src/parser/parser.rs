@@ -135,25 +135,31 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn parse(&mut self) {
-        let strained = self.form(Self::strainer(self.length())).collect_inputs();
-        self.input = strained;
+        let length = self.length();
+
+        let strained = {
+            let mut former = Former::new(self);
+            former.form(Self::strainer(length)).collect_inputs()
+        };
+
+        self.set_input(strained.clone());
         self.reset();
 
-        while self.peek().is_some() {
-            let forms = self.form(Self::parser()).flatten();
+        let mut former = Former::new(self);
 
-            for form in forms {
-                match form {
-                    Form::Output(output) => {
-                        self.output.push(output);
-                    }
+        let forms = former.form(Self::parser()).flatten();
 
-                    Form::Failure(failure) => {
-                        self.errors.push(failure);
-                    }
-
-                    _ => {}
+        for form in forms {
+            match form {
+                Form::Output(output) => {
+                    self.output.push(output);
                 }
+
+                Form::Failure(failure) => {
+                    self.errors.push(failure);
+                }
+
+                _ => {}
             }
         }
     }

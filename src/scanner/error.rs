@@ -1,9 +1,6 @@
 use {
     crate::{
-        format::{
-            Debug, Display,
-            Formatter, Result
-        },
+        format::{Debug, Display, Formatter, Result},
         text::numeral::ParseNumberError,
     },
 };

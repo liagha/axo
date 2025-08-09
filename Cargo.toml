@@ -3,16 +3,30 @@ name = "axo"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = [
+    "checker",
+    "formation", "schema",
+    "text", "internal", "initial",
+    "scanner", "parser", "resolver",
+]
+time = ["chrono"]
+checker = []
+formation = []
+schema = []
+text = []
+internal = []
+initial = ["formation", "scanner", "parser"]
+scanner = ["formation", "text"]
+parser = ["formation", "scanner"]
+resolver = []
+
 [dependencies]
 broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
 matchete = { path = "../matchete" }
 log = { version = "0.4.27"}
-derive_more = { version = "2.0.1", features = ["unwrap", "index", "is_variant"] }
-derive-ctor = { version = "1.0.6", features = ["enums"] }
-chrono = { version = "0.4.41" }
-
-# inkwell = { path = "inkwell", version = "0.5.0", features = ["default", "llvm18-0"] }
+chrono = { version = "0.4.41", optional = true }
 
 [profile.dev]
 debug = true

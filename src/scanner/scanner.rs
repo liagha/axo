@@ -1,23 +1,21 @@
 use {
     super::{
-        character::Character,
-        ScanError, Token,
+        Character, Token, ScanError,
     },
     crate::{
-        tracker::{
-            Peekable, Position,
-            Location,
+        data::string::Str,
+        formation::{
+            form::Form,
+            former::Former,
         },
         internal::{
             compiler::{
                 Registry, Marked,
             },
         },
-        formation::{
-            form::Form,
-            former::Former,
+        tracker::{
+            Peekable, Position, Location,
         },
-        data::string::Str,
     },
 };
 
@@ -113,22 +111,21 @@ impl<'scanner> Scanner<'scanner> {
 
     pub fn scan(&mut self) {
         let classifier = Self::classifier();
+        let mut former = Former::new(self);
 
-        while self.peek().is_some() {
-            let forms = self.form(classifier.clone()).flatten();
+        let forms = former.form(classifier.clone()).flatten();
 
-            for form in forms {
-                match form {
-                    Form::Output(output) => {
-                        self.output.push(output);
-                    }
-
-                    Form::Failure(failure) => {
-                        self.errors.push(failure);
-                    }
-
-                    _ => {}
+        for form in forms {
+            match form {
+                Form::Output(output) => {
+                    self.output.push(output);
                 }
+
+                Form::Failure(failure) => {
+                    self.errors.push(failure);
+                }
+
+                _ => {}
             }
         }
     }

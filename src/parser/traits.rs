@@ -5,16 +5,28 @@ use {
 
     crate::{
         data::memory::discriminant,
-
         internal::hash::{
             Hash, Hasher
         },
+        tracker::{Span, Spanned},
     },
 };
 
 impl<'element> Hash for Element<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
+    }
+}
+
+impl<'element> Spanned<'element> for Element<'element> {
+    #[track_caller]
+    fn borrow_span(&self) -> Span<'element> {
+        self.span
+    }
+
+    #[track_caller]
+    fn span(self) -> Span<'element> {
+        self.span
     }
 }
 

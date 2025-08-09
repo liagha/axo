@@ -1,16 +1,14 @@
 use {
+    super::Character,
     crate::{
         data::slice,
         format::{Debug, Display, Write, Result, Formatter},
-        scanner::Character,
     },
     
     OperatorKind::*,
-
-    derive_more::Unwrap,
 };
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Unwrap)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum OperatorKind {
     At,                     
     Ampersand,              

@@ -3,7 +3,7 @@ use {
     crate::{
         data::{memory, string::Str},
         format::{format_tokens, indent},
-        initial::initializer::{Initializer, Preference},
+        initial::{Initializer, Preference},
         parser::{Element, ElementKind, Parser, Symbol},
         resolver::Resolver,
         scanner::{Scanner, Token, TokenKind},

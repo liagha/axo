@@ -321,23 +321,26 @@ impl<'initializer> Initializer<'initializer> {
         let strained = {
             let length = self.length();
             let classifier = Self::strainer(length);
-            self.form(classifier).collect_inputs()
+            let mut former = Former::new(self);
+            former.form(classifier).collect_inputs()
         };
 
         self.input = strained;
         self.reset();
+        
+        let mut former = Former::new(self);
 
         let mut preferences = Vec::new();
 
-        while self.peek().is_some() {
-            let classifier = Self::classifier();
-            let forms = self.form(classifier).flatten();
-            for form in forms {
-                match form {
-                    Form::Output(output) => preferences.push(output),
-                    Form::Failure(failure) => self.errors.push(failure),
-                    _ => {}
-                }
+        let classifier = Self::classifier();
+        
+        let forms = former.form(classifier).flatten();
+        
+        for form in forms {
+            match form {
+                Form::Output(output) => preferences.push(output),
+                Form::Failure(failure) => self.errors.push(failure),
+                _ => {}
             }
         }
 

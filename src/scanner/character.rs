@@ -1,10 +1,10 @@
 use {
+    super::{
+        Scanner,
+    },
     crate::{
-        tracker::{Span, Position},
-        scanner::{
-            Scanner,
-        },
         text::{is_alphabetic, is_numeric, is_whitespace, is_alphanumeric},
+        tracker::{Span, Spanned, Position},
     },
 };
 

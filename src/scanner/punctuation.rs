@@ -1,11 +1,11 @@
 use {
+    super::Character,
     crate::{
         format::{
             self,
             Display, Debug, 
             Formatter
         },
-        scanner::Character,
     },
 };
 
