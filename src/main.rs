@@ -18,7 +18,6 @@ mod parser;
 mod resolver;
 #[cfg(feature = "scanner")]
 mod scanner;
-#[cfg(feature = "schema")]
 mod schema;
 #[cfg(feature = "text")]
 mod text;

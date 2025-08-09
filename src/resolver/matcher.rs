@@ -1,4 +1,8 @@
 use {
+    super::{
+        ResolveError,
+        ErrorKind,
+    },
     crate::{
         scanner::{
             Token, TokenKind,
@@ -8,13 +12,6 @@ use {
             Symbol, Symbolic,
         },
         schema::{Method, Structure},
-        resolver::{
-            ResolveError,
-            error::{
-                ErrorKind,
-            },
-        },
-
         data::float::FloatLiteral,
         internal::operation::Range,
     },

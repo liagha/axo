@@ -1,21 +1,22 @@
-pub mod scope;
-mod matcher;
-mod resolver;
 mod error;
 mod hint;
+mod matcher;
+mod resolver;
+pub mod scope;
+
+pub use {
+    resolver::Resolver,
+};
+
+pub(super) use {
+    error::*,
+    hint::*,
+};
 
 use {
     crate::{
         reporter::Error,
-        resolver::{
-            error::ErrorKind,
-            hint::ResolveHint,
-        },
     },
-};
-
-pub use {
-    resolver::Resolver,
 };
 
 pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, String, ResolveHint<'error>>;

@@ -5,27 +5,25 @@ edition = "2021"
 
 [features]
 default = [
-    "checker",
-    "formation", "schema",
+    "checker", "formation",
     "text", "internal", "initial",
     "scanner", "parser", "resolver",
 ]
 time = ["chrono"]
 checker = []
 formation = []
-schema = []
 text = []
 internal = []
 initial = ["formation", "scanner", "parser"]
 scanner = ["formation", "text"]
 parser = ["formation", "scanner"]
-resolver = []
+resolver = ["scanner", "parser", "matchete"]
 
 [dependencies]
 broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
-matchete = { path = "../matchete" }
 log = { version = "0.4.27"}
+matchete = { path = "../matchete", optional = true }
 chrono = { version = "0.4.41", optional = true }
 
 [profile.dev]
