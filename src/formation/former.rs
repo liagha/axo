@@ -17,6 +17,7 @@ use {
     crate::{
         data::{
             memory::PhantomData,
+            Offset,
         },
         tracker::{
             Position,
@@ -63,7 +64,7 @@ impl<'instance, 'former, Input: Formable<'former>, Output: Formable<'former>, Fa
 
 #[derive(Clone, Debug)]
 pub struct Draft<'draft, Input: Formable<'draft>, Output: Formable<'draft>, Failure: Formable<'draft>> {
-    pub marker: usize,
+    pub marker: Offset,
     pub position: Position<'draft>,
     pub consumed: Vec<Input>,
     pub record: Record,
@@ -73,9 +74,9 @@ pub struct Draft<'draft, Input: Formable<'draft>, Output: Formable<'draft>, Fail
 
 impl<'draft, Input: Formable<'draft>, Output: Formable<'draft>, Failure: Formable<'draft>> Draft<'draft, Input, Output, Failure> {
     #[inline(always)]
-    pub const fn new(index: usize, position: Position<'draft>, classifier: Classifier<'draft, Input, Output, Failure>) -> Self {
+    pub const fn new(marker: Offset, position: Position<'draft>, classifier: Classifier<'draft, Input, Output, Failure>) -> Self {
         Self {
-            marker: index,
+            marker,
             position,
             consumed: Vec::new(),
             record: BLANK,

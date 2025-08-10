@@ -3,6 +3,7 @@ use {
         Element, ParseError
     },
     crate::{
+        data::{Offset, Scale},
         tracker::{
             Peekable, Position, Location
         },
@@ -21,7 +22,7 @@ use {
 };
 
 pub struct Parser<'parser> {
-    pub index: usize,
+    pub index: Offset,
     pub position: Position<'parser>,
     pub input: Vec<Token<'parser>>,
     pub output: Vec<Element<'parser>>,
@@ -30,23 +31,23 @@ pub struct Parser<'parser> {
 
 impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
     #[inline]
-    fn length(&self) -> usize {
+    fn length(&self) -> Scale {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Token<'parser>> {
+    fn peek_ahead(&self, n: Offset) -> Option<&Token<'parser>> {
         let current = self.index + n;
 
         self.get(current)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Token<'parser>> {
+    fn peek_behind(&self, n: Offset) -> Option<&Token<'parser>> {
         let current = self.index - n;
 
         self.get(current)
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position<'parser>) -> Option<Token<'parser>> {
+    fn next(&self, index: &mut Offset, position: &mut Position<'parser>) -> Option<Token<'parser>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
 
@@ -74,11 +75,11 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
         &mut self.position
     }
 
-    fn index(&self) -> usize {
+    fn index(&self) -> Offset {
         self.index
     }
 
-    fn index_mut(&mut self) -> &mut usize {
+    fn index_mut(&mut self) -> &mut Offset {
         &mut self.index
     }
 }
@@ -105,7 +106,7 @@ impl<'parser> Parser<'parser> {
         self.input = input;
     }
 
-    pub fn strainer(length: usize) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn strainer(length: Scale) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {

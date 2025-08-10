@@ -3,7 +3,8 @@ extern crate alloc;
 use {
     crate::{
         data::{
-            slice::SliceIndex,
+            memory::{Borrow, Copied},
+            slice::{Iter, SliceIndex},
             platform::{OsStr, OsString, Path, PathBuf},
         },
         format::{
@@ -18,7 +19,7 @@ use {
 
 pub use {
     core::{
-        str::FromStr,
+        str::{from_utf8, FromStr, Utf8Error},
     },
 };
 
@@ -33,7 +34,7 @@ impl<'a> Str<'a> {
 
     #[inline]
     pub fn as_str(&self) -> Option<&'a str> {
-        core::str::from_utf8(self.0).ok()
+        from_utf8(self.0).ok()
     }
 
     #[inline]
@@ -52,7 +53,7 @@ impl<'a> Str<'a> {
     }
 
     #[inline]
-    pub fn bytes(&self) -> core::slice::Iter<'a, u8> {
+    pub fn bytes(&self) -> Iter<'a, u8> {
         self.0.iter()
     }
 }
@@ -100,13 +101,13 @@ impl<'a> AsRef<OsStr> for Str<'a> {
     }
 }
 
-impl<'a> core::borrow::Borrow<[u8]> for Str<'a> {
+impl<'a> Borrow<[u8]> for Str<'a> {
     fn borrow(&self) -> &[u8] {
         self.0
     }
 }
 
-impl<'a> core::borrow::Borrow<str> for Str<'a> {
+impl<'a> Borrow<str> for Str<'a> {
     fn borrow(&self) -> &str {
         self.as_str().expect("Str contains invalid UTF-8")
     }
@@ -327,7 +328,7 @@ impl<'a> From<OsString> for Str<'a> {
 
 impl<'a> IntoIterator for Str<'a> {
     type Item = u8;
-    type IntoIter = core::iter::Copied<core::slice::Iter<'a, u8>>;
+    type IntoIter = Copied<Iter<'a, u8>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter().copied()
@@ -336,7 +337,7 @@ impl<'a> IntoIterator for Str<'a> {
 
 impl<'a> IntoIterator for &Str<'a> {
     type Item = u8;
-    type IntoIter = core::iter::Copied<core::slice::Iter<'a, u8>>;
+    type IntoIter = Copied<Iter<'a, u8>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter().copied()
@@ -379,10 +380,10 @@ impl<'a> FromIterator<&'a str> for Str<'a> {
 }
 
 impl<'a> TryFrom<Vec<u8>> for Str<'a> {
-    type Error = core::str::Utf8Error;
+    type Error = Utf8Error;
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
-        core::str::from_utf8(&bytes)?;
+        from_utf8(&bytes)?;
         Ok(Str(bytes.leak()))
     }
 }

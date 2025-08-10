@@ -56,6 +56,8 @@ pub mod character {
 pub mod memory {
     pub use {
         core::{
+            borrow::Borrow,
+            iter::Copied,
             marker::PhantomData,
             mem::{
                 discriminant, replace,
@@ -77,7 +79,7 @@ pub mod platform {
 pub mod slice {
     pub use {
         core::{
-            slice::{from_ref, SliceIndex}
+            slice::{from_ref, from_raw_parts, Iter, SliceIndex}
         }
     };
 }
@@ -92,6 +94,7 @@ pub mod thread {
     };
 }
 
+pub type Pointer = *const u8;
 pub type Offset = usize;
 pub type Scale = usize;
 

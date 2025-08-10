@@ -3,7 +3,10 @@ use {
         Character, Token, ScanError,
     },
     crate::{
-        data::string::Str,
+        data::{
+            Offset, Scale,
+            string::Str,
+        },
         formation::{
             form::Form,
             former::Former,
@@ -20,7 +23,7 @@ use {
 };
 
 pub struct Scanner<'scanner> {
-    pub index: usize,
+    pub index: Offset,
     pub position: Position<'scanner>,
     pub input: Vec<Character<'scanner>>,
     pub output: Vec<Token<'scanner>>,
@@ -28,19 +31,19 @@ pub struct Scanner<'scanner> {
 }
 
 impl<'scanner> Peekable<'scanner, Character<'scanner>> for Scanner<'scanner> {
-    fn length(&self) -> usize {
+    fn length(&self) -> Scale {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Character<'scanner>> {
+    fn peek_ahead(&self, n: Offset) -> Option<&Character<'scanner>> {
         self.get(self.index + n)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Character<'scanner>> {
+    fn peek_behind(&self, n: Offset) -> Option<&Character<'scanner>> {
         self.index.checked_sub(n).and_then(|idx| self.get(idx))
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position<'scanner>) -> Option<Character<'scanner>> {
+    fn next(&self, index: &mut Offset, position: &mut Position<'scanner>) -> Option<Character<'scanner>> {
         let ch = self.get(*index)?;
 
         if *ch == '\n' {
@@ -70,11 +73,11 @@ impl<'scanner> Peekable<'scanner, Character<'scanner>> for Scanner<'scanner> {
         &mut self.position
     }
 
-    fn index(&self) -> usize {
+    fn index(&self) -> Offset {
         self.index
     }
 
-    fn index_mut(&mut self) -> &mut usize {
+    fn index_mut(&mut self) -> &mut Offset {
         &mut self.index
     }
 }

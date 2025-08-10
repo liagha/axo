@@ -8,9 +8,10 @@ use {
         resolver::Resolver,
         scanner::{Scanner, Token, TokenKind},
         tracker::{Location, Peekable, Span, Spanned},
-        Timer, TIMER,
     },
-    super::timer::Duration,
+    super::timer::{
+        DefaultTimer, Duration,
+    },
 };
 
 pub struct Pipeline<'pipeline, T> {
@@ -140,7 +141,9 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     pub fn compile(&mut self) -> () {
-        let timer = Timer::new(TIMER);
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
         let verbosity = self.compile_pipeline();
 
         if verbosity {
@@ -176,7 +179,9 @@ impl<'compiler> Compiler<'compiler> {
         let mut parser = Parser::new(location);
         let elements = parser.execute_pipeline(&mut self.registry.resolver, tokens);
 
-        let timer = Timer::new(TIMER);
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
         let resolver_verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
         if resolver_verbosity {
@@ -287,7 +292,8 @@ impl<'init> PipelineStage<'init, (), Location<'init>> for InitializerStage<'init
 
 impl<'scanner> Scanner<'scanner> {
     pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'scanner>, location: Location<'scanner>) -> Vec<Token<'scanner>> {
-        let timer = Timer::new(TIMER);
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
 
         let verbosity = Registry::get_verbosity(resolver);
         self.set_location(location);
@@ -348,7 +354,8 @@ impl<'scanner> Scanner<'scanner> {
 
 impl<'parser> Parser<'parser> {
     pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'parser>, tokens: Vec<Token<'parser>>) -> Vec<Element<'parser>> {
-        let timer = Timer::new(TIMER);
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
 
         let verbosity = Registry::get_verbosity(resolver);
 

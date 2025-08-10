@@ -1,26 +1,29 @@
 #![allow(unused)]
 
 #[cfg(feature = "checker")]
-mod checker;
-mod tracker;
-mod data;
-mod reporter;
+pub mod checker;
 #[cfg(feature = "formation")]
-mod formation;
-mod format;
+pub mod formation;
 #[cfg(feature = "initial")]
-mod initial;
+pub mod initial;
 #[cfg(feature = "internal")]
-mod internal;
+pub mod internal;
 #[cfg(feature = "parser")]
-mod parser;
+pub mod parser;
 #[cfg(feature = "resolver")]
-mod resolver;
+pub mod resolver;
 #[cfg(feature = "scanner")]
-mod scanner;
-mod schema;
+pub mod scanner;
+#[cfg(feature = "generator")]
+pub mod generator;
 #[cfg(feature = "text")]
-mod text;
+pub mod text;
+
+mod format;
+pub mod reporter;
+pub mod schema;
+pub mod tracker;
+pub(crate) mod data;
 
 use {
     internal::{
@@ -28,18 +31,9 @@ use {
             Compiler,
         },
         logger::{LogInfo, LogPlan, Logger},
-        timer::{
-            Timer,
-        },
     },
     log::Level,
 };
-
-#[cfg(target_arch = "x86_64")]
-pub const TIMER: internal::timer::CPUCycleSource = internal::timer::CPUCycleSource;
-
-#[cfg(target_arch = "aarch64")]
-pub const TIMER: internal::timer::ARMGenericTimerSource = internal::timer::ARMGenericTimerSource;
 
 fn main() {
     let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(" ".to_string());

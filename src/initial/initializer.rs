@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{memory, any::{Any, TypeId}},
+        data::{memory, any::{Any, TypeId}, Offset, Scale},
         format::Debug,
         formation::{
             classifier::Classifier,
@@ -20,7 +20,7 @@ use {
 
 #[derive(Debug)]
 pub struct Initializer<'initializer> {
-    pub index: usize,
+    pub index: Offset,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
     pub output: Vec<Preference<'initializer>>,
@@ -94,21 +94,21 @@ impl Symbolic for Preference<'static> {
 
 impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'initializer> {
     #[inline]
-    fn length(&self) -> usize {
+    fn length(&self) -> Scale {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Token<'initializer>> {
+    fn peek_ahead(&self, n: Offset) -> Option<&Token<'initializer>> {
         let current = self.index + n;
         self.get(current)
     }
 
-    fn peek_behind(&self, n: usize) -> Option<&Token<'initializer>> {
+    fn peek_behind(&self, n: Offset) -> Option<&Token<'initializer>> {
         let current = self.index - n;
         self.get(current)
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position<'initializer>) -> Option<Token<'initializer>> {
+    fn next(&self, index: &mut Offset, position: &mut Position<'initializer>) -> Option<Token<'initializer>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
             *index += 1;
@@ -133,11 +133,11 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
         &mut self.position
     }
 
-    fn index(&self) -> usize {
+    fn index(&self) -> Offset {
         self.index
     }
 
-    fn index_mut(&mut self) -> &mut usize {
+    fn index_mut(&mut self) -> &mut Offset {
         &mut self.index
     }
 }
@@ -260,7 +260,7 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn strainer(length: usize) -> Classifier<'initializer, Token<'initializer>, Element<'initializer>, ParseError<'initializer>> {
+    pub fn strainer(length: Scale) -> Classifier<'initializer, Token<'initializer>, Element<'initializer>, ParseError<'initializer>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {

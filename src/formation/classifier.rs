@@ -11,9 +11,8 @@ use {
     },
     crate::{
         data::{
-            thread::{
-                Arc,
-            },
+            thread::Arc,
+            Scale,
         },
         internal::{
             compiler::Registry,
@@ -59,7 +58,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn alternative<const SIZE: usize>(patterns: [Self; SIZE]) -> Self {
+    pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(Arc::new(Alternative {
             patterns,
             perfection: vec![PANICKED, ALIGNED],
@@ -68,7 +67,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn choice<const SIZE: usize>(patterns: [Self; SIZE], perfection: Vec<Record>) -> Self {
+    pub fn choice<const SIZE: Scale>(patterns: [Self; SIZE], perfection: Vec<Record>) -> Self {
         Self::new(Arc::new(Alternative {
             patterns,
             perfection,
@@ -77,7 +76,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn sequence<const SIZE: usize>(patterns: [Self; SIZE]) -> Self {
+    pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(Arc::new(Sequence { patterns }))
     }
 
@@ -89,7 +88,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn persistence(classifier: Self, minimum: usize, maximum: Option<usize>) -> Self {
+    pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(Arc::new(Repetition {
             classifier: Box::new(classifier),
             minimum,
@@ -104,7 +103,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn repetition(classifier: Self, minimum: usize, maximum: Option<usize>) -> Self {
+    pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(Arc::new(Repetition {
             classifier: Box::new(classifier),
             minimum,
@@ -119,7 +118,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn continuous(classifier: Self, minimum: usize, maximum: Option<usize>) -> Self {
+    pub fn continuous(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(Arc::new(Repetition {
             classifier: Box::new(classifier),
             minimum,
@@ -262,7 +261,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn as_persistence(&self, min: usize, max: Option<usize>) -> Self {
+    pub fn as_persistence(&self, min: Scale, max: Option<Scale>) -> Self {
         Self::persistence(self.clone(), min, max)
     }
 }
@@ -342,13 +341,13 @@ impl<'predicate, Input: Formable<'predicate>, Output: Formable<'predicate>, Fail
 }
 
 #[derive(Clone)]
-pub struct Alternative<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: usize> {
+pub struct Alternative<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: Scale> {
     pub patterns: [Classifier<'alternative, Input, Output, Failure>; SIZE],
     pub perfection: Vec<Record>,
     pub blacklist: Vec<Record>,
 }
 
-impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: usize> Order<'alternative, Input, Output, Failure> for Alternative<'alternative, Input, Output, Failure, SIZE> {
+impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: Scale> Order<'alternative, Input, Output, Failure> for Alternative<'alternative, Input, Output, Failure, SIZE> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'alternative, Input, Output, Failure>, draft: &mut Draft<'alternative, Input, Output, Failure>) {
         let mut best: Option<Draft<'alternative, Input, Output, Failure>> = None;
@@ -480,11 +479,11 @@ impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Form
 }
 
 #[derive(Clone)]
-pub struct Sequence<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: usize> {
+pub struct Sequence<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: Scale> {
     pub patterns: [Classifier<'sequence, Input, Output, Failure>; SIZE],
 }
 
-impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: usize> Order<'sequence, Input, Output, Failure> for Sequence<'sequence, Input, Output, Failure, SIZE> {
+impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: Scale> Order<'sequence, Input, Output, Failure> for Sequence<'sequence, Input, Output, Failure, SIZE> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'sequence, Input, Output, Failure>, draft: &mut Draft<'sequence, Input, Output, Failure>) {
         let mut index = draft.marker;
@@ -533,8 +532,8 @@ impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure
 #[derive(Clone)]
 pub struct Repetition<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, Failure: Formable<'repetition>> {
     pub classifier: Box<Classifier<'repetition, Input, Output, Failure>>,
-    pub minimum: usize,
-    pub maximum: Option<usize>,
+    pub minimum: Scale,
+    pub maximum: Option<Scale>,
     pub update: Vec<Record>,
     pub accept: Vec<Record>,
     pub consume: Vec<Record>,

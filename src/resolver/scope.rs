@@ -1,5 +1,6 @@
 use {
     crate::{
+        data::{Offset, Scale},
         internal::hash::HashSet,
         parser::Symbol,
     },
@@ -89,7 +90,7 @@ impl Scope {
         symbols
     }
 
-    pub fn count(&self) -> usize {
+    pub fn count(&self) -> Scale {
         self.symbols.len()
     }
 
@@ -101,7 +102,7 @@ impl Scope {
         self.symbols.clear();
     }
 
-    pub fn depth(&self) -> usize {
+    pub fn depth(&self) -> Scale {
         let mut depth = 0;
         let mut current = self.parent.as_deref();
 

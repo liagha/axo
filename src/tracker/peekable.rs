@@ -1,18 +1,21 @@
 use {
     crate::{
-        data::string::Str,
+        data::{
+            Offset, Scale,
+            string::Str,
+        },
         tracker::{Location, Position},
     },
 };
 
 pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
-    fn length(&self) -> usize;
-    fn remaining(&self) -> usize {
+    fn length(&self) -> Scale;
+    fn remaining(&self) -> Scale {
         self.length() - self.index()
     }
 
-    fn peek_ahead(&self, n: usize) -> Option<&Item>;
-    fn peek_behind(&self, n: usize) -> Option<&Item>;
+    fn peek_ahead(&self, n: Offset) -> Option<&Item>;
+    fn peek_behind(&self, n: Offset) -> Option<&Item>;
 
     fn reset(&mut self) {
         self.set_index(0);
@@ -37,21 +40,21 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
         result
     }
 
-    fn next(&self, index: &mut usize, position: &mut Position<'peekable>) -> Option<Item>;
+    fn next(&self, index: &mut Offset, position: &mut Position<'peekable>) -> Option<Item>;
 
-    fn get(&self, index: usize) -> Option<&Item> {
+    fn get(&self, index: Offset) -> Option<&Item> {
         self.input().get(index)
     }
 
-    fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.input_mut().get_mut(index)
     }
 
-    fn insert(&mut self, index: usize, item: Item) {
+    fn insert(&mut self, index: Offset, item: Item) {
         self.input_mut().insert(index, item);
     }
 
-    fn remove(&mut self, index: usize) -> Option<Item> {
+    fn remove(&mut self, index: Offset) -> Option<Item> {
         Some(self.input_mut().remove(index))
     }
 
@@ -60,8 +63,8 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
 
     fn position(&self) -> Position<'peekable>;
     fn position_mut(&mut self) -> &mut Position<'peekable>;
-    fn index(&self) -> usize;
-    fn index_mut(&mut self) -> &mut usize;
+    fn index(&self) -> Offset;
+    fn index_mut(&mut self) -> &mut Offset;
 
     fn peek(&self) -> Option<&Item> {
         self.peek_ahead(0)
@@ -71,7 +74,7 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
         self.peek_behind(1)
     }
 
-    fn set_index(&mut self, index: usize) {
+    fn set_index(&mut self, index: Offset) {
         *self.index_mut() = index;
     }
 
@@ -79,11 +82,11 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
         *self.position_mut() = position;
     }
 
-    fn set_line(&mut self, line: usize) {
+    fn set_line(&mut self, line: Offset) {
         self.position_mut().line = line;
     }
 
-    fn set_column(&mut self, line: usize) {
+    fn set_column(&mut self, line: Offset) {
         self.position_mut().column = line;
     }
 
@@ -95,7 +98,7 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
         self.position_mut().location = location;
     }
 
-    fn skip(&mut self, count: usize) {
+    fn skip(&mut self, count: Offset) {
         for _ in 0..count {
             self.advance();
         }

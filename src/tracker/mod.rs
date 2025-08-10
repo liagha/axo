@@ -5,6 +5,7 @@ mod span;
 
 use {
     crate::{
+        data::Scale,
         format::Display,
         reporter::Error,
     },
@@ -72,7 +73,7 @@ impl<'item, T: Spanned<'item>> Spanned<'item> for Box<[T]> {
     }
 }
 
-impl<'item, T: Spanned<'item>, const N: usize> Spanned<'item> for [T; N] {
+impl<'item, T: Spanned<'item>, const N: Scale> Spanned<'item> for [T; N] {
     #[track_caller]
     fn borrow_span(&self) -> Span<'item> {
         Span::from_slice(self.as_slice())

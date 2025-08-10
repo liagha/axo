@@ -1,6 +1,8 @@
 use {
     crate::{
+        data::Scale,
         internal::asm,
+        format::Debug,
     }
 };
 
@@ -14,13 +16,227 @@ pub enum TimerError {
     NotRunning,
     InvalidDuration,
     Overflow,
+    StorageFull,
 }
 
 pub type TimerResult<T> = Result<T, TimerError>;
 
-pub trait TimeSource : Sized {
-    fn now(&self) -> u64;
-    fn resolution(&self) -> u64; 
+pub trait TimeValue: Copy + Clone + PartialOrd + PartialEq + Ord + Debug {
+    const ZERO: Self;
+    const ONE: Self;
+    fn zero() -> Self;
+    fn one() -> Self;
+    fn max_value() -> Self;
+    fn saturating_add(self, other: Self) -> Self;
+    fn saturating_sub(self, other: Self) -> Self;
+    fn saturating_mul(self, scalar: u32) -> Self;
+    fn saturating_div(self, scalar: u32) -> Self;
+    fn checked_add(self, other: Self) -> Option<Self>;
+    fn checked_sub(self, other: Self) -> Option<Self>;
+    fn from_u32(value: u32) -> Self;
+    fn as_u32(self) -> u32;
+}
+
+impl TimeValue for u64 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    fn zero() -> Self { 0 }
+    fn one() -> Self { 1 }
+    fn max_value() -> Self { u64::MAX }
+    fn saturating_add(self, other: Self) -> Self { self.saturating_add(other) }
+    fn saturating_sub(self, other: Self) -> Self { self.saturating_sub(other) }
+    fn saturating_mul(self, scalar: u32) -> Self { self.saturating_mul(scalar as u64) }
+    fn saturating_div(self, scalar: u32) -> Self { self / (scalar as u64) }
+    fn checked_add(self, other: Self) -> Option<Self> { self.checked_add(other) }
+    fn checked_sub(self, other: Self) -> Option<Self> { self.checked_sub(other) }
+    fn from_u32(value: u32) -> Self { value as u64 }
+    fn as_u32(self) -> u32 { self.min(u32::MAX as u64) as u32 }
+}
+
+impl TimeValue for u32 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    fn zero() -> Self { 0 }
+    fn one() -> Self { 1 }
+    fn max_value() -> Self { u32::MAX }
+    fn saturating_add(self, other: Self) -> Self { self.saturating_add(other) }
+    fn saturating_sub(self, other: Self) -> Self { self.saturating_sub(other) }
+    fn saturating_mul(self, scalar: u32) -> Self { self.saturating_mul(scalar) }
+    fn saturating_div(self, scalar: u32) -> Self { self / scalar }
+    fn checked_add(self, other: Self) -> Option<Self> { self.checked_add(other) }
+    fn checked_sub(self, other: Self) -> Option<Self> { self.checked_sub(other) }
+    fn from_u32(value: u32) -> Self { value }
+    fn as_u32(self) -> u32 { self }
+}
+
+impl TimeValue for u128 {
+    const ZERO: Self = 0;
+    const ONE: Self = 1;
+    fn zero() -> Self { 0 }
+    fn one() -> Self { 1 }
+    fn max_value() -> Self { u128::MAX }
+    fn saturating_add(self, other: Self) -> Self { self.saturating_add(other) }
+    fn saturating_sub(self, other: Self) -> Self { self.saturating_sub(other) }
+    fn saturating_mul(self, scalar: u32) -> Self { self.saturating_mul(scalar as u128) }
+    fn saturating_div(self, scalar: u32) -> Self { self / (scalar as u128) }
+    fn checked_add(self, other: Self) -> Option<Self> { self.checked_add(other) }
+    fn checked_sub(self, other: Self) -> Option<Self> { self.checked_sub(other) }
+    fn from_u32(value: u32) -> Self { value as u128 }
+    fn as_u32(self) -> u32 { self.min(u32::MAX as u128) as u32 }
+}
+
+pub trait TimeSource<T: TimeValue> : Sized {
+    fn now(&self) -> T;
+    fn resolution(&self) -> T;
+}
+
+pub trait LapStorage<T: TimeValue> {
+    fn push(&mut self, value: T) -> Result<(), TimerError>;
+    fn clear(&mut self);
+    fn get(&self, index: usize) -> Option<T>;
+    fn len(&self) -> usize;
+    fn is_full(&self) -> bool;
+    fn as_slice(&self) -> &[T];
+}
+
+pub struct ArrayLapStorage<T: TimeValue, const N: usize> {
+    data: [T; N],
+    len: usize,
+}
+
+impl<T: TimeValue, const N: usize> ArrayLapStorage<T, N> {
+    pub const fn new() -> Self {
+        Self {
+            data: [T::ZERO; N],
+            len: 0,
+        }
+    }
+}
+
+impl<T: TimeValue, const N: usize> LapStorage<T> for ArrayLapStorage<T, N> {
+    fn push(&mut self, value: T) -> Result<(), TimerError> {
+        if self.is_full() {
+            for i in 1..N {
+                self.data[i - 1] = self.data[i];
+            }
+            self.data[N - 1] = value;
+        } else {
+            self.data[self.len] = value;
+            self.len += 1;
+        }
+        Ok(())
+    }
+
+    fn clear(&mut self) {
+        self.len = 0;
+        self.data.fill(T::zero());
+    }
+
+    fn get(&self, index: usize) -> Option<T> {
+        if index < self.len {
+            Some(self.data[index])
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn is_full(&self) -> bool {
+        self.len >= N
+    }
+
+    fn as_slice(&self) -> &[T] {
+        &self.data[0..self.len]
+    }
+}
+
+pub struct RingLapStorage<T: TimeValue, const N: usize> {
+    data: [T; N],
+    head: usize,
+    len: usize,
+}
+
+impl<T: TimeValue, const N: usize> RingLapStorage<T, N> {
+    pub const fn new() -> Self {
+        Self {
+            data: [T::ZERO; N],
+            head: 0,
+            len: 0,
+        }
+    }
+}
+
+impl<T: TimeValue, const N: usize> LapStorage<T> for RingLapStorage<T, N> {
+    fn push(&mut self, value: T) -> Result<(), TimerError> {
+        self.data[self.head] = value;
+        self.head = (self.head + 1) % N;
+        if self.len < N {
+            self.len += 1;
+        }
+        Ok(())
+    }
+
+    fn clear(&mut self) {
+        self.head = 0;
+        self.len = 0;
+        self.data.fill(T::zero());
+    }
+
+    fn get(&self, index: usize) -> Option<T> {
+        if index < self.len {
+            let actual_index = if self.len == N {
+                (self.head + index) % N
+            } else {
+                index
+            };
+            Some(self.data[actual_index])
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn is_full(&self) -> bool {
+        self.len >= N
+    }
+
+    fn as_slice(&self) -> &[T] {
+        if self.len == N {
+            &[]
+        } else {
+            &self.data[0..self.len]
+        }
+    }
+}
+
+pub trait CpuCycleCounter<T: TimeValue> {
+    fn read_cycles() -> T;
+    fn frequency() -> T;
+}
+
+#[cfg(target_arch = "x86_64")]
+pub struct X86CycleCounter;
+
+#[cfg(target_arch = "x86_64")]
+impl CpuCycleCounter<u64> for X86CycleCounter {
+    fn read_cycles() -> u64 {
+        let low: u32;
+        let high: u32;
+        unsafe {
+            asm!("rdtsc", out("eax") low, out("edx") high, options(nostack, nomem));
+        }
+        ((high as u64) << 32) | (low as u64)
+    }
+
+    fn frequency() -> u64 {
+        3_000_000_000
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -31,26 +247,38 @@ impl CPUCycleSource {
     pub const fn new() -> Self {
         CPUCycleSource
     }
-
-    #[inline(always)]
-    fn read_cycle_counter() -> u64 {
-        let low: u32;
-        let high: u32;
-        unsafe {
-            asm!("rdtsc", out("eax") low, out("edx") high, options(nostack, nomem));
-        }
-        ((high as u64) << 32) | (low as u64)
-    }
 }
 
 #[cfg(target_arch = "x86_64")]
-impl TimeSource for CPUCycleSource {
+impl TimeSource<u64> for CPUCycleSource {
     fn now(&self) -> u64 {
-        Self::read_cycle_counter()
+        X86CycleCounter::read_cycles()
     }
 
     fn resolution(&self) -> u64 {
-        1_000_000_000
+        X86CycleCounter::frequency()
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+pub struct ARMCycleCounter;
+
+#[cfg(target_arch = "aarch64")]
+impl CpuCycleCounter<u64> for ARMCycleCounter {
+    fn read_cycles() -> u64 {
+        let cnt: u64;
+        unsafe {
+            asm!("mrs {}, cntvct_el0", out(reg) cnt, options(nostack, nomem));
+        }
+        cnt
+    }
+
+    fn frequency() -> u64 {
+        let freq: u64;
+        unsafe {
+            asm!("mrs {}, cntfrq_el0", out(reg) freq, options(nostack, nomem));
+        }
+        freq
     }
 }
 
@@ -62,29 +290,34 @@ impl ARMGenericTimerSource {
     pub const fn new() -> Self {
         ARMGenericTimerSource
     }
-
-    #[inline(always)]
-    fn read_counter() -> u64 {
-        let cnt: u64;
-        unsafe {
-            asm!("mrs {}, cntvct_el0", out(reg) cnt, options(nostack, nomem));
-        }
-        cnt
-    }
 }
 
 #[cfg(target_arch = "aarch64")]
-impl TimeSource for ARMGenericTimerSource {
+impl TimeSource<u64> for ARMGenericTimerSource {
     fn now(&self) -> u64 {
-        Self::read_counter()
+        ARMCycleCounter::read_cycles()
     }
 
     fn resolution(&self) -> u64 {
-        let freq: u64;
+        ARMCycleCounter::frequency()
+    }
+}
+
+#[cfg(target_arch = "riscv64")]
+pub struct RISCVCycleCounter;
+
+#[cfg(target_arch = "riscv64")]
+impl CpuCycleCounter<u64> for RISCVCycleCounter {
+    fn read_cycles() -> u64 {
+        let cycles: u64;
         unsafe {
-            asm!("mrs {}, cntfrq_el0", out(reg) freq, options(nostack, nomem));
+            asm!("rdcycle {}", out(reg) cycles, options(nostack, nomem));
         }
-        freq
+        cycles
+    }
+
+    fn frequency() -> u64 {
+        1_000_000
     }
 }
 
@@ -96,25 +329,30 @@ impl RISCVCycleSource {
     pub const fn new() -> Self {
         RISCVCycleSource
     }
-
-    #[inline(always)]
-    fn read_cycle_counter() -> u64 {
-        let cycles: u64;
-        unsafe {
-            asm!("rdcycle {}", out(reg) cycles, options(nostack, nomem));
-        }
-        cycles
-    }
 }
 
 #[cfg(target_arch = "riscv64")]
-impl TimeSource for RISCVCycleSource {
+impl TimeSource<u64> for RISCVCycleSource {
     fn now(&self) -> u64 {
-        Self::read_cycle_counter()
+        RISCVCycleCounter::read_cycles()
     }
 
     fn resolution(&self) -> u64 {
-        1_000_000
+        RISCVCycleCounter::frequency()
+    }
+}
+
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+pub struct GenericCycleCounter;
+
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+impl<T: TimeValue> CpuCycleCounter<T> for GenericCycleCounter {
+    fn read_cycles() -> T {
+        T::zero()
+    }
+
+    fn frequency() -> T {
+        T::max_value()
     }
 }
 
@@ -129,13 +367,13 @@ impl DummyTimeSource {
 }
 
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-impl TimeSource for DummyTimeSource {
-    fn now(&self) -> u64 {
-        0
+impl<T: TimeValue> TimeSource<T> for DummyTimeSource {
+    fn now(&self) -> T {
+        T::zero()
     }
 
-    fn resolution(&self) -> u64 {
-        1
+    fn resolution(&self) -> T {
+        T::max_value()
     }
 }
 
@@ -146,61 +384,65 @@ pub enum TimerState {
     Paused,
 }
 
-pub struct Timer<T: TimeSource> {
-    source: T,
+pub struct Timer<T, S, L>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+{
+    source: S,
+    storage: L,
     state: TimerState,
-    start: u64,
-    elapsed: u64,
-    duration: Option<u64>,
-    laps: [u64; 32], 
-    lap_count: usize,
+    start_time: T,
+    accumulated: T,
+    target_duration: Option<T>,
 }
 
-impl<T: ?Sized + TimeSource> Timer<T> {
-    pub fn new(time_source: T) -> Self {
-        let mut timer = Timer {
+impl<T, S, L> Timer<T, S, L>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+{
+    pub fn new(time_source: S, lap_storage: L) -> Self {
+        Timer {
             source: time_source,
+            storage: lap_storage,
             state: TimerState::Stopped,
-            start: 0,
-            elapsed: 0,
-            duration: None,
-            laps: [0; 32],
-            lap_count: 0,
-        };
-
-        let _ = timer.start();
-
-        timer
+            start_time: T::zero(),
+            accumulated: T::zero(),
+            target_duration: None,
+        }
     }
 
     pub fn start(&mut self) -> TimerResult<()> {
         if self.state == TimerState::Running {
             return Err(TimerError::AlreadyRunning);
         }
-        
+
         self.state = TimerState::Running;
-        self.start = self.source.now();
-        self.elapsed = 0;
-        self.lap_count = 0;
-        
+        self.start_time = self.source.now();
+        self.accumulated = T::zero();
+        self.storage.clear();
+
         Ok(())
     }
 
-    pub fn stop(&mut self) -> TimerResult<u64> {
+    pub fn stop(&mut self) -> TimerResult<T> {
         if self.state == TimerState::Stopped {
             return Err(TimerError::NotRunning);
         }
         let elapsed = self.elapsed()?;
         self.state = TimerState::Stopped;
-        self.elapsed = 0;
+        self.accumulated = T::zero();
         Ok(elapsed)
     }
 
-    pub fn pause(&mut self) -> TimerResult<u64> {
+    pub fn pause(&mut self) -> TimerResult<T> {
         match self.state {
             TimerState::Running => {
                 let elapsed = self.elapsed()?;
-                self.elapsed = elapsed;
+                self.accumulated = elapsed;
                 self.state = TimerState::Paused;
                 Ok(elapsed)
             }
@@ -212,7 +454,7 @@ impl<T: ?Sized + TimeSource> Timer<T> {
     pub fn resume(&mut self) -> TimerResult<()> {
         match self.state {
             TimerState::Paused => {
-                self.start = self.source.now();
+                self.start_time = self.source.now();
                 self.state = TimerState::Running;
                 Ok(())
             }
@@ -223,123 +465,185 @@ impl<T: ?Sized + TimeSource> Timer<T> {
 
     pub fn reset(&mut self) {
         self.state = TimerState::Stopped;
-        self.start = 0;
-        self.elapsed = 0;
-        self.lap_count = 0;
+        self.start_time = T::zero();
+        self.accumulated = T::zero();
+        self.storage.clear();
     }
 
-    pub fn elapsed(&self) -> TimerResult<u64> {
+    pub fn elapsed(&self) -> TimerResult<T> {
         match self.state {
             TimerState::Stopped => {
-                if self.elapsed > 0 {
-                    Ok(self.elapsed)
+                if self.accumulated > T::zero() {
+                    Ok(self.accumulated)
                 } else {
                     Err(TimerError::NotRunning)
                 }
             }
-            TimerState::Paused => Ok(self.elapsed),
+            TimerState::Paused => Ok(self.accumulated),
             TimerState::Running => {
                 let now = self.source.now();
-                if now < self.start {
+                if now < self.start_time {
                     Err(TimerError::Overflow)
                 } else {
-                    Ok(self.elapsed + (now - self.start))
+                    now.checked_sub(self.start_time)
+                        .and_then(|diff| self.accumulated.checked_add(diff))
+                        .ok_or(TimerError::Overflow)
                 }
             }
         }
     }
 
-    pub fn set_duration(&mut self, duration: u64) -> TimerResult<()> {
-        if duration == 0 {
+    pub fn set_duration(&mut self, duration: T) -> TimerResult<()> {
+        if duration == T::zero() {
             return Err(TimerError::InvalidDuration);
         }
-        self.duration = Some(duration);
+        self.target_duration = Some(duration);
         Ok(())
     }
 
     pub fn clear_duration(&mut self) {
-        self.duration = None;
+        self.target_duration = None;
     }
 
     pub fn is_expired(&self) -> bool {
-        self.duration
+        self.target_duration
             .map(|duration| self.elapsed().map_or(false, |elapsed| elapsed >= duration))
             .unwrap_or(false)
     }
 
-    pub fn lap(&mut self) -> TimerResult<u64> {
+    pub fn lap(&mut self) -> TimerResult<T> {
         if self.state != TimerState::Running {
             return Err(TimerError::NotRunning);
         }
-        if self.lap_count >= self.laps.len() {
-            for i in 1..self.laps.len() {
-                self.laps[i - 1] = self.laps[i];
-            }
-            self.lap_count = self.laps.len() - 1;
-        }
         let elapsed = self.elapsed()?;
-        self.laps[self.lap_count] = elapsed;
-        self.lap_count += 1;
+        self.storage.push(elapsed)?;
         Ok(elapsed)
     }
 
-    pub fn laps(&self) -> &[u64] {
-        &self.laps[0..self.lap_count]
+    pub fn laps(&self) -> &[T] {
+        self.storage.as_slice()
+    }
+
+    pub fn lap_count(&self) -> usize {
+        self.storage.len()
+    }
+
+    pub fn get_lap(&self, index: usize) -> Option<T> {
+        self.storage.get(index)
     }
 
     pub fn state(&self) -> TimerState {
         self.state
     }
 
-    pub fn to_seconds(&self, time: u64) -> u64 {
-        time / self.source.resolution()
+    pub fn to_seconds(&self, time: T) -> T {
+        let resolution = self.source.resolution();
+        let resolution_u32 = resolution.as_u32().max(1);
+        let scale_factor = (resolution_u32 / 1000).max(1);
+        time.saturating_div(scale_factor)
     }
 
-    pub fn to_milliseconds(&self, time: u64) -> u64 {
-        time * 1_000 / self.source.resolution()
+    pub fn to_milliseconds(&self, time: T) -> T {
+        let resolution = self.source.resolution();
+        let resolution_u32 = resolution.as_u32().max(1);
+
+        if resolution_u32 >= 1_000_000 {
+            let scale_factor = (resolution_u32 / 1_000_000).max(1);
+            time.saturating_mul(1000).saturating_div(scale_factor)
+        } else {
+            time.saturating_mul(1000)
+        }
     }
 
-    pub fn to_microseconds(&self, time: u64) -> u64 {
-        time * 1_000_000 / self.source.resolution()
+    pub fn to_microseconds(&self, time: T) -> T {
+        let resolution = self.source.resolution();
+        let resolution_u32 = resolution.as_u32().max(1);
+
+        if resolution_u32 >= 1_000_000 {
+            let scale_factor = resolution_u32 / 1_000_000;
+            time.saturating_mul(1_000_000).saturating_div(scale_factor.max(1))
+        } else {
+            time.saturating_mul(1_000_000)
+        }
     }
 
-    pub fn to_nanoseconds(&self, time: u64) -> u64 {
-        time * 1_000_000_000 / self.source.resolution()
+    pub fn to_nanoseconds(&self, time: T) -> T {
+        let resolution = self.source.resolution();
+        let resolution_u32 = resolution.as_u32().max(1);
+
+        if resolution_u32 >= 1_000_000_000 {
+            let scale_factor = resolution_u32 / 1_000_000_000;
+            time.saturating_mul(1_000_000_000).saturating_div(scale_factor.max(1))
+        } else {
+            time.saturating_mul(1_000_000_000)
+        }
     }
 
-    pub fn remaining(&self) -> TimerResult<Option<u64>> {
-        self.duration
+    pub fn remaining(&self) -> TimerResult<Option<T>> {
+        self.target_duration
             .map(|duration| {
                 let elapsed = self.elapsed()?;
                 Ok(if elapsed >= duration {
-                    0
+                    T::zero()
                 } else {
-                    duration - elapsed
+                    duration.saturating_sub(elapsed)
                 })
             })
             .transpose()
     }
 }
 
-pub trait TimerCallback {
-    fn on_tick(&mut self, elapsed: u64, remaining: Option<u64>);
+pub type DefaultTimer = Timer<u64, CPUCycleSource, ArrayLapStorage<u64, 32>>;
+
+#[cfg(target_arch = "x86_64")]
+pub type PlatformTimer<T, L> = Timer<T, CPUCycleSource, L>;
+
+#[cfg(target_arch = "aarch64")]
+pub type PlatformTimer<T, L> = Timer<T, ARMGenericTimerSource, L>;
+
+#[cfg(target_arch = "riscv64")]
+pub type PlatformTimer<T, L> = Timer<T, RISCVCycleSource, L>;
+
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+pub type PlatformTimer<T, L> = Timer<T, DummyTimeSource, L>;
+
+impl DefaultTimer {
+    pub fn new_default() -> Self {
+        Timer::new(CPUCycleSource::new(), ArrayLapStorage::new())
+    }
+}
+
+pub trait TimerCallback<T: TimeValue> {
+    fn on_tick(&mut self, elapsed: T, remaining: Option<T>);
     fn on_complete(&mut self);
 }
 
-pub struct CallbackTimer<T: TimeSource, C: TimerCallback> {
-    timer: Timer<T>,
+pub struct CallbackTimer<T, S, L, C>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+    C: TimerCallback<T>,
+{
+    timer: Timer<T, S, L>,
     callback: C,
-    tick_interval: u64,
-    last_tick: u64,
+    tick_interval: T,
+    last_tick: T,
 }
 
-impl<T: TimeSource, C: TimerCallback> CallbackTimer<T, C> {
-    pub fn new(time_source: T, callback: C, tick_interval: u64) -> Self {
+impl<T, S, L, C> CallbackTimer<T, S, L, C>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+    C: TimerCallback<T>,
+{
+    pub fn new(time_source: S, lap_storage: L, callback: C, tick_interval: T) -> Self {
         CallbackTimer {
-            timer: Timer::new(time_source),
+            timer: Timer::new(time_source, lap_storage),
             callback,
             tick_interval,
-            last_tick: 0,
+            last_tick: T::zero(),
         }
     }
 
@@ -349,7 +653,7 @@ impl<T: TimeSource, C: TimerCallback> CallbackTimer<T, C> {
         }
         let elapsed = self.timer.elapsed()?;
         let remaining = self.timer.remaining()?;
-        if elapsed - self.last_tick >= self.tick_interval {
+        if elapsed.saturating_sub(self.last_tick) >= self.tick_interval {
             self.last_tick = elapsed;
             self.callback.on_tick(elapsed, remaining);
         }
@@ -363,27 +667,37 @@ impl<T: TimeSource, C: TimerCallback> CallbackTimer<T, C> {
     pub fn start(&mut self) -> TimerResult<()> {
         let result = self.timer.start();
         if result.is_ok() {
-            self.last_tick = 0;
+            self.last_tick = T::zero();
         }
         result
     }
 
-    pub fn stop(&mut self) -> TimerResult<u64> {
+    pub fn stop(&mut self) -> TimerResult<T> {
         self.timer.stop()
     }
 
-    pub fn set_duration(&mut self, duration: u64) -> TimerResult<()> {
+    pub fn set_duration(&mut self, duration: T) -> TimerResult<()> {
         self.timer.set_duration(duration)
     }
 }
 
-pub struct CountdownTimer<T: TimeSource> {
-    timer: Timer<T>,
+pub struct CountdownTimer<T, S, L>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+{
+    timer: Timer<T, S, L>,
 }
 
-impl<T: TimeSource> CountdownTimer<T> {
-    pub fn new(time_source: T, duration: u64) -> TimerResult<Self> {
-        let mut timer = Timer::new(time_source);
+impl<T, S, L> CountdownTimer<T, S, L>
+where
+    T: TimeValue,
+    S: TimeSource<T>,
+    L: LapStorage<T>,
+{
+    pub fn new(time_source: S, lap_storage: L, duration: T) -> TimerResult<Self> {
+        let mut timer = Timer::new(time_source, lap_storage);
         timer.set_duration(duration)?;
         Ok(CountdownTimer { timer })
     }
@@ -392,11 +706,11 @@ impl<T: TimeSource> CountdownTimer<T> {
         self.timer.start()
     }
 
-    pub fn stop(&mut self) -> TimerResult<u64> {
+    pub fn stop(&mut self) -> TimerResult<T> {
         self.timer.stop()
     }
 
-    pub fn remaining(&self) -> TimerResult<u64> {
+    pub fn remaining(&self) -> TimerResult<T> {
         self.timer
             .remaining()?
             .ok_or(TimerError::InvalidDuration)
@@ -405,7 +719,13 @@ impl<T: TimeSource> CountdownTimer<T> {
     pub fn is_expired(&self) -> bool {
         self.timer.is_expired()
     }
+}
 
+impl<S, L> CountdownTimer<u64, S, L>
+where
+    S: TimeSource<u64>,
+    L: LapStorage<u64>,
+{
     pub fn format_remaining(&self) -> TimerResult<(u64, u64)> {
         let remaining_ms = self.timer.to_milliseconds(self.remaining()?);
         let seconds = (remaining_ms / 1000) % 60;

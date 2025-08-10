@@ -23,9 +23,15 @@ use {
             Enumeration, Implementation,
             Interface, Method, Structure
         },
-        data::memory,
+        
+        data::{
+            Scale,
+            memory::{
+                self,
+                replace,
+            }
+        },
         format::Debug,
-        data::memory::replace,
     },
 };
 
@@ -319,7 +325,7 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.isolate();
     }
 
-    pub fn depth(&self) -> usize {
+    pub fn depth(&self) -> Scale {
         self.scope.depth()
     }
 
@@ -363,7 +369,7 @@ impl<'resolver> Resolver<'resolver> {
         !self.errors.is_empty()
     }
 
-    pub fn count(&self) -> usize {
+    pub fn count(&self) -> Scale {
         self.scope.count()
     }
 

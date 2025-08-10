@@ -1,5 +1,6 @@
 use {
     crate::{
+        data::{Offset, Scale},
         internal::hash::{Hash, Hasher}
     }
 };
@@ -130,15 +131,15 @@ impl<Item> Group<Item> {
         Group { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -153,15 +154,15 @@ impl<Item> Sequence<Item> {
         Sequence { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -176,15 +177,15 @@ impl<Item> Collection<Item> {
         Collection { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -199,15 +200,15 @@ impl<Item> Series<Item> {
         Series { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -222,15 +223,15 @@ impl<Item> Bundle<Item> {
         Bundle { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -245,15 +246,15 @@ impl<Item> Block<Item> {
         Block { items }
     }
     #[inline]
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get(&self, index: Offset) -> Option<&Item> {
         self.items.get(index)
     }
     #[inline]
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
         self.items.get_mut(index)
     }
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.items.len()
     }
     #[inline]
@@ -313,7 +314,7 @@ impl<Target, Value> Index<Target, Value> {
         &self.indexes
     }
     #[inline]
-    pub fn get_index(&self, index: usize) -> Option<&Value> {
+    pub fn get_index(&self, index: Offset) -> Option<&Value> {
         self.indexes.get(index)
     }
 }
@@ -332,7 +333,7 @@ impl<Target, Argument> Invoke<Target, Argument> {
         &self.arguments
     }
     #[inline]
-    pub fn get_argument(&self, index: usize) -> Option<&Argument> {
+    pub fn get_argument(&self, index: Offset) -> Option<&Argument> {
         self.arguments.get(index)
     }
 }
@@ -351,7 +352,7 @@ impl<Target, Field> Construct<Target, Field> {
         &self.fields
     }
     #[inline]
-    pub fn get_field(&self, index: usize) -> Option<&Field> {
+    pub fn get_field(&self, index: Offset) -> Option<&Field> {
         self.fields.get(index)
     }
 }

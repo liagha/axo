@@ -1,5 +1,6 @@
 use {
     crate::{
+        data::{Offset, Scale},
         internal::hash::{Hash, Hasher},
     },
 };
@@ -145,12 +146,12 @@ impl<Target, Field> Structure<Target, Field> {
     }
 
     #[inline]
-    pub fn get_field(&self, index: usize) -> Option<&Field> {
+    pub fn get_field(&self, index: Offset) -> Option<&Field> {
         self.fields.get(index)
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.fields.len()
     }
 
@@ -177,12 +178,12 @@ impl<Target, Variant> Enumeration<Target, Variant> {
     }
 
     #[inline]
-    pub fn get_variant(&self, index: usize) -> Option<&Variant> {
+    pub fn get_variant(&self, index: Offset) -> Option<&Variant> {
         self.variants.get(index)
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.variants.len()
     }
 
@@ -209,7 +210,7 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     }
 
     #[inline]
-    pub fn get_parameter(&self, index: usize) -> Option<&Parameter> {
+    pub fn get_parameter(&self, index: Offset) -> Option<&Parameter> {
         self.parameters.get(index)
     }
 
@@ -224,7 +225,7 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Scale {
         self.parameters.len()
     }
 

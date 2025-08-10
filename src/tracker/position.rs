@@ -1,6 +1,10 @@
 use {
     crate::{
-        data::string::Str,
+        data::{
+            string::{Str, from_utf8},
+            slice::from_raw_parts,
+            Pointer, Offset, Scale,
+        },
         internal::{
             environment::args,
             operation::Ordering,
@@ -12,22 +16,52 @@ use {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Location<'location> {
     File(Str<'location>),
+    Raw {
+        ptr: Pointer,
+        len: Scale,
+    },
     Flag,
 }
 
 impl<'location> Location<'location> {
     pub fn get_value(&self) -> Str<'location> {
         match self {
-            Location::File(file) => read_to_string(file.as_str().unwrap()).unwrap_or("".to_string()).into(),
+            Location::File(file) => {
+                read_to_string(file.as_str().unwrap()).unwrap_or_else(|_| "".to_string()).into()
+            }
+            Location::Raw { ptr, len, .. } => {
+                let slice = unsafe { from_raw_parts(*ptr, *len) };
+                let s = from_utf8(slice).unwrap();
+                s.into()
+            }
             Location::Flag => args().skip(1).collect::<Vec<String>>().join(" ").into(),
         }
+    }
+
+    pub fn file(string: Str<'location>) -> Location<'location> {
+        Location::File(string)
+    }
+
+    pub fn raw<T>(value: &'location T) -> Location<'location>
+    where
+        T: AsRef<[u8]> + ?Sized,
+    {
+        let bytes = value.as_ref();
+        Location::Raw {
+            ptr: bytes.as_ptr(),
+            len: bytes.len(),
+        }
+    }
+
+    pub fn flag() -> Location<'location> {
+        Location::Flag
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Position<'position> {
-    pub line: usize,
-    pub column: usize,
+    pub line: Offset,
+    pub column: Offset,
     pub location: Location<'position>,
 }
 
@@ -51,7 +85,7 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn path(line: usize, column: usize, path: Str<'a>) -> Self {
+    pub fn path(line: Offset, column: Offset, path: Str<'a>) -> Self {
         Self {
             line,
             column,
@@ -60,12 +94,12 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn set_line(&mut self, line: usize) {
+    pub fn set_line(&mut self, line: Offset) {
         self.line = line;
     }
 
     #[inline]
-    pub fn set_column(&mut self, column: usize) {
+    pub fn set_column(&mut self, column: Offset) {
         self.column = column;
     }
 
@@ -80,7 +114,7 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn swap_line(&self, line: usize) -> Self {
+    pub fn swap_line(&self, line: Offset) -> Self {
         Self {
             line,
             ..*self
@@ -88,7 +122,7 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn swap_column(&self, column: usize) -> Self {
+    pub fn swap_column(&self, column: Offset) -> Self {
         Self {
             column,
             ..*self
@@ -112,7 +146,7 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn advance_line(&self, amount: usize) -> Self {
+    pub fn advance_line(&self, amount: Offset) -> Self {
         Self {
             line: self.line + amount,
             ..*self
@@ -120,7 +154,7 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn join_column(&self, amount: usize) -> Self {
+    pub fn join_column(&self, amount: Offset) -> Self {
         Self {
             column: self.column + amount,
             ..*self
@@ -128,12 +162,12 @@ impl<'a> Position<'a> {
     }
 
     #[inline]
-    pub fn add_line(&mut self, amount: usize) {
+    pub fn add_line(&mut self, amount: Offset) {
         self.line += amount;
     }
 
     #[inline]
-    pub fn add_column(&mut self, amount: usize) {
+    pub fn add_column(&mut self, amount: Offset) {
         self.column += amount;
     }
 

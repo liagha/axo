@@ -16,6 +16,12 @@ impl Display for Location<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Location::File(file) => write!(f, "File({})", file),
+            Location::Raw {
+                ptr,
+                len
+            } => {
+                write!(f, "Raw({:?}, {} => {})", ptr, len, self.get_value())
+            }
             Location::Flag => write!(f, "Flag"),
         }
     }
