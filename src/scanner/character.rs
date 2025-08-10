@@ -3,6 +3,10 @@ use {
         Scanner,
     },
     crate::{
+        data::{
+            Char,
+            string::Str,
+        },
         text::{is_alphabetic, is_numeric, is_whitespace, is_alphanumeric},
         tracker::{Span, Spanned, Position},
     },
@@ -10,8 +14,15 @@ use {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Character<'character> {
-    pub value: char,
+    pub value: Char,
     pub span: Span<'character>,
+}
+
+impl<'a> FromIterator<Character<'a>> for Str<'a> {
+    fn from_iter<T: IntoIterator<Item = Character<'a>>>(iter: T) -> Self {
+        let s: String = iter.into_iter().collect();
+        Str(s.leak().as_bytes())
+    }
 }
 
 impl<'character> Character<'character> {

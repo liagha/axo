@@ -26,4 +26,4 @@ use {
     },
 };
 
-pub type ParseError<'error> = Error<'error, ErrorKind>;
+pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;

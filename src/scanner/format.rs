@@ -5,7 +5,7 @@ use {
     }
 };
 
-impl Debug for TokenKind {
+impl<'token> Debug for TokenKind<'token> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             TokenKind::Boolean(boolean) => write!(f, "Boolean({})", boolean),

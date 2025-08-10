@@ -94,7 +94,7 @@ impl<'registry> Registry<'registry> {
     }
 
     pub fn get_verbosity(resolver: &mut Resolver<'registry>) -> bool {
-        let identifier = Element::new(ElementKind::Identifier("Verbosity".to_string()), Span::default(Location::Flag));
+        let identifier = Element::new(ElementKind::Identifier(Str::from("Verbosity")), Span::default(Location::Flag));
 
         let result = resolver.try_get(&identifier);
 
@@ -111,8 +111,8 @@ impl<'registry> Registry<'registry> {
         false
     }
 
-    pub fn get_path(resolver: &mut Resolver<'registry>) -> String {
-        let identifier = Element::new(ElementKind::Identifier("Path".to_string()), Span::default(Location::Flag));
+    pub fn get_path(resolver: &mut Resolver<'registry>) -> Str<'registry> {
+        let identifier = Element::new(ElementKind::Identifier(Str::from("Path")), Span::default(Location::Flag));
 
         let result = resolver.try_get(&identifier);
 
@@ -126,7 +126,7 @@ impl<'registry> Registry<'registry> {
             }
         }
 
-        String::new()
+        Str::default()
     }
 }
 
@@ -182,8 +182,8 @@ impl<'compiler> Compiler<'compiler> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
-        let generator = crate::generator::Generator::new();
-        generator.print();
+        //let generator = crate::generator::Generator::new();
+        //generator.print();
 
         let resolver_verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 

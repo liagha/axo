@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{memory, any::{Any, TypeId}, Offset, Scale},
+        data::{memory, string::Str, any::{Any, TypeId}, Offset, Scale},
         format::Debug,
         formation::{
             classifier::Classifier,
@@ -176,7 +176,7 @@ impl<'initializer> Initializer<'initializer> {
                 let identifier = form.collect_inputs()[0].clone();
                 let span = identifier.span();
 
-                Ok(Form::Input(Token::new(TokenKind::Identifier("Verbosity".to_string()), span)))
+                Ok(Form::Input(Token::new(TokenKind::Identifier(Str::from("Verbosity")), span)))
             })
         ]).with_transform(move |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
             let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
@@ -206,7 +206,7 @@ impl<'initializer> Initializer<'initializer> {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
 
-                    Ok(Form::Input(Token::new(TokenKind::Identifier("Path".to_string()), span)))
+                    Ok(Form::Input(Token::new(TokenKind::Identifier(Str::from("Path")), span)))
                 }),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -255,7 +255,7 @@ impl<'initializer> Initializer<'initializer> {
                     }
                 }
 
-                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(path), span))))
+                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(Str::from(path)), span))))
             }
         )
     }

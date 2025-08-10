@@ -1,5 +1,6 @@
 use {
     crate::{
+        data::string::Str,
         internal::operation::{Deref, DerefMut},
         scanner::{Token, TokenKind},
         schema::{
@@ -17,9 +18,9 @@ pub struct Element<'element> {
 }
 
 pub enum ElementKind<'element> {
-    Literal(TokenKind),
+    Literal(TokenKind<'element>),
 
-    Identifier(String),
+    Identifier(Str<'element>),
 
     Procedural(Procedural<Box<Element<'element>>>),
 
@@ -73,11 +74,11 @@ impl<'element> Element<'element> {
 }
 
 impl<'element> ElementKind<'element> {
-    pub fn literal(token_kind: TokenKind) -> Self {
-        ElementKind::Literal(token_kind)
+    pub fn literal(kind: TokenKind<'element>) -> Self {
+        ElementKind::Literal(kind)
     }
 
-    pub fn identifier(name: String) -> Self {
+    pub fn identifier(name: Str<'element>) -> Self {
         ElementKind::Identifier(name)
     }
 
@@ -265,182 +266,182 @@ impl<'element> ElementKind<'element> {
         matches!(self, ElementKind::Pass(_))
     }
 
-    pub fn unwrap_literal(self) -> TokenKind {
+    pub fn unwrap_literal(self) -> TokenKind<'element> {
         match self {
             ElementKind::Literal(token_kind) => token_kind,
-            _ => panic!("Called unwrap_literal on non-Literal variant"),
+            _ => panic!("called `unwrap_literal` on non-Literal variant."),
         }
     }
 
-    pub fn unwrap_identifier(self) -> String {
+    pub fn unwrap_identifier(self) -> Str<'element> {
         match self {
             ElementKind::Identifier(name) => name,
-            _ => panic!("Called unwrap_identifier on non-Identifier variant"),
+            _ => panic!("called `unwrap_identifier` on non-Identifier variant."),
         }
     }
 
     pub fn unwrap_procedural(self) -> Procedural<Box<Element<'element>>> {
         match self {
             ElementKind::Procedural(proc) => proc,
-            _ => panic!("Called unwrap_procedural on non-Procedural variant"),
+            _ => panic!("called `unwrap_procedural` on non-Procedural variant."),
         }
     }
 
     pub fn unwrap_group(self) -> Group<Element<'element>> {
         match self {
             ElementKind::Group(group) => group,
-            _ => panic!("Called unwrap_group on non-Group variant"),
+            _ => panic!("called `unwrap_group` on non-Group variant."),
         }
     }
 
     pub fn unwrap_sequence(self) -> Sequence<Element<'element>> {
         match self {
             ElementKind::Sequence(seq) => seq,
-            _ => panic!("Called unwrap_sequence on non-Sequence variant"),
+            _ => panic!("called `unwrap_sequence` on non-Sequence variant."),
         }
     }
 
     pub fn unwrap_collection(self) -> Collection<Element<'element>> {
         match self {
             ElementKind::Collection(coll) => coll,
-            _ => panic!("Called unwrap_collection on non-Collection variant"),
+            _ => panic!("called `unwrap_collection` on non-Collection variant."),
         }
     }
 
     pub fn unwrap_series(self) -> Series<Element<'element>> {
         match self {
             ElementKind::Series(series) => series,
-            _ => panic!("Called unwrap_series on non-Series variant"),
+            _ => panic!("called `unwrap_series` on non-Series variant."),
         }
     }
 
     pub fn unwrap_bundle(self) -> Bundle<Element<'element>> {
         match self {
             ElementKind::Bundle(bundle) => bundle,
-            _ => panic!("Called unwrap_bundle on non-Bundle variant"),
+            _ => panic!("called `unwrap_bundle` on non-Bundle variant."),
         }
     }
 
     pub fn unwrap_block(self) -> Block<Element<'element>> {
         match self {
             ElementKind::Block(block) => block,
-            _ => panic!("Called unwrap_block on non-Block variant"),
+            _ => panic!("called `unwrap_block` on non-Block variant."),
         }
     }
 
     pub fn unwrap_unary(self) -> Unary<Token<'element>, Box<Element<'element>>> {
         match self {
             ElementKind::Unary(unary) => unary,
-            _ => panic!("Called unwrap_unary on non-Unary variant"),
+            _ => panic!("called `unwrap_unary` on non-Unary variant."),
         }
     }
 
     pub fn unwrap_binary(self) -> Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>> {
         match self {
             ElementKind::Binary(binary) => binary,
-            _ => panic!("Called unwrap_binary on non-Binary variant"),
+            _ => panic!("called `unwrap_binary` on non-Binary variant."),
         }
     }
 
     pub fn unwrap_label(self) -> Label<Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Label(label) => label,
-            _ => panic!("Called unwrap_label on non-Label variant"),
+            _ => panic!("called `unwrap_label` on non-Label variant."),
         }
     }
 
     pub fn unwrap_access(self) -> Access<Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Access(access) => access,
-            _ => panic!("Called unwrap_access on non-Access variant"),
+            _ => panic!("called `unwrap_access` on non-Access variant."),
         }
     }
 
     pub fn unwrap_index(self) -> Index<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Index(index) => index,
-            _ => panic!("Called unwrap_index on non-Index variant"),
+            _ => panic!("called `unwrap_index` on non-Index variant."),
         }
     }
 
     pub fn unwrap_invoke(self) -> Invoke<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Invoke(invoke) => invoke,
-            _ => panic!("Called unwrap_invoke on non-Invoke variant"),
+            _ => panic!("called `unwrap_invoke` on non-Invoke variant."),
         }
     }
 
     pub fn unwrap_construct(self) -> Construct<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Construct(construct) => construct,
-            _ => panic!("Called unwrap_construct on non-Construct variant"),
+            _ => panic!("called `unwrap_construct` on non-Construct variant."),
         }
     }
 
     pub fn unwrap_conditional(self) -> Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Conditional(conditional) => conditional,
-            _ => panic!("Called unwrap_conditional on non-Conditional variant"),
+            _ => panic!("called `unwrap_conditional` on non-Conditional variant."),
         }
     }
 
     pub fn unwrap_repeat(self) -> Repeat<Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Repeat(repeat) => repeat,
-            _ => panic!("Called unwrap_repeat on non-Repeat variant"),
+            _ => panic!("called `unwrap_repeat` on non-Repeat variant."),
         }
     }
 
     pub fn unwrap_iterate(self) -> Iterate<Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Iterate(iterate) => iterate,
-            _ => panic!("Called unwrap_iterate on non-Iterate variant"),
+            _ => panic!("called `unwrap_iterate` on non-Iterate variant."),
         }
     }
 
     pub fn unwrap_symbolize(self) -> Symbol {
         match self {
             ElementKind::Symbolize(symbol) => symbol,
-            _ => panic!("Called unwrap_symbolize on non-Symbolize variant"),
+            _ => panic!("called `unwrap_symbolize` on non-Symbolize variant."),
         }
     }
 
     pub fn unwrap_assign(self) -> Assign<Box<Element<'element>>, Box<Element<'element>>> {
         match self {
             ElementKind::Assign(assign) => assign,
-            _ => panic!("Called unwrap_assign on non-Assign variant"),
+            _ => panic!("called `unwrap_assign` on non-Assign variant."),
         }
     }
 
     pub fn unwrap_produce(self) -> Option<Box<Element<'element>>> {
         match self {
             ElementKind::Produce(element) => element,
-            _ => panic!("Called unwrap_produce on non-Produce variant"),
+            _ => panic!("called `unwrap_produce` on non-Produce variant."),
         }
     }
 
     pub fn unwrap_abort(self) -> Option<Box<Element<'element>>> {
         match self {
             ElementKind::Abort(element) => element,
-            _ => panic!("Called unwrap_abort on non-Abort variant"),
+            _ => panic!("called `unwrap_abort` on non-Abort variant."),
         }
     }
 
     pub fn unwrap_pass(self) -> Option<Box<Element<'element>>> {
         match self {
             ElementKind::Pass(element) => element,
-            _ => panic!("Called unwrap_pass on non-Pass variant"),
+            _ => panic!("called `unwrap_pass` on non-Pass variant."),
         }
     }
 
-    pub fn try_unwrap_literal(&self) -> Option<&TokenKind> {
+    pub fn try_unwrap_literal(&self) -> Option<&TokenKind<'element>> {
         match self {
             ElementKind::Literal(token_kind) => Some(token_kind),
             _ => None,
         }
     }
 
-    pub fn try_unwrap_identifier(&self) -> Option<&String> {
+    pub fn try_unwrap_identifier(&self) -> Option<&Str<'element>> {
         match self {
             ElementKind::Identifier(name) => Some(name),
             _ => None,
@@ -601,14 +602,14 @@ impl<'element> ElementKind<'element> {
         }
     }
 
-    pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut TokenKind> {
+    pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut TokenKind<'element>> {
         match self {
-            ElementKind::Literal(token_kind) => Some(token_kind),
+            ElementKind::Literal(kind) => Some(kind),
             _ => None,
         }
     }
 
-    pub fn try_unwrap_identifier_mut(&mut self) -> Option<&mut String> {
+    pub fn try_unwrap_identifier_mut(&mut self) -> Option<&mut Str<'element>> {
         match self {
             ElementKind::Identifier(name) => Some(name),
             _ => None,

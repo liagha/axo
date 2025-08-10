@@ -12,7 +12,10 @@ use {
             Symbol, Symbolic,
         },
         schema::{Method, Structure},
-        data::float::FloatLiteral,
+        data::{
+            float::Float,
+            string::Str,
+        },
         internal::operation::Range,
     },
     matchete::{
@@ -35,9 +38,9 @@ impl Aligner<'static> {
     }
 }
 
-impl<'aligner> Resembler<String, String, ()> for Aligner<'aligner> {
-    fn resemblance(&mut self, query: &String, candidate: &String) -> Result<Resemblance, ()> {
-        self.assessor.resemblance(query, candidate)
+impl<'aligner> Resembler<Str<'aligner>, Str<'aligner>, ()> for Aligner<'aligner> {
+    fn resemblance(&mut self, query: &Str, candidate: &Str) -> Result<Resemblance, ()> {
+        self.assessor.resemblance(&query.to_string(), &candidate.to_string())
     }
 }
 
@@ -58,13 +61,13 @@ pub fn aligner() -> Assessor<'static, String, String, ()> {
 }
 
 impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'aligner> {
-    fn resemblance(&mut self, query: &Token, candidate: &Token) -> Result<Resemblance, ()> {
+    fn resemblance(&mut self, query: &Token<'aligner>, candidate: &Token<'aligner>) -> Result<Resemblance, ()> {
         match (&query.kind, &candidate.kind) {
             (TokenKind::Identifier(query), TokenKind::Identifier(candidate)) => {
                 self.resemblance(query, candidate)
             }
             (TokenKind::Float(query), TokenKind::Float(candidate)) => {
-                Ok(Resemblance::from(FloatLiteral::abs(*query - *candidate).0))
+                Ok(Resemblance::from(Float::abs(*query - *candidate).0))
             }
             (TokenKind::Integer(query), TokenKind::Integer(candidate)) => {
                 Ok(Resemblance::from(i128::abs(*query - *candidate) as f64))

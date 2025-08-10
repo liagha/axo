@@ -6,16 +6,16 @@ use {
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub enum ErrorKind {
+pub enum ErrorKind<'error> {
     ExpectedCondition,
     ExpectedBody,
-    MissingSeparator(TokenKind),
-    UnclosedDelimiter(TokenKind),
+    MissingSeparator(TokenKind<'error>),
+    UnclosedDelimiter(TokenKind<'error>),
     UnexpectedPunctuation,
-    UnexpectedToken(TokenKind),
+    UnexpectedToken(TokenKind<'error>),
 }
 
-impl Display for ErrorKind {
+impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::ExpectedCondition => write!(f, "expected condition."),
@@ -34,7 +34,7 @@ impl Display for ErrorKind {
     }
 }
 
-impl Debug for ErrorKind {
+impl<'error> Debug for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self)
     }

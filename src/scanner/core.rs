@@ -1,8 +1,9 @@
 use {
     super::{
-        Character, Operator, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
+        Character, Operator, OperatorKind, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
     },
     crate::{
+        data::string::Str,
         formation::{form::Form, classifier::Classifier},
         tracker::{
             Spanned,
@@ -25,7 +26,7 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::literal('"'),
         ]).with_transform(move |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
-            let content = inputs.clone().into_iter().collect::<String>();
+            let content = inputs.clone().into_iter().collect::<Str>();
 
             Ok(Form::output(Token::new(TokenKind::String(content), inputs.borrow_span())))
         })
@@ -43,7 +44,7 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
 
                 Ok(Form::output(Token::new(TokenKind::String(content), inputs.borrow_span())))
             },
@@ -65,7 +66,7 @@ impl<'scanner> Scanner<'scanner> {
             Ok(Form::output(Token::new(TokenKind::Character(ch.value), ch.span)))
         })
     }
-
+    
     fn identifier() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::sequence([
@@ -78,11 +79,26 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
+                
+                let token = match content.unwrap_str() {
+                    "true" => {
+                        TokenKind::Boolean(true)
+                    }
+                    "false" => {
+                        TokenKind::Boolean(false)
+                    }
+                    "in" => {
+                        TokenKind::Operator(OperatorKind::In)
+                    }
+                    identifier => {
+                        TokenKind::Identifier(content)
+                    }
+                };
 
                 Ok(Form::output(
                     Token::new(
-                        TokenKind::from_str(&content).unwrap_or(TokenKind::Identifier(content)),
+                        token,
                         inputs.borrow_span(),
                     )
                 ))
@@ -176,7 +192,7 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
 
                 Ok(Form::output(Token::new(TokenKind::Comment(content), inputs.borrow_span())))
             },

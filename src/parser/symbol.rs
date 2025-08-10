@@ -21,7 +21,7 @@ use {
             Implementation, Method, Structure
         },
         internal::hash::{Hash, Hasher},
-        data::memory,
+        data::{memory, string::Str},
         format::{self, Debug, Formatter},
     },
 };
@@ -91,7 +91,7 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier("impl".to_string())
+                    token.kind == TokenKind::Identifier(Str::from("impl"))
                 }),
                 Self::token(),
                 Classifier::optional(
@@ -151,15 +151,15 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier("var".to_string())
-                        || token.kind == TokenKind::Identifier("const".to_string())
+                    token.kind == TokenKind::Identifier(Str::from("var"))
+                        || token.kind == TokenKind::Identifier(Str::from("const"))
                 }),
                 Classifier::deferred(Self::element),
             ]),
             |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
-                let mutable = keyword.kind == TokenKind::Identifier("var".to_string());
+                let mutable = keyword.kind == TokenKind::Identifier(Str::from("var"));
                 let body = sequence[1].unwrap_output().clone();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -191,7 +191,7 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier("struct".to_string())
+                    token.kind == TokenKind::Identifier(Str::from("struct"))
                 }),
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::symbolization)),
@@ -223,7 +223,7 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier("enum".to_string())
+                    token.kind == TokenKind::Identifier(Str::from("enum"))
                 }),
                 Self::token(),
                 Self::bundle(Classifier::deferred(Self::element)),
@@ -252,7 +252,7 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier("func".to_string())
+                    token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::token(),
                 Self::group(Classifier::deferred(Self::symbolization)),

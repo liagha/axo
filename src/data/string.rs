@@ -38,6 +38,12 @@ impl<'a> Str<'a> {
     }
 
     #[inline]
+    #[track_caller]
+    pub fn unwrap_str(self) -> &'a str {
+        self.as_str().unwrap()
+    }
+
+    #[inline]
     pub fn is_ascii(&self) -> bool {
         self.0.is_ascii()
     }
