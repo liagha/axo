@@ -2,7 +2,7 @@ use {
     broccli::{Color, xprintln},
     crate::{
         data::{memory, string::Str},
-        format::{format_tokens, indent},
+        format::{format_tokens, Show},
         initial::{Initializer, Preference},
         parser::{Element, ElementKind, Parser, Symbol},
         resolver::Resolver,
@@ -235,6 +235,8 @@ impl<'initialization> PipelineStage<'initialization, (), Location<'initializatio
 
         resolver.extend(symbols);
 
+        let verbosity = Registry::get_verbosity(resolver);
+
         if verbosity {
             let duration = Duration::from_nanos(timer.elapsed().unwrap());
 
@@ -273,7 +275,7 @@ impl<'scanner> Scanner<'scanner> {
         self.scan();
 
         if verbosity {
-            xprintln!("Tokens:\n{}", indent(&format_tokens(&self.output)));
+            xprintln!("Tokens:\n{}", &format_tokens(&self.output).indent());
             xprintln!();
 
             if !self.errors.is_empty() {
@@ -339,7 +341,7 @@ impl<'parser> Parser<'parser> {
                 .join("\n");
 
             if !tree.is_empty() {
-                xprintln!("Elements:\n{}" => Color::Green, indent(&tree));
+                xprintln!("Elements:\n{}" => Color::Green, &tree.indent());
                 xprintln!();
             }
 
@@ -411,7 +413,7 @@ impl<'resolver> Resolver<'resolver> {
             if !tree.is_empty() {
                 xprintln!(
                     "{}" => Color::Cyan,
-                    format!("Symbols:\n{}", indent(&tree)),
+                    format!("Symbols:\n{}", &tree.indent()),
                 );
                 xprintln!();
             }

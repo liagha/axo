@@ -1,6 +1,7 @@
-pub mod vector;
+mod show;
 
 pub use {
+    show::Show,
     core::{
         fmt::{
             Debug, Display,
@@ -20,13 +21,6 @@ use {
         },
     }
 };
-
-pub fn indent(string: &String) -> String {
-    string.lines()
-        .map(|line| format!("    {}", line))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
 
 pub fn print_usage() {
     println!("Usage: axo [OPTIONS] <file.axo>");

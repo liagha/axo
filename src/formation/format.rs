@@ -6,8 +6,7 @@ use {
     },
     crate::{
         format::{
-            vector::Show,
-            Debug, Display, Formatter, Result
+            Show, Debug, Display, Formatter, Result
         },
     },
 };
