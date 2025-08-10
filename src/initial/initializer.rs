@@ -1,6 +1,11 @@
 use {
     crate::{
-        data::{memory, string::Str, any::{Any, TypeId}, Offset, Scale},
+        data::{
+            any::{Any, TypeId},
+            memory,
+            string::Str,
+            Offset, Scale
+        },
         format::Debug,
         formation::{
             classifier::Classifier,
@@ -8,6 +13,8 @@ use {
             former::Former,
         },
         internal::{
+            environment::current_dir,
+            platform::{self, read_dir, Path, PathBuf},
             compiler::{Marked, Registry},
             hash::{DefaultHasher, Hash, Hasher},
         },
@@ -15,7 +22,7 @@ use {
         scanner::{OperatorKind, PunctuationKind, Scanner, Token, TokenKind},
         tracker::{Location, Peekable, Position, Span, Spanned},
     },
-    super::InitialError,
+    super::{Preference, InitialError},
 };
 
 #[derive(Debug)]
@@ -25,71 +32,6 @@ pub struct Initializer<'initializer> {
     pub input: Vec<Token<'initializer>>,
     pub output: Vec<Preference<'initializer>>,
     pub errors: Vec<InitialError<'initializer>>,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Preference<'preference> {
-    pub target: Token<'preference>,
-    pub value: Token<'preference>,
-    pub span: Span<'preference>,
-}
-
-impl<'preference> Spanned<'preference> for Preference<'preference> {
-    fn borrow_span(&self) -> Span<'preference> {
-        self.span.clone()
-    }
-
-    fn span(self) -> Span<'preference> {
-        self.span
-    }
-}
-
-impl<'preference> Preference<'preference> {
-    pub fn new(target: Token<'preference>, value: Token<'preference>) -> Self {
-        let span = Span::merge(&target.borrow_span(), &value.borrow_span());
-
-        Self {
-            target,
-            value,
-            span
-        }
-    }
-}
-
-impl Symbolic for Preference<'static> {
-    fn brand(&self) -> Option<Token<'static>> {
-        Some(unsafe { memory::transmute(self.target.clone()) })
-    }
-    
-    fn as_any(&self) -> &dyn Any where Self: 'static {
-        self
-    }
-    
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
-        Box::new(Self {
-            target: self.target.clone(),
-            value: self.value.clone(),
-            span: self.span.clone(),
-        })
-    }
-    
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Self>() {
-            self == other
-        } else {
-            false
-        }
-    }
-    
-    fn dyn_hash(&self, state: &mut dyn Hasher) {
-        let mut hasher = DefaultHasher::new();
-        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
-        state.write_u64(hasher.finish());
-        
-        let mut hasher = DefaultHasher::new();
-        Hash::hash(&self, &mut hasher);
-        state.write_u64(hasher.finish());
-    }
 }
 
 impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'initializer> {
@@ -305,6 +247,23 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
+    fn visit() -> Result<Vec<PathBuf>, platform::Error> {
+        use walkdir::WalkDir;
+
+        let files: Vec<PathBuf> = WalkDir::new(".")
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_file())
+            .filter(|entry| {
+                entry.path().extension()
+                    .map_or(false, |extension| extension == "axo")
+            })
+            .map(|entry| entry.path().to_path_buf())
+            .collect();
+
+        Ok(files)
+    }
+
     pub fn initialize(&mut self) {
         let location = Location::Flag;
         let input = location.get_value();
@@ -345,6 +304,10 @@ impl<'initializer> Initializer<'initializer> {
         }
 
         self.output = preferences;
+
+        for file in Self::visit().unwrap() {
+            println!("{:?}", file);
+        }
     }
 }
 

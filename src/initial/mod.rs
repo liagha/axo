@@ -1,11 +1,14 @@
 mod error;
 mod initializer;
+mod preference;
 
 pub use {
     initializer::{
         Initializer,
-        Preference,
     },
+    preference::{
+        Preference,
+    }
 };
 
 pub(super) use {

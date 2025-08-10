@@ -160,96 +160,29 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn compile_pipeline(&mut self) -> bool {
-        let mut initializer_stage = InitializerStage::new();
-        let location = initializer_stage.execute(&mut self.registry.resolver, ());
+        let location = {
+            let mut initializer = Initialization::new();
+            initializer.execute(&mut self.registry.resolver, ())
+        };
 
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
-        let mut scanner = Scanner::new(location);
-        let tokens = scanner.execute_pipeline(&mut self.registry.resolver, location);
-
-        let path = Registry::get_path(&mut self.registry.resolver);
-
-        let location = if path.is_empty() {
-            Location::Flag
-        } else {
-            Location::File(Str::from(path))
+        let tokens = {
+            let mut scanner = Scanner::new(location);
+            scanner.execute_pipeline(&mut self.registry.resolver, location)
         };
 
-        let mut parser = Parser::new(location);
-        let elements = parser.execute_pipeline(&mut self.registry.resolver, tokens);
+        let elements = {
+            let mut parser = Parser::new(location);
+            parser.execute_pipeline(&mut self.registry.resolver, tokens)
+        };
 
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
+        self.registry.resolver.execute_pipeline(elements.clone());
 
-        //let generator = crate::generator::Generator::new();
-        //generator.print();
-
-        let resolver_verbosity = Registry::get_verbosity(&mut self.registry.resolver);
-
-        if resolver_verbosity {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`resolving`" => Color::White,
-            );
-            xprintln!();
-        }
-
-        self.registry.resolver.process(elements);
-
-        let errors = &self.registry.resolver.errors;
-
-        if resolver_verbosity {
-            let symbols = self.registry.resolver.scope.all();
-
-            let tree = symbols
-                .iter()
-                .map(|symbol| {
-                    format!("{:?}", symbol)
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}" => Color::Cyan,
-                    format!("Symbols:\n{}", indent(&tree)),
-                );
-                xprintln!();
-            }
-
-            if !errors.is_empty() {
-                for error in errors {
-                    let (message, details) = error.format();
-                    xprintln!(
-                        "{}\n{}" => Color::Red,
-                        message => Color::Orange,
-                        details
-                    );
-                    xprintln!();
-                }
-
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                xprintln!(
-                        "Finished {} {}s with {} {}." => Color::Green,
-                        "`resolving` in" => Color::White,
-                        duration.as_secs_f64(),
-                        errors.len() => Color::BrightRed,
-                        "errors" => Color::Red,
-                    );
-                xprintln!();
-            } else {
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-                xprintln!(
-                        "Finished {} {}s." => Color::Green,
-                        "`resolving` in" => Color::White,
-                        duration.as_secs_f64(),
-                    );
-
-                xprintln!();
-            }
+        #[cfg(feature = "generator")]
+        {
+            let mut generation = Generation;
+            generation.execute_pipeline(&mut self.registry.resolver, elements.clone());
         }
 
         verbosity
@@ -262,11 +195,12 @@ impl<'compiler> Compiler<'compiler> {
         pipeline(self)
     }
 }
-pub struct InitializerStage<'init> {
-    initializer: Initializer<'init>,
+
+pub struct Initialization<'initialization> {
+    initializer: Initializer<'initialization>,
 }
 
-impl<'init> InitializerStage<'init> {
+impl<'initialization> Initialization<'initialization> {
     pub fn new() -> Self {
         Self {
             initializer: Initializer::new(Location::Flag),
@@ -274,8 +208,21 @@ impl<'init> InitializerStage<'init> {
     }
 }
 
-impl<'init> PipelineStage<'init, (), Location<'init>> for InitializerStage<'init> {
-    fn execute(&mut self, resolver: &mut Resolver<'init>, _input: ()) -> Location<'init> {
+impl<'initialization> PipelineStage<'initialization, (), Location<'initialization>> for Initialization<'initialization> {
+    fn execute(&mut self, resolver: &mut Resolver<'initialization>, _input: ()) -> Location<'initialization> {
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        let verbosity = Registry::get_verbosity(resolver);
+
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`initializing`" => Color::White,
+            );
+            xprintln!();
+        }
+
         self.initializer.initialize();
 
         let symbols = self.initializer.output.clone().into_iter().map(|preference| {
@@ -287,6 +234,17 @@ impl<'init> PipelineStage<'init, (), Location<'init>> for InitializerStage<'init
         }).collect::<Vec<Symbol>>();
 
         resolver.extend(symbols);
+
+        if verbosity {
+            let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+            xprintln!(
+                "Finished {} {}s." => Color::Green,
+                "`initializing` in" => Color::White,
+                duration.as_secs_f64(),
+            );
+            xprintln!();
+        }
 
         let path = Registry::get_path(resolver);
         Location::File(Str::from(path))
@@ -419,5 +377,114 @@ impl<'parser> Parser<'parser> {
         }
 
         self.output.clone()
+    }
+}
+
+impl<'resolver> Resolver<'resolver> {
+    pub fn execute_pipeline(&mut self, elements: Vec<Element<'resolver>>) -> () {
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        let verbosity = Registry::get_verbosity(self);
+
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`resolving`" => Color::White,
+            );
+            xprintln!();
+        }
+
+        self.process(elements);
+
+        if verbosity {
+            let symbols = self.scope.all();
+
+            let tree = symbols
+                .iter()
+                .map(|symbol| {
+                    format!("{:?}", symbol)
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}" => Color::Cyan,
+                    format!("Symbols:\n{}", indent(&tree)),
+                );
+                xprintln!();
+            }
+
+            if !self.errors.is_empty() {
+                for error in &self.errors {
+                    let (message, details) = error.format();
+                    xprintln!(
+                        "{}\n{}" => Color::Red,
+                        message => Color::Orange,
+                        details
+                    );
+                    xprintln!();
+                }
+
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s with {} {}." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                        self.errors.len() => Color::BrightRed,
+                        "errors" => Color::Red,
+                    );
+                xprintln!();
+            } else {
+                let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+                xprintln!(
+                        "Finished {} {}s." => Color::Green,
+                        "`resolving` in" => Color::White,
+                        duration.as_secs_f64(),
+                    );
+
+                xprintln!();
+            }
+        }
+    }
+}
+
+pub struct Generation;
+
+#[cfg(feature = "generator")]
+impl<'generator> Generation {
+    pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'generator>, elements: Vec<Element<'generator>>) -> () {
+        let context = inkwell::context::Context::create();
+        let mut generator = crate::generator::Generator::new(&context);
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        let verbosity = Registry::get_verbosity(resolver);
+
+        if verbosity {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`generating`" => Color::White,
+            );
+            xprintln!();
+        }
+
+        let result = generator.generate(elements);
+
+        if verbosity {
+            let duration = Duration::from_nanos(timer.elapsed().unwrap());
+
+            xprintln!(
+                "Finished {} {}s." => Color::Green,
+                "`generating` in" => Color::White,
+                duration.as_secs_f64(),
+            );
+            xprintln!();
+        }
+
+        result
     }
 }

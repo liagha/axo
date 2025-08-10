@@ -6,14 +6,13 @@ edition = "2021"
 [features]
 default = [
     "checker", "formation",
-    "text", "internal", "initial",
-    "scanner", "parser", "resolver", # "generator"
+    "text", "initial",
+    "scanner", "parser", "resolver", #"generator"
 ]
 time = ["chrono"]
 checker = []
 formation = []
 text = []
-internal = []
 initial = ["formation", "scanner", "parser"]
 scanner = ["formation", "text"]
 parser = ["formation", "scanner"]
@@ -27,6 +26,7 @@ log = { version = "0.4.27"}
 matchete = { path = "../matchete", optional = true }
 chrono = { version = "0.4.41", optional = true }
 inkwell = { version = "0.6.0", features = ["llvm18-1-force-static"], optional = true }
+walkdir = { version = "2.5.0" }
 
 [profile.dev]
 debug = true

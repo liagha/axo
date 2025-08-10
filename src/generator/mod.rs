@@ -1,41 +1,140 @@
+use inkwell::types::AnyType;
+use inkwell::values::{AnyValue, AsValueRef, BasicMetadataValueEnum};
 use {
     inkwell::{
-        context::Context,
         builder::Builder,
+        context::Context,
         module::Module,
-        types::BasicTypeEnum,
-        values::FunctionValue,
-        AddressSpace,
+        types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
+        values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+        AddressSpace, IntPredicate, FloatPredicate,
     },
+    std::collections::HashMap,
 };
 
-pub struct Generator {
-    context: Context,
+use crate::{
+    parser::{Element, ElementKind, Symbol},
+    scanner::{Operator, Token, TokenKind},
+    schema::{Binding, Method, Structure, Enumeration},
+};
+use crate::data::string::Str;
+use crate::parser::Symbolic;
+use crate::scanner::OperatorKind;
+use crate::schema::{Binary, Unary};
+
+pub struct Generator<'ctx> {
+    context: &'ctx Context,
+    builder: Builder<'ctx>,
+    module: Module<'ctx>,
+    entry: Option<FunctionValue<'ctx>>,
 }
 
-impl Generator {
-    pub fn new() -> Self {
-        let context = Context::create();
-        Self { context }
+impl<'ctx> Generator<'ctx> {
+    pub fn new(context: &'ctx Context) -> Self {
+        let module = context.create_module("program");
+        let builder = context.create_builder();
+
+        Self {
+            context,
+            builder,
+            module,
+            entry: None,
+        }
     }
 
-    pub fn print(&self) {
-        let module = self.context.create_module("axo_test");
-        let builder = self.context.create_builder();
+    pub fn execute_pipeline(&mut self, _resolver: &mut dyn std::any::Any, elements: Vec<Element>) {
+        self.generate(elements);
+    }
 
-        let i32_type = self.context.i32_type();
-        let fn_type = i32_type.fn_type(&[i32_type.into(), i32_type.into()], false);
-        let function = module.add_function("add", fn_type, None);
-        function.set_call_conventions(0);
-        let entry = self.context.append_basic_block(function, "entry");
-        builder.position_at_end(entry);
+    pub fn generate(&mut self, elements: Vec<Element>) {
+        let main_ty = self.context.i32_type().fn_type(&[], false);
+        let main_fn = self.module.add_function("main", main_ty, None);
+        let entry = self.context.append_basic_block(main_fn, "entry");
+        self.builder.position_at_end(entry);
+        self.entry = Some(main_fn);
 
-        let a = function.get_nth_param(0).unwrap().into_int_value();
-        let b = function.get_nth_param(1).unwrap().into_int_value();
+        let mut has_return = false;
+        for element in elements {
+            self.generate_statement(&element);
+            if matches!(element.kind, ElementKind::Binary(_)) {
+                has_return = true; // Track if a binary expression generated a return
+            }
+        }
 
-        let sum = builder.build_int_add(a, b, "sum").unwrap();
-        builder.build_return(Some(&sum)).unwrap();
+        if !has_return {
+            let zero = self.context.i32_type().const_zero();
+            self.builder.build_return(Some(&zero)).unwrap();
+        }
 
-        module.print_to_file("lab/add.bc").unwrap();
+        self.module.print_to_file("program.bc").unwrap();
+    }
+
+    fn generate_statement(&mut self, elem: &Element) {
+        match &elem.kind {
+            ElementKind::Binary(bin) => {
+                if let Some(value) = self.generate_binary(bin) {
+                    self.builder.build_return(Some(&value)).unwrap();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn generate_literal(&self, literal: &TokenKind) -> Option<BasicValueEnum<'ctx>> {
+        match literal {
+            TokenKind::Integer(integer) => {
+                Some(self.context.i32_type().const_int(*integer as u64, false).into())
+            },
+            TokenKind::Float(float) => {
+                Some(self.context.f16_type().const_float(float.0).into())
+            }
+            TokenKind::Boolean(bool) => {
+                Some(self.context.bool_type().const_int(*bool as u64, false).into())
+            }
+            _ => None,
+        }
+    }
+
+    fn generate_expr(&mut self, elem: &Element) -> Option<BasicValueEnum<'ctx>> {
+        match &elem.kind {
+            ElementKind::Literal(lit) => self.generate_literal(lit),
+            ElementKind::Binary(bin) => self.generate_binary(bin),
+            ElementKind::Unary(un) => self.generate_unary(un),
+            _ => None,
+        }
+    }
+
+    fn generate_binary(&mut self, bin: &Binary<Box<Element>, Token, Box<Element>>) -> Option<BasicValueEnum<'ctx>> {
+        let left = self.generate_expr(&bin.get_left());
+        let right = self.generate_expr(&bin.get_right());
+        if let (Some(l), Some(r)) = (left, right) {
+            match bin.get_operator().kind.try_unwrap_operator() {
+                Some(op) => match op {
+                    OperatorKind::Plus => Some(self.builder.build_int_add(l.into_int_value(), r.into_int_value(), "add").unwrap().into()),
+                    OperatorKind::Minus => Some(self.builder.build_int_sub(l.into_int_value(), r.into_int_value(), "sub").unwrap().into()),
+                    OperatorKind::Star => Some(self.builder.build_int_mul(l.into_int_value(), r.into_int_value(), "mul").unwrap().into()),
+                    OperatorKind::Slash => Some(self.builder.build_int_unsigned_div(l.into_int_value(), r.into_int_value(), "div").unwrap().into()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn generate_unary(&mut self, un: &Unary<Token, Box<Element>>) -> Option<BasicValueEnum<'ctx>> {
+        let opnd = self.generate_expr(&un.get_operand());
+        if let Some(o) = opnd {
+            match un.get_operator().kind.try_unwrap_operator() {
+                Some(op) => match op {
+                    OperatorKind::Minus => Some(self.builder.build_int_neg(o.into_int_value(), "neg").unwrap().into()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 }

@@ -6,8 +6,6 @@ pub mod checker;
 pub mod formation;
 #[cfg(feature = "initial")]
 pub mod initial;
-#[cfg(feature = "internal")]
-pub mod internal;
 #[cfg(feature = "parser")]
 pub mod parser;
 #[cfg(feature = "resolver")]
@@ -19,6 +17,7 @@ pub mod generator;
 #[cfg(feature = "text")]
 pub mod text;
 
+pub mod internal;
 mod format;
 pub mod reporter;
 pub mod schema;

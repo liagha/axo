@@ -1,7 +1,11 @@
 use {
     broccli::{Color, TextStyle},
     log::{Level, Log, Metadata, Record, SetLoggerError},
-    crate::internal::{stdout, Write},
+    crate::{
+        internal::{
+            platform::{stdout, Write},
+        },
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]

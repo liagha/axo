@@ -67,15 +67,6 @@ pub mod memory {
     };
 }
 
-pub mod platform {
-    pub use {
-        std::{
-            ffi::{OsStr, OsString},
-            path::{Path, PathBuf},
-        },
-    };
-}
-
 pub mod slice {
     pub use {
         core::{

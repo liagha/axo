@@ -5,7 +5,6 @@ use {
         data::{
             memory::{Borrow, Copied},
             slice::{Iter, SliceIndex},
-            platform::{OsStr, OsString, Path, PathBuf},
         },
         format::{
             self,
@@ -13,6 +12,7 @@ use {
         },
         internal::{
             operation::{Deref, Index},
+            platform::{OsStr, OsString, Path, PathBuf},
         },
     },
 };

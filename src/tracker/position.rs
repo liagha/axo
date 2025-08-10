@@ -8,7 +8,7 @@ use {
         internal::{
             environment::args,
             operation::Ordering,
-            read_to_string,
+            platform::read_to_string,
         },
     },
 };
