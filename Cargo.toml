@@ -7,7 +7,7 @@ edition = "2021"
 default = [
     "checker", "formation",
     "text", "internal", "initial",
-    "scanner", "parser", "resolver",
+    "scanner", "parser", "resolver", "generator"
 ]
 time = ["chrono"]
 checker = []

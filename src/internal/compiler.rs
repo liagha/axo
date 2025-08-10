@@ -182,6 +182,9 @@ impl<'compiler> Compiler<'compiler> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
+        let generator = crate::generator::Generator::new();
+        generator.print();
+
         let resolver_verbosity = Registry::get_verbosity(&mut self.registry.resolver);
 
         if resolver_verbosity {
