@@ -1,0 +1,4 @@
+[env]
+LLVM_SYS_181_PREFIX="/opt/local/libexec/llvm-18"
+LIBRARY_PATH="/opt/local/lib:${LIBRARY_PATH:-}"
+CPATH="/opt/local/include:${CPATH:-}"

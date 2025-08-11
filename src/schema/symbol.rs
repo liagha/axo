@@ -51,6 +51,10 @@ pub struct Method<Target, Parameter, Body, Output> {
     output: Output,
 }
 
+pub struct Module<Target> {
+    target: Target,
+}
+
 impl<Target> Inclusion<Target> {
     #[inline]
     pub fn new(target: Target) -> Self {
@@ -235,6 +239,18 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     }
 }
 
+impl<Target> Module<Target> {
+    #[inline]
+    pub fn new(target: Target) -> Self {
+        Module { target }
+    }
+
+    #[inline]
+    pub fn get_target(&self) -> &Target {
+        &self.target
+    }
+}
+
 impl<Target: Hash> Hash for Inclusion<Target> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
@@ -287,7 +303,12 @@ impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash for Method<Ta
     }
 }
 
-// PartialEq implementations
+impl<Target: Hash> Hash for Module<Target> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.get_target().hash(state);
+    }
+}
+
 impl<Target: PartialEq> PartialEq for Inclusion<Target> {
     fn eq(&self, other: &Self) -> bool {
         self.get_target() == other.get_target()
@@ -336,7 +357,12 @@ impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq
     }
 }
 
-// Clone implementations
+impl<Target: PartialEq> PartialEq for Module<Target> {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_target() == other.get_target()
+    }
+}
+
 impl<Target: Clone> Clone for Inclusion<Target> {
     fn clone(&self) -> Self {
         Inclusion::new(self.get_target().clone())
@@ -386,5 +412,11 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Meth
             self.get_body().clone(),
             self.get_output().clone()
         )
+    }
+}
+
+impl<Target: Clone> Clone for Module<Target> {
+    fn clone(&self) -> Self {
+        Module::new(self.get_target().clone())
     }
 }

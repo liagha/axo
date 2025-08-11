@@ -115,7 +115,7 @@ impl<'scanner> Scanner<'scanner> {
             ),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
 
                 Ok(Form::output(
                     Token::new(
@@ -132,7 +132,7 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
 
                 Ok(Form::output(
                     Token::new(
@@ -153,7 +153,7 @@ impl<'scanner> Scanner<'scanner> {
             ),
             |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<String>();
+                let content = inputs.clone().into_iter().collect::<Str>();
 
                 let kind = match content.len() {
                     1 => TokenKind::Punctuation(PunctuationKind::Space),

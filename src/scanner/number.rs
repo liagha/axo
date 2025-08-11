@@ -3,6 +3,7 @@ use {
         Character, ScanError, Scanner, Token, TokenKind, ErrorKind,
     },
     crate::{
+        data::{string::Str},
         formation::{form::Form, classifier::Classifier},
         text::parser,
         tracker::Spanned,
@@ -35,7 +36,7 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             move |_, form| {
                 let inputs = form.collect_inputs();
-                let number: String = inputs.clone().into_iter().collect();
+                let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
@@ -62,7 +63,7 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form| {
                 let inputs = form.collect_inputs();
-                let number: String = inputs.clone().into_iter().collect();
+                let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
@@ -89,7 +90,7 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form| {
                 let inputs = form.collect_inputs();
-                let number: String = inputs.clone().into_iter().collect();
+                let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
@@ -131,10 +132,10 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |_, form| {
                 let inputs = form.collect_inputs();
-                let number: String = inputs.clone().into_iter().collect();
+                let number: Str = inputs.clone().into_iter().collect();
                 let span = inputs.borrow_span().clone();
 
-                if number.contains('.') || number.to_lowercase().contains('e') {
+                if number.contains(".") || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
                     parser.parse(&number)
                         .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), span)))

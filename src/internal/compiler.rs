@@ -271,7 +271,7 @@ impl<'scanner> Scanner<'scanner> {
 
         let content = location.get_value();
 
-        self.set_input(content.to_string());
+        self.set_input(content);
         self.scan();
 
         if verbosity {
@@ -336,8 +336,8 @@ impl<'parser> Parser<'parser> {
         if verbosity {
             let tree = self.output
                 .iter()
-                .map(|element| format!("{:?}", element))
-                .collect::<Vec<String>>()
+                .map(|element| Str::from(format!("{:?}", element)))
+                .collect::<Vec<Str>>()
                 .join("\n");
 
             if !tree.is_empty() {
@@ -404,10 +404,8 @@ impl<'resolver> Resolver<'resolver> {
 
             let tree = symbols
                 .iter()
-                .map(|symbol| {
-                    format!("{:?}", symbol)
-                })
-                .collect::<Vec<String>>()
+                .map(|symbol| Str::from(format!("{:?}", symbol)))
+                .collect::<Vec<Str>>()
                 .join("\n");
 
             if !tree.is_empty() {
@@ -460,7 +458,8 @@ pub struct Generation;
 impl<'generator> Generation {
     pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'generator>, elements: Vec<Element<'generator>>) -> () {
         let context = inkwell::context::Context::create();
-        let mut generator = crate::generator::Generator::new(&context);
+        let backend = crate::generator::Inkwell::new(&context);
+        let mut generator = crate::generator::Generator::new(backend);
         let mut timer = DefaultTimer::new_default();
         timer.start();
 

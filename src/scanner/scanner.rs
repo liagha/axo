@@ -105,7 +105,7 @@ impl<'scanner> Scanner<'scanner> {
         }
     }
 
-    pub fn set_input(&mut self, input: String) {
+    pub fn set_input(&mut self, input: Str) {
         let chars: Vec<char> = input.chars().collect();
         let characters = Self::inspect(self.position, chars);
 

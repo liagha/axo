@@ -20,8 +20,9 @@ pub struct Character<'character> {
 
 impl<'a> FromIterator<Character<'a>> for Str<'a> {
     fn from_iter<T: IntoIterator<Item = Character<'a>>>(iter: T) -> Self {
-        let s: String = iter.into_iter().collect();
-        Str(s.leak().as_bytes())
+        let string: Str = iter.into_iter().map(|c| c.value).collect();
+        
+        string
     }
 }
 

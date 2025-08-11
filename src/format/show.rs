@@ -1,27 +1,34 @@
 use {
     crate::{
+        data::{string::Str},
         format::Display,
     }
 };
 
-pub trait Show {
-    fn format(&self) -> String;
-    fn indent(&self) -> String {
+pub trait Show<'show> {
+    fn format(&self) -> Str<'show>;
+    fn indent(&self) -> Str<'show> {
         self.format().lines()
+            .into_iter()
             .map(|line| format!("    {}", line))
             .collect::<Vec<_>>()
             .join("\n")
+            .into()
     }
 }
 
-impl<Item: Display> Show for Item {
-    fn format(&self) -> String {
-        self.to_string()
+impl<'show, Item: Display> Show<'show> for Item {
+    fn format(&self) -> Str<'show> {
+        Str::from(self.to_string())
     }
 }
 
-impl<Item: Display> Show for [Item] {
-    fn format(&self) -> String {
-        self.iter().map(|form| form.to_string()).collect::<Vec<_>>().join(", ")
+impl<'show, Item: Display> Show<'show> for [Item] {
+    fn format(&self) -> Str<'show> {
+        self.iter()
+            .map(|form| Str::from(form.to_string()))
+            .collect::<Vec<Str>>()
+            .join(", ")
+            .into()
     }
 }

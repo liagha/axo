@@ -1,7 +1,10 @@
 use {
-    crate::internal::{
-        hash::Hash,
-        operation::Ordering,
+    crate::{
+        data::{Offset, string::Str},
+        internal::{
+            hash::Hash,
+            operation::Ordering,
+        }
     },
     super::{Location, Position, Spanned},
 };
@@ -21,6 +24,27 @@ impl<'span> Span<'span> {
     #[inline]
     pub fn default(location: Location<'span>) -> Self {
         Self { start: Position::default(location), end: Position::default(location) } 
+    }
+
+    #[inline]
+    pub fn file(path: Str<'span>) -> Self {
+        let location = Location::File(path);
+        let content = location.get_value();
+
+        let lines: Vec<Str> = content.lines();
+        let total = lines.len().max(1) as Offset;
+        let end = lines.last()
+            .map(|line| line.chars().count() + 1)
+            .unwrap_or(1) as Offset;
+
+        let start = Position::new(location);
+        let end = Position {
+            line: total,
+            column: end,
+            location,
+        };
+
+        Self::new(start, end)
     }
     
     #[inline]

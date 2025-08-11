@@ -1,7 +1,7 @@
 use {
     super::Character,
     crate::{
-        data::slice,
+        data::{slice, string::Str},
         format::{Debug, Display, Write, Result, Formatter},
     },
     
@@ -183,14 +183,9 @@ impl Display for OperatorKind {
             SingleQuote => write!(f, "'"),
             Backtick => write!(f, "`"),
             Underscore => write!(f, "_"),
-            Composite(ops) => {
-                let mut result = String::new();
-                
-                for op in ops {
-                    write!(result, "{}", op)?;
-                }
-                write!(f, "{}", result)
-            },
+            Composite(operators) => {
+                write!(f, "{}", operators.iter().map(|operator| operator.to_string()).collect::<Str>())
+            }
         }
     }
 }

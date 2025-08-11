@@ -7,7 +7,11 @@ use {
         reporter,
         format::{Display, Debug, Formatter, Result},
         tracker::{Span},
-        data::string::Str,
+        data::{
+            Number,
+            Scale,
+            string::Str,
+        },
     },
 
     broccli::{Color, TextStyle}
@@ -58,26 +62,14 @@ impl<'error, K: Display, N: Display, H: Display> Error<'error, K, N, H> {
         self
     }
 
-    pub fn format(&self) -> (String, String) {
-        fn count_digits(mut num: usize) -> usize {
-            if num == 0 {
-                return 1;
-            }
-            let mut count = 0;
-            while num != 0 {
-                num /= 10;
-                count += 1;
-            }
-            count
-        }
-
+    pub fn format(&self) -> (Str<'error>, Str<'error>) {
         let mut messages = String::new();
         let mut details = String::new();
 
         messages.push_str(&format!("{} {}", "error:".colorize(Color::Crimson).bold(), self.kind));
 
         let source = self.span.start.location.get_value();
-        let lines: Vec<Str> = source.lines().map(|string| Str::from(string)).collect();
+        let lines: Vec<Str> = source.lines();
 
         let start = self.span.start;
         let end = self.span.end;
@@ -86,7 +78,7 @@ impl<'error, K: Display, N: Display, H: Display> Error<'error, K, N, H> {
         let beginning = start.line.saturating_sub(surround);
         let finish = end.line.saturating_add(surround);
 
-        let max = count_digits(lines.len()) + 2;
+        let max = (lines.len().digit_count() + 2) as usize;
 
         details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
 
@@ -133,6 +125,6 @@ impl<'error, K: Display, N: Display, H: Display> Error<'error, K, N, H> {
             details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
         }
 
-        (messages, details)
+        (Str::from(messages), Str::from(details))
     }
 }

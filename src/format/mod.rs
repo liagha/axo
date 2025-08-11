@@ -15,6 +15,7 @@ use {
     broccli::{Color, TextStyle},
     
     crate::{
+        data::{string::Str},
         scanner::{
             Token, TokenKind, 
             PunctuationKind, 
@@ -22,17 +23,7 @@ use {
     }
 };
 
-pub fn print_usage() {
-    println!("Usage: axo [OPTIONS] <file.axo>");
-    println!("Options:");
-    println!("  -v, --verbose   Enable verbose output");
-    println!("  -t, --tokens    Show scanner tokens");
-    println!("  -a, --ast       Show parsed AST");
-    println!("  --time          Show execution time reports");
-    println!("  -h, --help      Show this help message");
-}
-
-pub fn format_tokens(tokens: &[Token]) -> String {
+pub fn format_tokens<'token>(tokens: &[Token<'token>]) -> Str<'token> {
     tokens
         .iter()
         .enumerate()

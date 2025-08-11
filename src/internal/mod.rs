@@ -19,7 +19,9 @@ pub mod operation {
         core::{
             arch::asm,
             cmp::Ordering,
-            ops::{Add, Deref, DerefMut, Div, Index, Mul, Neg, Range, Rem, Sub},
+            ops::{
+                Add, BitAnd, BitOr, BitXor, Deref, DerefMut, Div, Index, Mul, Neg, Range, Rem, Shl, Shr, Sub,
+            },
         },
     };
 }
