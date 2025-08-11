@@ -26,7 +26,7 @@ impl<'parser> Parser<'parser> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
-                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl"].contains(&identifier.unwrap_str())
+                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl", "module"].contains(&identifier.unwrap_str())
                 } else {
                     false
                 }

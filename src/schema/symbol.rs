@@ -51,6 +51,7 @@ pub struct Method<Target, Parameter, Body, Output> {
     output: Output,
 }
 
+#[derive(Debug)]
 pub struct Module<Target> {
     target: Target,
 }

@@ -11,7 +11,7 @@ use {
             Debug,
         },
         schema::{
-            Binding, Enumeration, Implementation, Inclusion, Interface, Method, Structure
+            Binding, Enumeration, Implementation, Inclusion, Interface, Method, Structure, Module,
         },
         internal::hash::{Hash, Hasher, DefaultHasher},
         data::{
@@ -23,13 +23,13 @@ use {
 
 pub trait Symbolic: Debug + 'static {
     fn brand(&self) -> Option<Token<'static>>;
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static;
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic>;
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool;
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher);
 }
 
@@ -117,11 +117,11 @@ impl Symbolic for Symbol {
     fn brand(&self) -> Option<Token<'static>> {
         self.value.brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(Self {
             value: self.value.clone(),
@@ -129,7 +129,7 @@ impl Symbolic for Symbol {
             members: self.members.clone(),
         })
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self.value == other.value.clone()
@@ -137,12 +137,12 @@ impl Symbolic for Symbol {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         self.value.dyn_hash(&mut hasher);
         state.write_u64(hasher.finish());
@@ -153,15 +153,15 @@ impl Symbolic for Inclusion<Box<Element<'static>>> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -169,12 +169,12 @@ impl Symbolic for Inclusion<Box<Element<'static>>> {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -185,15 +185,15 @@ impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, S
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -201,12 +201,12 @@ impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, S
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -217,15 +217,15 @@ impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -233,12 +233,12 @@ impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -249,15 +249,15 @@ impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Elem
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -265,12 +265,12 @@ impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Elem
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -281,15 +281,15 @@ impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -297,12 +297,12 @@ impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -313,15 +313,15 @@ impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -329,12 +329,12 @@ impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -345,15 +345,15 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, O
     fn brand(&self) -> Option<Token<'static>> {
         self.get_target().clone().brand()
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -361,12 +361,44 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, O
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(&self, &mut hasher);
+        state.write_u64(hasher.finish());
+    }
+}
+
+impl Symbolic for Module<Element<'static>> {
+    fn brand(&self) -> Option<Token<'static>> {
+        self.get_target().brand().clone()
+    }
+
+    fn as_any(&self) -> &dyn Any where Self: 'static {
+        self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+        Box::new(self.clone())
+    }
+
+    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Self>() {
+            self == other
+        } else {
+            false
+        }
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
+        state.write_u64(hasher.finish());
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());
@@ -394,15 +426,15 @@ impl Symbolic for Element<'static> {
             _ => None,
         }
     }
-    
+
     fn as_any(&self) -> &dyn Any where Self: 'static {
         self
     }
-    
+
     fn dyn_clone(&self) -> Box<dyn Symbolic> {
         Box::new(self.clone())
     }
-    
+
     fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
@@ -410,12 +442,12 @@ impl Symbolic for Element<'static> {
             false
         }
     }
-    
+
     fn dyn_hash(&self, state: &mut dyn Hasher) {
         let mut hasher = DefaultHasher::new();
         Hash::hash(&TypeId::of::<Self>(), &mut hasher);
         state.write_u64(hasher.finish());
-        
+
         let mut hasher = DefaultHasher::new();
         Hash::hash(&self, &mut hasher);
         state.write_u64(hasher.finish());

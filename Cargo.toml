@@ -17,7 +17,7 @@ initial = ["formation", "scanner", "parser"]
 scanner = ["formation", "text"]
 parser = ["formation", "scanner"]
 resolver = ["scanner", "parser", "matchete"]
-generator = ["inkwell"]
+generator = ["llvm-sys"]
 
 [dependencies]
 broccli = { version = "0.0.22" }
@@ -25,8 +25,8 @@ hashish = { version = "0.0.1" }
 log = { version = "0.4.27"}
 matchete = { path = "../matchete", optional = true }
 chrono = { version = "0.4.41", optional = true }
-inkwell = { version = "0.6.0", features = ["llvm18-1-force-static"], optional = true }
 walkdir = { version = "2.5.0" }
+llvm-sys = { version = "181.2.0", optional = true }
 
 [profile.dev]
 debug = true

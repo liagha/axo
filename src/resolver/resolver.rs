@@ -23,7 +23,6 @@ use {
             Enumeration, Implementation,
             Interface, Method, Structure
         },
-        
         data::{
             Scale,
             memory::{

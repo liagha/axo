@@ -179,12 +179,6 @@ impl<'compiler> Compiler<'compiler> {
 
         self.registry.resolver.execute_pipeline(elements.clone());
 
-        #[cfg(feature = "generator")]
-        {
-            let mut generation = Generation;
-            generation.execute_pipeline(&mut self.registry.resolver, elements.clone());
-        }
-
         verbosity
     }
 
@@ -449,43 +443,5 @@ impl<'resolver> Resolver<'resolver> {
                 xprintln!();
             }
         }
-    }
-}
-
-pub struct Generation;
-
-#[cfg(feature = "generator")]
-impl<'generator> Generation {
-    pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'generator>, elements: Vec<Element<'generator>>) -> () {
-        let context = inkwell::context::Context::create();
-        let backend = crate::generator::Inkwell::new(&context);
-        let mut generator = crate::generator::Generator::new(backend);
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
-        let verbosity = Registry::get_verbosity(resolver);
-
-        if verbosity {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`generating`" => Color::White,
-            );
-            xprintln!();
-        }
-
-        let result = generator.generate(elements);
-
-        if verbosity {
-            let duration = Duration::from_nanos(timer.elapsed().unwrap());
-
-            xprintln!(
-                "Finished {} {}s." => Color::Green,
-                "`generating` in" => Color::White,
-                duration.as_secs_f64(),
-            );
-            xprintln!();
-        }
-
-        result
     }
 }

@@ -25,6 +25,7 @@ use {
         format::{self, Debug, Formatter},
     },
 };
+use crate::schema::Module;
 
 pub struct Symbol {
     pub value: Box<dyn Symbolic>,
@@ -84,6 +85,7 @@ impl<'parser> Parser<'parser> {
             Self::structure(),
             Self::enumeration(),
             Self::method(),
+            Self::module(),
         ])
     }
 
@@ -102,7 +104,7 @@ impl<'parser> Parser<'parser> {
                         Self::token(),
                     ])
                 ),
-                Self::block(Classifier::deferred(Self::symbolization))
+                Classifier::deferred(Self::symbolization),
             ]),
             |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let keyword = form.collect_inputs()[0].clone();
@@ -194,7 +196,7 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("struct"))
                 }),
                 Self::token(),
-                Self::bundle(Classifier::deferred(Self::symbolization)),
+                Classifier::deferred(Self::symbolization),
             ]),
             |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
@@ -226,7 +228,7 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("enum"))
                 }),
                 Self::token(),
-                Self::bundle(Classifier::deferred(Self::element)),
+                Classifier::deferred(Self::symbolization),
             ]),
             |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
@@ -256,25 +258,94 @@ impl<'parser> Parser<'parser> {
                 }),
                 Self::token(),
                 Self::group(Classifier::deferred(Self::symbolization)),
-                Self::block(Classifier::deferred(Self::element)),
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
+                        if let TokenKind::Operator(operator) = &token.kind {
+                            matches!(operator.as_slice(), [OperatorKind::Minus, OperatorKind::RightAngle])
+                        } else {
+                            false
+                        }
+                    }).with_ignore(),
+                    Self::token(),
+                ]).with_transform(|_, form| {
+                    let output = form.as_forms();
+
+                    Ok(output[0].clone())
+                }).as_optional(),
+                Classifier::deferred(Self::element),
             ]),
             |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
-                let body = sequence[3].unwrap_output().clone();
 
-                let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
-                    parameter.kind.clone().unwrap_symbolize()
+                if sequence.len() == 4 {
+                    let body = sequence[3].unwrap_output().clone();
+
+                    let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
+                        parameter.kind.clone().unwrap_symbolize()
+                    }).collect::<Vec<_>>();
+
+                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Symbolize(
+                                Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { memory::transmute(span) })
+                            ),
+                            span,
+                        )
+                    ))
+                } else {
+                    let output = sequence[3].unwrap_output().clone();
+                    let body = sequence[4].unwrap_output().clone();
+
+                    let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
+                        parameter.kind.clone().unwrap_symbolize()
+                    }).collect::<Vec<_>>();
+
+                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+
+                    Ok(Form::output(
+                        Element::new(
+                            ElementKind::Symbolize(
+                                Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)))) }, unsafe { memory::transmute(span) })
+                            ),
+                            span,
+                        )
+                    ))
+                }
+            }
+        )
+    }
+
+    pub fn module() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+        Classifier::with_transform(
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
+                    token.kind == TokenKind::Identifier(Str::from("module"))
+                }),
+                Self::token(),
+                Classifier::deferred(Self::symbolization),
+            ]),
+            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input().clone();
+                let name = sequence[1].unwrap_output().clone();
+                let body = sequence[2].unwrap_output().clone();
+
+                let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
+                    item.kind.clone().unwrap_symbolize().clone()
                 }).collect::<Vec<_>>();
-
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let mut symbol = Symbol::new(unsafe { memory::transmute::<_, Module<Element<'static>>>(Module::new(name)) }, unsafe { memory::transmute(span) });
+                symbol.members.extend(fields);
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { memory::transmute(span) })
+                            symbol,
                         ),
                         span,
                     )
