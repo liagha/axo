@@ -19,4 +19,4 @@ use {
     },
 };
 
-pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, String, ResolveHint<'error>>;
+pub type ResolveError<'error> = Error<'error, ErrorKind, String, ResolveHint<'error>>;

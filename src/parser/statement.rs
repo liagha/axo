@@ -27,7 +27,7 @@ impl<'parser> Parser<'parser> {
                 }),
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
@@ -35,7 +35,7 @@ impl<'parser> Parser<'parser> {
                 ),
                 Classifier::with_fallback(
                     Classifier::deferred(Self::element),
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
@@ -53,7 +53,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::deferred(Self::element),
                 ])),
             ]),
-            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
                 let condition = sequence[1].unwrap_output().clone();
@@ -94,14 +94,14 @@ impl<'parser> Parser<'parser> {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedCondition, span)
                     })
                 ),
                 Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
@@ -117,7 +117,7 @@ impl<'parser> Parser<'parser> {
                     }
                 }).with_ignore(),
                 Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|_, form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
                         let span = form.unwrap_input().borrow_span();
 
                         ParseError::new(ErrorKind::ExpectedBody, span)
@@ -125,7 +125,7 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
         ], vec![1, 0]).with_transform(
-            |_, form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence: &[Form<Token<'_>, Element, ParseError>] = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 

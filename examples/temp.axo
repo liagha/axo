@@ -1,3 +1,5 @@
-func test() -> i32 test + 4
+module test {
+    var x
+}
 
-module test x
+test.xg

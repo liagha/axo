@@ -14,9 +14,6 @@ use {
             thread::Arc,
             Scale,
         },
-        internal::{
-            compiler::Registry,
-        },
     },
 };
 
@@ -191,7 +188,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(Form<Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Arc::new(Fail { emitter: Arc::new(emitter) }))
     }
@@ -219,7 +216,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Registry, Form<Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(Form<Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Self::panic(emitter))
     }
@@ -245,7 +242,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_transform<T>(self, transform: T) -> Self
     where
-        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
+        T: FnMut(Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
     {
         self.with_order(Self::transform(transform))
     }

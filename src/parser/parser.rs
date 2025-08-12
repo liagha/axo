@@ -12,8 +12,8 @@ use {
             former::Former,
             classifier::Classifier,
         },
-        internal::compiler::{
-            Registry, Marked
+        internal::{
+            compiler::{Registry},
         },
         scanner::{
             PunctuationKind, Token, TokenKind
@@ -163,15 +163,5 @@ impl<'parser> Parser<'parser> {
                 _ => {}
             }
         }
-    }
-}
-
-impl<'parser> Marked<'parser> for Parser<'parser> {
-    fn registry(&self) -> &Registry<'parser> {
-        todo!()
-    }
-
-    fn registry_mut(&mut self) -> &mut Registry<'parser> {
-        todo!()
     }
 }

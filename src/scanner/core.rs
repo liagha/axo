@@ -24,7 +24,7 @@ impl<'scanner> Scanner<'scanner> {
                 None,
             ),
             Classifier::literal('"'),
-        ]).with_transform(move |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(move |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -42,7 +42,7 @@ impl<'scanner> Scanner<'scanner> {
                 ]),
                 Classifier::literal('`'),
             ]),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -59,7 +59,7 @@ impl<'scanner> Scanner<'scanner> {
                 Self::escape_sequence(),
             ]),
             Classifier::literal('\''),
-        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(|form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let ch = inputs[1];
 
@@ -77,7 +77,7 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
                 
@@ -113,7 +113,7 @@ impl<'scanner> Scanner<'scanner> {
                 1,
                 None
             ),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -130,7 +130,7 @@ impl<'scanner> Scanner<'scanner> {
     fn punctuation() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -151,7 +151,7 @@ impl<'scanner> Scanner<'scanner> {
                 1,
                 None,
             ),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -190,7 +190,7 @@ impl<'scanner> Scanner<'scanner> {
                     ])
                 ])
             ]),
-            |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
 
@@ -202,7 +202,7 @@ impl<'scanner> Scanner<'scanner> {
     fn fallback() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::with_order(
             Classifier::anything(),
-            Classifier::fail(|_, form| {
+            Classifier::fail(|form| {
                 let ch : &Character = form.unwrap_input();
 
                 ScanError::new(

@@ -16,7 +16,7 @@ use {
         internal::{
             environment::current_dir,
             platform::{self, read_dir, Path, PathBuf},
-            compiler::{Marked, Registry},
+            compiler::{Registry},
             hash::{DefaultHasher, Hash, Hasher},
         },
         parser::{Element, ParseError, Symbol, Symbolic},
@@ -201,15 +201,5 @@ impl<'initializer> Initializer<'initializer> {
 
         let files = Self::visit().unwrap().iter().map(|path| format!("{}\n", path.as_path().display())).collect::<String>();
         xprintln!("\nAxolotls:\n{}\n" => Color::Pink, files.indent() => Color::Magenta);
-    }
-}
-
-impl<'initializer> Marked<'initializer> for Initializer<'initializer> {
-    fn registry(&self) -> &Registry<'initializer> {
-        todo!()
-    }
-
-    fn registry_mut(&mut self) -> &mut Registry<'initializer> {
-        todo!()
     }
 }

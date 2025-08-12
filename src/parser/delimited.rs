@@ -25,7 +25,7 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
 
                                 ParseError::new(
@@ -45,7 +45,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
 
                         ParseError::new(
@@ -57,7 +57,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let braces = form.collect_inputs();
                 let elements = form.collect_outputs();
 
@@ -81,7 +81,7 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
 
                                 ParseError::new(
@@ -101,7 +101,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
 
                         ParseError::new(
@@ -113,7 +113,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let braces = form.collect_inputs();
                 let elements = form.collect_outputs();
 
@@ -139,7 +139,7 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::branch(
                                 Classifier::ignore(),
-                                Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                     let span = Span::default(Location::Flag);
 
                                     ParseError::new(
@@ -160,7 +160,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
                         
                         ParseError::new(
@@ -172,7 +172,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let parentheses = form.collect_inputs();
                 let elements = form.collect_outputs();
 
@@ -198,7 +198,7 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::branch(
                                 Classifier::ignore(),
-                                Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                                Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                     let span = Span::default(Location::Flag);
 
                                     ParseError::new(
@@ -219,7 +219,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
 
                         ParseError::new(
@@ -231,7 +231,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let parentheses = form.collect_inputs();
                 let elements = form.collect_outputs();
 
@@ -255,7 +255,7 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                             }),
-                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
 
                                 ParseError::new(
@@ -275,7 +275,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
 
                         ParseError::new(
@@ -287,7 +287,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let brackets = form.collect_inputs();
                 let elements = form.collect_outputs();
 
@@ -312,7 +312,7 @@ impl<'parser> Parser<'parser> {
                             Classifier::predicate(|token: &Token| {
                                 token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                             }),
-                            Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
 
                                 ParseError::new(
@@ -332,7 +332,7 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
                     }),
-                    Classifier::fail(|_, _form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
 
                         ParseError::new(
@@ -344,7 +344,7 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let brackets = form.collect_inputs();
                 let elements = form.collect_outputs();
 

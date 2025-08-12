@@ -97,9 +97,9 @@ pub struct Label<Value, Element> {
 }
 
 #[derive(Eq)]
-pub struct Access<Object, Target> {
-    object: Object,
+pub struct Access<Target, Member> {
     target: Target,
+    member: Member,
 }
 
 #[derive(Eq)]
@@ -425,18 +425,18 @@ impl<Value, Element> Label<Value, Element> {
     }
 }
 
-impl<Object, Target> Access<Object, Target> {
+impl<Target, Member> Access<Target, Member> {
     #[inline]
-    pub fn new(object: Object, target: Target) -> Self {
-        Access { object, target }
-    }
-    #[inline]
-    pub fn get_object(&self) -> &Object {
-        &self.object
+    pub fn new(target: Target, member: Member) -> Self {
+        Access { target, member }
     }
     #[inline]
     pub fn get_target(&self) -> &Target {
         &self.target
+    }
+    #[inline]
+    pub fn get_member(&self) -> &Member {
+        &self.member
     }
 }
 
@@ -564,10 +564,10 @@ impl<Value: Hash, Element: Hash> Hash for Label<Value, Element> {
     }
 }
 
-impl<Object: Hash, Member: Hash> Hash for Access<Object, Member> {
+impl<Target: Hash, Member: Hash> Hash for Access<Target, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_object().hash(state);
         self.get_target().hash(state);
+        self.get_member().hash(state);
     }
 }
 
@@ -682,9 +682,9 @@ impl<Value: PartialEq, Element: PartialEq> PartialEq for Label<Value, Element> {
     }
 }
 
-impl<Object: PartialEq, Member: PartialEq> PartialEq for Access<Object, Member> {
+impl<Target: PartialEq, Member: PartialEq> PartialEq for Access<Target, Member> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_object() == other.get_object() && self.get_target() == other.get_target()
+        self.get_target() == other.get_target() && self.get_member() == other.get_member()
     }
 }
 
@@ -802,7 +802,7 @@ impl<Value: Clone, Element: Clone> Clone for Label<Value, Element> {
 
 impl<Object: Clone, Member: Clone> Clone for Access<Object, Member> {
     fn clone(&self) -> Self {
-        Access::new(self.get_object().clone(), self.get_target().clone())
+        Access::new(self.get_target().clone(), self.get_member().clone())
     }
 }
 

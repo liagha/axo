@@ -12,9 +12,7 @@ use {
             former::Former,
         },
         internal::{
-            compiler::{
-                Registry, Marked,
-            },
+            compiler::{Registry},
         },
         tracker::{
             Peekable, Position, Location,
@@ -131,15 +129,5 @@ impl<'scanner> Scanner<'scanner> {
                 _ => {}
             }
         }
-    }
-}
-
-impl<'scanner> Marked<'scanner> for Scanner<'scanner> {
-    fn registry(&self) -> &Registry<'scanner> {
-        todo!()
-    }
-
-    fn registry_mut(&mut self) -> &mut Registry<'scanner> {
-        todo!()
     }
 }

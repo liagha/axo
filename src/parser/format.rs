@@ -65,7 +65,7 @@ impl<'element> Debug for ElementKind<'element> {
                 write!(f, "Invoke({:?}({:?}))", invoke.get_target(), invoke.get_arguments())
             },
             ElementKind::Access(access) => {
-                write!(f, "Access({:?}.{:?})", access.get_object(), access.get_target())
+                write!(f, "Access({:?}.{:?})", access.get_target(), access.get_member())
             },
 
             ElementKind::Conditional(cond) => {

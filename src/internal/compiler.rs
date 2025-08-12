@@ -66,21 +66,6 @@ pub trait PipelineStage<'stage, Input, Output> {
     fn execute(&mut self, resolver: &mut Resolver<'stage>, input: Input) -> Output;
 }
 
-pub trait Marked<'marked> {
-    #[track_caller]
-    fn registry(&self) -> &Registry<'marked>;
-    #[track_caller]
-    fn registry_mut(&mut self) -> &mut Registry<'marked>;
-    #[track_caller]
-    fn resolver(&self) -> &Resolver<'marked> {
-        &self.registry().resolver
-    }
-    #[track_caller]
-    fn resolver_mut(&mut self) -> &mut Resolver<'marked> {
-        &mut self.registry_mut().resolver
-    }
-}
-
 #[derive(Debug)]
 pub struct Registry<'registry> {
     pub resolver: Resolver<'registry>,
@@ -99,11 +84,9 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(symbol) = found {
-                if let Some(preference) = symbol.cast::<Preference<'static>>() {
-                    if let TokenKind::Boolean(verbosity) = preference.value.kind {
-                        return verbosity
-                    }
+            if let Some(preference) = found.cast::<Preference<'static>>() {
+                if let TokenKind::Boolean(verbosity) = preference.value.kind {
+                    return verbosity
                 }
             }
         }
@@ -117,11 +100,9 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(symbol) = found {
-                if let Some(preference) = symbol.cast::<Preference<'static>>() {
-                    if let TokenKind::Identifier(path) = preference.value.kind.clone() {
-                        return path.clone()
-                    }
+            if let Some(preference) = found.cast::<Preference<'static>>() {
+                if let TokenKind::Identifier(path) = preference.value.kind.clone() {
+                    return path.clone()
                 }
             }
         }

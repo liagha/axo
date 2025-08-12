@@ -22,6 +22,20 @@ use {
 };
 
 impl<'parser> Parser<'parser> {
+    pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
+        match element.kind {
+            ElementKind::Bundle(bundle) => {
+                bundle.items
+            }
+            ElementKind::Block(block) => {
+                block.items
+            }
+            _ => {
+                vec![element]
+            }
+        }
+    }
+
     pub fn identifier() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
@@ -31,7 +45,7 @@ impl<'parser> Parser<'parser> {
                     false
                 }
             }),
-            |_, form| {
+            |form| {
                 let input = form.collect_inputs()[0].clone();
                 let identifier = input.kind.unwrap_identifier();
 
@@ -54,7 +68,7 @@ impl<'parser> Parser<'parser> {
                         | TokenKind::Integer(_)
                 )
             }),
-            |_, form| {
+            |form| {
                 let input = form.collect_inputs()[0].clone();
 
                 Ok(Form::output(
@@ -98,7 +112,7 @@ impl<'parser> Parser<'parser> {
             }),
             Self::primary(),
         ]).with_transform(
-            |_, form: Form<Token, Element, ParseError>| {
+            |form: Form<Token, Element, ParseError>| {
                 let prefixes = form.collect_inputs();
                 let operand = form.collect_outputs()[0].clone();
                 let mut unary = operand.clone();
@@ -141,7 +155,7 @@ impl<'parser> Parser<'parser> {
                     None
                 ),
             ]),
-            |_, form| {
+            |form| {
                 let sequence = form.as_forms();
                 let operand = sequence[0].unwrap_output();
                 let suffixes = sequence[1].as_forms();
@@ -226,7 +240,7 @@ impl<'parser> Parser<'parser> {
                         None,
                     ),
                 ]),
-                move |_, form| {
+                move |form| {
                     let sequence = form.as_forms();
                     let mut left = sequence[0].unwrap_output().clone();
                     let operations = sequence[1].as_forms();
@@ -335,7 +349,7 @@ impl<'parser> Parser<'parser> {
     pub fn fallback() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_fail(
             Classifier::anything(),
-            |_, form: Form<Token, Element, ParseError>| {
+            |form: Form<Token, Element, ParseError>| {
                 let token = form.unwrap_input();
 
                 ParseError::new(

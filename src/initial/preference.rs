@@ -104,13 +104,13 @@ impl<'initializer> Initializer<'initializer> {
                 } else {
                     false
                 }
-            }).with_transform(move |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
+            }).with_transform(move |form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                 let identifier = form.collect_inputs()[0].clone();
                 let span = identifier.span();
 
                 Ok(Form::Input(Token::new(TokenKind::Identifier(Str::from("Verbosity")), span)))
             })
-        ]).with_transform(move |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
+        ]).with_transform(move |form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
             let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
             let span: Span<'initializer> = identifier.clone().span();
 
@@ -134,7 +134,7 @@ impl<'initializer> Initializer<'initializer> {
                     } else {
                         false
                     }
-                }).with_transform(|_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
+                }).with_transform(|form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
 
@@ -166,7 +166,7 @@ impl<'initializer> Initializer<'initializer> {
                     ]).as_optional()
                 ])
             ]),
-            |_, form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
+            |form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
                 let inputs = form.collect_inputs();
                 let identifier = inputs[0].clone();
                 let span = identifier.clone().span();

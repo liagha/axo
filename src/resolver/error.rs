@@ -10,16 +10,16 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub enum ErrorKind<'error> {
+pub enum ErrorKind {
     UndefinedSymbol {
-        query: Token<'error>,
+        query: Token<'static>,
     },
     BindMismatch {
-        candidate: Token<'error>,
+        candidate: Token<'static>,
     },
 }
 
-impl<'error> Display for ErrorKind<'error> {
+impl<'error> Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::UndefinedSymbol { query } => {

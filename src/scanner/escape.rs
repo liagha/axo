@@ -26,7 +26,7 @@ impl<'scanner> Scanner<'scanner> {
                     _ => false,
                 }
             })
-        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(|form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let span = inputs.borrow_span().clone();
             let escape = inputs[1];
@@ -64,7 +64,7 @@ impl<'scanner> Scanner<'scanner> {
                 1,
                 Some(3),
             ),
-        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(|form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
             let span = inputs.borrow_span().clone();
@@ -110,7 +110,7 @@ impl<'scanner> Scanner<'scanner> {
                 1,
                 Some(2),
             ),
-        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(|form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
             let span = inputs.borrow_span().clone();
@@ -158,7 +158,7 @@ impl<'scanner> Scanner<'scanner> {
                 Some(6),
             ),
             Classifier::literal('}'),
-        ]).with_transform(|_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(|form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter()
                 .skip(3)
@@ -212,7 +212,7 @@ impl<'scanner> Scanner<'scanner> {
                 4,
                 Some(4),
             ),
-        ]).with_transform(move |_, form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
+        ]).with_transform(move |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
             let inputs = form.collect_inputs();
             let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
             let span = inputs.span().clone();

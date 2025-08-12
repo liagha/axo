@@ -34,7 +34,7 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            move |_, form| {
+            move |form| {
                 let inputs = form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
@@ -61,7 +61,7 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |_, form| {
+            |form| {
                 let inputs = form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
@@ -88,7 +88,7 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |_, form| {
+            |form| {
                 let inputs = form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
@@ -130,7 +130,7 @@ impl<'scanner> Scanner<'scanner> {
                     Classifier::persistence(Classifier::predicate(|c: &Character| c.is_numeric()), 1, None),
                 ])),
             ]),
-            |_, form| {
+            |form| {
                 let inputs = form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let span = inputs.borrow_span().clone();

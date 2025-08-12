@@ -17,7 +17,7 @@ pub mod helper {
             format::Debug,
             internal::{
                 hash::{Hash},
-                compiler::{Registry, Marked},
+                compiler::{Registry},
             },
             tracker::Peekable,
         },
@@ -32,21 +32,21 @@ pub mod helper {
         T: Clone + Debug + Eq + Hash + PartialEq + 'formable
     {}
 
-    pub trait Source<'source, Input>: Peekable<'source, Input> + Marked<'source>
+    pub trait Source<'source, Input>: Peekable<'source, Input> 
     where
         Input: Formable<'source>,
     {}
 
     impl<'source, Target, Input> Source<'source, Input> for Target
     where
-        Target: Peekable<'source, Input> + Marked<'source>,
+        Target: Peekable<'source, Input>,
         Input: Formable<'source>,
     {}
 
-    pub type Emitter<'emitter, Input, Output, Failure> = Arc<dyn Fn(&mut Registry, Form<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
+    pub type Emitter<'emitter, Input, Output, Failure> = Arc<dyn Fn(Form<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
     pub type Evaluator<'evaluator, Input, Output, Failure> = Arc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
     pub type Inspector<'inspector, Input, Output, Failure> = Arc<dyn Fn(Draft<'inspector, Input, Output, Failure>) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector> + 'inspector>;
     pub type Performer<'performer> = Arc<Mutex<dyn FnMut() -> () + 'performer>>;
     pub type Predicate<'predicate, Input> = Arc<dyn Fn(&Input) -> bool + 'predicate>;
-    pub type Transformer<'transformer, Input, Output, Failure> = Arc<Mutex<dyn FnMut(&mut Registry, Form<'transformer, Input, Output, Failure>) -> Result<Form<'transformer, Input, Output, Failure>, Failure> + 'transformer>>;
+    pub type Transformer<'transformer, Input, Output, Failure> = Arc<Mutex<dyn FnMut(Form<'transformer, Input, Output, Failure>) -> Result<Form<'transformer, Input, Output, Failure>, Failure> + 'transformer>>;
 }

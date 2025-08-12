@@ -21,7 +21,7 @@ use {
         },
         schema::{
             Enumeration, Implementation,
-            Interface, Method, Structure
+            Interface, Method, Structure, Module,
         },
         data::{
             Scale,
@@ -33,6 +33,7 @@ use {
         format::Debug,
     },
 };
+use crate::parser::Symbolic;
 
 #[derive(Debug)]
 pub struct Resolver<'resolver> {
@@ -79,16 +80,23 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.add(symbol);
     }
 
-    pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Option<Symbol>, Vec<ResolveError<'resolver>>> {
+    pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Symbol, Vec<ResolveError<'resolver>>> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(unsafe { memory::transmute(target) }, &candidates);
 
         if let Some(champion) = champion {
-            Ok(Some(champion))
+            Ok(champion)
         } else {
             if assessor.errors.is_empty() {
-                Ok(None)
+                let error = ResolveError {
+                    kind: ErrorKind::UndefinedSymbol { query: unsafe { memory::transmute::<&Element<'_>, &Element<'static>>(target) }.brand().unwrap().clone() },
+                    span: target.span.clone(),
+                    hints: vec![],
+                    note: None,
+                };
+
+                Err(vec![error])
             } else {
                 Err(unsafe { memory::transmute(assessor.errors.clone()) })
             }
@@ -97,8 +105,7 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn get(&mut self, target: &Element<'resolver>) -> Option<Symbol> {
         match self.try_get(target) {
-            Ok(Some(symbol)) => Some(symbol),
-            Ok(None) => None,
+            Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());
 
@@ -107,15 +114,22 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol>) -> Result<Option<Symbol>, Vec<ResolveError<'resolver>>> {
+    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol>) -> Result<Symbol, Vec<ResolveError<'resolver>>> {
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(unsafe { memory::transmute(target) }, &candidates);
 
         if let Some(champion) = champion {
-            Ok(Some(champion))
+            Ok(champion)
         } else {
             if assessor.errors.is_empty() {
-                Ok(None)
+                let error = ResolveError {
+                    kind: ErrorKind::UndefinedSymbol { query: unsafe { memory::transmute::<&Element<'_>, &Element<'static>>(target) }.brand().unwrap().clone() },
+                    span: target.span.clone(),
+                    hints: vec![],
+                    note: None,
+                };
+
+                Err(vec![error])
             } else {
                 Err(unsafe { memory::transmute(assessor.errors.clone()) })
             }
@@ -124,8 +138,7 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol>) -> Option<Symbol> {
         match self.try_lookup(target, candidates) {
-            Ok(Some(symbol)) => Some(symbol),
-            Ok(None) => None,
+            Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());
 
@@ -134,7 +147,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn fail(&mut self, error: ErrorKind<'resolver>, span: Span<'resolver>) {
+    pub fn fail(&mut self, error: ErrorKind, span: Span<'resolver>) {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
@@ -241,7 +254,12 @@ impl<'resolver> Resolver<'resolver> {
 
             ElementKind::Access(access) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-                let _target = self.lookup(access.get_object(), candidates);
+                let target = self.lookup(access.get_target(), candidates);
+
+                if let Some(target) = target {
+                    let members = target.scope.all().iter().cloned().collect::<Vec<_>>();
+                    let member = self.lookup(access.get_member(), members);
+                }
             }
 
             ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
@@ -275,6 +293,8 @@ impl<'resolver> Resolver<'resolver> {
         } else if let Some(_) = symbol.cast::<Enumeration<Box<Element>, Element>>() {
             self.scope.add(symbol.clone());
         } else if let Some(_) = symbol.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
+            self.scope.add(symbol.clone());
+        } else if let Some(_) = symbol.cast::<Module<Element>>() {
             self.scope.add(symbol.clone());
         }
     }

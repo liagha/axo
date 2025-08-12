@@ -126,7 +126,7 @@ impl Symbolic for Symbol {
         Box::new(Self {
             value: self.value.clone(),
             span: self.span.clone(),
-            members: self.members.clone(),
+            scope: self.scope.clone(),
         })
     }
 
@@ -420,7 +420,7 @@ impl Symbolic for Element<'static> {
             ElementKind::Label(label) => label.get_label().brand(),
             ElementKind::Index(index) => index.get_target().brand(),
             ElementKind::Invoke(invoke) => invoke.get_target().brand(),
-            ElementKind::Access(access) => access.get_object().brand(),
+            ElementKind::Access(access) => access.get_member().brand(),
             ElementKind::Symbolize(symbol) => symbol.brand(),
             ElementKind::Assign(assign) => assign.get_target().brand(),
             _ => None,

@@ -55,8 +55,7 @@ pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure:
 impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>> Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'fail, Input, Output, Failure>, draft: &mut Draft<'fail, Input, Output, Failure>) {
-        // Todo: Actual Registry Handling
-        let failure = (self.emitter)(&mut Registry::new(), draft.form.clone());
+        let failure = (self.emitter)(draft.form.clone());
 
         draft.set_fail();
         draft.form = Form::Failure(failure);
@@ -116,7 +115,7 @@ pub struct Panic<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Fail
 impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>> Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'panic, Input, Output, Failure>, draft: &mut Draft<'panic, Input, Output, Failure>) {
-        let failure = (self.emitter)(composer.source.registry_mut(), draft.form.clone());
+        let failure = (self.emitter)(draft.form.clone());
 
         let form = Form::Failure(failure);
         draft.set_panic();
@@ -170,8 +169,7 @@ impl<'transform, Input: Formable<'transform>, Output: Formable<'transform>, Fail
     fn order(&self, composer: &mut Former<'_, 'transform, Input, Output, Failure>, draft: &mut Draft<'transform, Input, Output, Failure>) {
         if draft.is_aligned() {
             let result = if let Ok(mut guard) = self.transformer.lock() {
-                // Todo: Actual Registry Handling
-                let result = guard(&mut Registry::new(), draft.form.clone());
+                let result = guard(draft.form.clone());
                 drop(guard);
                 result
             } else {
@@ -195,7 +193,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn transform<T>(transformer: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: FnMut(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
+        T: FnMut(Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
     {
         Arc::new(Transform { transformer: Arc::new(Mutex::new(transformer))})
     }
@@ -203,7 +201,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn fail<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Fail { emitter: Arc::new(emitter) })
     }
@@ -211,7 +209,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn panic<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(&mut Registry, Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Panic { emitter: Arc::new(emitter) })
     }
