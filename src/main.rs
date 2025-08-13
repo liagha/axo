@@ -23,6 +23,7 @@ pub mod reporter;
 pub mod schema;
 pub mod tracker;
 pub(crate) mod data;
+mod validator;
 
 use {
     internal::{

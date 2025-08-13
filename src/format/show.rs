@@ -1,7 +1,7 @@
-use hashish::HashSet;
 use {
     crate::{
         data::{string::Str},
+        internal::hash::Set,
         format::Display,
     }
 };
@@ -28,7 +28,7 @@ impl<'show, Item: Display> Show<'show> for [Item] {
     }
 }
 
-impl<'show, Item: Display> Show<'show> for HashSet<Item> {
+impl<'show, Item: Display> Show<'show> for Set<Item> {
     fn format(&self) -> Str<'show> {
         self.iter()
             .map(|form| Str::from(form.to_string()))

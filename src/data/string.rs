@@ -95,7 +95,7 @@ impl<'string> Str<'string> {
     where
         F: FnOnce(&str) -> R,
     {
-        f(self.as_str().expect("Str contains invalid UTF-8"))
+        f(self.as_str().expect("Str contains invalid UTF-8."))
     }
 
     #[inline]
@@ -110,7 +110,7 @@ impl<'string> Str<'string> {
     #[inline]
     pub fn split(&self, pat: &str) -> Vec<Str<'string>> {
         self.as_str()
-            .expect("Str contains invalid UTF-8")
+            .expect("Str contains invalid UTF-8.")
             .split(pat)
             .map(|s| Str(s.as_bytes()))
             .collect()
@@ -119,7 +119,7 @@ impl<'string> Str<'string> {
     #[inline]
     pub fn trim(&self) -> Str<'string> {
         Str(self.as_str()
-            .expect("Str contains invalid UTF-8")
+            .expect("Str contains invalid UTF-8.")
             .trim()
             .as_bytes())
     }
@@ -127,21 +127,21 @@ impl<'string> Str<'string> {
     #[inline]
     pub fn to_lowercase(&self) -> String {
         self.as_str()
-            .expect("Str contains invalid UTF-8")
+            .expect("Str contains invalid UTF-8.")
             .to_lowercase()
     }
 
     #[inline]
     pub fn to_uppercase(&self) -> String {
         self.as_str()
-            .expect("Str contains invalid UTF-8")
+            .expect("Str contains invalid UTF-8.")
             .to_uppercase()
     }
 
     #[inline]
     pub fn contains(&self, pat: &str) -> bool {
         self.as_str()
-            .expect("Str contains invalid UTF-8")
+            .expect("Str contains invalid UTF-8.")
             .contains(pat)
     }
 }
@@ -150,7 +150,7 @@ impl<'string> Deref for Str<'string> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.as_str().expect("Str contains invalid UTF-8")
+        self.as_str().expect("Str contains invalid UTF-8.")
     }
 }
 
@@ -161,7 +161,7 @@ where
     type Output = str;
 
     fn index(&self, index: I) -> &Self::Output {
-        &self.as_str().expect("Str contains invalid UTF-8")[index]
+        &self.as_str().expect("Str contains invalid UTF-8.")[index]
     }
 }
 
@@ -173,19 +173,19 @@ impl<'string> AsRef<[u8]> for Str<'string> {
 
 impl<'string> AsRef<str> for Str<'string> {
     fn as_ref(&self) -> &str {
-        self.as_str().expect("Str contains invalid UTF-8")
+        self.as_str().expect("Str contains invalid UTF-8.")
     }
 }
 
 impl<'string> AsRef<Path> for Str<'string> {
     fn as_ref(&self) -> &Path {
-        Path::new(self.as_str().expect("Str contains invalid UTF-8"))
+        Path::new(self.as_str().expect("Str contains invalid UTF-8."))
     }
 }
 
 impl<'string> AsRef<OsStr> for Str<'string> {
     fn as_ref(&self) -> &OsStr {
-        OsStr::new(self.as_str().expect("Str contains invalid UTF-8"))
+        OsStr::new(self.as_str().expect("Str contains invalid UTF-8."))
     }
 }
 
@@ -396,7 +396,7 @@ impl<'string> From<&'string Path> for Str<'string> {
 
 impl<'string> From<PathBuf> for Str<'string> {
     fn from(p: PathBuf) -> Self {
-        let s = p.into_os_string().into_string().expect("PathBuf contains invalid UTF-8");
+        let s = p.into_os_string().into_string().expect("PathBuf contains invalid UTF-8.");
         Str(s.leak().as_bytes())
     }
 }
@@ -409,7 +409,7 @@ impl<'string> From<&'string OsStr> for Str<'string> {
 
 impl<'string> From<OsString> for Str<'string> {
     fn from(os: OsString) -> Self {
-        let s = os.into_string().expect("OsString contains invalid UTF-8");
+        let s = os.into_string().expect("OSString contains invalid UTF-8.");
         Str(s.leak().as_bytes())
     }
 }

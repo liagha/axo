@@ -1,21 +1,21 @@
 use {
     crate::{
         data::{Offset, Scale},
-        internal::hash::HashSet,
+        internal::hash::Set,
         parser::Symbol,
     },
 };
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    pub symbols: HashSet<Symbol>,
+    pub symbols: Set<Symbol>,
     pub parent: Option<Box<Scope>>,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            symbols: HashSet::new(),
+            symbols: Set::new(),
             parent: None,
         }
     }
@@ -26,7 +26,7 @@ impl Scope {
 
     pub fn with_parent(parent: Scope) -> Self {
         Self {
-            symbols: HashSet::new(),
+            symbols: Set::new(),
             parent: Some(Box::new(parent)),
         }
     }
@@ -74,12 +74,12 @@ impl Scope {
         None
     }
 
-    pub fn local(&self) -> &HashSet<Symbol> {
+    pub fn local(&self) -> &Set<Symbol> {
         &self.symbols
     }
 
-    pub fn all(&self) -> HashSet<Symbol> {
-        let mut symbols = HashSet::new();
+    pub fn all(&self) -> Set<Symbol> {
+        let mut symbols = Set::new();
         let mut current = Some(self);
 
         while let Some(scope) = current {
@@ -154,7 +154,7 @@ impl Scope {
         self.symbols.retain(predicate);
     }
 
-    pub fn filter<F>(&self, predicate: F) -> HashSet<Symbol>
+    pub fn filter<F>(&self, predicate: F) -> Set<Symbol>
     where
         F: Fn(&Symbol) -> bool,
     {
@@ -184,15 +184,15 @@ impl Scope {
         self.all().into_iter().collect()
     }
 
-    pub fn intersect(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn intersect(&self, other: &Scope) -> Set<Symbol> {
         self.symbols.intersection(&other.symbols).cloned().collect()
     }
 
-    pub fn difference(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn difference(&self, other: &Scope) -> Set<Symbol> {
         self.symbols.difference(&other.symbols).cloned().collect()
     }
 
-    pub fn union(&self, other: &Scope) -> HashSet<Symbol> {
+    pub fn union(&self, other: &Scope) -> Set<Symbol> {
         self.symbols.union(&other.symbols).cloned().collect()
     }
 
@@ -208,7 +208,7 @@ impl Scope {
         self.parent = None;
     }
 
-    pub fn cascade(&self) -> Vec<HashSet<Symbol>> {
+    pub fn cascade(&self) -> Vec<Set<Symbol>> {
         let mut levels = Vec::new();
         let mut current = Some(self);
 

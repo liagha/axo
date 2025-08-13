@@ -10,7 +10,7 @@ pub mod hash {
     pub use {
         core::hash::{Hash, Hasher},
         std::hash::DefaultHasher,
-        hashish::HashSet,
+        hashish::HashSet as Set,
     };
 }
 
