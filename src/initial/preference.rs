@@ -140,54 +140,69 @@ impl<'initializer> Initializer<'initializer> {
 
                     Ok(Form::Input(Token::new(TokenKind::Identifier(Str::from("Path")), span)))
                 }),
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Identifier(_))
-                    }),
-                    Classifier::repetition(
+                Classifier::repetition(
+                    Classifier::sequence([
+                        Classifier::predicate(|token: &Token| {
+                            matches!(token.kind, TokenKind::Identifier(_))
+                        }),
+                        Classifier::repetition(
+                            Classifier::sequence([
+                                Classifier::predicate(|token: &Token| {
+                                    matches!(token.kind, TokenKind::Operator(OperatorKind::Slash))
+                                }),
+                                Classifier::predicate(|token: &Token| {
+                                    matches!(token.kind, TokenKind::Identifier(_))
+                                }),
+                            ]),
+                            0,
+                            None
+                        ),
                         Classifier::sequence([
                             Classifier::predicate(|token: &Token| {
-                                matches!(token.kind, TokenKind::Operator(OperatorKind::Slash))
+                                matches!(token.kind, TokenKind::Operator(OperatorKind::Dot))
                             }),
                             Classifier::predicate(|token: &Token| {
                                 matches!(token.kind, TokenKind::Identifier(_))
                             }),
-                        ]),
-                        0,
-                        None
-                    ),
-                    Classifier::sequence([
-                        Classifier::predicate(|token: &Token| {
-                            matches!(token.kind, TokenKind::Operator(OperatorKind::Dot))
-                        }),
-                        Classifier::predicate(|token: &Token| {
-                            matches!(token.kind, TokenKind::Identifier(_))
-                        }),
-                    ]).as_optional()
-                ])
+                        ]).as_optional()
+                    ]),
+                    1,
+                    None
+                )
             ]),
             |form: Form<'initializer, Token<'initializer>, Preference, InitialError<'initializer>>| {
-                let inputs = form.collect_inputs();
-                let identifier = inputs[0].clone();
+                let mut output = Vec::new();
+                let forms = form.as_forms();
+                let identifier = forms[0].unwrap_input().clone();
+                let paths = forms[1].as_forms();
                 let span = identifier.clone().span();
-                let mut path = String::new();
 
-                for input in inputs.iter().skip(1) {
-                    match &input.kind {
-                        TokenKind::Identifier(identifier) => {
-                            path.push_str(&identifier);
+                for path in paths.iter() {
+                    let mut result = String::new();
+
+                    for input in path.collect_inputs() {
+                        match input.kind {
+                            TokenKind::Identifier(identifier) => {
+                                result.push_str(&identifier);
+                            }
+                            TokenKind::Operator(OperatorKind::Slash) => {
+                                result.push('/');
+                            }
+                            TokenKind::Operator(OperatorKind::Dot) => {
+                                result.push('.');
+                            }
+                            _ => {}
                         }
-                        TokenKind::Operator(OperatorKind::Slash) => {
-                            path.push('/');
-                        }
-                        TokenKind::Operator(OperatorKind::Dot) => {
-                            path.push('.');
-                        }
-                        _ => {}
                     }
+
+                    output.push(result);
                 }
 
-                Ok(Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(Str::from(path)), span))))
+                let forms = output.iter().cloned().map(|path| {
+                    Form::output(Preference::new(identifier.clone(), Token::new(TokenKind::Identifier(Str::from(path)), span)))
+                }).collect::<Vec<_>>();
+
+                Ok(Form::multiple(forms))
             }
         )
     }

@@ -12,7 +12,7 @@ use {
     }
 };
 
-impl Display for Location<'_> {
+impl Debug for Location<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Location::File(file) => write!(f, "File({})", file),
@@ -22,6 +22,23 @@ impl Display for Location<'_> {
             } => {
                 write!(f, "Raw({:?}, {} => {})", ptr, len, self.get_value())
             }
+            Location::Void => write!(f, "Void"),
+            Location::Flag => write!(f, "Flag"),
+        }
+    }
+}
+
+impl Display for Location<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Location::File(file) => write!(f, "{}", file),
+            Location::Raw {
+                ptr,
+                len
+            } => {
+                write!(f, "{}", self.get_value())
+            }
+            Location::Void => write!(f, "Void"),
             Location::Flag => write!(f, "Flag"),
         }
     }

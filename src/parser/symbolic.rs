@@ -39,75 +39,15 @@ impl Clone for Box<dyn Symbolic> {
     }
 }
 
-impl Clone for Box<dyn Symbolic + Send> {
-    fn clone(&self) -> Self {
-        let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { memory::transmute(cloned) }
-    }
-}
-
-impl Clone for Box<dyn Symbolic + Sync> {
-    fn clone(&self) -> Self {
-        let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { memory::transmute(cloned) }
-    }
-}
-
-impl Clone for Box<dyn Symbolic + Send + Sync> {
-    fn clone(&self) -> Self {
-        let cloned: Box<dyn Symbolic> = (**self).dyn_clone();
-        unsafe { memory::transmute(cloned) }
-    }
-}
-
 impl PartialEq for dyn Symbolic + '_ {
     fn eq(&self, other: &Self) -> bool {
         self.dyn_eq(other)
     }
 }
 
-impl PartialEq for dyn Symbolic + Send + '_ {
-    fn eq(&self, other: &Self) -> bool {
-        self.dyn_eq(other)
-    }
-}
-
-impl PartialEq for dyn Symbolic + Sync + '_ {
-    fn eq(&self, other: &Self) -> bool {
-        self.dyn_eq(other)
-    }
-}
-
-impl PartialEq for dyn Symbolic + Send + Sync + '_ {
-    fn eq(&self, other: &Self) -> bool {
-        self.dyn_eq(other)
-    }
-}
-
 impl Eq for dyn Symbolic + '_ {}
-impl Eq for dyn Symbolic + Send + '_ {}
-impl Eq for dyn Symbolic + Sync + '_ {}
-impl Eq for dyn Symbolic + Send + Sync + '_ {}
 
 impl Hash for dyn Symbolic + '_ {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dyn_hash(state);
-    }
-}
-
-impl Hash for dyn Symbolic + Send + '_ {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dyn_hash(state);
-    }
-}
-
-impl Hash for dyn Symbolic + Sync + '_ {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.dyn_hash(state);
-    }
-}
-
-impl Hash for dyn Symbolic + Send + Sync + '_ {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.dyn_hash(state);
     }

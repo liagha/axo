@@ -66,12 +66,6 @@ pub struct Invoke<Target, Argument> {
 }
 
 #[derive(Eq)]
-pub struct Construct<Target, Field> {
-    target: Target,
-    fields: Vec<Field>,
-}
-
-#[derive(Eq)]
 pub struct Conditional<Condition, Then, Alternate> {
     condition: Condition,
     then: Then,
@@ -338,25 +332,6 @@ impl<Target, Argument> Invoke<Target, Argument> {
     }
 }
 
-impl<Target, Field> Construct<Target, Field> {
-    #[inline]
-    pub fn new(target: Target, fields: Vec<Field>) -> Self {
-        Construct { target, fields }
-    }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-    #[inline]
-    pub fn get_fields(&self) -> &Vec<Field> {
-        &self.fields
-    }
-    #[inline]
-    pub fn get_field(&self, index: Offset) -> Option<&Field> {
-        self.fields.get(index)
-    }
-}
-
 impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
     #[inline]
     pub fn new(condition: Condition, then: Then, alternate: Option<Alternate>) -> Self {
@@ -526,13 +501,6 @@ impl<Target: Hash, Argument: Hash> Hash for Invoke<Target, Argument> {
     }
 }
 
-impl<Target: Hash, Field: Hash> Hash for Construct<Target, Field> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_fields().hash(state);
-    }
-}
-
 impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
     for Conditional<Condition, Then, Alternate>
 {
@@ -648,12 +616,6 @@ impl<Target: PartialEq, Argument: PartialEq> PartialEq for Invoke<Target, Argume
     }
 }
 
-impl<Target: PartialEq, Field: PartialEq> PartialEq for Construct<Target, Field> {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_fields() == other.get_fields()
-    }
-}
-
 impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
     for Conditional<Condition, Then, Alternate>
 {
@@ -761,12 +723,6 @@ impl<Target: Clone, Value: Clone> Clone for Index<Target, Value> {
 impl<Target: Clone, Argument: Clone> Clone for Invoke<Target, Argument> {
     fn clone(&self) -> Self {
         Invoke::new(self.get_target().clone(), self.get_arguments().clone())
-    }
-}
-
-impl<Target: Clone, Field: Clone> Clone for Construct<Target, Field> {
-    fn clone(&self) -> Self {
-        Construct::new(self.get_target().clone(), self.get_fields().clone())
     }
 }
 

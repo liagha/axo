@@ -1,10 +1,11 @@
 use {
     crate::{
         data::string::Str,
+        formation::classifier::Classifier,
         scanner::{Token, TokenKind},
         schema::{
-            Access, Assign, Binary, Block, Bundle, Collection, Conditional, Construct, Group,
-            Index, Invoke, Iterate, Label, Procedural, Repeat, Sequence, Series, Unary,
+            Access, Assign, Binary, Block, Bundle, Collection, Conditional, Group,
+            Index, Invoke, Iterate, Label, Procedural, Repeat, Structure, Sequence, Series, Unary,
         },
         tracker::{Span, Spanned},
     },
@@ -47,7 +48,7 @@ pub enum ElementKind<'element> {
 
     Invoke(Invoke<Box<Element<'element>>, Element<'element>>),
 
-    Construct(Construct<Box<Element<'element>>, Element<'element>>),
+    Construct(Structure<Box<Element<'element>>, Element<'element>>),
 
     Conditional(Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>),
 
@@ -149,7 +150,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn construct(construct: Construct<Box<Element<'element>>, Element<'element>>) -> Self {
+    pub fn construct(construct: Structure<Box<Element<'element>>, Element<'element>>) -> Self {
         ElementKind::Construct(construct)
     }
 
@@ -450,7 +451,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_construct(self) -> Construct<Box<Element<'element>>, Element<'element>> {
+    pub fn unwrap_construct(self) -> Structure<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Construct(construct) => construct,
             _ => panic!("called `unwrap_construct` on non-Construct variant."),
@@ -650,7 +651,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_construct(&self) -> Option<&Construct<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_construct(&self) -> Option<&Structure<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Construct(construct) => Some(construct),
             _ => None,
@@ -842,7 +843,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Construct<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Structure<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Construct(construct) => Some(construct),
             _ => None,

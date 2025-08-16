@@ -354,8 +354,6 @@ impl<'parser> Parser<'parser> {
                 let mut symbol = Symbol::new(unsafe { memory::transmute::<_, Module<Element<'static>>>(Module::new(name)) }, unsafe { memory::transmute(span) });
                 symbol.scope.extend(fields);
 
-                println!("Symbol: {:?}", symbol);
-
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(

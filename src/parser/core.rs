@@ -12,7 +12,7 @@ use {
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         schema::{
             Access, Assign,
-            Binary, Construct,
+            Binary, Structure,
             Index, Invoke, Label, Unary,
         },
         tracker::{
@@ -187,7 +187,7 @@ impl<'parser> Parser<'parser> {
                             }
                             ElementKind::Bundle(bundle) => {
                                 unary = Element::new(
-                                    ElementKind::construct(Construct::new(Box::new(unary), bundle.items)),
+                                    ElementKind::construct(Structure::new(Box::new(unary), bundle.items)),
                                     span,
                                 )
                             }

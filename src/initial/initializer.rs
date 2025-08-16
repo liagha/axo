@@ -1,5 +1,6 @@
-use broccli::{xprintln, Color};
 use {
+    broccli::{xprintln, Color},
+
     crate::{
         data::{
             any::{Any, TypeId},
@@ -144,7 +145,7 @@ impl<'initializer> Initializer<'initializer> {
     fn visit() -> Result<Vec<PathBuf>, platform::Error> {
         use walkdir::WalkDir;
 
-        let files: Vec<PathBuf> = WalkDir::new(".")
+        let files: Vec<PathBuf> = WalkDir::new(current_dir()?.as_os_str())
             .into_iter()
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_type().is_file())
@@ -158,7 +159,7 @@ impl<'initializer> Initializer<'initializer> {
         Ok(files)
     }
 
-    pub fn initialize(&mut self) {
+    pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
         let location = Location::Flag;
         let input = location.get_value();
 
@@ -193,13 +194,38 @@ impl<'initializer> Initializer<'initializer> {
             match form {
                 Form::Output(output) => preferences.push(output),
                 Form::Failure(failure) => self.errors.push(failure),
+                Form::Multiple(multiple) => {
+                    for form in multiple {
+                        preferences.push(form.unwrap_output().clone());
+                    }
+                }
                 _ => {}
             }
         }
 
+        let targets = {
+            preferences
+                .iter()
+                .filter(|preference| {
+                    if let TokenKind::Identifier(identifier) = preference.target.kind {
+                        identifier == Str::from("Path")
+                    } else {
+                        false
+                    }
+                })
+                .map(|preference| {
+                    let path = preference.clone().value.kind.unwrap_identifier();
+
+                    Location::File(path)
+                })
+                .collect::<Vec<_>>()
+        };
+
         self.output = preferences;
 
-        let files = Self::visit().unwrap().iter().map(|path| format!("{}\n", path.as_path().display())).collect::<String>();
-        xprintln!("\nAxolotls:\n{}\n" => Color::Pink, files.indent() => Color::Magenta);
+        //let files = Self::visit().unwrap().iter().map(|path| format!("{}\n", path.as_path().display())).collect::<String>();
+        //xprintln!("\nAxolotls:\n{}\n" => Color::Pink, files.indent() => Color::Magenta);
+
+        targets
     }
 }

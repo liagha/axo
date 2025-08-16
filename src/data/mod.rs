@@ -1,6 +1,8 @@
 pub mod float;
 pub mod string;
 
+pub use float::Float;
+
 pub mod any {
     pub use {
         core::{

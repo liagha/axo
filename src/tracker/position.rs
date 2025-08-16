@@ -13,13 +13,14 @@ use {
     },
 };
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Location<'location> {
     File(Str<'location>),
     Raw {
         ptr: Pointer,
         len: Scale,
     },
+    Void,
     Flag,
 }
 
@@ -35,6 +36,7 @@ impl<'location> Location<'location> {
                 s.into()
             }
             Location::Flag => args().skip(1).collect::<Vec<String>>().join(" ").into(),
+            Location::Void => Str::from(""),
         }
     }
 
