@@ -14,6 +14,8 @@ use {
         DefaultTimer, Duration,
     },
 };
+use crate::schema::Module;
+use crate::tracker::Position;
 
 pub struct Pipeline<'pipeline, T> {
     data: T,
@@ -295,8 +297,10 @@ impl<'compiler> Compiler<'compiler> {
         let mut logger = CompileLogger::new(verbosity, targets.len());
 
         for target in targets {
-            let target_name = format!("{}", target);
-            logger.set_current(target_name);
+            self.registry.resolver.enter();
+
+            let display = format!("{}", target);
+            logger.set_current(display.clone());
 
             let tokens = {
                 let mut scanner = Scanner::new(target);
@@ -312,8 +316,20 @@ impl<'compiler> Compiler<'compiler> {
                 self.registry.resolver.execute(elements.clone(), &logger)
             };
 
+            let span = unsafe { memory::transmute::<_, Span<'static>>(Span::file(target.to_string().into())) };
+            let identifier = Element::new(ElementKind::Identifier(display.clone().into()), span);
+
+            let mut module = Symbol::new(Module::new(identifier), span);
+            module.with_scope(self.registry.resolver.scope.clone());
+
+            self.registry.resolver.exit();
+
+            self.registry.resolver.define(module);
+
             logger.clear_current();
         }
+
+        println!("{:#?}", self.registry.resolver.scope.symbols);
 
         verbosity
     }

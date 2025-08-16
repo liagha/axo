@@ -48,6 +48,10 @@ impl Symbol {
         self.scope.symbols.extend(members);
     }
 
+    pub fn with_scope(&mut self, scope: Scope) {
+        self.scope = scope;
+    }
+
     pub fn cast<Type: 'static>(&self) -> Option<&Type> {
         self.value.as_ref().as_any().downcast_ref::<Type>()
     }
@@ -65,12 +69,18 @@ impl Clone for Symbol {
 
 impl Debug for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
-        write!(f, "{:?}\n{}", self.value, self.scope.symbols.indent())
+        write!(f, "{:?}", self.value)?;
+
+        if !self.scope.empty() {
+            write!(f, "\n{}", self.scope.symbols.indent())
+        } else {
+            write!(f, "")
+        }
     }
 }
 
 impl Display for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "{:?}", self)
     }
 }
@@ -208,7 +218,7 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("struct"))
                 }),
                 Self::token(),
-                Classifier::deferred(Self::symbolization),
+                Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();

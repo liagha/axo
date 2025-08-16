@@ -34,6 +34,7 @@ use {
     },
 };
 use crate::parser::Symbolic;
+use crate::schema::Binding;
 
 #[derive(Debug)]
 pub struct Resolver<'resolver> {
@@ -248,6 +249,7 @@ impl<'resolver> Resolver<'resolver> {
                 let parent = replace(&mut self.scope, Scope::child());
                 self.scope.attach(parent);
 
+                self.enter();
                 self.resolve(walk.get_body());
                 self.exit();
             }
@@ -291,6 +293,8 @@ impl<'resolver> Resolver<'resolver> {
         if let Some(_) = symbol.cast::<Structure<Box<Element>, Symbol>>() {
             self.scope.add(symbol.clone());
         } else if let Some(_) = symbol.cast::<Enumeration<Box<Element>, Element>>() {
+            self.scope.add(symbol.clone());
+        } else if let Some(_) = symbol.cast::<Binding<Box<Element>, Box<Element>, Box<Element>>>() {
             self.scope.add(symbol.clone());
         } else if let Some(_) = symbol.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
             self.scope.add(symbol.clone());
