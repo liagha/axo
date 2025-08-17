@@ -87,7 +87,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'static>>() {
+            if let Some(preference) = found.cast::<Preference<'registry>>() {
                 return Some(preference.value.clone())
             }
         }
@@ -101,7 +101,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'static>>() {
+            if let Some(preference) = found.cast::<Preference<'registry>>() {
                 if let TokenKind::Boolean(verbosity) = preference.value.kind {
                     return verbosity
                 }
@@ -117,7 +117,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'static>>() {
+            if let Some(preference) = found.cast::<Preference<'registry>>() {
                 if let TokenKind::Identifier(path) = preference.value.kind.clone() {
                     return path.clone()
                 }

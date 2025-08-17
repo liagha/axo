@@ -32,7 +32,7 @@ pub struct Aligner<'aligner> {
     pub suggestion: Range<f64>,
 }
 
-impl Aligner<'static> {
+impl<'aligner: 'static> Aligner<'aligner> {
     pub fn new() -> Self {
         Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, }
     }
@@ -44,7 +44,7 @@ impl<'aligner> Resembler<Str<'aligner>, Str<'aligner>, ()> for Aligner<'aligner>
     }
 }
 
-pub fn aligner() -> Assessor<'static, String, String, ()> {
+pub fn aligner<'aligner: 'static>() -> Assessor<'aligner, String, String, ()> {
     Assessor::new()
         .dimension(Box::leak(Box::new(Exact)), 0.02)
         .dimension(Box::leak(Box::new(Relaxed)), 0.02)
@@ -217,7 +217,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     }
 }
 
-pub fn symbol_matcher() -> Assessor<'static, Element<'static>, Symbol<'static>, ResolveError<'static>> {
+pub fn symbol_matcher<'matcher: 'static>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
     Assessor::new()
         .floor(0.65)
         .dimension(Box::leak(Box::new(Aligner::new())), 0.75)

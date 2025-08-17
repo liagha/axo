@@ -48,16 +48,16 @@ impl<'preference> Preference<'preference> {
     }
 }
 
-impl Symbolic<'static> for Preference<'static> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'preference: 'static> Symbolic<'preference> for Preference<'preference> {
+    fn brand(&self) -> Option<Token<'preference>> {
         Some(self.target.clone())
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'preference {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic<'static>> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'preference>> {
         Box::new(Self {
             target: self.target.clone(),
             value: self.value.clone(),
@@ -65,7 +65,7 @@ impl Symbolic<'static> for Preference<'static> {
         })
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic<'static>) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'preference>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {

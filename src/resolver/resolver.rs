@@ -17,11 +17,11 @@ use {
         },
         parser::{
             Element, ElementKind,
-            Symbol,
+            Symbol, Symbolic,
         },
         schema::{
             Enumeration, Implementation,
-            Interface, Method, Structure, Module,
+            Interface, Method, Structure, Module, Binding,
         },
         data::{
             Scale,
@@ -33,8 +33,6 @@ use {
         format::Debug,
     },
 };
-use crate::parser::Symbolic;
-use crate::schema::Binding;
 
 #[derive(Debug)]
 pub struct Resolver<'resolver: 'static> {
@@ -148,7 +146,7 @@ impl<'resolver: 'static> Resolver<'resolver> {
         }
     }
 
-    pub fn fail(&mut self, error: ErrorKind, span: Span<'resolver>) {
+    pub fn fail(&mut self, error: ErrorKind<'resolver>, span: Span<'resolver>) {
         let error = ResolveError {
             kind: error,
             span: span.clone(),

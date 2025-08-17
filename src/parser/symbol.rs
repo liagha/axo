@@ -144,7 +144,7 @@ impl<'parser: 'static> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members),
+                                    Implementation::new(Box::new(name), None::<Box<Element<'parser>>>, members),
                                     span
                                 ),
                             ),
