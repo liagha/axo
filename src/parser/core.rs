@@ -21,7 +21,7 @@ use {
     },
 };
 
-impl<'parser> Parser<'parser> {
+impl<'parser: 'static> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
         match element.kind {
             ElementKind::Bundle(bundle) => {

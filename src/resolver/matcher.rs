@@ -113,7 +113,7 @@ impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'alig
     }
 }
 
-impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol, ResolveError<'aligner>> for Aligner<'aligner> {
+impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner<'aligner> {
     fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
@@ -163,7 +163,7 @@ impl Affinity {
     }
 }
 
-impl<'aligner> Resembler<Element<'aligner>, Symbol, ResolveError<'aligner>> for Affinity {
+impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Affinity {
     fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
         let mut score = 0.0;
 
@@ -217,7 +217,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol, ResolveError<'aligner>> for 
     }
 }
 
-pub fn symbol_matcher() -> Assessor<'static, Element<'static>, Symbol, ResolveError<'static>> {
+pub fn symbol_matcher() -> Assessor<'static, Element<'static>, Symbol<'static>, ResolveError<'static>> {
     Assessor::new()
         .floor(0.65)
         .dimension(Box::leak(Box::new(Aligner::new())), 0.75)

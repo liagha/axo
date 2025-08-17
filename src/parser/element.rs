@@ -56,7 +56,7 @@ pub enum ElementKind<'element> {
 
     Iterate(Iterate<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Symbolize(Symbol),
+    Symbolize(Symbol<'static>),
 
     Assign(Assign<Box<Element<'element>>, Box<Element<'element>>>),
 
@@ -170,7 +170,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn symbolize(symbol: Symbol) -> Self {
+    pub fn symbolize(symbol: Symbol<'element>) -> Self {
         ElementKind::Symbolize(symbol)
     }
 
@@ -487,7 +487,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_symbolize(self) -> Symbol {
+    pub fn unwrap_symbolize(self) -> Symbol<'element> {
         match self {
             ElementKind::Symbolize(symbol) => symbol,
             _ => panic!("called `unwrap_symbolize` on non-Symbolize variant."),
@@ -683,7 +683,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_symbolize(&self) -> Option<&Symbol> {
+    pub fn try_unwrap_symbolize(&self) -> Option<&Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
             _ => None,
@@ -875,7 +875,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_symbolize_mut(&mut self) -> Option<&mut Symbol> {
+    pub fn try_unwrap_symbolize_mut(&mut self) -> Option<&mut Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
             _ => None,

@@ -17,7 +17,7 @@ use {
 use crate::schema::Module;
 use crate::tracker::Position;
 
-pub struct Pipeline<'pipeline, T> {
+pub struct Pipeline<'pipeline: 'static, T> {
     data: T,
     resolver: &'pipeline mut Resolver<'pipeline>,
 }
@@ -70,11 +70,11 @@ pub trait Stage<'stage, Input, Output> {
 }
 
 #[derive(Debug)]
-pub struct Registry<'registry> {
+pub struct Registry<'registry: 'static> {
     pub resolver: Resolver<'registry>,
 }
 
-impl<'registry> Registry<'registry> {
+impl<'registry: 'static> Registry<'registry> {
     pub fn new() -> Self {
         Registry {
             resolver: Resolver::new(),
@@ -258,11 +258,11 @@ impl CompileLogger {
     }
 }
 
-pub struct Compiler<'compiler> {
+pub struct Compiler<'compiler: 'static> {
     pub registry: Registry<'compiler>,
 }
 
-impl<'compiler> Compiler<'compiler> {
+impl<'compiler: 'static> Compiler<'compiler> {
     pub fn new() -> Self {
         let registry = Registry::new();
         Compiler { registry }
@@ -316,7 +316,7 @@ impl<'compiler> Compiler<'compiler> {
                 self.registry.resolver.execute(elements.clone(), &logger)
             };
 
-            let span = unsafe { memory::transmute::<_, Span<'static>>(Span::file(target.to_string().into())) };
+            let span = Span::file(target.to_string().into());
             let identifier = Element::new(ElementKind::Identifier(display.clone().into()), span);
 
             let mut module = Symbol::new(Module::new(identifier), span);
@@ -369,8 +369,8 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
         let symbols = self.initializer.output.clone().into_iter().map(|preference| {
             let span = preference.borrow_span();
             Symbol::new(
-                unsafe { memory::transmute::<_, Preference<'static>>(preference) },
-                unsafe { memory::transmute(span) }
+                preference,
+                span
             )
         }).collect::<Vec<Symbol>>();
 

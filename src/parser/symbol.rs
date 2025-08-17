@@ -29,14 +29,14 @@ use {
     },
 };
 
-pub struct Symbol {
-    pub value: Box<dyn Symbolic>,
-    pub span: Span<'static>,
-    pub scope: Scope,
+pub struct Symbol<'symbol: 'static> {
+    pub value: Box<dyn Symbolic<'symbol>>,
+    pub span: Span<'symbol>,
+    pub scope: Scope<'symbol>,
 }
 
-impl Symbol {
-    pub fn new(value: impl Symbolic + 'static, span: Span<'static>) -> Self {
+impl<'symbol: 'static> Symbol<'symbol> {
+    pub fn new(value: impl Symbolic<'symbol> + 'symbol, span: Span<'symbol>) -> Self {
         Self {
             value: Box::new(value),
             span,
@@ -52,12 +52,12 @@ impl Symbol {
         self.scope = scope;
     }
 
-    pub fn cast<Type: 'static>(&self) -> Option<&Type> {
+    pub fn cast<Type: 'symbol>(&self) -> Option<&Type> {
         self.value.as_ref().as_any().downcast_ref::<Type>()
     }
 }
 
-impl Clone for Symbol {
+impl Clone for Symbol<'_> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -67,7 +67,7 @@ impl Clone for Symbol {
     }
 }
 
-impl Debug for Symbol {
+impl Debug for Symbol<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "{:?}", self.value)?;
 
@@ -79,27 +79,27 @@ impl Debug for Symbol {
     }
 }
 
-impl Display for Symbol {
+impl Display for Symbol<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Eq for Symbol {}
+impl Eq for Symbol<'_> {}
 
-impl Hash for Symbol {
+impl Hash for Symbol<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
 }
 
-impl PartialEq for Symbol {
+impl PartialEq for Symbol<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value.clone()
     }
 }
 
-impl<'parser> Parser<'parser> {
+impl<'parser: 'static> Parser<'parser> {
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::implementation(),
@@ -143,7 +143,10 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { memory::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members)) }, unsafe { memory::transmute(span) }),
+                                Symbol::new(
+                                    Implementation::new(Box::new(name), None::<Box<Element<'static>>>, members),
+                                    span
+                                ),
                             ),
                             span
                         )
@@ -159,7 +162,10 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { memory::transmute::<_, Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol>>(Implementation::new(Box::new(name), Some(Box::new(target)), members)) }, unsafe { memory::transmute(span) }),
+                                Symbol::new(
+                                    Implementation::new(Box::new(name), Some(Box::new(target)), members),
+                                    span,
+                                ),
                             ),
                             span
                         )
@@ -203,7 +209,12 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(Symbol::new(unsafe { memory::transmute::<_, Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>>>(symbol) }, unsafe { memory::transmute(span) })),
+                        ElementKind::Symbolize(
+                            Symbol::new(
+                                symbol,
+                                span
+                            )
+                        ),
                         span,
                     )
                 ))
@@ -234,7 +245,10 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { memory::transmute::<_, Structure<Box<Element<'static>>, Symbol>>(Structure::new(Box::new(name), fields)) }, unsafe { memory::transmute(span) }),
+                            Symbol::new(
+                                Structure::new(Box::new(name), fields),
+                                span,
+                            ),
                         ),
                         span,
                     )
@@ -263,7 +277,10 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
-                            Symbol::new(unsafe { memory::transmute::<_, Enumeration<Box<Element<'static>>, Element<'static>>>(Enumeration::new(Box::new(name), items)) }, unsafe { memory::transmute(span) })
+                            Symbol::new(
+                                Enumeration::new(Box::new(name), items),
+                                span,
+                            )
                         ),
                         span,
                     )
@@ -314,7 +331,10 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'static>>>)) }, unsafe { memory::transmute(span) })
+                                Symbol::new(
+                                    Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>),
+                                    span,
+                                ),
                             ),
                             span,
                         )
@@ -332,7 +352,10 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
-                                Symbol::new(unsafe { memory::transmute::<_, Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>>>(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)))) }, unsafe { memory::transmute(span) })
+                                Symbol::new(
+                                    Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output))),
+                                    span
+                                )
                             ),
                             span,
                         )
@@ -361,7 +384,10 @@ impl<'parser> Parser<'parser> {
                     item.kind.clone().unwrap_symbolize().clone()
                 }).collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-                let mut symbol = Symbol::new(unsafe { memory::transmute::<_, Module<Element<'static>>>(Module::new(name)) }, unsafe { memory::transmute(span) });
+                let mut symbol = Symbol::new(
+                    Module::new(name),
+                    span,
+                );
                 symbol.scope.extend(fields);
 
                 Ok(Form::output(

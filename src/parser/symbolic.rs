@@ -21,48 +21,48 @@ use {
     }
 };
 
-pub trait Symbolic: Debug + 'static {
-    fn brand(&self) -> Option<Token<'static>>;
+pub trait Symbolic<'symbol: 'static>: Debug + 'symbol {
+    fn brand(&self) -> Option<Token<'symbol>>;
 
-    fn as_any(&self) -> &dyn Any where Self: 'static;
+    fn as_any(&self) -> &dyn Any where Self: 'symbol;
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic>;
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>>;
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool;
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool;
 
     fn dyn_hash(&self, state: &mut dyn Hasher);
 }
 
-impl Clone for Box<dyn Symbolic> {
+impl<'symbol: 'static> Clone for Box<dyn Symbolic<'symbol>> {
     fn clone(&self) -> Self {
         (**self).dyn_clone()
     }
 }
 
-impl PartialEq for dyn Symbolic + '_ {
+impl<'symbol: 'static> PartialEq for dyn Symbolic<'symbol> + '_ {
     fn eq(&self, other: &Self) -> bool {
         self.dyn_eq(other)
     }
 }
 
-impl Eq for dyn Symbolic + '_ {}
+impl<'symbol: 'static> Eq for dyn Symbolic<'symbol> + '_ {}
 
-impl Hash for dyn Symbolic + '_ {
+impl<'symbol: 'static> Hash for dyn Symbolic<'symbol> + '_ {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.dyn_hash(state);
     }
 }
 
-impl Symbolic for Symbol {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Symbol<'symbol> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.value.brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(Self {
             value: self.value.clone(),
             span: self.span.clone(),
@@ -70,7 +70,7 @@ impl Symbolic for Symbol {
         })
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self.value == other.value.clone()
         } else {
@@ -89,20 +89,20 @@ impl Symbolic for Symbol {
     }
 }
 
-impl Symbolic for Inclusion<Box<Element<'static>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Inclusion<Box<Element<'symbol>>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -121,20 +121,20 @@ impl Symbolic for Inclusion<Box<Element<'static>>> {
     }
 }
 
-impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, Symbol> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Implementation<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -153,20 +153,20 @@ impl Symbolic for Implementation<Box<Element<'static>>, Box<Element<'static>>, S
     }
 }
 
-impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Interface<Box<Element<'symbol>>, Symbol<'symbol>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -185,20 +185,20 @@ impl Symbolic for Interface<Box<Element<'static>>, Symbol> {
     }
 }
 
-impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Element<'static>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -217,20 +217,20 @@ impl Symbolic for Binding<Box<Element<'static>>, Box<Element<'static>>, Box<Elem
     }
 }
 
-impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Structure<Box<Element<'symbol>>, Symbol<'symbol>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -249,20 +249,20 @@ impl Symbolic for Structure<Box<Element<'static>>, Symbol> {
     }
 }
 
-impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Enumeration<Box<Element<'symbol>>, Element<'symbol>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -281,20 +281,20 @@ impl Symbolic for Enumeration<Box<Element<'static>>, Element<'static>> {
     }
 }
 
-impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, Option<Box<Element<'static>>>> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol> Symbolic<'symbol> for Method<Box<Element<'symbol>>, Symbol<'symbol>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -313,20 +313,20 @@ impl Symbolic for Method<Box<Element<'static>>, Symbol, Box<Element<'static>>, O
     }
 }
 
-impl Symbolic for Module<Element<'static>> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Module<Element<'symbol>> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().brand().clone()
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
@@ -345,8 +345,8 @@ impl Symbolic for Module<Element<'static>> {
     }
 }
 
-impl Symbolic for Element<'static> {
-    fn brand(&self) -> Option<Token<'static>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Element<'symbol> {
+    fn brand(&self) -> Option<Token<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(Token {
                 kind: literal.clone(),
@@ -367,15 +367,15 @@ impl Symbolic for Element<'static> {
         }
     }
 
-    fn as_any(&self) -> &dyn Any where Self: 'static {
+    fn as_any(&self) -> &dyn Any where Self: 'symbol {
         self
     }
 
-    fn dyn_clone(&self) -> Box<dyn Symbolic> {
+    fn dyn_clone(&self) -> Box<dyn Symbolic<'symbol>> {
         Box::new(self.clone())
     }
 
-    fn dyn_eq(&self, other: &dyn Symbolic) -> bool {
+    fn dyn_eq(&self, other: &dyn Symbolic<'symbol>) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self == other
         } else {
