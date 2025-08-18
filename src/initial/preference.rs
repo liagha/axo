@@ -48,42 +48,6 @@ impl<'preference> Preference<'preference> {
     }
 }
 
-impl<'preference: 'static> Symbolic<'preference> for Preference<'preference> {
-    fn brand(&self) -> Option<Token<'preference>> {
-        Some(self.target.clone())
-    }
-
-    fn as_any(&self) -> &dyn Any where Self: 'preference {
-        self
-    }
-
-    fn dyn_clone(&self) -> Box<dyn Symbolic<'preference>> {
-        Box::new(Self {
-            target: self.target.clone(),
-            value: self.value.clone(),
-            span: self.span.clone(),
-        })
-    }
-
-    fn dyn_eq(&self, other: &dyn Symbolic<'preference>) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Self>() {
-            self == other
-        } else {
-            false
-        }
-    }
-
-    fn dyn_hash(&self, state: &mut dyn Hasher) {
-        let mut hasher = DefaultHasher::new();
-        Hash::hash(&TypeId::of::<Self>(), &mut hasher);
-        state.write_u64(hasher.finish());
-
-        let mut hasher = DefaultHasher::new();
-        Hash::hash(&self, &mut hasher);
-        state.write_u64(hasher.finish());
-    }
-}
-
 impl<'initializer> Initializer<'initializer> {
     pub fn verbosity() -> Classifier<'initializer, Token<'initializer>, Preference<'initializer>, InitialError<'initializer>> {
         Classifier::sequence([

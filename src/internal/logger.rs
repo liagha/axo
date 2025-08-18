@@ -2,6 +2,7 @@ use {
     broccli::{Color, TextStyle},
     log::{Level, Log, Metadata, Record, SetLoggerError},
     crate::{
+        data::string::Str,
         internal::{
             platform::{stdout, Write},
         },
@@ -18,20 +19,20 @@ pub enum LogInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct LogPlan {
+pub struct LogPlan<'logger> {
     components: Vec<LogInfo>,
-    separator: String,
+    separator: Str<'logger>,
 }
 
-impl LogPlan {
+impl<'logger> LogPlan<'logger> {
     pub fn new(components: Vec<LogInfo>) -> Self {
         Self {
             components,
-            separator: " ".to_string(),
+            separator: Str::from(" "),
         }
     }
 
-    pub fn with_separator(mut self, separator: String) -> Self {
+    pub fn with_separator(mut self, separator: Str<'logger>) -> Self {
         self.separator = separator;
         self
     }
@@ -63,13 +64,13 @@ impl LogPlan {
     }
 }
 
-pub struct Logger {
+pub struct Logger<'logger: 'static> {
     level: Level,
-    plan: LogPlan,
+    plan: LogPlan<'logger>,
 }
 
-impl Logger {
-    pub fn new(level: Level, plan: LogPlan) -> Self {
+impl<'logger: 'static> Logger<'logger> {
+    pub fn new(level: Level, plan: LogPlan<'logger>) -> Self {
         Self {
             level,
             plan,
@@ -79,7 +80,7 @@ impl Logger {
     pub fn init(self) -> Result<(), SetLoggerError> {
         let level = self.level;
 
-        let logger: &'static Logger = Box::leak(Box::new(self));
+        let logger: &'logger Logger = Box::leak(Box::new(self));
         log::set_logger(logger)?;
         log::set_max_level(level.to_level_filter());
         Ok(())
@@ -144,7 +145,7 @@ impl Logger {
     }
 }
 
-impl Log for Logger {
+impl<'logger> Log for Logger<'logger> {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.level
     }

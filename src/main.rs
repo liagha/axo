@@ -25,6 +25,9 @@ pub mod tracker;
 pub(crate) mod data;
 
 use {
+    data::{
+        string::Str,
+    },
     internal::{
         compiler::{
             Compiler,
@@ -35,7 +38,7 @@ use {
 };
 
 fn main() {
-    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(" ".to_string());
+    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(Str::from(" "));
 
     let logger = Logger::new(Level::max(), plan);
     logger.init().expect("fuck");

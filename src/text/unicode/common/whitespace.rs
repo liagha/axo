@@ -12,7 +12,7 @@ char_property! {
         long => "White_Space";
         human => "White Space";
 
-        data_table_path => "tables/white_space.rsv";
+        data_table_path => "tables/whitespace.rsv";
     }
 
     pub fn is_whitespace(char) -> bool;

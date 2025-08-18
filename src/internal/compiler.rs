@@ -8,14 +8,13 @@ use {
         reporter::{Error},
         resolver::Resolver,
         scanner::{Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Span, Spanned},
+        schema::{Module},
+        tracker::{Location, Peekable, Position, Span, Spanned},
     },
     super::timer::{
         DefaultTimer, Duration,
     },
 };
-use crate::schema::Module;
-use crate::tracker::Position;
 
 pub struct Pipeline<'pipeline: 'static, T> {
     data: T,
