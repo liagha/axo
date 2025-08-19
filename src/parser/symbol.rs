@@ -189,21 +189,21 @@ impl<'parser: 'static> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
-                let mutable = keyword.kind == TokenKind::Identifier(Str::from("var"));
+                let constant = keyword.kind == TokenKind::Identifier(Str::from("const"));
                 let body = sequence[1].unwrap_output().clone();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
                         if let ElementKind::Label(label) = assign.get_target().kind.clone() {
-                            Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), mutable)
+                            Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), constant)
                         } else {
-                            Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, mutable)
+                            Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, constant)
                         }
                     }
 
                     _ => {
-                        Binding::new(Box::new(body), None, None, mutable)
+                        Binding::new(Box::new(body), None, None, constant)
                     }
                 };
 
@@ -272,13 +272,15 @@ impl<'parser: 'static> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-                let items = body.kind.unwrap_bundle().items;
+                let variant = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
+                    item.kind.clone().unwrap_symbolize().clone()
+                }).collect::<Vec<_>>();
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::Symbolize(
+                        ElementKind::symbolize(
                             Symbol::new(
-                                Enumeration::new(Box::new(name), items),
+                                Enumeration::new(Box::new(name), variant),
                                 span,
                             )
                         ),

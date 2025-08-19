@@ -5,98 +5,98 @@ use {
     }
 };
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Procedural<Body> {
     pub body: Body,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Group<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Sequence<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Collection<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Series<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Bundle<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Block<Item> {
     pub items: Vec<Item>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Binary<Left, Operator, Right> {
     left: Left,
     operator: Operator,
     right: Right,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Unary<Operator, Operand> {
     operator: Operator,
     operand: Operand,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Index<Target, Value> {
     target: Target,
     indexes: Vec<Value>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Invoke<Target, Argument> {
     target: Target,
     arguments: Vec<Argument>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Conditional<Condition, Then, Alternate> {
     condition: Condition,
     then: Then,
     alternate: Option<Alternate>,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Repeat<Condition, Body> {
     condition: Option<Condition>,
     body: Body,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Iterate<Clause, Body> {
     clause: Clause,
     body: Body,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Label<Value, Element> {
     label: Value,
     element: Element,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Access<Target, Member> {
     target: Target,
     member: Member,
 }
 
-#[derive(Eq)]
+#[derive(Debug, Eq)]
 pub struct Assign<Target, Value> {
     target: Target,
     value: Value,

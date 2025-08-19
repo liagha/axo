@@ -1,5 +1,9 @@
-module test {
-    var x
+func test(var test: int = 43, const test2: int = 6) -> int {
+
 }
 
-test.xg
+struct Test {
+    var test: int = 5
+}
+
+4 + 4542

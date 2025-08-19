@@ -27,8 +27,8 @@ pub struct Interface<Target, Member> {
 pub struct Binding<Target, Value, Type> {
     target: Target,
     value: Option<Value>,
-    ty: Option<Type>,
-    mutable: bool,
+    annotation: Option<Type>,
+    constant: bool,
 }
 
 #[derive(Debug, Eq)]
@@ -109,8 +109,8 @@ impl<Target, Member> Interface<Target, Member> {
 
 impl<Target, Value, Type> Binding<Target, Value, Type> {
     #[inline]
-    pub fn new(target: Target, value: Option<Value>, ty: Option<Type>, mutable: bool) -> Self {
-        Binding { target, value, ty, mutable }
+    pub fn new(target: Target, value: Option<Value>, annotation: Option<Type>, constant: bool) -> Self {
+        Binding { target, value, annotation, constant }
     }
 
     #[inline]
@@ -125,12 +125,12 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
 
     #[inline]
     pub fn get_type(&self) -> Option<&Type> {
-        self.ty.as_ref()
+        self.annotation.as_ref()
     }
 
     #[inline]
-    pub fn is_mutable(&self) -> bool {
-        self.mutable
+    pub fn is_constant(&self) -> bool {
+        self.constant
     }
 }
 
@@ -277,7 +277,7 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
         self.get_target().hash(state);
         self.get_value().hash(state);
         self.get_type().hash(state);
-        self.is_mutable().hash(state);
+        self.is_constant().hash(state);
     }
 }
 
@@ -333,7 +333,7 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq for Binding
         self.get_target() == other.get_target()
             && self.get_value() == other.get_value()
             && self.get_type() == other.get_type()
-            && self.is_mutable() == other.is_mutable()
+            && self.is_constant() == other.is_constant()
     }
 }
 
@@ -388,7 +388,7 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
             self.get_target().clone(),
             self.get_value().cloned(),
             self.get_type().cloned(),
-            self.is_mutable(),
+            self.is_constant(),
         )
     }
 }

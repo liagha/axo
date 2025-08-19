@@ -254,7 +254,7 @@ impl<'symbol: 'static> Symbolic<'symbol> for Structure<Box<Element<'symbol>>, Sy
     }
 }
 
-impl<'symbol: 'static> Symbolic<'symbol> for Enumeration<Box<Element<'symbol>>, Element<'symbol>> {
+impl<'symbol: 'static> Symbolic<'symbol> for Enumeration<Box<Element<'symbol>>, Symbol<'symbol>> {
     fn brand(&self) -> Option<Token<'symbol>> {
         self.get_target().clone().brand()
     }

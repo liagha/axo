@@ -15,6 +15,7 @@ use {
         tracker::{
             Span,
         },
+        checker::Checker,
         parser::{
             Element, ElementKind,
             Symbol, Symbolic,
@@ -26,7 +27,6 @@ use {
         data::{
             Scale,
             memory::{
-                self,
                 replace,
             }
         },
@@ -36,6 +36,7 @@ use {
 
 #[derive(Debug)]
 pub struct Resolver<'resolver: 'static> {
+    pub checker: Checker<'resolver>,
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
@@ -44,6 +45,7 @@ pub struct Resolver<'resolver: 'static> {
 impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
+            checker: self.checker.clone(),
             scope: self.scope.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
@@ -54,6 +56,7 @@ impl Clone for Resolver<'_> {
 impl<'resolver: 'static> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
+            checker: Checker::new(),
             scope: Scope::new(),
             input: Vec::new(),
             errors: Vec::new(),
@@ -159,7 +162,9 @@ impl<'resolver: 'static> Resolver<'resolver> {
 
     pub fn process(&mut self, elements: Vec<Element<'resolver>>) {
         for element in elements {
-            self.resolve(&element.into());
+            let ty = self.checker.check(&element);
+            println!("Type: {:?}", ty);
+            self.resolve(&element);
         }
     }
 
@@ -268,7 +273,10 @@ impl<'resolver: 'static> Resolver<'resolver> {
                 }
             }
 
-            _ => {}
+            ElementKind::Literal(_) => {}
+            ElementKind::Procedural(_) => {}
+            ElementKind::Sequence(_) => {}
+            ElementKind::Series(_) => {}
         }
     }
 

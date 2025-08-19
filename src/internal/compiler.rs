@@ -204,7 +204,9 @@ impl CompileLogger {
         if self.verbosity {
             let tree = elements
                 .iter()
-                .map(|element| Str::from(format!("{:?}", element)))
+                .map(|element| {
+                    Str::from(format!("{:?}", element))
+                })
                 .collect::<Vec<Str>>()
                 .join("\n");
 
