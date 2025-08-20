@@ -73,13 +73,13 @@ pub struct Conditional<Condition, Then, Alternate> {
 }
 
 #[derive(Debug, Eq)]
-pub struct Repeat<Condition, Body> {
+pub struct While<Condition, Body> {
     condition: Option<Condition>,
     body: Body,
 }
 
 #[derive(Debug, Eq)]
-pub struct Iterate<Clause, Body> {
+pub struct Cycle<Clause, Body> {
     clause: Clause,
     body: Body,
 }
@@ -355,10 +355,10 @@ impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
     }
 }
 
-impl<Condition, Body> Repeat<Condition, Body> {
+impl<Condition, Body> While<Condition, Body> {
     #[inline]
     pub fn new(condition: Option<Condition>, body: Body) -> Self {
-        Repeat { condition, body }
+        While { condition, body }
     }
     #[inline]
     pub fn get_condition(&self) -> Option<&Condition> {
@@ -370,10 +370,10 @@ impl<Condition, Body> Repeat<Condition, Body> {
     }
 }
 
-impl<Clause, Body> Iterate<Clause, Body> {
+impl<Clause, Body> Cycle<Clause, Body> {
     #[inline]
     pub fn new(clause: Clause, body: Body) -> Self {
-        Iterate { clause, body }
+        Cycle { clause, body }
     }
     #[inline]
     pub fn get_clause(&self) -> &Clause {
@@ -511,14 +511,14 @@ impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
     }
 }
 
-impl<Condition: Hash, Body: Hash> Hash for Repeat<Condition, Body> {
+impl<Condition: Hash, Body: Hash> Hash for While<Condition, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_condition().hash(state);
         self.get_body().hash(state);
     }
 }
 
-impl<Clause: Hash, Body: Hash> Hash for Iterate<Clause, Body> {
+impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_clause().hash(state);
         self.get_body().hash(state);
@@ -626,13 +626,13 @@ impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
     }
 }
 
-impl<Condition: PartialEq, Body: PartialEq> PartialEq for Repeat<Condition, Body> {
+impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body> {
     fn eq(&self, other: &Self) -> bool {
         self.get_condition() == other.get_condition() && self.get_body() == other.get_body()
     }
 }
 
-impl<Clause: PartialEq, Body: PartialEq> PartialEq for Iterate<Clause, Body> {
+impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
         self.get_clause() == other.get_clause() && self.get_body() == other.get_body()
     }
@@ -738,15 +738,15 @@ impl<Condition: Clone, Then: Clone, Alternate: Clone> Clone
     }
 }
 
-impl<Condition: Clone, Body: Clone> Clone for Repeat<Condition, Body> {
+impl<Condition: Clone, Body: Clone> Clone for While<Condition, Body> {
     fn clone(&self) -> Self {
-        Repeat::new(self.get_condition().cloned(), self.get_body().clone())
+        While::new(self.get_condition().cloned(), self.get_body().clone())
     }
 }
 
-impl<Clause: Clone, Body: Clone> Clone for Iterate<Clause, Body> {
+impl<Clause: Clone, Body: Clone> Clone for Cycle<Clause, Body> {
     fn clone(&self) -> Self {
-        Iterate::new(self.get_clause().clone(), self.get_body().clone())
+        Cycle::new(self.get_clause().clone(), self.get_body().clone())
     }
 }
 

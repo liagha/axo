@@ -10,7 +10,7 @@ use {
             classifier::Classifier,
         },
         scanner::{Token, TokenKind},
-        schema::{Conditional, Repeat},
+        schema::{Conditional, While},
     }
 };
 
@@ -135,7 +135,7 @@ impl<'parser: 'static> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Repeat(Repeat::new(None, body.into())),
+                            ElementKind::While(While::new(None, body.into())),
                             span,
                         )
                     ))
@@ -146,7 +146,7 @@ impl<'parser: 'static> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Repeat(Repeat::new(Some(condition.into()), body.into())),
+                            ElementKind::While(While::new(Some(condition.into()), body.into())),
                             span,
                         )
                     ))

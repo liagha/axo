@@ -157,10 +157,10 @@ impl<'checker: 'static> Checker<'checker> {
             ElementKind::Conditional(conditional) => {
                 self.check(conditional.get_then())
             }
-            ElementKind::Repeat(repeat) => {
+            ElementKind::While(repeat) => {
                 self.check(repeat.get_body())
             }
-            ElementKind::Iterate(iterate) => {
+            ElementKind::Cycle(iterate) => {
                 self.check(iterate.get_body())
             }
             ElementKind::Assign(assign) => {
@@ -169,13 +169,13 @@ impl<'checker: 'static> Checker<'checker> {
             ElementKind::Symbolize(_) => {
                 Self::unit()
             }
-            ElementKind::Produce(_) => {
+            ElementKind::Return(_) => {
                 Self::unit()
             }
-            ElementKind::Abort(_) => {
+            ElementKind::Break(_) => {
                 Self::unit()
             }
-            ElementKind::Pass(_) => {
+            ElementKind::Continue(_) => {
                 Self::unit()
             }
         }

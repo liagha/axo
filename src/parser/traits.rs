@@ -105,11 +105,11 @@ impl<'element> Hash for ElementKind<'element> {
                 discriminant(self).hash(state);
                 conditioned.hash(state);
             }
-            ElementKind::Repeat(repeat) => {
+            ElementKind::While(repeat) => {
                 discriminant(self).hash(state);
                 repeat.hash(state);
             }
-            ElementKind::Iterate(walk) => {
+            ElementKind::Cycle(walk) => {
                 discriminant(self).hash(state);
                 walk.hash(state);
             }
@@ -123,15 +123,15 @@ impl<'element> Hash for ElementKind<'element> {
                 assign.hash(state);
             }
 
-            ElementKind::Produce(element) => {
+            ElementKind::Return(element) => {
                 discriminant(self).hash(state);
                 element.hash(state);
             }
-            ElementKind::Abort(element) => {
+            ElementKind::Break(element) => {
                 discriminant(self).hash(state);
                 element.hash(state);
             }
-            ElementKind::Pass(element) => {
+            ElementKind::Continue(element) => {
                 discriminant(self).hash(state);
                 element.hash(state);
             }
@@ -169,15 +169,15 @@ impl<'element> PartialEq for ElementKind<'element> {
             (ElementKind::Invoke(a), ElementKind::Invoke(b)) => a == b,
 
             (ElementKind::Conditional(a), ElementKind::Conditional(b)) => a == b,
-            (ElementKind::Repeat(a), ElementKind::Repeat(b)) => a == b,
-            (ElementKind::Iterate(a), ElementKind::Iterate(b)) => a == b,
+            (ElementKind::While(a), ElementKind::While(b)) => a == b,
+            (ElementKind::Cycle(a), ElementKind::Cycle(b)) => a == b,
 
             (ElementKind::Symbolize(a), ElementKind::Symbolize(b)) => a == b,
             (ElementKind::Assign(a), ElementKind::Assign(b)) => a == b,
 
-            (ElementKind::Produce(a), ElementKind::Produce(b)) => a == b,
-            (ElementKind::Abort(a), ElementKind::Abort(b)) => a == b,
-            (ElementKind::Pass(a), ElementKind::Pass(b)) => a == b,
+            (ElementKind::Return(a), ElementKind::Return(b)) => a == b,
+            (ElementKind::Break(a), ElementKind::Break(b)) => a == b,
+            (ElementKind::Continue(a), ElementKind::Continue(b)) => a == b,
 
             _ => false,
         }
@@ -217,15 +217,15 @@ impl<'element> Clone for ElementKind<'element> {
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
 
             ElementKind::Conditional(conditioned) => ElementKind::Conditional(conditioned.clone()),
-            ElementKind::Repeat(repeat) => ElementKind::Repeat(repeat.clone()),
-            ElementKind::Iterate(walk) => ElementKind::Iterate(walk.clone()),
+            ElementKind::While(repeat) => ElementKind::While(repeat.clone()),
+            ElementKind::Cycle(walk) => ElementKind::Cycle(walk.clone()),
 
             ElementKind::Symbolize(symbol) => ElementKind::Symbolize(symbol.clone()),
             ElementKind::Assign(assign) => ElementKind::Assign(assign.clone()),
 
-            ElementKind::Produce(element) => ElementKind::Produce(element.clone()),
-            ElementKind::Abort(element) => ElementKind::Abort(element.clone()),
-            ElementKind::Pass(element) => ElementKind::Pass(element.clone()),
+            ElementKind::Return(element) => ElementKind::Return(element.clone()),
+            ElementKind::Break(element) => ElementKind::Break(element.clone()),
+            ElementKind::Continue(element) => ElementKind::Continue(element.clone()),
         }
     }
 }

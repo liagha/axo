@@ -161,14 +161,24 @@ impl<'resolver: 'static> Resolver<'resolver> {
     }
 
     pub fn process(&mut self, elements: Vec<Element<'resolver>>) {
+        self.symbolize_all(&elements);
+        self.resolve_all(&elements);
+    }
+
+    fn symbolize_all(&mut self, elements: &Vec<Element<'resolver>>) {
         for element in elements {
-            let ty = self.checker.check(&element);
-            println!("Type: {:?}", ty);
-            self.resolve(&element);
+            self.extract_symbols(element);
         }
     }
 
-    pub fn resolve(&mut self, element: &Element<'resolver>) {
+    fn resolve_all(&mut self, elements: &Vec<Element<'resolver>>) {
+        for element in elements {
+            let ty = self.checker.check(element);
+            self.resolve(element);
+        }
+    }
+
+    fn extract_symbols(&mut self, element: &Element<'resolver>) {
         let Element { kind, .. } = element.clone();
 
         match kind {
@@ -176,13 +186,102 @@ impl<'resolver: 'static> Resolver<'resolver> {
                 self.symbolize(symbol);
             }
 
+            ElementKind::Block(body) => {
+                for item in body.items {
+                    self.extract_symbols(&item);
+                }
+            }
+
+            ElementKind::Group(group) => {
+                for item in group.items {
+                    self.extract_symbols(&item.into());
+                }
+            }
+
+            ElementKind::Collection(collection) => {
+                for item in collection.items {
+                    self.extract_symbols(&item.into());
+                }
+            }
+
+            ElementKind::Bundle(bundle) => {
+                for item in bundle.items {
+                    self.extract_symbols(&item.into());
+                }
+            }
+
+            ElementKind::Binary(binary) => {
+                self.extract_symbols(binary.get_left());
+                self.extract_symbols(binary.get_right());
+            }
+
+            ElementKind::Unary(unary) => {
+                self.extract_symbols(&unary.get_operand());
+            }
+
+            ElementKind::Label(label) => {
+                self.extract_symbols(label.get_label());
+                self.extract_symbols(label.get_element());
+            }
+
+            ElementKind::Conditional(conditioned) => {
+                self.extract_symbols(conditioned.get_condition());
+                self.extract_symbols(conditioned.get_then());
+
+                if let Some(alternate) = conditioned.get_alternate() {
+                    self.extract_symbols(alternate);
+                }
+            }
+
+            ElementKind::While(repeat) => {
+                if let Some(condition) = repeat.get_condition() {
+                    self.extract_symbols(condition);
+                }
+                self.extract_symbols(repeat.get_body());
+            }
+
+            ElementKind::Cycle(walk) => {
+                self.extract_symbols(walk.get_clause());
+                self.extract_symbols(walk.get_body());
+            }
+
+            ElementKind::Access(access) => {
+                self.extract_symbols(access.get_target());
+                self.extract_symbols(access.get_member());
+            }
+
+            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {
+                if let Some(value) = value {
+                    self.extract_symbols(&value);
+                }
+            }
+
+            ElementKind::Assign(assign) => {
+                self.extract_symbols(assign.get_target());
+            }
+
+            ElementKind::Construct { .. }
+            | ElementKind::Invoke { .. }
+            | ElementKind::Index { .. }
+            | ElementKind::Identifier(_)
+            | ElementKind::Literal(_)
+            | ElementKind::Procedural(_)
+            | ElementKind::Sequence(_)
+            | ElementKind::Series(_) => {}
+        }
+    }
+
+    pub fn resolve(&mut self, element: &Element<'resolver>) {
+        let Element { kind, .. } = element.clone();
+
+        match kind {
             ElementKind::Assign(assign) => {
                 self.get(assign.get_target());
             }
 
             ElementKind::Block(body) => {
                 self.enter();
-                self.process(body.items);
+                self.resolve_all(&body.items);
                 self.exit();
             }
 
@@ -237,7 +336,7 @@ impl<'resolver: 'static> Resolver<'resolver> {
                 }
             }
 
-            ElementKind::Repeat(repeat) => {
+            ElementKind::While(repeat) => {
                 if let Some(condition) = repeat.get_condition() {
                     self.resolve(condition);
                 }
@@ -246,7 +345,7 @@ impl<'resolver: 'static> Resolver<'resolver> {
                 self.exit();
             }
 
-            ElementKind::Iterate(walk) => {
+            ElementKind::Cycle(walk) => {
                 self.resolve(walk.get_clause());
 
                 let parent = replace(&mut self.scope, Scope::child());
@@ -267,16 +366,17 @@ impl<'resolver: 'static> Resolver<'resolver> {
                 }
             }
 
-            ElementKind::Produce(value) | ElementKind::Abort(value) | ElementKind::Pass(value) => {
+            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {
                 if let Some(value) = value {
                     self.resolve(&value);
                 }
             }
 
-            ElementKind::Literal(_) => {}
-            ElementKind::Procedural(_) => {}
-            ElementKind::Sequence(_) => {}
-            ElementKind::Series(_) => {}
+            ElementKind::Symbolize(_)
+            | ElementKind::Literal(_)
+            | ElementKind::Procedural(_)
+            | ElementKind::Sequence(_)
+            | ElementKind::Series(_) => {}
         }
     }
 

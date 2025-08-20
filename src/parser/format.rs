@@ -77,14 +77,14 @@ impl<'element> Debug for ElementKind<'element> {
 
                 write!(f, ")")
             }
-            ElementKind::Repeat(repeat) => {
+            ElementKind::While(repeat) => {
                 if let Some(condition) = repeat.get_condition() {
                     write!(f, "While({:?} | {:?})", condition, repeat.get_body())
                 } else {
                     write!(f, "Loop({:?})", repeat.get_body())
                 }
             },
-            ElementKind::Iterate(walk) => {
+            ElementKind::Cycle(walk) => {
                 write!(f, "For({:?} in {:?})", walk.get_clause(), walk.get_body())
             },
 
@@ -97,7 +97,7 @@ impl<'element> Debug for ElementKind<'element> {
 
             ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),
 
-            ElementKind::Produce(element) => {
+            ElementKind::Return(element) => {
                 write!(f, "Return")?;
 
                 if let Some(element) = element {
@@ -106,7 +106,7 @@ impl<'element> Debug for ElementKind<'element> {
 
                 Ok(())
             }
-            ElementKind::Abort(element) => {
+            ElementKind::Break(element) => {
                 write!(f, "Break")?;
 
                 if let Some(element) = element {
@@ -115,7 +115,7 @@ impl<'element> Debug for ElementKind<'element> {
 
                 Ok(())
             }
-            ElementKind::Pass(element) => {
+            ElementKind::Continue(element) => {
                 write!(f, "Continue")?;
 
                 if let Some(element) = element {
