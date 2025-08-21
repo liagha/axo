@@ -7,7 +7,7 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub struct Scope<'scope: 'static> {
+pub struct Scope<'scope> {
     pub symbols: Set<Symbol<'scope>>,
     pub parent: Option<Box<Scope<'scope>>>,
 }

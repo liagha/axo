@@ -19,7 +19,7 @@ pub enum LogInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct LogPlan<'logger> {
+pub struct LogPlan<'logger: 'static> {
     components: Vec<LogInfo>,
     separator: Str<'logger>,
 }

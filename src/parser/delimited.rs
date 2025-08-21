@@ -11,7 +11,7 @@ use {
     super::{ErrorKind, Element, ElementKind, ParseError, Parser},
 };
 
-impl<'parser: 'static> Parser<'parser> {
+impl<'parser> Parser<'parser> {
     pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([

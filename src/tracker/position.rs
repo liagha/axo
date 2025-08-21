@@ -6,9 +6,8 @@ use {
             Pointer, Offset, Scale,
         },
         internal::{
-            environment::args,
             operation::Ordering,
-            platform::read_to_string,
+            platform::{args, read_to_string},
         },
     },
 };

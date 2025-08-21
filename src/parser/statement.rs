@@ -14,7 +14,7 @@ use {
     }
 };
 
-impl<'parser: 'static> Parser<'parser> {
+impl<'parser> Parser<'parser> {
     pub fn conditional() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([

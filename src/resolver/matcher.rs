@@ -24,6 +24,7 @@ use {
         string::*,
     },
 };
+use crate::resolver::{HintKind, ResolveHint};
 
 #[derive(Debug)]
 pub struct Aligner<'aligner> {
@@ -32,9 +33,9 @@ pub struct Aligner<'aligner> {
     pub suggestion: Range<f64>,
 }
 
-impl<'aligner: 'static> Aligner<'aligner> {
+impl<'aligner> Aligner<'aligner> {
     pub fn new() -> Self {
-        Aligner { assessor: aligner(), perfection: 0.90..1.1, suggestion: 0.2..0.90, }
+        Aligner { assessor: aligner(), perfection: 0.85..1.1, suggestion: 0.3..0.85, }
     }
 }
 
@@ -44,19 +45,19 @@ impl<'aligner> Resembler<Str<'aligner>, Str<'aligner>, ()> for Aligner<'aligner>
     }
 }
 
-pub fn aligner<'aligner: 'static>() -> Assessor<'aligner, String, String, ()> {
+pub fn aligner<'aligner>() -> Assessor<'aligner, String, String, ()> {
     Assessor::new()
-        .dimension(Box::leak(Box::new(Exact)), 0.02)
-        .dimension(Box::leak(Box::new(Relaxed)), 0.02)
+        .dimension(Box::leak(Box::new(Exact)), 0.05)
+        .dimension(Box::leak(Box::new(Relaxed)), 0.05)
         .dimension(Box::leak(Box::new(Prefix)), 0.15)
-        .dimension(Box::leak(Box::new(Suffix)), 0.14)
-        .dimension(Box::leak(Box::new(Contains)), 0.13)
-        .dimension(Box::leak(Box::new(Keyboard::default())), 0.10)
-        .dimension(Box::leak(Box::new(Words::default())), 0.10)
-        .dimension(Box::leak(Box::new(Phonetic::default())), 0.07)
-        .dimension(Box::leak(Box::new(Sequential::default())), 0.06)
-        .dimension(Box::leak(Box::new(Jaro::default())), 0.05)
-        .dimension(Box::leak(Box::new(Cosine::default())), 0.04)
+        .dimension(Box::leak(Box::new(Suffix)), 0.1)
+        .dimension(Box::leak(Box::new(Contains)), 0.1)
+        .dimension(Box::leak(Box::new(Keyboard::default())), 0.1)
+        .dimension(Box::leak(Box::new(Words::default())), 0.1)
+        .dimension(Box::leak(Box::new(Phonetic::default())), 0.1)
+        .dimension(Box::leak(Box::new(Sequential::default())), 0.05)
+        .dimension(Box::leak(Box::new(Jaro::default())), 0.1)
+        .dimension(Box::leak(Box::new(Cosine::default())), 0.1)
         .scheme(Scheme::Additive)
 }
 
@@ -113,20 +114,26 @@ impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'alig
     }
 }
 
-impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner<'aligner> {
-    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
+impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Aligner<'aligner> {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
-                    if self.perfection.contains(&resemblance.to_f64()) {
+                    let score = resemblance.to_f64();
+                    if self.perfection.contains(&score) {
                         Ok(resemblance)
-                    } else if self.suggestion.contains(&resemblance.to_f64()) {
+                    } else if self.suggestion.contains(&score) {
+                        let dominant = self.assessor.dominant();
+                        let how = if let Some(d) = dominant {
+                            format!("{:?}", d.resembler)
+                        } else {
+                            "are similar".to_string()
+                        };
                         Err(
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
                                 span: query.span.clone(),
-                                hints: vec![],
-                                note: None,
+                                hints: vec![ResolveHint::new(HintKind::SimilarBrand { candidate: candidate.clone(), how })],
                             }
                         )
                     } else {
@@ -135,7 +142,6 @@ impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveEr
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
                                 span: query.span.clone(),
                                 hints: vec![],
-                                note: None,
                             }
                         )
                     }
@@ -154,7 +160,6 @@ impl<'aligner: 'static> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveEr
 struct Affinity {
     shaping: f64,
     binding: f64,
-
 }
 
 impl Affinity {
@@ -164,7 +169,7 @@ impl Affinity {
 }
 
 impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>> for Affinity {
-    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol) -> Result<Resemblance, ResolveError<'aligner>> {
+    fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.clone()) {
@@ -175,7 +180,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             }
 
             (ElementKind::Invoke(invoke), candidate) => {
-                if let Some(method) = candidate.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
+                if let Symbolic::Method(method) = candidate.value {
                     score += self.shaping;
 
                     if invoke.get_arguments().len() == method.get_parameters().len() {
@@ -186,14 +191,13 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                                 kind: ErrorKind::BindMismatch { candidate: method.get_target().brand().unwrap() },
                                 span: query.span.clone(),
                                 hints: vec![],
-                                note: None,
                             }
                         )
                     }
                 }
             }
             (ElementKind::Construct(construct), candidate) => {
-                if let Some(structure) = candidate.cast::<Structure<Box<Element>, Symbol>>() {
+                if let Symbolic::Structure(structure) = candidate.value {
                     score += self.shaping;
 
                     if construct.get_fields().len() == structure.get_fields().len() {
@@ -204,7 +208,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                                 kind: ErrorKind::BindMismatch { candidate: structure.get_target().brand().unwrap() },
                                 span: query.span.clone(),
                                 hints: vec![],
-                                note: None,
                             }
                         )
                     }
@@ -217,9 +220,9 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     }
 }
 
-pub fn symbol_matcher<'matcher: 'static>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
+pub fn symbol_matcher<'matcher>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
     Assessor::new()
-        .floor(0.65)
+        .floor(0.5)
         .dimension(Box::leak(Box::new(Aligner::new())), 0.75)
         .dimension(Box::leak(Box::new(Affinity::new())), 0.25)
         .scheme(Scheme::Multiplicative)

@@ -2,7 +2,7 @@ use {
     super::{
         Element, ElementKind,
         ParseError, Parser,
-        Symbolic,
+        Symbolic,  // Now an enum instead of a trait
     },
     crate::{
         resolver::{
@@ -21,7 +21,7 @@ use {
         },
         schema::{
             Binding, Enumeration,
-            Implementation, Method, Structure, Module,
+            Extension, Method, Structure, Module,
         },
         internal::hash::{Hash, Hasher},
         data::{memory, string::Str},
@@ -29,35 +29,35 @@ use {
     },
 };
 
-pub struct Symbol<'symbol: 'static> {
-    pub value: Box<dyn Symbolic<'symbol>>,
+pub struct Symbol<'symbol> {
+    pub value: Symbolic<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
 }
 
-impl<'symbol: 'static> Symbol<'symbol> {
-    pub fn new(value: impl Symbolic<'symbol> + 'symbol, span: Span<'symbol>) -> Self {
+impl<'symbol> Symbol<'symbol> {
+    pub fn new(value: impl Into<Symbolic<'symbol>>, span: Span<'symbol>) -> Self {
         Self {
-            value: Box::new(value),
+            value: value.into(),
             span,
             scope: Scope::new(),
         }
     }
 
-    pub fn with_members(&mut self, members: Vec<Symbol>) {
+    pub fn with_members(&mut self, members: Vec<Symbol<'symbol>>) {
         self.scope.symbols.extend(members);
     }
 
-    pub fn with_scope(&mut self, scope: Scope) {
+    pub fn with_scope(&mut self, scope: Scope<'symbol>) {
         self.scope = scope;
     }
 
-    pub fn cast<Type: 'symbol>(&self) -> Option<&Type> {
-        self.value.as_ref().as_any().downcast_ref::<Type>()
+    pub fn brand(&self) -> Option<Token<'symbol>> {
+        self.value.brand()
     }
 }
 
-impl Clone for Symbol<'_> {
+impl<'symbol> Clone for Symbol<'symbol> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -67,7 +67,7 @@ impl Clone for Symbol<'_> {
     }
 }
 
-impl Debug for Symbol<'_> {
+impl<'symbol> Debug for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "{:?}", self.value)?;
 
@@ -79,30 +79,30 @@ impl Debug for Symbol<'_> {
     }
 }
 
-impl Display for Symbol<'_> {
+impl<'symbol> Display for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Eq for Symbol<'_> {}
+impl<'symbol> Eq for Symbol<'symbol> {}
 
-impl Hash for Symbol<'_> {
+impl<'symbol> PartialEq for Symbol<'symbol> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<'symbol> Hash for Symbol<'symbol> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
 }
 
-impl PartialEq for Symbol<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value.clone()
-    }
-}
-
-impl<'parser: 'static> Parser<'parser> {
+impl<'parser> Parser<'parser> {
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::implementation(),
+            Self::extension(),
             Self::binding(),
             Self::structure(),
             Self::enumeration(),
@@ -111,11 +111,11 @@ impl<'parser: 'static> Parser<'parser> {
         ])
     }
 
-    pub fn implementation() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("impl"))
+                    token.kind == TokenKind::Identifier(Str::from("extend"))
                 }),
                 Self::token(),
                 Classifier::optional(
@@ -144,7 +144,7 @@ impl<'parser: 'static> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Implementation::new(Box::new(name), None::<Box<Element<'parser>>>, members),
+                                    Symbolic::Extension(Extension::new(Box::new(name), None::<Box<Element<'parser>>>, members)),
                                     span
                                 ),
                             ),
@@ -163,7 +163,7 @@ impl<'parser: 'static> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Implementation::new(Box::new(name), Some(Box::new(target)), members),
+                                    Symbolic::Extension(Extension::new(Box::new(name), Some(Box::new(target)), members)),
                                     span,
                                 ),
                             ),
@@ -211,7 +211,7 @@ impl<'parser: 'static> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                symbol,
+                                Symbolic::Binding(symbol),
                                 span
                             )
                         ),
@@ -246,7 +246,7 @@ impl<'parser: 'static> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                Structure::new(Box::new(name), fields),
+                                Symbolic::Structure(Structure::new(Box::new(name), fields)),
                                 span,
                             ),
                         ),
@@ -264,7 +264,7 @@ impl<'parser: 'static> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("enum"))
                 }),
                 Self::token(),
-                Classifier::deferred(Self::symbolization),
+                Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
@@ -278,9 +278,9 @@ impl<'parser: 'static> Parser<'parser> {
 
                 Ok(Form::output(
                     Element::new(
-                        ElementKind::symbolize(
+                        ElementKind::Symbolize(
                             Symbol::new(
-                                Enumeration::new(Box::new(name), variant),
+                                Symbolic::Enumeration(Enumeration::new(Box::new(name), variant)),
                                 span,
                             )
                         ),
@@ -334,7 +334,7 @@ impl<'parser: 'static> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>),
+                                    Symbolic::Method(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>)),
                                     span,
                                 ),
                             ),
@@ -355,7 +355,7 @@ impl<'parser: 'static> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output))),
+                                    Symbolic::Method(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)))),
                                     span
                                 )
                             ),
@@ -387,7 +387,7 @@ impl<'parser: 'static> Parser<'parser> {
                 }).collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol = Symbol::new(
-                    Module::new(name),
+                    Symbolic::Module(Module::new(Box::new(name))),
                     span,
                 );
                 symbol.scope.extend(fields);

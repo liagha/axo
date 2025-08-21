@@ -15,8 +15,9 @@ pub(super) use {
 
 use {
     crate::{
-        reporter::Error,
+        reporter::{Error, Hint},
     },
 };
 
-pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, String, ResolveHint<'error>>;
+pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, HintKind<'error>>;
+pub type ResolveHint<'hint> = Hint<HintKind<'hint>>;

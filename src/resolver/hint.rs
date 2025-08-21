@@ -12,19 +12,19 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub enum ResolveHint<'hint> {
-    SimilarBrand { candidate: Token<'hint>, effective: Arc<Mutex<dyn Resembler<String, String, ()>>> },
+pub enum HintKind<'hint> {
+    SimilarBrand { candidate: Token<'hint>, how: String },
     Parameter
 }
 
-impl<'hint> Display for ResolveHint<'hint> {
+impl<'hint> Display for HintKind<'hint> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         match self {
-            ResolveHint::SimilarBrand { candidate, effective } => {
-                write!(f, "did you mean `{:?}`? they {:?}.", candidate, effective.lock().unwrap())
+            HintKind::SimilarBrand { candidate, how } => {
+                write!(f, "did you mean `{:?}`? they {}", candidate, how)
             }
 
-            ResolveHint::Parameter => {
+            HintKind::Parameter => {
                 write!(f, "")
             }
         }

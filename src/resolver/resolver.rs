@@ -15,14 +15,13 @@ use {
         tracker::{
             Span,
         },
-        checker::Checker,
         parser::{
             Element, ElementKind,
             Symbol, Symbolic,
         },
         schema::{
-            Enumeration, Implementation,
-            Interface, Method, Structure, Module, Binding,
+            Enumeration, Extension,
+            Method, Structure, Module, Binding,
         },
         data::{
             Scale,
@@ -35,8 +34,7 @@ use {
 };
 
 #[derive(Debug)]
-pub struct Resolver<'resolver: 'static> {
-    pub checker: Checker<'resolver>,
+pub struct Resolver<'resolver> {
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
@@ -45,7 +43,6 @@ pub struct Resolver<'resolver: 'static> {
 impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
-            checker: self.checker.clone(),
             scope: self.scope.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
@@ -53,10 +50,9 @@ impl Clone for Resolver<'_> {
     }
 }
 
-impl<'resolver: 'static> Resolver<'resolver> {
+impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
-            checker: Checker::new(),
             scope: Scope::new(),
             input: Vec::new(),
             errors: Vec::new(),
@@ -95,7 +91,6 @@ impl<'resolver: 'static> Resolver<'resolver> {
                     kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
                     span: target.span.clone(),
                     hints: vec![],
-                    note: None,
                 };
 
                 Err(vec![error])
@@ -116,9 +111,9 @@ impl<'resolver: 'static> Resolver<'resolver> {
         }
     }
 
-    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
+    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
         let mut assessor = symbol_matcher();
-        let champion = assessor.champion(target, &candidates);
+        let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {
             Ok(champion)
@@ -128,7 +123,6 @@ impl<'resolver: 'static> Resolver<'resolver> {
                     kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
                     span: target.span.clone(),
                     hints: vec![],
-                    note: None,
                 };
 
                 Err(vec![error])
@@ -138,7 +132,7 @@ impl<'resolver: 'static> Resolver<'resolver> {
         }
     }
 
-    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
+    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
         match self.try_lookup(target, candidates) {
             Ok(symbol) => Some(symbol),
             Err(errors) => {
@@ -153,7 +147,6 @@ impl<'resolver: 'static> Resolver<'resolver> {
         let error = ResolveError {
             kind: error,
             span: span.clone(),
-            note: None,
             hints: vec![],
         };
 
@@ -173,7 +166,6 @@ impl<'resolver: 'static> Resolver<'resolver> {
 
     fn resolve_all(&mut self, elements: &Vec<Element<'resolver>>) {
         for element in elements {
-            let ty = self.checker.check(element);
             self.resolve(element);
         }
     }
@@ -358,11 +350,11 @@ impl<'resolver: 'static> Resolver<'resolver> {
 
             ElementKind::Access(access) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-                let target = self.lookup(access.get_target(), candidates);
+                let target = self.lookup(access.get_target(), &candidates);
 
                 if let Some(target) = target {
                     let members = target.scope.all().iter().cloned().collect::<Vec<_>>();
-                    let member = self.lookup(access.get_member(), members);
+                    let member = self.lookup(access.get_member(), &members);
                 }
             }
 
@@ -380,36 +372,36 @@ impl<'resolver: 'static> Resolver<'resolver> {
         }
     }
 
-    pub fn symbolize(&mut self, symbol: Symbol) {
-        if let Some(implementation) = symbol.cast::<Implementation<Box<Element>, Box<Element>, Symbol>>() {
-            let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-            if let Some(target) = self.lookup(implementation.get_target(), candidates) {
-                if let Some(interface) = implementation.get_interface() {
-                    self.scope.remove(&target);
-
-                    let _member = Interface::new(interface.clone(), implementation.get_members().clone());
-                    self.scope.add(target);
-                } else {
-                    self.scope.remove(&target);
-                    self.scope.add(target);
+    pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
+        match symbol.value {
+            Symbolic::Inclusion(_) => {}
+            Symbolic::Extension(extension) => {
+                let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
+                
+                if let Some(mut target) = self.lookup(extension.get_target(), &candidates) {
+                    if let Some(extension) = extension.get_extension() {
+                        if let Some(found) = self.lookup(extension, &candidates) {
+                            if let Symbolic::Structure(structure) = found.value {
+                                self.scope.remove(&target);
+                                target.scope.symbols.extend(structure.get_fields().iter().cloned());
+                                self.scope.add(target);
+                            }
+                        }
+                    } else {
+                        self.scope.remove(&target);
+                        target.scope.symbols.extend(extension.get_members().iter().cloned());
+                        self.scope.add(target);
+                    }
                 }
             }
-        }
-
-        if let Some(_) = symbol.cast::<Structure<Box<Element>, Symbol>>() {
-            self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.cast::<Enumeration<Box<Element>, Element>>() {
-            self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.cast::<Binding<Box<Element>, Box<Element>, Box<Element>>>() {
-            self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.cast::<Method<Box<Element>, Symbol, Box<Element>, Option<Box<Element>>>>() {
-            self.scope.add(symbol.clone());
-        } else if let Some(_) = symbol.cast::<Module<Element>>() {
-            self.scope.add(symbol.clone());
+            Symbolic::Preference(_) => {}
+            _ => {
+                self.scope.add(symbol);
+            }
         }
     }
 
-    pub fn extend(&mut self, symbols: Vec<Symbol>) {
+    pub fn extend(&mut self, symbols: Vec<Symbol<'resolver>>) {
         self.scope.extend(symbols);
     }
 

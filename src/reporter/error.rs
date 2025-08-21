@@ -18,20 +18,19 @@ use {
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Error<'error, K, N = Str<'error>, H = Str<'error>>
-where K: Display, N: Display, H: Display
+pub struct Error<'error, K, H = Str<'error>>
+where K: Display, H: Display
 {
     pub kind: K,
     pub span: Span<'error>,
-    pub note: Option<N>,
     pub hints: Vec<Hint<H>>,
 }
 
-impl<'error, K, N, H> reporter::Failure for Error<'error, K, N, H>
-where K: Display, N: Display, H: Display
+impl<'error, K, H> reporter::Failure for Error<'error, K, H>
+where K: Display, H: Display
 {}
 
-impl<'error, K: Display, N: Display, H: Display > Debug for Error<'error, K, N, H> {
+impl<'error, K: Display, H: Display > Debug for Error<'error, K, H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -39,7 +38,7 @@ impl<'error, K: Display, N: Display, H: Display > Debug for Error<'error, K, N, 
     }
 }
 
-impl<'error, K: Display, N: Display, H: Display > Display for Error<'error, K, N, H> {
+impl<'error, K: Display, H: Display > Display for Error<'error, K, H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -47,19 +46,13 @@ impl<'error, K: Display, N: Display, H: Display > Display for Error<'error, K, N
     }
 }
 
-impl<'error, K: Display, N: Display, H: Display> Error<'error, K, N, H> {
+impl<'error, K: Display, H: Display> Error<'error, K, H> {
     pub fn new(kind: K, span: Span<'error>) -> Self {
         Self {
             kind,
             span,
-            note: None,
             hints: vec![],
         }
-    }
-
-    pub fn with_help(mut self, note: impl Into<N>) -> Self {
-        self.note = Some(note.into());
-        self
     }
 
     pub fn format(&self) -> (Str<'error>, Str<'error>) {

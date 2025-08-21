@@ -2,10 +2,6 @@ pub mod compiler;
 pub mod logger;
 pub mod timer;
 
-pub mod environment {
-    pub use std::env::{args, current_dir, current_exe};
-}
-
 pub mod hash {
     pub use {
         core::hash::{Hash, Hasher},
@@ -30,6 +26,7 @@ pub mod operation {
 pub mod platform {
     pub use {
         std::{
+            env::{args, current_dir, current_exe},
             fs::{
                 read_dir,
                 read_to_string,

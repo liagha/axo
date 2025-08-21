@@ -11,15 +11,9 @@ pub struct Inclusion<Target> {
 }
 
 #[derive(Debug, Eq)]
-pub struct Implementation<Target, Interface, Member> {
+pub struct Extension<Target, Interface, Member> {
     target: Target,
-    interface: Option<Interface>,
-    members: Vec<Member>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Interface<Target, Member> {
-    target: Target,
+    extension: Option<Interface>,
     members: Vec<Member>,
 }
 
@@ -68,32 +62,15 @@ impl<Target> Inclusion<Target> {
     }
 }
 
-impl<Target, Interface, Member> Implementation<Target, Interface, Member> {
+impl<Target, Interface, Member> Extension<Target, Interface, Member> {
     #[inline]
-    pub fn new(target: Target, interface: Option<Interface>, members: Vec<Member>) -> Self {
-        Implementation { interface, target, members }
+    pub fn new(target: Target, extension: Option<Interface>, members: Vec<Member>) -> Self {
+        Extension { target, extension, members }
     }
 
     #[inline]
-    pub fn get_interface(&self) -> &Option<Interface> {
-        &self.interface
-    }
-
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-
-    #[inline]
-    pub fn get_members(&self) -> &Vec<Member> {
-        &self.members
-    }
-}
-
-impl<Target, Member> Interface<Target, Member> {
-    #[inline]
-    pub fn new(target: Target, members: Vec<Member>) -> Self {
-        Interface { target, members }
+    pub fn get_extension(&self) -> &Option<Interface> {
+        &self.extension
     }
 
     #[inline]
@@ -258,14 +235,7 @@ impl<Target: Hash> Hash for Inclusion<Target> {
     }
 }
 
-impl<Interface: Hash, Target: Hash, Member: Hash> Hash for Implementation<Target, Interface, Member> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_members().hash(state);
-    }
-}
-
-impl<Target: Hash, Member: Hash> Hash for Interface<Target, Member> {
+impl<Interface: Hash, Target: Hash, Member: Hash> Hash for Extension<Target, Interface, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
         self.get_members().hash(state);
@@ -316,13 +286,7 @@ impl<Target: PartialEq> PartialEq for Inclusion<Target> {
     }
 }
 
-impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq for Implementation<Target, Interface, Member> {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_members() == other.get_members()
-    }
-}
-
-impl<Target: PartialEq, Member: PartialEq> PartialEq for Interface<Target, Member> {
+impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq for Extension<Target, Interface, Member> {
     fn eq(&self, other: &Self) -> bool {
         self.get_target() == other.get_target() && self.get_members() == other.get_members()
     }
@@ -370,15 +334,9 @@ impl<Target: Clone> Clone for Inclusion<Target> {
     }
 }
 
-impl<Interface: Clone, Target: Clone, Member: Clone> Clone for Implementation<Target, Interface, Member> {
+impl<Interface: Clone, Target: Clone, Member: Clone> Clone for Extension<Target, Interface, Member> {
     fn clone(&self) -> Self {
-        Implementation::new(self.get_target().clone(), self.get_interface().clone(), self.get_members().clone())
-    }
-}
-
-impl<Target: Clone, Member: Clone> Clone for Interface<Target, Member> {
-    fn clone(&self) -> Self {
-        Interface::new(self.get_target().clone(), self.get_members().clone())
+        Extension::new(self.get_target().clone(), self.get_extension().clone(), self.get_members().clone())
     }
 }
 

@@ -84,7 +84,7 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
     }
 }
 
-impl<'parser: 'static> Parser<'parser> {
+impl<'parser> Parser<'parser> {
     pub fn new(location: Location<'parser>) -> Self {
         Parser {
             index: 0,

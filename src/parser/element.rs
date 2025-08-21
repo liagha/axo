@@ -56,7 +56,7 @@ pub enum ElementKind<'element> {
 
     Cycle(Cycle<Box<Element<'element>>, Box<Element<'element>>>),
 
-    Symbolize(Symbol<'static>),
+    Symbolize(Symbol<'element>),
 
     Assign(Assign<Box<Element<'element>>, Box<Element<'element>>>),
 

@@ -4,7 +4,8 @@ use {
         data::{memory, string::Str},
         format::{format_tokens, Show, Display},
         initial::{Initializer, Preference},
-        parser::{Element, ElementKind, Parser, Symbol},
+        internal::{platform::Path},
+        parser::{Element, ElementKind, Parser, Symbol, Symbolic},
         reporter::{Error},
         resolver::Resolver,
         scanner::{Scanner, Token, TokenKind},
@@ -16,7 +17,7 @@ use {
     },
 };
 
-pub struct Pipeline<'pipeline: 'static, T> {
+pub struct Pipeline<'pipeline, T> {
     data: T,
     resolver: &'pipeline mut Resolver<'pipeline>,
 }
@@ -69,11 +70,11 @@ pub trait Stage<'stage, Input, Output> {
 }
 
 #[derive(Debug)]
-pub struct Registry<'registry: 'static> {
+pub struct Registry<'registry> {
     pub resolver: Resolver<'registry>,
 }
 
-impl<'registry: 'static> Registry<'registry> {
+impl<'registry> Registry<'registry> {
     pub fn new() -> Self {
         Registry {
             resolver: Resolver::new(),
@@ -86,7 +87,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'registry>>() {
+            if let Symbolic::Preference(preference) = found.value {
                 return Some(preference.value.clone())
             }
         }
@@ -100,7 +101,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'registry>>() {
+            if let Symbolic::Preference(preference) = found.value {
                 if let TokenKind::Boolean(verbosity) = preference.value.kind {
                     return verbosity
                 }
@@ -116,7 +117,7 @@ impl<'registry: 'static> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Some(preference) = found.cast::<Preference<'registry>>() {
+            if let Symbolic::Preference(preference) = found.value {
                 if let TokenKind::Identifier(path) = preference.value.kind.clone() {
                     return path.clone()
                 }
@@ -205,7 +206,7 @@ impl CompileLogger {
             let tree = elements
                 .iter()
                 .map(|element| {
-                    Str::from(format!("{:?}", element))
+                    Str::from(format!("{:#?}", element))
                 })
                 .collect::<Vec<Str>>()
                 .join("\n");
@@ -221,7 +222,7 @@ impl CompileLogger {
         if self.verbosity {
             let tree = symbols
                 .iter()
-                .map(|symbol| Str::from(format!("{:?}", symbol)))
+                .map(|symbol| Str::from(format!("{:#?}", symbol)))
                 .collect::<Vec<Str>>()
                 .join("\n");
 
@@ -235,7 +236,7 @@ impl CompileLogger {
         }
     }
 
-    fn errors<K: Display, N: Display, H: Display>(&self, errors: &[Error<K, N, H>]) {
+    fn errors<K: Display, H: Display>(&self, errors: &[Error<K, H>]) {
         if self.verbosity && !errors.is_empty() {
             for error in errors {
                 let (message, details) = error.format();
@@ -259,11 +260,11 @@ impl CompileLogger {
     }
 }
 
-pub struct Compiler<'compiler: 'static> {
+pub struct Compiler<'compiler> {
     pub registry: Registry<'compiler>,
 }
 
-impl<'compiler: 'static> Compiler<'compiler> {
+impl<'compiler> Compiler<'compiler> {
     pub fn new() -> Self {
         let registry = Registry::new();
         Compiler { registry }
@@ -300,8 +301,8 @@ impl<'compiler: 'static> Compiler<'compiler> {
         for target in targets {
             self.registry.resolver.enter();
 
-            let display = format!("{}", target);
-            logger.set_current(display.clone());
+            let display = target.to_string();
+            logger.set_current(display.clone().to_string());
 
             let tokens = {
                 let mut scanner = Scanner::new(target);
@@ -318,9 +319,14 @@ impl<'compiler: 'static> Compiler<'compiler> {
             };
 
             let span = Span::file(target.to_string().into());
-            let identifier = Element::new(ElementKind::Identifier(display.clone().into()), span);
+            let module_name = Path::new(&display)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let identifier = Element::new(ElementKind::Identifier(module_name.into()), span);
 
-            let mut module = Symbol::new(Module::new(identifier), span);
+            let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);
             module.with_scope(self.registry.resolver.scope.clone());
 
             self.registry.resolver.exit();
@@ -330,7 +336,7 @@ impl<'compiler: 'static> Compiler<'compiler> {
             logger.clear_current();
         }
 
-        println!("{:#?}", self.registry.resolver.scope.symbols);
+        logger.symbols(&*self.registry.resolver.scope.symbols.clone().into_iter().collect::<Vec<_>>());
 
         verbosity
     }
@@ -370,7 +376,7 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
         let symbols = self.initializer.output.clone().into_iter().map(|preference| {
             let span = preference.borrow_span();
             Symbol::new(
-                preference,
+                Symbolic::Preference(preference),
                 span
             )
         }).collect::<Vec<Symbol>>();
@@ -437,7 +443,6 @@ impl<'resolver> Resolver<'resolver> {
         self.process(elements);
 
         let symbols = self.scope.all();
-        logger.symbols(&symbols.into_iter().collect::<Vec<_>>());
         logger.errors(self.errors.as_slice());
 
         let duration = Duration::from_nanos(timer.elapsed().unwrap());

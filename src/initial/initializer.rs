@@ -15,8 +15,7 @@ use {
             former::Former,
         },
         internal::{
-            environment::current_dir,
-            platform::{self, read_dir, Path, PathBuf},
+            platform::{self, read_dir, current_dir, Path, PathBuf},
             compiler::{Registry},
             hash::{DefaultHasher, Hash, Hasher},
         },
