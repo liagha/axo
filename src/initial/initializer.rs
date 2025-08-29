@@ -163,7 +163,7 @@ impl<'initializer> Initializer<'initializer> {
         let input = location.get_value();
 
         let tokens = {
-            let mut scanner = Scanner::new(Location::Flag).with_input(input);
+            let mut scanner = Scanner::new(location).with_input(input);
             scanner.scan();
             scanner.output
         };

@@ -439,8 +439,10 @@ impl<'resolver> Resolver<'resolver> {
         timer.start();
 
         logger.start("resolving");
+        
+        self.with_input(elements);
 
-        self.process(elements);
+        self.process();
 
         let symbols = self.scope.all();
         logger.errors(self.errors.as_slice());

@@ -3,3 +3,5 @@ struct Test {
 
 enum Test2 {
 }
+
+test

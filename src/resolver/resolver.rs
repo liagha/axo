@@ -82,6 +82,7 @@ impl<'resolver> Resolver<'resolver> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, &candidates);
+        // assessor.dimensions.sort_by(|first, other| first.resemblance.to_f64().partial_cmp(&other.resemblance.to_f64()).unwrap());
 
         if let Some(champion) = champion {
             Ok(champion)
@@ -153,9 +154,9 @@ impl<'resolver> Resolver<'resolver> {
         self.errors.push(error);
     }
 
-    pub fn process(&mut self, elements: Vec<Element<'resolver>>) {
-        self.symbolize_all(&elements);
-        self.resolve_all(&elements);
+    pub fn process(&mut self) {
+        self.symbolize_all(&self.input.clone());
+        self.resolve_all(&self.input.clone());
     }
 
     fn symbolize_all(&mut self, elements: &Vec<Element<'resolver>>) {
@@ -468,12 +469,6 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn toplevel(&self) -> bool {
         self.scope.toplevel()
-    }
-
-    pub fn check(&mut self, elements: Vec<Element<'resolver>>) -> bool {
-        let initial_errors = self.errors.len();
-        self.process(elements);
-        self.errors.len() == initial_errors
     }
 
     pub fn validate(&mut self, element: &Element<'resolver>) -> bool {

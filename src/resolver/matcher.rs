@@ -120,6 +120,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             match self.resemblance(&query, &candidate) {
                 Ok(resemblance) => {
                     let score = resemblance.to_f64();
+
                     if self.perfection.contains(&score) {
                         Ok(resemblance)
                     } else if self.suggestion.contains(&score) {
