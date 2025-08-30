@@ -76,266 +76,261 @@ impl<'analyzer> Analyzer<'analyzer> {
             ElementKind::Series(_) => { unimplemented!() }
             ElementKind::Bundle(_) => { unimplemented!() }
             ElementKind::Block(_) => { unimplemented!() }
-            ElementKind::Unary(_) => { unimplemented!() }
+            ElementKind::Unary(unary) => {
+                if let TokenKind::Operator(operator) = &unary.get_operator().kind {
+                    match operator.as_slice() {
+                        [OperatorKind::Exclamation] => {
+                            let operand = self.analyze(*unary.get_operand().clone())?;
+                            let operator = unary.get_operator();
+
+                            if operand.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::LogicalNot(Box::from(operand))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+                        _ => {
+                            let operator = unary.get_operator();
+
+                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                        }
+                    }
+                } else {
+                    let operator = unary.get_operator();
+
+                    Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                }
+            }
             ElementKind::Binary(binary) => {
-                match binary.get_operator().kind {
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
+                if let TokenKind::Operator(operator) = &binary.get_operator().kind {
+                    match operator.as_slice() {
+                        [OperatorKind::Plus] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
 
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Minus] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Subtract(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Star] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Multiply(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Slash] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Divide(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Percent] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Modulus(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::LogicalAnd(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Pipe, OperatorKind::Pipe] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::LogicalOr(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Ampersand] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::BitwiseAnd(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Pipe] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::BitwiseOr(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Caret] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::BitwiseXOr(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::ShiftLeft(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::ShiftRight(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Equal, OperatorKind::Equal] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Equal(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::Exclamation, OperatorKind::Equal] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::NotEqual(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::LeftAngle] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Less(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::LeftAngle, OperatorKind::Equal] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::LessOrEqual(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::RightAngle] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::Greater(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        [OperatorKind::RightAngle, OperatorKind::Equal] => {
+                            let left = self.analyze(*binary.get_left().clone())?;
+                            let right = self.analyze(*binary.get_right().clone())?;
+                            let operator = binary.get_operator();
+
+                            if left.instruction.is_value() && right.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::GreaterOrEqual(Box::from(left), Box::from(right))))
+                            } else {
+                                Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                            }
+                        }
+
+                        _ => {
+                            let operator = binary.get_operator();
+
                             Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                         }
                     }
 
-                    TokenKind::Operator(OperatorKind::Minus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
+                } else {
+                    let operator = binary.get_operator();
 
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Subtract(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Star) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Multiply(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Slash) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Divide(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Percent) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Plus) => {
-                        let left = self.analyze(*binary.get_left().clone())?;
-                        let right = self.analyze(*binary.get_right().clone())?;
-                        let operator = binary.get_operator();
-
-                        if left.instruction.is_value() && right.instruction.is_value() {
-                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
-                        } else {
-                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                        }
-                    }
-
-                    _ => {
-                        let operator = binary.get_operator();
-
-                        Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
-                    }
+                    Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                 }
             }
             ElementKind::Label(_) => { unimplemented!() }
