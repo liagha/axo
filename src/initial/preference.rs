@@ -2,8 +2,7 @@ use {
     crate::{
         data::{
             any::{Any, TypeId},
-            string::Str,
-            memory,
+            Str,
         },
         internal::{
             hash::{Hash, Hasher, DefaultHasher},

@@ -2,7 +2,7 @@ use {
     broccli::{Color, TextStyle},
     log::{Level, Log, Metadata, Record, SetLoggerError},
     crate::{
-        data::string::Str,
+        data::Str,
         internal::{
             platform::{stdout, Write},
         },

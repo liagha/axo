@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{string::Str},
+        data::Str,
         internal::hash::Set,
         format::Display,
     }

@@ -3,7 +3,7 @@ use {
         Character, Operator, OperatorKind, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
     },
     crate::{
-        data::string::Str,
+        data::Str,
         formation::{form::Form, classifier::Classifier},
         tracker::{
             Spanned,

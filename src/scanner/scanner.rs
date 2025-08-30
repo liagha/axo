@@ -4,8 +4,7 @@ use {
     },
     crate::{
         data::{
-            Offset, Scale,
-            string::Str,
+            Offset, Scale, Str,
         },
         formation::{
             form::Form,

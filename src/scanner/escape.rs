@@ -5,7 +5,7 @@ use {
     crate::{
         data::{
             character::{parse_radix, from_u32},
-            string::Str,
+            Str,
         },
         formation::{
             classifier::Classifier,

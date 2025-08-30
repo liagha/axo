@@ -1,7 +1,17 @@
 pub mod float;
-pub mod string;
+mod string;
 
 pub use float::Float;
+pub use string::{
+    Str, Utf8Error, FromStr, from_utf8,
+};
+
+pub type Char = char;
+pub type Boolean = bool;
+pub type Pointer = *const u8;
+pub type Offset = usize;
+pub type Scale = usize;
+pub type Integer = i128;
 
 pub mod any {
     pub use {
@@ -18,7 +28,7 @@ pub mod character {
         },
     };
 
-    use super::{Number, string::Str};
+    use super::{Number, Str};
 
     pub fn parse_radix<T: Number>(input: Str, radix: T) -> Option<T> {
         if input.is_empty() {
@@ -86,13 +96,6 @@ pub mod thread {
         },
     };
 }
-
-pub type Char = char;
-pub type Boolean = bool;
-pub type Pointer = *const u8;
-pub type Offset = usize;
-pub type Scale = usize;
-pub type Integer = i128;
 
 use crate::internal::operation::{Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, Shl, Shr};
 

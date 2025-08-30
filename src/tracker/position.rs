@@ -1,9 +1,9 @@
 use {
     crate::{
         data::{
-            string::{Str, from_utf8},
             slice::from_raw_parts,
-            Pointer, Offset, Scale,
+            from_utf8,
+            Pointer, Offset, Scale, Str,
         },
         internal::{
             operation::Ordering,

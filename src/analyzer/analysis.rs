@@ -1,11 +1,52 @@
-use crate::data;
+use {
+    crate::{
+        data,
+        schema::Binding,
+    }
+};
 
+#[derive(Debug)]
 pub struct Analysis<'analysis> {
-    pub instruction: Instruction<'analysis>, 
+    pub instruction: Instruction<'analysis>,
 }
 
+impl<'analysis> Analysis<'analysis> {
+    pub fn new(instruction: Instruction<'analysis>) -> Self {
+        Analysis { instruction }
+    }
+}
+
+#[derive(Debug)]
 pub enum Instruction<'analysis> {
+    // Primitives
     Integer(data::Integer),
     Float(data::Float),
-    Add(Box<Instruction<'analysis>>, Box<Instruction<'analysis>>),
+    Boolean(data::Boolean),
+
+    // Operations
+    // Arithmetic
+    Add(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Subtract(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Multiply(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Divide(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Modulus(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    And(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Or(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    XOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Not(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    ShiftLeft(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    ShiftRight(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+
+    // Comparison
+    Equal(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    NotEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Less(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    LessOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Greater(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+
+
+    Usage(data::Str<'analysis>),
+    Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    P(&'analysis ())
 }

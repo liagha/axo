@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::string::Str,
+        data::Str,
         formation::classifier::Classifier,
         scanner::{Token, TokenKind},
         schema::{

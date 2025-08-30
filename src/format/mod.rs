@@ -15,7 +15,7 @@ use {
     broccli::{Color, TextStyle},
     
     crate::{
-        data::{string::Str},
+        data::Str,
         scanner::{
             Token, TokenKind, 
             PunctuationKind, 

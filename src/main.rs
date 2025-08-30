@@ -26,9 +26,7 @@ pub(crate) mod data;
 mod analyzer;
 
 use {
-    data::{
-        string::Str,
-    },
+    data::Str,
     internal::{
         compiler::{
             Compiler,

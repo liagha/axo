@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{Offset, string::Str},
+        data::{Offset, Str},
         internal::{
             hash::Hash,
             operation::Ordering,

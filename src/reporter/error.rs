@@ -9,8 +9,7 @@ use {
         tracker::{Span},
         data::{
             Number,
-            Scale,
-            string::Str,
+            Scale, Str,
         },
     },
 

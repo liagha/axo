@@ -1,9 +1,31 @@
 use {
     super::{Token, TokenKind},
     crate::{
-        format::{Debug, Formatter, Result},
+        format::{Display, Debug, Formatter, Result},
     }
 };
+
+impl<'token> Display for TokenKind<'token> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            TokenKind::Boolean(boolean) => write!(f, "{}", boolean),
+            TokenKind::Float(number) => write!(f, "{}", number),
+            TokenKind::Integer(number) => write!(f, "{}", number),
+            TokenKind::Operator(operator) => write!(f, "{:?}", operator),
+            TokenKind::Punctuation(punctuation) => write!(f, "{:?}", punctuation),
+            TokenKind::Identifier(identifier) => write!(f, "{}", identifier),
+            TokenKind::String(string) => write!(f, "\"{}\"", string),
+            TokenKind::Character(character) => write!(f, "'{}'", character),
+            TokenKind::Comment(comment) => write!(f, "//{}", comment),
+        }
+    }
+}
+
+impl<'token> Display for Token<'token> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.kind)
+    }
+}
 
 impl<'token> Debug for TokenKind<'token> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {

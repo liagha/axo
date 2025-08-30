@@ -24,7 +24,7 @@ use {
             Extension, Method, Structure, Module,
         },
         internal::hash::{Hash, Hasher},
-        data::{memory, string::Str},
+        data::{memory, Str},
         format::{self, Show, Display, Debug, Formatter},
     },
 };

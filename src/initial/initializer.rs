@@ -5,8 +5,7 @@ use {
         data::{
             any::{Any, TypeId},
             memory,
-            string::Str,
-            Offset, Scale
+            Str, Offset, Scale,
         },
         format::{Display, Show},
         formation::{

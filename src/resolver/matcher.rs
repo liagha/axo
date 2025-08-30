@@ -13,8 +13,7 @@ use {
         },
         schema::{Method, Structure},
         data::{
-            float::Float,
-            string::Str,
+            Float, Str,
         },
         internal::operation::Range,
     },

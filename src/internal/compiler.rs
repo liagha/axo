@@ -1,7 +1,7 @@
 use {
     broccli::{Color, xprintln},
     crate::{
-        data::{memory, string::Str},
+        data::{memory, Str},
         format::{format_tokens, Show, Display},
         initial::{Initializer, Preference},
         internal::{platform::Path},
@@ -16,6 +16,7 @@ use {
         DefaultTimer, Duration,
     },
 };
+use crate::{analyzer, generator};
 
 pub struct Pipeline<'pipeline, T> {
     data: T,
@@ -318,12 +319,24 @@ impl<'compiler> Compiler<'compiler> {
                 self.registry.resolver.execute(elements.clone(), &logger)
             };
 
+            let mut analyzer = analyzer::Analyzer::new();
+            analyzer.with_input(elements);
+
+            analyzer.process();
+
+            println!("Instructions:\n{:#?}", analyzer.output);
+
+            let context = &inkwell::context::Context::create();
+            let mut generator = generator::Inkwell::new(context);
+            generator.instruct(analyzer.output);
+
             let span = Span::file(target.to_string().into());
             let module_name = Path::new(&display)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown")
                 .to_string();
+
             let identifier = Element::new(ElementKind::Identifier(module_name.into()), span);
 
             let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);

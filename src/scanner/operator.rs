@@ -1,7 +1,7 @@
 use {
     super::Character,
     crate::{
-        data::{slice, string::Str},
+        data::{slice, Str},
         format::{Debug, Display, Write, Result, Formatter},
     },
     

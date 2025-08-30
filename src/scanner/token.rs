@@ -5,11 +5,7 @@ use {
 
     crate::{
         data::{
-            Boolean,
-            Char,
-            Integer,
-            string::Str,
-            float::Float,
+            Boolean, Char, Integer, Str, Float,
         },
         tracker::Span,
     }

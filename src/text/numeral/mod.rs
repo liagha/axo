@@ -2,8 +2,7 @@ use {
     crate::{
         format::{self, Debug, Display, Formatter},
         data::{
-            string::FromStr,
-            memory::PhantomData,
+            FromStr, memory::PhantomData,
         },
     }
 };
