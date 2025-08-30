@@ -148,7 +148,7 @@ impl<'parser> Parser<'parser> {
                         let span = Span::merge(&unary.borrow_span(), &token.borrow_span());
 
                         unary = Element::new(
-                            ElementKind::Unary(Unary::new(token, unary.into())),
+                            ElementKind::Unary(Unary::new(token, Box::new(unary))),
                             span,
                         );
                     } else if let Some(element) = suffix.get_output() {

@@ -65,7 +65,7 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::Conditional(Conditional::new(Box::new(condition), Box::new(then), Some(alternate.into()))),
+                            ElementKind::Conditional(Conditional::new(Box::new(condition), Box::new(then), Some(Box::new(alternate)))),
                             span,
                         )
                     ))
@@ -135,7 +135,7 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::While(While::new(None, body.into())),
+                            ElementKind::While(While::new(None, Box::new(body))),
                             span,
                         )
                     ))
@@ -146,7 +146,7 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(
                         Element::new(
-                            ElementKind::While(While::new(Some(condition.into()), body.into())),
+                            ElementKind::While(While::new(Some(Box::new(condition)), Box::new(body))),
                             span,
                         )
                     ))

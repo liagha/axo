@@ -36,9 +36,9 @@ pub struct Symbol<'symbol> {
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: impl Into<Symbolic<'symbol>>, span: Span<'symbol>) -> Self {
+    pub fn new(value: Symbolic<'symbol>, span: Span<'symbol>) -> Self {
         Self {
-            value: value.into(),
+            value,
             span,
             scope: Scope::new(),
         }

@@ -354,7 +354,7 @@ impl<'compiler> Compiler<'compiler> {
             let mut generator = generator::Inkwell::new(context);
             generator.instruct(analyzer.output);
 
-            let span = Span::file(target.to_string().into());
+            let span = Span::file(Str::from(target.to_string()));
             let module_name = Path::new(&display)
                 .file_stem()
                 .and_then(|s| s.to_str())

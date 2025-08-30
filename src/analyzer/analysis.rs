@@ -48,5 +48,15 @@ pub enum Instruction<'analysis> {
 
     Usage(data::Str<'analysis>),
     Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
-    P(&'analysis ())
+}
+
+impl<'analysis> Instruction<'analysis> {
+    pub fn is_value(&self) -> bool {
+        matches!(
+            self,
+            Instruction::Integer(_)
+            | Instruction::Float(_)
+            | Instruction::Boolean(_)
+        )
+    }
 }

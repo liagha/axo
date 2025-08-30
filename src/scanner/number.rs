@@ -3,7 +3,7 @@ use {
         Character, ScanError, Scanner, Token, TokenKind, ErrorKind,
     },
     crate::{
-        data::Str,
+        data::{Str, Float},
         formation::{form::Form, classifier::Classifier},
         text::parser,
         tracker::Spanned,
@@ -138,7 +138,7 @@ impl<'scanner> Scanner<'scanner> {
                 if number.contains(".") || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
                     parser.parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Float(num.into()), span)))
+                        .map(|num| Form::output(Token::new(TokenKind::Float(Float::from(num)), span)))
                         .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
                 } else {
                     let parser = parser::<i128>();

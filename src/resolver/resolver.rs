@@ -190,19 +190,19 @@ impl<'resolver> Resolver<'resolver> {
 
             ElementKind::Group(group) => {
                 for item in group.items {
-                    self.extract_symbols(&item.into());
+                    self.extract_symbols(&item);
                 }
             }
 
             ElementKind::Collection(collection) => {
                 for item in collection.items {
-                    self.extract_symbols(&item.into());
+                    self.extract_symbols(&item);
                 }
             }
 
             ElementKind::Bundle(bundle) => {
                 for item in bundle.items {
-                    self.extract_symbols(&item.into());
+                    self.extract_symbols(&item);
                 }
             }
 
@@ -292,17 +292,17 @@ impl<'resolver> Resolver<'resolver> {
 
             ElementKind::Group(group) => {
                 for element in group.items {
-                    self.resolve(&element.into());
+                    self.resolve(&element);
                 }
             }
             ElementKind::Collection(collection) => {
                 for element in collection.items {
-                    self.resolve(&element.into());
+                    self.resolve(&element);
                 }
             }
             ElementKind::Bundle(bundle) => {
                 for element in bundle.items {
-                    self.resolve(&element.into());
+                    self.resolve(&element);
                 }
             }
 
@@ -519,7 +519,7 @@ impl<'resolver> Resolver<'resolver> {
     {
         for element in elements {
             visitor(&element, self);
-            self.resolve(&element.into());
+            self.resolve(&element);
         }
     }
 }
