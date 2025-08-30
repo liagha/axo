@@ -5,7 +5,7 @@ use {
     }
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {
     pub instruction: Instruction<'analysis>,
 }
@@ -16,7 +16,7 @@ impl<'analysis> Analysis<'analysis> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Instruction<'analysis> {
     // Primitives
     Integer(data::Integer),
@@ -51,6 +51,7 @@ pub enum Instruction<'analysis> {
 
     Usage(data::Str<'analysis>),
     Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Module(data::Str<'analysis>, Vec<Analysis<'analysis>>),
 }
 
 impl<'analysis> Instruction<'analysis> {

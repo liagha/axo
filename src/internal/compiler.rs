@@ -326,6 +326,14 @@ impl<'compiler> Compiler<'compiler> {
             self.registry.resolver.enter();
 
             let display = target.to_string();
+
+            let span = Span::file(Str::from(target.to_string()));
+            let module_name = Path::new(&display)
+                .file_stem()
+                .and_then(|string| string.to_str())
+                .unwrap_or("Unknown")
+                .to_string();
+
             logger.set_current(display.clone().to_string());
 
             let tokens = {
@@ -354,17 +362,11 @@ impl<'compiler> Compiler<'compiler> {
                 #[cfg(feature = "generator")]
                 {
                     let context = &inkwell::context::Context::create();
-                    let mut generator = crate::generator::Inkwell::new(context);
-                    generator.instruct(analyzer.output);
+                    let mut generator = crate::generator::Inkwell::new(Str::from(module_name.clone()), context);
+                    generator.generate(analyzer.output);
+                    generator.print_ir();
                 }
             }
-
-            let span = Span::file(Str::from(target.to_string()));
-            let module_name = Path::new(&display)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_string();
 
             let identifier = Element::new(
                 ElementKind::Literal(
