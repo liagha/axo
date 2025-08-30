@@ -30,10 +30,14 @@ pub enum Instruction<'analysis> {
     Multiply(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Divide(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Modulus(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    And(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Or(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    XOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Not(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    LogicalAnd(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    LogicalOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    LogicalNot(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    LogicalXOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    BitwiseAnd(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    BitwiseOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    BitwiseNot(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    BitwiseXOr(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     ShiftLeft(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     ShiftRight(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
@@ -44,7 +48,6 @@ pub enum Instruction<'analysis> {
     LessOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Greater(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-
 
     Usage(data::Str<'analysis>),
     Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
