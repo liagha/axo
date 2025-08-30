@@ -1,16 +1,21 @@
 use {
     crate::{
         data::Str,
-        analyzer::analysis::{Analysis, Instruction},
+        analyzer::{
+            Analysis, Instruction,
+            AnalyzeError,
+        },
         parser::{Element, ElementKind, Symbolic},
         scanner::{OperatorKind, Token, TokenKind},
         schema::Binding,
     },
 };
+use crate::analyzer::ErrorKind;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
     pub output: Vec<Analysis<'analyzer>>,
+    pub errors: Vec<AnalyzeError<'analyzer>>,
 }
 
 impl<'analyzer> Analyzer<'analyzer> {
@@ -18,6 +23,7 @@ impl<'analyzer> Analyzer<'analyzer> {
         Self {
             input: Vec::new(),
             output: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -28,26 +34,33 @@ impl<'analyzer> Analyzer<'analyzer> {
     pub fn process(&mut self) {
         for element in self.input.clone() {
             let analysis = self.analyze(element.clone());
-            
-            self.output.push(analysis);
+
+            match analysis {
+                Ok(analysis) => {
+                    self.output.push(analysis);
+                }
+                Err(error) => {
+                    self.errors.push(error);
+                }
+            }
         }
     }
 
-    pub fn analyze(&mut self, element: Element<'analyzer>) -> Analysis<'analyzer> {
+    pub fn analyze(&mut self, element: Element<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &element.kind {
             ElementKind::Literal(literal) => {
                 match literal.kind {
                     TokenKind::Float(float) => {
-                        Analysis::new(Instruction::Float(float.clone()))
+                        Ok(Analysis::new(Instruction::Float(float.clone())))
                     }
                     TokenKind::Integer(integer) => {
-                        Analysis::new(Instruction::Integer(integer.clone()))
+                        Ok(Analysis::new(Instruction::Integer(integer.clone())))
                     }
                     TokenKind::Boolean(boolean) => {
-                        Analysis::new(Instruction::Boolean(boolean.clone()))
+                        Ok(Analysis::new(Instruction::Boolean(boolean.clone())))
                     }
                     TokenKind::Identifier(identifier) => {
-                        Analysis::new(Instruction::Usage(identifier.clone()))
+                        Ok(Analysis::new(Instruction::Usage(identifier.clone())))
                     }
                     TokenKind::String(_) => { unimplemented!() }
                     TokenKind::Character(_) => { unimplemented!() }
@@ -64,13 +77,18 @@ impl<'analyzer> Analyzer<'analyzer> {
             ElementKind::Bundle(_) => { unimplemented!() }
             ElementKind::Block(_) => { unimplemented!() }
             ElementKind::Unary(_) => { unimplemented!() }
-            ElementKind::Binary(binary) => { 
-                match binary.get_operator() { 
+            ElementKind::Binary(binary) => {
+                match binary.get_operator() {
                     Token { kind: TokenKind::Operator(OperatorKind::Plus), .. } => {
-                        let left = self.analyze(*binary.get_left().clone());
-                        let right = self.analyze(*binary.get_right().clone());
-                        
-                        Analysis::new(Instruction::Add(Box::from(left), Box::from(right)))
+                        let left = self.analyze(*binary.get_left().clone())?;
+                        let right = self.analyze(*binary.get_right().clone())?;
+                        let operator = binary.get_operator();
+
+                        if left.instruction.is_value() && right.instruction.is_value() {
+                            Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
+                        } else {
+                            Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
+                        }
                     }
                     _ => {
                         unimplemented!();
@@ -90,14 +108,15 @@ impl<'analyzer> Analyzer<'analyzer> {
                     Symbolic::Inclusion(_) => { unimplemented!() }
                     Symbolic::Extension(_) => { unimplemented!() }
                     Symbolic::Binding(binding) => {
+                        let value = self.analyze(*(binding.get_value().unwrap().clone()))?;
                         let transformed = Binding::new(
                             Str::from(binding.get_target().brand().unwrap().to_string()),
-                            Some(Box::new(self.analyze(*(binding.get_value().unwrap().clone())))),
+                            Some(Box::new(value)),
                             None,
                             binding.is_constant()
                         );
-                        
-                        Analysis::new(Instruction::Binding(transformed))
+
+                        Ok(Analysis::new(Instruction::Binding(transformed)))
                     }
                     Symbolic::Structure(_) => { unimplemented!() }
                     Symbolic::Enumeration(_) => { unimplemented!() }

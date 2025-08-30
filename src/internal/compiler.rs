@@ -16,7 +16,6 @@ use {
         DefaultTimer, Duration,
     },
 };
-use crate::{analyzer, generator};
 
 pub struct Pipeline<'pipeline, T> {
     data: T,
@@ -343,16 +342,22 @@ impl<'compiler> Compiler<'compiler> {
                 self.registry.resolver.execute(elements.clone(), &logger)
             };
 
-            let mut analyzer = analyzer::Analyzer::new();
-            analyzer.with_input(elements);
+            #[cfg(feature = "analyzer")]
+            {
+                let mut analyzer = crate::analyzer::Analyzer::new();
+                analyzer.with_input(elements);
 
-            analyzer.process();
+                analyzer.process();
 
-            println!("Instructions:\n{:#?}", analyzer.output);
+                println!("Instructions:\n{:#?}", analyzer.output);
 
-            let context = &inkwell::context::Context::create();
-            let mut generator = generator::Inkwell::new(context);
-            generator.instruct(analyzer.output);
+                #[cfg(feature = "generator")]
+                {
+                    let context = &inkwell::context::Context::create();
+                    let mut generator = crate::generator::Inkwell::new(context);
+                    generator.instruct(analyzer.output);
+                }
+            }
 
             let span = Span::file(Str::from(target.to_string()));
             let module_name = Path::new(&display)

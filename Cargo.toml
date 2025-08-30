@@ -7,7 +7,8 @@ edition = "2021"
 default = [
     "checker", "formation",
     "text", "initial",
-    "scanner", "parser", "resolver", #"generator"
+    "scanner", "parser", "resolver",
+    "analyzer", #"generator"
 ]
 time = ["chrono"]
 checker = []
@@ -17,8 +18,8 @@ initial = ["formation", "scanner", "parser"]
 scanner = ["formation", "text"]
 parser = ["formation", "scanner"]
 resolver = ["scanner", "parser", "matchete"]
-analyzer = ["parser"]
-generator = ["inkwell"]
+analyzer = ["scanner", "parser"]
+generator = ["analyzer", "inkwell"]
 
 [dependencies]
 broccli = { version = "0.0.22" }
