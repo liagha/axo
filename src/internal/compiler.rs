@@ -83,7 +83,15 @@ impl<'registry> Registry<'registry> {
     }
 
     pub fn get_preference(resolver: &mut Resolver<'registry>, identifier: Str<'registry>) -> Option<Token<'registry>> {
-        let identifier = Element::new(ElementKind::Identifier(identifier), Span::default(Location::Flag));
+        let identifier = Element::new(
+            ElementKind::Literal(
+                Token::new(
+                    TokenKind::Identifier(identifier),
+                    Span::default(Location::Flag)
+                )
+            ),
+            Span::default(Location::Flag)
+        );
 
         let result = resolver.try_get(&identifier);
 
@@ -97,7 +105,15 @@ impl<'registry> Registry<'registry> {
     }
 
     pub fn get_verbosity(resolver: &mut Resolver<'registry>) -> bool {
-        let identifier = Element::new(ElementKind::Identifier(Str::from("Verbosity")), Span::default(Location::Flag));
+        let identifier = Element::new(
+            ElementKind::Literal(
+                Token::new(
+                    TokenKind::Identifier(Str::from("Verbosity")),
+                    Span::default(Location::Flag)
+                ),
+            ),
+            Span::default(Location::Flag)
+        );
 
         let result = resolver.try_get(&identifier);
 
@@ -113,7 +129,15 @@ impl<'registry> Registry<'registry> {
     }
 
     pub fn get_path(resolver: &mut Resolver<'registry>) -> Str<'registry> {
-        let identifier = Element::new(ElementKind::Identifier(Str::from("Path")), Span::default(Location::Flag));
+        let identifier = Element::new(
+            ElementKind::Literal(
+                Token::new(
+                    TokenKind::Identifier(Str::from("Path")),
+                    Span::default(Location::Flag)
+                ),
+            ),
+            Span::default(Location::Flag)
+        );
 
         let result = resolver.try_get(&identifier);
 
@@ -337,7 +361,15 @@ impl<'compiler> Compiler<'compiler> {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let identifier = Element::new(ElementKind::Identifier(module_name.into()), span);
+            let identifier = Element::new(
+                ElementKind::Literal(
+                    Token::new(
+                        TokenKind::Identifier(Str::from(module_name)),
+                        span
+                    ),
+                ),
+                span
+            );
 
             let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);
             module.with_scope(self.registry.resolver.scope.clone());

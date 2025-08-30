@@ -18,9 +18,7 @@ pub struct Element<'element> {
 }
 
 pub enum ElementKind<'element> {
-    Literal(TokenKind<'element>),
-
-    Identifier(Str<'element>),
+    Literal(Token<'element>),
 
     Procedural(Procedural<Box<Element<'element>>>),
 
@@ -75,13 +73,8 @@ impl<'element> Element<'element> {
 
 impl<'element> ElementKind<'element> {
     #[inline]
-    pub fn literal(kind: TokenKind<'element>) -> Self {
+    pub fn literal(kind: Token<'element>) -> Self {
         ElementKind::Literal(kind)
-    }
-
-    #[inline]
-    pub fn identifier(name: Str<'element>) -> Self {
-        ElementKind::Identifier(name)
     }
 
     #[inline]
@@ -200,11 +193,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn is_identifier(&self) -> bool {
-        matches!(self, ElementKind::Identifier(_))
-    }
-
-    #[inline(always)]
     pub fn is_procedural(&self) -> bool {
         matches!(self, ElementKind::Procedural(_))
     }
@@ -316,19 +304,10 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_literal(self) -> TokenKind<'element> {
+    pub fn unwrap_literal(self) -> Token<'element> {
         match self {
             ElementKind::Literal(token_kind) => token_kind,
             _ => panic!("called `unwrap_literal` on non-Literal variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_identifier(self) -> Str<'element> {
-        match self {
-            ElementKind::Identifier(name) => name,
-            _ => panic!("called `unwrap_identifier` on non-Identifier variant."),
         }
     }
 
@@ -531,17 +510,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_literal(&self) -> Option<&TokenKind<'element>> {
+    pub fn try_unwrap_literal(&self) -> Option<&Token<'element>> {
         match self {
             ElementKind::Literal(token_kind) => Some(token_kind),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_identifier(&self) -> Option<&Str<'element>> {
-        match self {
-            ElementKind::Identifier(name) => Some(name),
             _ => None,
         }
     }
@@ -723,17 +694,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut TokenKind<'element>> {
+    pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut Token<'element>> {
         match self {
             ElementKind::Literal(kind) => Some(kind),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_identifier_mut(&mut self) -> Option<&mut Str<'element>> {
-        match self {
-            ElementKind::Identifier(name) => Some(name),
             _ => None,
         }
     }

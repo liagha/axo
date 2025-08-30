@@ -11,6 +11,7 @@ use {
             Element, ElementKind,
             Symbol, Symbolic,
         },
+        resolver::{HintKind, ResolveHint},
         schema::{Method, Structure},
         data::{
             Float, Str,
@@ -23,7 +24,6 @@ use {
         string::*,
     },
 };
-use crate::resolver::{HintKind, ResolveHint};
 
 #[derive(Debug)]
 pub struct Aligner<'aligner> {
@@ -173,7 +173,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
         let mut score = 0.0;
 
         match (query.kind.clone(), candidate.clone()) {
-            (ElementKind::Identifier(_), _) => {
+            (ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }), _) => {
                 score += self.shaping;
 
                 score += self.binding;

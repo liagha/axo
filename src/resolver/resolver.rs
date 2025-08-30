@@ -15,6 +15,9 @@ use {
         tracker::{
             Span,
         },
+        scanner::{
+            Token, TokenKind
+        },
         parser::{
             Element, ElementKind,
             Symbol, Symbolic,
@@ -256,7 +259,6 @@ impl<'resolver> Resolver<'resolver> {
             ElementKind::Construct { .. }
             | ElementKind::Invoke { .. }
             | ElementKind::Index { .. }
-            | ElementKind::Identifier(_)
             | ElementKind::Literal(_)
             | ElementKind::Procedural(_)
             | ElementKind::Sequence(_)
@@ -278,7 +280,7 @@ impl<'resolver> Resolver<'resolver> {
                 self.exit();
             }
 
-            ElementKind::Identifier(_) => {
+            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => {
                 self.get(&element);
             }
 

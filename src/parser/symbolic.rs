@@ -56,14 +56,7 @@ impl<'symbol> Symbolic<'symbol> {
 impl<'symbol> Element<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match &self.kind {
-            ElementKind::Literal(literal) => Some(Token {
-                kind: literal.clone(),
-                span: self.span,
-            }),
-            ElementKind::Identifier(identifier) => Some(Token {
-                kind: TokenKind::Identifier(identifier.clone()),
-                span: self.span,
-            }),
+            ElementKind::Literal(literal) => Some(literal.clone()),
             ElementKind::Construct(construct) => construct.get_target().brand(),
             ElementKind::Label(label) => label.get_label().brand(),
             ElementKind::Index(index) => index.get_target().brand(),

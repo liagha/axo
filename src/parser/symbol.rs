@@ -2,7 +2,7 @@ use {
     super::{
         Element, ElementKind,
         ParseError, Parser,
-        Symbolic,  // Now an enum instead of a trait
+        Symbolic, 
     },
     crate::{
         resolver::{
@@ -117,13 +117,13 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("extend"))
                 }),
-                Self::token(),
+                Self::literal(),
                 Classifier::optional(
                     Classifier::sequence([
                         Classifier::predicate(|token: &Token| {
                             matches!(token.kind, TokenKind::Operator(OperatorKind::Colon))
                         }),
-                        Self::token(),
+                        Self::literal(),
                     ])
                 ),
                 Classifier::deferred(Self::symbolization),
@@ -228,7 +228,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("struct"))
                 }),
-                Self::token(),
+                Self::literal(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
@@ -263,7 +263,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("enum"))
                 }),
-                Self::token(),
+                Self::literal(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
@@ -297,7 +297,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
-                Self::token(),
+                Self::literal(),
                 Self::group(Classifier::deferred(Self::symbolization)),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -307,7 +307,7 @@ impl<'parser> Parser<'parser> {
                             false
                         }
                     }).with_ignore(),
-                    Self::token(),
+                    Self::literal(),
                 ]).with_transform(|form| {
                     let output = form.as_forms();
 
@@ -373,7 +373,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("module"))
                 }),
-                Self::token(),
+                Self::literal(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {

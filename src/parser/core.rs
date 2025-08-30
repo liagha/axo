@@ -20,6 +20,8 @@ use {
         },
     },
 };
+use crate::data::Str;
+use crate::tracker::Location;
 
 impl<'parser> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
@@ -36,26 +38,6 @@ impl<'parser> Parser<'parser> {
         }
     }
 
-    pub fn identifier() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::predicate(|token: &Token| {
-                if let TokenKind::Identifier(identifier) = &token.kind {
-                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl", "module"].contains(&identifier.unwrap_str())
-                } else {
-                    false
-                }
-            }),
-            |form| {
-                let input = form.collect_inputs()[0].clone();
-                let identifier = input.kind.unwrap_identifier();
-
-                Ok(Form::output(
-                    Element::new(ElementKind::identifier(identifier), input.span)
-                ))
-            },
-        )
-    }
-
     pub fn literal() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::predicate(|token: &Token| {
@@ -66,20 +48,20 @@ impl<'parser> Parser<'parser> {
                         | TokenKind::Boolean(_)
                         | TokenKind::Float(_)
                         | TokenKind::Integer(_)
-                )
+                ) || if let TokenKind::Identifier(identifier) = &token.kind {
+                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl", "module"].contains(&identifier.unwrap_str())
+                } else {
+                    false
+                }
             }),
             |form| {
                 let input = form.collect_inputs()[0].clone();
 
                 Ok(Form::output(
-                    Element::new(ElementKind::literal(input.kind), input.span)
+                    Element::new(ElementKind::literal(input.clone()), input.span)
                 ))
             },
         )
-    }
-
-    pub fn token() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::identifier(), Self::literal()])
     }
 
     pub fn whitespace() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
@@ -98,7 +80,7 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::delimited(), Self::token()])
+        Classifier::alternative([Self::delimited(), Self::literal()])
     }
 
     pub fn prefixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {

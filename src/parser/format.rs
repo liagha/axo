@@ -23,9 +23,6 @@ impl<'element> Debug for ElementKind<'element> {
             ElementKind::Literal(literal) => {
                 write!(f, "{:?}", literal)
             },
-            ElementKind::Identifier(identifier) => {
-                write!(f, "Identifier({})", identifier)
-            },
             ElementKind::Procedural(procedural) => {
                 write!(f, "Procedural({:?})", procedural.get_body())
             }

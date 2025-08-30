@@ -37,10 +37,6 @@ impl<'element> Hash for ElementKind<'element> {
                 discriminant(self).hash(state);
                 kind.hash(state);
             }
-            ElementKind::Identifier(name) => {
-                discriminant(self).hash(state);
-                name.hash(state);
-            }
             ElementKind::Procedural(element) => {
                 discriminant(self).hash(state);
                 element.hash(state);
@@ -149,7 +145,6 @@ impl<'element> PartialEq for ElementKind<'element> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ElementKind::Literal(a), ElementKind::Literal(b)) => a == b,
-            (ElementKind::Identifier(a), ElementKind::Identifier(b)) => a == b,
             (ElementKind::Procedural(a), ElementKind::Procedural(b)) => a == b,
 
             (ElementKind::Group(a), ElementKind::Group(b)) => a == b,
@@ -197,7 +192,6 @@ impl<'element> Clone for ElementKind<'element> {
     fn clone(&self) -> Self {
         match self {
             ElementKind::Literal(kind) => ElementKind::Literal(kind.clone()),
-            ElementKind::Identifier(name) => ElementKind::Identifier(name.clone()),
             ElementKind::Procedural(element) => ElementKind::Procedural(element.clone()),
 
             ElementKind::Group(group) => ElementKind::Group(group.clone()),

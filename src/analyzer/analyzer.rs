@@ -36,7 +36,7 @@ impl<'analyzer> Analyzer<'analyzer> {
     pub fn analyze(&mut self, element: Element<'analyzer>) -> Analysis<'analyzer> {
         match &element.kind {
             ElementKind::Literal(literal) => {
-                match literal {
+                match literal.kind {
                     TokenKind::Float(float) => {
                         Analysis::new(Instruction::Float(float.clone()))
                     }
@@ -46,16 +46,15 @@ impl<'analyzer> Analyzer<'analyzer> {
                     TokenKind::Boolean(boolean) => {
                         Analysis::new(Instruction::Boolean(boolean.clone()))
                     }
+                    TokenKind::Identifier(identifier) => {
+                        Analysis::new(Instruction::Usage(identifier.clone()))
+                    }
                     TokenKind::String(_) => { unimplemented!() }
                     TokenKind::Character(_) => { unimplemented!() }
                     TokenKind::Operator(_) => { unimplemented!() }
-                    TokenKind::Identifier(_) => { unimplemented!() }
                     TokenKind::Punctuation(_) => { unimplemented!() }
                     TokenKind::Comment(_) => { unimplemented!() }
                 }
-            }
-            ElementKind::Identifier(identifier) => { 
-                Analysis::new(Instruction::Usage(identifier.clone()))
             }
             ElementKind::Procedural(_) => { unimplemented!() }
             ElementKind::Group(_) => { unimplemented!() }
