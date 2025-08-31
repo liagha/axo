@@ -1,0 +1,18 @@
+use {
+    crate::{
+        format::{self, Display},
+        checker::types::Type,
+    },
+};
+
+pub enum ErrorKind<'error> {
+    Mismatch(Type<'error>, Type<'error>),
+}
+
+impl Display for ErrorKind<'_> {
+    fn fmt(&self, f: &mut format::Formatter<'_>) -> format::Result {
+        match self { 
+            ErrorKind::Mismatch(this, other) => write!(f, "expected {:?} but got {:?}.", this, other),
+        }
+    }
+}
