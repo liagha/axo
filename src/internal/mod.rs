@@ -6,6 +6,7 @@ pub mod hash {
     pub use {
         core::hash::{Hash, Hasher},
         hashish::HashSet as Set,
+        hashish::HashMap as Map,
 
         std::hash::DefaultHasher,
     };

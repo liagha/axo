@@ -17,6 +17,12 @@ use {
     },
 };
 
+#[cfg(feature = "analyzer")]
+use crate::analyzer::{Analysis, Analyzer};
+
+#[cfg(feature = "generator")]
+use crate::generator::Generator;
+
 pub struct Pipeline<'pipeline, T> {
     data: T,
     resolver: &'pipeline mut Resolver<'pipeline>,
@@ -352,19 +358,17 @@ impl<'compiler> Compiler<'compiler> {
 
             #[cfg(feature = "analyzer")]
             {
-                let mut analyzer = crate::analyzer::Analyzer::new();
-                analyzer.with_input(elements);
+                let mut analyzer = Analyzer::new();
+                let analysis = analyzer.execute(elements, &logger);
 
-                analyzer.process();
-
-                println!("Instructions:\n{:#?}", analyzer.output);
+                println!("Instructions:\n{:#?}", analysis);
 
                 #[cfg(feature = "generator")]
                 {
                     let context = &inkwell::context::Context::create();
-                    let mut generator = crate::generator::Inkwell::new(Str::from(module_name.clone()), context);
-                    generator.generate(analyzer.output);
-                    generator.print_ir();
+                    let backend = crate::generator::Inkwell::new(Str::from(module_name.clone()), context);
+                    let mut generator = Generator::new(backend);
+                    generator.execute(analysis, &logger);
                 }
             }
 
@@ -486,13 +490,13 @@ impl<'parser> Parser<'parser> {
 }
 
 impl<'resolver> Resolver<'resolver> {
-    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> () {
+    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> Vec<Element<'resolver>> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
         logger.start("resolving");
         
-        self.with_input(elements);
+        self.with_input(elements.clone());
 
         self.process();
 
@@ -501,5 +505,46 @@ impl<'resolver> Resolver<'resolver> {
 
         let duration = Duration::from_nanos(timer.elapsed().unwrap());
         logger.finish("resolving", duration, self.errors.len());
+
+        elements
+    }
+}
+
+impl<'resolver> Analyzer<'resolver> {
+    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> Vec<Analysis<'resolver>> {
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        logger.start("analyzing");
+        self.with_input(elements);
+
+        let analysis = self.process();
+
+        logger.errors(self.errors.as_slice());
+
+        let duration = Duration::from_nanos(timer.elapsed().unwrap());
+        logger.finish("analyzing", duration, self.errors.len());
+
+        analysis
+    }
+}
+
+impl<'resolver> Generator<'resolver> {
+    pub fn execute(&mut self, elements: Vec<Analysis<'resolver>>, logger: &CompileLogger) -> () {
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        logger.start("generating");
+
+        self.backend.generate(elements);
+
+        logger.errors(self.errors.as_slice());
+
+        let duration = Duration::from_nanos(timer.elapsed().unwrap());
+        logger.finish("generating", duration, self.errors.len());
+
+        println!("Intermediate Representation:\n");
+
+        self.backend.print_ir();
     }
 }

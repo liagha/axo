@@ -1,4 +1,4 @@
-pub mod float;
+mod float;
 mod string;
 
 pub use float::Float;

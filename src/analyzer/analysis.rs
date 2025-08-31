@@ -50,6 +50,7 @@ pub enum Instruction<'analysis> {
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
     Usage(data::Str<'analysis>),
+    Assign(data::Str<'analysis>, Box<Analysis<'analysis>>),
     Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     Module(data::Str<'analysis>, Vec<Analysis<'analysis>>),
 }
