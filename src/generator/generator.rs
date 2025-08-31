@@ -33,13 +33,21 @@ use {
     },
 };
 
-pub struct Generator<'generator> {
-    pub backend: Inkwell<'generator>,
+pub trait Backend<'backend> {
+    fn generate(&mut self, analysis: Vec<Analysis<'backend>>);
+
+    fn generate_instruction(&mut self, instruction: Instruction<'backend>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend>;
+
+    fn print(&self);
+}
+
+pub struct Generator<'generator, B: Backend<'generator>> {
+    pub backend: B,
     pub errors: Vec<GenerateError<'generator>>,
 }
 
-impl<'generator> Generator<'generator> {
-    pub fn new(backend: Inkwell<'generator>) -> Self {
+impl<'generator, B: Backend<'generator>> Generator<'generator, B> {
+    pub fn new(backend: B) -> Self {
         Self { backend, errors: Vec::new() }
     }
 }
@@ -63,8 +71,10 @@ impl<'backend> Inkwell<'backend> {
             variables: Map::new(),
         }
     }
+}
 
-    pub fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
+impl<'backend> Backend<'backend> for Inkwell<'backend> {
+    fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         let function_type = self.context.i64_type().fn_type(&[], false);
         let function = self.module.add_function("main", function_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
@@ -434,7 +444,7 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    pub fn print_ir(&self) {
+    fn print(&self) {
         let ir = self.module.print_to_string();
         println!("{}", ir.to_string());
     }

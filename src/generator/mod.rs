@@ -5,6 +5,7 @@ pub use {
     generator::{
         Generator,
         Inkwell,
+        Backend,
     },
 };
 

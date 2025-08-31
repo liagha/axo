@@ -19,7 +19,7 @@ use {
 
 #[cfg(feature = "analyzer")]
 use crate::analyzer::{Analysis, Analyzer};
-
+use crate::generator::Backend;
 #[cfg(feature = "generator")]
 use crate::generator::Generator;
 
@@ -529,7 +529,7 @@ impl<'resolver> Analyzer<'resolver> {
     }
 }
 
-impl<'resolver> Generator<'resolver> {
+impl<'resolver, B: Backend<'resolver>> Generator<'resolver, B> {
     pub fn execute(&mut self, elements: Vec<Analysis<'resolver>>, logger: &CompileLogger) -> () {
         let mut timer = DefaultTimer::new_default();
         timer.start();
@@ -545,6 +545,6 @@ impl<'resolver> Generator<'resolver> {
 
         println!("Intermediate Representation:\n");
 
-        self.backend.print_ir();
+        self.backend.print();
     }
 }
