@@ -5,19 +5,25 @@ edition = "2021"
 
 [features]
 default = [
+    "internal",
     "checker", "formation",
-    "text", "initial",
-    "scanner", "parser", "resolver",
+    "initial", "scanner",
+    "parser", "resolver",
     "analyzer", #"generator"
 ]
-time = ["chrono"]
-checker = []
 formation = []
-text = []
+internal = [
+    "formation",
+    "initial", "scanner",
+    "parser", "resolver",
+    "checker", "analyzer",
+    "generator",
+]
 initial = ["formation", "scanner", "parser"]
-scanner = ["formation", "text"]
+scanner = ["formation"]
 parser = ["formation", "scanner"]
 resolver = ["scanner", "parser", "matchete"]
+checker = []
 analyzer = ["scanner", "parser"]
 generator = ["analyzer", "inkwell"]
 
@@ -26,7 +32,6 @@ broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
 log = { version = "0.4.27"}
 matchete = { path = "../matchete", optional = true }
-chrono = { version = "0.4.41", optional = true }
 walkdir = { version = "2.5.0" }
 inkwell = { version = "0.6.0", features = ["llvm18-1-force-static"], optional = true }
 

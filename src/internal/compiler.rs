@@ -3,8 +3,10 @@ use {
     crate::{
         data::{memory, Str},
         format::{format_tokens, Show, Display},
-        initial::{Initializer, Preference},
+        analyzer::{Analysis, Analyzer},
+        generator::{Generator, Backend},
         internal::{platform::Path},
+        initial::{Initializer, Preference},
         parser::{Element, ElementKind, Parser, Symbol, Symbolic},
         reporter::{Error},
         resolver::Resolver,
@@ -16,12 +18,6 @@ use {
         DefaultTimer, Duration,
     },
 };
-
-#[cfg(feature = "analyzer")]
-use crate::analyzer::{Analysis, Analyzer};
-use crate::generator::Backend;
-#[cfg(feature = "generator")]
-use crate::generator::Generator;
 
 pub struct Pipeline<'pipeline, T> {
     data: T,

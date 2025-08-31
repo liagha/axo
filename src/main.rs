@@ -1,48 +1,62 @@
 #![allow(unused)]
 
-#[cfg(feature = "checker")]
-pub mod checker;
+#[cfg(feature = "internal")]
+pub mod internal;
 #[cfg(feature = "formation")]
 pub mod formation;
 #[cfg(feature = "initial")]
 pub mod initial;
+#[cfg(feature = "scanner")]
+pub mod scanner;
 #[cfg(feature = "parser")]
 pub mod parser;
 #[cfg(feature = "resolver")]
 pub mod resolver;
-#[cfg(feature = "scanner")]
-pub mod scanner;
+#[cfg(feature = "checker")]
+pub mod checker;
 #[cfg(feature = "generator")]
 pub mod generator;
-#[cfg(feature = "text")]
+
+#[cfg(feature = "analyzer")]
+pub mod analyzer;
+
+#[cfg(feature = "internal")]
+mod format;
+
+#[cfg(feature = "internal")]
+pub mod reporter;
+
+#[cfg(feature = "internal")]
+pub mod schema;
+
+#[cfg(feature = "internal")]
 pub mod text;
 
-pub mod internal;
-mod format;
-pub mod reporter;
-pub mod schema;
+#[cfg(feature = "internal")]
 pub mod tracker;
-pub(crate) mod data;
-mod analyzer;
 
-use {
-    data::Str,
-    internal::{
-        compiler::{
-            Compiler,
-        },
-        logger::{LogInfo, LogPlan, Logger},
-    },
-    log::Level,
-};
+#[cfg(feature = "internal")]
+pub mod data;
 
 fn main() {
-    let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]) .with_separator(Str::from(" "));
+    #[cfg(feature = "internal")]
+    {
+        use {
+            log::Level,
+            data::Str,
+            internal::{
+                logger::{LogInfo, LogPlan, Logger},
+                compiler::Compiler,
+            },
+        };
 
-    let logger = Logger::new(Level::max(), plan);
-    logger.init().expect("fuck");
+        let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message]).with_separator(Str::from(" "));
 
-    let mut compiler = Compiler::new();
+        let logger = Logger::new(Level::max(), plan);
+        logger.init().expect("fuck");
 
-    compiler.compile();
+        let mut compiler = Compiler::new();
+
+        compiler.compile();
+    }
 }

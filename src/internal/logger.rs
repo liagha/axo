@@ -109,18 +109,7 @@ impl<'logger: 'static> Logger<'logger> {
     fn format_component(&self, component: LogInfo, record: &Record) -> String {
         match component {
             LogInfo::Time => {
-                #[cfg(feature = "time")]
-                {
-                    use chrono::Timelike;
-                    let time = chrono::Local::now().time();
-
-                    format!("[{:02}:{:02}:{:02}]", time.hour(), time.minute(), time.second())
-                }
-
-                #[cfg(not(feature = "time"))]
-                {
-                    "".to_string()
-                }
+                "".to_string()
             },
             LogInfo::Level => {
                 format!("{}", self.format_level(record.level()).colorize(self.get_level_color(record.level())))
