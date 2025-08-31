@@ -1,7 +1,10 @@
 use {
     crate::{
         data,
-        schema::Binding,
+        schema::{
+            Assign, Block, Conditional, Cycle,
+            Enumeration, Index, Invoke, Method,
+            Structure, While, Binding},
     }
 };
 
@@ -22,6 +25,8 @@ pub enum Instruction<'analysis> {
     Integer(data::Integer),
     Float(data::Float),
     Boolean(data::Boolean),
+    Array(Vec<Box<Analysis<'analysis>>>),
+    Tuple(Vec<Box<Analysis<'analysis>>>),
 
     // Operations
     // Arithmetic
@@ -49,9 +54,28 @@ pub enum Instruction<'analysis> {
     Greater(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
+    // IDK what these are named
+    Index(Index<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Invoke(Invoke<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+
+    // Control Flow Related
+    Block(Block<Box<Analysis<'analysis>>>),
+    Conditional(Conditional<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    While(While<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Cycle(Cycle<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Return(Option<Box<Analysis<'analysis>>>),
+    Break(Option<Box<Analysis<'analysis>>>),
+    Continue(Option<Box<Analysis<'analysis>>>),
+
+    // Symbols & Stuff
     Usage(data::Str<'analysis>),
-    Assign(data::Str<'analysis>, Box<Analysis<'analysis>>),
+    Access(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Constructor(Structure<data::Str<'analysis>, Box<Analysis<'analysis>>>),
+    Assign(Assign<data::Str<'analysis>, Box<Analysis<'analysis>>>),
     Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Structure(Structure<data::Str<'analysis>, Box<Analysis<'analysis>>>),
+    Enumeration(Enumeration<data::Str<'analysis>, Box<Analysis<'analysis>>>),
+    Method(Method<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Option<Box<Analysis<'analysis>>>>),
     Module(data::Str<'analysis>, Vec<Analysis<'analysis>>),
 }
 

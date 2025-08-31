@@ -3,14 +3,13 @@ use {
         data::Str,
         analyzer::{
             Analysis, Instruction,
-            AnalyzeError,
+            AnalyzeError, ErrorKind,
         },
-        parser::{Element, ElementKind, Symbolic},
+        parser::{Element, ElementKind, Symbol, Symbolic},
         scanner::{OperatorKind, Token, TokenKind},
-        schema::Binding,
+        schema::{Assign, Enumeration, Index, Invoke, Method, Structure, Binding},
     },
 };
-use crate::analyzer::ErrorKind;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -336,44 +335,167 @@ impl<'analyzer> Analyzer<'analyzer> {
                 }
             }
             ElementKind::Label(_) => { unimplemented!() }
-            ElementKind::Access(_) => { unimplemented!() }
-            ElementKind::Index(_) => { unimplemented!() }
-            ElementKind::Invoke(_) => { unimplemented!() }
-            ElementKind::Construct(_) => { unimplemented!() }
+            ElementKind::Access(access) => { 
+                let left = self.analyze(*access.get_target().clone())?;
+                let right = self.analyze(*access.get_member().clone())?;
+
+                Ok(Analysis::new(Instruction::Access(Box::from(left), Box::from(right))))
+            }
+            ElementKind::Index(index) => { 
+                let target = self.analyze(*index.get_target().clone())?;
+                let index = self.analyze(index.get_index(0).unwrap().clone())?;
+                
+                let analyzed = Index::new(
+                    Box::new(target),
+                    vec![Box::new(index)],
+                );
+
+                Ok(Analysis::new(Instruction::Index(analyzed)))
+            }
+            ElementKind::Invoke(invoke) => { 
+                let target = self.analyze(*invoke.get_target().clone())?;
+                let arguments : Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = invoke.get_arguments()
+                    .iter().map(|argument| {
+                    let analysis = self.analyze(argument.clone())?;
+                    Ok(Box::from(analysis))
+                }).collect();
+                
+                let analyzed = Invoke::new(
+                    Box::from(target),
+                    arguments?
+                );
+
+                Ok(Analysis::new(Instruction::Invoke(analyzed)))
+            }
+            ElementKind::Construct(constructor) => { 
+                let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = constructor
+                    .get_fields()
+                    .iter()
+                    .map(|field| {
+                        let analysis = self.analyze(field.clone())?;
+                        Ok(Box::from(analysis))
+                    })
+                    .collect();
+
+                let analyzed = Structure::new(
+                    Str::from(constructor.get_target().brand().unwrap().to_string()),
+                    fields?,
+                );
+
+                Ok(Analysis::new(Instruction::Constructor(analyzed)))
+            }
             ElementKind::Conditional(_) => { unimplemented!() }
             ElementKind::While(_) => { unimplemented!() }
             ElementKind::Cycle(_) => { unimplemented!() }
             ElementKind::Symbolize(symbol) => {
-                match &symbol.value {
-                    Symbolic::Inclusion(_) => { unimplemented!() }
-                    Symbolic::Extension(_) => { unimplemented!() }
-                    Symbolic::Binding(binding) => {
-                        let value = self.analyze(*(binding.get_value().unwrap().clone()))?;
-                        let transformed = Binding::new(
-                            Str::from(binding.get_target().brand().unwrap().to_string()),
-                            Some(Box::new(value)),
-                            None,
-                            binding.is_constant()
-                        );
-
-                        Ok(Analysis::new(Instruction::Binding(transformed)))
-                    }
-                    Symbolic::Structure(_) => { unimplemented!() }
-                    Symbolic::Enumeration(_) => { unimplemented!() }
-                    Symbolic::Method(_) => { unimplemented!() }
-                    Symbolic::Module(_) => { unimplemented!() }
-                    Symbolic::Preference(_) => { unimplemented!() }
-                }
+                self.analyze_symbol(symbol.clone())
             }
             ElementKind::Assign(assign) => {
                 let target = assign.get_target().brand().unwrap().to_string();
                 let value = self.analyze(*assign.get_value().clone())?;
 
-                Ok(Analysis::new(Instruction::Assign(Str::from(target), Box::from(value))))
+                Ok(Analysis::new(Instruction::Assign(Assign::new(Str::from(target), Box::from(value)))))
             }
-            ElementKind::Return(_) => { unimplemented!() }
-            ElementKind::Break(_) => { unimplemented!() }
-            ElementKind::Continue(_) => { unimplemented!() }
+            ElementKind::Return(output) => { 
+                let output = output.clone().map(|output| {
+                    self.analyze(*output.clone())
+                }).transpose()?;
+
+                Ok(Analysis::new(Instruction::Return(output.map(Box::new))))
+            }
+            ElementKind::Break(output) => {
+                let output = output.clone().map(|output| {
+                    self.analyze(*output.clone())
+                }).transpose()?;
+
+                Ok(Analysis::new(Instruction::Break(output.map(Box::new))))
+            }
+            ElementKind::Continue(output) => {
+                let output = output.clone().map(|output| {
+                    self.analyze(*output.clone())
+                }).transpose()?;
+
+                Ok(Analysis::new(Instruction::Continue(output.map(Box::new))))
+            }
+        }
+    }
+
+    pub fn analyze_symbol(&mut self, symbol: Symbol<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
+        match &symbol.value {
+            Symbolic::Inclusion(_) => { unimplemented!() }
+            Symbolic::Extension(_) => { unimplemented!() }
+            Symbolic::Binding(binding) => {
+                let value = self.analyze(*(binding.get_value().unwrap().clone()))?;
+                let analyzed = Binding::new(
+                    Str::from(binding.get_target().brand().unwrap().to_string()),
+                    Some(Box::new(value)),
+                    None,
+                    binding.is_constant()
+                );
+                Ok(Analysis::new(Instruction::Binding(analyzed)))
+            }
+            Symbolic::Structure(structure) => {
+                let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = structure
+                    .get_fields()
+                    .iter()
+                    .map(|field| {
+                        let analysis = self.analyze_symbol(field.clone())?;
+                        Ok(Box::from(analysis))
+                    })
+                    .collect();
+
+                let analyzed = Structure::new(
+                    Str::from(structure.get_target().brand().unwrap().to_string()),
+                    fields?,
+                );
+
+                Ok(Analysis::new(Instruction::Structure(analyzed)))
+            }
+            Symbolic::Enumeration(enumeration) => {
+                let variants: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = enumeration
+                    .get_variants()
+                    .iter()
+                    .map(|field| {
+                        let analysis = self.analyze_symbol(field.clone())?;
+                        Ok(Box::from(analysis))
+                    })
+                    .collect();
+
+                let analyzed = Enumeration::new(
+                    Str::from(enumeration.get_target().brand().unwrap().to_string()),
+                    variants?,
+                );
+
+                Ok(Analysis::new(Instruction::Enumeration(analyzed)))
+            }
+            Symbolic::Method(method) => {
+                let parameters: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = method
+                    .get_parameters()
+                    .iter()
+                    .map(|field| {
+                        let analysis = self.analyze_symbol(field.clone())?;
+                        Ok(Box::from(analysis))
+                    })
+                    .collect();
+
+                let body = self.analyze(*method.get_body().clone())?;
+
+                let output: Result<Option<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> =
+                    method.get_output().clone().map(|output| {
+                        self.analyze(*output).map(Box::new)
+                    }).transpose();
+
+                let analyzed = Method::new(
+                    Str::from(method.get_target().brand().unwrap().to_string()),
+                    parameters?,
+                    Box::new(body),
+                    output?,
+                );
+
+                Ok(Analysis::new(Instruction::Method(analyzed)))
+            }
+            Symbolic::Module(_) => { unimplemented!() }
+            Symbolic::Preference(_) => { unimplemented!() }
         }
     }
 }

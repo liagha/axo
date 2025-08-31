@@ -80,9 +80,10 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 
-        let mut last_value = self.context.i64_type().const_zero().into();
+        let mut last_value = BasicValueEnum::from(self.context.i64_type().const_zero());
+        
         for analysis in analyses {
-            last_value = self.generate_instruction(analysis.instruction, function);
+            last_value = BasicValueEnum::from(self.generate_instruction(analysis.instruction, function));
         }
 
         self.builder.build_return(Some(&last_value));
@@ -91,323 +92,324 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate_instruction(&mut self, instruction: Instruction<'backend>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {
         match instruction {
             Instruction::Integer(int) => {
-                self.context.i64_type().const_int(int.try_into().unwrap(), false).into()
+                let unsigned: u64 = int as u64;
+                BasicValueEnum::from(self.context.i64_type().const_int(unsigned, true))
             }
             Instruction::Float(float) => {
-                self.context.f64_type().const_float(float.0).into()
+                BasicValueEnum::from(self.context.f64_type().const_float(float.0))
             }
             Instruction::Boolean(boolean) => {
-                self.context.bool_type().const_int(boolean as u64, false).into()
+                BasicValueEnum::from(self.context.bool_type().const_int(boolean as u64, false))
             }
             Instruction::Add(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_add(
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_add(
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "add",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_add(
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                    BasicValueEnum::from(self.builder.build_float_add(
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "add",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Subtract(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_sub(
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_sub(
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "sub",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_sub(
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                    BasicValueEnum::from(self.builder.build_float_sub(
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "sub",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Multiply(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_mul(
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_mul(
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "mul",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_mul(
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                    BasicValueEnum::from(self.builder.build_float_mul(
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "mul",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Divide(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_signed_div(
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_signed_div(
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "div",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_div(
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                    BasicValueEnum::from(self.builder.build_float_div(
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "div",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Modulus(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_int_signed_rem(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_int_signed_rem(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "mod",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::LogicalAnd(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_and(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_and(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "and",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::LogicalOr(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_or(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_or(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "or",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::LogicalNot(operand) => {
                 let operand_val = self.generate_instruction(operand.instruction, function);
 
-                self.builder.build_not(
+                BasicValueEnum::from(self.builder.build_not(
                     operand_val.into_int_value(),
                     "not",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::BitwiseAnd(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_and(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_and(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "bitand",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::BitwiseOr(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_or(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_or(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "bitor",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::BitwiseNot(operand) => {
                 let operand_val = self.generate_instruction(operand.instruction, function);
 
-                self.builder.build_not(
+                BasicValueEnum::from(self.builder.build_not(
                     operand_val.into_int_value(),
                     "bitnot",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::BitwiseXOr(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_xor(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_xor(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "bitxor",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::ShiftLeft(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_left_shift(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_left_shift(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     "shl",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::ShiftRight(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                self.builder.build_right_shift(
-                    left_val.into_int_value(),
-                    right_val.into_int_value(),
+                BasicValueEnum::from(self.builder.build_right_shift(
+                    left.into_int_value(),
+                    right.into_int_value(),
                     true,
                     "shr",
-                ).unwrap().into()
+                ).unwrap())
             }
             Instruction::Equal(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::EQ,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "eq",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::OEQ,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "eq",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::NotEqual(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::NE,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "ne",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::ONE,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "ne",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Less(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::SLT,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "lt",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::OLT,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "lt",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::LessOrEqual(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::SLE,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "le",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::OLE,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "le",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Greater(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::SGT,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "gt",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::OGT,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "gt",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::GreaterOrEqual(left, right) => {
-                let left_val = self.generate_instruction(left.instruction, function);
-                let right_val = self.generate_instruction(right.instruction, function);
+                let left = self.generate_instruction(left.instruction, function);
+                let right = self.generate_instruction(right.instruction, function);
 
-                if left_val.is_int_value() && right_val.is_int_value() {
-                    self.builder.build_int_compare(
+                if left.is_int_value() && right.is_int_value() {
+                    BasicValueEnum::from(self.builder.build_int_compare(
                         IntPredicate::SGE,
-                        left_val.into_int_value(),
-                        right_val.into_int_value(),
+                        left.into_int_value(),
+                        right.into_int_value(),
                         "ge",
-                    ).unwrap().into()
+                    ).unwrap())
                 } else {
-                    self.builder.build_float_compare(
+                    BasicValueEnum::from(self.builder.build_float_compare(
                         FloatPredicate::OGE,
-                        left_val.into_float_value(),
-                        right_val.into_float_value(),
+                        left.into_float_value(),
+                        right.into_float_value(),
                         "ge",
-                    ).unwrap().into()
+                    ).unwrap())
                 }
             }
             Instruction::Usage(identifier) => {
                 let ptr = self.variables.get(&identifier).unwrap();
-                self.builder.build_load(ptr.get_type(), *ptr, &identifier).unwrap().into()
+                self.builder.build_load(ptr.get_type(), *ptr, &identifier).unwrap()
             }
-            Instruction::Assign(target, value) => {
-                let value_result = self.generate_instruction(value.instruction, function);
+            Instruction::Assign(assign) => {
+                let value_result = self.generate_instruction(assign.get_value().instruction.clone(), function);
 
-                if let Some(ptr) = self.variables.get(&target) {
+                if let Some(ptr) = self.variables.get(assign.get_target()) {
                     self.builder.build_store(*ptr, value_result);
                 } else {
                     let ptr = if value_result.is_int_value() {
-                        self.builder.build_alloca(self.context.i64_type(), &target)
+                        self.builder.build_alloca(self.context.i64_type(), &assign.get_target())
                     } else if value_result.is_float_value() {
-                        self.builder.build_alloca(self.context.f64_type(), &target)
+                        self.builder.build_alloca(self.context.f64_type(), assign.get_target())
                     } else {
-                        self.builder.build_alloca(self.context.bool_type(), &target)
+                        self.builder.build_alloca(self.context.bool_type(), assign.get_target())
                     }.unwrap();
 
                     self.builder.build_store(ptr, value_result);
-                    self.variables.insert(target, ptr);
+                    self.variables.insert(*assign.get_target(), ptr);
                 }
 
                 value_result
@@ -438,9 +440,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 }
 
                 self.builder.build_return(None);
-                self.context.i64_type().const_zero().into()
+                BasicValueEnum::from(self.context.i64_type().const_zero())
             }
-            _ => self.context.i64_type().const_zero().into()
+            _ => BasicValueEnum::from(self.context.i64_type().const_zero())
         }
     }
 
