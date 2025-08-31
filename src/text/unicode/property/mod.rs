@@ -1,8 +1,8 @@
 mod property;
 pub use self::property::{CharProperty, PartialCharProperty, TotalCharProperty};
 
-mod range_types;
-pub use range_types::{
+mod range;
+pub use range::{
     BinaryCharProperty,
     CustomCharProperty,
     EnumeratedCharProperty,

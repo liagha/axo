@@ -224,7 +224,7 @@ mod data {
     };
 
     pub const GENERAL_CATEGORY_TABLE: CharDataTable<super::GeneralCategory> =
-        include!("tables/general_category.rsv");
+        include!("tables/general.rsv");
 }
 
 impl GeneralCategory {
