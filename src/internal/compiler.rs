@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use {
     super::timer::{
         DefaultTimer, Duration,
@@ -264,7 +265,9 @@ impl CompileLogger {
         }
     }
 
-    fn errors<K: Display, H: Display>(&self, errors: &[Error<K, H>]) {
+    fn errors<K, H>(&self, errors: &[Error<K, H>])
+    where K: Clone + Display, H: Clone + Display
+    {
         if self.verbosity && !errors.is_empty() {
             for error in errors {
                 let (message, details) = error.format();

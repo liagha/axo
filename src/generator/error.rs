@@ -4,6 +4,7 @@ use {
     },
 };
 
+#[derive(Clone, Debug)]
 pub enum ErrorKind {
 
 }

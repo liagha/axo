@@ -6,6 +6,7 @@ use {
     }
 };
 
+#[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
     InvalidOperation(Token<'error>),
 }

@@ -25,7 +25,9 @@ pub trait Spanned<'spanned> {
     fn span(self) -> Span<'spanned>;
 }
 
-impl<'error, E: Display> Spanned<'error> for Error<'error, E> {
+impl<'error, E> Spanned<'error> for Error<'error, E> 
+where E: Clone + Display
+{
     #[track_caller]
     fn borrow_span(&self) -> Span<'error> {
         self.span

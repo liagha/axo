@@ -18,7 +18,7 @@ use {
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Error<'error, K, H = Str<'error>>
-where K: Display, H: Display
+where K: Clone + Display, H: Clone + Display
 {
     pub kind: K,
     pub span: Span<'error>,
@@ -26,10 +26,12 @@ where K: Display, H: Display
 }
 
 impl<'error, K, H> reporter::Failure for Error<'error, K, H>
-where K: Display, H: Display
+where K: Clone + Display, H: Clone + Display
 {}
 
-impl<'error, K: Display, H: Display > Debug for Error<'error, K, H> {
+impl<'error, K, H> Debug for Error<'error, K, H>
+where K: Clone + Display, H: Clone + Display
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -37,7 +39,9 @@ impl<'error, K: Display, H: Display > Debug for Error<'error, K, H> {
     }
 }
 
-impl<'error, K: Display, H: Display > Display for Error<'error, K, H> {
+impl<'error, K, H> Display for Error<'error, K, H>
+where K: Clone + Display, H: Clone + Display
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let (msg, details) = self.format();
 
@@ -45,7 +49,9 @@ impl<'error, K: Display, H: Display > Display for Error<'error, K, H> {
     }
 }
 
-impl<'error, K: Display, H: Display> Error<'error, K, H> {
+impl<'error, K, H> Error<'error, K, H>
+where K: Clone + Display, H: Clone + Display
+{
     pub fn new(kind: K, span: Span<'error>) -> Self {
         Self {
             kind,

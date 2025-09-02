@@ -153,20 +153,25 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn fail(&mut self, error: ErrorKind<'resolver>, span: Span<'resolver>) {
-        let error = ResolveError {
-            kind: error,
-            span: span.clone(),
-            hints: vec![],
-        };
-
-        self.errors.push(error);
-    }
-
     pub fn process(&mut self) -> Vec<Analysis<'resolver>> {
         self.symbolize_all(&self.input.clone());
         self.resolve_all(&self.input.clone());
-        
+
+        for element in self.input.clone() {
+            let analysis = self.analyze(element.clone());
+
+            match analysis {
+                Ok(analysis) => {
+                    self.output.push(analysis);
+                }
+                Err(error) => {
+                    let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
+                    
+                    self.errors.push(error);
+                }
+            }
+        }
+
         self.output.clone()
     }
 

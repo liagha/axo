@@ -8,6 +8,7 @@ use {
         scanner::Token,
     }
 };
+use crate::resolver::analyzer::AnalyzeError;
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
@@ -17,6 +18,9 @@ pub enum ErrorKind<'error> {
     BindMismatch {
         candidate: Token<'error>,
     },
+    Analyze {
+        error: AnalyzeError<'error>,
+    }
 }
 
 impl<'error> Display for ErrorKind<'error> {
@@ -27,6 +31,9 @@ impl<'error> Display for ErrorKind<'error> {
             },
             ErrorKind::BindMismatch { candidate } => {
                 write!(f, "slots of `{:?}` aren't matched correctly.", candidate)
+            }
+            ErrorKind::Analyze { error } => {
+                write!(f, "{}", error)
             }
         }
     }
