@@ -80,6 +80,10 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn set_position(&mut self, position: Position<'peekable>) {
         *self.position_mut() = position;
     }
+    
+    fn set_input(&mut self, input: Vec<Item>) {
+        *self.input_mut() = input;
+    }
 
     fn set_line(&mut self, line: Offset) {
         self.position_mut().line = line;

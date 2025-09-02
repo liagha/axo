@@ -12,8 +12,6 @@ pub mod scanner;
 pub mod parser;
 #[cfg(feature = "resolver")]
 pub mod resolver;
-#[cfg(feature = "checker")]
-pub mod checker;
 #[cfg(feature = "generator")]
 pub mod generator;
 

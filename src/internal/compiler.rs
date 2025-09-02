@@ -97,7 +97,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.value {
+            if let Symbolic::Preference(preference) = found.kind {
                 return Some(preference.value.clone())
             }
         }
@@ -119,7 +119,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.value {
+            if let Symbolic::Preference(preference) = found.kind {
                 if let TokenKind::Boolean(verbosity) = preference.value.kind {
                     return verbosity
                 }
@@ -143,7 +143,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.value {
+            if let Symbolic::Preference(preference) = found.kind {
                 if let TokenKind::Identifier(path) = preference.value.kind.clone() {
                     return path.clone()
                 }
@@ -451,8 +451,9 @@ impl<'scanner> Scanner<'scanner> {
         logger.start("scanning");
 
         let content = location.get_value();
+        let characters = Scanner::inspect(Position::new(location), content.chars().collect::<Vec<_>>());
+        self.set_input(characters);
 
-        self.set_input(content);
         self.scan();
 
         logger.tokens(&self.output);

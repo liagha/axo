@@ -162,7 +162,9 @@ impl<'initializer> Initializer<'initializer> {
         let input = location.get_value();
 
         let tokens = {
-            let mut scanner = Scanner::new(location).with_input(input);
+            let mut scanner = Scanner::new(location);
+            let characters = Scanner::inspect(Position::new(location), input.chars().collect::<Vec<_>>());
+            scanner.set_input(characters);
             scanner.scan();
             scanner.output
         };

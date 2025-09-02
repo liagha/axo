@@ -421,7 +421,7 @@ impl<'analyzer> Analyzer<'analyzer> {
     }
 
     pub fn analyze_symbol(&mut self, symbol: Symbol<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
-        match &symbol.value {
+        match &symbol.kind {
             Symbolic::Inclusion(_) => { unimplemented!() }
             Symbolic::Extension(_) => { unimplemented!() }
             Symbolic::Binding(binding) => {

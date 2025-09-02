@@ -1,9 +1,5 @@
-use {
-    crate::{
-        format::{self, Display},
-        checker::types::Type,
-    },
-};
+use crate::format::{self, Display};
+use crate::resolver::checker::types::Type;
 
 pub enum ErrorKind<'error> {
     Mismatch(Type<'error>, Type<'error>),

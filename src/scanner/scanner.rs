@@ -92,23 +92,6 @@ impl<'scanner> Scanner<'scanner> {
         }
     }
 
-    pub fn with_input(self, input: Str) -> Self {
-        let chars: Vec<char> = input.chars().collect();
-        let characters = Self::inspect(self.position, chars);
-
-        Self {
-            input: characters,
-            ..self
-        }
-    }
-
-    pub fn set_input(&mut self, input: Str) {
-        let chars: Vec<char> = input.chars().collect();
-        let characters = Self::inspect(self.position, chars);
-
-        self.input = characters;
-    }
-
     pub fn scan(&mut self) {
         let classifier = Self::classifier();
         let mut former = Former::new(self);

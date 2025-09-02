@@ -180,7 +180,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             }
 
             (ElementKind::Invoke(invoke), candidate) => {
-                if let Symbolic::Method(method) = candidate.value {
+                if let Symbolic::Method(method) = candidate.kind {
                     score += self.shaping;
 
                     if invoke.get_arguments().len() == method.get_parameters().len() {
@@ -197,7 +197,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 }
             }
             (ElementKind::Construct(construct), candidate) => {
-                if let Symbolic::Structure(structure) = candidate.value {
+                if let Symbolic::Structure(structure) = candidate.kind {
                     score += self.shaping;
 
                     if construct.get_fields().len() == structure.get_fields().len() {

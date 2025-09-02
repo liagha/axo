@@ -30,7 +30,7 @@ use {
 };
 
 pub struct Symbol<'symbol> {
-    pub value: Symbolic<'symbol>,
+    pub kind: Symbolic<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
 }
@@ -38,7 +38,7 @@ pub struct Symbol<'symbol> {
 impl<'symbol> Symbol<'symbol> {
     pub fn new(value: Symbolic<'symbol>, span: Span<'symbol>) -> Self {
         Self {
-            value,
+            kind: value,
             span,
             scope: Scope::new(),
         }
@@ -53,14 +53,14 @@ impl<'symbol> Symbol<'symbol> {
     }
 
     pub fn brand(&self) -> Option<Token<'symbol>> {
-        self.value.brand()
+        self.kind.brand()
     }
 }
 
 impl<'symbol> Clone for Symbol<'symbol> {
     fn clone(&self) -> Self {
         Self {
-            value: self.value.clone(),
+            kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
         }
@@ -69,7 +69,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
 
 impl<'symbol> Debug for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
-        write!(f, "{:?}", self.value)?;
+        write!(f, "{:?}", self.kind)?;
 
         if !self.scope.empty() {
             write!(f, "\n{}", self.scope.symbols.indent())
@@ -89,13 +89,13 @@ impl<'symbol> Eq for Symbol<'symbol> {}
 
 impl<'symbol> PartialEq for Symbol<'symbol> {
     fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
+        self.kind == other.kind
     }
 }
 
 impl<'symbol> Hash for Symbol<'symbol> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state);
+        self.kind.hash(state);
     }
 }
 

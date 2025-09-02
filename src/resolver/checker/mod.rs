@@ -2,7 +2,7 @@ mod types;
 mod checker;
 mod error;
 
-pub(super) use {
+pub(crate) use {
     error::*,
 };
 

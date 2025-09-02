@@ -376,7 +376,7 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
-        match symbol.value {
+        match symbol.kind {
             Symbolic::Inclusion(_) => {}
             Symbolic::Extension(extension) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
@@ -384,7 +384,7 @@ impl<'resolver> Resolver<'resolver> {
                 if let Some(mut target) = self.lookup(extension.get_target(), &candidates) {
                     if let Some(extension) = extension.get_extension() {
                         if let Some(found) = self.lookup(extension, &candidates) {
-                            if let Symbolic::Structure(structure) = found.value {
+                            if let Symbolic::Structure(structure) = found.kind {
                                 self.scope.remove(&target);
                                 target.scope.symbols.extend(structure.get_fields().iter().cloned());
                                 self.scope.add(target);

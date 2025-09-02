@@ -11,11 +11,23 @@ pub struct Type<'ty> {
     kind: TypeKind<'ty>,
 }
 
+impl<'ty> Type<'ty> {
+    pub fn new(kind: TypeKind<'ty>) -> Self {
+        Self { kind }
+    }
+
+    pub fn unit() -> Self {
+        Self { kind: TypeKind::Tuple { items: Vec::new() }}
+    }
+}
+
 #[derive(Debug)]
 pub enum TypeKind<'ty> {
     Integer { size: Scale },
     Float { size: Scale },
+    Boolean,
     Array { item: Box<Type<'ty>>, size: Scale },
+    Tuple { items: Vec<Type<'ty>> },
 
     Type(Box<Type<'ty>>),
 
