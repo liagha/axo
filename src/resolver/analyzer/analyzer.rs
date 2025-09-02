@@ -1,52 +1,16 @@
-use {
-    crate::{
-        data::Str,
-        analyzer::{
-            Analysis, Instruction,
-            AnalyzeError, ErrorKind,
-        },
-        parser::{Element, ElementKind, Symbol, Symbolic},
-        scanner::{OperatorKind, Token, TokenKind},
-        schema::{Assign, Enumeration, Index, Invoke, Method, Structure, Binding},
-    },
+use crate::{
+    data::Str,
+    parser::{Element, ElementKind, Symbol, Symbolic},
+    scanner::{OperatorKind, TokenKind},
+    schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure},
 };
+use crate::resolver::analyzer::{
+    Analysis, AnalyzeError,
+    ErrorKind, Instruction,
+};
+use crate::resolver::Resolver;
 
-pub struct Analyzer<'analyzer> {
-    pub input: Vec<Element<'analyzer>>,
-    pub output: Vec<Analysis<'analyzer>>,
-    pub errors: Vec<AnalyzeError<'analyzer>>,
-}
-
-impl<'analyzer> Analyzer<'analyzer> {
-    pub fn new() -> Self {
-        Self {
-            input: Vec::new(),
-            output: Vec::new(),
-            errors: Vec::new(),
-        }
-    }
-
-    pub fn with_input(&mut self, input: Vec<Element<'analyzer>>) {
-        self.input = input;
-    }
-
-    pub fn process(&mut self) -> Vec<Analysis<'analyzer>> {
-        for element in self.input.clone() {
-            let analysis = self.analyze(element.clone());
-
-            match analysis {
-                Ok(analysis) => {
-                    self.output.push(analysis);
-                }
-                Err(error) => {
-                    self.errors.push(error);
-                }
-            }
-        }
-        
-        self.output.clone()
-    }
-
+impl<'analyzer> Resolver<'analyzer> {
     pub fn analyze(&mut self, element: Element<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &element.kind {
             ElementKind::Literal(literal) => {

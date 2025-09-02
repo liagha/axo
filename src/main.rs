@@ -15,9 +15,6 @@ pub mod resolver;
 #[cfg(feature = "generator")]
 pub mod generator;
 
-#[cfg(feature = "analyzer")]
-pub mod analyzer;
-
 #[cfg(feature = "internal")]
 mod format;
 

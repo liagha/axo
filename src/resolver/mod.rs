@@ -2,11 +2,14 @@ mod error;
 mod hint;
 mod matcher;
 mod resolver;
-pub mod scope;
-#[cfg(feature = "checker")]
+pub mod analyzer;
 pub mod checker;
+pub mod scope;
 
-pub use resolver::Resolver;
+pub use {
+    resolver::Resolver,
+};
+
 
 pub(super) use {
     error::*,

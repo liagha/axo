@@ -1,35 +1,17 @@
 use {
+    super::GenerateError,
+    crate::{
+        data::Str,
+        internal::hash::Map,
+        resolver::analyzer::{Analysis, Instruction},
+    },
     inkwell::{
-        types::AnyType,
-        values::{AnyValue, AsValueRef, BasicMetadataValueEnum},
         builder::Builder,
         context::Context,
         module::Module,
-        types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
-        values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
-        AddressSpace, IntPredicate, FloatPredicate,
-    },
-    super::{
-        GenerateError,
-    },
-    crate::{
-        reporter::Error,
-        scanner::OperatorKind,
-        analyzer::{Analysis, Instruction},
-        scanner::{Operator, Token, TokenKind},
-        parser::{Element, ElementKind, Symbol, Symbolic},
-        internal::{
-            hash::Map,
-        },
-        data::{
-            Boolean, Scale,
-            Integer, Float, Str,
-        },
-        schema::{
-            Binary, Unary,
-            Binding, Method,
-            Structure, Enumeration,
-        },
+        types::{AnyType, BasicType},
+        values::{AnyValue, BasicValueEnum, FunctionValue, PointerValue},
+        FloatPredicate, IntPredicate,
     },
 };
 

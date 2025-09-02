@@ -6,26 +6,23 @@ edition = "2021"
 [features]
 default = [
     "internal",
-    "checker", "formation",
+    "formation",
     "initial", "scanner",
     "parser", "resolver",
-    "analyzer", #"generator"
+    #"generator"
 ]
 formation = []
 internal = [
     "formation",
     "initial", "scanner",
     "parser", "resolver",
-    "checker", "analyzer",
     "generator",
 ]
 initial = ["formation", "scanner", "parser"]
 scanner = ["formation"]
 parser = ["formation", "scanner"]
 resolver = ["scanner", "parser", "matchete"]
-checker = []
-analyzer = ["scanner", "parser"]
-generator = ["analyzer", "inkwell"]
+generator = ["resolver", "inkwell"]
 
 [dependencies]
 broccli = { version = "0.0.22" }

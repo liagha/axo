@@ -1,22 +1,24 @@
 use {
-    broccli::{Color, xprintln},
-    crate::{
-        data::{memory, Str},
-        format::{format_tokens, Show, Display},
-        analyzer::{Analysis, Analyzer},
-        generator::{Generator, Backend},
-        internal::{platform::Path},
-        initial::{Initializer, Preference},
-        parser::{Element, ElementKind, Parser, Symbol, Symbolic},
-        reporter::{Error},
-        resolver::Resolver,
-        scanner::{Scanner, Token, TokenKind},
-        schema::{Module},
-        tracker::{Location, Peekable, Position, Span, Spanned},
-    },
     super::timer::{
         DefaultTimer, Duration,
     },
+    crate::{
+        data::Str,
+        format::{format_tokens, Display, Show},
+        generator::{Backend, Generator},
+        initial::Initializer,
+        internal::platform::Path,
+        parser::{Element, ElementKind, Parser, Symbol, Symbolic},
+        reporter::Error,
+        resolver::{
+            Resolver,
+            analyzer::Analysis,
+        },
+        scanner::{Scanner, Token, TokenKind},
+        schema::Module,
+        tracker::{Location, Peekable, Position, Span, Spanned},
+    },
+    broccli::{xprintln, Color},
 };
 
 pub struct Pipeline<'pipeline, T> {
@@ -349,13 +351,10 @@ impl<'compiler> Compiler<'compiler> {
             };
 
             {
-                self.registry.resolver.execute(elements.clone(), &logger)
             };
 
-            #[cfg(feature = "analyzer")]
             {
-                let mut analyzer = Analyzer::new();
-                let analysis = analyzer.execute(elements, &logger);
+                let analysis = self.registry.resolver.execute(elements.clone(), &logger);
 
                 println!("Instructions:\n{:#?}", analysis);
 
@@ -433,7 +432,7 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
             )
         }).collect::<Vec<Symbol>>();
 
-        resolver.extend(symbols);
+        resolver.scope.extend(symbols);
 
         let duration = Duration::from_nanos(timer.elapsed().unwrap());
         logger.finish("initializing", duration, 0);
@@ -487,40 +486,21 @@ impl<'parser> Parser<'parser> {
 }
 
 impl<'resolver> Resolver<'resolver> {
-    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> Vec<Element<'resolver>> {
+    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> Vec<Analysis<'resolver>> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
         logger.start("resolving");
         
-        self.with_input(elements.clone());
+        self.with_input(elements);
 
-        self.process();
+        let analysis = self.process();
 
         let symbols = self.scope.all();
         logger.errors(self.errors.as_slice());
 
         let duration = Duration::from_nanos(timer.elapsed().unwrap());
         logger.finish("resolving", duration, self.errors.len());
-
-        elements
-    }
-}
-
-impl<'resolver> Analyzer<'resolver> {
-    pub fn execute(&mut self, elements: Vec<Element<'resolver>>, logger: &CompileLogger) -> Vec<Analysis<'resolver>> {
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
-        logger.start("analyzing");
-        self.with_input(elements);
-
-        let analysis = self.process();
-
-        logger.errors(self.errors.as_slice());
-
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
-        logger.finish("analyzing", duration, self.errors.len());
 
         analysis
     }

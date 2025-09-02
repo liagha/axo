@@ -7,7 +7,7 @@ pub use {
     analysis::*,
 };
 
-pub(super) use {
+pub(crate) use {
     error::*,
 };
 
