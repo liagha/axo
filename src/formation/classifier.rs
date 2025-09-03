@@ -68,7 +68,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
         Self::new(Arc::new(Alternative {
             patterns,
             perfection,
-            blacklist: vec![]
+            blacklist: Vec::new()
         }))
     }
 
@@ -90,10 +90,10 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             classifier: Box::new(classifier),
             minimum,
             maximum,
-            update: vec![],
+            update: Vec::new(),
             accept: vec![PANICKED, ALIGNED, FAILED, IGNORED],
             consume: vec![PANICKED, ALIGNED, FAILED],
-            halt: vec![],
+            halt: Vec::new(),
             align_on_success: true,
             empty_on_failure: true,
         }))
@@ -123,7 +123,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             update: vec![ALIGNED, PANICKED, FAILED],
             accept: vec![ALIGNED, PANICKED, FAILED, IGNORED],
             consume: vec![ALIGNED, PANICKED, FAILED],
-            halt: vec![],
+            halt: Vec::new(),
             align_on_success: false,
             empty_on_failure: false,
         }))

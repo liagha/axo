@@ -22,6 +22,11 @@ impl<'span> Span<'span> {
     }
 
     #[inline]
+    pub fn void() -> Self {
+        Span::point(Position::new(Location::Void))
+    }
+    
+    #[inline]
     pub fn default(location: Location<'span>) -> Self {
         Self { start: Position::default(location), end: Position::default(location) } 
     }

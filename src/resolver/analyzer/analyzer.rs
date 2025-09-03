@@ -9,30 +9,13 @@ use crate::resolver::analyzer::{
     ErrorKind, Instruction,
 };
 use crate::resolver::Resolver;
+use crate::scanner::Token;
 
 impl<'analyzer> Resolver<'analyzer> {
     pub fn analyze(&mut self, element: Element<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &element.kind {
             ElementKind::Literal(literal) => {
-                match literal.kind {
-                    TokenKind::Float(float) => {
-                        Ok(Analysis::new(Instruction::Float(float.clone())))
-                    }
-                    TokenKind::Integer(integer) => {
-                        Ok(Analysis::new(Instruction::Integer(integer.clone())))
-                    }
-                    TokenKind::Boolean(boolean) => {
-                        Ok(Analysis::new(Instruction::Boolean(boolean.clone())))
-                    }
-                    TokenKind::Identifier(identifier) => {
-                        Ok(Analysis::new(Instruction::Usage(identifier.clone())))
-                    }
-                    TokenKind::String(_) => { unimplemented!() }
-                    TokenKind::Character(_) => { unimplemented!() }
-                    TokenKind::Operator(_) => { unimplemented!() }
-                    TokenKind::Punctuation(_) => { unimplemented!() }
-                    TokenKind::Comment(_) => { unimplemented!() }
-                }
+                self.analyze_literal(literal)
             }
             ElementKind::Procedural(_) => { unimplemented!() }
             ElementKind::Group(_) => { unimplemented!() }
@@ -49,7 +32,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = unary.get_operator();
 
                             if operand.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::LogicalNot(Box::from(operand))))
+                                Ok(Analysis::new(Instruction::LogicalNot(Box::new(operand))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -75,7 +58,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Add(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Add(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -87,7 +70,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Subtract(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Subtract(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -99,7 +82,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Multiply(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Multiply(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -111,7 +94,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Divide(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Divide(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -123,7 +106,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Modulus(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Modulus(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -135,7 +118,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::LogicalAnd(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::LogicalAnd(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -147,7 +130,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::LogicalOr(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::LogicalOr(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -159,7 +142,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::BitwiseAnd(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::BitwiseAnd(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -171,7 +154,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::BitwiseOr(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::BitwiseOr(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -183,7 +166,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::BitwiseXOr(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::BitwiseXOr(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -195,7 +178,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::ShiftLeft(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::ShiftLeft(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -207,7 +190,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::ShiftRight(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::ShiftRight(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -219,7 +202,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Equal(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Equal(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -231,7 +214,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::NotEqual(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::NotEqual(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -243,7 +226,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Less(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Less(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -255,7 +238,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::LessOrEqual(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::LessOrEqual(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -267,7 +250,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::Greater(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::Greater(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -279,7 +262,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let operator = binary.get_operator();
 
                             if left.instruction.is_value() || right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::GreaterOrEqual(Box::from(left), Box::from(right))))
+                                Ok(Analysis::new(Instruction::GreaterOrEqual(Box::new(left), Box::new(right))))
                             } else {
                                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                             }
@@ -303,7 +286,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 let left = self.analyze(*access.get_target().clone())?;
                 let right = self.analyze(*access.get_member().clone())?;
 
-                Ok(Analysis::new(Instruction::Access(Box::from(left), Box::from(right))))
+                Ok(Analysis::new(Instruction::Access(Box::new(left), Box::new(right))))
             }
             ElementKind::Index(index) => { 
                 let target = self.analyze(*index.get_target().clone())?;
@@ -321,11 +304,11 @@ impl<'analyzer> Resolver<'analyzer> {
                 let arguments : Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = invoke.get_arguments()
                     .iter().map(|argument| {
                     let analysis = self.analyze(argument.clone())?;
-                    Ok(Box::from(analysis))
+                    Ok(Box::new(analysis))
                 }).collect();
                 
                 let analyzed = Invoke::new(
-                    Box::from(target),
+                    Box::new(target),
                     arguments?
                 );
 
@@ -337,7 +320,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze(field.clone())?;
-                        Ok(Box::from(analysis))
+                        Ok(Box::new(analysis))
                     })
                     .collect();
 
@@ -358,7 +341,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 let target = assign.get_target().brand().unwrap().to_string();
                 let value = self.analyze(*assign.get_value().clone())?;
 
-                Ok(Analysis::new(Instruction::Assign(Assign::new(Str::from(target), Box::from(value)))))
+                Ok(Analysis::new(Instruction::Assign(Assign::new(Str::from(target), Box::new(value)))))
             }
             ElementKind::Return(output) => { 
                 let output = output.clone().map(|output| {
@@ -384,6 +367,28 @@ impl<'analyzer> Resolver<'analyzer> {
         }
     }
 
+    pub fn analyze_literal(&mut self, literal: &Token<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
+        match literal.kind {
+            TokenKind::Float(float) => {
+                Ok(Analysis::new(Instruction::Float(float.clone())))
+            }
+            TokenKind::Integer(integer) => {
+                Ok(Analysis::new(Instruction::Integer(integer.clone())))
+            }
+            TokenKind::Boolean(boolean) => {
+                Ok(Analysis::new(Instruction::Boolean(boolean.clone())))
+            }
+            TokenKind::Identifier(identifier) => {
+                Ok(Analysis::new(Instruction::Usage(identifier.clone())))
+            }
+            TokenKind::String(_) => { unimplemented!() }
+            TokenKind::Character(_) => { unimplemented!() }
+            TokenKind::Operator(_) => { unimplemented!() }
+            TokenKind::Punctuation(_) => { unimplemented!() }
+            TokenKind::Comment(_) => { unimplemented!() }
+        }
+    }
+
     pub fn analyze_symbol(&mut self, symbol: Symbol<'analyzer>) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &symbol.kind {
             Symbolic::Inclusion(_) => { unimplemented!() }
@@ -404,7 +409,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
-                        Ok(Box::from(analysis))
+                        Ok(Box::new(analysis))
                     })
                     .collect();
 
@@ -421,7 +426,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
-                        Ok(Box::from(analysis))
+                        Ok(Box::new(analysis))
                     })
                     .collect();
 
@@ -438,7 +443,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
-                        Ok(Box::from(analysis))
+                        Ok(Box::new(analysis))
                     })
                     .collect();
 

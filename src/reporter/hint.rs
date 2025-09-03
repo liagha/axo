@@ -12,6 +12,6 @@ pub struct Hint<M: Display> {
 
 impl<M: Display> Hint<M> {
     pub fn new(message: M) -> Self {
-        Hint { message, action: vec![] }
+        Hint { message, action: Vec::new() }
     }
 }

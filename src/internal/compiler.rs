@@ -1,11 +1,10 @@
-use std::fmt::Debug;
 use {
     super::timer::{
         DefaultTimer, Duration,
     },
     crate::{
         data::Str,
-        format::{format_tokens, Display, Show},
+        format::{format_tokens, Display, Debug, Show},
         generator::{Backend, Generator},
         initial::Initializer,
         internal::platform::Path,
@@ -320,6 +319,59 @@ impl<'compiler> Compiler<'compiler> {
         }
     }
 
+    pub fn process_module(&mut self, target: Location<'compiler>) -> Symbol<'compiler> {
+        self.registry.resolver.enter();
+
+        let display = target.to_string();
+        let span = Span::file(Str::from(target.to_string()));
+        let module_name = Path::new(&display)
+            .file_stem()
+            .and_then(|string| string.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+
+        let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
+        let logger = CompileLogger::new(verbosity, 1);
+
+        let tokens = {
+            let mut scanner = Scanner::new(target);
+            scanner.execute_pipeline(&mut self.registry.resolver, target, &logger)
+        };
+
+        let elements = {
+            let mut parser = Parser::new(target);
+            parser.execute(&mut self.registry.resolver, tokens, &logger)
+        };
+
+        let analysis = self.registry.resolver.execute(elements.clone(), &logger);
+
+        #[cfg(feature = "generator")]
+        {
+            let context = &inkwell::context::Context::create();
+            let backend = crate::generator::Inkwell::new(Str::from(module_name.clone()), context);
+            let mut generator = Generator::new(backend);
+            generator.execute(analysis, &logger);
+        }
+
+        let identifier = Element::new(
+            ElementKind::Literal(
+                Token::new(
+                    TokenKind::Identifier(Str::from(module_name)),
+                    span
+                ),
+            ),
+            span
+        );
+
+        let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);
+        module.with_scope(self.registry.resolver.scope.clone());
+
+        self.registry.resolver.exit();
+        self.registry.resolver.define(module.clone());
+
+        module
+    }
+
     fn compile_pipeline(&mut self) -> bool {
         let targets = {
             let mut initializer = Initialization::new();
@@ -330,63 +382,8 @@ impl<'compiler> Compiler<'compiler> {
         let mut logger = CompileLogger::new(verbosity, targets.len());
 
         for target in targets {
-            self.registry.resolver.enter();
-
-            let display = target.to_string();
-
-            let span = Span::file(Str::from(target.to_string()));
-            let module_name = Path::new(&display)
-                .file_stem()
-                .and_then(|string| string.to_str())
-                .unwrap_or("Unknown")
-                .to_string();
-
-            logger.set_current(display.clone().to_string());
-
-            let tokens = {
-                let mut scanner = Scanner::new(target);
-                scanner.execute_pipeline(&mut self.registry.resolver, target, &logger)
-            };
-
-            let elements = {
-                let mut parser = Parser::new(target);
-                parser.execute(&mut self.registry.resolver, tokens, &logger)
-            };
-
-            {
-            };
-
-            {
-                let analysis = self.registry.resolver.execute(elements.clone(), &logger);
-
-                println!("Instructions:\n{:#?}", analysis);
-
-                #[cfg(feature = "generator")]
-                {
-                    let context = &inkwell::context::Context::create();
-                    let backend = crate::generator::Inkwell::new(Str::from(module_name.clone()), context);
-                    let mut generator = Generator::new(backend);
-                    generator.execute(analysis, &logger);
-                }
-            }
-
-            let identifier = Element::new(
-                ElementKind::Literal(
-                    Token::new(
-                        TokenKind::Identifier(Str::from(module_name)),
-                        span
-                    ),
-                ),
-                span
-            );
-
-            let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);
-            module.with_scope(self.registry.resolver.scope.clone());
-
-            self.registry.resolver.exit();
-
-            self.registry.resolver.define(module);
-
+            logger.set_current(target.to_string());
+            self.process_module(target);
             logger.clear_current();
         }
 
@@ -494,7 +491,7 @@ impl<'resolver> Resolver<'resolver> {
         timer.start();
 
         logger.start("resolving");
-        
+
         self.with_input(elements);
 
         let analysis = self.process();

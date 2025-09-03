@@ -141,7 +141,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
                                 span: query.span.clone(),
-                                hints: vec![],
+                                hints: Vec::new(),
                             }
                         )
                     }
@@ -190,7 +190,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             ResolveError {
                                 kind: ErrorKind::BindMismatch { candidate: method.get_target().brand().unwrap() },
                                 span: query.span.clone(),
-                                hints: vec![],
+                                hints: Vec::new(),
                             }
                         )
                     }
@@ -207,7 +207,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             ResolveError {
                                 kind: ErrorKind::BindMismatch { candidate: structure.get_target().brand().unwrap() },
                                 span: query.span.clone(),
-                                hints: vec![],
+                                hints: Vec::new(),
                             }
                         )
                     }

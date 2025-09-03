@@ -56,7 +56,7 @@ where K: Clone + Display, H: Clone + Display
         Self {
             kind,
             span,
-            hints: vec![],
+            hints: Vec::new(),
         }
     }
 

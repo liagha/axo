@@ -6,7 +6,7 @@ use {
     }
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Type<'ty> {
     kind: TypeKind<'ty>,
 }
@@ -21,7 +21,7 @@ impl<'ty> Type<'ty> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TypeKind<'ty> {
     Integer { size: Scale },
     Float { size: Scale },

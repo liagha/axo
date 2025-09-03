@@ -100,7 +100,7 @@ impl<'resolver> Resolver<'resolver> {
                 let error = ResolveError {
                     kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
                     span: target.span.clone(),
-                    hints: vec![],
+                    hints: Vec::new(),
                 };
 
                 Err(vec![error])
@@ -132,7 +132,7 @@ impl<'resolver> Resolver<'resolver> {
                 let error = ResolveError {
                     kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
                     span: target.span.clone(),
-                    hints: vec![],
+                    hints: Vec::new(),
                 };
 
                 Err(vec![error])
@@ -154,142 +154,44 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn process(&mut self) -> Vec<Analysis<'resolver>> {
-        self.symbolize_all(&self.input.clone());
-        self.resolve_all(&self.input.clone());
+        self.preresolve(&self.input.clone());
 
         for element in self.input.clone() {
-            let analysis = self.analyze(element.clone());
-
-            match analysis {
-                Ok(analysis) => {
-                    self.output.push(analysis);
-                }
-                Err(error) => {
-                    let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
-                    
-                    self.errors.push(error);
-                }
-            }
+            self.resolve(&element);
         }
 
         self.output.clone()
     }
 
-    fn symbolize_all(&mut self, elements: &Vec<Element<'resolver>>) {
-        for element in elements {
-            self.extract_symbols(element);
-        }
-    }
-
-    fn resolve_all(&mut self, elements: &Vec<Element<'resolver>>) {
-        for element in elements {
-            self.resolve(element);
-        }
-    }
-
-    fn extract_symbols(&mut self, element: &Element<'resolver>) {
-        let Element { kind, .. } = element.clone();
-
-        match kind {
-            ElementKind::Symbolize(symbol) => {
-                self.symbolize(symbol);
+    pub fn preresolve(&mut self, elements: &Vec<Element<'resolver>>) {
+        elements.iter().for_each(|element| {
+            if let ElementKind::Symbolize(symbol) = &element.kind {
+                self.scope.add(symbol.clone());
             }
-
-            ElementKind::Block(body) => {
-                for item in body.items {
-                    self.extract_symbols(&item);
-                }
-            }
-
-            ElementKind::Group(group) => {
-                for item in group.items {
-                    self.extract_symbols(&item);
-                }
-            }
-
-            ElementKind::Collection(collection) => {
-                for item in collection.items {
-                    self.extract_symbols(&item);
-                }
-            }
-
-            ElementKind::Bundle(bundle) => {
-                for item in bundle.items {
-                    self.extract_symbols(&item);
-                }
-            }
-
-            ElementKind::Binary(binary) => {
-                self.extract_symbols(binary.get_left());
-                self.extract_symbols(binary.get_right());
-            }
-
-            ElementKind::Unary(unary) => {
-                self.extract_symbols(&unary.get_operand());
-            }
-
-            ElementKind::Label(label) => {
-                self.extract_symbols(label.get_label());
-                self.extract_symbols(label.get_element());
-            }
-
-            ElementKind::Conditional(conditioned) => {
-                self.extract_symbols(conditioned.get_condition());
-                self.extract_symbols(conditioned.get_then());
-
-                if let Some(alternate) = conditioned.get_alternate() {
-                    self.extract_symbols(alternate);
-                }
-            }
-
-            ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.get_condition() {
-                    self.extract_symbols(condition);
-                }
-                self.extract_symbols(repeat.get_body());
-            }
-
-            ElementKind::Cycle(walk) => {
-                self.extract_symbols(walk.get_clause());
-                self.extract_symbols(walk.get_body());
-            }
-
-            ElementKind::Access(access) => {
-                self.extract_symbols(access.get_target());
-                self.extract_symbols(access.get_member());
-            }
-
-            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {
-                if let Some(value) = value {
-                    self.extract_symbols(&value);
-                }
-            }
-
-            ElementKind::Assign(assign) => {
-                self.extract_symbols(assign.get_target());
-            }
-
-            ElementKind::Construct { .. }
-            | ElementKind::Invoke { .. }
-            | ElementKind::Index { .. }
-            | ElementKind::Literal(_)
-            | ElementKind::Procedural(_)
-            | ElementKind::Sequence(_)
-            | ElementKind::Series(_) => {}
-        }
+        })
     }
 
     pub fn resolve(&mut self, element: &Element<'resolver>) {
-        let Element { kind, .. } = element.clone();
+        let Element { kind, .. } = self.desugar(element.clone());
 
         match kind {
             ElementKind::Assign(assign) => {
-                self.get(assign.get_target());
+                if let Some(symbol) = self.get(assign.get_target()) {
+                    self.resolve(assign.get_value());
+
+                    let target = self.infer_symbol(symbol.clone());
+                    let value = self.infer_element(assign.get_value());
+
+                    if target == value {
+                        println!("types match in {}.", symbol.span);
+                    } else {
+                        println!("types don't match (`{:?}` & `{:?}`) in `{}`.", target, value, symbol.span);
+                    }
+                }
             }
 
             ElementKind::Block(body) => {
                 self.enter();
-                self.resolve_all(&body.items);
                 self.exit();
             }
 
@@ -386,11 +288,25 @@ impl<'resolver> Resolver<'resolver> {
             | ElementKind::Sequence(_)
             | ElementKind::Series(_) => {}
         }
+
+        let analysis = self.analyze(element.clone());
+
+        match analysis {
+            Ok(analysis) => {
+                self.output.push(analysis);
+            }
+            Err(error) => {
+                let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
+
+                self.errors.push(error);
+            }
+        }
     }
 
     pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
         match symbol.kind {
             Symbolic::Inclusion(_) => {}
+            Symbolic::Preference(_) => {}
             Symbolic::Extension(extension) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
                 
@@ -410,7 +326,6 @@ impl<'resolver> Resolver<'resolver> {
                     }
                 }
             }
-            Symbolic::Preference(_) => {}
             _ => {
                 self.scope.add(symbol);
             }

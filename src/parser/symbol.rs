@@ -28,6 +28,7 @@ use {
         format::{self, Show, Display, Debug, Formatter},
     },
 };
+use crate::internal::hash::Set;
 
 pub struct Symbol<'symbol> {
     pub kind: Symbolic<'symbol>,
@@ -44,7 +45,14 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn with_members(&mut self, members: Vec<Symbol<'symbol>>) {
+    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(&self, members: I) -> Self {
+        Self {
+            scope: Scope { symbols: Set::from_iter(members), parent: None },
+            ..self.clone()
+        }
+    }
+
+    pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
         self.scope.symbols.extend(members);
     }
 

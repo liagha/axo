@@ -101,7 +101,7 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
     }
 
     #[inline]
-    pub fn get_type(&self) -> Option<&Type> {
+    pub fn get_annotation(&self) -> Option<&Type> {
         self.annotation.as_ref()
     }
 
@@ -246,7 +246,7 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.get_target().hash(state);
         self.get_value().hash(state);
-        self.get_type().hash(state);
+        self.get_annotation().hash(state);
         self.is_constant().hash(state);
     }
 }
@@ -296,7 +296,7 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq for Binding
     fn eq(&self, other: &Self) -> bool {
         self.get_target() == other.get_target()
             && self.get_value() == other.get_value()
-            && self.get_type() == other.get_type()
+            && self.get_annotation() == other.get_annotation()
             && self.is_constant() == other.is_constant()
     }
 }
@@ -345,7 +345,7 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
         Binding::new(
             self.get_target().clone(),
             self.get_value().cloned(),
-            self.get_type().cloned(),
+            self.get_annotation().cloned(),
             self.is_constant(),
         )
     }

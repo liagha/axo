@@ -116,11 +116,35 @@ impl<'resolver> Resolver<'resolver> {
             Symbolic::Extension(_) => {
                 Type::unit()
             }
-            Symbolic::Binding(_) => {
-                Type::unit()
+            Symbolic::Binding(binding) => {
+                if let Some(annotation) = binding.get_annotation() {
+                    if let Some(ty) = self.get(annotation) {
+                        self.infer_symbol(ty)
+                    } else {
+                        Type::unit()
+                    }
+                } else if let Some(value) = binding.get_value() {
+                    self.infer_element(value)
+                } else {
+                    Type::unit()
+                }
             }
-            Symbolic::Structure(_) => {
-                Type::unit()
+            Symbolic::Structure(structure) => {
+                let structure = Structure::new(
+                    Str::from(structure.get_target().brand().unwrap().to_string()),
+                    structure.get_fields()
+                        .iter()
+                        .map(|field| {
+                            Box::new(self.infer_symbol(field.clone()))
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                Type::new(
+                    TypeKind::Structure(
+                        structure,
+                    )
+                )
             }
             Symbolic::Enumeration(_) => {
                 Type::unit()

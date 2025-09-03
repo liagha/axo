@@ -2,6 +2,10 @@ mod types;
 mod checker;
 mod error;
 
+pub use {
+    types::*,  
+};
+
 pub(crate) use {
     error::*,
 };
