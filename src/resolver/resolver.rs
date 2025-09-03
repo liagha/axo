@@ -182,16 +182,13 @@ impl<'resolver> Resolver<'resolver> {
                     let target = self.infer_symbol(symbol.clone());
                     let value = self.infer_element(assign.get_value());
 
-                    if target == value {
-                        println!("types match in {}.", symbol.span);
-                    } else {
-                        println!("types don't match (`{:?}` & `{:?}`) in `{}`.", target, value, symbol.span);
-                    }
+                    self.check(target, value);
                 }
             }
 
             ElementKind::Block(body) => {
                 self.enter();
+                body.items.iter().for_each(|item| self.resolve(item));
                 self.exit();
             }
 

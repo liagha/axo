@@ -3,25 +3,27 @@ use {
         scanner::Token,
         data::{Str, Scale},
         schema::{Enumeration, Method, Structure},
+        tracker::Span,
     }
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Type<'ty> {
     kind: TypeKind<'ty>,
+    pub span: Span<'ty>,
 }
 
 impl<'ty> Type<'ty> {
-    pub fn new(kind: TypeKind<'ty>) -> Self {
-        Self { kind }
+    pub fn new(kind: TypeKind<'ty>, span: Span<'ty>) -> Self {
+        Self { kind, span }
     }
 
-    pub fn unit() -> Self {
-        Self { kind: TypeKind::Tuple { items: Vec::new() }}
+    pub fn unit(span: Span<'ty>) -> Self {
+        Self::new(TypeKind::Tuple { items: Vec::new() }, span)
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'ty> {
     Integer { size: Scale },
     Float { size: Scale },

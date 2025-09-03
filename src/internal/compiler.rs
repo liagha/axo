@@ -5,7 +5,6 @@ use {
     crate::{
         data::Str,
         format::{format_tokens, Display, Debug, Show},
-        generator::{Backend, Generator},
         initial::Initializer,
         internal::platform::Path,
         parser::{Element, ElementKind, Parser, Symbol, Symbolic},
@@ -20,6 +19,9 @@ use {
     },
     broccli::{xprintln, Color},
 };
+
+#[cfg(feature = "generator")]
+use crate::generator::{Backend, Generator};
 
 pub struct Pipeline<'pipeline, T> {
     data: T,
@@ -506,6 +508,7 @@ impl<'resolver> Resolver<'resolver> {
     }
 }
 
+#[cfg(feature = "generator")]
 impl<'resolver, B: Backend<'resolver>> Generator<'resolver, B> {
     pub fn execute(&mut self, elements: Vec<Analysis<'resolver>>, logger: &CompileLogger) -> () {
         let mut timer = DefaultTimer::new_default();

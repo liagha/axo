@@ -9,6 +9,7 @@ use {
     }
 };
 use crate::resolver::analyzer::AnalyzeError;
+use crate::resolver::checker::{CheckError, Type};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
@@ -20,7 +21,10 @@ pub enum ErrorKind<'error> {
     },
     Analyze {
         error: AnalyzeError<'error>,
-    }
+    },
+    Check {
+        error: CheckError<'error>,
+    },
 }
 
 impl<'error> Display for ErrorKind<'error> {
@@ -33,7 +37,10 @@ impl<'error> Display for ErrorKind<'error> {
                 write!(f, "slots of `{:?}` aren't matched correctly.", candidate)
             }
             ErrorKind::Analyze { error } => {
-                write!(f, "{}", error)
+                write!(f, "{}", error.kind)
+            }
+            ErrorKind::Check { error } => {
+                write!(f, "{}", error.kind)
             }
         }
     }
