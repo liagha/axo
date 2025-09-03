@@ -176,11 +176,11 @@ impl<'resolver> Resolver<'resolver> {
 
         match kind {
             ElementKind::Assign(assign) => {
-                if let Some(symbol) = self.get(assign.get_target()) {
-                    self.resolve(assign.get_value());
+                if let Some(symbol) = self.get(&*assign.target) {
+                    self.resolve(&*assign.value);
 
                     let target = self.infer_symbol(symbol.clone());
-                    let value = self.infer_element(assign.get_value());
+                    let value = self.infer_element(&*assign.value);
 
                     self.check(target, value);
                 }
@@ -219,57 +219,57 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             ElementKind::Binary(binary) => {
-                self.resolve(binary.get_left());
-                self.resolve(binary.get_right());
+                self.resolve(&*binary.left);
+                self.resolve(&*binary.right);
             }
 
-            ElementKind::Unary(unary) => self.resolve(&unary.get_operand()),
+            ElementKind::Unary(unary) => self.resolve(&*unary.operand),
 
             ElementKind::Label(label) => {
-                self.resolve(label.get_label());
-                self.resolve(label.get_element());
+                self.resolve(&*label.label);
+                self.resolve(&*label.element);
             }
 
             ElementKind::Conditional(conditioned) => {
-                self.resolve(conditioned.get_condition());
+                self.resolve(&*conditioned.condition);
                 self.enter();
-                self.resolve(conditioned.get_then());
+                self.resolve(&*conditioned.then);
                 self.exit();
 
-                if let Some(alternate) = conditioned.get_alternate() {
+                if let Some(alternate) = conditioned.alternate {
                     self.enter();
-                    self.resolve(alternate);
+                    self.resolve(&*alternate);
                     self.exit();
                 }
             }
 
             ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.get_condition() {
-                    self.resolve(condition);
+                if let Some(condition) = repeat.condition {
+                    self.resolve(&*condition);
                 }
                 self.enter();
-                self.resolve(repeat.get_body());
+                self.resolve(&*repeat.body);
                 self.exit();
             }
 
             ElementKind::Cycle(walk) => {
-                self.resolve(walk.get_clause());
+                self.resolve(&*walk.clause);
 
                 let parent = replace(&mut self.scope, Scope::child());
                 self.scope.attach(parent);
 
                 self.enter();
-                self.resolve(walk.get_body());
+                self.resolve(&*walk.body);
                 self.exit();
             }
 
             ElementKind::Access(access) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-                let target = self.lookup(access.get_target(), &candidates);
+                let target = self.lookup(&*access.target, &candidates);
 
                 if let Some(target) = target {
                     let members = target.scope.all().iter().cloned().collect::<Vec<_>>();
-                    let member = self.lookup(access.get_member(), &members);
+                    let member = self.lookup(&*access.member, &members);
                 }
             }
 
@@ -307,18 +307,18 @@ impl<'resolver> Resolver<'resolver> {
             Symbolic::Extension(extension) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
                 
-                if let Some(mut target) = self.lookup(extension.get_target(), &candidates) {
-                    if let Some(extension) = extension.get_extension() {
-                        if let Some(found) = self.lookup(extension, &candidates) {
+                if let Some(mut target) = self.lookup(&*extension.target, &candidates) {
+                    if let Some(extension) = extension.extension {
+                        if let Some(found) = self.lookup(&*extension, &candidates) {
                             if let Symbolic::Structure(structure) = found.kind {
                                 self.scope.remove(&target);
-                                target.scope.symbols.extend(structure.get_fields().iter().cloned());
+                                target.scope.symbols.extend(structure.fields.iter().cloned());
                                 self.scope.add(target);
                             }
                         }
                     } else {
                         self.scope.remove(&target);
-                        target.scope.symbols.extend(extension.get_members().iter().cloned());
+                        target.scope.symbols.extend(extension.members.iter().cloned());
                         self.scope.add(target);
                     }
                 }

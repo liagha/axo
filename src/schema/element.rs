@@ -42,80 +42,70 @@ pub struct Block<Item> {
 
 #[derive(Debug, Eq)]
 pub struct Binary<Left, Operator, Right> {
-    left: Left,
-    operator: Operator,
-    right: Right,
+    pub left: Left,
+    pub operator: Operator,
+    pub right: Right,
 }
 
 #[derive(Debug, Eq)]
 pub struct Unary<Operator, Operand> {
-    operator: Operator,
-    operand: Operand,
+    pub operator: Operator,
+    pub operand: Operand,
 }
 
 #[derive(Debug, Eq)]
 pub struct Index<Target, Value> {
-    target: Target,
-    indexes: Vec<Value>,
+    pub target: Target,
+    pub indexes: Vec<Value>,
 }
 
 #[derive(Debug, Eq)]
 pub struct Invoke<Target, Argument> {
-    target: Target,
-    arguments: Vec<Argument>,
+    pub target: Target,
+    pub arguments: Vec<Argument>,
 }
 
 #[derive(Debug, Eq)]
 pub struct Conditional<Condition, Then, Alternate> {
-    condition: Condition,
-    then: Then,
-    alternate: Option<Alternate>,
+    pub condition: Condition,
+    pub then: Then,
+    pub alternate: Option<Alternate>,
 }
 
 #[derive(Debug, Eq)]
 pub struct While<Condition, Body> {
-    condition: Option<Condition>,
-    body: Body,
+    pub condition: Option<Condition>,
+    pub body: Body,
 }
 
 #[derive(Debug, Eq)]
 pub struct Cycle<Clause, Body> {
-    clause: Clause,
-    body: Body,
+    pub clause: Clause,
+    pub body: Body,
 }
 
 #[derive(Debug, Eq)]
 pub struct Label<Value, Element> {
-    label: Value,
-    element: Element,
+    pub label: Value,
+    pub element: Element,
 }
 
 #[derive(Debug, Eq)]
 pub struct Access<Target, Member> {
-    target: Target,
-    member: Member,
+    pub target: Target,
+    pub member: Member,
 }
 
 #[derive(Debug, Eq)]
 pub struct Assign<Target, Value> {
-    target: Target,
-    value: Value,
+    pub target: Target,
+    pub value: Value,
 }
 
 impl<Body> Procedural<Body> {
     #[inline]
     pub fn new(body: Body) -> Self {
         Procedural { body }
-    }
-
-    #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
-    }
-
-    #[inline]
-    pub fn get_body_mut(&mut self) -> &mut Body {
-        &mut self.body
     }
 }
 
@@ -124,44 +114,12 @@ impl<Item> Group<Item> {
     pub fn new(items: Vec<Item>) -> Self {
         Group { items }
     }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
 }
 
 impl<Item> Sequence<Item> {
     #[inline]
     pub fn new(items: Vec<Item>) -> Self {
         Sequence { items }
-    }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
     }
 }
 
@@ -170,44 +128,12 @@ impl<Item> Collection<Item> {
     pub fn new(items: Vec<Item>) -> Self {
         Collection { items }
     }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
 }
 
 impl<Item> Series<Item> {
     #[inline]
     pub fn new(items: Vec<Item>) -> Self {
         Series { items }
-    }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
     }
 }
 
@@ -216,22 +142,6 @@ impl<Item> Bundle<Item> {
     pub fn new(items: Vec<Item>) -> Self {
         Bundle { items }
     }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
 }
 
 impl<Item> Block<Item> {
@@ -239,43 +149,16 @@ impl<Item> Block<Item> {
     pub fn new(items: Vec<Item>) -> Self {
         Block { items }
     }
-    #[inline]
-    pub fn get(&self, index: Offset) -> Option<&Item> {
-        self.items.get(index)
-    }
-    #[inline]
-    pub fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.items.get_mut(index)
-    }
-    #[inline]
-    pub fn len(&self) -> Scale {
-        self.items.len()
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
 }
 
 impl<Left, Operator, Right> Binary<Left, Operator, Right> {
+    #[inline]
     pub fn new(left: Left, operator: Operator, right: Right) -> Self {
         Binary {
             left,
             operator,
             right,
         }
-    }
-    #[inline]
-    pub fn get_left(&self) -> &Left {
-        &self.left
-    }
-    #[inline]
-    pub fn get_right(&self) -> &Right {
-        &self.right
-    }
-    #[inline]
-    pub fn get_operator(&self) -> &Operator {
-        &self.operator
     }
 }
 
@@ -284,14 +167,6 @@ impl<Operator, Operand> Unary<Operator, Operand> {
     pub fn new(operator: Operator, operand: Operand) -> Self {
         Unary { operator, operand }
     }
-    #[inline]
-    pub fn get_operand(&self) -> &Operand {
-        &self.operand
-    }
-    #[inline]
-    pub fn get_operator(&self) -> &Operator {
-        &self.operator
-    }
 }
 
 impl<Target, Value> Index<Target, Value> {
@@ -299,36 +174,12 @@ impl<Target, Value> Index<Target, Value> {
     pub fn new(target: Target, indexes: Vec<Value>) -> Self {
         Index { target, indexes }
     }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-    #[inline]
-    pub fn get_indexes(&self) -> &Vec<Value> {
-        &self.indexes
-    }
-    #[inline]
-    pub fn get_index(&self, index: Offset) -> Option<&Value> {
-        self.indexes.get(index)
-    }
 }
 
 impl<Target, Argument> Invoke<Target, Argument> {
     #[inline]
     pub fn new(target: Target, arguments: Vec<Argument>) -> Self {
         Invoke { target, arguments }
-    }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-    #[inline]
-    pub fn get_arguments(&self) -> &Vec<Argument> {
-        &self.arguments
-    }
-    #[inline]
-    pub fn get_argument(&self, index: Offset) -> Option<&Argument> {
-        self.arguments.get(index)
     }
 }
 
@@ -341,32 +192,12 @@ impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
             alternate,
         }
     }
-    #[inline]
-    pub fn get_condition(&self) -> &Condition {
-        &self.condition
-    }
-    #[inline]
-    pub fn get_then(&self) -> &Then {
-        &self.then
-    }
-    #[inline]
-    pub fn get_alternate(&self) -> Option<&Alternate> {
-        self.alternate.as_ref()
-    }
 }
 
 impl<Condition, Body> While<Condition, Body> {
     #[inline]
     pub fn new(condition: Option<Condition>, body: Body) -> Self {
         While { condition, body }
-    }
-    #[inline]
-    pub fn get_condition(&self) -> Option<&Condition> {
-        self.condition.as_ref()
-    }
-    #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
     }
 }
 
@@ -375,28 +206,12 @@ impl<Clause, Body> Cycle<Clause, Body> {
     pub fn new(clause: Clause, body: Body) -> Self {
         Cycle { clause, body }
     }
-    #[inline]
-    pub fn get_clause(&self) -> &Clause {
-        &self.clause
-    }
-    #[inline]
-    pub fn get_body(&self) -> &Body {
-        &self.body
-    }
 }
 
 impl<Value, Element> Label<Value, Element> {
     #[inline]
     pub fn new(label: Value, element: Element) -> Self {
         Label { label, element }
-    }
-    #[inline]
-    pub fn get_label(&self) -> &Value {
-        &self.label
-    }
-    #[inline]
-    pub fn get_element(&self) -> &Element {
-        &self.element
     }
 }
 
@@ -405,28 +220,12 @@ impl<Target, Member> Access<Target, Member> {
     pub fn new(target: Target, member: Member) -> Self {
         Access { target, member }
     }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-    #[inline]
-    pub fn get_member(&self) -> &Member {
-        &self.member
-    }
 }
 
 impl<Target, Value> Assign<Target, Value> {
     #[inline]
     pub fn new(target: Target, value: Value) -> Self {
         Assign { target, value }
-    }
-    #[inline]
-    pub fn get_target(&self) -> &Target {
-        &self.target
-    }
-    #[inline]
-    pub fn get_value(&self) -> &Value {
-        &self.value
     }
 }
 
@@ -474,75 +273,75 @@ impl<Item: Hash> Hash for Block<Item> {
 
 impl<Left: Hash, Operator: Hash, Right: Hash> Hash for Binary<Left, Operator, Right> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_left().hash(state);
-        self.get_operator().hash(state);
-        self.get_right().hash(state);
+        self.left.hash(state);
+        self.operator.hash(state);
+        self.right.hash(state);
     }
 }
 
 impl<Operator: Hash, Operand: Hash> Hash for Unary<Operator, Operand> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_operator().hash(state);
-        self.get_operand().hash(state);
+        self.operator.hash(state);
+        self.operand.hash(state);
     }
 }
 
 impl<Target: Hash, Value: Hash> Hash for Index<Target, Value> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_indexes().hash(state);
+        self.target.hash(state);
+        self.indexes.hash(state);
     }
 }
 
 impl<Target: Hash, Argument: Hash> Hash for Invoke<Target, Argument> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_arguments().hash(state);
+        self.target.hash(state);
+        self.arguments.hash(state);
     }
 }
 
 impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
-    for Conditional<Condition, Then, Alternate>
+for Conditional<Condition, Then, Alternate>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_condition().hash(state);
-        self.get_then().hash(state);
-        self.get_alternate().hash(state);
+        self.condition.hash(state);
+        self.then.hash(state);
+        self.alternate.hash(state);
     }
 }
 
 impl<Condition: Hash, Body: Hash> Hash for While<Condition, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_condition().hash(state);
-        self.get_body().hash(state);
+        self.condition.hash(state);
+        self.body.hash(state);
     }
 }
 
 impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_clause().hash(state);
-        self.get_body().hash(state);
+        self.clause.hash(state);
+        self.body.hash(state);
     }
 }
 
 impl<Value: Hash, Element: Hash> Hash for Label<Value, Element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_label().hash(state);
-        self.get_element().hash(state);
+        self.label.hash(state);
+        self.element.hash(state);
     }
 }
 
 impl<Target: Hash, Member: Hash> Hash for Access<Target, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_member().hash(state);
+        self.target.hash(state);
+        self.member.hash(state);
     }
 }
 
 impl<Target: Hash, Value: Hash> Hash for Assign<Target, Value> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_target().hash(state);
-        self.get_value().hash(state);
+        self.target.hash(state);
+        self.value.hash(state);
     }
 }
 
@@ -589,70 +388,70 @@ impl<Item: PartialEq> PartialEq for Block<Item> {
 }
 
 impl<Left: PartialEq, Operator: PartialEq, Right: PartialEq> PartialEq
-    for Binary<Left, Operator, Right>
+for Binary<Left, Operator, Right>
 {
     fn eq(&self, other: &Self) -> bool {
-        self.get_left() == other.get_left()
-            && self.get_operator() == other.get_operator()
-            && self.get_right() == other.get_right()
+        self.left == other.left
+            && self.operator == other.operator
+            && self.right == other.right
     }
 }
 
 impl<Operator: PartialEq, Operand: PartialEq> PartialEq for Unary<Operator, Operand> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_operator() == other.get_operator() && self.get_operand() == other.get_operand()
+        self.operator == other.operator && self.operand == other.operand
     }
 }
 
 impl<Target: PartialEq, Value: PartialEq> PartialEq for Index<Target, Value> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_indexes() == other.get_indexes()
+        self.target == other.target && self.indexes == other.indexes
     }
 }
 
 impl<Target: PartialEq, Argument: PartialEq> PartialEq for Invoke<Target, Argument> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_arguments() == other.get_arguments()
+        self.target == other.target && self.arguments == other.arguments
     }
 }
 
 impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
-    for Conditional<Condition, Then, Alternate>
+for Conditional<Condition, Then, Alternate>
 {
     fn eq(&self, other: &Self) -> bool {
-        self.get_condition() == other.get_condition()
-            && self.get_then() == other.get_then()
-            && self.get_alternate() == other.get_alternate()
+        self.condition == other.condition
+            && self.then == other.then
+            && self.alternate == other.alternate
     }
 }
 
 impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_condition() == other.get_condition() && self.get_body() == other.get_body()
+        self.condition == other.condition && self.body == other.body
     }
 }
 
 impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_clause() == other.get_clause() && self.get_body() == other.get_body()
+        self.clause == other.clause && self.body == other.body
     }
 }
 
 impl<Value: PartialEq, Element: PartialEq> PartialEq for Label<Value, Element> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_label() == other.get_label() && self.get_element() == other.get_element()
+        self.label == other.label && self.element == other.element
     }
 }
 
 impl<Target: PartialEq, Member: PartialEq> PartialEq for Access<Target, Member> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_member() == other.get_member()
+        self.target == other.target && self.member == other.member
     }
 }
 
 impl<Target: PartialEq, Value: PartialEq> PartialEq for Assign<Target, Value> {
     fn eq(&self, other: &Self) -> bool {
-        self.get_target() == other.get_target() && self.get_value() == other.get_value()
+        self.target == other.target && self.value == other.value
     }
 }
 
@@ -701,69 +500,69 @@ impl<Item: Clone> Clone for Block<Item> {
 impl<Left: Clone, Operator: Clone, Right: Clone> Clone for Binary<Left, Operator, Right> {
     fn clone(&self) -> Self {
         Binary::new(
-            self.get_left().clone(),
-            self.get_operator().clone(),
-            self.get_right().clone(),
+            self.left.clone(),
+            self.operator.clone(),
+            self.right.clone(),
         )
     }
 }
 
 impl<Operator: Clone, Operand: Clone> Clone for Unary<Operator, Operand> {
     fn clone(&self) -> Self {
-        Unary::new(self.get_operator().clone(), self.get_operand().clone())
+        Unary::new(self.operator.clone(), self.operand.clone())
     }
 }
 
 impl<Target: Clone, Value: Clone> Clone for Index<Target, Value> {
     fn clone(&self) -> Self {
-        Index::new(self.get_target().clone(), self.get_indexes().clone())
+        Index::new(self.target.clone(), self.indexes.clone())
     }
 }
 
 impl<Target: Clone, Argument: Clone> Clone for Invoke<Target, Argument> {
     fn clone(&self) -> Self {
-        Invoke::new(self.get_target().clone(), self.get_arguments().clone())
+        Invoke::new(self.target.clone(), self.arguments.clone())
     }
 }
 
 impl<Condition: Clone, Then: Clone, Alternate: Clone> Clone
-    for Conditional<Condition, Then, Alternate>
+for Conditional<Condition, Then, Alternate>
 {
     fn clone(&self) -> Self {
         Conditional::new(
-            self.get_condition().clone(),
-            self.get_then().clone(),
-            self.get_alternate().cloned(),
+            self.condition.clone(),
+            self.then.clone(),
+            self.alternate.clone(),
         )
     }
 }
 
 impl<Condition: Clone, Body: Clone> Clone for While<Condition, Body> {
     fn clone(&self) -> Self {
-        While::new(self.get_condition().cloned(), self.get_body().clone())
+        While::new(self.condition.clone(), self.body.clone())
     }
 }
 
 impl<Clause: Clone, Body: Clone> Clone for Cycle<Clause, Body> {
     fn clone(&self) -> Self {
-        Cycle::new(self.get_clause().clone(), self.get_body().clone())
+        Cycle::new(self.clause.clone(), self.body.clone())
     }
 }
 
 impl<Value: Clone, Element: Clone> Clone for Label<Value, Element> {
     fn clone(&self) -> Self {
-        Label::new(self.get_label().clone(), self.get_element().clone())
+        Label::new(self.label.clone(), self.element.clone())
     }
 }
 
-impl<Object: Clone, Member: Clone> Clone for Access<Object, Member> {
+impl<Target: Clone, Member: Clone> Clone for Access<Target, Member> {
     fn clone(&self) -> Self {
-        Access::new(self.get_target().clone(), self.get_member().clone())
+        Access::new(self.target.clone(), self.member.clone())
     }
 }
 
 impl<Target: Clone, Value: Clone> Clone for Assign<Target, Value> {
     fn clone(&self) -> Self {
-        Assign::new(self.get_target().clone(), self.get_value().clone())
+        Assign::new(self.target.clone(), self.value.clone())
     }
 }

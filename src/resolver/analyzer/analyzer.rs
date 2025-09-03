@@ -25,11 +25,11 @@ impl<'analyzer> Resolver<'analyzer> {
             ElementKind::Bundle(_) => { unimplemented!() }
             ElementKind::Block(_) => { unimplemented!() }
             ElementKind::Unary(unary) => {
-                if let TokenKind::Operator(operator) = &unary.get_operator().kind {
+                if let TokenKind::Operator(operator) = &unary.operator.kind {
                     match operator.as_slice() {
                         [OperatorKind::Exclamation] => {
-                            let operand = self.analyze(*unary.get_operand().clone())?;
-                            let operator = unary.get_operator();
+                            let operand = self.analyze(*unary.operand.clone())?;
+                            let operator = &unary.operator;
 
                             if operand.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::LogicalNot(Box::new(operand))))
@@ -38,24 +38,24 @@ impl<'analyzer> Resolver<'analyzer> {
                             }
                         }
                         _ => {
-                            let operator = unary.get_operator();
+                            let operator = &unary.operator;
 
                             Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                         }
                     }
                 } else {
-                    let operator = unary.get_operator();
+                    let operator = &unary.operator;
 
                     Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                 }
             }
             ElementKind::Binary(binary) => {
-                if let TokenKind::Operator(operator) = &binary.get_operator().kind {
+                if let TokenKind::Operator(operator) = &binary.operator.kind {
                     match operator.as_slice() {
                         [OperatorKind::Plus] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Add(Box::new(left), Box::new(right))))
@@ -65,9 +65,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Minus] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Subtract(Box::new(left), Box::new(right))))
@@ -77,9 +77,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Star] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Multiply(Box::new(left), Box::new(right))))
@@ -89,9 +89,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Slash] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Divide(Box::new(left), Box::new(right))))
@@ -101,9 +101,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Percent] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Modulus(Box::new(left), Box::new(right))))
@@ -113,9 +113,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::LogicalAnd(Box::new(left), Box::new(right))))
@@ -125,9 +125,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::LogicalOr(Box::new(left), Box::new(right))))
@@ -137,9 +137,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Ampersand] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::BitwiseAnd(Box::new(left), Box::new(right))))
@@ -149,9 +149,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Pipe] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::BitwiseOr(Box::new(left), Box::new(right))))
@@ -161,9 +161,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Caret] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::BitwiseXOr(Box::new(left), Box::new(right))))
@@ -173,9 +173,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::ShiftLeft(Box::new(left), Box::new(right))))
@@ -185,9 +185,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::ShiftRight(Box::new(left), Box::new(right))))
@@ -197,9 +197,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Equal, OperatorKind::Equal] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Equal(Box::new(left), Box::new(right))))
@@ -209,9 +209,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::Exclamation, OperatorKind::Equal] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::NotEqual(Box::new(left), Box::new(right))))
@@ -221,9 +221,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::LeftAngle] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Less(Box::new(left), Box::new(right))))
@@ -233,9 +233,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::LeftAngle, OperatorKind::Equal] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::LessOrEqual(Box::new(left), Box::new(right))))
@@ -245,9 +245,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::RightAngle] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::Greater(Box::new(left), Box::new(right))))
@@ -257,9 +257,9 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                            let left = self.analyze(*binary.get_left().clone())?;
-                            let right = self.analyze(*binary.get_right().clone())?;
-                            let operator = binary.get_operator();
+                            let left = self.analyze(*binary.left.clone())?;
+                            let right = self.analyze(*binary.right.clone())?;
+                            let operator = &binary.operator;
 
                             if left.instruction.is_value() || right.instruction.is_value() {
                                 Ok(Analysis::new(Instruction::GreaterOrEqual(Box::new(left), Box::new(right))))
@@ -269,28 +269,28 @@ impl<'analyzer> Resolver<'analyzer> {
                         }
 
                         _ => {
-                            let operator = binary.get_operator();
+                            let operator = &binary.operator;
 
                             Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                         }
                     }
 
                 } else {
-                    let operator = binary.get_operator();
+                    let operator = &binary.operator;
 
                     Err(AnalyzeError::new(ErrorKind::InvalidOperation(operator.clone()), operator.span))
                 }
             }
             ElementKind::Label(_) => { unimplemented!() }
             ElementKind::Access(access) => { 
-                let left = self.analyze(*access.get_target().clone())?;
-                let right = self.analyze(*access.get_member().clone())?;
+                let left = self.analyze(*access.target.clone())?;
+                let right = self.analyze(*access.member.clone())?;
 
                 Ok(Analysis::new(Instruction::Access(Box::new(left), Box::new(right))))
             }
             ElementKind::Index(index) => { 
-                let target = self.analyze(*index.get_target().clone())?;
-                let index = self.analyze(index.get_index(0).unwrap().clone())?;
+                let target = self.analyze(*index.target.clone())?;
+                let index = self.analyze(index.indexes[0].clone())?;
                 
                 let analyzed = Index::new(
                     Box::new(target),
@@ -300,8 +300,8 @@ impl<'analyzer> Resolver<'analyzer> {
                 Ok(Analysis::new(Instruction::Index(analyzed)))
             }
             ElementKind::Invoke(invoke) => { 
-                let target = self.analyze(*invoke.get_target().clone())?;
-                let arguments : Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = invoke.get_arguments()
+                let target = self.analyze(*invoke.target.clone())?;
+                let arguments : Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = invoke.arguments
                     .iter().map(|argument| {
                     let analysis = self.analyze(argument.clone())?;
                     Ok(Box::new(analysis))
@@ -316,7 +316,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             ElementKind::Construct(constructor) => { 
                 let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = constructor
-                    .get_fields()
+                    .fields
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze(field.clone())?;
@@ -325,7 +325,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .collect();
 
                 let analyzed = Structure::new(
-                    Str::from(constructor.get_target().brand().unwrap().to_string()),
+                    Str::from(constructor.target.brand().unwrap().to_string()),
                     fields?,
                 );
 
@@ -338,8 +338,8 @@ impl<'analyzer> Resolver<'analyzer> {
                 self.analyze_symbol(symbol.clone())
             }
             ElementKind::Assign(assign) => {
-                let target = assign.get_target().brand().unwrap().to_string();
-                let value = self.analyze(*assign.get_value().clone())?;
+                let target = assign.target.brand().unwrap().to_string();
+                let value = self.analyze(*assign.value.clone())?;
 
                 Ok(Analysis::new(Instruction::Assign(Assign::new(Str::from(target), Box::new(value)))))
             }
@@ -394,18 +394,18 @@ impl<'analyzer> Resolver<'analyzer> {
             Symbolic::Inclusion(_) => { unimplemented!() }
             Symbolic::Extension(_) => { unimplemented!() }
             Symbolic::Binding(binding) => {
-                let value = self.analyze(*(binding.get_value().unwrap().clone()))?;
+                let value = self.analyze(*binding.clone().value.unwrap())?;
                 let analyzed = Binding::new(
-                    Str::from(binding.get_target().brand().unwrap().to_string()),
+                    Str::from(binding.target.brand().unwrap().to_string()),
                     Some(Box::new(value)),
                     None,
-                    binding.is_constant()
+                    binding.constant
                 );
                 Ok(Analysis::new(Instruction::Binding(analyzed)))
             }
             Symbolic::Structure(structure) => {
                 let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = structure
-                    .get_fields()
+                    .fields
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
@@ -414,7 +414,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .collect();
 
                 let analyzed = Structure::new(
-                    Str::from(structure.get_target().brand().unwrap().to_string()),
+                    Str::from(structure.target.brand().unwrap().to_string()),
                     fields?,
                 );
 
@@ -422,7 +422,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             Symbolic::Enumeration(enumeration) => {
                 let variants: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = enumeration
-                    .get_variants()
+                    .variants
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
@@ -431,7 +431,7 @@ impl<'analyzer> Resolver<'analyzer> {
                     .collect();
 
                 let analyzed = Enumeration::new(
-                    Str::from(enumeration.get_target().brand().unwrap().to_string()),
+                    Str::from(enumeration.target.brand().unwrap().to_string()),
                     variants?,
                 );
 
@@ -439,7 +439,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             Symbolic::Method(method) => {
                 let parameters: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = method
-                    .get_parameters()
+                    .parameters
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
@@ -447,15 +447,15 @@ impl<'analyzer> Resolver<'analyzer> {
                     })
                     .collect();
 
-                let body = self.analyze(*method.get_body().clone())?;
+                let body = self.analyze(*method.body.clone())?;
 
                 let output: Result<Option<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> =
-                    method.get_output().clone().map(|output| {
+                    method.output.clone().map(|output| {
                         self.analyze(*output).map(Box::new)
                     }).transpose();
 
                 let analyzed = Method::new(
-                    Str::from(method.get_target().brand().unwrap().to_string()),
+                    Str::from(method.target.brand().unwrap().to_string()),
                     parameters?,
                     Box::new(body),
                     output?,

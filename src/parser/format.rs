@@ -24,7 +24,7 @@ impl<'element> Debug for ElementKind<'element> {
                 write!(f, "{:?}", literal)
             },
             ElementKind::Procedural(procedural) => {
-                write!(f, "Procedural({:?})", procedural.get_body())
+                write!(f, "Procedural({:?})", procedural.body)
             }
             ElementKind::Series(series) => {
                 write!(f, "Series({:?})", series.items)
@@ -46,50 +46,50 @@ impl<'element> Debug for ElementKind<'element> {
             }
 
             ElementKind::Binary(binary) => {
-                write!(f, "Binary({:?} {:?} {:?})", binary.get_left(), binary.get_operator(), binary.get_right())
+                write!(f, "Binary({:?} {:?} {:?})", binary.left, binary.operator, binary.right)
             }
             ElementKind::Unary(unary) => {
-                write!(f, "Unary({:?} {:?})", unary.get_operator(), unary.get_operand())
+                write!(f, "Unary({:?} {:?})", unary.operator, unary.operand)
             },
 
             ElementKind::Label(label) => {
-                write!(f, "Labeled({:?}: {:?})", label.get_label(), label.get_element())
+                write!(f, "Labeled({:?}: {:?})", label.label, label.element)
             },
             ElementKind::Index(index) => {
-                write!(f, "Index({:?}[{:?}])", index.get_target(), index.get_indexes())
+                write!(f, "Index({:?}[{:?}])", index.target, index.indexes)
             },
             ElementKind::Invoke(invoke) => {
-                write!(f, "Invoke({:?}({:?}))", invoke.get_target(), invoke.get_arguments())
+                write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.arguments)
             },
             ElementKind::Access(access) => {
-                write!(f, "Access({:?}.{:?})", access.get_target(), access.get_member())
+                write!(f, "Access({:?}.{:?})", access.target, access.member)
             },
 
             ElementKind::Conditional(cond) => {
-                write!(f, "Conditional({:?} | Then: {:?}", cond.get_condition(), cond.get_then())?;
+                write!(f, "Conditional({:?} | Then: {:?}", cond.condition, cond.then)?;
 
-                if let Some(else_expr) = cond.get_alternate() {
+                if let Some(else_expr) = &cond.alternate {
                     write!(f, " | Else: {:?}", else_expr)?;
                 }
 
                 write!(f, ")")
             }
             ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.get_condition() {
-                    write!(f, "While({:?} | {:?})", condition, repeat.get_body())
+                if let Some(condition) = &repeat.condition {
+                    write!(f, "While({:?} | {:?})", condition, repeat.body)
                 } else {
-                    write!(f, "Loop({:?})", repeat.get_body())
+                    write!(f, "Loop({:?})", repeat.body)
                 }
             },
             ElementKind::Cycle(walk) => {
-                write!(f, "For({:?} in {:?})", walk.get_clause(), walk.get_body())
+                write!(f, "For({:?} in {:?})", walk.clause, walk.body)
             },
 
             ElementKind::Assign(assign) => {
-                write!(f, "Assignment({:?} = {:?})", assign.get_target(), assign.get_value())
+                write!(f, "Assignment({:?} = {:?})", assign.target, assign.value)
             },
             ElementKind::Construct(construct) => {
-                write!(f, "Constructor({:?} | {:?})", construct.get_target(), construct.get_fields())
+                write!(f, "Constructor({:?} | {:?})", construct.target, construct.fields)
             },
 
             ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),

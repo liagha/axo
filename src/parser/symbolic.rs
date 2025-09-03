@@ -41,13 +41,13 @@ pub enum Symbolic<'symbol> {
 impl<'symbol> Symbolic<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match self {
-            Symbolic::Inclusion(inclusion) => inclusion.get_target().clone().brand(),
-            Symbolic::Extension(extension) => extension.get_target().clone().brand(),
-            Symbolic::Binding(binding) => binding.get_target().clone().brand(),
-            Symbolic::Structure(structure) => structure.get_target().clone().brand(),
-            Symbolic::Enumeration(enumeration) => enumeration.get_target().clone().brand(),
-            Symbolic::Method(method) => method.get_target().clone().brand(),
-            Symbolic::Module(module) => module.get_target().brand().clone(),
+            Symbolic::Inclusion(inclusion) => inclusion.target.clone().brand(),
+            Symbolic::Extension(extension) => extension.target.clone().brand(),
+            Symbolic::Binding(binding) => binding.target.clone().brand(),
+            Symbolic::Structure(structure) => structure.target.clone().brand(),
+            Symbolic::Enumeration(enumeration) => enumeration.target.clone().brand(),
+            Symbolic::Method(method) => method.target.clone().brand(),
+            Symbolic::Module(module) => module.target.brand().clone(),
             Symbolic::Preference(preference) => Some(preference.target.clone()),
         }
     }
@@ -57,13 +57,13 @@ impl<'symbol> Element<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(literal.clone()),
-            ElementKind::Construct(construct) => construct.get_target().brand(),
-            ElementKind::Label(label) => label.get_label().brand(),
-            ElementKind::Index(index) => index.get_target().brand(),
-            ElementKind::Invoke(invoke) => invoke.get_target().brand(),
-            ElementKind::Access(access) => access.get_member().brand(),
+            ElementKind::Construct(construct) => construct.target.brand(),
+            ElementKind::Label(label) => label.label.brand(),
+            ElementKind::Index(index) => index.target.brand(),
+            ElementKind::Invoke(invoke) => invoke.target.brand(),
+            ElementKind::Access(access) => access.member.brand(),
             ElementKind::Symbolize(symbol) => symbol.brand(),
-            ElementKind::Assign(assign) => assign.get_target().brand(),
+            ElementKind::Assign(assign) => assign.target.brand(),
             _ => None,
         }
     }

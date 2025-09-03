@@ -203,10 +203,10 @@ impl<'parser> Parser<'parser> {
 
                 let symbol = match body.kind {
                     ElementKind::Assign(assign) => {
-                        if let ElementKind::Label(label) = assign.get_target().kind.clone() {
-                            Binding::new(label.get_label().clone(), Some(assign.get_value().clone()), Some(label.get_element().clone()), constant)
+                        if let ElementKind::Label(label) = assign.target.kind.clone() {
+                            Binding::new(label.label.clone(), Some(assign.value.clone()), Some(label.element.clone()), constant)
                         } else {
-                            Binding::new(assign.get_target().clone(), Some(assign.get_value().clone()), None, constant)
+                            Binding::new(assign.target.clone(), Some(assign.value.clone()), None, constant)
                         }
                     }
 

@@ -75,10 +75,10 @@ impl<'resolver> Resolver<'resolver> {
                 }
             }
             ElementKind::Unary(unary) => {
-                self.infer_element(unary.get_operand())
+                self.infer_element(&*unary.operand)
             }
             ElementKind::Binary(binary) => {
-                self.infer_element(binary.get_left())
+                self.infer_element(&*binary.left)
             }
             ElementKind::Label(_) => {
                 Type::unit(element.span)
@@ -94,8 +94,8 @@ impl<'resolver> Resolver<'resolver> {
             }
             ElementKind::Construct(construct) => {
                 let structure = Structure::new(
-                    Str::from(construct.get_target().brand().unwrap().to_string()),
-                    construct.get_fields().iter().map(|field| Box::new(self.infer_element(field))).collect::<Vec<_>>(),
+                    Str::from(construct.target.brand().unwrap().to_string()),
+                    construct.fields.iter().map(|field| Box::new(self.infer_element(field))).collect::<Vec<_>>(),
                 );
 
                 Type::new(TypeKind::Structure(structure), element.span)
@@ -136,13 +136,13 @@ impl<'resolver> Resolver<'resolver> {
                 Type::unit(symbol.span)
             }
             Symbolic::Binding(binding) => {
-                if let Some(annotation) = binding.get_annotation() {
+                if let Some(annotation) = &binding.annotation {
                     if let Some(ty) = self.get(annotation) {
                         self.infer_symbol(ty)
                     } else {
                         Type::unit(symbol.span)
                     }
-                } else if let Some(value) = binding.get_value() {
+                } else if let Some(value) = &binding.value {
                     self.infer_element(value)
                 } else {
                     Type::unit(symbol.span)
@@ -150,8 +150,8 @@ impl<'resolver> Resolver<'resolver> {
             }
             Symbolic::Structure(structure) => {
                 let structure = Structure::new(
-                    Str::from(structure.get_target().brand().unwrap().to_string()),
-                    structure.get_fields()
+                    Str::from(structure.target.brand().unwrap().to_string()),
+                    structure.fields
                         .iter()
                         .map(|field| {
                             Box::new(self.infer_symbol(field.clone()))

@@ -377,38 +377,38 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 self.builder.build_load(ptr.get_type(), *ptr, &identifier).unwrap()
             }
             Instruction::Assign(assign) => {
-                let value_result = self.generate_instruction(assign.get_value().instruction.clone(), function);
+                let value_result = self.generate_instruction(assign.value.instruction.clone(), function);
 
-                if let Some(ptr) = self.variables.get(assign.get_target()) {
+                if let Some(ptr) = self.variables.get(&assign.target) {
                     self.builder.build_store(*ptr, value_result);
                 } else {
                     let ptr = if value_result.is_int_value() {
-                        self.builder.build_alloca(self.context.i64_type(), &assign.get_target())
+                        self.builder.build_alloca(self.context.i64_type(), &assign.target)
                     } else if value_result.is_float_value() {
-                        self.builder.build_alloca(self.context.f64_type(), assign.get_target())
+                        self.builder.build_alloca(self.context.f64_type(), &*assign.target)
                     } else {
-                        self.builder.build_alloca(self.context.bool_type(), assign.get_target())
+                        self.builder.build_alloca(self.context.bool_type(), &*assign.target)
                     }.unwrap();
 
                     self.builder.build_store(ptr, value_result);
-                    self.variables.insert(*assign.get_target(), ptr);
+                    self.variables.insert(assign.target, ptr);
                 }
 
                 value_result
             }
             Instruction::Binding(binding) => {
-                let value = self.generate_instruction(binding.get_value().unwrap().instruction.clone(), function);
+                let value = self.generate_instruction(binding.value.unwrap().instruction.clone(), function);
 
                 let ptr = if value.is_int_value() {
-                    self.builder.build_alloca(self.context.i64_type(), &binding.get_target())
+                    self.builder.build_alloca(self.context.i64_type(), &binding.target)
                 } else if value.is_float_value() {
-                    self.builder.build_alloca(self.context.f64_type(), &binding.get_target())
+                    self.builder.build_alloca(self.context.f64_type(), &binding.target)
                 } else {
-                    self.builder.build_alloca(self.context.bool_type(), &binding.get_target())
+                    self.builder.build_alloca(self.context.bool_type(), &binding.target)
                 }.unwrap();
 
                 self.builder.build_store(ptr, value);
-                self.variables.insert(*binding.get_target(), ptr);
+                self.variables.insert(binding.target, ptr);
                 value
             }
             Instruction::Module(name, analyses) => {

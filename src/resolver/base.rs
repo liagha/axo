@@ -223,9 +223,9 @@ impl<'resolver> Resolver<'resolver> {
                 }
             }
             ElementKind::Unary(unary) => {
-                let operand = Box::new(self.desugar(*unary.get_operand().clone()));
+                let operand = Box::new(self.desugar(*unary.operand.clone()));
 
-                if let TokenKind::Operator(operator) = &unary.get_operator().kind {
+                if let TokenKind::Operator(operator) = &unary.operator.kind {
                     match operator.as_slice() {
                         [OperatorKind::Exclamation] => {
                             let member = Element::new(
@@ -258,53 +258,53 @@ impl<'resolver> Resolver<'resolver> {
                         }
                         _ => {
                             Element::new(
-                                ElementKind::Unary(Unary::new(unary.get_operator().clone(), operand)),
+                                ElementKind::Unary(Unary::new(unary.operator.clone(), operand)),
                                 element.span
                             )
                         }
                     }
                 } else {
                     Element::new(
-                        ElementKind::Unary(Unary::new(unary.get_operator().clone(), operand)),
+                        ElementKind::Unary(Unary::new(unary.operator.clone(), operand)),
                         element.span
                     )
                 }
             }
             ElementKind::Binary(binary) => {
-                let left = Box::new(self.desugar(*binary.get_left().clone()));
-                let right = Box::new(self.desugar(*binary.get_right().clone()));
+                let left = Box::new(self.desugar(*binary.left.clone()));
+                let right = Box::new(self.desugar(*binary.right.clone()));
                 Element::new(
-                    ElementKind::Binary(Binary::new(left, binary.get_operator().clone(), right)),
+                    ElementKind::Binary(Binary::new(left, binary.operator.clone(), right)),
                     element.span
                 )
             }
             ElementKind::Access(access) => {
-                let target = Box::new(self.desugar(*access.get_target().clone()));
-                let member = Box::new(self.desugar(*access.get_member().clone()));
+                let target = Box::new(self.desugar(*access.target.clone()));
+                let member = Box::new(self.desugar(*access.member.clone()));
                 Element::new(
                     ElementKind::Access(Access::new(target, member)),
                     element.span
                 )
             }
             ElementKind::Index(index) => {
-                let target = Box::new(self.desugar(*index.get_target().clone()));
-                let indexes = index.get_indexes().into_iter().map(|i| self.desugar(i.clone())).collect();
+                let target = Box::new(self.desugar(*index.target.clone()));
+                let indexes = index.indexes.into_iter().map(|i| self.desugar(i.clone())).collect();
                 Element::new(
                     ElementKind::Index(Index::new(target, indexes)),
                     element.span
                 )
             }
             ElementKind::Invoke(invoke) => {
-                let target = Box::new(self.desugar(*invoke.get_target().clone()));
-                let arguments = invoke.get_arguments().into_iter().map(|a| self.desugar(a.clone())).collect();
+                let target = Box::new(self.desugar(*invoke.target.clone()));
+                let arguments = invoke.arguments.into_iter().map(|a| self.desugar(a.clone())).collect();
                 Element::new(
                     ElementKind::Invoke(Invoke::new(target, arguments)),
                     element.span
                 )
             }
             ElementKind::Construct(construct) => {
-                let target = Box::new(self.desugar(*construct.get_target().clone()));
-                let fields = construct.get_fields().into_iter().map(|f| self.desugar(f.clone())).collect();
+                let target = Box::new(self.desugar(*construct.target.clone()));
+                let fields = construct.fields.into_iter().map(|f| self.desugar(f.clone())).collect();
                 Element::new(
                     ElementKind::Construct(Structure::new(target, fields)),
                     element.span
@@ -353,41 +353,41 @@ impl<'resolver> Resolver<'resolver> {
                 )
             }
             ElementKind::Label(label) => {
-                let label_val = Box::new(self.desugar(*label.get_label().clone()));
-                let element_val = Box::new(self.desugar(*label.get_element().clone()));
+                let label_val = Box::new(self.desugar(*label.label.clone()));
+                let element_val = Box::new(self.desugar(*label.element.clone()));
                 Element::new(
                     ElementKind::Label(Label::new(label_val, element_val)),
                     element.span
                 )
             }
             ElementKind::Assign(assign) => {
-                let target = Box::new(self.desugar(*assign.get_target().clone()));
-                let value = Box::new(self.desugar(*assign.get_value().clone()));
+                let target = Box::new(self.desugar(*assign.target.clone()));
+                let value = Box::new(self.desugar(*assign.value.clone()));
                 Element::new(
                     ElementKind::Assign(Assign::new(target, value)),
                     element.span
                 )
             }
             ElementKind::Conditional(conditional) => {
-                let condition = Box::new(self.desugar(*conditional.get_condition().clone()));
-                let then = Box::new(self.desugar(*conditional.get_then().clone()));
-                let alternate = conditional.get_alternate().map(|a| Box::new(self.desugar(*a.clone())));
+                let condition = Box::new(self.desugar(*conditional.condition.clone()));
+                let then = Box::new(self.desugar(*conditional.then.clone()));
+                let alternate = conditional.alternate.map(|a| Box::new(self.desugar(*a.clone())));
                 Element::new(
                     ElementKind::Conditional(Conditional::new(condition, then, alternate)),
                     element.span
                 )
             }
             ElementKind::While(repeat) => {
-                let condition = repeat.get_condition().map(|c| Box::new(self.desugar(*c.clone())));
-                let body = Box::new(self.desugar(*repeat.get_body().clone()));
+                let condition = repeat.condition.map(|c| Box::new(self.desugar(*c.clone())));
+                let body = Box::new(self.desugar(*repeat.body.clone()));
                 Element::new(
                     ElementKind::While(While::new(condition, body)),
                     element.span
                 )
             }
             ElementKind::Cycle(cycle) => {
-                let clause = Box::new(self.desugar(*cycle.get_clause().clone()));
-                let body = Box::new(self.desugar(*cycle.get_body().clone()));
+                let clause = Box::new(self.desugar(*cycle.clause.clone()));
+                let body = Box::new(self.desugar(*cycle.body.clone()));
                 Element::new(
                     ElementKind::Cycle(Cycle::new(clause, body)),
                     element.span
@@ -405,8 +405,38 @@ impl<'resolver> Resolver<'resolver> {
                 let value = value.map(|v| Box::new(self.desugar(*v)));
                 Element::new(ElementKind::Continue(value), element.span)
             }
-            ElementKind::Symbolize(_) => {
-                element
+            ElementKind::Symbolize(mut symbol) => {
+                match &mut symbol.kind {
+                    Symbolic::Inclusion(inclusion) => {
+                        *inclusion.target = self.desugar(*inclusion.target.clone());
+                    }
+                    Symbolic::Extension(extension) => {}
+                    Symbolic::Binding(binding) => {
+                        if let Some(value) = &binding.value {
+                            binding.value = Some(Box::new(self.desugar(*value.clone())));
+                        }
+                    }
+                    Symbolic::Structure(_) => {
+
+                    }
+                    Symbolic::Enumeration(_) => {
+
+                    }
+                    Symbolic::Method(_) => {
+
+                    }
+                    Symbolic::Module(_) => {
+
+                    }
+                    Symbolic::Preference(_) => {
+
+                    }
+                }
+
+                Element::new(
+                    ElementKind::Symbolize(symbol.clone()),
+                    element.span.clone()
+                )
             }
             ElementKind::Procedural(procedural) => {
                 let body = Box::new(self.desugar(*procedural.body));

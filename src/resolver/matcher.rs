@@ -183,12 +183,12 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 if let Symbolic::Method(method) = candidate.kind {
                     score += self.shaping;
 
-                    if invoke.get_arguments().len() == method.get_parameters().len() {
+                    if invoke.arguments.len() == method.parameters.len() {
                         score += self.binding;
                     } else {
                         return Err(
                             ResolveError {
-                                kind: ErrorKind::BindMismatch { candidate: method.get_target().brand().unwrap() },
+                                kind: ErrorKind::BindMismatch { candidate: method.target.brand().unwrap() },
                                 span: query.span.clone(),
                                 hints: Vec::new(),
                             }
@@ -200,12 +200,12 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 if let Symbolic::Structure(structure) = candidate.kind {
                     score += self.shaping;
 
-                    if construct.get_fields().len() == structure.get_fields().len() {
+                    if construct.fields.len() == structure.fields.len() {
                         score += self.binding;
                     } else {
                         return Err(
                             ResolveError {
-                                kind: ErrorKind::BindMismatch { candidate: structure.get_target().brand().unwrap() },
+                                kind: ErrorKind::BindMismatch { candidate: structure.target.brand().unwrap() },
                                 span: query.span.clone(),
                                 hints: Vec::new(),
                             }
