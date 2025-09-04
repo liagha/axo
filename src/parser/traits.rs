@@ -175,7 +175,18 @@ impl<'symbol> Debug for SymbolKind<'symbol> {
                 write!(f, "Enumeration({:?} {:?})", enumeration.target, enumeration.members)
             }
             SymbolKind::Method(method) => {
-                write!(f, "Method({:?} {:?} -> {:?} : {:?})", method.target, method.members, method.output, method.body)
+                write!(
+                    f,
+                    "Method({:?} {:?}{} -> {:?} : {:?})",
+                    method.target,
+                    method.members,
+                    if method.variadic {
+                        "..."
+                    } else {
+                        ""
+                    },
+                    method.output,
+                    method.body)
             }
             SymbolKind::Module(module) => {
                 write!(f, "Module({:?})", module)

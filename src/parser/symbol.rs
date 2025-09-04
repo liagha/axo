@@ -264,9 +264,9 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::literal(),
-                Self::group(Classifier::deferred(||
+                Self::group(
                     Classifier::alternative([
-                        Self::symbolization(),
+                        Classifier::deferred(Self::symbolization),
                         Classifier::literal(
                             Token::new(
                                 TokenKind::Operator(
@@ -281,8 +281,7 @@ impl<'parser> Parser<'parser> {
                                 Span::void(),
                             )
                         )
-                    ])
-                )),
+                    ])),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {

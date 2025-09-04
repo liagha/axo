@@ -64,7 +64,7 @@ impl<'backend> Inkwell<'backend> {
         let printf = module.add_function("printf", printf_type, Some(inkwell::module::Linkage::External));
 
         let mut functions = Map::new();
-        functions.insert(Str::from("print"), printf);
+        functions.insert(Str::from("printf"), printf);
 
         Self {
             context,
@@ -75,6 +75,16 @@ impl<'backend> Inkwell<'backend> {
             functions,
             print: printf,
         }
+    }
+
+    fn create_format_string(&self, format: &str) -> PointerValue<'backend> {
+        let format_str = self.context.const_string(format.as_bytes(), true);
+        let global = self.module.add_global(format_str.get_type(), Some(AddressSpace::default()), "format_str");
+        global.set_initializer(&format_str);
+        global.set_constant(true);
+
+        // Get pointer to the global string
+        self.builder.build_global_string_ptr(format, "format_str_ptr").unwrap().as_pointer_value()
     }
 }
 
@@ -566,87 +576,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 // Store the function in our functions map IMMEDIATELY
                 self.functions.insert(method.target.clone(), func);
 
-                // Handle special case for print function
-                if func_name == "print" {
-                    let basic_block = self.context.append_basic_block(func, "entry");
-
-                    // Save current builder position
-                    let current_bb = self.builder.get_insert_block();
-
-                    self.builder.position_at_end(basic_block);
-
-                    if !param_types.is_empty() {
-                        let value_param = func.get_nth_param(0).unwrap();
-
-                        // Determine format string based on parameter type
-                        let format_str = if param_types[0].is_int_type() {
-                            "%lld\n"
-                        } else if param_types[0].is_float_type() {
-                            "%f\n"
-                        } else {
-                            "%d\n"
-                        };
-
-                        let format_global = self.builder.build_global_string_ptr(format_str, "fmt")
-                            .expect("Failed to build global string");
-                        let args: Vec<BasicMetadataValueEnum> = vec![
-                            format_global.as_pointer_value().into(),
-                            value_param.into()
-                        ];
-
-                        self.builder.build_call(self.print, &args, "print_call");
-                    }
-
-                    self.builder.build_return(None);
-
-                    // Restore builder position if we had one
-                    if let Some(bb) = current_bb {
-                        self.builder.position_at_end(bb);
-                    }
-                } else {
-                    // Handle other methods normally
-                    if let Instruction::Block(block) = &method.body.instruction {
-                        let basic_block = self.context.append_basic_block(func, "entry");
-
-                        // Save current builder position
-                        let current_bb = self.builder.get_insert_block();
-
-                        self.builder.position_at_end(basic_block);
-
-                        // Set up parameters
-                        let mut i = 0;
-                        for param in &method.members {
-                            if let Instruction::Binding(bind) = &param.instruction {
-                                if let Some(param_val) = func.get_nth_param(i) {
-                                    let alloca_ty = param_val.get_type();
-                                    let ptr = self.builder.build_alloca(alloca_ty, &bind.target).unwrap();
-                                    self.builder.build_store(ptr, param_val);
-                                    self.variables.insert(bind.target.clone(), ptr);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        // Generate method body
-                        let mut last_value = self.context.i64_type().const_zero().into();
-                        for item in &block.items {
-                            last_value = self.generate_instruction(item.instruction.clone(), func);
-                        }
-
-                        // Return
-                        if ret_ty.is_void_type() {
-                            self.builder.build_return(None);
-                        } else {
-                            self.builder.build_return(Some(&last_value));
-                        }
-
-                        // Restore builder position
-                        if let Some(bb) = current_bb {
-                            self.builder.position_at_end(bb);
-                        }
-                    }
-                }
-
                 self.context.i64_type().const_zero().into()
             }
 
@@ -655,14 +584,53 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                     let func_opt = self.functions.get(func_name).cloned();
 
                     if let Some(func) = func_opt {
-                        let mut args = vec![];
-                        for arg in &invoke.arguments {
-                            let arg_val = self.generate_instruction(arg.instruction.clone(), function);
-                            args.push(arg_val.into());
-                        }
+                        // Special handling for printf
+                        if func_name.as_str().unwrap() == "printf" {
+                            let mut args = vec![];
 
-                        let result = self.builder.build_call(func, &args, "call").unwrap();
-                        result.try_as_basic_value().left().unwrap_or(self.context.i64_type().const_zero().into())
+                            if !invoke.arguments.is_empty() {
+                                let first_arg = self.generate_instruction(invoke.arguments[0].instruction.clone(), function);
+
+                                // Create appropriate format string based on argument type
+                                let format_str = if first_arg.is_int_value() {
+                                    "%d\n"
+                                } else if first_arg.is_float_value() {
+                                    "%f\n"
+                                } else {
+                                    "%s\n"
+                                };
+
+                                // Create format string pointer
+                                let format_ptr = self.builder.build_global_string_ptr(format_str, "format_str").unwrap().as_pointer_value();
+                                args.push(BasicMetadataValueEnum::from(format_ptr));
+
+                                // Add the actual argument
+                                args.push(BasicMetadataValueEnum::from(first_arg));
+
+                                // Add any additional arguments
+                                for arg in invoke.arguments.iter().skip(1) {
+                                    let arg_val = self.generate_instruction(arg.instruction.clone(), function);
+                                    args.push(BasicMetadataValueEnum::from(arg_val));
+                                }
+                            } else {
+                                // No arguments, just print newline
+                                let format_ptr = self.builder.build_global_string_ptr("\n", "format_str").unwrap().as_pointer_value();
+                                args.push(BasicMetadataValueEnum::from(format_ptr));
+                            }
+
+                            let result = self.builder.build_call(func, &args, "printf_call").unwrap();
+                            result.try_as_basic_value().left().unwrap_or(self.context.i32_type().const_zero().into())
+                        } else {
+                            // Handle other function calls normally
+                            let mut args = vec![];
+                            for arg in &invoke.arguments {
+                                let arg_val = self.generate_instruction(arg.instruction.clone(), function);
+                                args.push(arg_val.into());
+                            }
+
+                            let result = self.builder.build_call(func, &args, "call").unwrap();
+                            result.try_as_basic_value().left().unwrap_or(self.context.i64_type().const_zero().into())
+                        }
                     } else {
                         self.context.i64_type().const_zero().into()
                     }

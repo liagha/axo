@@ -1,1 +1,5 @@
-print(3)
+var x = 4
+
+x = 4 + 44
+
+printf(x)
