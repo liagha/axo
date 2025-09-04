@@ -28,19 +28,19 @@ pub struct Binding<Target, Value, Type> {
 #[derive(Debug, Eq)]
 pub struct Structure<Target, Field> {
     pub target: Target,
-    pub fields: Vec<Field>,
+    pub members: Vec<Field>,
 }
 
 #[derive(Debug, Eq)]
 pub struct Enumeration<Target, Variant> {
     pub target: Target,
-    pub variants: Vec<Variant>,
+    pub members: Vec<Variant>,
 }
 
 #[derive(Debug, Eq)]
 pub struct Method<Target, Parameter, Body, Output> {
     pub target: Target,
-    pub parameters: Vec<Parameter>,
+    pub members: Vec<Parameter>,
     pub body: Body,
     pub output: Output,
 }
@@ -74,21 +74,21 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
 impl<Target, Field> Structure<Target, Field> {
     #[inline]
     pub fn new(target: Target, fields: Vec<Field>) -> Self {
-        Structure { target, fields }
+        Structure { target, members: fields }
     }
 }
 
 impl<Target, Variant> Enumeration<Target, Variant> {
     #[inline]
     pub fn new(target: Target, variants: Vec<Variant>) -> Self {
-        Enumeration { target, variants }
+        Enumeration { target, members: variants }
     }
 }
 
 impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     #[inline]
     pub fn new(target: Target, parameters: Vec<Parameter>, body: Body, output: Output) -> Self {
-        Method { target, parameters, body, output }
+        Method { target, members: parameters, body, output }
     }
 }
 
@@ -124,21 +124,21 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
 impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.fields.hash(state);
+        self.members.hash(state);
     }
 }
 
 impl<Target: Hash, Variant: Hash> Hash for Enumeration<Target, Variant> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.variants.hash(state);
+        self.members.hash(state);
     }
 }
 
 impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash for Method<Target, Parameter, Body, Output> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.parameters.hash(state);
+        self.members.hash(state);
         self.body.hash(state);
         self.output.hash(state);
     }
@@ -173,20 +173,20 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq for Binding
 
 impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field> {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.fields == other.fields
+        self.target == other.target && self.members == other.members
     }
 }
 
 impl<Target: PartialEq, Variant: PartialEq> PartialEq for Enumeration<Target, Variant> {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.variants == other.variants
+        self.target == other.target && self.members == other.members
     }
 }
 
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq for Method<Target, Parameter, Body, Output> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
-            && self.parameters == other.parameters
+            && self.members == other.members
             && self.body == other.body
             && self.output == other.output
     }
@@ -223,13 +223,13 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
 
 impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
     fn clone(&self) -> Self {
-        Structure::new(self.target.clone(), self.fields.clone())
+        Structure::new(self.target.clone(), self.members.clone())
     }
 }
 
 impl<Target: Clone, Variant: Clone> Clone for Enumeration<Target, Variant> {
     fn clone(&self) -> Self {
-        Enumeration::new(self.target.clone(), self.variants.clone())
+        Enumeration::new(self.target.clone(), self.members.clone())
     }
 }
 
@@ -237,7 +237,7 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Meth
     fn clone(&self) -> Self {
         Method::new(
             self.target.clone(),
-            self.parameters.clone(),
+            self.members.clone(),
             self.body.clone(),
             self.output.clone()
         )

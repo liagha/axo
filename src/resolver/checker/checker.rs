@@ -95,7 +95,7 @@ impl<'resolver> Resolver<'resolver> {
             ElementKind::Construct(construct) => {
                 let structure = Structure::new(
                     Str::from(construct.target.brand().unwrap().to_string()),
-                    construct.fields.iter().map(|field| Box::new(self.infer_element(field))).collect::<Vec<_>>(),
+                    construct.members.iter().map(|field| Box::new(self.infer_element(field))).collect::<Vec<_>>(),
                 );
 
                 Type::new(TypeKind::Structure(structure), element.span)
@@ -151,7 +151,7 @@ impl<'resolver> Resolver<'resolver> {
             Symbolic::Structure(structure) => {
                 let structure = Structure::new(
                     Str::from(structure.target.brand().unwrap().to_string()),
-                    structure.fields
+                    structure.members
                         .iter()
                         .map(|field| {
                             Box::new(self.infer_symbol(field.clone()))

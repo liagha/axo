@@ -2,7 +2,6 @@ mod core;
 mod delimited;
 mod element;
 pub mod error;
-mod format;
 mod parser;
 mod statement;
 mod symbol;

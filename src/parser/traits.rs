@@ -1,16 +1,191 @@
+use std::fmt::Display;
 use {
     super::{
         Element, ElementKind,
+        Symbol, Symbolic,
     },
 
     crate::{
         data::memory::discriminant,
+        format::{self, Debug, Formatter},
         internal::hash::{
             Hash, Hasher
         },
         tracker::{Span, Spanned},
     },
 };
+
+impl<'element> Debug for Element<'element> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} | {:#?}", self.kind, self.span)
+    }
+}
+
+impl<'element> Debug for ElementKind<'element> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ElementKind::Literal(literal) => {
+                write!(f, "{:?}", literal)
+            },
+            ElementKind::Procedural(procedural) => {
+                write!(f, "Procedural({:?})", procedural.body)
+            }
+            ElementKind::Series(series) => {
+                write!(f, "Series({:?})", series.items)
+            }
+            ElementKind::Collection(collection) => {
+                write!(f, "Collection({:?})", collection.items)
+            },
+            ElementKind::Group(group) => {
+                write!(f, "Group({:?})", group.items)
+            },
+            ElementKind::Sequence(sequence) => {
+                write!(f, "Sequence({:?})", sequence.items)
+            }
+            ElementKind::Bundle(bundle) => {
+                write!(f, "Bundle({:?})", bundle.items)
+            },
+            ElementKind::Block(block) => {
+                write!(f, "Block({:#?})", block.items)
+            }
+
+            ElementKind::Binary(binary) => {
+                write!(f, "Binary({:?} {:?} {:?})", binary.left, binary.operator, binary.right)
+            }
+            ElementKind::Unary(unary) => {
+                write!(f, "Unary({:?} {:?})", unary.operator, unary.operand)
+            },
+
+            ElementKind::Label(label) => {
+                write!(f, "Labeled({:?}: {:?})", label.label, label.element)
+            },
+            ElementKind::Index(index) => {
+                write!(f, "Index({:?}[{:?}])", index.target, index.indexes)
+            },
+            ElementKind::Invoke(invoke) => {
+                write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.arguments)
+            },
+            ElementKind::Access(access) => {
+                write!(f, "Access({:?}.{:?})", access.target, access.member)
+            },
+
+            ElementKind::Conditional(cond) => {
+                write!(f, "Conditional({:?} | Then: {:?}", cond.condition, cond.then)?;
+
+                if let Some(else_expr) = &cond.alternate {
+                    write!(f, " | Else: {:?}", else_expr)?;
+                }
+
+                write!(f, ")")
+            }
+            ElementKind::While(repeat) => {
+                if let Some(condition) = &repeat.condition {
+                    write!(f, "While({:?} | {:?})", condition, repeat.body)
+                } else {
+                    write!(f, "Loop({:?})", repeat.body)
+                }
+            },
+            ElementKind::Cycle(walk) => {
+                write!(f, "For({:?} in {:?})", walk.clause, walk.body)
+            },
+
+            ElementKind::Assign(assign) => {
+                write!(f, "Assignment({:?} = {:?})", assign.target, assign.value)
+            },
+            ElementKind::Construct(construct) => {
+                write!(f, "Constructor({:?} | {:?})", construct.target, construct.members)
+            },
+
+            ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),
+
+            ElementKind::Return(element) => {
+                write!(f, "Return")?;
+
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
+                }
+
+                Ok(())
+            }
+            ElementKind::Break(element) => {
+                write!(f, "Break")?;
+
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
+                }
+
+                Ok(())
+            }
+            ElementKind::Continue(element) => {
+                write!(f, "Continue")?;
+
+                if let Some(element) = element {
+                    write!(f, "({:?})", element)?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<'symbol> Debug for Symbol<'symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
+}
+
+impl<'symbol> Debug for Symbolic<'symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbolic::Inclusion(inclusion) => {
+                write!(f, "Inclusion({:?})", inclusion.target)
+            }
+            Symbolic::Extension(extension) => {
+                write!(f, "Extension(")?;
+
+                if let Some(extension) = &extension.extension {
+                    write!(f, "{:?}, ", extension)?;
+                }
+
+                write!(f, "{:?}, {:?})", extension.target, extension.members)
+            }
+            Symbolic::Binding(binding) => {
+                write!(
+                    f,
+                    "Binding({} {:?}",
+                    if binding.constant { "Constant" } else { "Variable" },
+                    binding.target
+                )?;
+
+                if let Some(annotation) = &binding.annotation {
+                    write!(f, " : {:?}", annotation)?;
+                }
+
+                if let Some(value) = &binding.value {
+                    write!(f, " = {:?}", value)?;
+                }
+
+                write!(f, ")")
+            }
+            Symbolic::Structure(structure) => {
+                write!(f, "Structure({:?} {:?})", structure.target, structure.members)
+            }
+            Symbolic::Enumeration(enumeration) => {
+                write!(f, "Enumeration({:?} {:?})", enumeration.target, enumeration.members)
+            }
+            Symbolic::Method(method) => {
+                write!(f, "Method({:?} {:?} -> {:?} : {:?})", method.target, method.members, method.output, method.body)
+            }
+            Symbolic::Module(module) => {
+                write!(f, "Module({:?})", module)
+            }
+            Symbolic::Preference(preference) => {
+                write!(f, "Preference({:?}, {:?})", preference.target, preference.value)
+            }
+        }
+    }
+}
 
 impl<'element> Hash for Element<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -227,3 +402,33 @@ impl<'element> Clone for ElementKind<'element> {
 impl<'element> Eq for Element<'element> {}
 
 impl<'element> Eq for ElementKind<'element> {}
+
+impl<'symbol> Clone for Symbol<'symbol> {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind.clone(),
+            span: self.span.clone(),
+            scope: self.scope.clone(),
+        }
+    }
+}
+
+impl<'symbol> Display for Symbol<'symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl<'symbol> Eq for Symbol<'symbol> {}
+
+impl<'symbol> PartialEq for Symbol<'symbol> {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
+impl<'symbol> Hash for Symbol<'symbol> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
+    }
+}

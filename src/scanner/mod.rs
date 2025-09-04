@@ -1,7 +1,6 @@
 mod character;
 mod core;
 mod escape;
-mod format;
 mod number;
 mod operator;
 mod punctuation;

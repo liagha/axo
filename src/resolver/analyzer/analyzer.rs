@@ -316,7 +316,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             ElementKind::Construct(constructor) => { 
                 let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = constructor
-                    .fields
+                    .members
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze(field.clone())?;
@@ -405,7 +405,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             Symbolic::Structure(structure) => {
                 let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = structure
-                    .fields
+                    .members
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
@@ -422,7 +422,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             Symbolic::Enumeration(enumeration) => {
                 let variants: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = enumeration
-                    .variants
+                    .members
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;
@@ -439,7 +439,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             Symbolic::Method(method) => {
                 let parameters: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = method
-                    .parameters
+                    .members
                     .iter()
                     .map(|field| {
                         let analysis = self.analyze_symbol(field.clone())?;

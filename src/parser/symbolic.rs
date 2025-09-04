@@ -26,7 +26,7 @@ use {
     }
 };
 
-#[derive(Clone, Debug, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub enum Symbolic<'symbol> {
     Inclusion(Inclusion<Box<Element<'symbol>>>),
     Extension(Extension<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>>),

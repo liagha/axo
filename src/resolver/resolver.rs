@@ -174,6 +174,8 @@ impl<'resolver> Resolver<'resolver> {
     pub fn resolve(&mut self, element: &Element<'resolver>) {
         let Element { kind, .. } = self.desugar(element.clone());
 
+        println!("Desugared: {:?}", kind);
+
         match kind {
             ElementKind::Assign(assign) => {
                 if let Some(symbol) = self.get(&*assign.target) {
@@ -312,7 +314,7 @@ impl<'resolver> Resolver<'resolver> {
                         if let Some(found) = self.lookup(&*extension, &candidates) {
                             if let Symbolic::Structure(structure) = found.kind {
                                 self.scope.remove(&target);
-                                target.scope.symbols.extend(structure.fields.iter().cloned());
+                                target.scope.symbols.extend(structure.members.iter().cloned());
                                 self.scope.add(target);
                             }
                         }

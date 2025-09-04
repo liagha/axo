@@ -1,4 +1,4 @@
-mod format;
+mod traits;
 pub mod classifier;
 pub mod form;
 pub mod former;

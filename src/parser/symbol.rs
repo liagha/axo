@@ -65,48 +65,6 @@ impl<'symbol> Symbol<'symbol> {
     }
 }
 
-impl<'symbol> Clone for Symbol<'symbol> {
-    fn clone(&self) -> Self {
-        Self {
-            kind: self.kind.clone(),
-            span: self.span.clone(),
-            scope: self.scope.clone(),
-        }
-    }
-}
-
-impl<'symbol> Debug for Symbol<'symbol> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
-        write!(f, "{:?}", self.kind)?;
-
-        if !self.scope.empty() {
-            write!(f, "\n{}", self.scope.symbols.indent())
-        } else {
-            write!(f, "")
-        }
-    }
-}
-
-impl<'symbol> Display for Symbol<'symbol> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl<'symbol> Eq for Symbol<'symbol> {}
-
-impl<'symbol> PartialEq for Symbol<'symbol> {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
-    }
-}
-
-impl<'symbol> Hash for Symbol<'symbol> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
-    }
-}
-
 impl<'parser> Parser<'parser> {
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
