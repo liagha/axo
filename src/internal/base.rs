@@ -199,9 +199,133 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
         Span::void()
     );
 
-    [
+    let boolean = Symbol::new(
+        Symbolic::Structure(
+            Structure::new(
+                Box::new(
+                    Element::new(
+                        ElementKind::Literal(
+                            Token::new(
+                                TokenKind::Identifier(Str::from("Boolean")),
+                                Span::void(),
+                            ),
+                        ),
+                        Span::void()
+                    ),
+                ),
+                vec![
+                    Symbol::new(
+                        Symbolic::Binding(
+                            Binding::new(
+                                Box::new(
+                                    Element::new(
+                                        ElementKind::Literal(
+                                            Token::new(
+                                                TokenKind::Identifier(Str::from("value")),
+                                                Span::void(),
+                                            ),
+                                        ),
+                                        Span::void()
+                                    ),
+                                ),
+                                None,
+                                Some(
+                                    Box::new(
+                                        Element::new(
+                                            ElementKind::Literal(
+                                                Token::new(
+                                                    TokenKind::Identifier(Str::from("Token")),
+                                                    Span::void(),
+                                                ),
+                                            ),
+                                            Span::void()
+                                        ),
+                                    ),
+                                ),
+                                false,
+                            )
+                        ),
+                        Span::void()
+                    ),
+                ]
+            )
+        ),
+        Span::void()
+    );
+
+    let mut primitives = [
         token,
         integer,
         float,
-    ].to_vec()
+        boolean,
+    ].to_vec();
+
+    primitives.extend(io_primitives());
+
+    primitives
+}
+
+pub fn io_primitives<'symbol>() -> Vec<Symbol<'symbol>> {
+    vec![
+        Symbol::new(
+            Symbolic::Method(
+                Method::new(
+                    Box::new(
+                        Element::new(
+                            ElementKind::Literal(
+                                Token::new(
+                                    TokenKind::Identifier(Str::from("print")),
+                                    Span::void(),
+                                ),
+                            ),
+                            Span::void()
+                        ),
+                    ),
+                    vec![
+                        Symbol::new(
+                            Symbolic::Binding(
+                                Binding::new(
+                                    Box::new(
+                                        Element::new(
+                                            ElementKind::Literal(
+                                                Token::new(
+                                                    TokenKind::Identifier(Str::from("value")),
+                                                    Span::void(),
+                                                ),
+                                            ),
+                                            Span::void()
+                                        ),
+                                    ),
+                                    None,
+                                    Some(
+                                        Box::new(
+                                            Element::new(
+                                                ElementKind::Literal(
+                                                    Token::new(
+                                                        TokenKind::Identifier(Str::from("Integer")),
+                                                        Span::void(),
+                                                    ),
+                                                ),
+                                                Span::void()
+                                            ),
+                                        ),
+                                    ),
+                                    false,
+                                )
+                            ),
+                            Span::void()
+                        )
+                    ],
+                    Box::new(
+                        Element::new(
+                            ElementKind::Block(Block::new(vec![])),
+                            Span::void()
+                        )
+                    ),
+                    None
+                )
+            ),
+            Span::void()
+        ),
+    ]
 }

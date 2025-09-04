@@ -1,3 +1,5 @@
+use inkwell::types::{AnyTypeEnum, BasicTypeEnum};
+use inkwell::values::{BasicMetadataValueEnum, IntValue};
 use {
     super::GenerateError,
     crate::{
@@ -13,6 +15,8 @@ use {
         values::{AnyValue, BasicValueEnum, FunctionValue, PointerValue},
         FloatPredicate, IntPredicate,
     },
+    std::fs::File,
+    std::io::Write,
 };
 
 pub trait Backend<'backend> {
@@ -21,6 +25,8 @@ pub trait Backend<'backend> {
     fn generate_instruction(&mut self, instruction: Instruction<'backend>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend>;
 
     fn print(&self);
+
+    fn write_to_file(&self, filename: &str) -> std::io::Result<()>;
 }
 
 pub struct Generator<'generator, B: Backend<'generator>> {
@@ -39,6 +45,8 @@ pub struct Inkwell<'backend> {
     builder: Builder<'backend>,
     module: Module<'backend>,
     variables: Map<Str<'backend>, PointerValue<'backend>>,
+    functions: Map<Str<'backend>, FunctionValue<'backend>>,
+    printf: FunctionValue<'backend>,
 }
 
 impl<'backend> Inkwell<'backend> {
@@ -46,24 +54,33 @@ impl<'backend> Inkwell<'backend> {
         let builder = context.create_builder();
         let module = context.create_module(&module);
 
+        let printf_type = context.i32_type().fn_type(
+            &[context.i8_type().ptr_type(inkwell::AddressSpace::default()).into()],
+            true,
+        );
+        let printf = module.add_function("printf", printf_type, Some(inkwell::module::Linkage::External));
+
         Self {
             context,
             builder,
             module,
             variables: Map::new(),
+            functions: Map::new(),
+            printf,
         }
     }
+
 }
 
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
-        let function_type = self.context.i64_type().fn_type(&[], false);
+        let function_type = self.context.i32_type().fn_type(&[], false);
         let function = self.module.add_function("main", function_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 
         let mut last_value = BasicValueEnum::from(self.context.i64_type().const_zero());
-        
+
         for analysis in analyses {
             last_value = BasicValueEnum::from(self.generate_instruction(analysis.instruction, function));
         }
@@ -73,12 +90,28 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
 
     fn generate_instruction(&mut self, instruction: Instruction<'backend>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {
         match instruction {
-            Instruction::Integer(int) => {
+            Instruction::Integer(int, scale) => {
+                let int_type = match scale {
+                    8 => self.context.i8_type(),
+                    16 => self.context.i16_type(),
+                    32 => self.context.i32_type(),
+                    64 => self.context.i64_type(),
+                    _ => {
+                        self.context.i64_type()
+                    }
+                };
                 let unsigned: u64 = int as u64;
-                BasicValueEnum::from(self.context.i64_type().const_int(unsigned, true))
+                BasicValueEnum::from(int_type.const_int(unsigned, false))
             }
-            Instruction::Float(float) => {
-                BasicValueEnum::from(self.context.f64_type().const_float(float.0))
+            Instruction::Float(float, scale) => {
+                let float_type = match scale {
+                    32 => self.context.f32_type(),
+                    64 => self.context.f64_type(),
+                    _ => {
+                        self.context.f64_type()
+                    }
+                };
+                BasicValueEnum::from(float_type.const_float(float.0))
             }
             Instruction::Boolean(boolean) => {
                 BasicValueEnum::from(self.context.bool_type().const_int(boolean as u64, false))
@@ -373,8 +406,13 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 }
             }
             Instruction::Usage(identifier) => {
-                let ptr = self.variables.get(&identifier).unwrap();
-                self.builder.build_load(ptr.get_type(), *ptr, &identifier).unwrap()
+                if let Some(func) = self.functions.get(&identifier) {
+                    BasicValueEnum::from(func.as_global_value().as_pointer_value())
+                } else if let Some(ptr) = self.variables.get(&identifier) {
+                    self.builder.build_load(ptr.get_type(), *ptr, &identifier).unwrap()
+                } else {
+                    self.context.i64_type().const_zero().into()
+                }
             }
             Instruction::Assign(assign) => {
                 let value_result = self.generate_instruction(assign.value.instruction.clone(), function);
@@ -424,6 +462,145 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 self.builder.build_return(None);
                 BasicValueEnum::from(self.context.i64_type().const_zero())
             }
+            Instruction::Method(method) => {
+                let mut param_types = vec![];
+                for param in &method.members {
+                    if let Instruction::Binding(bind) = &param.instruction {
+                        if let Some(ann) = &bind.annotation {
+                            if let Instruction::Usage(ty_name) = &ann.instruction {
+                                let ty = match ty_name.as_str().unwrap() {
+                                    "Integer" => self.context.i64_type().into(),
+                                    "Float" => self.context.f64_type().into(),
+                                    "Boolean" => self.context.bool_type().into(),
+                                    _ => return self.context.i64_type().const_zero().into(),
+                                };
+                                param_types.push(ty);
+                            }
+                        }
+                    }
+                }
+
+                let default_ty: AnyTypeEnum<'backend> = self.context.void_type().as_any_type_enum();
+                let ret_ty = method.output.as_ref().map_or(default_ty, |o| {
+                    if let Instruction::Usage(ty_name) = &o.instruction {
+                        match ty_name.as_str().unwrap() {
+                            "Integer" => self.context.i64_type().into(),
+                            "Float" => self.context.f64_type().into(),
+                            "Boolean" => self.context.bool_type().into(),
+                            _ => self.context.void_type().into(),
+                        }
+                    } else {
+                        self.context.void_type().into()
+                    }
+                });
+
+                let fn_type = if ret_ty.is_void_type() {
+                    self.context.void_type().fn_type(&param_types, false)
+                } else {
+                    match ret_ty {
+                        AnyTypeEnum::IntType(int_type) => int_type.fn_type(&param_types, false),
+                        AnyTypeEnum::FloatType(float_type) => float_type.fn_type(&param_types, false),
+                        AnyTypeEnum::VoidType(void_type) => void_type.fn_type(&param_types, false),
+                        _ => {
+                            self.context.void_type().fn_type(&param_types, false)
+                        }
+                    }
+                };
+
+                let func = self.module.add_function(&method.target.as_str().unwrap(), fn_type, None);
+                self.functions.insert(method.target.clone(), func);
+
+                if let Instruction::Block(block) = &method.body.instruction {
+                    if block.items.is_empty() && method.target.as_str().unwrap() == "print" {
+                        let basic_block = self.context.append_basic_block(func, "entry");
+                        self.builder.position_at_end(basic_block);
+
+                        let value_param = func.get_nth_param(0).unwrap();
+                        let format_str = if let Some(ann) = &method.members.get(0) {
+                            if let Instruction::Binding(b) = &ann.instruction {
+                                if let Some(a) = &b.annotation {
+                                    if let Instruction::Usage(t) = &a.instruction {
+                                        match t.as_str().unwrap() {
+                                            "Integer" => "%lld\n",
+                                            "Float" => "%f\n",
+                                            "Boolean" => "%d\n",
+                                            _ => "%lld\n",
+                                        }
+                                    } else { "%lld\n" }
+                                } else { "%lld\n" }
+                            } else { "%lld\n" }
+                        } else { "%lld\n" };
+
+                        let format = self.builder.build_global_string_ptr(format_str, "fmt").expect("Failed to build global string").as_pointer_value().into();
+                        let args: Vec<BasicMetadataValueEnum> = vec![format, value_param.into()];
+
+                        self.builder.build_call(self.printf, &args, "printf");
+                        self.builder.build_return(None);
+                    } else {
+                        let basic_block = self.context.append_basic_block(func, "entry");
+                        self.builder.position_at_end(basic_block);
+
+                        let mut i = 0;
+                        for param in &method.members {
+                            if let Instruction::Binding(bind) = &param.instruction {
+                                let param_val = func.get_nth_param(i).unwrap();
+                                let alloca_ty = param_val.get_type();
+                                let ptr = self.builder.build_alloca(alloca_ty, &bind.target).unwrap();
+                                self.builder.build_store(ptr, param_val);
+                                self.variables.insert(bind.target.clone(), ptr);
+                                i += 1;
+                            }
+                        }
+
+                        let mut last_value = self.context.i64_type().const_zero().into();
+                        for item in &block.items {
+                            last_value = self.generate_instruction(item.instruction.clone(), func);
+                        }
+
+                        if ret_ty.is_void_type() {
+                            self.builder.build_return(None);
+                        } else {
+                            self.builder.build_return(Some(&last_value));
+                        }
+                    }
+                }
+
+                self.context.i64_type().const_zero().into()
+            }
+
+            Instruction::Invoke(invoke) => {
+                let target_val = self.generate_instruction(invoke.target.instruction.clone(), function);
+                let mut args = vec![];
+                for arg in &invoke.arguments {
+                    let arg_val = self.generate_instruction(arg.instruction.clone(), function);
+                    args.push(arg_val.into());
+                }
+
+                if let Instruction::Usage(func_name) = invoke.target.instruction {
+                    if let Some(func) = self.functions.get(&func_name) {
+                        let result = self.builder.build_call(*func, &args, "call").unwrap();
+                        result.try_as_basic_value().left().unwrap_or(self.context.i64_type().const_zero().into())
+                    } else {
+                        self.context.i64_type().const_zero().into()
+                    }
+                } else {
+                    self.context.i64_type().const_zero().into()
+                }
+            }
+
+            Instruction::Return(value) => {
+                match value {
+                    Some(v) => {
+                        let val = self.generate_instruction(v.instruction, function);
+                        self.builder.build_return(Some(&val));
+                        val
+                    }
+                    None => {
+                        self.builder.build_return(None);
+                        self.context.i64_type().const_zero().into()
+                    }
+                }
+            }
             _ => BasicValueEnum::from(self.context.i64_type().const_zero())
         }
     }
@@ -431,5 +608,12 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn print(&self) {
         let ir = self.module.print_to_string();
         println!("{}", ir.to_string());
+    }
+
+    fn write_to_file(&self, filename: &str) -> std::io::Result<()> {
+        let ir = self.module.print_to_string();
+        let mut file = File::create(filename)?;
+        file.write_all(ir.to_string().as_bytes())?;
+        Ok(())
     }
 }

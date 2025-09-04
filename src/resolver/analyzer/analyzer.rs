@@ -7,6 +7,7 @@ use crate::{
     scanner::{OperatorKind, TokenKind},
     schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure},
 };
+use crate::data::Scale;
 use crate::schema::{Block, Conditional, Cycle, While};
 
 impl<'analyzer> Resolver<'analyzer> {
@@ -404,8 +405,8 @@ impl<'analyzer> Resolver<'analyzer> {
                 match target_name.as_str() {
                     "Integer" => {
                         if fields.len() == 2 {
-                            if let Instruction::Integer(value) = &fields[0].instruction {
-                                Ok(Analysis::new(Instruction::Integer(value.clone())))
+                            if let (Instruction::Integer(value, _), Instruction::Integer(size, _)) = (&fields[0].instruction, &fields[1].instruction) {
+                                Ok(Analysis::new(Instruction::Integer(value.clone(), (*size).try_into().unwrap())))
                             } else {
                                 Err(AnalyzeError::new(
                                     ErrorKind::InvalidType,
@@ -421,8 +422,8 @@ impl<'analyzer> Resolver<'analyzer> {
                     }
                     "Float" => {
                         if fields.len() == 2 {
-                            if let Instruction::Float(value) = &fields[0].instruction {
-                                Ok(Analysis::new(Instruction::Float(value.clone())))
+                            if let (Instruction::Float(value, _), Instruction::Integer(size, _)) = (&fields[0].instruction, &fields[1].instruction) {
+                                Ok(Analysis::new(Instruction::Float(value.clone(), (*size).try_into().unwrap())))
                             } else {
                                 Err(AnalyzeError::new(
                                     ErrorKind::InvalidType,
@@ -531,8 +532,8 @@ impl<'analyzer> Resolver<'analyzer> {
         literal: &Token<'analyzer>,
     ) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &literal.kind {
-            TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float(float.clone()))),
-            TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer(integer.clone()))),
+            TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float(float.clone(), 64))),
+            TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer(integer.clone(), 64))),
             TokenKind::Boolean(boolean) => Ok(Analysis::new(Instruction::Boolean(boolean.clone()))),
             TokenKind::Identifier(identifier) => {
                 Ok(Analysis::new(Instruction::Usage(identifier.clone())))
