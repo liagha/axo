@@ -172,22 +172,16 @@ impl<'resolver> Resolver<'resolver> {
                     span,
                 );
 
-                let member = Element::new(
-                    ElementKind::Invoke(Invoke::new(
-                        Box::new(Element::new(
-                            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("new")), span)),
-                            span,
-                        )),
-                        vec![
-                            Element::new(ElementKind::Literal(literal), span),
-                            Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
-                        ],
-                    )),
-                    span,
-                );
-
                 Element::new(
-                    ElementKind::Access(Access::new(Box::new(target), Box::new(member))),
+                    ElementKind::Construct(
+                        Structure::new(
+                            Box::new(target),
+                            vec![
+                                Element::new(ElementKind::Literal(literal), span),
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
+                            ],
+                        )
+                    ),
                     span,
                 )
             },
@@ -197,22 +191,16 @@ impl<'resolver> Resolver<'resolver> {
                     span,
                 );
 
-                let member = Element::new(
-                    ElementKind::Invoke(Invoke::new(
-                        Box::new(Element::new(
-                            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("new")), span)),
-                            span,
-                        )),
-                        vec![
-                            Element::new(ElementKind::Literal(literal), span),
-                            Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
-                        ],
-                    )),
-                    span,
-                );
-
                 Element::new(
-                    ElementKind::Access(Access::new(Box::new(target), Box::new(member))),
+                    ElementKind::Construct(
+                        Structure::new(
+                            Box::new(target),
+                            vec![
+                                Element::new(ElementKind::Literal(literal), span),
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
+                            ],
+                        )
+                    ),
                     span,
                 )
             },
@@ -222,19 +210,15 @@ impl<'resolver> Resolver<'resolver> {
                     span,
                 );
 
-                let member = Element::new(
-                    ElementKind::Invoke(Invoke::new(
-                        Box::new(Element::new(
-                            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("new")), span)),
-                            span,
-                        )),
-                        vec![Element::new(ElementKind::Literal(literal), span)],
-                    )),
-                    span,
-                );
-
                 Element::new(
-                    ElementKind::Access(Access::new(Box::new(target), Box::new(member))),
+                    ElementKind::Construct(
+                        Structure::new(
+                            Box::new(target),
+                            vec![
+                                Element::new(ElementKind::Literal(literal), span),
+                            ],
+                        )
+                    ),
                     span,
                 )
             },
@@ -244,19 +228,15 @@ impl<'resolver> Resolver<'resolver> {
                     span,
                 );
 
-                let member = Element::new(
-                    ElementKind::Invoke(Invoke::new(
-                        Box::new(Element::new(
-                            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("new")), span)),
-                            span,
-                        )),
-                        vec![Element::new(ElementKind::Literal(literal), span)],
-                    )),
-                    span,
-                );
-
                 Element::new(
-                    ElementKind::Access(Access::new(Box::new(target), Box::new(member))),
+                    ElementKind::Construct(
+                        Structure::new(
+                            Box::new(target),
+                            vec![
+                                Element::new(ElementKind::Literal(literal), span),
+                            ],
+                        )
+                    ),
                     span,
                 )
             },
@@ -266,19 +246,15 @@ impl<'resolver> Resolver<'resolver> {
                     span,
                 );
 
-                let member = Element::new(
-                    ElementKind::Invoke(Invoke::new(
-                        Box::new(Element::new(
-                            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("new")), span)),
-                            span,
-                        )),
-                        vec![Element::new(ElementKind::Literal(literal), span)],
-                    )),
-                    span,
-                );
-
                 Element::new(
-                    ElementKind::Access(Access::new(Box::new(target), Box::new(member))),
+                    ElementKind::Construct(
+                        Structure::new(
+                            Box::new(target),
+                            vec![
+                                Element::new(ElementKind::Literal(literal), span),
+                            ],
+                        )
+                    ),
                     span,
                 )
             },
