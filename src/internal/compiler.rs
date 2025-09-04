@@ -375,6 +375,8 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn compile_pipeline(&mut self) -> bool {
+        self.registry.resolver.scope.extend(super::base::primitives());
+
         let targets = {
             let mut initializer = Initialization::new();
             initializer.execute(&mut self.registry.resolver, ())

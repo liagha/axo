@@ -154,7 +154,7 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn process(&mut self) -> Vec<Analysis<'resolver>> {
-        self.preresolve(&self.input.clone());
+        self.preresolve();
 
         for element in self.input.clone() {
             self.resolve(&element);
@@ -163,18 +163,19 @@ impl<'resolver> Resolver<'resolver> {
         self.output.clone()
     }
 
-    pub fn preresolve(&mut self, elements: &Vec<Element<'resolver>>) {
-        elements.iter().for_each(|element| {
-            if let ElementKind::Symbolize(symbol) = &element.kind {
+    pub fn preresolve(&mut self) {
+        for index in 0..self.input.len() {
+            let element = self.input[index].clone();
+            self.input[index] = self.desugar(element);
+
+            if let ElementKind::Symbolize(symbol) = &self.input[index].kind {
                 self.scope.add(symbol.clone());
             }
-        })
+        }
     }
 
     pub fn resolve(&mut self, element: &Element<'resolver>) {
-        let Element { kind, .. } = self.desugar(element.clone());
-
-        println!("Desugared: {:?}", kind);
+        let Element { kind, .. } = element.clone();
 
         match kind {
             ElementKind::Assign(assign) => {

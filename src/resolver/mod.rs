@@ -5,7 +5,7 @@ mod resolver;
 pub mod analyzer;
 pub mod checker;
 pub mod scope;
-mod base;
+mod validator;
 
 pub use {
     resolver::Resolver,

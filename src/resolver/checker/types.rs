@@ -7,7 +7,7 @@ use {
     }
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Type<'ty> {
     kind: TypeKind<'ty>,
     pub span: Span<'ty>,
@@ -36,4 +36,10 @@ pub enum TypeKind<'ty> {
     Structure(Structure<Str<'ty>, Box<Type<'ty>>>),
     Enumeration(Enumeration<Str<'ty>, Box<Type<'ty>>>),
     Method(Method<Str<'ty>, Box<Type<'ty>>, Box<Type<'ty>>, Box<Type<'ty>>>),
+}
+
+impl<'ty> PartialEq for Type<'ty> {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
 }
