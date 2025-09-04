@@ -274,7 +274,7 @@ pub fn io_primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                         Element::new(
                             ElementKind::Literal(
                                 Token::new(
-                                    TokenKind::Identifier(Str::from("print")),
+                                    TokenKind::Identifier(Str::from("printf")),
                                     Span::void(),
                                 ),
                             ),

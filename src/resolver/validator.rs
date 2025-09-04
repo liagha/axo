@@ -178,7 +178,7 @@ impl<'resolver> Resolver<'resolver> {
                             Box::new(target),
                             vec![
                                 Element::new(ElementKind::Literal(literal), span),
-                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(32), span)), span)
                             ],
                         )
                     ),
@@ -197,7 +197,7 @@ impl<'resolver> Resolver<'resolver> {
                             Box::new(target),
                             vec![
                                 Element::new(ElementKind::Literal(literal), span),
-                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(64), span)), span)
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(32), span)), span)
                             ],
                         )
                     ),

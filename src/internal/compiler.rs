@@ -266,6 +266,24 @@ impl CompileLogger {
         }
     }
 
+    fn analyses(&self, analyses: &[Analysis]) {
+        if self.verbosity {
+            let tree = analyses
+                .iter()
+                .map(|analysis| Str::from(format!("{:#?}", analysis)))
+                .collect::<Vec<Str>>()
+                .join("\n");
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}" => Color::Pink,
+                    format!("Analyses:\n{}", &tree.indent()),
+                );
+                xprintln!();
+            }
+        }
+    }
+
     fn errors<K, H>(&self, errors: &[Error<K, H>])
     where K: Clone + Display, H: Clone + Display
     {
@@ -498,15 +516,16 @@ impl<'resolver> Resolver<'resolver> {
 
         self.with_input(elements);
 
-        let analysis = self.process();
+        let analyses = self.process();
 
-        let symbols = self.scope.all();
+        logger.analyses(&*analyses);
+
         logger.errors(self.errors.as_slice());
 
         let duration = Duration::from_nanos(timer.elapsed().unwrap());
         logger.finish("resolving", duration, self.errors.len());
 
-        analysis
+        analyses
     }
 }
 

@@ -43,6 +43,7 @@ pub struct Method<Target, Parameter, Body, Output> {
     pub members: Vec<Parameter>,
     pub body: Body,
     pub output: Output,
+    pub variadic: bool,
 }
 
 #[derive(Debug)]
