@@ -25,9 +25,6 @@ impl<'ty> Type<'ty> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'ty> {
-    Integer { size: Scale },
-    Float { size: Scale },
-    Boolean,
     Array { item: Box<Type<'ty>>, size: Scale },
     Tuple { items: Vec<Type<'ty>> },
 

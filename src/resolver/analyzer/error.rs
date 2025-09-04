@@ -9,6 +9,7 @@ use {
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
     InvalidOperation(Token<'error>),
+    InvalidType,
     UnImplemented,
 }
 
@@ -17,6 +18,9 @@ impl Display for ErrorKind<'_> {
         match self { 
             ErrorKind::InvalidOperation(token) => {
                 write!(f, "invalid operation token: {}.", token)
+            }
+            ErrorKind::InvalidType => {
+                write!(f, "invalid type.")
             }
             ErrorKind::UnImplemented => {
                 write!(f, "unimplemented operation.")

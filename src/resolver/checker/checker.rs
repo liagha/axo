@@ -37,7 +37,7 @@ impl<'resolver> Resolver<'resolver> {
     pub fn infer_element(&mut self, element: &Element<'resolver>) -> Type<'resolver> {
         match &element.kind {
             ElementKind::Literal(literal) => {
-                self.infer_literal(literal)
+                Type::unit(literal.span)
             }
             ElementKind::Procedural(_) => {
                 Type::unit(element.span)
@@ -177,38 +177,6 @@ impl<'resolver> Resolver<'resolver> {
             }
             Symbolic::Preference(_) => {
                 Type::unit(symbol.span)
-            }
-        }
-    }
-
-    pub fn infer_literal(&mut self, literal: &Token<'resolver>) -> Type<'resolver> {
-        match literal.kind {
-            TokenKind::Float(_) => {
-                Type::new(TypeKind::Float { size: 64 }, literal.span)
-            }
-            TokenKind::Integer(_) => {
-                Type::new(TypeKind::Integer { size: 64 }, literal.span)
-            }
-            TokenKind::Boolean(_) => {
-                Type::new(TypeKind::Boolean, literal.span)
-            }
-            TokenKind::String(_) => {
-                Type::unit(literal.span)
-            }
-            TokenKind::Character(_) => {
-                Type::unit(literal.span)
-            }
-            TokenKind::Operator(_) => {
-                Type::unit(literal.span)
-            }
-            TokenKind::Identifier(_) => {
-                Type::unit(literal.span)
-            }
-            TokenKind::Punctuation(_) => {
-                Type::unit(literal.span)
-            }
-            TokenKind::Comment(_) => {
-                Type::unit(literal.span)
             }
         }
     }
