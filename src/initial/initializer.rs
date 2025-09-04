@@ -18,7 +18,7 @@ use {
             compiler::{Registry},
             hash::{DefaultHasher, Hash, Hasher},
         },
-        parser::{Element, ParseError, Symbol, Symbolic},
+        parser::{Element, ParseError, Symbol, SymbolKind},
         scanner::{OperatorKind, PunctuationKind, Scanner, Token, TokenKind},
         tracker::{Location, Peekable, Position, Span, Spanned},
     },

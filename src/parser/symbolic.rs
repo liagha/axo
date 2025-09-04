@@ -27,7 +27,7 @@ use {
 };
 
 #[derive(Clone, PartialEq, Hash)]
-pub enum Symbolic<'symbol> {
+pub enum SymbolKind<'symbol> {
     Inclusion(Inclusion<Box<Element<'symbol>>>),
     Extension(Extension<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>>),
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
@@ -38,17 +38,17 @@ pub enum Symbolic<'symbol> {
     Preference(Preference<'symbol>),
 }
 
-impl<'symbol> Symbolic<'symbol> {
+impl<'symbol> SymbolKind<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match self {
-            Symbolic::Inclusion(inclusion) => inclusion.target.clone().brand(),
-            Symbolic::Extension(extension) => extension.target.clone().brand(),
-            Symbolic::Binding(binding) => binding.target.clone().brand(),
-            Symbolic::Structure(structure) => structure.target.clone().brand(),
-            Symbolic::Enumeration(enumeration) => enumeration.target.clone().brand(),
-            Symbolic::Method(method) => method.target.clone().brand(),
-            Symbolic::Module(module) => module.target.brand().clone(),
-            Symbolic::Preference(preference) => Some(preference.target.clone()),
+            SymbolKind::Inclusion(inclusion) => inclusion.target.clone().brand(),
+            SymbolKind::Extension(extension) => extension.target.clone().brand(),
+            SymbolKind::Binding(binding) => binding.target.clone().brand(),
+            SymbolKind::Structure(structure) => structure.target.clone().brand(),
+            SymbolKind::Enumeration(enumeration) => enumeration.target.clone().brand(),
+            SymbolKind::Method(method) => method.target.clone().brand(),
+            SymbolKind::Module(module) => module.target.brand().clone(),
+            SymbolKind::Preference(preference) => Some(preference.target.clone()),
         }
     }
 }

@@ -9,7 +9,7 @@ use {
         },
         parser::{
             Element, ElementKind,
-            Symbol, Symbolic,
+            Symbol, SymbolKind,
         },
         resolver::{HintKind, ResolveHint},
         schema::{Method, Structure},
@@ -180,7 +180,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             }
 
             (ElementKind::Invoke(invoke), candidate) => {
-                if let Symbolic::Method(method) = candidate.kind {
+                if let SymbolKind::Method(method) = candidate.kind {
                     score += self.shaping;
 
                     if invoke.arguments.len() == method.members.len() {
@@ -197,7 +197,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 }
             }
             (ElementKind::Construct(construct), candidate) => {
-                if let Symbolic::Structure(structure) = candidate.kind {
+                if let SymbolKind::Structure(structure) = candidate.kind {
                     score += self.shaping;
 
                     if construct.members.len() == structure.members.len() {

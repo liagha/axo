@@ -3,7 +3,7 @@ use crate::resolver::Resolver;
 use crate::scanner::Token;
 use crate::{
     data::Str,
-    parser::{Element, ElementKind, Symbol, Symbolic},
+    parser::{Element, ElementKind, Symbol, SymbolKind},
     scanner::{OperatorKind, TokenKind},
     schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure},
 };
@@ -557,9 +557,9 @@ impl<'analyzer> Resolver<'analyzer> {
         symbol: Symbol<'analyzer>,
     ) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &symbol.kind {
-            Symbolic::Inclusion(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
-            Symbolic::Extension(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
-            Symbolic::Binding(binding) => {
+            SymbolKind::Inclusion(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
+            SymbolKind::Extension(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
+            SymbolKind::Binding(binding) => {
                 let value = binding
                     .value
                     .clone()
@@ -580,7 +580,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 );
                 Ok(Analysis::new(Instruction::Binding(analyzed)))
             }
-            Symbolic::Structure(structure) => {
+            SymbolKind::Structure(structure) => {
                 let fields: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> =
                     structure
                         .members
@@ -593,7 +593,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 );
                 Ok(Analysis::new(Instruction::Structure(analyzed)))
             }
-            Symbolic::Enumeration(enumeration) => {
+            SymbolKind::Enumeration(enumeration) => {
                 let variants: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> =
                     enumeration
                         .members
@@ -606,7 +606,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 );
                 Ok(Analysis::new(Instruction::Enumeration(analyzed)))
             }
-            Symbolic::Method(method) => {
+            SymbolKind::Method(method) => {
                 let parameters: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> =
                     method
                         .members
@@ -624,11 +624,12 @@ impl<'analyzer> Resolver<'analyzer> {
                     parameters?,
                     Box::new(body),
                     output,
+                    method.variadic,
                 );
                 Ok(Analysis::new(Instruction::Method(analyzed)))
             }
-            Symbolic::Module(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
-            Symbolic::Preference(_) => {
+            SymbolKind::Module(_) => Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span)),
+            SymbolKind::Preference(_) => {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, symbol.span))
             }
         }

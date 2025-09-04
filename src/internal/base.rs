@@ -1,12 +1,12 @@
 use crate::data::Str;
-use crate::parser::{Element, ElementKind, Symbol, Symbolic};
+use crate::parser::{Element, ElementKind, Symbol, SymbolKind};
 use crate::scanner::{Token, TokenKind};
 use crate::schema::{Binding, Block, Enumeration, Method, Structure};
 use crate::tracker::{Location, Position, Span};
 
 pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
     let token = Symbol::new(
-        Symbolic::Enumeration(
+        SymbolKind::Enumeration(
             Enumeration::new(
                 Box::new(
                     Element::new(
@@ -26,7 +26,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
     );
 
     let integer = Symbol::new(
-        Symbolic::Structure(
+        SymbolKind::Structure(
             Structure::new(
                 Box::new(
                     Element::new(
@@ -41,7 +41,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                 ),
                 vec![
                     Symbol::new(
-                        Symbolic::Binding(
+                        SymbolKind::Binding(
                             Binding::new(
                                 Box::new(
                                     Element::new(
@@ -74,7 +74,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                         Span::void()
                     ),
                     Symbol::new(
-                        Symbolic::Binding(
+                        SymbolKind::Binding(
                             Binding::new(
                                 Box::new(
                                     Element::new(
@@ -113,7 +113,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
     );
 
     let float = Symbol::new(
-        Symbolic::Structure(
+        SymbolKind::Structure(
             Structure::new(
                 Box::new(
                     Element::new(
@@ -128,7 +128,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                 ),
                 vec![
                     Symbol::new(
-                        Symbolic::Binding(
+                        SymbolKind::Binding(
                             Binding::new(
                                 Box::new(
                                     Element::new(
@@ -161,7 +161,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                         Span::void()
                     ),
                     Symbol::new(
-                        Symbolic::Binding(
+                        SymbolKind::Binding(
                             Binding::new(
                                 Box::new(
                                     Element::new(
@@ -200,7 +200,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
     );
 
     let boolean = Symbol::new(
-        Symbolic::Structure(
+        SymbolKind::Structure(
             Structure::new(
                 Box::new(
                     Element::new(
@@ -215,7 +215,7 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                 ),
                 vec![
                     Symbol::new(
-                        Symbolic::Binding(
+                        SymbolKind::Binding(
                             Binding::new(
                                 Box::new(
                                     Element::new(
@@ -260,15 +260,15 @@ pub fn primitives<'symbol>() -> Vec<Symbol<'symbol>> {
         boolean,
     ].to_vec();
 
-    primitives.extend(io_primitives());
+    primitives.extend(standard());
 
     primitives
 }
 
-pub fn io_primitives<'symbol>() -> Vec<Symbol<'symbol>> {
+pub fn standard<'symbol>() -> Vec<Symbol<'symbol>> {
     vec![
         Symbol::new(
-            Symbolic::Method(
+            SymbolKind::Method(
                 Method::new(
                     Box::new(
                         Element::new(
@@ -283,7 +283,7 @@ pub fn io_primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                     ),
                     vec![
                         Symbol::new(
-                            Symbolic::Binding(
+                            SymbolKind::Binding(
                                 Binding::new(
                                     Box::new(
                                         Element::new(
@@ -322,7 +322,8 @@ pub fn io_primitives<'symbol>() -> Vec<Symbol<'symbol>> {
                             Span::void()
                         )
                     ),
-                    None
+                    None,
+                    false,
                 )
             ),
             Span::void()

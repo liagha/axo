@@ -2,7 +2,7 @@ use std::fmt::Display;
 use {
     super::{
         Element, ElementKind,
-        Symbol, Symbolic,
+        Symbol, SymbolKind,
     },
 
     crate::{
@@ -135,13 +135,13 @@ impl<'symbol> Debug for Symbol<'symbol> {
     }
 }
 
-impl<'symbol> Debug for Symbolic<'symbol> {
+impl<'symbol> Debug for SymbolKind<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Symbolic::Inclusion(inclusion) => {
+            SymbolKind::Inclusion(inclusion) => {
                 write!(f, "Inclusion({:?})", inclusion.target)
             }
-            Symbolic::Extension(extension) => {
+            SymbolKind::Extension(extension) => {
                 write!(f, "Extension(")?;
 
                 if let Some(extension) = &extension.extension {
@@ -150,7 +150,7 @@ impl<'symbol> Debug for Symbolic<'symbol> {
 
                 write!(f, "{:?}, {:?})", extension.target, extension.members)
             }
-            Symbolic::Binding(binding) => {
+            SymbolKind::Binding(binding) => {
                 write!(
                     f,
                     "Binding({} {:?}",
@@ -168,19 +168,19 @@ impl<'symbol> Debug for Symbolic<'symbol> {
 
                 write!(f, ")")
             }
-            Symbolic::Structure(structure) => {
+            SymbolKind::Structure(structure) => {
                 write!(f, "Structure({:?} {:?})", structure.target, structure.members)
             }
-            Symbolic::Enumeration(enumeration) => {
+            SymbolKind::Enumeration(enumeration) => {
                 write!(f, "Enumeration({:?} {:?})", enumeration.target, enumeration.members)
             }
-            Symbolic::Method(method) => {
+            SymbolKind::Method(method) => {
                 write!(f, "Method({:?} {:?} -> {:?} : {:?})", method.target, method.members, method.output, method.body)
             }
-            Symbolic::Module(module) => {
+            SymbolKind::Module(module) => {
                 write!(f, "Module({:?})", module)
             }
-            Symbolic::Preference(preference) => {
+            SymbolKind::Preference(preference) => {
                 write!(f, "Preference({:?}, {:?})", preference.target, preference.value)
             }
         }

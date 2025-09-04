@@ -12,7 +12,7 @@ pub use {
     element::{Element, ElementKind},
     parser::Parser,
     symbol::Symbol,
-    symbolic::Symbolic,
+    symbolic::SymbolKind,
 };
 
 pub(super) use {

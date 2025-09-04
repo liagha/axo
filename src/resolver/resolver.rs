@@ -23,7 +23,7 @@ use {
         },
         parser::{
             Element, ElementKind,
-            Symbol, Symbolic,
+            Symbol, SymbolKind,
         },
         schema::{
             Enumeration, Extension,
@@ -305,15 +305,15 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
         match symbol.kind {
-            Symbolic::Inclusion(_) => {}
-            Symbolic::Preference(_) => {}
-            Symbolic::Extension(extension) => {
+            SymbolKind::Inclusion(_) => {}
+            SymbolKind::Preference(_) => {}
+            SymbolKind::Extension(extension) => {
                 let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
                 
                 if let Some(mut target) = self.lookup(&*extension.target, &candidates) {
                     if let Some(extension) = extension.extension {
                         if let Some(found) = self.lookup(&*extension, &candidates) {
-                            if let Symbolic::Structure(structure) = found.kind {
+                            if let SymbolKind::Structure(structure) = found.kind {
                                 self.scope.remove(&target);
                                 target.scope.symbols.extend(structure.members.iter().cloned());
                                 self.scope.add(target);

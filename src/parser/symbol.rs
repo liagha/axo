@@ -2,7 +2,7 @@ use {
     super::{
         Element, ElementKind,
         ParseError, Parser,
-        Symbolic, 
+        SymbolKind,
     },
     crate::{
         resolver::{
@@ -31,13 +31,13 @@ use {
 use crate::internal::hash::Set;
 
 pub struct Symbol<'symbol> {
-    pub kind: Symbolic<'symbol>,
+    pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: Symbolic<'symbol>, span: Span<'symbol>) -> Self {
+    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>) -> Self {
         Self {
             kind: value,
             span,
@@ -110,7 +110,7 @@ impl<'parser> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Symbolic::Extension(Extension::new(Box::new(name), None::<Box<Element<'parser>>>, members)),
+                                    SymbolKind::Extension(Extension::new(Box::new(name), None::<Box<Element<'parser>>>, members)),
                                     span
                                 ),
                             ),
@@ -129,7 +129,7 @@ impl<'parser> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Symbolic::Extension(Extension::new(Box::new(name), Some(Box::new(target)), members)),
+                                    SymbolKind::Extension(Extension::new(Box::new(name), Some(Box::new(target)), members)),
                                     span,
                                 ),
                             ),
@@ -177,7 +177,7 @@ impl<'parser> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                Symbolic::Binding(symbol),
+                                SymbolKind::Binding(symbol),
                                 span
                             )
                         ),
@@ -212,7 +212,7 @@ impl<'parser> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                Symbolic::Structure(Structure::new(Box::new(name), fields)),
+                                SymbolKind::Structure(Structure::new(Box::new(name), fields)),
                                 span,
                             ),
                         ),
@@ -246,7 +246,7 @@ impl<'parser> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                Symbolic::Enumeration(Enumeration::new(Box::new(name), variant)),
+                                SymbolKind::Enumeration(Enumeration::new(Box::new(name), variant)),
                                 span,
                             )
                         ),
@@ -264,7 +264,25 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::literal(),
-                Self::group(Classifier::deferred(Self::symbolization)),
+                Self::group(Classifier::deferred(||
+                    Classifier::alternative([
+                        Self::symbolization(),
+                        Classifier::literal(
+                            Token::new(
+                                TokenKind::Operator(
+                                    OperatorKind::Composite(
+                                        vec![
+                                            OperatorKind::Dot,
+                                            OperatorKind::Dot,
+                                            OperatorKind::Dot,
+                                        ]
+                                    )
+                                ),
+                                Span::void(),
+                            )
+                        )
+                    ])
+                )),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
@@ -288,11 +306,18 @@ impl<'parser> Parser<'parser> {
                 let invoke = sequence[2].unwrap_output().clone();
 
                 if sequence.len() == 4 {
+                    let mut variadic = false;
                     let body = sequence[3].unwrap_output().clone();
 
-                    let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
-                        parameter.kind.clone().unwrap_symbolize()
-                    }).collect::<Vec<_>>();
+                    let mut parameters = Vec::new();
+
+                    for item in invoke.kind.clone().unwrap_group().items {
+                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
+                            parameters.push(symbol);
+                        } else { 
+                            variadic = true;
+                        }
+                    }
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -300,7 +325,7 @@ impl<'parser> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Symbolic::Method(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>)),
+                                    SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>, variadic)),
                                     span,
                                 ),
                             ),
@@ -310,10 +335,17 @@ impl<'parser> Parser<'parser> {
                 } else {
                     let output = sequence[3].unwrap_output().clone();
                     let body = sequence[4].unwrap_output().clone();
+                    let mut variadic = false;
 
-                    let parameters = invoke.kind.unwrap_group().items.iter().map(|parameter| {
-                        parameter.kind.clone().unwrap_symbolize()
-                    }).collect::<Vec<_>>();
+                    let mut parameters = Vec::new();
+
+                    for item in invoke.kind.clone().unwrap_group().items {
+                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
+                            parameters.push(symbol);
+                        } else {
+                            variadic = true;
+                        }
+                    }
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -321,7 +353,7 @@ impl<'parser> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    Symbolic::Method(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)))),
+                                    SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)), variadic)),
                                     span
                                 )
                             ),
@@ -353,7 +385,7 @@ impl<'parser> Parser<'parser> {
                 }).collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol = Symbol::new(
-                    Symbolic::Module(Module::new(Box::new(name))),
+                    SymbolKind::Module(Module::new(Box::new(name))),
                     span,
                 );
                 symbol.scope.extend(fields);

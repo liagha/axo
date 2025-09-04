@@ -88,8 +88,8 @@ impl<Target, Variant> Enumeration<Target, Variant> {
 
 impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     #[inline]
-    pub fn new(target: Target, parameters: Vec<Parameter>, body: Body, output: Output) -> Self {
-        Method { target, members: parameters, body, output }
+    pub fn new(target: Target, parameters: Vec<Parameter>, body: Body, output: Output, variadic: bool) -> Self {
+        Method { target, members: parameters, body, output, variadic }
     }
 }
 
@@ -240,7 +240,8 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone for Meth
             self.target.clone(),
             self.members.clone(),
             self.body.clone(),
-            self.output.clone()
+            self.output.clone(),
+            self.variadic.clone(),
         )
     }
 }

@@ -11,7 +11,7 @@ use {
             classifier::Classifier,
             form::Form,
         },
-        parser::Symbolic,
+        parser::SymbolKind,
         scanner::{Token, TokenKind, OperatorKind},
         tracker::{Span, Spanned},
     },

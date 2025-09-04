@@ -7,7 +7,7 @@ use {
         format::{format_tokens, Display, Debug, Show},
         initial::Initializer,
         internal::platform::Path,
-        parser::{Element, ElementKind, Parser, Symbol, Symbolic},
+        parser::{Element, ElementKind, Parser, Symbol, SymbolKind},
         reporter::Error,
         resolver::{
             Resolver,
@@ -101,7 +101,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.kind {
+            if let SymbolKind::Preference(preference) = found.kind {
                 return Some(preference.value.clone())
             }
         }
@@ -123,7 +123,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.kind {
+            if let SymbolKind::Preference(preference) = found.kind {
                 if let TokenKind::Boolean(verbosity) = preference.value.kind {
                     return verbosity
                 }
@@ -147,7 +147,7 @@ impl<'registry> Registry<'registry> {
         let result = resolver.try_get(&identifier);
 
         if let Ok(found) = result {
-            if let Symbolic::Preference(preference) = found.kind {
+            if let SymbolKind::Preference(preference) = found.kind {
                 if let TokenKind::Identifier(path) = preference.value.kind.clone() {
                     return path.clone()
                 }
@@ -383,7 +383,7 @@ impl<'compiler> Compiler<'compiler> {
             span
         );
 
-        let mut module = Symbol::new(Symbolic::Module(Module::new(Box::new(identifier))), span);
+        let mut module = Symbol::new(SymbolKind::Module(Module::new(Box::new(identifier))), span);
         module.with_scope(self.registry.resolver.scope.clone());
 
         self.registry.resolver.exit();
@@ -449,7 +449,7 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
         let symbols = self.initializer.output.clone().into_iter().map(|preference| {
             let span = preference.borrow_span();
             Symbol::new(
-                Symbolic::Preference(preference),
+                SymbolKind::Preference(preference),
                 span
             )
         }).collect::<Vec<Symbol>>();

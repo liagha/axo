@@ -2,7 +2,7 @@ use {
     crate::{
         data::Str,
         internal::hash::Set,
-        parser::{Element, ElementKind, Symbol, Symbolic},
+        parser::{Element, ElementKind, Symbol, SymbolKind},
         scanner::{OperatorKind, Token, TokenKind},
         schema::*,
         tracker::{Location, Position, Span},
@@ -443,31 +443,31 @@ impl<'resolver> Resolver<'resolver> {
 
     fn desugar_symbol(&mut self, symbol: &mut Symbol<'resolver>) {
         match &mut symbol.kind {
-            Symbolic::Inclusion(inclusion) => {
+            SymbolKind::Inclusion(inclusion) => {
                 *inclusion.target = self.desugar(*inclusion.target.clone());
             }
-            Symbolic::Extension(extension) => {
+            SymbolKind::Extension(extension) => {
                 extension.target = Box::new(self.desugar(*extension.target.clone()));
                 extension.members.iter_mut().for_each(|member| {
                     self.desugar_symbol(member);
                 });
             }
-            Symbolic::Binding(binding) => {
+            SymbolKind::Binding(binding) => {
                 if let Some(value) = &binding.value {
                     binding.value = Some(Box::new(self.desugar(*value.clone())));
                 }
             }
-            Symbolic::Structure(structure) => {
+            SymbolKind::Structure(structure) => {
                 structure.members.iter_mut().for_each(|member| {
                     self.desugar_symbol(member);
                 });
             }
-            Symbolic::Enumeration(enumeration) => {
+            SymbolKind::Enumeration(enumeration) => {
                 enumeration.members.iter_mut().for_each(|member| {
                     self.desugar_symbol(member);
                 });
             }
-            Symbolic::Method(method) => {
+            SymbolKind::Method(method) => {
                 method.members.iter_mut().for_each(|member| {
                     self.desugar_symbol(member);
                 });

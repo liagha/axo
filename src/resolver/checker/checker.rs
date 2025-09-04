@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use crate::resolver::checker::types::TypeKind;
-use crate::parser::Symbolic;
+use crate::parser::SymbolKind;
 use crate::resolver::checker::{
     types::Type,
     CheckError,
@@ -129,13 +129,13 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn infer_symbol(&mut self, symbol: Symbol<'resolver>) -> Type<'resolver> {
         match &symbol.kind {
-            Symbolic::Inclusion(_) => {
+            SymbolKind::Inclusion(_) => {
                 Type::unit(symbol.span)
             }
-            Symbolic::Extension(_) => {
+            SymbolKind::Extension(_) => {
                 Type::unit(symbol.span)
             }
-            Symbolic::Binding(binding) => {
+            SymbolKind::Binding(binding) => {
                 if let Some(annotation) = &binding.annotation {
                     if let Some(ty) = self.get(annotation) {
                         self.infer_symbol(ty)
@@ -148,7 +148,7 @@ impl<'resolver> Resolver<'resolver> {
                     Type::unit(symbol.span)
                 }
             }
-            Symbolic::Structure(structure) => {
+            SymbolKind::Structure(structure) => {
                 let structure = Structure::new(
                     Str::from(structure.target.brand().unwrap().to_string()),
                     structure.members
@@ -166,16 +166,16 @@ impl<'resolver> Resolver<'resolver> {
                     symbol.span
                 )
             }
-            Symbolic::Enumeration(_) => {
+            SymbolKind::Enumeration(_) => {
                 Type::unit(symbol.span)
             }
-            Symbolic::Method(_) => {
+            SymbolKind::Method(_) => {
                 Type::unit(symbol.span)
             }
-            Symbolic::Module(_) => {
+            SymbolKind::Module(_) => {
                 Type::unit(symbol.span)
             }
-            Symbolic::Preference(_) => {
+            SymbolKind::Preference(_) => {
                 Type::unit(symbol.span)
             }
         }
