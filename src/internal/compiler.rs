@@ -270,7 +270,7 @@ impl CompileLogger {
         if self.verbosity {
             let tree = analyses
                 .iter()
-                .map(|analysis| Str::from(format!("{:#?}", analysis)))
+                .map(|analysis| Str::from(format!("{:#?}", analysis.instruction)))
                 .collect::<Vec<Str>>()
                 .join("\n");
 

@@ -8,7 +8,7 @@ use {
         },
         format::{
             self,
-            Display, Formatter,
+            Display, Debug, Formatter,
         },
         internal::{
             operation::{Deref, Index},
@@ -23,7 +23,7 @@ pub use {
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Str<'string>(pub &'string [u8]);
 
 impl<'string> Str<'string> {
@@ -249,6 +249,12 @@ impl<'string> Display for Str<'string> {
             Some(s) => write!(f, "{}", s),
             None => write!(f, "{:?}", self.0),
         }
+    }
+}
+
+impl<'string> Debug for Str<'string> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self)
     }
 }
 

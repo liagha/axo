@@ -1,11 +1,17 @@
 mod error;
 mod generator;
+mod backend;
+mod inkwell;
 
 pub use {
+    backend::{
+        Backend,
+    },
+    inkwell::{
+        Inkwell
+    },
     generator::{
         Generator,
-        Inkwell,
-        Backend,
     },
 };
 
