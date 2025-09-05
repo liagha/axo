@@ -1,4 +1,5 @@
 use {
+    super::resolver::Id,
     crate::{
         data::{Offset, Scale},
         internal::hash::Set,
@@ -78,14 +79,16 @@ impl<'scope> Scope<'scope> {
         &self.symbols
     }
 
-    pub fn all(&self) -> Set<Symbol<'scope>> {
-        let mut symbols = Set::new();
+    pub fn all(&self) -> Vec<Symbol<'scope>> {
+        let mut symbols = Vec::new();
         let mut current = Some(self);
 
         while let Some(scope) = current {
             symbols.extend(scope.symbols.iter().cloned());
             current = scope.parent.as_deref();
         }
+
+        symbols.sort();
 
         symbols
     }
@@ -181,7 +184,7 @@ impl<'scope> Scope<'scope> {
     }
 
     pub fn flatten(&self) -> Vec<Symbol<'scope>> {
-        self.all().into_iter().collect()
+        self.all()
     }
 
     pub fn intersect(&self, other: &Scope<'scope>) -> Set<Symbol<'scope>> {

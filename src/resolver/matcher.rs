@@ -129,7 +129,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     let score = resemblance.to_f64();
 
                     if self.perfection.contains(&score) {
-                        println!("Perfect: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
                         Ok(resemblance)
                     } else if self.suggestion.contains(&score) {
                         let dominant = self.assessor.dominant();
@@ -138,7 +137,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         } else {
                             "are similar".to_string()
                         };
-                        println!("Suggestion: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
 
                         Err(
                             ResolveError {
@@ -148,7 +146,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             }
                         )
                     } else {
-                        println!("Disparity: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
                         Err(
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },

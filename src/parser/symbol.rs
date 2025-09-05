@@ -7,6 +7,7 @@ use {
     crate::{
         resolver::{
             scope::Scope,
+            Id,
         },
         tracker::{
             Span, Spanned,
@@ -31,14 +32,16 @@ use {
 use crate::internal::hash::Set;
 
 pub struct Symbol<'symbol> {
+    pub id: Id,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>) -> Self {
+    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>, id: Id) -> Self {
         Self {
+            id,
             kind: value,
             span,
             scope: Scope::new(),
@@ -48,6 +51,7 @@ impl<'symbol> Symbol<'symbol> {
     pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(&self, members: I) -> Self {
         Self {
             scope: Scope { symbols: Set::from_iter(members), parent: None },
+            id: self.id,
             ..self.clone()
         }
     }
@@ -111,7 +115,8 @@ impl<'parser> Parser<'parser> {
                             ElementKind::Symbolize(
                                 Symbol::new(
                                     SymbolKind::Extension(Extension::new(Box::new(name), None::<Box<Element<'parser>>>, members)),
-                                    span
+                                    span,
+                                    0
                                 ),
                             ),
                             span
@@ -131,6 +136,7 @@ impl<'parser> Parser<'parser> {
                                 Symbol::new(
                                     SymbolKind::Extension(Extension::new(Box::new(name), Some(Box::new(target)), members)),
                                     span,
+                                    0
                                 ),
                             ),
                             span
@@ -178,7 +184,8 @@ impl<'parser> Parser<'parser> {
                         ElementKind::Symbolize(
                             Symbol::new(
                                 SymbolKind::Binding(symbol),
-                                span
+                                span,
+                                0
                             )
                         ),
                         span,
@@ -214,6 +221,7 @@ impl<'parser> Parser<'parser> {
                             Symbol::new(
                                 SymbolKind::Structure(Structure::new(Box::new(name), fields)),
                                 span,
+                                0
                             ),
                         ),
                         span,
@@ -248,6 +256,7 @@ impl<'parser> Parser<'parser> {
                             Symbol::new(
                                 SymbolKind::Enumeration(Enumeration::new(Box::new(name), variant)),
                                 span,
+                                0
                             )
                         ),
                         span,
@@ -308,8 +317,6 @@ impl<'parser> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
 
-                println!("Invoke: {:?}", invoke);
-
                 if sequence.len() == 4 {
                     let mut variadic = false;
                     let body = sequence[3].unwrap_output().clone();
@@ -319,7 +326,7 @@ impl<'parser> Parser<'parser> {
                     for item in invoke.kind.clone().unwrap_group().items {
                         if let ElementKind::Symbolize(symbol) = item.kind.clone() {
                             parameters.push(symbol);
-                        } else { 
+                        } else {
                             variadic = true;
                         }
                     }
@@ -332,6 +339,7 @@ impl<'parser> Parser<'parser> {
                                 Symbol::new(
                                     SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>, variadic)),
                                     span,
+                                    0
                                 ),
                             ),
                             span,
@@ -359,7 +367,8 @@ impl<'parser> Parser<'parser> {
                             ElementKind::Symbolize(
                                 Symbol::new(
                                     SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)), variadic)),
-                                    span
+                                    span,
+                                    0
                                 )
                             ),
                             span,
@@ -392,6 +401,7 @@ impl<'parser> Parser<'parser> {
                 let mut symbol = Symbol::new(
                     SymbolKind::Module(Module::new(Box::new(name))),
                     span,
+                    0
                 );
                 symbol.scope.extend(fields);
 

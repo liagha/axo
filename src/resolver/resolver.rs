@@ -33,13 +33,20 @@ use {
                 replace,
             }
         },
+        resolver::{
+            matcher::{
+                Affinity, Aligner,
+            },
+        },
         format::Debug,
     },
 };
-use crate::resolver::matcher::{Affinity, Aligner};
+
+pub type Id = usize;
 
 #[derive(Debug)]
 pub struct Resolver<'resolver> {
+    pub counter: Id,
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
     pub output: Vec<Analysis<'resolver>>,
@@ -49,6 +56,7 @@ pub struct Resolver<'resolver> {
 impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
+            counter: self.counter,
             scope: self.scope.clone(),
             input: self.input.clone(),
             output: self.output.clone(),
@@ -60,6 +68,7 @@ impl Clone for Resolver<'_> {
 impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
+            counter: 0,
             scope: Scope::new(),
             input: Vec::new(),
             output: Vec::new(),
@@ -82,20 +91,27 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn define(&mut self, symbol: Symbol<'resolver>) {
+    pub fn define(&mut self, mut symbol: Symbol<'resolver>) {
+        symbol.id = self.next_id();
         self.scope.add(symbol);
     }
 
+    pub fn next_id(&mut self) -> Id {
+        let id = self.counter;
+        self.counter += 1;
+        id
+    }
+
     pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
-        let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
+        let candidates = self.scope.all();
 
         let mut aligner = Aligner::new();
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.25)
-            .dimension(&mut affinity, 0.5)
-            .dimension(&mut aligner, 0.5)
+            .floor(0.5)
+            .dimension(&mut affinity, 0.6)
+            .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Additive);
 
         let champion = assessor.champion(target, &candidates);
@@ -120,7 +136,6 @@ impl<'resolver> Resolver<'resolver> {
             Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());
-
                 None
             }
         }
@@ -131,11 +146,11 @@ impl<'resolver> Resolver<'resolver> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.25)
-            .dimension(&mut affinity, 0.5)
-            .dimension(&mut aligner, 0.5)
+            .floor(0.5)
+            .dimension(&mut affinity, 0.6)
+            .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Additive);
-        
+
         let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {
@@ -147,7 +162,6 @@ impl<'resolver> Resolver<'resolver> {
                     span: target.span.clone(),
                     hints: Vec::new(),
                 };
-
                 Err(vec![error])
             } else {
                 Err(assessor.errors.clone())
@@ -160,7 +174,6 @@ impl<'resolver> Resolver<'resolver> {
             Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());
-
                 None
             }
         }
@@ -182,7 +195,8 @@ impl<'resolver> Resolver<'resolver> {
             self.input[index] = self.desugar(element);
 
             if let ElementKind::Symbolize(symbol) = &self.input[index].kind {
-                self.scope.add(symbol.clone());
+                let symbol = symbol.clone();
+                self.define(symbol);
             }
         }
     }
@@ -280,11 +294,11 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             ElementKind::Access(access) => {
-                let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
+                let candidates = self.scope.all();
                 let target = self.lookup(&*access.target, &candidates);
 
                 if let Some(target) = target {
-                    let members = target.scope.all().iter().cloned().collect::<Vec<_>>();
+                    let members = target.scope.all();
                     let member = self.lookup(&*access.member, &members);
                 }
             }
@@ -316,13 +330,14 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn symbolize(&mut self, symbol: Symbol<'resolver>) {
+    pub fn symbolize(&mut self, mut symbol: Symbol<'resolver>) {
+        symbol.id = self.next_id();
         match symbol.kind {
             SymbolKind::Inclusion(_) => {}
             SymbolKind::Preference(_) => {}
             SymbolKind::Extension(extension) => {
-                let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-                
+                let candidates = self.scope.all();
+
                 if let Some(mut target) = self.lookup(&*extension.target, &candidates) {
                     if let Some(extension) = extension.extension {
                         if let Some(found) = self.lookup(&*extension, &candidates) {

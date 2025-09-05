@@ -36,15 +36,19 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::UndefinedSymbol { query } => {
-                write!(f, "undefined symbol: `{:?}`.", query)
+                write!(f, "undefined symbol: `{:#?}`.", query)
             },
 
             ErrorKind::MissingMember { target, members } => {
-                write!(f, "the members `{:?}` is missing from `{:?}`.", members, target)
+                let pretty = members.iter().map(|member| format!("{:#?}", member)).collect::<Vec<_>>().join(", ");
+
+                write!(f, "the members `{}` are missing from `{:#?}`.", pretty, target)
             }
 
             ErrorKind::UndefinedMember { target, members } => {
-                write!(f, "the members `{:?}` don't exist in `{:?}`.", members, target)
+                let pretty = members.iter().map(|member| format!("{:#?}", member)).collect::<Vec<_>>().join(", ");
+
+                write!(f, "the members `{}` don't exist in `{:#?}`.", pretty, target)
             }
             ErrorKind::Analyze { error } => {
                 write!(f, "{}", error.kind)

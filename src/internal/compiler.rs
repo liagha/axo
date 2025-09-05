@@ -383,7 +383,12 @@ impl<'compiler> Compiler<'compiler> {
             span
         );
 
-        let mut module = Symbol::new(SymbolKind::Module(Module::new(Box::new(identifier))), span);
+        let mut module = Symbol::new(
+            SymbolKind::Module(Module::new(Box::new(identifier))),
+            span,
+            self.registry.resolver.next_id()
+        );
+
         module.with_scope(self.registry.resolver.scope.clone());
 
         self.registry.resolver.exit();
@@ -464,7 +469,8 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
             let span = preference.borrow_span();
             Symbol::new(
                 SymbolKind::Preference(preference),
-                span
+                span,
+                resolver.next_id()
             )
         }).collect::<Vec<Symbol>>();
 
