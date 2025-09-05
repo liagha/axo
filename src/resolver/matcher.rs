@@ -164,7 +164,7 @@ struct Affinity {
 
 impl Affinity {
     fn new() -> Self {
-        Affinity { shaping: 0.75, binding: 0.25 }
+        Affinity { shaping: 0.9, binding: 0.1 }
     }
 }
 

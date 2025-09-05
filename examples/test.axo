@@ -1,1 +1,5 @@
-symbol.Tes
+struct Test {
+    var x
+}
+
+Test {}
