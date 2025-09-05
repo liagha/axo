@@ -56,6 +56,14 @@ impl<'token> Debug for Token<'token> {
     }
 }
 
+impl<'token> PartialEq for Token<'token> {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
+impl<'token> Eq for Token<'token> {}
+
 impl<'character> Spanned<'character> for Character<'character> {
     #[track_caller]
     fn borrow_span(&self) -> Span<'character> {

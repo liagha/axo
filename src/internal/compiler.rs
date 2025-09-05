@@ -558,6 +558,6 @@ impl<'resolver, B: Backend<'resolver>> Generator<'resolver, B> {
         let duration = Duration::from_nanos(timer.elapsed().unwrap());
         logger.finish("generating", duration, self.errors.len());
 
-        self.backend.write_to_file("test.ll");
+        self.backend.write_to_file("lab/test.ll");
     }
 }

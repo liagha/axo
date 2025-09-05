@@ -11,7 +11,7 @@ use {
     }
 };
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Hash)]
 pub struct Token<'token> {
     pub kind: TokenKind<'token>,
     pub span: Span<'token>,
