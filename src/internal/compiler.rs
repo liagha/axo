@@ -393,8 +393,6 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     fn compile_pipeline(&mut self) -> bool {
-        self.registry.resolver.scope.extend(super::base::primitives());
-
         let targets = {
             let mut initializer = Initialization::new();
             initializer.execute(&mut self.registry.resolver, ())
@@ -402,6 +400,22 @@ impl<'compiler> Compiler<'compiler> {
 
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
         let mut logger = CompileLogger::new(verbosity, targets.len());
+
+        {
+            let target = Location::File(Str::from("/Users/ali/Projects/axo/src/internal/base.axo"));
+
+            let tokens = {
+                let mut scanner = Scanner::new(target);
+                scanner.execute_pipeline(&mut self.registry.resolver, target, &logger)
+            };
+
+            let elements = {
+                let mut parser = Parser::new(target);
+                parser.execute(&mut self.registry.resolver, tokens, &logger)
+            };
+
+            self.registry.resolver.execute(elements.clone(), &logger);
+        }
 
         for target in targets {
             logger.set_current(target.to_string());

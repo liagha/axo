@@ -1,0 +1,13 @@
+enum Token {}
+
+struct Integer {
+    var value: Token,
+    var size: Token,
+}
+
+struct Float {
+    var value: Token,
+    var size: Token,
+}
+
+func printf(var value: Integer) {}

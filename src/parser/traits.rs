@@ -189,7 +189,7 @@ impl<'symbol> Debug for SymbolKind<'symbol> {
                     method.body)
             }
             SymbolKind::Module(module) => {
-                write!(f, "Module({:?})", module)
+                write!(f, "Module({:?})", module.target)
             }
             SymbolKind::Preference(preference) => {
                 write!(f, "Preference({:?}, {:?})", preference.target, preference.value)
