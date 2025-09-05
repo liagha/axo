@@ -191,104 +191,108 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             (ElementKind::Invoke(invoke), SymbolKind::Method(method)) => {
                 score += self.shaping;
 
-                if invoke.members.len() == method.members.len() {
-                    score += self.binding;
-                } else if invoke.members.len() > method.members.len() {
-                    let candidates = method.members
-                        .iter()
-                        .map(|member| member.brand().unwrap())
-                        .collect::<Vec<_>>();
+                let candidates = method.members
+                    .iter()
+                    .map(|member| member.brand().unwrap())
+                    .collect::<Vec<_>>();
 
-                    let members = invoke.members
+                let members = invoke.members
+                    .iter()
+                    .map(|member| member.brand().unwrap())
+                    .collect::<Vec<_>>();
+
+                if candidates == members {
+                    score += self.binding;
+                } else {
+                    let undefined = members
                         .iter()
-                        .map(|member| member.brand().unwrap())
+                        .cloned()
                         .filter(|member| !candidates.contains(member))
                         .collect::<Vec<_>>();
 
-                    return Err(
-                        ResolveError {
-                            kind: ErrorKind::UndefinedMember {
-                                target: method.target.brand().unwrap(),
-                                members,
-                            },
-                            span: query.span.clone(),
-                            hints: Vec::new(),
-                        }
-                    )
-                } else if invoke.members.len() < method.members.len() {
-                    let members = invoke.members
+                    let missing = candidates
                         .iter()
-                        .map(|member| member.brand().unwrap())
-                        .collect::<Vec<_>>();
-
-                    let candidates = method.members
-                        .iter()
-                        .map(|member| member.brand().unwrap())
+                        .cloned()
                         .filter(|member| !members.contains(member))
                         .collect::<Vec<_>>();
 
-                    return Err(
-                        ResolveError {
-                            kind: ErrorKind::MissingMember {
-                                target: method.target.brand().unwrap(),
-                                members,
-                            },
-                            span: query.span.clone(),
-                            hints: Vec::new(),
-                        }
-                    )
+                    if !missing.is_empty() {
+                        return Err(
+                            ResolveError {
+                                kind: ErrorKind::MissingMember {
+                                    target: method.target.brand().unwrap(),
+                                    members: missing,
+                                },
+                                span: query.span.clone(),
+                                hints: Vec::new(),
+                            }
+                        )
+                    } else if !undefined.is_empty() {
+                        return Err(
+                            ResolveError {
+                                kind: ErrorKind::UndefinedMember {
+                                    target: method.target.brand().unwrap(),
+                                    members: undefined,
+                                },
+                                span: query.span.clone(),
+                                hints: Vec::new(),
+                            }
+                        )
+                    }
                 }
             }
 
             (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
                 score += self.shaping;
 
-                if construct.members.len() == structure.members.len() {
-                    score += self.binding;
-                } else if construct.members.len() > structure.members.len() {
-                    let candidates = structure.members
-                        .iter()
-                        .map(|member| member.brand().unwrap())
-                        .collect::<Vec<_>>();
+                let candidates = structure.members
+                    .iter()
+                    .map(|member| member.brand().unwrap())
+                    .collect::<Vec<_>>();
 
-                    let members = construct.members
+                let members = construct.members
+                    .iter()
+                    .map(|member| member.brand().unwrap())
+                    .collect::<Vec<_>>();
+
+                if candidates == members {
+                    score += self.binding;
+                } else {
+                    let undefined = members
                         .iter()
-                        .map(|member| member.brand().unwrap())
+                        .cloned()
                         .filter(|member| !candidates.contains(member))
                         .collect::<Vec<_>>();
 
-                    return Err(
-                        ResolveError {
-                            kind: ErrorKind::UndefinedMember {
-                                target: structure.target.brand().unwrap(),
-                                members: candidates,
-                            },
-                            span: query.span.clone(),
-                            hints: Vec::new(),
-                        }
-                    )
-                } else if construct.members.len() < structure.members.len() {
-                    let members = construct.members
+                    let missing = candidates
                         .iter()
-                        .map(|member| member.brand().unwrap())
-                        .collect::<Vec<_>>();
-
-                    let candidates = structure.members
-                        .iter()
-                        .map(|member| member.brand().unwrap())
+                        .cloned()
                         .filter(|member| !members.contains(member))
                         .collect::<Vec<_>>();
 
-                    return Err(
-                        ResolveError {
-                            kind: ErrorKind::MissingMember {
-                                target: structure.target.brand().unwrap(),
-                                members: candidates,
-                            },
-                            span: query.span.clone(),
-                            hints: Vec::new(),
-                        }
-                    )
+                    if !missing.is_empty() {
+                        return Err(
+                            ResolveError {
+                                kind: ErrorKind::MissingMember {
+                                    target: structure.target.brand().unwrap(),
+                                    members: missing,
+                                },
+                                span: query.span.clone(),
+                                hints: Vec::new(),
+                            }
+                        )
+                    } else if !undefined.is_empty() {
+                        return Err(
+                            ResolveError {
+                                kind: ErrorKind::UndefinedMember {
+                                    target: structure.target.brand().unwrap(),
+                                    members: undefined,
+                                },
+                                span: query.span.clone(),
+                                hints: Vec::new(),
+                            }
+                        )
+                    }
                 }
             }
             _ => {}

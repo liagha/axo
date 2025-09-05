@@ -38,17 +38,24 @@ impl<'error> Display for ErrorKind<'error> {
             ErrorKind::UndefinedSymbol { query } => {
                 write!(f, "undefined symbol: `{:#?}`.", query)
             },
-
             ErrorKind::MissingMember { target, members } => {
-                let pretty = members.iter().map(|member| format!("{:#?}", member)).collect::<Vec<_>>().join(", ");
+                let pretty = members.iter().map(|member| format!("{}", member)).collect::<Vec<_>>().join(", ");
 
-                write!(f, "the members `{}` are missing from `{:#?}`.", pretty, target)
+                if members.len() == 1 {
+                    write!(f, "the member `{}` is missing from `{}`.", pretty, target)
+                } else {
+                    write!(f, "the members `{}` are missing from `{}`.", pretty, target)
+                }
             }
 
             ErrorKind::UndefinedMember { target, members } => {
-                let pretty = members.iter().map(|member| format!("{:#?}", member)).collect::<Vec<_>>().join(", ");
+                let pretty = members.iter().map(|member| format!("{}", member)).collect::<Vec<_>>().join(", ");
 
-                write!(f, "the members `{}` don't exist in `{:#?}`.", pretty, target)
+                if members.len() == 1 {
+                    write!(f, "the member `{}` doesn't exist in `{}`.", pretty, target)
+                } else {
+                    write!(f, "the members `{}` don't exist in `{}`.", pretty, target)
+                }
             }
             ErrorKind::Analyze { error } => {
                 write!(f, "{}", error.kind)
