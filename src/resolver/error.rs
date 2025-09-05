@@ -16,8 +16,13 @@ pub enum ErrorKind<'error> {
     UndefinedSymbol {
         query: Token<'error>,
     },
-    BindMismatch {
-        candidate: Token<'error>,
+    MissingMember {
+        target: Token<'error>,
+        members: Vec<Token<'error>>,
+    },
+    UndefinedMember {
+        target: Token<'error>,
+        members: Vec<Token<'error>>,
     },
     Analyze {
         error: AnalyzeError<'error>,
@@ -33,8 +38,13 @@ impl<'error> Display for ErrorKind<'error> {
             ErrorKind::UndefinedSymbol { query } => {
                 write!(f, "undefined symbol: `{:?}`.", query)
             },
-            ErrorKind::BindMismatch { candidate } => {
-                write!(f, "slots of `{:?}` aren't matched correctly.", candidate)
+
+            ErrorKind::MissingMember { target, members } => {
+                write!(f, "the members `{:?}` is missing from `{:?}`.", members, target)
+            }
+
+            ErrorKind::UndefinedMember { target, members } => {
+                write!(f, "the members `{:?}` don't exist in `{:?}`.", members, target)
             }
             ErrorKind::Analyze { error } => {
                 write!(f, "{}", error.kind)

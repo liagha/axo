@@ -532,7 +532,7 @@ impl<'resolver> Resolver<'resolver> {
 
         let analyses = self.process();
 
-        logger.analyses(&*analyses);
+        //logger.analyses(&*analyses);
 
         logger.errors(self.errors.as_slice());
 

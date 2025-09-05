@@ -11,12 +11,20 @@ use {
             Element, ElementKind,
             Symbol, SymbolKind,
         },
-        resolver::{HintKind, ResolveHint},
+        reporter::{
+            Hint,
+        },
+        resolver::{
+            HintKind, ResolveHint,
+            Resolver,
+        },
         schema::{Method, Structure},
         data::{
-            Float, Str,
+            Float, Str
         },
-        internal::operation::Range,
+        internal::{
+            operation::Range,
+        },
     },
     matchete::{
         Scheme,
@@ -121,6 +129,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     let score = resemblance.to_f64();
 
                     if self.perfection.contains(&score) {
+                        println!("Perfect: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
                         Ok(resemblance)
                     } else if self.suggestion.contains(&score) {
                         let dominant = self.assessor.dominant();
@@ -129,6 +138,8 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         } else {
                             "are similar".to_string()
                         };
+                        println!("Suggestion: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
+
                         Err(
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
@@ -137,6 +148,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             }
                         )
                     } else {
+                        println!("Disparity: {:#?} --- {:#?} => {}", query, candidate, resemblance.to_f64());
                         Err(
                             ResolveError {
                                 kind: ErrorKind::UndefinedSymbol { query: query.clone() },
@@ -157,13 +169,13 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 }
 
 #[derive(Debug)]
-struct Affinity {
+pub struct Affinity {
     shaping: f64,
     binding: f64,
 }
 
 impl Affinity {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Affinity { shaping: 0.9, binding: 0.1 }
     }
 }
@@ -172,45 +184,114 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
     fn resemblance(&mut self, query: &Element<'aligner>, candidate: &Symbol<'aligner>) -> Result<Resemblance, ResolveError<'aligner>> {
         let mut score = 0.0;
 
-        match (query.kind.clone(), candidate.clone()) {
+        match (query.kind.clone(), candidate.kind.clone()) {
             (ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }), _) => {
                 score += self.shaping;
 
                 score += self.binding;
             }
 
-            (ElementKind::Invoke(invoke), candidate) => {
-                if let SymbolKind::Method(method) = candidate.kind {
-                    score += self.shaping;
+            (ElementKind::Invoke(invoke), SymbolKind::Method(method)) => {
+                score += self.shaping;
 
-                    if invoke.arguments.len() == method.members.len() {
-                        score += self.binding;
-                    } else {
-                        return Err(
-                            ResolveError {
-                                kind: ErrorKind::BindMismatch { candidate: method.target.brand().unwrap() },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            }
-                        )
-                    }
+                if invoke.members.len() == method.members.len() {
+                    score += self.binding;
+                } else if invoke.members.len() > method.members.len() {
+                    let candidates = method.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .collect::<Vec<_>>();
+
+                    let members = invoke.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .filter(|member| !candidates.contains(member))
+                        .collect::<Vec<_>>();
+
+                    return Err(
+                        ResolveError {
+                            kind: ErrorKind::UndefinedMember {
+                                target: method.target.brand().unwrap(),
+                                members,
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        }
+                    )
+                } else if invoke.members.len() < method.members.len() {
+                    let members = invoke.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .collect::<Vec<_>>();
+
+                    let candidates = method.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .filter(|member| !members.contains(member))
+                        .collect::<Vec<_>>();
+
+                    return Err(
+                        ResolveError {
+                            kind: ErrorKind::MissingMember {
+                                target: method.target.brand().unwrap(),
+                                members,
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        }
+                    )
                 }
             }
-            (ElementKind::Construct(construct), candidate) => {
-                if let SymbolKind::Structure(structure) = candidate.kind {
-                    score += self.shaping;
 
-                    if construct.members.len() == structure.members.len() {
-                        score += self.binding;
-                    } else {
-                        return Err(
-                            ResolveError {
-                                kind: ErrorKind::BindMismatch { candidate: structure.target.brand().unwrap() },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            }
-                        )
-                    }
+            (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
+                score += self.shaping;
+
+                if construct.members.len() == structure.members.len() {
+                    score += self.binding;
+                } else if construct.members.len() > structure.members.len() {
+                    let candidates = structure.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .collect::<Vec<_>>();
+
+                    let members = construct.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .filter(|member| !candidates.contains(member))
+                        .collect::<Vec<_>>();
+
+                    return Err(
+                        ResolveError {
+                            kind: ErrorKind::UndefinedMember {
+                                target: structure.target.brand().unwrap(),
+                                members: candidates,
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        }
+                    )
+                } else if construct.members.len() < structure.members.len() {
+                    let members = construct.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .collect::<Vec<_>>();
+
+                    let candidates = structure.members
+                        .iter()
+                        .map(|member| member.brand().unwrap())
+                        .filter(|member| !members.contains(member))
+                        .collect::<Vec<_>>();
+
+                    return Err(
+                        ResolveError {
+                            kind: ErrorKind::MissingMember {
+                                target: structure.target.brand().unwrap(),
+                                members: candidates,
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        }
+                    )
                 }
             }
             _ => {}
@@ -218,12 +299,4 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
         Ok(Resemblance::from(score))
     }
-}
-
-pub fn symbol_matcher<'matcher>() -> Assessor<'matcher, Element<'matcher>, Symbol<'matcher>, ResolveError<'matcher>> {
-    Assessor::new()
-        .floor(0.5)
-        .dimension(Box::leak(Box::new(Aligner::new())), 0.75)
-        .dimension(Box::leak(Box::new(Affinity::new())), 0.25)
-        .scheme(Scheme::Multiplicative)
 }

@@ -60,10 +60,10 @@ impl<'element> Debug for ElementKind<'element> {
                 write!(f, "Labeled({:?}: {:?})", label.label, label.element)
             },
             ElementKind::Index(index) => {
-                write!(f, "Index({:?}[{:?}])", index.target, index.indexes)
+                write!(f, "Index({:?}[{:?}])", index.target, index.members)
             },
             ElementKind::Invoke(invoke) => {
-                write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.arguments)
+                write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.members)
             },
             ElementKind::Access(access) => {
                 write!(f, "Access({:?}.{:?})", access.target, access.member)

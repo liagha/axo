@@ -1,10 +1,8 @@
+use matchete::{Assessor, Scheme};
 use {
     super::{
         error::{
             ErrorKind,
-        },
-        matcher::{
-            symbol_matcher,
         },
         scope::{
             Scope,
@@ -38,6 +36,7 @@ use {
         format::Debug,
     },
 };
+use crate::resolver::matcher::{Affinity, Aligner};
 
 #[derive(Debug)]
 pub struct Resolver<'resolver> {
@@ -87,31 +86,35 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.add(symbol);
     }
 
-    #[track_caller]
     pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
-        let mut assessor = symbol_matcher();
+
+        let mut aligner = Aligner::new();
+        let mut affinity = Affinity::new();
+
+        let mut assessor = Assessor::new()
+            .floor(0.25)
+            .dimension(&mut affinity, 0.5)
+            .dimension(&mut aligner, 0.5)
+            .scheme(Scheme::Additive);
+
         let champion = assessor.champion(target, &candidates);
-        // assessor.dimensions.sort_by(|first, other| first.resemblance.to_f64().partial_cmp(&other.resemblance.to_f64()).unwrap());
 
         if let Some(champion) = champion {
             Ok(champion)
         } else {
-            if assessor.errors.is_empty() {
-                let error = ResolveError {
+            let mut errors = assessor.errors.clone();
+            if errors.is_empty() {
+                errors.push(ResolveError {
                     kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
                     span: target.span.clone(),
                     hints: Vec::new(),
-                };
-
-                Err(vec![error])
-            } else {
-                Err(assessor.errors.clone())
+                });
             }
+            Err(errors)
         }
     }
 
-    #[track_caller]
     pub fn get(&mut self, target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
         match self.try_get(target) {
             Ok(symbol) => Some(symbol),
@@ -123,9 +126,16 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    #[track_caller]
     pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
-        let mut assessor = symbol_matcher();
+        let mut aligner = Aligner::new();
+        let mut affinity = Affinity::new();
+
+        let mut assessor = Assessor::new()
+            .floor(0.25)
+            .dimension(&mut affinity, 0.5)
+            .dimension(&mut aligner, 0.5)
+            .scheme(Scheme::Additive);
+        
         let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {
@@ -145,7 +155,6 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    #[track_caller]
     pub fn lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
         match self.try_lookup(target, candidates) {
             Ok(symbol) => Some(symbol),

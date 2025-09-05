@@ -56,13 +56,13 @@ pub struct Unary<Operator, Operand> {
 #[derive(Debug, Eq)]
 pub struct Index<Target, Value> {
     pub target: Target,
-    pub indexes: Vec<Value>,
+    pub members: Vec<Value>,
 }
 
 #[derive(Debug, Eq)]
 pub struct Invoke<Target, Argument> {
     pub target: Target,
-    pub arguments: Vec<Argument>,
+    pub members: Vec<Argument>,
 }
 
 #[derive(Debug, Eq)]
@@ -172,14 +172,14 @@ impl<Operator, Operand> Unary<Operator, Operand> {
 impl<Target, Value> Index<Target, Value> {
     #[inline]
     pub fn new(target: Target, indexes: Vec<Value>) -> Self {
-        Index { target, indexes }
+        Index { target, members: indexes }
     }
 }
 
 impl<Target, Argument> Invoke<Target, Argument> {
     #[inline]
     pub fn new(target: Target, arguments: Vec<Argument>) -> Self {
-        Invoke { target, arguments }
+        Invoke { target, members: arguments }
     }
 }
 
@@ -289,14 +289,14 @@ impl<Operator: Hash, Operand: Hash> Hash for Unary<Operator, Operand> {
 impl<Target: Hash, Value: Hash> Hash for Index<Target, Value> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.indexes.hash(state);
+        self.members.hash(state);
     }
 }
 
 impl<Target: Hash, Argument: Hash> Hash for Invoke<Target, Argument> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.arguments.hash(state);
+        self.members.hash(state);
     }
 }
 
@@ -405,13 +405,13 @@ impl<Operator: PartialEq, Operand: PartialEq> PartialEq for Unary<Operator, Oper
 
 impl<Target: PartialEq, Value: PartialEq> PartialEq for Index<Target, Value> {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.indexes == other.indexes
+        self.target == other.target && self.members == other.members
     }
 }
 
 impl<Target: PartialEq, Argument: PartialEq> PartialEq for Invoke<Target, Argument> {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.arguments == other.arguments
+        self.target == other.target && self.members == other.members
     }
 }
 
@@ -515,13 +515,13 @@ impl<Operator: Clone, Operand: Clone> Clone for Unary<Operator, Operand> {
 
 impl<Target: Clone, Value: Clone> Clone for Index<Target, Value> {
     fn clone(&self) -> Self {
-        Index::new(self.target.clone(), self.indexes.clone())
+        Index::new(self.target.clone(), self.members.clone())
     }
 }
 
 impl<Target: Clone, Argument: Clone> Clone for Invoke<Target, Argument> {
     fn clone(&self) -> Self {
-        Invoke::new(self.target.clone(), self.arguments.clone())
+        Invoke::new(self.target.clone(), self.members.clone())
     }
 }
 

@@ -2,4 +2,4 @@ struct Test {
     var x
 }
 
-Test {}
+Test { }

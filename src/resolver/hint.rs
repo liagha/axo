@@ -14,7 +14,6 @@ use {
 #[derive(Clone, Debug)]
 pub enum HintKind<'hint> {
     SimilarBrand { candidate: Token<'hint>, how: String },
-    Parameter
 }
 
 impl<'hint> Display for HintKind<'hint> {
@@ -22,10 +21,6 @@ impl<'hint> Display for HintKind<'hint> {
         match self {
             HintKind::SimilarBrand { candidate, how } => {
                 write!(f, "did you mean `{:?}`? they {}", candidate, how)
-            }
-
-            HintKind::Parameter => {
-                write!(f, "")
             }
         }
     }

@@ -94,8 +94,8 @@ impl<'backend> super::Inkwell<'backend> {
             if let Some(value) = option {
                 if name.as_str().unwrap() == "printf" {
                     let mut arguments = vec![];
-                    if !invoke.arguments.is_empty() {
-                        let first = self.generate_instruction(invoke.arguments[0].instruction.clone(), function);
+                    if !invoke.members.is_empty() {
+                        let first = self.generate_instruction(invoke.members[0].instruction.clone(), function);
                         let format = if first.is_int_value() {
                             "%d\n"
                         } else if first.is_float_value() {
@@ -106,7 +106,7 @@ impl<'backend> super::Inkwell<'backend> {
                         let pointer = self.builder.build_global_string_ptr(format, "format").unwrap().as_pointer_value();
                         arguments.push(BasicMetadataValueEnum::from(pointer));
                         arguments.push(BasicMetadataValueEnum::from(first));
-                        for argument in invoke.arguments.iter().skip(1) {
+                        for argument in invoke.members.iter().skip(1) {
                             let value = self.generate_instruction(argument.instruction.clone(), function);
                             arguments.push(BasicMetadataValueEnum::from(value));
                         }
@@ -118,7 +118,7 @@ impl<'backend> super::Inkwell<'backend> {
                     result.try_as_basic_value().left().unwrap_or(self.context.i32_type().const_zero().into())
                 } else {
                     let mut arguments = vec![];
-                    for argument in &invoke.arguments {
+                    for argument in &invoke.members {
                         let value = self.generate_instruction(argument.instruction.clone(), function);
                         arguments.push(value.into());
                     }
