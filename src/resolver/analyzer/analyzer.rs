@@ -57,6 +57,17 @@ impl<'analyzer> Resolver<'analyzer> {
                                 ))
                             }
                         }
+                        [OperatorKind::Tilde] => {
+                            let operand = self.analyze(*unary.operand.clone())?;
+                            if operand.instruction.is_value() {
+                                Ok(Analysis::new(Instruction::BitwiseNot(Box::new(operand))))
+                            } else {
+                                Err(AnalyzeError::new(
+                                    ErrorKind::InvalidOperation(unary.operator.clone()),
+                                    unary.operator.span,
+                                ))
+                            }
+                        }
                         _ => Err(AnalyzeError::new(
                             ErrorKind::InvalidOperation(unary.operator.clone()),
                             unary.operator.span,
@@ -211,7 +222,7 @@ impl<'analyzer> Resolver<'analyzer> {
                             let left = self.analyze(*binary.left.clone())?;
                             let right = self.analyze(*binary.right.clone())?;
                             if left.instruction.is_value() && right.instruction.is_value() {
-                                Ok(Analysis::new(Instruction::BitwiseXOr(
+                                Ok(Analysis::new(Instruction::LogicalXOr(
                                     Box::new(left),
                                     Box::new(right),
                                 )))
@@ -358,6 +369,177 @@ impl<'analyzer> Resolver<'analyzer> {
             ElementKind::Access(access) => {
                 let target = self.analyze(*access.target.clone())?;
                 let member = self.analyze(*access.member.clone())?;
+
+                if let Instruction::Invoke(invoke) = &member.instruction {
+                    if let Instruction::Usage(method_name) = &invoke.target.instruction {
+                        let is_primitive = matches!(
+                            target.instruction,
+                            Instruction::Integer(_, _) | Instruction::Float(_, _) | Instruction::Boolean(_)
+                        );
+
+                        if is_primitive {
+                            match method_name.as_str().unwrap() {
+                                "add" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Add(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "subtract" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Subtract(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "multiply" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Multiply(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "divide" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Divide(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "modulus" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Modulus(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "and" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::LogicalAnd(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "or" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::LogicalOr(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "xor" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::LogicalXOr(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "bitwise_and" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::BitwiseAnd(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "bitwise_or" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::BitwiseOr(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "shift_left" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::ShiftLeft(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "shift_right" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::ShiftRight(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "equal" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Equal(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "not_equal" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::NotEqual(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "less" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Less(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "less_or_equal" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::LessOrEqual(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "greater" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::Greater(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "greater_or_equal" if invoke.arguments.len() == 1 => {
+                                    if invoke.arguments[0].instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::GreaterOrEqual(
+                                            Box::new(target),
+                                            Box::new(*invoke.arguments[0].clone()),
+                                        )));
+                                    }
+                                }
+                                "not" if invoke.arguments.is_empty() => {
+                                    if target.instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::LogicalNot(Box::new(target))));
+                                    }
+                                }
+                                "bitwise_not" if invoke.arguments.is_empty() => {
+                                    if target.instruction.is_value() {
+                                        return Ok(Analysis::new(Instruction::BitwiseNot(Box::new(target))));
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                // Fallback to regular Access if not a primitive operation
                 Ok(Analysis::new(Instruction::Access(
                     Box::new(target),
                     Box::new(member),

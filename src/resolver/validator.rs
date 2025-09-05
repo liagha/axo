@@ -291,6 +291,26 @@ impl<'resolver> Resolver<'resolver> {
                         span,
                     );
                 }
+                [OperatorKind::Tilde] => {
+                    let member = Element::new(
+                        ElementKind::Invoke(Invoke::new(
+                            Box::new(Element::new(
+                                ElementKind::Literal(Token::new(
+                                    TokenKind::Identifier(Str::from("bitwise_not")),
+                                    span,
+                                )),
+                                span,
+                            )),
+                            Vec::new(),
+                        )),
+                        span,
+                    );
+
+                    return Element::new(
+                        ElementKind::Access(Access::new(operand, Box::new(member))),
+                        span,
+                    );
+                }
                 _ => {}
             }
         }
@@ -309,135 +329,57 @@ impl<'resolver> Resolver<'resolver> {
         let left = Box::new(self.desugar(*binary.left));
         let right = Box::new(self.desugar(*binary.right));
 
-        match &binary.operator.kind {
-            TokenKind::Operator(operator) => {
-                match operator.as_slice() {
-                    [OperatorKind::Plus] => {
-                        let method = Box::new(
-                            Element::new(
-                                ElementKind::Invoke(
-                                    Invoke::new(
-                                        Box::new(
-                                            Element::new(
-                                                ElementKind::Literal(
-                                                    Token::new(
-                                                        TokenKind::Identifier(Str::from("add")),
-                                                        span,
-                                                    )
-                                                ),
-                                                span,
-                                            )
-                                        ),
-                                        vec![*right]
-                                    )
-                                ),
-                                span,
-                            )
-                        );
-
-                        Element::new(
-                            ElementKind::Access(Access::new(left, method)),
-                            span
-                        )
-                    }
-                    [OperatorKind::Minus] => {
-                        let method = Box::new(
-                            Element::new(
-                                ElementKind::Invoke(
-                                    Invoke::new(
-                                        Box::new(
-                                            Element::new(
-                                                ElementKind::Literal(
-                                                    Token::new(
-                                                        TokenKind::Identifier(Str::from("subtract")),
-                                                        span,
-                                                    )
-                                                ),
-                                                span,
-                                            )
-                                        ),
-                                        vec![*right]
-                                    )
-                                ),
-                                span,
-                            )
-                        );
-
-                        Element::new(
-                            ElementKind::Access(Access::new(left, method)),
-                            span
-                        )
-                    }
-                    [OperatorKind::Star] => {
-                        let method = Box::new(
-                            Element::new(
-                                ElementKind::Invoke(
-                                    Invoke::new(
-                                        Box::new(
-                                            Element::new(
-                                                ElementKind::Literal(
-                                                    Token::new(
-                                                        TokenKind::Identifier(Str::from("multiply")),
-                                                        span,
-                                                    )
-                                                ),
-                                                span,
-                                            )
-                                        ),
-                                        vec![*right]
-                                    )
-                                ),
-                                span,
-                            )
-                        );
-
-                        Element::new(
-                            ElementKind::Access(Access::new(left, method)),
-                            span
-                        )
-                    }
-                    [OperatorKind::Slash] => {
-                        let method = Box::new(
-                            Element::new(
-                                ElementKind::Invoke(
-                                    Invoke::new(
-                                        Box::new(
-                                            Element::new(
-                                                ElementKind::Literal(
-                                                    Token::new(
-                                                        TokenKind::Identifier(Str::from("divide")),
-                                                        span,
-                                                    )
-                                                ),
-                                                span,
-                                            )
-                                        ),
-                                        vec![*right]
-                                    )
-                                ),
-                                span,
-                            )
-                        );
-
-                        Element::new(
-                            ElementKind::Access(Access::new(left, method)),
-                            span
-                        )
-                    }
-                    _ => {
-                        Element::new(
-                            ElementKind::Binary(Binary::new(left, binary.operator, right)),
-                            span,
-                        )
-                    }
+        if let TokenKind::Operator(operator) = &binary.operator.kind {
+            let method_name = match operator.as_slice() {
+                [OperatorKind::Plus] => "add",
+                [OperatorKind::Minus] => "subtract",
+                [OperatorKind::Star] => "multiply",
+                [OperatorKind::Slash] => "divide",
+                [OperatorKind::Percent] => "modulus",
+                [OperatorKind::Ampersand, OperatorKind::Ampersand] => "and",
+                [OperatorKind::Pipe, OperatorKind::Pipe] => "or",
+                [OperatorKind::Caret] => "xor",
+                [OperatorKind::Ampersand] => "bitwise_and",
+                [OperatorKind::Pipe] => "bitwise_or",
+                [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => "shift_left",
+                [OperatorKind::RightAngle, OperatorKind::RightAngle] => "shift_right",
+                [OperatorKind::Equal, OperatorKind::Equal] => "equal",
+                [OperatorKind::Exclamation, OperatorKind::Equal] => "not_equal",
+                [OperatorKind::LeftAngle] => "less",
+                [OperatorKind::LeftAngle, OperatorKind::Equal] => "less_or_equal",
+                [OperatorKind::RightAngle] => "greater",
+                [OperatorKind::RightAngle, OperatorKind::Equal] => "greater_or_equal",
+                _ => {
+                    return Element::new(
+                        ElementKind::Binary(Binary::new(left, binary.operator, right)),
+                        span,
+                    )
                 }
-            }
-            _ => {
-                Element::new(
-                    ElementKind::Binary(Binary::new(left, binary.operator, right)),
-                    span,
-                )
-            }
+            };
+
+            let method = Box::new(Element::new(
+                ElementKind::Invoke(Invoke::new(
+                    Box::new(Element::new(
+                        ElementKind::Literal(Token::new(
+                            TokenKind::Identifier(Str::from(method_name)),
+                            span,
+                        )),
+                        span,
+                    )),
+                    vec![*right],
+                )),
+                span,
+            ));
+
+            Element::new(
+                ElementKind::Access(Access::new(left, method)),
+                span,
+            )
+        } else {
+            Element::new(
+                ElementKind::Binary(Binary::new(left, binary.operator, right)),
+                span,
+            )
         }
     }
 
