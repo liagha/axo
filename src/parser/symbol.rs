@@ -267,20 +267,24 @@ impl<'parser> Parser<'parser> {
                 Self::group(
                     Classifier::alternative([
                         Classifier::deferred(Self::symbolization),
-                        Classifier::literal(
-                            Token::new(
-                                TokenKind::Operator(
-                                    OperatorKind::Composite(
-                                        vec![
-                                            OperatorKind::Dot,
-                                            OperatorKind::Dot,
-                                            OperatorKind::Dot,
-                                        ]
-                                    )
-                                ),
-                                Span::void(),
-                            )
-                        )
+                        Classifier::predicate(|token: &Token| {
+                            if let TokenKind::Operator(operator) = &token.kind {
+                                matches!(operator.as_slice(), [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot])
+                            } else {
+                                false
+                            }
+                        }).with_transform(|form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+                            let variadic = form.unwrap_input();
+
+                            Ok(Form::output(
+                                Element::new(
+                                    ElementKind::literal(
+                                        variadic.clone()
+                                    ),
+                                    variadic.span
+                                )
+                            ))
+                        })
                     ])),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -303,6 +307,8 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
+
+                println!("Invoke: {:?}", invoke);
 
                 if sequence.len() == 4 {
                     let mut variadic = false;

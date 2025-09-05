@@ -10,4 +10,4 @@ struct Float {
     var size: Token,
 }
 
-func printf(var value: Integer) {}
+func printf(var value: Integer, ...) {}

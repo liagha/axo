@@ -181,7 +181,7 @@ impl<'symbol> Debug for SymbolKind<'symbol> {
                     method.target,
                     method.members,
                     if method.variadic {
-                        "..."
+                        "- Variadic"
                     } else {
                         ""
                     },
