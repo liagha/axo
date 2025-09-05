@@ -197,7 +197,8 @@ impl<'resolver> Resolver<'resolver> {
                             Box::new(target),
                             vec![
                                 Element::new(ElementKind::Literal(literal), span),
-                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(32), span)), span)
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Integer(32), span)), span),
+                                Element::new(ElementKind::Literal(Token::new(TokenKind::Boolean(true), span)), span),
                             ],
                         )
                     ),
@@ -271,6 +272,26 @@ impl<'resolver> Resolver<'resolver> {
 
         if let TokenKind::Operator(operator) = &unary.operator.kind {
             match operator.as_slice() {
+                [OperatorKind::Minus] => {
+                    let member = Element::new(
+                        ElementKind::Invoke(Invoke::new(
+                            Box::new(Element::new(
+                                ElementKind::Literal(Token::new(
+                                    TokenKind::Identifier(Str::from("negate")),
+                                    span,
+                                )),
+                                span,
+                            )),
+                            Vec::new(),
+                        )),
+                        span,
+                    );
+
+                    return Element::new(
+                        ElementKind::Access(Access::new(operand, Box::new(member))),
+                        span,
+                    );
+                }
                 [OperatorKind::Exclamation] => {
                     let member = Element::new(
                         ElementKind::Invoke(Invoke::new(

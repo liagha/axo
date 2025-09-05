@@ -87,6 +87,7 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.add(symbol);
     }
 
+    #[track_caller]
     pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
         let candidates = self.scope.all().iter().cloned().collect::<Vec<_>>();
         let mut assessor = symbol_matcher();
@@ -110,6 +111,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
+    #[track_caller]
     pub fn get(&mut self, target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
         match self.try_get(target) {
             Ok(symbol) => Some(symbol),
@@ -121,6 +123,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
+    #[track_caller]
     pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
         let mut assessor = symbol_matcher();
         let champion = assessor.champion(target, candidates);
@@ -142,6 +145,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
+    #[track_caller]
     pub fn lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
         match self.try_lookup(target, candidates) {
             Ok(symbol) => Some(symbol),

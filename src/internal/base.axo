@@ -3,11 +3,16 @@ enum Token {}
 struct Integer {
     var value: Token,
     var size: Token,
+    var signed: Boolean,
 }
 
 struct Float {
     var value: Token,
     var size: Token,
+}
+
+struct Boolean {
+    var value: Token,
 }
 
 func printf(var value, ...) {}

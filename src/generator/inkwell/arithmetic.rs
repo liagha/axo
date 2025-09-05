@@ -1,9 +1,17 @@
-use inkwell::values::BasicValueEnum;
-
-use crate::resolver::analyzer::Analysis;
-
-use inkwell::values::FunctionValue;
-use crate::generator::Backend;
+use {
+    inkwell::{
+        values::{
+            BasicValueEnum,
+            FunctionValue,
+        }
+    },
+    crate::{
+        resolver::{
+            analyzer::Analysis,
+        },
+    },
+    super::Backend,
+};
 
 impl<'backend> super::Inkwell<'backend> {
     pub fn generate_add(&mut self, left: Box<Analysis<'backend>>, right: Box<Analysis<'backend>>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {

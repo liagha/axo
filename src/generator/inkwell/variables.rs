@@ -1,19 +1,25 @@
-use inkwell::values::BasicValueEnum;
 
 use {
+    inkwell::{
+        values::{
+            BasicValueEnum, FunctionValue,
+        }
+    },
     crate::{
-        data::Str,
-        schema::{Assign, Binding},
+        data::{
+            Str,
+        },
+        schema::{
+            Assign, Binding,
+        },
         resolver::{
             analyzer::{
                 Analysis
             }
         }
-    }
+    },
+    super::Backend,
 };
-
-use inkwell::values::FunctionValue;
-use crate::generator::Backend;
 
 impl<'backend> super::Inkwell<'backend> {
     pub fn generate_usage(&self, identifier: Str<'backend>) -> BasicValueEnum<'backend> {

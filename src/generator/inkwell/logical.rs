@@ -1,9 +1,18 @@
-use inkwell::values::BasicValueEnum;
+use {
+    inkwell::{
+        values::{
+            BasicValueEnum,
+            FunctionValue,
+        },
+    },
+    crate::{
+        resolver::{
+            analyzer::Analysis,
+        },
+    },
+    super::Backend,
+};
 
-use crate::resolver::analyzer::Analysis;
-
-use inkwell::values::FunctionValue;
-use crate::generator::Backend;
 
 impl<'backend> super::Inkwell<'backend> {
     pub fn generate_logical_and(&mut self, left: Box<Analysis<'backend>>, right: Box<Analysis<'backend>>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {

@@ -6,12 +6,37 @@ mod comparison;
 mod variables;
 mod functions;
 
-use std::io::Write;
-use inkwell::{AddressSpace, builder::Builder, context::Context, module::Module, types::{AnyTypeEnum, BasicTypeEnum}, values::{BasicValueEnum, FunctionValue, PointerValue}};
+use {
+    inkwell::{
+        AddressSpace,
+        builder::Builder,
+        context::Context,
+        module::Module,
+        types::{
+            AnyTypeEnum, BasicTypeEnum
+        },
+        values::{
+            BasicValueEnum,
+            FunctionValue, 
+            PointerValue
+        },
+    },
 
-use crate::{data::Str, internal::hash::Map, resolver::analyzer::{Analysis, Instruction}};
-
-use super::Backend;
+    crate::{
+        data::{
+            Str,
+        },
+        internal::{
+            hash::Map,
+            platform::Write,
+        },
+        resolver::{
+            analyzer::{Analysis, Instruction}
+        }
+    },
+    
+    super::Backend,
+};
 
 pub struct Inkwell<'backend> {
     context: &'backend Context,
@@ -101,9 +126,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
 
     fn generate_instruction(&mut self, instruction: Instruction<'backend>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {
         match instruction {
-            Instruction::Integer(number, scale) => self.generate_integer(number, scale),
-            Instruction::Float(number, scale) => self.generate_float(number, scale),
-            Instruction::Boolean(value) => self.generate_boolean(value),
+            Instruction::Integer { value, size, signed } => self.generate_integer(value, size, signed),
+            Instruction::Float { value, size } => self.generate_float(value, size),
+            Instruction::Boolean { value } => self.generate_boolean(value),
             Instruction::Add(left, right) => self.generate_add(left, right, function),
             Instruction::Subtract(left, right) => self.generate_subtract(left, right, function),
             Instruction::Multiply(left, right) => self.generate_multiply(left, right, function),

@@ -1,7 +1,9 @@
-use inkwell::types::AnyTypeEnum;
 use {
     inkwell::{
-        types::{AnyType, BasicType}, 
+        types::{
+            AnyType, BasicType,
+            AnyTypeEnum,
+        }, 
         values::{
             BasicMetadataValueEnum, 
             BasicValueEnum,
@@ -16,13 +18,11 @@ use {
         schema::{
             Method, Invoke, 
         },
-        generator::{
-            Backend,
-        },
         resolver::{
             analyzer::{Analysis, Instruction},
         },
-    }
+    },
+    super::Backend,
 };
 
 impl<'backend> super::Inkwell<'backend> {

@@ -22,9 +22,9 @@ impl<'analysis> Analysis<'analysis> {
 #[derive(Clone, Debug)]
 pub enum Instruction<'analysis> {
     // Primitives
-    Integer(data::Integer, data::Scale),
-    Float(data::Float, data::Scale),
-    Boolean(data::Boolean),
+    Integer { value: data::Integer, size: data::Scale, signed: data::Boolean },
+    Float { value: data::Float, size: data::Scale },
+    Boolean { value: data::Boolean },
     Array(Vec<Box<Analysis<'analysis>>>),
     Tuple(Vec<Box<Analysis<'analysis>>>),
 
@@ -83,9 +83,9 @@ impl<'analysis> Instruction<'analysis> {
     pub fn is_value(&self) -> bool {
         matches!(
             self,
-            Instruction::Integer(_, _)
-            | Instruction::Float(_, _)
-            | Instruction::Boolean(_)
+            Instruction::Integer { .. }
+            | Instruction::Float { .. }
+            | Instruction::Boolean { .. }
         )
     }
 }

@@ -1,9 +1,20 @@
-use inkwell::values::BasicValueEnum;
-use crate::data::{Float, Integer, Scale};
-use crate::resolver::analyzer::Instruction;
+use {
+    inkwell::{
+        values::BasicValueEnum,
+    },
+
+    crate::{
+        data::{
+            Float, Integer, Boolean, Scale,
+        },
+        resolver::{
+            analyzer::Instruction,
+        },
+    },
+};
 
 impl<'backend> super::Inkwell<'backend> {
-    pub fn generate_integer(&self, number: Integer, scale: Scale) -> BasicValueEnum<'backend> {
+    pub fn generate_integer(&self, number: Integer, scale: Scale, signed: Boolean) -> BasicValueEnum<'backend> {
         let kind = match scale {
             8 => self.context.i8_type(),
             16 => self.context.i16_type(),
@@ -11,7 +22,9 @@ impl<'backend> super::Inkwell<'backend> {
             64 => self.context.i64_type(),
             _ => self.context.i64_type()
         };
+
         let unsigned = number as u64;
+
         BasicValueEnum::from(kind.const_int(unsigned, false))
     }
 

@@ -1,12 +1,7 @@
 use crate::resolver::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
 use crate::resolver::Resolver;
 use crate::scanner::Token;
-use crate::{
-    data::Str,
-    parser::{Element, ElementKind, Symbol, SymbolKind},
-    scanner::{OperatorKind, TokenKind},
-    schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure},
-};
+use crate::{data, data::Str, parser::{Element, ElementKind, Symbol, SymbolKind}, scanner::{OperatorKind, TokenKind}, schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure}};
 use crate::data::Scale;
 use crate::schema::{Block, Conditional, Cycle, While};
 
@@ -372,12 +367,7 @@ impl<'analyzer> Resolver<'analyzer> {
 
                 if let Instruction::Invoke(invoke) = &member.instruction {
                     if let Instruction::Usage(method_name) = &invoke.target.instruction {
-                        let is_primitive = matches!(
-                            target.instruction,
-                            Instruction::Integer(_, _) | Instruction::Float(_, _) | Instruction::Boolean(_)
-                        );
-
-                        if is_primitive {
+                        if target.instruction.is_value() {
                             match method_name.as_str().unwrap() {
                                 "add" if invoke.arguments.len() == 1 => {
                                     if invoke.arguments[0].instruction.is_value() {
@@ -528,6 +518,13 @@ impl<'analyzer> Resolver<'analyzer> {
                                         return Ok(Analysis::new(Instruction::LogicalNot(Box::new(target))));
                                     }
                                 }
+                                "negate" if invoke.arguments.is_empty() => {
+                                    if let Instruction::Integer { value, size, signed } = target.instruction {
+                                        return Ok(Analysis::new(Instruction::Integer { value: -value, size, signed }));
+                                    } else if let Instruction::Float { value, size } = target.instruction {
+                                        return Ok(Analysis::new(Instruction::Float { value: -value, size }));
+                                    }
+                                }
                                 "bitwise_not" if invoke.arguments.is_empty() => {
                                     if target.instruction.is_value() {
                                         return Ok(Analysis::new(Instruction::BitwiseNot(Box::new(target))));
@@ -586,9 +583,21 @@ impl<'analyzer> Resolver<'analyzer> {
 
                 match target_name.as_str() {
                     "Integer" => {
-                        if fields.len() == 2 {
-                            if let (Instruction::Integer(value, _), Instruction::Integer(size, _)) = (&fields[0].instruction, &fields[1].instruction) {
-                                Ok(Analysis::new(Instruction::Integer(value.clone(), (*size).try_into().unwrap())))
+                        if fields.len() == 3 {
+                            if let (
+                                Instruction::Integer { value, .. },
+                                Instruction::Integer { size, .. },
+                                Instruction::Boolean { value: signed }
+                            ) = (&fields[0].instruction, &fields[1].instruction, &fields[2].instruction) {
+                                Ok(
+                                    Analysis::new(
+                                        Instruction::Integer {
+                                            value: value.clone(),
+                                            size: (*size).try_into().unwrap(),
+                                            signed: signed.clone(),
+                                        }
+                                    )
+                                )
                             } else {
                                 Err(AnalyzeError::new(
                                     ErrorKind::InvalidType,
@@ -604,8 +613,15 @@ impl<'analyzer> Resolver<'analyzer> {
                     }
                     "Float" => {
                         if fields.len() == 2 {
-                            if let (Instruction::Float(value, _), Instruction::Integer(size, _)) = (&fields[0].instruction, &fields[1].instruction) {
-                                Ok(Analysis::new(Instruction::Float(value.clone(), (*size).try_into().unwrap())))
+                            if let (Instruction::Float { value, .. }, Instruction::Integer { size, .. }) = (&fields[0].instruction, &fields[1].instruction) {
+                                Ok(
+                                    Analysis::new(
+                                        Instruction::Float {
+                                            value: value.clone(),
+                                            size: (*size).try_into().unwrap()
+                                        }
+                                    )
+                                )
                             } else {
                                 Err(AnalyzeError::new(
                                     ErrorKind::InvalidType,
@@ -621,8 +637,8 @@ impl<'analyzer> Resolver<'analyzer> {
                     }
                     "Boolean" => {
                         if fields.len() == 1 {
-                            if let Instruction::Boolean(value) = &fields[0].instruction {
-                                Ok(Analysis::new(Instruction::Boolean(value.clone())))
+                            if let Instruction::Boolean { value } = &fields[0].instruction {
+                                Ok(Analysis::new(Instruction::Boolean { value: value.clone() }))
                             } else {
                                 Err(AnalyzeError::new(
                                     ErrorKind::InvalidType,
@@ -714,9 +730,9 @@ impl<'analyzer> Resolver<'analyzer> {
         literal: &Token<'analyzer>,
     ) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &literal.kind {
-            TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float(float.clone(), 64))),
-            TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer(integer.clone(), 64))),
-            TokenKind::Boolean(boolean) => Ok(Analysis::new(Instruction::Boolean(boolean.clone()))),
+            TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float { value: float.clone(), size: 64 })),
+            TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer { value: integer.clone(), size: 64, signed: true })),
+            TokenKind::Boolean(boolean) => Ok(Analysis::new(Instruction::Boolean { value: boolean.clone() })),
             TokenKind::Identifier(identifier) => {
                 Ok(Analysis::new(Instruction::Usage(identifier.clone())))
             }
