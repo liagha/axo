@@ -36,7 +36,7 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::UndefinedSymbol { query } => {
-                write!(f, "undefined symbol: `{:#?}`.", query)
+                write!(f, "undefined symbol: `{}`.", query)
             },
             ErrorKind::MissingMember { target, members } => {
                 let pretty = members.iter().map(|member| format!("{}", member)).collect::<Vec<_>>().join(", ");
