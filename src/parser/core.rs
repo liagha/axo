@@ -9,6 +9,7 @@ use {
             form::Form,
             classifier::Classifier,
         },
+        data::Str,
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         schema::{
             Access, Assign,
@@ -17,20 +18,16 @@ use {
         },
         tracker::{
             Span, Spanned,
+            Location,
         },
     },
 };
-use crate::data::Str;
-use crate::tracker::Location;
 
 impl<'parser> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
         match element.kind {
-            ElementKind::Bundle(bundle) => {
-                bundle.items
-            }
-            ElementKind::Block(block) => {
-                block.items
+            ElementKind::Delimited(delimited) => {
+                delimited.items
             }
             _ => {
                 vec![element]
@@ -155,23 +152,55 @@ impl<'parser> Parser<'parser> {
                         let span = Span::merge(&unary.borrow_span(), &element.borrow_span());
 
                         match element.kind {
-                            ElementKind::Group(group) => {
-                                unary = Element::new(
-                                    ElementKind::invoke(Invoke::new(Box::new(unary), group.items)),
-                                    span,
-                                )
-                            }
-                            ElementKind::Collection(collection) => {
-                                unary = Element::new(
-                                    ElementKind::index(Index::new(Box::new(unary), collection.items)),
-                                    span,
-                                )
-                            }
-                            ElementKind::Bundle(bundle) => {
-                                unary = Element::new(
-                                    ElementKind::construct(Structure::new(Box::new(unary), bundle.items)),
-                                    span,
-                                )
+                            ElementKind::Delimited(delimited) => {
+                                match (delimited.start.kind, delimited.separator.map(|token| token.kind), delimited.end.kind) {
+                                    (
+                                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                                        None,
+                                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                                    ) | (
+                                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                                    ) => {
+                                        unary = Element::new(
+                                            ElementKind::invoke(Invoke::new(Box::new(unary), delimited.items)),
+                                            span,
+                                        )
+                                    }
+
+                                    (
+                                        TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                        None,
+                                        TokenKind::Punctuation(PunctuationKind::RightBracket),
+                                    ) | (
+                                        TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                                        TokenKind::Punctuation(PunctuationKind::RightBracket),
+                                    ) => {
+                                        unary = Element::new(
+                                            ElementKind::index(Index::new(Box::new(unary), delimited.items)),
+                                            span,
+                                        ) 
+                                    }
+
+                                    (
+                                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                        None,
+                                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                                    ) | (
+                                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                                    ) => {
+                                        unary = Element::new(
+                                            ElementKind::construct(Structure::new(Box::new(unary), delimited.items)),
+                                            span,
+                                        ) 
+                                    }
+                                    
+                                    _ => {}
+                                }
                             }
                             _ => {}
                         }

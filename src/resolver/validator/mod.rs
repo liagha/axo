@@ -65,40 +65,23 @@ impl<'resolver> Resolver<'resolver> {
                     element.span,
                 )
             }
-            ElementKind::Group(group) => {
-                let items = group.items.into_iter().map(|i| self.desugar(i)).collect();
-                Element::new(ElementKind::Group(Group::new(items)), element.span)
-            }
-            ElementKind::Sequence(sequence) => {
-                let items = sequence
-                    .items
-                    .into_iter()
-                    .map(|i| self.desugar(i))
-                    .collect();
-                Element::new(ElementKind::Sequence(Sequence::new(items)), element.span)
-            }
-            ElementKind::Collection(collection) => {
-                let items = collection
+            ElementKind::Delimited(delimited) => {
+                let items = delimited
                     .items
                     .into_iter()
                     .map(|i| self.desugar(i))
                     .collect();
                 Element::new(
-                    ElementKind::Collection(Collection::new(items)),
-                    element.span,
+                    ElementKind::Delimited(
+                        Delimited::new(
+                            delimited.start,
+                            items,
+                            delimited.separator,
+                            delimited.end,
+                        )
+                    ),
+                    element.span
                 )
-            }
-            ElementKind::Series(series) => {
-                let items = series.items.into_iter().map(|i| self.desugar(i)).collect();
-                Element::new(ElementKind::Series(Series::new(items)), element.span)
-            }
-            ElementKind::Bundle(bundle) => {
-                let items = bundle.items.into_iter().map(|i| self.desugar(i)).collect();
-                Element::new(ElementKind::Bundle(Bundle::new(items)), element.span)
-            }
-            ElementKind::Block(block) => {
-                let items = block.items.into_iter().map(|i| self.desugar(i)).collect();
-                Element::new(ElementKind::Block(Block::new(items)), element.span)
             }
             ElementKind::Label(label) => {
                 let label_val = Box::new(self.desugar(*label.label));

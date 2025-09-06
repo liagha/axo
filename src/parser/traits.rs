@@ -37,23 +37,22 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Procedural(procedural) => {
                     write!(f, "Procedural({:#?})", procedural.body)
                 }
-                ElementKind::Series(series) => {
-                    write!(f, "Series({:#?})", series.items)
-                }
-                ElementKind::Collection(collection) => {
-                    write!(f, "Collection({:#?})", collection.items)
-                },
-                ElementKind::Group(group) => {
-                    write!(f, "Group({:#?})", group.items)
-                },
-                ElementKind::Sequence(sequence) => {
-                    write!(f, "Sequence({:#?})", sequence.items)
-                }
-                ElementKind::Bundle(bundle) => {
-                    write!(f, "Bundle({:#?})", bundle.items)
-                },
-                ElementKind::Block(block) => {
-                    write!(f, "Block({:#?})", block.items)
+                ElementKind::Delimited(delimited) => {
+                    write!(
+                        f,
+                        "Delimited({}{:#?}{})",
+                        format!("{} ", delimited.start),
+                        delimited.items
+                            .iter()
+                            .map(|item| format!("{:#?}", item))
+                            .collect::<Vec<_>>()
+                            .join(
+                                &*delimited.clone().separator.map(
+                                    |separator| format!("{} ", separator)
+                                ).unwrap_or(" ".to_string())
+                            ),
+                        format!("{} ", delimited.end)
+                    )
                 }
 
                 ElementKind::Binary(binary) => {
@@ -141,23 +140,22 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Procedural(procedural) => {
                     write!(f, "Procedural({:?})", procedural.body)
                 }
-                ElementKind::Series(series) => {
-                    write!(f, "Series({:?})", series.items)
-                }
-                ElementKind::Collection(collection) => {
-                    write!(f, "Collection({:?})", collection.items)
-                },
-                ElementKind::Group(group) => {
-                    write!(f, "Group({:?})", group.items)
-                },
-                ElementKind::Sequence(sequence) => {
-                    write!(f, "Sequence({:?})", sequence.items)
-                }
-                ElementKind::Bundle(bundle) => {
-                    write!(f, "Bundle({:?})", bundle.items)
-                },
-                ElementKind::Block(block) => {
-                    write!(f, "Block({:#?})", block.items)
+                ElementKind::Delimited(delimited) => {
+                    write!(
+                        f,
+                        "Delimited({}{:#?}{})",
+                        format!("{} ", delimited.start),
+                        delimited.items
+                            .iter()
+                            .map(|item| format!("{:?}", item))
+                            .collect::<Vec<_>>()
+                            .join(
+                                &*delimited.clone().separator.map(
+                                    |separator| format!("{} ", separator)
+                                ).unwrap_or(" ".to_string())
+                            ),
+                        format!("{} ", delimited.end)
+                    )
                 }
 
                 ElementKind::Binary(binary) => {
@@ -405,30 +403,11 @@ impl<'element> Hash for ElementKind<'element> {
                 element.hash(state);
             }
 
-            ElementKind::Group(group) => {
+            ElementKind::Delimited(delimited) => {
                 discriminant(self).hash(state);
-                group.hash(state);
+                delimited.hash(state);
             }
-            ElementKind::Sequence(sequence) => {
-                discriminant(self).hash(state);
-                sequence.hash(state);
-            }
-            ElementKind::Collection(collection) => {
-                discriminant(self).hash(state);
-                collection.hash(state);
-            }
-            ElementKind::Series(series) => {
-                discriminant(self).hash(state);
-                series.hash(state);
-            }
-            ElementKind::Bundle(bundle) => {
-                discriminant(self).hash(state);
-                bundle.hash(state);
-            }
-            ElementKind::Block(block) => {
-                discriminant(self).hash(state);
-                block.hash(state);
-            }
+
             ElementKind::Construct(construct) => {
                 discriminant(self).hash(state);
                 construct.hash(state);
@@ -510,12 +489,7 @@ impl<'element> PartialEq for ElementKind<'element> {
             (ElementKind::Literal(a), ElementKind::Literal(b)) => a == b,
             (ElementKind::Procedural(a), ElementKind::Procedural(b)) => a == b,
 
-            (ElementKind::Group(a), ElementKind::Group(b)) => a == b,
-            (ElementKind::Sequence(a), ElementKind::Sequence(b)) => a == b,
-            (ElementKind::Collection(a), ElementKind::Collection(b)) => a == b,
-            (ElementKind::Series(a), ElementKind::Series(b)) => a == b,
-            (ElementKind::Bundle(a), ElementKind::Bundle(b)) => a == b,
-            (ElementKind::Block(a), ElementKind::Block(b)) => a == b,
+            (ElementKind::Delimited(a), ElementKind::Delimited(b)) => a == b,
             (ElementKind::Construct(a), ElementKind::Construct(b)) => a == b,
 
             (ElementKind::Binary(a), ElementKind::Binary(b)) => a == b,
@@ -557,12 +531,7 @@ impl<'element> Clone for ElementKind<'element> {
             ElementKind::Literal(kind) => ElementKind::Literal(kind.clone()),
             ElementKind::Procedural(element) => ElementKind::Procedural(element.clone()),
 
-            ElementKind::Group(group) => ElementKind::Group(group.clone()),
-            ElementKind::Sequence(sequence) => ElementKind::Sequence(sequence.clone()),
-            ElementKind::Collection(collection) => ElementKind::Collection(collection.clone()),
-            ElementKind::Series(series) => ElementKind::Series(series.clone()),
-            ElementKind::Bundle(bundle) => ElementKind::Bundle(bundle.clone()),
-            ElementKind::Block(block) => ElementKind::Block(block.clone()),
+            ElementKind::Delimited(delimited) => ElementKind::Delimited(delimited.clone()),
             ElementKind::Construct(construct) => ElementKind::Construct(construct.clone()),
 
             ElementKind::Binary(binary) => ElementKind::Binary(binary.clone()),

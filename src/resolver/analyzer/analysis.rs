@@ -2,7 +2,7 @@ use {
     crate::{
         data,
         schema::{
-            Assign, Block, Conditional, Cycle,
+            Assign, Conditional, Cycle,
             Enumeration, Index, Invoke, Method,
             Structure, While, Binding},
     }
@@ -59,7 +59,7 @@ pub enum Instruction<'analysis> {
     Invoke(Invoke<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
 
     // Control Flow Related
-    Block(Block<Box<Analysis<'analysis>>>),
+    Block(Vec<Box<Analysis<'analysis>>>),
     Conditional(Conditional<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     While(While<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     Cycle(Cycle<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),

@@ -1,9 +1,9 @@
 use crate::resolver::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
 use crate::resolver::Resolver;
-use crate::scanner::Token;
+use crate::scanner::{PunctuationKind, Token};
 use crate::{data, data::Str, parser::{Element, ElementKind, Symbol, SymbolKind}, scanner::{OperatorKind, TokenKind}, schema::{Assign, Binding, Enumeration, Index, Invoke, Method, Structure}};
 use crate::data::Scale;
-use crate::schema::{Block, Conditional, Cycle, While};
+use crate::schema::{Delimited, Conditional, Cycle, While};
 
 impl<'analyzer> Resolver<'analyzer> {
     pub fn analyze(
@@ -15,33 +15,37 @@ impl<'analyzer> Resolver<'analyzer> {
             ElementKind::Procedural(_) => {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
             }
-            ElementKind::Group(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
-            }
-            ElementKind::Sequence(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
-            }
-            ElementKind::Collection(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
-            }
-            ElementKind::Series(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
-            }
-            ElementKind::Bundle(bundle) => {
-                let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = bundle
-                    .items
-                    .iter()
-                    .map(|item| self.analyze(item.clone()).map(Box::new))
-                    .collect();
-                Ok(Analysis::new(Instruction::Block(Block::new(items?))))
-            }
-            ElementKind::Block(block) => {
-                let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = block
-                    .items
-                    .iter()
-                    .map(|item| self.analyze(item.clone()).map(Box::new))
-                    .collect();
-                Ok(Analysis::new(Instruction::Block(Block::new(items?))))
+            ElementKind::Delimited(delimited) => {
+                match element.kind {
+                    ElementKind::Delimited(delimited) => {
+                        match (delimited.start.kind, delimited.separator.map(|token| token.kind), delimited.end.kind) {
+                            (
+                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                None,
+                                TokenKind::Punctuation(PunctuationKind::RightBrace),
+                            ) | (
+                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                                Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                                TokenKind::Punctuation(PunctuationKind::RightBrace),
+                            ) => {
+                                let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = delimited
+                                    .items
+                                    .iter()
+                                    .map(|item| self.analyze(item.clone()).map(Box::new))
+                                    .collect();
+
+                                Ok(Analysis::new(Instruction::Block(items?)))
+                            }
+
+                            _ => {
+                                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
+                            }
+                        }
+                    }
+                    _ => {
+                        Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
+                    }
+                }
             }
             ElementKind::Unary(unary) => {
                 if let TokenKind::Operator(operator) = &unary.operator.kind {

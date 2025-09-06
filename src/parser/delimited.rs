@@ -5,7 +5,7 @@ use {
             form::Form,
         },
         scanner::{PunctuationKind, Token, TokenKind},
-        schema::{Block, Bundle, Collection, Group, Sequence, Series},
+        schema::Delimited,
         tracker::{Location, Span, Spanned},
     },
     super::{ErrorKind, Element, ElementKind, ParseError, Parser},
@@ -27,7 +27,6 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
-
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
@@ -47,7 +46,6 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBrace,
@@ -58,12 +56,34 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
             move |form| {
-                let braces = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::bundle(Bundle::new(elements.clone())), braces.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }
@@ -83,7 +103,6 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
-
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
@@ -103,23 +122,44 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(
-                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                            ),
+                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                                PunctuationKind::LeftBrace,
+                            )),
                             span,
                         )
                     }),
                 ),
             ]),
             move |form| {
-                let braces = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::block(Block::new(elements.clone())), braces.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }
@@ -141,7 +181,6 @@ impl<'parser> Parser<'parser> {
                                 Classifier::ignore(),
                                 Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                     let span = Span::default(Location::Flag);
-
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Comma,
@@ -162,7 +201,6 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-                        
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
@@ -173,12 +211,34 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
             move |form| {
-                let parentheses = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::group(Group::new(elements.clone())), parentheses.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }
@@ -200,7 +260,6 @@ impl<'parser> Parser<'parser> {
                                 Classifier::ignore(),
                                 Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                     let span = Span::default(Location::Flag);
-
                                     ParseError::new(
                                         ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                             PunctuationKind::Semicolon,
@@ -221,7 +280,6 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftParenthesis,
@@ -232,12 +290,34 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
             move |form| {
-                let parentheses = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::sequence(Sequence::new(elements.clone())), parentheses.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }
@@ -257,7 +337,6 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
-
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Comma,
@@ -277,7 +356,6 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,
@@ -288,12 +366,34 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
             move |form| {
-                let brackets = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::collection(Collection::new(elements.clone())), brackets.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }
@@ -303,8 +403,7 @@ impl<'parser> Parser<'parser> {
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                })
-                .with_ignore(),
+                }),
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
@@ -314,7 +413,6 @@ impl<'parser> Parser<'parser> {
                             }),
                             Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                                 let span = Span::default(Location::Flag);
-
                                 ParseError::new(
                                     ErrorKind::MissingSeparator(TokenKind::Punctuation(
                                         PunctuationKind::Semicolon,
@@ -334,7 +432,6 @@ impl<'parser> Parser<'parser> {
                     }),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
-
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                                 PunctuationKind::LeftBracket,
@@ -345,12 +442,34 @@ impl<'parser> Parser<'parser> {
                 ),
             ]),
             move |form| {
-                let brackets = form.collect_inputs();
+                let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
+                let start = delimiters.first().unwrap();
+                let end = delimiters.last().unwrap();
+                let span = Span::merge(&start.span, &end.span);
 
-                Ok(Form::output(
-                    Element::new(ElementKind::series(Series::new(elements.clone())), brackets.borrow_span())
-                ))
+                if delimiters.len() == 2 {
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            None,
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                } else {
+                    let separator = delimiters[1].clone();
+                    Ok(Form::output(Element::new(
+                        ElementKind::delimited(Delimited::new(
+                            start.clone(),
+                            elements.clone(),
+                            Some(separator),
+                            end.clone(),
+                        )),
+                        span,
+                    )))
+                }
             },
         )
     }

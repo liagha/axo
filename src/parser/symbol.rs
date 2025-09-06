@@ -96,7 +96,7 @@ impl<'parser> Parser<'parser> {
                         Self::literal(),
                     ])
                 ),
-                Classifier::deferred(Self::symbolization),
+                Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let keyword = form.collect_inputs()[0].clone();
@@ -105,9 +105,15 @@ impl<'parser> Parser<'parser> {
 
                 if outputs.len() == 2 {
                     let body = outputs[1].clone();
-                    let members = body.kind.clone().unwrap_block().items.iter().map(|item| {
-                        item.kind.clone().unwrap_symbolize()
-                    }).collect::<Vec<_>>();
+
+                    let members: Vec<_> = Self::get_body(body.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            _ => None,
+                        })
+                        .collect();
+
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
@@ -125,9 +131,13 @@ impl<'parser> Parser<'parser> {
                 } else if outputs.len() == 3 {
                     let target = outputs[1].clone();
                     let body = outputs[2].clone();
-                    let members = <ElementKind as Clone>::clone(&body.kind).unwrap_block().clone().items.iter().map(|item| {
-                        item.kind.clone().unwrap_symbolize()
-                    }).collect::<Vec<_>>();
+                    let members: Vec<_> = Self::get_body(body.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            _ => None,
+                        })
+                        .collect();
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
@@ -210,16 +220,20 @@ impl<'parser> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
 
-                let fields = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
-                    item.kind.clone().unwrap_symbolize().clone()
-                }).collect::<Vec<_>>();
+                let members: Vec<_> = Self::get_body(body.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(symbol),
+                        _ => None,
+                    })
+                    .collect();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                SymbolKind::Structure(Structure::new(Box::new(name), fields)),
+                                SymbolKind::Structure(Structure::new(Box::new(name), members)),
                                 span,
                                 0
                             ),
@@ -245,19 +259,24 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
+
+                let members: Vec<_> = Self::get_body(body.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(symbol),
+                        _ => None,
+                    })
+                    .collect();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-                let variant = body.kind.clone().unwrap_bundle().items.iter().map(|item| {
-                    item.kind.clone().unwrap_symbolize().clone()
-                }).collect::<Vec<_>>();
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                SymbolKind::Enumeration(Enumeration::new(Box::new(name), variant)),
+                                SymbolKind::Enumeration(Enumeration::new(Box::new(name), members)),
                                 span,
                                 0
-                            )
+                            ),
                         ),
                         span,
                     )
@@ -321,23 +340,25 @@ impl<'parser> Parser<'parser> {
                     let mut variadic = false;
                     let body = sequence[3].unwrap_output().clone();
 
-                    let mut parameters = Vec::new();
-
-                    for item in invoke.kind.clone().unwrap_group().items {
-                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
-                            parameters.push(symbol);
-                        } else {
-                            variadic = true;
-                        }
-                    }
-
+                    let members: Vec<_> = Self::get_body(body.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            _ => {
+                                variadic = true;
+                                
+                                None
+                            },
+                        })
+                        .collect();
+                    
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), None::<Box<Element<'parser>>>, variadic)),
+                                    SymbolKind::Method(Method::new(Box::new(name), members, Box::new(body), None::<Box<Element<'parser>>>, variadic)),
                                     span,
                                     0
                                 ),
@@ -350,15 +371,17 @@ impl<'parser> Parser<'parser> {
                     let body = sequence[4].unwrap_output().clone();
                     let mut variadic = false;
 
-                    let mut parameters = Vec::new();
+                    let members: Vec<_> = Self::get_body(body.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            _ => {
+                                variadic = true;
 
-                    for item in invoke.kind.clone().unwrap_group().items {
-                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
-                            parameters.push(symbol);
-                        } else {
-                            variadic = true;
-                        }
-                    }
+                                None
+                            },
+                        })
+                        .collect();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -366,7 +389,7 @@ impl<'parser> Parser<'parser> {
                         Element::new(
                             ElementKind::Symbolize(
                                 Symbol::new(
-                                    SymbolKind::Method(Method::new(Box::new(name), parameters, Box::new(body), Some(Box::new(output)), variadic)),
+                                    SymbolKind::Method(Method::new(Box::new(name), members, Box::new(body), Some(Box::new(output)), variadic)),
                                     span,
                                     0
                                 )

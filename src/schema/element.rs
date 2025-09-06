@@ -11,33 +11,11 @@ pub struct Procedural<Body> {
 }
 
 #[derive(Debug, Eq)]
-pub struct Group<Item> {
+pub struct Delimited<Delimiter, Item> {
+    pub start: Delimiter,
     pub items: Vec<Item>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Sequence<Item> {
-    pub items: Vec<Item>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Collection<Item> {
-    pub items: Vec<Item>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Series<Item> {
-    pub items: Vec<Item>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Bundle<Item> {
-    pub items: Vec<Item>,
-}
-
-#[derive(Debug, Eq)]
-pub struct Block<Item> {
-    pub items: Vec<Item>,
+    pub separator: Option<Delimiter>,
+    pub end: Delimiter,
 }
 
 #[derive(Debug, Eq)]
@@ -109,45 +87,10 @@ impl<Body> Procedural<Body> {
     }
 }
 
-impl<Item> Group<Item> {
+impl<Delimiter, Item> Delimited<Delimiter, Item> {
     #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Group { items }
-    }
-}
-
-impl<Item> Sequence<Item> {
-    #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Sequence { items }
-    }
-}
-
-impl<Item> Collection<Item> {
-    #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Collection { items }
-    }
-}
-
-impl<Item> Series<Item> {
-    #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Series { items }
-    }
-}
-
-impl<Item> Bundle<Item> {
-    #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Bundle { items }
-    }
-}
-
-impl<Item> Block<Item> {
-    #[inline]
-    pub fn new(items: Vec<Item>) -> Self {
-        Block { items }
+    pub fn new(start: Delimiter, items: Vec<Item>, separator: Option<Delimiter>, end: Delimiter) -> Self {
+        Delimited { start, items, separator, end }
     }
 }
 
@@ -235,39 +178,12 @@ impl<Body: Hash> Hash for Procedural<Body> {
     }
 }
 
-impl<Item: Hash> Hash for Group<Item> {
+impl<Delimiter: Hash, Item: Hash> Hash for Delimited<Delimiter, Item> {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        self.start.hash(state);
         self.items.hash(state);
-    }
-}
-
-impl<Item: Hash> Hash for Sequence<Item> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
-    }
-}
-
-impl<Item: Hash> Hash for Collection<Item> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
-    }
-}
-
-impl<Item: Hash> Hash for Series<Item> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
-    }
-}
-
-impl<Item: Hash> Hash for Bundle<Item> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
-    }
-}
-
-impl<Item: Hash> Hash for Block<Item> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.hash(state);
+        self.separator.hash(state);
+        self.end.hash(state);
     }
 }
 
@@ -351,39 +267,12 @@ impl<Body: PartialEq> PartialEq for Procedural<Body> {
     }
 }
 
-impl<Item: PartialEq> PartialEq for Group<Item> {
+impl<Delimiter: PartialEq, Item: PartialEq> PartialEq for Delimited<Delimiter, Item> {
     fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
-    }
-}
-
-impl<Item: PartialEq> PartialEq for Sequence<Item> {
-    fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
-    }
-}
-
-impl<Item: PartialEq> PartialEq for Collection<Item> {
-    fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
-    }
-}
-
-impl<Item: PartialEq> PartialEq for Series<Item> {
-    fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
-    }
-}
-
-impl<Item: PartialEq> PartialEq for Bundle<Item> {
-    fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
-    }
-}
-
-impl<Item: PartialEq> PartialEq for Block<Item> {
-    fn eq(&self, other: &Self) -> bool {
-        self.items == other.items
+        self.start == other.start
+            && self.items == other.items
+            && self.separator == other.separator
+            && self.end == other.end
     }
 }
 
@@ -461,39 +350,14 @@ impl<Body: Clone> Clone for Procedural<Body> {
     }
 }
 
-impl<Item: Clone> Clone for Group<Item> {
+impl<Delimiter: Clone, Item: Clone> Clone for Delimited<Delimiter, Item> {
     fn clone(&self) -> Self {
-        Group::new(self.items.clone())
-    }
-}
-
-impl<Item: Clone> Clone for Sequence<Item> {
-    fn clone(&self) -> Self {
-        Sequence::new(self.items.clone())
-    }
-}
-
-impl<Item: Clone> Clone for Collection<Item> {
-    fn clone(&self) -> Self {
-        Collection::new(self.items.clone())
-    }
-}
-
-impl<Item: Clone> Clone for Series<Item> {
-    fn clone(&self) -> Self {
-        Series::new(self.items.clone())
-    }
-}
-
-impl<Item: Clone> Clone for Bundle<Item> {
-    fn clone(&self) -> Self {
-        Bundle::new(self.items.clone())
-    }
-}
-
-impl<Item: Clone> Clone for Block<Item> {
-    fn clone(&self) -> Self {
-        Block::new(self.items.clone())
+        Delimited::new(
+            self.start.clone(),
+            self.items.clone(),
+            self.separator.clone(),
+            self.end.clone(),
+        )
     }
 }
 

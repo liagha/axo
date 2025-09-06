@@ -12,8 +12,8 @@ use crate::resolver::checker::{
     CheckError,
 };
 use crate::resolver::{ResolveError, Resolver};
-use crate::scanner::{Token, TokenKind};
-use crate::schema::Structure;
+use crate::scanner::{PunctuationKind, Token, TokenKind};
+use crate::schema::{Index, Invoke, Structure};
 
 impl<'resolver> Resolver<'resolver> {
     pub fn check(&mut self, target: Type<'resolver>, source: Type<'resolver>) {
@@ -35,43 +35,56 @@ impl<'resolver> Resolver<'resolver> {
     }
     
     pub fn infer_element(&mut self, element: &Element<'resolver>) -> Type<'resolver> {
-        match &element.kind {
+        match element.kind.clone() {
             ElementKind::Literal(literal) => {
                 Type::unit(literal.span)
             }
             ElementKind::Procedural(_) => {
                 Type::unit(element.span)
             }
-            ElementKind::Group(group) => {
-                Type::new(
-                    TypeKind::Tuple {
-                        items: group.items
-                            .iter()
-                            .map(|item| {
-                                self.infer_element(item)
-                            })
-                            .collect::<Vec<_>>()
-                    },
-                    element.span,
-                )
-            }
-            ElementKind::Sequence(_) => {
-                Type::unit(element.span)
-            }
-            ElementKind::Collection(_) => {
-                Type::unit(element.span)
-            }
-            ElementKind::Series(_) => {
-                Type::unit(element.span)
-            }
-            ElementKind::Bundle(_) => {
-                Type::unit(element.span)
-            }
-            ElementKind::Block(block) => {
-                if let Some(element) = block.items.last() {
-                    self.infer_element(element)
-                } else {
-                    Type::unit(element.span)
+            ElementKind::Delimited(delimited) => {
+                match (delimited.start.kind, delimited.separator.map(|token| token.kind), delimited.end.kind) {
+                    (
+                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                        None,
+                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                    ) | (
+                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                    ) => {
+                        Type::new(
+                            TypeKind::Tuple {
+                                items: delimited.items
+                                    .iter()
+                                    .map(|item| {
+                                        self.infer_element(item)
+                                    })
+                                    .collect::<Vec<_>>()
+                            },
+                            element.span,
+                        )
+                    }
+
+                    (
+                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                        None,
+                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                    ) | (
+                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                    ) => {
+                        if let Some(element) = delimited.items.last() {
+                            self.infer_element(element)
+                        } else {
+                            Type::unit(element.span)
+                        }
+                    }
+
+                    _ => {
+                        Type::unit(element.span)
+                    }
                 }
             }
             ElementKind::Unary(unary) => {

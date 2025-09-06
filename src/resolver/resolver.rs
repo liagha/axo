@@ -216,9 +216,9 @@ impl<'resolver> Resolver<'resolver> {
                 }
             }
 
-            ElementKind::Block(body) => {
+            ElementKind::Delimited(delimited) => {
                 self.enter();
-                body.items.iter().for_each(|item| self.resolve(item));
+                delimited.items.iter().for_each(|item| self.resolve(item));
                 self.exit();
             }
 
@@ -230,22 +230,6 @@ impl<'resolver> Resolver<'resolver> {
             | ElementKind::Invoke { .. }
             | ElementKind::Index { .. } => {
                 self.get(&element);
-            }
-
-            ElementKind::Group(group) => {
-                for element in group.items {
-                    self.resolve(&element);
-                }
-            }
-            ElementKind::Collection(collection) => {
-                for element in collection.items {
-                    self.resolve(&element);
-                }
-            }
-            ElementKind::Bundle(bundle) => {
-                for element in bundle.items {
-                    self.resolve(&element);
-                }
             }
 
             ElementKind::Binary(binary) => {
@@ -311,9 +295,7 @@ impl<'resolver> Resolver<'resolver> {
 
             ElementKind::Symbolize(_)
             | ElementKind::Literal(_)
-            | ElementKind::Procedural(_)
-            | ElementKind::Sequence(_)
-            | ElementKind::Series(_) => {}
+            | ElementKind::Procedural(_) => {}
         }
 
         let analysis = self.analyze(element.clone());

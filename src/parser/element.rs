@@ -4,8 +4,8 @@ use {
         formation::classifier::Classifier,
         scanner::{Token, TokenKind},
         schema::{
-            Access, Assign, Binary, Block, Bundle, Collection, Conditional, Group,
-            Index, Invoke, Cycle, Label, Procedural, While, Structure, Sequence, Series, Unary,
+            Access, Assign, Binary, Delimited, Conditional,
+            Index, Invoke, Cycle, Label, Procedural, While, Structure, Unary,
         },
         tracker::{Span, Spanned},
     },
@@ -22,17 +22,7 @@ pub enum ElementKind<'element> {
 
     Procedural(Procedural<Box<Element<'element>>>),
 
-    Group(Group<Element<'element>>),
-
-    Sequence(Sequence<Element<'element>>),
-
-    Collection(Collection<Element<'element>>),
-
-    Series(Series<Element<'element>>),
-
-    Bundle(Bundle<Element<'element>>),
-
-    Block(Block<Element<'element>>),
+    Delimited(Delimited<Token<'element>, Element<'element>>), 
 
     Unary(Unary<Token<'element>, Box<Element<'element>>>),
 
@@ -83,33 +73,8 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn group(group: Group<Element<'element>>) -> Self {
-        ElementKind::Group(group)
-    }
-
-    #[inline]
-    pub fn sequence(seq: Sequence<Element<'element>>) -> Self {
-        ElementKind::Sequence(seq)
-    }
-
-    #[inline]
-    pub fn collection(coll: Collection<Element<'element>>) -> Self {
-        ElementKind::Collection(coll)
-    }
-
-    #[inline]
-    pub fn series(series: Series<Element<'element>>) -> Self {
-        ElementKind::Series(series)
-    }
-
-    #[inline]
-    pub fn bundle(bundle: Bundle<Element<'element>>) -> Self {
-        ElementKind::Bundle(bundle)
-    }
-
-    #[inline]
-    pub fn block(block: Block<Element<'element>>) -> Self {
-        ElementKind::Block(block)
+    pub fn delimited(delimited: Delimited<Token<'element>, Element<'element>>) -> Self {
+        ElementKind::Delimited(delimited)
     }
 
     #[inline]
@@ -198,33 +163,8 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn is_group(&self) -> bool {
-        matches!(self, ElementKind::Group(_))
-    }
-
-    #[inline(always)]
-    pub fn is_sequence(&self) -> bool {
-        matches!(self, ElementKind::Sequence(_))
-    }
-
-    #[inline(always)]
-    pub fn is_collection(&self) -> bool {
-        matches!(self, ElementKind::Collection(_))
-    }
-
-    #[inline(always)]
-    pub fn is_series(&self) -> bool {
-        matches!(self, ElementKind::Series(_))
-    }
-
-    #[inline(always)]
-    pub fn is_bundle(&self) -> bool {
-        matches!(self, ElementKind::Bundle(_))
-    }
-
-    #[inline(always)]
-    pub fn is_block(&self) -> bool {
-        matches!(self, ElementKind::Block(_))
+    pub fn is_delimited(&self) -> bool {
+        matches!(self, ElementKind::Delimited(_))
     }
 
     #[inline(always)]
@@ -322,55 +262,10 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_group(self) -> Group<Element<'element>> {
+    pub fn unwrap_delimited(self) -> Delimited<Token<'element>, Element<'element>> {
         match self {
-            ElementKind::Group(group) => group,
-            _ => panic!("called `unwrap_group` on non-Group variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_sequence(self) -> Sequence<Element<'element>> {
-        match self {
-            ElementKind::Sequence(seq) => seq,
-            _ => panic!("called `unwrap_sequence` on non-Sequence variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_collection(self) -> Collection<Element<'element>> {
-        match self {
-            ElementKind::Collection(coll) => coll,
-            _ => panic!("called `unwrap_collection` on non-Collection variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_series(self) -> Series<Element<'element>> {
-        match self {
-            ElementKind::Series(series) => series,
-            _ => panic!("called `unwrap_series` on non-Series variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_bundle(self) -> Bundle<Element<'element>> {
-        match self {
-            ElementKind::Bundle(bundle) => bundle,
-            _ => panic!("called `unwrap_bundle` on non-Bundle variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_block(self) -> Block<Element<'element>> {
-        match self {
-            ElementKind::Block(block) => block,
-            _ => panic!("called `unwrap_block` on non-Block variant."),
+            ElementKind::Delimited(delimited) => delimited,
+            _ => panic!("called `unwrap_delimited` on non-Group variant."),
         }
     }
 
@@ -526,49 +421,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_group(&self) -> Option<&Group<Element<'element>>> {
+    pub fn try_unwrap_delimited(&self) -> Option<&Delimited<Token<'element>, Element<'element>>> {
         match self {
-            ElementKind::Group(group) => Some(group),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_sequence(&self) -> Option<&Sequence<Element<'element>>> {
-        match self {
-            ElementKind::Sequence(seq) => Some(seq),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_collection(&self) -> Option<&Collection<Element<'element>>> {
-        match self {
-            ElementKind::Collection(coll) => Some(coll),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_series(&self) -> Option<&Series<Element<'element>>> {
-        match self {
-            ElementKind::Series(series) => Some(series),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_bundle(&self) -> Option<&Bundle<Element<'element>>> {
-        match self {
-            ElementKind::Bundle(bundle) => Some(bundle),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_block(&self) -> Option<&Block<Element<'element>>> {
-        match self {
-            ElementKind::Block(block) => Some(block),
+            ElementKind::Delimited(delimited) => Some(delimited),
             _ => None,
         }
     }
@@ -710,49 +565,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_group_mut(&mut self) -> Option<&mut Group<Element<'element>>> {
+    pub fn try_unwrap_delimited_mut(&mut self) -> Option<&mut Delimited<Token<'element>, Element<'element>>> {
         match self {
-            ElementKind::Group(group) => Some(group),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_sequence_mut(&mut self) -> Option<&mut Sequence<Element<'element>>> {
-        match self {
-            ElementKind::Sequence(seq) => Some(seq),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_collection_mut(&mut self) -> Option<&mut Collection<Element<'element>>> {
-        match self {
-            ElementKind::Collection(coll) => Some(coll),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_series_mut(&mut self) -> Option<&mut Series<Element<'element>>> {
-        match self {
-            ElementKind::Series(series) => Some(series),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_bundle_mut(&mut self) -> Option<&mut Bundle<Element<'element>>> {
-        match self {
-            ElementKind::Bundle(bundle) => Some(bundle),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_block_mut(&mut self) -> Option<&mut Block<Element<'element>>> {
-        match self {
-            ElementKind::Block(block) => Some(block),
+            ElementKind::Delimited(delimited) => Some(delimited),
             _ => None,
         }
     }
