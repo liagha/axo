@@ -45,7 +45,6 @@ pub struct Inkwell<'backend> {
     variables: Map<Str<'backend>, PointerValue<'backend>>,
     types: Map<Str<'backend>, BasicTypeEnum<'backend>>,
     functions: Map<Str<'backend>, FunctionValue<'backend>>,
-    printf: FunctionValue<'backend>,
 }
 
 impl<'backend> Inkwell<'backend> {
@@ -66,7 +65,6 @@ impl<'backend> Inkwell<'backend> {
             variables: Map::new(),
             types: Map::new(),
             functions,
-            printf,
         }
     }
 

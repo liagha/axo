@@ -27,8 +27,13 @@ impl<'analyzer> Resolver<'analyzer> {
             ElementKind::Series(_) => {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
             }
-            ElementKind::Bundle(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
+            ElementKind::Bundle(bundle) => {
+                let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = bundle
+                    .items
+                    .iter()
+                    .map(|item| self.analyze(item.clone()).map(Box::new))
+                    .collect();
+                Ok(Analysis::new(Instruction::Block(Block::new(items?))))
             }
             ElementKind::Block(block) => {
                 let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = block

@@ -191,53 +191,57 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             (ElementKind::Invoke(invoke), SymbolKind::Method(method)) => {
                 score += self.shaping;
 
-                let candidates = method.members
-                    .iter()
-                    .map(|member| member.brand().unwrap())
-                    .collect::<Vec<_>>();
+                if method.variadic {
 
-                let members = invoke.members
-                    .iter()
-                    .map(|member| member.brand().unwrap())
-                    .collect::<Vec<_>>();
-
-                if candidates == members {
-                    score += self.binding;
                 } else {
-                    let undefined = members
+                    let candidates = method.members
                         .iter()
-                        .cloned()
-                        .filter(|member| !candidates.contains(member))
+                        .map(|member| member.brand().unwrap())
                         .collect::<Vec<_>>();
 
-                    let missing = candidates
+                    let members = invoke.members
                         .iter()
-                        .cloned()
-                        .filter(|member| !members.contains(member))
+                        .map(|member| member.brand().unwrap())
                         .collect::<Vec<_>>();
 
-                    if !missing.is_empty() {
-                        return Err(
-                            ResolveError {
-                                kind: ErrorKind::MissingMember {
-                                    target: method.target.brand().unwrap(),
-                                    members: missing,
-                                },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            }
-                        )
-                    } else if !undefined.is_empty() {
-                        return Err(
-                            ResolveError {
-                                kind: ErrorKind::UndefinedMember {
-                                    target: method.target.brand().unwrap(),
-                                    members: undefined,
-                                },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            }
-                        )
+                    if candidates == members {
+                        score += self.binding;
+                    } else {
+                        let undefined = members
+                            .iter()
+                            .cloned()
+                            .filter(|member| !candidates.contains(member))
+                            .collect::<Vec<_>>();
+
+                        let missing = candidates
+                            .iter()
+                            .cloned()
+                            .filter(|member| !members.contains(member))
+                            .collect::<Vec<_>>();
+
+                        if !missing.is_empty() {
+                            return Err(
+                                ResolveError {
+                                    kind: ErrorKind::MissingMember {
+                                        target: method.target.brand().unwrap(),
+                                        members: missing,
+                                    },
+                                    span: query.span.clone(),
+                                    hints: Vec::new(),
+                                }
+                            )
+                        } else if !undefined.is_empty() {
+                            return Err(
+                                ResolveError {
+                                    kind: ErrorKind::UndefinedMember {
+                                        target: method.target.brand().unwrap(),
+                                        members: undefined,
+                                    },
+                                    span: query.span.clone(),
+                                    hints: Vec::new(),
+                                }
+                            )
+                        }
                     }
                 }
             }

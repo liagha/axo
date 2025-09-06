@@ -3,3 +3,7 @@ struct Test {
 }
 
 Test { y = 3, x = 4 }
+
+func Test(var x) {}
+
+Test()
