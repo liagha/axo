@@ -2,3 +2,4 @@
 /Cargo.lock
 /.idea
 /lab
+*/.DS_Store
