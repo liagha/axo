@@ -1,6 +1,6 @@
 use {
     crate::{
-        data,
+        data::{Scale, Str, Integer, Float, Boolean},
         schema::{
             Assign, Conditional, Cycle,
             Enumeration, Index, Invoke, Method,
@@ -22,9 +22,9 @@ impl<'analysis> Analysis<'analysis> {
 #[derive(Clone, Debug)]
 pub enum Instruction<'analysis> {
     // Primitives
-    Integer { value: data::Integer, size: data::Scale, signed: data::Boolean },
-    Float { value: data::Float, size: data::Scale },
-    Boolean { value: data::Boolean },
+    Integer { value: Integer, size: Scale, signed: Boolean },
+    Float { value: Float, size: Scale },
+    Boolean { value: Boolean },
     Array(Vec<Box<Analysis<'analysis>>>),
     Tuple(Vec<Box<Analysis<'analysis>>>),
 
@@ -59,7 +59,7 @@ pub enum Instruction<'analysis> {
     Invoke(Invoke<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
 
     // Control Flow Related
-    Block(Vec<Box<Analysis<'analysis>>>),
+    Block(Vec<Analysis<'analysis>>),
     Conditional(Conditional<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     While(While<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     Cycle(Cycle<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
@@ -68,15 +68,15 @@ pub enum Instruction<'analysis> {
     Continue(Option<Box<Analysis<'analysis>>>),
 
     // Symbols & Stuff
-    Usage(data::Str<'analysis>),
+    Usage(Str<'analysis>),
     Access(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Constructor(Structure<data::Str<'analysis>, Box<Analysis<'analysis>>>),
-    Assign(Assign<data::Str<'analysis>, Box<Analysis<'analysis>>>),
-    Binding(Binding<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
-    Structure(Structure<data::Str<'analysis>, Box<Analysis<'analysis>>>),
-    Enumeration(Enumeration<data::Str<'analysis>, Box<Analysis<'analysis>>>),
-    Method(Method<data::Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Option<Box<Analysis<'analysis>>>>),
-    Module(data::Str<'analysis>, Vec<Analysis<'analysis>>),
+    Constructor(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Assign(Assign<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Structure(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Enumeration(Enumeration<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Method(Method<Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Option<Box<Analysis<'analysis>>>>),
+    Module(Str<'analysis>, Vec<Analysis<'analysis>>),
 }
 
 impl<'analysis> Instruction<'analysis> {

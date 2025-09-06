@@ -14,5 +14,3 @@ struct Float {
 struct Boolean {
     var value: Token,
 }
-
-func printf(var value, ...) {}

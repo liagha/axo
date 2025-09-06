@@ -28,10 +28,10 @@ impl<'analyzer> Resolver<'analyzer> {
                                 Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                                 TokenKind::Punctuation(PunctuationKind::RightBrace),
                             ) => {
-                                let items: Result<Vec<Box<Analysis<'analyzer>>>, AnalyzeError<'analyzer>> = delimited
+                                let items: Result<Vec<Analysis<'analyzer>>, AnalyzeError<'analyzer>> = delimited
                                     .items
                                     .iter()
-                                    .map(|item| self.analyze(item.clone()).map(Box::new))
+                                    .map(|item| self.analyze(item.clone()))
                                     .collect();
 
                                 Ok(Analysis::new(Instruction::Block(items?)))
