@@ -8,7 +8,9 @@ use {
         schema::Delimited,
         tracker::{Location, Span, Spanned},
     },
-    super::{ErrorKind, Element, ElementKind, ParseError, Parser},
+    super::{
+        super::{ErrorKind, Element, ElementKind, ParseError, Parser}
+    },
 };
 
 impl<'parser> Parser<'parser> {

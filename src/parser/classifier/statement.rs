@@ -1,7 +1,9 @@
 use {
     super::{
-        Element, ElementKind, ParseError, Parser,
-        ErrorKind,
+        super::{
+            Element, ElementKind, ParseError, Parser,
+            ErrorKind,
+        },
     },
     crate::{
         tracker::{Span, Spanned},

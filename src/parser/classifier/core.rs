@@ -1,8 +1,10 @@
 use {
     super::{
-        ErrorKind,
-        Element, ElementKind,
-        Parser, ParseError,
+        super::{
+            ErrorKind,
+            Element, ElementKind,
+            Parser, ParseError,
+        },
     },
     crate::{
         formation::{

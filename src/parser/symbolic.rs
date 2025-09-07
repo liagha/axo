@@ -1,15 +1,16 @@
 use {
     super::{
         Element, ElementKind,
-        Symbol,
     },
     crate::{
         scanner::{
-            Token, TokenKind
+            Token, TokenKind,
+            OperatorKind,
         },
         format::{
             Debug, Formatter, Result as FormatResult,
         },
+        tracker::Span,
         schema::{
             Binding, Enumeration, Extension, Inclusion, Method, Structure, Module,
         },
@@ -17,7 +18,11 @@ use {
             Preference,
         },
         internal::{
-            hash::{Hash, Hasher},
+            hash::{Hash, Hasher, Set},
+        },
+        resolver::{
+            Id,
+            scope::Scope,
         },
         data::{
             any::{Any, TypeId},
@@ -25,7 +30,44 @@ use {
         },
     }
 };
-use crate::scanner::OperatorKind;
+
+pub struct Symbol<'symbol> {
+    pub id: Id,
+    pub kind: SymbolKind<'symbol>,
+    pub span: Span<'symbol>,
+    pub scope: Scope<'symbol>,
+}
+
+impl<'symbol> Symbol<'symbol> {
+    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>, id: Id) -> Self {
+        Self {
+            id,
+            kind: value,
+            span,
+            scope: Scope::new(),
+        }
+    }
+
+    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(&self, members: I) -> Self {
+        Self {
+            scope: Scope { symbols: Set::from_iter(members), parent: None },
+            id: self.id,
+            ..self.clone()
+        }
+    }
+
+    pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
+        self.scope.symbols.extend(members);
+    }
+
+    pub fn with_scope(&mut self, scope: Scope<'symbol>) {
+        self.scope = scope;
+    }
+
+    pub fn brand(&self) -> Option<Token<'symbol>> {
+        self.kind.brand()
+    }
+}
 
 #[derive(Clone, PartialEq, Hash)]
 pub enum SymbolKind<'symbol> {

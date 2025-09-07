@@ -1,28 +1,18 @@
-mod core;
-mod delimited;
 mod element;
 pub mod error;
 mod parser;
-mod statement;
-mod symbol;
 mod symbolic;
 mod traits;
+mod classifier;
 
 pub use {
     element::{Element, ElementKind},
     parser::Parser,
-    symbol::Symbol,
-    symbolic::SymbolKind,
+    symbolic::{Symbol, SymbolKind},
 };
 
-pub(super) use {
-    error::*,  
-};
+pub(super) use error::*;
 
-use {
-    crate::{
-        reporter::Error,
-    },
-};
+use crate::reporter::Error;
 
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;

@@ -1,8 +1,10 @@
 use {
     super::{
-        Element, ElementKind,
-        ParseError, Parser,
-        SymbolKind,
+        super::{
+            Element, ElementKind,
+            ParseError, Parser,
+            Symbol, SymbolKind,
+        },
     },
     crate::{
         resolver::{
@@ -24,50 +26,13 @@ use {
             Binding, Enumeration,
             Extension, Method, Structure, Module,
         },
-        internal::hash::{Hash, Hasher},
+        internal::{
+            hash::{Hash, Hasher, Set},
+        },
         data::{memory, Str},
         format::{self, Show, Display, Debug, Formatter},
     },
 };
-use crate::internal::hash::Set;
-
-pub struct Symbol<'symbol> {
-    pub id: Id,
-    pub kind: SymbolKind<'symbol>,
-    pub span: Span<'symbol>,
-    pub scope: Scope<'symbol>,
-}
-
-impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>, id: Id) -> Self {
-        Self {
-            id,
-            kind: value,
-            span,
-            scope: Scope::new(),
-        }
-    }
-
-    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(&self, members: I) -> Self {
-        Self {
-            scope: Scope { symbols: Set::from_iter(members), parent: None },
-            id: self.id,
-            ..self.clone()
-        }
-    }
-
-    pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
-        self.scope.symbols.extend(members);
-    }
-
-    pub fn with_scope(&mut self, scope: Scope<'symbol>) {
-        self.scope = scope;
-    }
-
-    pub fn brand(&self) -> Option<Token<'symbol>> {
-        self.kind.brand()
-    }
-}
 
 impl<'parser> Parser<'parser> {
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
