@@ -45,20 +45,20 @@ pub struct Invoke<Target, Argument> {
 
 #[derive(Debug, Eq)]
 pub struct Conditional<Condition, Then, Alternate> {
-    pub condition: Condition,
+    pub guard: Condition,
     pub then: Then,
     pub alternate: Option<Alternate>,
 }
 
 #[derive(Debug, Eq)]
 pub struct While<Condition, Body> {
-    pub condition: Option<Condition>,
+    pub guard: Option<Condition>,
     pub body: Body,
 }
 
 #[derive(Debug, Eq)]
 pub struct Cycle<Clause, Body> {
-    pub clause: Clause,
+    pub guard: Clause,
     pub body: Body,
 }
 
@@ -112,7 +112,7 @@ impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
     #[inline]
     pub fn new(condition: Condition, then: Then, alternate: Option<Alternate>) -> Self {
         Conditional {
-            condition,
+            guard: condition,
             then,
             alternate,
         }
@@ -122,14 +122,14 @@ impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
 impl<Condition, Body> While<Condition, Body> {
     #[inline]
     pub fn new(condition: Option<Condition>, body: Body) -> Self {
-        While { condition, body }
+        While { guard: condition, body }
     }
 }
 
 impl<Clause, Body> Cycle<Clause, Body> {
     #[inline]
     pub fn new(clause: Clause, body: Body) -> Self {
-        Cycle { clause, body }
+        Cycle { guard: clause, body }
     }
 }
 
@@ -181,7 +181,7 @@ impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
 for Conditional<Condition, Then, Alternate>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.condition.hash(state);
+        self.guard.hash(state);
         self.then.hash(state);
         self.alternate.hash(state);
     }
@@ -189,14 +189,14 @@ for Conditional<Condition, Then, Alternate>
 
 impl<Condition: Hash, Body: Hash> Hash for While<Condition, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.condition.hash(state);
+        self.guard.hash(state);
         self.body.hash(state);
     }
 }
 
 impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.clause.hash(state);
+        self.guard.hash(state);
         self.body.hash(state);
     }
 }
@@ -248,7 +248,7 @@ impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
 for Conditional<Condition, Then, Alternate>
 {
     fn eq(&self, other: &Self) -> bool {
-        self.condition == other.condition
+        self.guard == other.guard
             && self.then == other.then
             && self.alternate == other.alternate
     }
@@ -256,13 +256,13 @@ for Conditional<Condition, Then, Alternate>
 
 impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body> {
     fn eq(&self, other: &Self) -> bool {
-        self.condition == other.condition && self.body == other.body
+        self.guard == other.guard && self.body == other.body
     }
 }
 
 impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
-        self.clause == other.clause && self.body == other.body
+        self.guard == other.guard && self.body == other.body
     }
 }
 
@@ -316,7 +316,7 @@ for Conditional<Condition, Then, Alternate>
 {
     fn clone(&self) -> Self {
         Conditional::new(
-            self.condition.clone(),
+            self.guard.clone(),
             self.then.clone(),
             self.alternate.clone(),
         )
@@ -325,12 +325,12 @@ for Conditional<Condition, Then, Alternate>
 
 impl<Condition: Clone, Body: Clone> Clone for While<Condition, Body> {
     fn clone(&self) -> Self {
-        While::new(self.condition.clone(), self.body.clone())
+        While::new(self.guard.clone(), self.body.clone())
     }
 }
 
 impl<Clause: Clone, Body: Clone> Clone for Cycle<Clause, Body> {
     fn clone(&self) -> Self {
-        Cycle::new(self.clause.clone(), self.body.clone())
+        Cycle::new(self.guard.clone(), self.body.clone())
     }
 }

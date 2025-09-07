@@ -70,7 +70,7 @@ impl<'element> Debug for ElementKind<'element> {
                 },
 
                 ElementKind::Conditional(cond) => {
-                    write!(f, "Conditional({:#?} | Then: {:#?}", cond.condition, cond.then)?;
+                    write!(f, "Conditional({:#?} | Then: {:#?}", cond.guard, cond.then)?;
 
                     if let Some(else_expr) = &cond.alternate {
                         write!(f, " | Else: {:#?}", else_expr)?;
@@ -79,14 +79,14 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, ")")
                 }
                 ElementKind::While(repeat) => {
-                    if let Some(condition) = &repeat.condition {
+                    if let Some(condition) = &repeat.guard {
                         write!(f, "While({:#?} | {:#?})", condition, repeat.body)
                     } else {
                         write!(f, "Loop({:#?})", repeat.body)
                     }
                 },
                 ElementKind::Cycle(walk) => {
-                    write!(f, "For({:#?} in {:#?})", walk.clause, walk.body)
+                    write!(f, "For({:#?} in {:#?})", walk.guard, walk.body)
                 },
 
                 ElementKind::Construct(construct) => {
@@ -164,7 +164,7 @@ impl<'element> Debug for ElementKind<'element> {
                 },
 
                 ElementKind::Conditional(cond) => {
-                    write!(f, "Conditional({:?} | Then: {:?}", cond.condition, cond.then)?;
+                    write!(f, "Conditional({:?} | Then: {:?}", cond.guard, cond.then)?;
 
                     if let Some(else_expr) = &cond.alternate {
                         write!(f, " | Else: {:?}", else_expr)?;
@@ -173,14 +173,14 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, ")")
                 }
                 ElementKind::While(repeat) => {
-                    if let Some(condition) = &repeat.condition {
+                    if let Some(condition) = &repeat.guard {
                         write!(f, "While({:?} | {:?})", condition, repeat.body)
                     } else {
                         write!(f, "Loop({:?})", repeat.body)
                     }
                 },
                 ElementKind::Cycle(walk) => {
-                    write!(f, "For({:?} in {:?})", walk.clause, walk.body)
+                    write!(f, "For({:?} in {:?})", walk.guard, walk.body)
                 },
 
                 ElementKind::Construct(construct) => {

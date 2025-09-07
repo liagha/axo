@@ -306,7 +306,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
-                            matches!(operator.as_slice(), [OperatorKind::Minus, OperatorKind::RightAngle])
+                            matches!(operator, OperatorKind::Colon)
                         } else {
                             false
                         }

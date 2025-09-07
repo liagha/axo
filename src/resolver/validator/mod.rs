@@ -137,18 +137,18 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
                 )
             }
             ElementKind::Conditional(conditional) => {
-                let condition = Box::new(conditional.condition.desugar());
+                let condition = Box::new(conditional.guard.desugar());
                 let then = Box::new(conditional.then.desugar());
                 let alternate = conditional.alternate.as_ref().map(|alternate| Box::new(alternate.desugar()));
                 Element::new(ElementKind::Conditional(Conditional::new(condition, then, alternate)), self.span)
             }
             ElementKind::While(repeat) => {
-                let condition = repeat.condition.as_ref().map(|condition| Box::new(condition.desugar()));
+                let condition = repeat.guard.as_ref().map(|condition| Box::new(condition.desugar()));
                 let body = Box::new(repeat.body.desugar());
                 Element::new(ElementKind::While(While::new(condition, body)), self.span)
             }
             ElementKind::Cycle(cycle) => {
-                let clause = Box::new(cycle.clause.desugar());
+                let clause = Box::new(cycle.guard.desugar());
                 let body = Box::new(cycle.body.desugar());
                 Element::new(ElementKind::Cycle(Cycle::new(clause, body)), self.span)
             }

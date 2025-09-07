@@ -692,7 +692,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 }
             }
             ElementKind::Conditional(conditional) => {
-                let condition = self.analyze(*conditional.condition.clone())?;
+                let condition = self.analyze(*conditional.guard.clone())?;
                 let then = self.analyze(*conditional.then.clone())?;
                 let alternate = conditional
                     .alternate
@@ -707,7 +707,7 @@ impl<'analyzer> Resolver<'analyzer> {
             }
             ElementKind::While(repeat) => {
                 let condition = repeat
-                    .condition
+                    .guard
                     .clone()
                     .map(|c| self.analyze(*c))
                     .transpose()?;
@@ -718,7 +718,7 @@ impl<'analyzer> Resolver<'analyzer> {
                 ))))
             }
             ElementKind::Cycle(cycle) => {
-                let clause = self.analyze(*cycle.clause.clone())?;
+                let clause = self.analyze(*cycle.guard.clone())?;
                 let body = self.analyze(*cycle.body.clone())?;
                 Ok(Analysis::new(Instruction::Cycle(Cycle::new(
                     Box::new(clause),

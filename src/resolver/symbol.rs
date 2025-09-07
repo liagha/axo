@@ -1,6 +1,13 @@
-use crate::parser::{Symbol, SymbolKind};
-use crate::resolver::Resolver;
-use crate::resolver::resolver::Resolvable;
+use {
+    super::{
+        Resolver, Resolvable,
+    },
+    crate::{
+        parser::{
+            Symbol, SymbolKind,
+        },
+    }
+};
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn resolve(&self, resolver: &mut Resolver<'symbol>) {

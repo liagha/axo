@@ -13,7 +13,7 @@ use {
             Element, ElementKind,
         },
         scanner::{
-            OperatorKind, 
+            OperatorKind,
             Token, TokenKind,
         },
     }
@@ -73,7 +73,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Unary(unary) => unary.operand.resolve(resolver),
 
             ElementKind::Conditional(conditioned) => {
-                conditioned.condition.resolve(resolver);
+                conditioned.guard.resolve(resolver);
                 resolver.enter();
                 conditioned.then.resolve(resolver);
                 resolver.exit();
@@ -86,7 +86,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.condition {
+                if let Some(condition) = repeat.guard {
                     condition.resolve(resolver);
                 }
                 resolver.enter();
@@ -95,7 +95,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Cycle(walk) => {
-                walk.clause.resolve(resolver);
+                walk.guard.resolve(resolver);
 
                 let parent = replace(&mut resolver.scope, Scope::new());
                 resolver.scope.attach(parent);

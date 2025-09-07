@@ -10,7 +10,7 @@ mod element;
 mod symbol;
 
 pub use {
-    resolver::{Resolver, Id},
+    resolver::*,
 };
 
 pub(super) use {
