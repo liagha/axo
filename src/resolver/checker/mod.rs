@@ -1,9 +1,12 @@
 mod types;
 mod checker;
 mod error;
+mod element;
+mod symbol;
 
 pub use {
-    types::*,  
+    types::*,
+    checker::*,
 };
 
 pub(crate) use {

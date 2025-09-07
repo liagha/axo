@@ -10,6 +10,8 @@ use {
         analyzer::{
             Analysis,
         },
+        validator::Sugared,
+        checker::Checkable,
         ResolveError,
     },
     crate::{
@@ -192,7 +194,7 @@ impl<'resolver> Resolver<'resolver> {
     pub fn preresolve(&mut self) {
         for index in 0..self.input.len() {
             let element = self.input[index].clone();
-            self.input[index] = self.desugar(element);
+            self.input[index] = element.desugar();
 
             if let ElementKind::Symbolize(symbol) = &self.input[index].kind {
                 let symbol = symbol.clone();
@@ -209,8 +211,8 @@ impl<'resolver> Resolver<'resolver> {
                 if let Some(symbol) = self.get(&*assign.target) {
                     self.resolve(&*assign.value);
 
-                    let target = self.infer_symbol(symbol.clone());
-                    let value = self.infer_element(&*assign.value);
+                    let target = symbol.clone().infer();
+                    let value = (&*assign.value).infer();
 
                     self.check(target, value);
                 }
