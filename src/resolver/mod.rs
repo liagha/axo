@@ -6,6 +6,8 @@ pub mod analyzer;
 pub mod checker;
 pub mod scope;
 mod validator;
+mod element;
+mod symbol;
 
 pub use {
     resolver::{Resolver, Id},

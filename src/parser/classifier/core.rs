@@ -1,11 +1,4 @@
 use {
-    super::{
-        super::{
-            ErrorKind,
-            Element, ElementKind,
-            Parser, ParseError,
-        },
-    },
     crate::{
         formation::{
             form::Form,
@@ -16,6 +9,11 @@ use {
         schema::{
             Binary, Structure,
             Index, Invoke, Unary,
+        },
+        parser::{
+            ErrorKind,
+            Element, ElementKind,
+            Parser, ParseError,
         },
         tracker::{
             Span, Spanned,
@@ -182,7 +180,7 @@ impl<'parser> Parser<'parser> {
                                         unary = Element::new(
                                             ElementKind::index(Index::new(Box::new(unary), delimited.items)),
                                             span,
-                                        ) 
+                                        )
                                     }
 
                                     (
@@ -197,9 +195,9 @@ impl<'parser> Parser<'parser> {
                                         unary = Element::new(
                                             ElementKind::construct(Structure::new(Box::new(unary), delimited.items)),
                                             span,
-                                        ) 
+                                        )
                                     }
-                                    
+
                                     _ => {}
                                 }
                             }

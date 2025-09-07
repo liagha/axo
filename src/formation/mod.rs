@@ -32,7 +32,7 @@ pub mod helper {
         T: Clone + Debug + Eq + Hash + PartialEq + 'formable
     {}
 
-    pub trait Source<'source, Input>: Peekable<'source, Input> 
+    pub trait Source<'source, Input>: Peekable<'source, Input>
     where
         Input: Formable<'source>,
     {}

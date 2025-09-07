@@ -68,6 +68,10 @@ impl Clone for Resolver<'_> {
     }
 }
 
+pub trait Resolvable<'resolvable> {
+    fn resolve(&self, resolver: &mut Resolver<'resolvable>);
+}
+
 impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
@@ -84,7 +88,7 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn enter(&mut self) {
-        let parent_scope = replace(&mut self.scope, Scope::child());
+        let parent_scope = replace(&mut self.scope, Scope::new());
         self.scope.attach(parent_scope);
     }
 
@@ -186,7 +190,7 @@ impl<'resolver> Resolver<'resolver> {
         self.preresolve();
 
         for element in self.input.clone() {
-            self.resolve(&element);
+            element.resolve(self);
         }
 
         self.output.clone()
@@ -204,143 +208,6 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn resolve(&mut self, element: &Element<'resolver>) {
-        let Element { kind, .. } = element.clone();
-
-        match kind {
-            ElementKind::Delimited(delimited) => {
-                self.enter();
-                delimited.items.iter().for_each(|item| self.resolve(item));
-                self.exit();
-            }
-
-            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => {
-                self.get(&element);
-            }
-
-            ElementKind::Construct { .. }
-            | ElementKind::Invoke { .. }
-            | ElementKind::Index { .. } => {
-                self.get(&element);
-            }
-
-            ElementKind::Binary(binary) => {
-                match binary.operator.kind {
-                    TokenKind::Operator(OperatorKind::Equal) => {
-                        if let Some(symbol) = self.get(&*binary.left) {
-                            self.resolve(&*binary.right);
-
-                            let target = symbol.clone().infer();
-                            let value = binary.right.infer();
-
-                            self.check(target, value);
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Dot) => {
-                        let candidates = self.scope.all();
-                        let target = self.lookup(&*binary.left, &candidates);
-
-                        if let Some(target) = target {
-                            let members = target.scope.all();
-                            let member = self.lookup(&*binary.right, &members);
-                        }
-                    }
-
-                    _ => {
-                        self.resolve(&*binary.left);
-                        self.resolve(&*binary.right);
-                    }
-                }
-            }
-
-            ElementKind::Unary(unary) => self.resolve(&*unary.operand),
-
-            ElementKind::Conditional(conditioned) => {
-                self.resolve(&*conditioned.condition);
-                self.enter();
-                self.resolve(&*conditioned.then);
-                self.exit();
-
-                if let Some(alternate) = conditioned.alternate {
-                    self.enter();
-                    self.resolve(&*alternate);
-                    self.exit();
-                }
-            }
-
-            ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.condition {
-                    self.resolve(&*condition);
-                }
-                self.enter();
-                self.resolve(&*repeat.body);
-                self.exit();
-            }
-
-            ElementKind::Cycle(walk) => {
-                self.resolve(&*walk.clause);
-
-                let parent = replace(&mut self.scope, Scope::child());
-                self.scope.attach(parent);
-
-                self.enter();
-                self.resolve(&*walk.body);
-                self.exit();
-            }
-
-            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {
-                if let Some(value) = value {
-                    self.resolve(&value);
-                }
-            }
-
-            ElementKind::Symbolize(_)
-            | ElementKind::Literal(_)
-            | ElementKind::Procedural(_) => {}
-        }
-
-        let analysis = self.analyze(element.clone());
-
-        match analysis {
-            Ok(analysis) => {
-                self.output.push(analysis);
-            }
-            Err(error) => {
-                let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
-
-                self.errors.push(error);
-            }
-        }
-    }
-
     pub fn symbolize(&mut self, mut symbol: Symbol<'resolver>) {
-        symbol.id = self.next_id();
-        match symbol.kind {
-            SymbolKind::Inclusion(_) => {}
-            SymbolKind::Preference(_) => {}
-            SymbolKind::Extension(extension) => {
-                let candidates = self.scope.all();
-
-                if let Some(mut target) = self.lookup(&*extension.target, &candidates) {
-                    if let Some(extension) = extension.extension {
-                        if let Some(found) = self.lookup(&*extension, &candidates) {
-                            if let SymbolKind::Structure(structure) = found.kind {
-                                self.scope.remove(&target);
-                                target.scope.symbols.extend(structure.members.iter().cloned());
-                                self.scope.add(target);
-                            }
-                        }
-                    } else {
-                        self.scope.remove(&target);
-                        target.scope.symbols.extend(extension.members.iter().cloned());
-                        self.scope.add(target);
-                    }
-                }
-            }
-            _ => {
-                self.scope.add(symbol);
-            }
-        }
     }
 }

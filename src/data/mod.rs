@@ -1,9 +1,11 @@
 mod float;
 mod string;
 
-pub use float::Float;
-pub use string::{
-    Str, Utf8Error, FromStr, from_utf8,
+pub use {
+    float::Float,
+    string::{
+        Str, Utf8Error, FromStr, from_utf8,
+    },
 };
 
 pub type Char = char;
