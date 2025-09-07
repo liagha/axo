@@ -172,28 +172,52 @@ impl<'parser> Parser<'parser> {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
                 let constant = keyword.kind == TokenKind::Identifier(Str::from("const"));
-                let body = sequence[1].unwrap_output().clone();
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let mut body = sequence[1].unwrap_output().clone();
+                let mut span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                let symbol = match body.kind {
-                    ElementKind::Assign(assign) => {
-                        if let ElementKind::Label(label) = assign.target.kind.clone() {
-                            Binding::new(label.label.clone(), Some(assign.value.clone()), Some(label.element.clone()), constant)
-                        } else {
-                            Binding::new(assign.target.clone(), Some(assign.value.clone()), None, constant)
+                let mut value = None;
+                let mut annotation = None;
+
+                if let ElementKind::Binary(binary) = &body.kind.clone() {
+                    match (&*binary.left, &binary.operator, &*binary.right) {
+                        (
+                            Element { kind: ElementKind::Binary(binary), .. },
+                            Token { kind: TokenKind::Operator(OperatorKind::Equal), .. },
+                            right,
+                        ) => {
+                            value = Some(Box::new(right.clone()));
+
+                            if matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Colon)) {
+                                body = *binary.left.clone();
+                                annotation = Some(binary.right.clone());
+                            }
                         }
-                    }
 
-                    _ => {
-                        Binding::new(Box::new(body), None, None, constant)
+                        (
+                            left,
+                            Token { kind: TokenKind::Operator(OperatorKind::Equal), .. },
+                            right,
+                        ) => {
+                            body = left.clone();
+                            value = Some(Box::new(right.clone()));
+                        },
+
+                        _ => {}
                     }
-                };
+                }
 
                 Ok(Form::output(
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                SymbolKind::Binding(symbol),
+                                SymbolKind::Binding(
+                                    Binding::new(
+                                        Box::new(body),
+                                        value,
+                                        annotation,
+                                        constant,
+                                    )
+                                ),
                                 span,
                                 0
                             )

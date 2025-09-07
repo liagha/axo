@@ -25,6 +25,7 @@ use {
         },
     }
 };
+use crate::scanner::OperatorKind;
 
 #[derive(Clone, PartialEq, Hash)]
 pub enum SymbolKind<'symbol> {
@@ -58,12 +59,17 @@ impl<'symbol> Element<'symbol> {
         match &self.kind {
             ElementKind::Literal(literal) => Some(literal.clone()),
             ElementKind::Construct(construct) => construct.target.brand(),
-            ElementKind::Label(label) => label.label.brand(),
             ElementKind::Index(index) => index.target.brand(),
             ElementKind::Invoke(invoke) => invoke.target.brand(),
-            ElementKind::Access(access) => access.member.brand(),
             ElementKind::Symbolize(symbol) => symbol.brand(),
-            ElementKind::Assign(assign) => assign.target.brand(),
+            ElementKind::Binary(binary) => {
+                match binary.operator.kind {
+                    TokenKind::Operator(OperatorKind::Colon) => binary.left.brand().clone(),
+                    TokenKind::Operator(OperatorKind::Equal) => binary.left.brand().clone(),
+                    TokenKind::Operator(OperatorKind::Dot) => binary.right.brand().clone(),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }

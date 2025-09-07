@@ -65,12 +65,6 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Binary(binary) => {
                 (&*binary.left).infer()
             }
-            ElementKind::Label(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Access(_) => {
-                Type::unit(self.span)
-            }
             ElementKind::Index(_) => {
                 Type::unit(self.span)
             }
@@ -95,9 +89,6 @@ impl<'element> Checkable<'element> for Element<'element> {
                 Type::unit(self.span)
             }
             ElementKind::Symbolize(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Assign(_) => {
                 Type::unit(self.span)
             }
             ElementKind::Return(_) => {

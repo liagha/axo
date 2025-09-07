@@ -12,9 +12,8 @@ use {
         data::Str,
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
         schema::{
-            Access, Assign,
             Binary, Structure,
-            Index, Invoke, Label, Unary,
+            Index, Invoke, Unary,
         },
         tracker::{
             Span, Spanned,
@@ -313,32 +312,10 @@ impl<'parser> Parser<'parser> {
             let end = right.borrow_span().end.clone();
             let span = Span::new(start, end);
 
-            match &operator.kind {
-                TokenKind::Operator(OperatorKind::Dot) => {
-                    left = Element::new(
-                        ElementKind::Access(Access::new(Box::new(left), Box::new(right))),
-                        span,
-                    );
-                }
-                TokenKind::Operator(OperatorKind::Equal) => {
-                    left = Element::new(
-                        ElementKind::Assign(Assign::new(Box::new(left), Box::new(right))),
-                        span,
-                    );
-                }
-                TokenKind::Operator(OperatorKind::Colon) => {
-                    left = Element::new(
-                        ElementKind::Label(Label::new(Box::new(left), Box::new(right))),
-                        span,
-                    );
-                }
-                _ => {
-                    left = Element::new(
-                        ElementKind::Binary(Binary::new(Box::new(left), operator.clone(), Box::new(right))),
-                        span,
-                    );
-                }
-            }
+            left = Element::new(
+                ElementKind::Binary(Binary::new(Box::new(left), operator.clone(), Box::new(right))),
+                span,
+            );
 
             current = lookahead;
         }

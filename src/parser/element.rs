@@ -4,8 +4,8 @@ use {
         formation::classifier::Classifier,
         scanner::{Token, TokenKind},
         schema::{
-            Access, Assign, Binary, Delimited, Conditional,
-            Index, Invoke, Cycle, Label, Procedural, While, Structure, Unary,
+            Binary, Delimited, Conditional,
+            Index, Invoke, Cycle, Procedural, While, Structure, Unary,
         },
         tracker::{Span, Spanned},
     },
@@ -28,10 +28,6 @@ pub enum ElementKind<'element> {
 
     Binary(Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>),
 
-    Label(Label<Box<Element<'element>>, Box<Element<'element>>>),
-
-    Access(Access<Box<Element<'element>>, Box<Element<'element>>>),
-
     Index(Index<Box<Element<'element>>, Element<'element>>),
 
     Invoke(Invoke<Box<Element<'element>>, Element<'element>>),
@@ -45,8 +41,6 @@ pub enum ElementKind<'element> {
     Cycle(Cycle<Box<Element<'element>>, Box<Element<'element>>>),
 
     Symbolize(Symbol<'element>),
-
-    Assign(Assign<Box<Element<'element>>, Box<Element<'element>>>),
 
     Return(Option<Box<Element<'element>>>),
 
@@ -88,16 +82,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn label(label: Label<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::Label(label)
-    }
-
-    #[inline]
-    pub fn access(access: Access<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::Access(access)
-    }
-
-    #[inline]
     pub fn index(index: Index<Box<Element<'element>>, Element<'element>>) -> Self {
         ElementKind::Index(index)
     }
@@ -130,11 +114,6 @@ impl<'element> ElementKind<'element> {
     #[inline]
     pub fn symbolize(symbol: Symbol<'element>) -> Self {
         ElementKind::Symbolize(symbol)
-    }
-
-    #[inline]
-    pub fn assign(assign: Assign<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::Assign(assign)
     }
 
     #[inline]
@@ -178,16 +157,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn is_label(&self) -> bool {
-        matches!(self, ElementKind::Label(_))
-    }
-
-    #[inline(always)]
-    pub fn is_access(&self) -> bool {
-        matches!(self, ElementKind::Access(_))
-    }
-
-    #[inline(always)]
     pub fn is_index(&self) -> bool {
         matches!(self, ElementKind::Index(_))
     }
@@ -220,11 +189,6 @@ impl<'element> ElementKind<'element> {
     #[inline(always)]
     pub fn is_symbolize(&self) -> bool {
         matches!(self, ElementKind::Symbolize(_))
-    }
-
-    #[inline(always)]
-    pub fn is_assign(&self) -> bool {
-        matches!(self, ElementKind::Assign(_))
     }
 
     #[inline(always)]
@@ -289,24 +253,6 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_label(self) -> Label<Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::Label(label) => label,
-            _ => panic!("called `unwrap_label` on non-Label variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_access(self) -> Access<Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::Access(access) => access,
-            _ => panic!("called `unwrap_access` on non-Access variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
     pub fn unwrap_index(self) -> Index<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Index(index) => index,
@@ -365,15 +311,6 @@ impl<'element> ElementKind<'element> {
         match self {
             ElementKind::Symbolize(symbol) => symbol,
             _ => panic!("called `unwrap_symbolize` on non-Symbolize variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_assign(self) -> Assign<Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::Assign(assign) => assign,
-            _ => panic!("called `unwrap_assign` on non-Assign variant."),
         }
     }
 
@@ -445,22 +382,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_label(&self) -> Option<&Label<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Label(label) => Some(label),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_access(&self) -> Option<&Access<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Access(access) => Some(access),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
     pub fn try_unwrap_index(&self) -> Option<&Index<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Index(index) => Some(index),
@@ -512,14 +433,6 @@ impl<'element> ElementKind<'element> {
     pub fn try_unwrap_symbolize(&self) -> Option<&Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_assign(&self) -> Option<&Assign<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Assign(assign) => Some(assign),
             _ => None,
         }
     }
@@ -589,22 +502,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_label_mut(&mut self) -> Option<&mut Label<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Label(label) => Some(label),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_access_mut(&mut self) -> Option<&mut Access<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Access(access) => Some(access),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
     pub fn try_unwrap_index_mut(&mut self) -> Option<&mut Index<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Index(index) => Some(index),
@@ -656,14 +553,6 @@ impl<'element> ElementKind<'element> {
     pub fn try_unwrap_symbolize_mut(&mut self) -> Option<&mut Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_assign_mut(&mut self) -> Option<&mut Assign<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Assign(assign) => Some(assign),
             _ => None,
         }
     }

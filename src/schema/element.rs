@@ -62,24 +62,6 @@ pub struct Cycle<Clause, Body> {
     pub body: Body,
 }
 
-#[derive(Debug, Eq)]
-pub struct Label<Value, Element> {
-    pub label: Value,
-    pub element: Element,
-}
-
-#[derive(Debug, Eq)]
-pub struct Access<Target, Member> {
-    pub target: Target,
-    pub member: Member,
-}
-
-#[derive(Debug, Eq)]
-pub struct Assign<Target, Value> {
-    pub target: Target,
-    pub value: Value,
-}
-
 impl<Body> Procedural<Body> {
     #[inline]
     pub fn new(body: Body) -> Self {
@@ -151,27 +133,6 @@ impl<Clause, Body> Cycle<Clause, Body> {
     }
 }
 
-impl<Value, Element> Label<Value, Element> {
-    #[inline]
-    pub fn new(label: Value, element: Element) -> Self {
-        Label { label, element }
-    }
-}
-
-impl<Target, Member> Access<Target, Member> {
-    #[inline]
-    pub fn new(target: Target, member: Member) -> Self {
-        Access { target, member }
-    }
-}
-
-impl<Target, Value> Assign<Target, Value> {
-    #[inline]
-    pub fn new(target: Target, value: Value) -> Self {
-        Assign { target, value }
-    }
-}
-
 impl<Body: Hash> Hash for Procedural<Body> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.body.hash(state);
@@ -240,27 +201,6 @@ impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
     }
 }
 
-impl<Value: Hash, Element: Hash> Hash for Label<Value, Element> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.label.hash(state);
-        self.element.hash(state);
-    }
-}
-
-impl<Target: Hash, Member: Hash> Hash for Access<Target, Member> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.target.hash(state);
-        self.member.hash(state);
-    }
-}
-
-impl<Target: Hash, Value: Hash> Hash for Assign<Target, Value> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.target.hash(state);
-        self.value.hash(state);
-    }
-}
-
 impl<Body: PartialEq> PartialEq for Procedural<Body> {
     fn eq(&self, other: &Self) -> bool {
         self.body == other.body
@@ -323,24 +263,6 @@ impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body>
 impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
         self.clause == other.clause && self.body == other.body
-    }
-}
-
-impl<Value: PartialEq, Element: PartialEq> PartialEq for Label<Value, Element> {
-    fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && self.element == other.element
-    }
-}
-
-impl<Target: PartialEq, Member: PartialEq> PartialEq for Access<Target, Member> {
-    fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.member == other.member
-    }
-}
-
-impl<Target: PartialEq, Value: PartialEq> PartialEq for Assign<Target, Value> {
-    fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.value == other.value
     }
 }
 
@@ -410,23 +332,5 @@ impl<Condition: Clone, Body: Clone> Clone for While<Condition, Body> {
 impl<Clause: Clone, Body: Clone> Clone for Cycle<Clause, Body> {
     fn clone(&self) -> Self {
         Cycle::new(self.clause.clone(), self.body.clone())
-    }
-}
-
-impl<Value: Clone, Element: Clone> Clone for Label<Value, Element> {
-    fn clone(&self) -> Self {
-        Label::new(self.label.clone(), self.element.clone())
-    }
-}
-
-impl<Target: Clone, Member: Clone> Clone for Access<Target, Member> {
-    fn clone(&self) -> Self {
-        Access::new(self.target.clone(), self.member.clone())
-    }
-}
-
-impl<Target: Clone, Value: Clone> Clone for Assign<Target, Value> {
-    fn clone(&self) -> Self {
-        Assign::new(self.target.clone(), self.value.clone())
     }
 }

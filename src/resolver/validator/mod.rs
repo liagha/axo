@@ -46,7 +46,14 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
                     self.span,
                 );
 
-                Element::new(ElementKind::Access(Access::new(operand, Box::new(member))), self.span)
+                Element::new(
+                    ElementKind::Binary(Binary::new(
+                        operand,
+                        Token::new(TokenKind::Operator(OperatorKind::Dot), self.span),
+                        Box::new(member)
+                    )),
+                    self.span
+                )
             }
             ElementKind::Binary(binary) => {
                 let left = Box::new(binary.left.desugar());
@@ -57,6 +64,10 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
                 };
 
                 let method = match operator {
+                    [OperatorKind::Dot] => {
+                        return Element::new(ElementKind::Binary(Binary::new(left, binary.operator.clone(), right)), self.span)
+                    }
+                    [OperatorKind::Equal] => "assign",
                     [OperatorKind::Plus] => "add",
                     [OperatorKind::Minus] => "subtract",
                     [OperatorKind::Star] => "multiply",
@@ -89,12 +100,14 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
                     self.span,
                 ));
 
-                Element::new(ElementKind::Access(Access::new(left, method)), self.span)
-            }
-            ElementKind::Access(access) => {
-                let target = Box::new(access.target.desugar());
-                let member = Box::new(access.member.desugar());
-                Element::new(ElementKind::Access(Access::new(target, member)), self.span)
+                Element::new(
+                    ElementKind::Binary(Binary::new(
+                        left,
+                        Token::new(TokenKind::Operator(OperatorKind::Dot), self.span),
+                        method
+                    )),
+                    self.span
+                )
             }
             ElementKind::Index(index) => {
                 let target = Box::new(index.target.desugar());
@@ -122,16 +135,6 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
                     )),
                     self.span,
                 )
-            }
-            ElementKind::Label(labeled) => {
-                let label = Box::new(labeled.label.desugar());
-                let element = Box::new(labeled.element.desugar());
-                Element::new(ElementKind::Label(Label::new(label, element)), self.span)
-            }
-            ElementKind::Assign(assign) => {
-                let target = Box::new(assign.target.desugar());
-                let value = Box::new(assign.value.desugar());
-                Element::new(ElementKind::Assign(Assign::new(target, value)), self.span)
             }
             ElementKind::Conditional(conditional) => {
                 let condition = Box::new(conditional.condition.desugar());

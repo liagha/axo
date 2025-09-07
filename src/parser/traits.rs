@@ -62,17 +62,11 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "Unary({:#?} {:#?})", unary.operator, unary.operand)
                 },
 
-                ElementKind::Label(label) => {
-                    write!(f, "Labeled({:#?}: {:#?})", label.label, label.element)
-                },
                 ElementKind::Index(index) => {
                     write!(f, "Index({:#?}[{:#?}])", index.target, index.members)
                 },
                 ElementKind::Invoke(invoke) => {
                     write!(f, "Invoke({:#?}({:#?}))", invoke.target, invoke.members)
-                },
-                ElementKind::Access(access) => {
-                    write!(f, "Access({:#?}.{:#?})", access.target, access.member)
                 },
 
                 ElementKind::Conditional(cond) => {
@@ -95,9 +89,6 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "For({:#?} in {:#?})", walk.clause, walk.body)
                 },
 
-                ElementKind::Assign(assign) => {
-                    write!(f, "Assignment({:#?} = {:#?})", assign.target, assign.value)
-                },
                 ElementKind::Construct(construct) => {
                     write!(f, "Constructor({:#?} | {:#?})", construct.target, construct.members)
                 },
@@ -165,17 +156,11 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "Unary({:?} {:?})", unary.operator, unary.operand)
                 },
 
-                ElementKind::Label(label) => {
-                    write!(f, "Labeled({:?}: {:?})", label.label, label.element)
-                },
                 ElementKind::Index(index) => {
                     write!(f, "Index({:?}[{:?}])", index.target, index.members)
                 },
                 ElementKind::Invoke(invoke) => {
                     write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.members)
-                },
-                ElementKind::Access(access) => {
-                    write!(f, "Access({:?}.{:?})", access.target, access.member)
                 },
 
                 ElementKind::Conditional(cond) => {
@@ -198,9 +183,6 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "For({:?} in {:?})", walk.clause, walk.body)
                 },
 
-                ElementKind::Assign(assign) => {
-                    write!(f, "Assignment({:?} = {:?})", assign.target, assign.value)
-                },
                 ElementKind::Construct(construct) => {
                     write!(f, "Constructor({:?} | {:?})", construct.target, construct.members)
                 },
@@ -422,14 +404,6 @@ impl<'element> Hash for ElementKind<'element> {
                 unary.hash(state);
             }
 
-            ElementKind::Label(label) => {
-                discriminant(self).hash(state);
-                label.hash(state);
-            }
-            ElementKind::Access(access) => {
-                discriminant(self).hash(state);
-                access.hash(state);
-            }
             ElementKind::Index(index) => {
                 discriminant(self).hash(state);
                 index.hash(state);
@@ -455,10 +429,6 @@ impl<'element> Hash for ElementKind<'element> {
             ElementKind::Symbolize(symbol) => {
                 discriminant(self).hash(state);
                 symbol.hash(state);
-            }
-            ElementKind::Assign(assign) => {
-                discriminant(self).hash(state);
-                assign.hash(state);
             }
 
             ElementKind::Return(element) => {
@@ -495,8 +465,6 @@ impl<'element> PartialEq for ElementKind<'element> {
             (ElementKind::Binary(a), ElementKind::Binary(b)) => a == b,
             (ElementKind::Unary(a), ElementKind::Unary(b)) => a == b,
 
-            (ElementKind::Label(a), ElementKind::Label(b)) => a == b,
-            (ElementKind::Access(a), ElementKind::Access(b)) => a == b,
             (ElementKind::Index(a), ElementKind::Index(b)) => a == b,
             (ElementKind::Invoke(a), ElementKind::Invoke(b)) => a == b,
 
@@ -505,7 +473,6 @@ impl<'element> PartialEq for ElementKind<'element> {
             (ElementKind::Cycle(a), ElementKind::Cycle(b)) => a == b,
 
             (ElementKind::Symbolize(a), ElementKind::Symbolize(b)) => a == b,
-            (ElementKind::Assign(a), ElementKind::Assign(b)) => a == b,
 
             (ElementKind::Return(a), ElementKind::Return(b)) => a == b,
             (ElementKind::Break(a), ElementKind::Break(b)) => a == b,
@@ -537,8 +504,6 @@ impl<'element> Clone for ElementKind<'element> {
             ElementKind::Binary(binary) => ElementKind::Binary(binary.clone()),
             ElementKind::Unary(unary) => ElementKind::Unary(unary.clone()),
 
-            ElementKind::Label(label) => ElementKind::Label(label.clone()),
-            ElementKind::Access(access) => ElementKind::Access(access.clone()),
             ElementKind::Index(index) => ElementKind::Index(index.clone()),
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
 
@@ -547,7 +512,6 @@ impl<'element> Clone for ElementKind<'element> {
             ElementKind::Cycle(walk) => ElementKind::Cycle(walk.clone()),
 
             ElementKind::Symbolize(symbol) => ElementKind::Symbolize(symbol.clone()),
-            ElementKind::Assign(assign) => ElementKind::Assign(assign.clone()),
 
             ElementKind::Return(element) => ElementKind::Return(element.clone()),
             ElementKind::Break(element) => ElementKind::Break(element.clone()),

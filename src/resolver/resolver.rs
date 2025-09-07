@@ -43,6 +43,7 @@ use {
         format::Debug,
     },
 };
+use crate::scanner::OperatorKind;
 
 pub type Id = usize;
 
@@ -207,17 +208,6 @@ impl<'resolver> Resolver<'resolver> {
         let Element { kind, .. } = element.clone();
 
         match kind {
-            ElementKind::Assign(assign) => {
-                if let Some(symbol) = self.get(&*assign.target) {
-                    self.resolve(&*assign.value);
-
-                    let target = symbol.clone().infer();
-                    let value = (&*assign.value).infer();
-
-                    self.check(target, value);
-                }
-            }
-
             ElementKind::Delimited(delimited) => {
                 self.enter();
                 delimited.items.iter().for_each(|item| self.resolve(item));
@@ -235,16 +225,36 @@ impl<'resolver> Resolver<'resolver> {
             }
 
             ElementKind::Binary(binary) => {
-                self.resolve(&*binary.left);
-                self.resolve(&*binary.right);
+                match binary.operator.kind {
+                    TokenKind::Operator(OperatorKind::Equal) => {
+                        if let Some(symbol) = self.get(&*binary.left) {
+                            self.resolve(&*binary.right);
+
+                            let target = symbol.clone().infer();
+                            let value = binary.right.infer();
+
+                            self.check(target, value);
+                        }
+                    }
+
+                    TokenKind::Operator(OperatorKind::Dot) => {
+                        let candidates = self.scope.all();
+                        let target = self.lookup(&*binary.left, &candidates);
+
+                        if let Some(target) = target {
+                            let members = target.scope.all();
+                            let member = self.lookup(&*binary.right, &members);
+                        }
+                    }
+
+                    _ => {
+                        self.resolve(&*binary.left);
+                        self.resolve(&*binary.right);
+                    }
+                }
             }
 
             ElementKind::Unary(unary) => self.resolve(&*unary.operand),
-
-            ElementKind::Label(label) => {
-                self.resolve(&*label.label);
-                self.resolve(&*label.element);
-            }
 
             ElementKind::Conditional(conditioned) => {
                 self.resolve(&*conditioned.condition);
@@ -277,16 +287,6 @@ impl<'resolver> Resolver<'resolver> {
                 self.enter();
                 self.resolve(&*walk.body);
                 self.exit();
-            }
-
-            ElementKind::Access(access) => {
-                let candidates = self.scope.all();
-                let target = self.lookup(&*access.target, &candidates);
-
-                if let Some(target) = target {
-                    let members = target.scope.all();
-                    let member = self.lookup(&*access.member, &members);
-                }
             }
 
             ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {

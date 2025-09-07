@@ -150,7 +150,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             Instruction::Greater(left, right) => self.generate_greater(left, right, function),
             Instruction::GreaterOrEqual(left, right) => self.generate_greater_or_equal(left, right, function),
             Instruction::Usage(identifier) => self.generate_usage(identifier),
-            Instruction::Assign(assign) => self.generate_assign(assign, function),
+            Instruction::Assign(target, value) => self.generate_assign(target, value, function),
             Instruction::Binding(binding) => self.generate_binding(binding, function),
             Instruction::Module(name, analyses) => self.generate_module(name, analyses, function),
             Instruction::Method(method) => self.generate_method(method),

@@ -10,7 +10,7 @@ use {
             Str,
         },
         schema::{
-            Assign, Binding,
+            Binding,
         },
         resolver::{
             analyzer::{
@@ -36,22 +36,22 @@ impl<'backend> super::Inkwell<'backend> {
         }
     }
 
-    pub fn generate_assign(&mut self, assign: Assign<Str<'backend>, Box<Analysis<'backend>>>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {
-        let result = self.generate_instruction(assign.value.instruction.clone(), function);
-        if let Some(pointer) = self.variables.get(&assign.target) {
+    pub fn generate_assign(&mut self, target: Str<'backend>, value: Box<Analysis<'backend>>, function: FunctionValue<'backend>) -> BasicValueEnum<'backend> {
+        let result = self.generate_instruction(value.instruction.clone(), function);
+        if let Some(pointer) = self.variables.get(&target) {
             self.builder.build_store(*pointer, result);
-            self.types.insert(assign.target.clone(), result.get_type());
+            self.types.insert(target.clone(), result.get_type());
         } else {
             let pointer = if result.is_int_value() {
-                self.builder.build_alloca(result.get_type(), &assign.target)
+                self.builder.build_alloca(result.get_type(), &target)
             } else if result.is_float_value() {
-                self.builder.build_alloca(result.get_type(), &assign.target)
+                self.builder.build_alloca(result.get_type(), &target)
             } else {
-                self.builder.build_alloca(result.get_type(), &assign.target)
+                self.builder.build_alloca(result.get_type(), &target)
             }.unwrap();
             self.builder.build_store(pointer, result);
-            self.variables.insert(assign.target.clone(), pointer);
-            self.types.insert(assign.target, result.get_type());
+            self.variables.insert(target.clone(), pointer);
+            self.types.insert(target, result.get_type());
         }
         result
     }
