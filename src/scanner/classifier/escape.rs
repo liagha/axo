@@ -1,6 +1,8 @@
 use {
     super::{
-        Character, ScanError, Token, ErrorKind, Scanner, CharacterError, EscapeError,
+        super::{
+            Character, ScanError, Token, ErrorKind, Scanner, CharacterError, EscapeError,
+        },
     },
     crate::{
         data::{

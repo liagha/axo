@@ -1,6 +1,8 @@
 use {
     super::{
-        Character, Operator, OperatorKind, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
+        super::{
+            Character, Operator, OperatorKind, Punctuation, PunctuationKind, ScanError, Scanner, Token, TokenKind, CharacterError, ErrorKind,
+        },
     },
     crate::{
         data::Str,

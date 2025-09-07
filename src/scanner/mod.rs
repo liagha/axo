@@ -1,30 +1,22 @@
 mod character;
-mod core;
-mod escape;
-mod number;
 mod operator;
 mod punctuation;
 mod scanner;
 mod token;
 mod error;
 mod traits;
+mod classifier;
 
 pub use {
-    scanner::Scanner,
     character::Character,
     operator::*,
     punctuation::*,
+    scanner::Scanner,
     token::*,
 };
 
-pub(super) use {
-    error::*
-};
+pub(super) use error::*;
 
-use {
-    crate::{
-        reporter::Error,
-    }
-};
+use crate::reporter::Error;
 
 pub type ScanError<'error> = Error<'error, ErrorKind>;

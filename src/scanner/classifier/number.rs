@@ -1,6 +1,8 @@
 use {
     super::{
-        Character, ScanError, Scanner, Token, TokenKind, ErrorKind,
+        super::{
+            Character, ScanError, Scanner, Token, TokenKind, ErrorKind,
+        },
     },
     crate::{
         data::{Str, Float},
