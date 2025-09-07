@@ -4,15 +4,21 @@ use {
         former::{
             record::*,
             Former,
-            Draft
         },
         helper::Formable,
         order::*,
     },
     crate::{
         data::{
-            thread::Arc,
+            thread::{
+                Arc, Mutex,
+            },
             Scale,
+            Offset,
+        },
+        tracker::{
+            Position,
+            Location,
         },
     },
 };
@@ -20,28 +26,93 @@ use {
 #[derive(Clone)]
 pub struct Classifier<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, Failure: Formable<'classifier>> {
     pub order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+    pub marker: Offset,
+    pub position: Position<'classifier>,
+    pub consumed: Vec<Input>,
+    pub record: Record,
+    pub form: Form<'classifier, Input, Output, Failure>,
 }
 
 impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, Failure: Formable<'classifier>> Classifier<'classifier, Input, Output, Failure> {
     #[inline]
-    pub const fn new(classifier: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>) -> Self {
+    pub fn new(classifier: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>, marker: Offset, position: Position<'classifier>) -> Self {
         Self {
             order: classifier,
+            marker,
+            position,
+            consumed: Vec::new(),
+            record: BLANK,
+            form: Form::Blank,
         }
+    }
+
+    #[inline]
+    pub const fn is_panicked(&self) -> bool {
+        self.record == PANICKED
+    }
+
+    #[inline]
+    pub const fn is_aligned(&self) -> bool {
+        self.record == ALIGNED
+    }
+
+    #[inline]
+    pub const fn is_failed(&self) -> bool {
+        self.record == FAILED
+    }
+
+    #[inline]
+    pub const fn is_effected(&self) -> bool {
+        matches!(self.record, ALIGNED | FAILED)
+    }
+
+    #[inline]
+    pub const fn is_blank(&self) -> bool {
+        self.record == BLANK
+    }
+
+    #[inline]
+    pub const fn is_ignored(&self) -> bool {
+        self.record == IGNORED
+    }
+
+    #[inline]
+    pub fn set_panic(&mut self) {
+        self.record = PANICKED;
+    }
+
+    #[inline]
+    pub fn set_align(&mut self) {
+        self.record = ALIGNED;
+    }
+
+    #[inline]
+    pub fn set_fail(&mut self) {
+        self.record = FAILED;
+    }
+
+    #[inline]
+    pub fn set_empty(&mut self) {
+        self.record = BLANK;
+    }
+
+    #[inline]
+    pub fn set_ignore(&mut self) {
+        self.record = IGNORED;
     }
 
     #[inline]
     pub fn literal(value: impl PartialEq<Input> + 'classifier) -> Self {
         Self::new(Arc::new(Literal {
             value: Arc::new(value),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
     pub fn negate(classifier: Self) -> Self {
         Self::new(Arc::new(Negate {
             classifier: Box::new(classifier),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -49,9 +120,9 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     where
         F: Fn(&Input) -> bool + 'classifier,
     {
-        Self::new(Arc::new(Predicate {
+        Self::new(Arc::new(Predicate::<Input> {
             function: Arc::new(predicate),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -60,7 +131,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             patterns,
             perfection: vec![PANICKED, ALIGNED],
             blacklist: vec![BLANK]
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -69,19 +140,19 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             patterns,
             perfection,
             blacklist: Vec::new()
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
-        Self::new(Arc::new(Sequence { patterns }))
+        Self::new(Arc::new(Sequence { patterns }), 0, Position::new(Location::Void))
     }
 
     #[inline]
     pub fn optional(classifier: Self) -> Self {
         Self::new(Arc::new(Optional {
             classifier: Box::new(classifier),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -96,7 +167,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             halt: Vec::new(),
             align_on_success: true,
             empty_on_failure: true,
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -111,7 +182,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             halt: vec![PANICKED, FAILED],
             align_on_success: false,
             empty_on_failure: false,
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -126,14 +197,14 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             halt: Vec::new(),
             align_on_success: false,
             empty_on_failure: false,
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
     pub fn wrapper(classifier: Self) -> Self {
         Self::new(Arc::new(Wrapper {
             classifier: Box::new(classifier),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -141,7 +212,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
         Self::new(Arc::new(Ranked {
             classifier: Box::new(classifier),
             precedence,
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -151,7 +222,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     {
         Self::new(Arc::new(Deferred {
             function: Arc::new(factory),
-        }))
+        }), 0, Position::new(Location::Void))
     }
 
     #[inline]
@@ -201,7 +272,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn with_inspect<I>(self, inspector: I) -> Self
     where
-        I: Fn(Draft<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + 'classifier
+        I: Fn(Classifier<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + 'classifier
     {
         self.with_order(Arc::new(Inspect { inspector: Arc::new(inspector) }))
     }
@@ -261,6 +332,71 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     pub fn as_persistence(&self, min: Scale, max: Option<Scale>) -> Self {
         Self::persistence(self.clone(), min, max)
     }
+
+    #[inline]
+    pub fn transform<T>(transformer: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    where
+        T: FnMut(Form<'classifier, Input, Output, Failure>) -> Result<Form<'classifier, Input, Output, Failure>, Failure> + 'classifier,
+    {
+        Arc::new(Transform { transformer: Arc::new(Mutex::new(transformer))})
+    }
+
+    #[inline]
+    pub fn fail<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    where
+        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+    {
+        Arc::new(Fail { emitter: Arc::new(emitter) })
+    }
+
+    #[inline]
+    pub fn panic<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    where
+        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+    {
+        Arc::new(Panic { emitter: Arc::new(emitter) })
+    }
+
+    #[inline]
+    pub fn ignore() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
+        Arc::new(Ignore)
+    }
+
+    #[inline]
+    pub fn inspect<T>(inspector: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    where
+        T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> + 'classifier
+    {
+        Arc::new(Inspect { inspector: Arc::new(inspector) })
+    }
+
+    #[inline]
+    pub fn multiple(orders: Vec<Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
+        Arc::new(Multiple { orders })
+    }
+
+    #[inline]
+    pub fn pardon() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
+        Arc::new(Pardon)
+    }
+
+    #[inline]
+    pub fn perform<T>(executor: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    where
+        T: FnMut() + 'classifier,
+    {
+        Arc::new(Perform { performer: Arc::new(Mutex::new(executor))})
+    }
+
+    #[inline]
+    pub fn skip() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
+        Arc::new(Skip)
+    }
+
+    #[inline]
+    pub fn branch(found: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>, missing: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
+        Arc::new(Branch { found, missing })
+    }
 }
 
 #[derive(Clone)]
@@ -270,18 +406,18 @@ pub struct Literal<'literal, Input> {
 
 impl<'literal, Input: Formable<'literal>, Output: Formable<'literal>, Failure: Formable<'literal>> Order<'literal, Input, Output, Failure> for Literal<'literal, Input> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'literal, Input, Output, Failure>, draft: &mut Draft<'literal, Input, Output, Failure>) {
-        if let Some(peek) = composer.source.get(draft.marker).cloned() {
+    fn order(&self, composer: &mut Former<'_, 'literal, Input, Output, Failure>, classifier: &mut Classifier<'literal, Input, Output, Failure>) {
+        if let Some(peek) = composer.source.get(classifier.marker).cloned() {
             if self.value.eq(&peek) {
-                draft.set_align();
-                composer.source.next(&mut draft.marker, &mut draft.position);
-                draft.consumed.push(peek.clone());
-                draft.form = Form::input(peek);
+                classifier.set_align();
+                composer.source.next(&mut classifier.marker, &mut classifier.position);
+                classifier.consumed.push(peek.clone());
+                classifier.form = Form::input(peek);
             } else {
-                draft.set_empty();
+                classifier.set_empty();
             }
         } else {
-            draft.set_empty();
+            classifier.set_empty();
         }
     }
 }
@@ -293,46 +429,48 @@ pub struct Negate<'negate, Input: Formable<'negate>, Output: Formable<'negate>, 
 
 impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Formable<'negate>> Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'negate, Input, Output, Failure>, draft: &mut Draft<'negate, Input, Output, Failure>) {
-        if let Some(peek) = composer.source.get(draft.marker).cloned() {
-            let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
-            composer.build(&mut child);
+    fn order(&self, composer: &mut Former<'_, 'negate, Input, Output, Failure>, classifier: &mut Classifier<'negate, Input, Output, Failure>) {
+        let mut child = Classifier {
+            order: self.classifier.order.clone(),
+            marker: classifier.marker,
+            position: classifier.position,
+            consumed: Vec::new(),
+            record: BLANK,
+            form: Form::Blank,
+        };
+        composer.build(&mut child);
 
-            if !child.is_aligned() {
-                draft.set_align();
-                composer.source.next(&mut draft.marker, &mut draft.position);
-                draft.consumed.push(peek.clone());
-                draft.form = Form::input(peek);
-            } else {
-                draft.set_empty();
-            }
+        if child.is_aligned() {
+            classifier.set_empty();
+        } else if child.is_effected() {
+            classifier.set_align();
+            classifier.form = Form::Blank;
         } else {
-            draft.set_empty();
+            classifier.set_empty();
         }
     }
 }
 
 #[derive(Clone)]
-pub struct Predicate<'predicate, Input> {
+pub struct Predicate<'predicate, Input: Formable<'predicate>> {
     pub function: Arc<dyn Fn(&Input) -> bool + 'predicate>,
 }
 
 impl<'predicate, Input: Formable<'predicate>, Output: Formable<'predicate>, Failure: Formable<'predicate>> Order<'predicate, Input, Output, Failure> for Predicate<'predicate, Input> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'predicate, Input, Output, Failure>, draft: &mut Draft<'predicate, Input, Output, Failure>) {
-        if let Some(peek) = composer.source.get(draft.marker).cloned() {
-            let predicate = (self.function)(&peek);
-
-            if predicate {
-                draft.set_align();
-                composer.source.next(&mut draft.marker, &mut draft.position);
-                draft.consumed.push(peek.clone());
-                draft.form = Form::input(peek);
+    fn order(&self, composer: &mut Former<'_, 'predicate, Input, Output, Failure>, classifier: &mut Classifier<'predicate, Input, Output, Failure>) {
+        if let Some(peek) = composer.source.peek_ahead(classifier.marker) {
+            if (self.function)(peek) {
+                let value = composer.source.get(classifier.marker).cloned().unwrap();
+                classifier.set_align();
+                composer.source.next(&mut classifier.marker, &mut classifier.position);
+                classifier.consumed.push(value.clone());
+                classifier.form = Form::input(value);
             } else {
-                draft.set_empty();
+                classifier.set_empty();
             }
         } else {
-            draft.set_empty();
+            classifier.set_empty();
         }
     }
 }
@@ -346,42 +484,48 @@ pub struct Alternative<'alternative, Input: Formable<'alternative>, Output: Form
 
 impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>, Failure: Formable<'alternative>, const SIZE: Scale> Order<'alternative, Input, Output, Failure> for Alternative<'alternative, Input, Output, Failure, SIZE> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'alternative, Input, Output, Failure>, draft: &mut Draft<'alternative, Input, Output, Failure>) {
-        let mut best: Option<Draft<'alternative, Input, Output, Failure>> = None;
+    fn order(&self, composer: &mut Former<'_, 'alternative, Input, Output, Failure>, classifier: &mut Classifier<'alternative, Input, Output, Failure>) {
+        let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
 
-        for classifier in &self.patterns {
-            let mut child = Draft::new(draft.marker, draft.position, classifier.clone());
+        for pattern in &self.patterns {
+            let mut child = Classifier {
+                order: pattern.order.clone(),
+                marker: classifier.marker,
+                position: classifier.position,
+                consumed: Vec::new(),
+                record: BLANK,
+                form: Form::Blank,
+            };
             composer.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
                 continue;
             }
 
-            match &best {
-                None => {
-                    best = Some(child.clone())
-                },
-                Some(champion) => {
-                    if child.record > champion.record {
-                        best = Some(child.clone());
-                    }
+            if let Some(ref mut champion) = best {
+                if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
+                    *champion = child;
                 }
+            } else {
+                best = Some(child);
             }
 
-            if self.perfection.contains(&child.record) {
-                break;
+            if let Some(ref champion) = best {
+                if self.perfection.contains(&champion.record) {
+                    break;
+                }
             }
         }
 
         match best {
             Some(champion) => {
-                draft.record = champion.record;
-                draft.marker = champion.marker;
-                draft.position = champion.position;
-                draft.consumed = champion.consumed;
-                draft.form = champion.form;
+                classifier.record = champion.record;
+                classifier.marker = champion.marker;
+                classifier.position = champion.position;
+                classifier.consumed = champion.consumed;
+                classifier.form = champion.form;
             }
-            None => draft.set_empty(),
+            None => classifier.set_empty(),
         }
     }
 }
@@ -393,16 +537,17 @@ pub struct Deferred<'deferred, Input: Formable<'deferred>, Output: Formable<'def
 
 impl<'deferred, Input: Formable<'deferred>, Output: Formable<'deferred>, Failure: Formable<'deferred>> Order<'deferred, Input, Output, Failure> for Deferred<'deferred, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'deferred, Input, Output, Failure>, draft: &mut Draft<'deferred, Input, Output, Failure>) {
-        let resolved = (self.function)();
-        let mut child = Draft::new(draft.marker, draft.position, resolved);
-        composer.build(&mut child);
+    fn order(&self, composer: &mut Former<'_, 'deferred, Input, Output, Failure>, classifier: &mut Classifier<'deferred, Input, Output, Failure>) {
+        let mut resolved = (self.function)();
+        resolved.marker = classifier.marker;
+        resolved.position = classifier.position;
+        composer.build(&mut resolved);
 
-        draft.marker = child.marker;
-        draft.position = child.position;
-        draft.consumed = child.consumed;
-        draft.record = child.record;
-        draft.form = child.form;
+        classifier.marker = resolved.marker;
+        classifier.position = resolved.position;
+        classifier.consumed = resolved.consumed;
+        classifier.record = resolved.record;
+        classifier.form = resolved.form;
     }
 }
 
@@ -413,18 +558,25 @@ pub struct Optional<'optional, Input: Formable<'optional>, Output: Formable<'opt
 
 impl<'optional, Input: Formable<'optional>, Output: Formable<'optional>, Failure: Formable<'optional>> Order<'optional, Input, Output, Failure> for Optional<'optional, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'optional, Input, Output, Failure>, draft: &mut Draft<'optional, Input, Output, Failure>) {
-        let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
+    fn order(&self, composer: &mut Former<'_, 'optional, Input, Output, Failure>, classifier: &mut Classifier<'optional, Input, Output, Failure>) {
+        let mut child = Classifier {
+            order: self.classifier.order.clone(),
+            marker: classifier.marker,
+            position: classifier.position,
+            consumed: Vec::new(),
+            record: BLANK,
+            form: Form::Blank,
+        };
         composer.build(&mut child);
 
         if child.is_effected() {
-            draft.marker = child.marker;
-            draft.position = child.position;
-            draft.consumed = child.consumed;
-            draft.form = child.form;
-            draft.set_align();
+            classifier.marker = child.marker;
+            classifier.position = child.position;
+            classifier.consumed = child.consumed;
+            classifier.form = child.form;
+            classifier.set_align();
         } else {
-            draft.set_ignore();
+            classifier.set_ignore();
         }
     }
 }
@@ -436,15 +588,22 @@ pub struct Wrapper<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrappe
 
 impl<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrapper>, Failure: Formable<'wrapper>> Order<'wrapper, Input, Output, Failure> for Wrapper<'wrapper, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'wrapper, Input, Output, Failure>, draft: &mut Draft<'wrapper, Input, Output, Failure>) {
-        let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
+    fn order(&self, composer: &mut Former<'_, 'wrapper, Input, Output, Failure>, classifier: &mut Classifier<'wrapper, Input, Output, Failure>) {
+        let mut child = Classifier {
+            order: self.classifier.order.clone(),
+            marker: classifier.marker,
+            position: classifier.position,
+            consumed: Vec::new(),
+            record: BLANK,
+            form: Form::Blank,
+        };
         composer.build(&mut child);
 
-        draft.marker = child.marker;
-        draft.position = child.position;
-        draft.consumed = child.consumed;
-        draft.record = child.record;
-        draft.form = child.form;
+        classifier.marker = child.marker;
+        classifier.position = child.position;
+        classifier.consumed = child.consumed;
+        classifier.record = child.record;
+        classifier.form = child.form;
     }
 }
 
@@ -456,21 +615,28 @@ pub struct Ranked<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, 
 
 impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>> Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'ranked, Input, Output, Failure>, draft: &mut Draft<'ranked, Input, Output, Failure>) {
-        let mut child = Draft::new(draft.marker, draft.position, self.classifier.as_ref().clone());
+    fn order(&self, composer: &mut Former<'_, 'ranked, Input, Output, Failure>, classifier: &mut Classifier<'ranked, Input, Output, Failure>) {
+        let mut child = Classifier {
+            order: self.classifier.order.clone(),
+            marker: classifier.marker,
+            position: classifier.position,
+            consumed: Vec::new(),
+            record: BLANK,
+            form: Form::Blank,
+        };
         composer.build(&mut child);
 
-        draft.marker = child.marker;
-        draft.position = child.position;
-        draft.consumed = child.consumed.clone();
-        draft.form = child.form.clone();
+        classifier.marker = child.marker;
+        classifier.position = child.position;
+        classifier.consumed = child.consumed.clone();
+        classifier.form = child.form.clone();
 
         if child.is_aligned() {
-            draft.record = self.precedence.max(ALIGNED);
+            classifier.record = self.precedence.max(ALIGNED);
         } else if child.is_failed() {
-            draft.record = self.precedence.min(FAILED);
+            classifier.record = self.precedence.min(FAILED);
         } else {
-            draft.record = child.record;
+            classifier.record = child.record;
         }
     }
 }
@@ -482,26 +648,33 @@ pub struct Sequence<'sequence, Input: Formable<'sequence>, Output: Formable<'seq
 
 impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure: Formable<'sequence>, const SIZE: Scale> Order<'sequence, Input, Output, Failure> for Sequence<'sequence, Input, Output, Failure, SIZE> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'sequence, Input, Output, Failure>, draft: &mut Draft<'sequence, Input, Output, Failure>) {
-        let mut index = draft.marker;
-        let mut position = draft.position;
+    fn order(&self, composer: &mut Former<'_, 'sequence, Input, Output, Failure>, classifier: &mut Classifier<'sequence, Input, Output, Failure>) {
+        let mut index = classifier.marker;
+        let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::with_capacity(SIZE);
 
-        for classifier in &self.patterns {
-            let mut child = Draft::new(index, position, classifier.clone());
+        for pattern in &self.patterns {
+            let mut child = Classifier {
+                order: pattern.order.clone(),
+                marker: index,
+                position,
+                consumed: Vec::new(),
+                record: BLANK,
+                form: Form::Blank,
+            };
             composer.build(&mut child);
 
             match child.record {
                 ALIGNED => {
-                    draft.record = child.record;
+                    classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
                 PANICKED | FAILED => {
-                    draft.record = child.record;
+                    classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
@@ -513,16 +686,16 @@ impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure
                     position = child.position;
                 }
                 _ => {
-                    draft.record = child.record;
+                    classifier.record = child.record;
                     break;
                 }
             }
         }
 
-        draft.marker = index;
-        draft.position = position;
-        draft.consumed = consumed;
-        draft.form = Form::multiple(forms);
+        classifier.marker = index;
+        classifier.position = position;
+        classifier.consumed = consumed;
+        classifier.form = Form::multiple(forms);
     }
 }
 
@@ -541,14 +714,21 @@ pub struct Repetition<'repetition, Input: Formable<'repetition>, Output: Formabl
 
 impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, Failure: Formable<'repetition>> Order<'repetition, Input, Output, Failure> for Repetition<'repetition, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'repetition, Input, Output, Failure>, draft: &mut Draft<'repetition, Input, Output, Failure>) {
-        let mut index = draft.marker;
-        let mut position = draft.position;
+    fn order(&self, composer: &mut Former<'_, 'repetition, Input, Output, Failure>, classifier: &mut Classifier<'repetition, Input, Output, Failure>) {
+        let mut index = classifier.marker;
+        let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
 
         while composer.source.peek_ahead(index).is_some() {
-            let mut child = Draft::new(index, position, self.classifier.as_ref().clone());
+            let mut child = Classifier {
+                order: self.classifier.order.clone(),
+                marker: index,
+                position,
+                consumed: Vec::new(),
+                record: BLANK,
+                form: Form::Blank,
+            };
             composer.build(&mut child);
 
             if child.marker == index {
@@ -556,7 +736,7 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
             }
 
             if self.update.contains(&child.record) {
-                draft.record = child.record;
+                classifier.record = child.record;
             }
 
             if self.accept.contains(&child.record) {
@@ -582,15 +762,15 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
 
         if forms.len() >= self.minimum {
             if self.align_on_success {
-                draft.set_align();
+                classifier.set_align();
             }
-            draft.marker = index;
-            draft.position = position;
-            draft.consumed = consumed;
-            draft.form = Form::multiple(forms);
+            classifier.marker = index;
+            classifier.position = position;
+            classifier.consumed = consumed;
+            classifier.form = Form::multiple(forms);
         } else {
             if self.empty_on_failure {
-                draft.set_empty();
+                classifier.set_empty();
             }
         }
     }
