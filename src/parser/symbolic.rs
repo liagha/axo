@@ -24,7 +24,7 @@ use {
         },
         data::{
             any::{Any, TypeId},
-            memory,
+            Boolean,
         },
     }
 };
@@ -34,6 +34,18 @@ pub struct Symbol<'symbol> {
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
+}
+
+pub struct Specifier {
+    pub entry: Boolean,
+    pub interface: Interface,
+}
+
+pub enum Interface {
+    C,
+    Rust,
+    Axo,
+    Compiler
 }
 
 impl<'symbol> Symbol<'symbol> {

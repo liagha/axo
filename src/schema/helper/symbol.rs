@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{Offset, Scale},
+        data::{Offset, Scale, Boolean},
         internal::hash::{Hash, Hasher},
     },
 };
@@ -22,7 +22,7 @@ pub struct Binding<Target, Value, Type> {
     pub target: Target,
     pub value: Option<Value>,
     pub annotation: Option<Type>,
-    pub constant: bool,
+    pub constant: Boolean,
 }
 
 #[derive(Debug, Eq)]
@@ -37,7 +37,7 @@ pub struct Method<Target, Parameter, Body, Output> {
     pub members: Vec<Parameter>,
     pub body: Body,
     pub output: Output,
-    pub variadic: bool,
+    pub variadic: Boolean,
 }
 
 #[derive(Debug)]

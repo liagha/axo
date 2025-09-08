@@ -41,41 +41,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Binary(binary) => {
-                match binary.operator.kind {
-                    TokenKind::Operator(OperatorKind::Equal) => {
-                        if let Some(symbol) = resolver.get(&*binary.left) {
-                            binary.right.resolve(resolver);
-
-                            let target = symbol.clone().infer();
-                            let value = binary.right.infer();
-
-                            resolver.check(target, value);
-                        }
-                    }
-
-                    TokenKind::Operator(OperatorKind::Dot) => {
-                        let left_symbol = resolver.get(&*binary.left);
-
-                        if let Some(left_symbol) = left_symbol {
-                            let member = resolver.lookup(&*binary.right, &left_symbol.scope);
-
-                            if member.is_none() {
-                                if let ElementKind::Binary(right_binary) = &binary.right.kind {
-                                    if let TokenKind::Operator(OperatorKind::Dot) = right_binary.operator.kind {
-                                        binary.right.resolve(resolver);
-                                    }
-                                }
-                            }
-                        } else {
-                            binary.left.resolve(resolver);
-                            binary.right.resolve(resolver);
-                        }
-                    }
-
-                    _ => {
-                        binary.left.resolve(resolver);
-                        binary.right.resolve(resolver);
-                    }
+                if let Some(left) = resolver.get(&*binary.right) {
+                    resolver.lookup(&*binary.right, &left.scope);    
                 }
             }
 

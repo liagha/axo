@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{Offset, Str},
+        data::{Offset, Str, Boolean},
         internal::{
             hash::Hash,
             operation::Ordering,
@@ -61,7 +61,7 @@ impl<'span> Span<'span> {
     }
 
     #[inline]
-    pub fn contains(&self, pos: &Position) -> bool {
+    pub fn contains(&self, pos: &Position) -> Boolean {
         if self.start.location != pos.location {
             return false;
         }
@@ -70,7 +70,7 @@ impl<'span> Span<'span> {
     }
 
     #[inline]
-    pub fn overlaps(&self, other: &Self) -> bool {
+    pub fn overlaps(&self, other: &Self) -> Boolean {
         if self.start.location != other.start.location {
             return false;
         }

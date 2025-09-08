@@ -1,3 +1,4 @@
+use broccli::{xprintln, Color};
 use matchete::{Assessor, Scheme};
 use {
     super::{
@@ -86,8 +87,8 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn enter(&mut self) {
-        let parent_scope = replace(&mut self.scope, Scope::new());
-        self.scope.attach(parent_scope);
+        let parent = replace(&mut self.scope, Scope::new());
+        self.scope.attach(parent);
     }
 
     pub fn exit(&mut self) {
@@ -147,8 +148,5 @@ impl<'resolver> Resolver<'resolver> {
                 self.define(symbol);
             }
         }
-    }
-
-    pub fn symbolize(&mut self, mut symbol: Symbol<'resolver>) {
     }
 }
