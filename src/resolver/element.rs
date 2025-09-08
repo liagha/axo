@@ -54,11 +54,21 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     }
 
                     TokenKind::Operator(OperatorKind::Dot) => {
-                        let scope = resolver.scope.clone();
-                        let target = resolver.lookup(&*binary.left, &scope);
+                        let left_symbol = resolver.get(&*binary.left);
 
-                        if let Some(target) = target {
-                            let member = resolver.lookup(&*binary.right, &target.scope);
+                        if let Some(left_symbol) = left_symbol {
+                            let member = resolver.lookup(&*binary.right, &left_symbol.scope);
+
+                            if member.is_none() {
+                                if let ElementKind::Binary(right_binary) = &binary.right.kind {
+                                    if let TokenKind::Operator(OperatorKind::Dot) = right_binary.operator.kind {
+                                        binary.right.resolve(resolver);
+                                    }
+                                }
+                            }
+                        } else {
+                            binary.left.resolve(resolver);
+                            binary.right.resolve(resolver);
                         }
                     }
 

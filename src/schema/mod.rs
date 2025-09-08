@@ -1,7 +1,4 @@
-mod element;
-mod symbol;
+mod helper;
 
-pub use {
-    element::*,
-    symbol::*,
-};
+pub use helper::element::*;
+pub use helper::symbol::*;
