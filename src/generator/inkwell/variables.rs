@@ -9,9 +9,7 @@ use {
         data::{
             Str,
         },
-        schema::{
-            Binding,
-        },
+        schema::*,
         resolver::{
             analyzer::{
                 Analysis

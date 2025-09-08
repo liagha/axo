@@ -1,5 +1,1 @@
-var x = 4
-
-x = 4 + 4
-
-printf(x)
+package.test.Test { }

@@ -3,10 +3,7 @@ use {
         data::Str,
         formation::classifier::Classifier,
         scanner::{Token, TokenKind},
-        schema::{
-            Binary, Delimited, Conditional,
-            Index, Invoke, Cycle, Procedural, While, Structure, Unary,
-        },
+        schema::*,
         tracker::{Span, Spanned},
     },
     super::Symbol,

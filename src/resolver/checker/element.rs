@@ -1,9 +1,17 @@
-use crate::data::Str;
-use crate::parser::{Element, ElementKind};
-use crate::resolver::checker::checker::Checkable;
-use crate::resolver::checker::{Type, TypeKind};
-use crate::scanner::{PunctuationKind, TokenKind};
-use crate::schema::Structure;
+use {
+    crate::{
+        data::Str,
+        parser::{Element, ElementKind},
+        resolver::{
+            checker::{
+                Checkable,
+                Type, TypeKind,
+            },
+        },
+        scanner::{PunctuationKind, TokenKind},
+        schema::*,
+    },
+};
 
 impl<'element> Checkable<'element> for Element<'element> {
     fn infer(&self) -> Type<'element> {

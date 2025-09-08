@@ -14,7 +14,7 @@ use {
             analyzer::Analysis,
         },
         scanner::{Scanner, Token, TokenKind},
-        schema::Module,
+        schema::*,
         tracker::{Location, Peekable, Position, Span, Spanned},
     },
     broccli::{xprintln, Color},
@@ -98,7 +98,7 @@ impl<'registry> Registry<'registry> {
             Span::default(Location::Flag)
         );
 
-        let result = resolver.try_get(&identifier);
+        let result = resolver.scope.try_get(&identifier);
 
         if let Ok(found) = result {
             if let SymbolKind::Preference(preference) = found.kind {
@@ -120,7 +120,7 @@ impl<'registry> Registry<'registry> {
             Span::default(Location::Flag)
         );
 
-        let result = resolver.try_get(&identifier);
+        let result = resolver.scope.try_get(&identifier);
 
         if let Ok(found) = result {
             if let SymbolKind::Preference(preference) = found.kind {
@@ -144,7 +144,7 @@ impl<'registry> Registry<'registry> {
             Span::default(Location::Flag)
         );
 
-        let result = resolver.try_get(&identifier);
+        let result = resolver.scope.try_get(&identifier);
 
         if let Ok(found) = result {
             if let SymbolKind::Preference(preference) = found.kind {

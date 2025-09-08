@@ -18,7 +18,7 @@ use {
             HintKind, ResolveHint,
             Resolver,
         },
-        schema::{Method, Structure},
+        schema::*,
         data::{
             Float, Str
         },

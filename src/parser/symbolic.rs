@@ -11,9 +11,7 @@ use {
             Debug, Formatter, Result as FormatResult,
         },
         tracker::Span,
-        schema::{
-            Binding, Enumeration, Extension, Inclusion, Method, Structure, Module,
-        },
+        schema::*,
         initial::{
             Preference,
         },
@@ -60,8 +58,12 @@ impl<'symbol> Symbol<'symbol> {
         self.scope.symbols.extend(members);
     }
 
-    pub fn with_scope(&mut self, scope: Scope<'symbol>) {
-        self.scope = scope;
+    pub fn with_scope(&mut self, scope: Scope<'symbol>) -> Self {
+        Self {
+            scope,
+            id: self.id,
+            ..self.clone()
+        }
     }
 
     pub fn brand(&self) -> Option<Token<'symbol>> {
@@ -75,7 +77,7 @@ pub enum SymbolKind<'symbol> {
     Extension(Extension<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>>),
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Enumeration(Enumeration<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Method(Method<Box<Element<'symbol>>, Symbol<'symbol>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
     Module(Module<Box<Element<'symbol>>>),
     Preference(Preference<'symbol>),

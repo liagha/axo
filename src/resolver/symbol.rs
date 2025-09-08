@@ -18,11 +18,11 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             SymbolKind::Inclusion(_) => {}
             SymbolKind::Preference(_) => {}
             SymbolKind::Extension(extension) => {
-                let candidates = resolver.scope.all();
+                let scope = resolver.scope.clone();
 
-                if let Some(mut target) = resolver.lookup(&*extension.target, &candidates) {
+                if let Some(mut target) = resolver.lookup(&*extension.target, &scope) {
                     if let Some(extension) = extension.extension {
-                        if let Some(found) = resolver.lookup(&*extension, &candidates) {
+                        if let Some(found) = resolver.lookup(&*extension, &scope) {
                             if let SymbolKind::Structure(structure) = found.kind {
                                 resolver.scope.remove(&target);
                                 target.scope.symbols.extend(structure.members.iter().cloned());

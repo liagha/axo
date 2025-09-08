@@ -1,9 +1,20 @@
-use crate::resolver::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
-use crate::resolver::Resolver;
-use crate::scanner::{PunctuationKind, Token};
-use crate::{data, data::Str, parser::{Element, ElementKind, Symbol, SymbolKind}, scanner::{OperatorKind, TokenKind}, schema::{Binding, Enumeration, Index, Invoke, Method, Structure}};
-use crate::data::Scale;
-use crate::schema::{Delimited, Conditional, Cycle, While};
+use {
+    crate::{
+        resolver::{
+            Resolver,
+            analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction}
+        },
+        parser::{
+            Element, ElementKind, Symbol, SymbolKind
+        }, 
+        scanner::{
+            OperatorKind, PunctuationKind,
+            Token, TokenKind,
+        }, 
+        data::{Str},
+        schema::*,
+    },
+};
 
 impl<'analyzer> Resolver<'analyzer> {
     pub fn analyze(
@@ -823,7 +834,7 @@ impl<'analyzer> Resolver<'analyzer> {
                         .iter()
                         .map(|field| self.analyze_symbol(field.clone()).map(Box::new))
                         .collect();
-                let analyzed = Enumeration::new(
+                let analyzed = Structure::new(
                     Str::from(enumeration.target.brand().unwrap().to_string()),
                     variants?,
                 );

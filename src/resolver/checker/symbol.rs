@@ -1,8 +1,16 @@
-use crate::data::Str;
-use crate::parser::{Symbol, SymbolKind};
-use crate::resolver::checker::checker::Checkable;
-use crate::resolver::checker::{Type, TypeKind};
-use crate::schema::Structure;
+use {
+    crate::{
+        data::Str,
+        parser::{Symbol, SymbolKind},
+        resolver::{
+            checker::{
+                Checkable,
+                Type, TypeKind,
+            },
+        },
+        schema::*,
+    },
+};
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn infer(&self) -> Type<'symbol> {

@@ -22,10 +22,7 @@ use {
             OperatorKind, Token,
             TokenKind,
         },
-        schema::{
-            Binding, Enumeration,
-            Extension, Method, Structure, Module,
-        },
+        schema::*,
         internal::{
             hash::{Hash, Hasher, Set},
         },
@@ -262,7 +259,7 @@ impl<'parser> Parser<'parser> {
                     Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                SymbolKind::Enumeration(Enumeration::new(Box::new(name), members)),
+                                SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
                                 span,
                                 0
                             ),

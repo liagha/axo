@@ -32,12 +32,6 @@ pub struct Structure<Target, Field> {
 }
 
 #[derive(Debug, Eq)]
-pub struct Enumeration<Target, Variant> {
-    pub target: Target,
-    pub members: Vec<Variant>,
-}
-
-#[derive(Debug, Eq)]
 pub struct Method<Target, Parameter, Body, Output> {
     pub target: Target,
     pub members: Vec<Parameter>,
@@ -79,13 +73,6 @@ impl<Target, Field> Structure<Target, Field> {
     }
 }
 
-impl<Target, Variant> Enumeration<Target, Variant> {
-    #[inline]
-    pub fn new(target: Target, variants: Vec<Variant>) -> Self {
-        Enumeration { target, members: variants }
-    }
-}
-
 impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     #[inline]
     pub fn new(target: Target, parameters: Vec<Parameter>, body: Body, output: Output, variadic: bool) -> Self {
@@ -123,13 +110,6 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
 }
 
 impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.target.hash(state);
-        self.members.hash(state);
-    }
-}
-
-impl<Target: Hash, Variant: Hash> Hash for Enumeration<Target, Variant> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
         self.members.hash(state);
@@ -178,12 +158,6 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field>
     }
 }
 
-impl<Target: PartialEq, Variant: PartialEq> PartialEq for Enumeration<Target, Variant> {
-    fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.members == other.members
-    }
-}
-
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq for Method<Target, Parameter, Body, Output> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -225,12 +199,6 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
 impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
     fn clone(&self) -> Self {
         Structure::new(self.target.clone(), self.members.clone())
-    }
-}
-
-impl<Target: Clone, Variant: Clone> Clone for Enumeration<Target, Variant> {
-    fn clone(&self) -> Self {
-        Enumeration::new(self.target.clone(), self.members.clone())
     }
 }
 

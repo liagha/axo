@@ -1,10 +1,7 @@
 use {
     crate::{
         data::{Scale, Str, Integer, Float, Boolean},
-        schema::{
-            Conditional, Cycle,
-            Enumeration, Index, Invoke, Method,
-            Structure, While, Binding},
+        schema::*,
     }
 };
 
@@ -74,7 +71,7 @@ pub enum Instruction<'analysis> {
     Assign(Str<'analysis>, Box<Analysis<'analysis>>),
     Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
     Structure(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
-    Enumeration(Enumeration<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Enumeration(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
     Method(Method<Str<'analysis>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Option<Box<Analysis<'analysis>>>>),
     Module(Str<'analysis>, Vec<Analysis<'analysis>>),
 }

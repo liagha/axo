@@ -25,10 +25,7 @@ use {
             Element, ElementKind,
             Symbol, SymbolKind,
         },
-        schema::{
-            Enumeration, Extension,
-            Method, Structure, Module, Binding,
-        },
+        schema::*,
         data::{
             Scale,
             memory::{
@@ -43,6 +40,7 @@ use {
         format::Debug,
     },
 };
+use crate::data::Str;
 use crate::scanner::OperatorKind;
 
 pub type Id = usize;
@@ -109,37 +107,8 @@ impl<'resolver> Resolver<'resolver> {
         id
     }
 
-    pub fn try_get(&mut self, target: &Element<'resolver>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
-        let candidates = self.scope.all();
-
-        let mut aligner = Aligner::new();
-        let mut affinity = Affinity::new();
-
-        let mut assessor = Assessor::new()
-            .floor(0.5)
-            .dimension(&mut affinity, 0.6)
-            .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Additive);
-
-        let champion = assessor.champion(target, &candidates);
-
-        if let Some(champion) = champion {
-            Ok(champion)
-        } else {
-            let mut errors = assessor.errors.clone();
-            if errors.is_empty() {
-                errors.push(ResolveError {
-                    kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
-                    span: target.span.clone(),
-                    hints: Vec::new(),
-                });
-            }
-            Err(errors)
-        }
-    }
-
     pub fn get(&mut self, target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
-        match self.try_get(target) {
+        match self.scope.try_get(target) {
             Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());
@@ -148,36 +117,8 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn try_lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Result<Symbol<'resolver>, Vec<ResolveError<'resolver>>> {
-        let mut aligner = Aligner::new();
-        let mut affinity = Affinity::new();
-
-        let mut assessor = Assessor::new()
-            .floor(0.5)
-            .dimension(&mut affinity, 0.6)
-            .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Additive);
-
-        let champion = assessor.champion(target, candidates);
-
-        if let Some(champion) = champion {
-            Ok(champion)
-        } else {
-            if assessor.errors.is_empty() {
-                let error = ResolveError {
-                    kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
-                    span: target.span.clone(),
-                    hints: Vec::new(),
-                };
-                Err(vec![error])
-            } else {
-                Err(assessor.errors.clone())
-            }
-        }
-    }
-
-    pub fn lookup(&mut self, target: &Element<'resolver>, candidates: &Vec<Symbol<'resolver>>) -> Option<Symbol<'resolver>> {
-        match self.try_lookup(target, candidates) {
+    pub fn lookup(&mut self, target: &Element<'resolver>, scope: &Scope<'resolver>) -> Option<Symbol<'resolver>> {
+        match Scope::try_lookup(target, scope) {
             Ok(symbol) => Some(symbol),
             Err(errors) => {
                 self.errors.extend(errors.clone());

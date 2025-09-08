@@ -12,7 +12,7 @@ use {
             classifier::Classifier,
         },
         scanner::{Token, TokenKind},
-        schema::{Conditional, While},
+        schema::*,
     }
 };
 

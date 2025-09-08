@@ -6,10 +6,7 @@ use {
         },
         data::Str,
         scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
-        schema::{
-            Binary, Structure,
-            Index, Invoke, Unary,
-        },
+        schema::*,
         parser::{
             ErrorKind,
             Element, ElementKind,

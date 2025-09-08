@@ -15,9 +15,7 @@ use {
         data::{
             Str,
         },
-        schema::{
-            Method, Invoke, 
-        },
+        schema::*,
         resolver::{
             analyzer::{Analysis, Instruction},
         },

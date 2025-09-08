@@ -2,7 +2,7 @@ use {
     crate::{
         scanner::Token,
         data::{Str, Scale},
-        schema::{Enumeration, Method, Structure},
+        schema::*,
         tracker::Span,
     }
 };
@@ -31,7 +31,7 @@ pub enum TypeKind<'ty> {
     Type(Box<Type<'ty>>),
 
     Structure(Structure<Str<'ty>, Box<Type<'ty>>>),
-    Enumeration(Enumeration<Str<'ty>, Box<Type<'ty>>>),
+    Enumeration(Structure<Str<'ty>, Box<Type<'ty>>>),
     Method(Method<Str<'ty>, Box<Type<'ty>>, Box<Type<'ty>>, Box<Type<'ty>>>),
 }
 
