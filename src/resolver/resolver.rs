@@ -143,9 +143,8 @@ impl<'resolver> Resolver<'resolver> {
             let element = self.input[index].clone();
             self.input[index] = element.desugar();
 
-            if let ElementKind::Symbolize(symbol) = &self.input[index].kind {
-                let symbol = symbol.clone();
-                self.define(symbol);
+            if let ElementKind::Symbolize(symbol) = self.input[index].kind.clone() {
+                symbol.resolve(self);
             }
         }
     }

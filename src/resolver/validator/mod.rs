@@ -241,41 +241,46 @@ impl<'token> Sugared<'token, Element<'token>> for Token<'token> {
 
 impl<'symbol> Sugared<'symbol, Symbol<'symbol>> for Symbol<'symbol> {
     fn desugar(&self) -> Symbol<'symbol> {
-        match &self.kind {
+        let kind = match &self.kind {
             SymbolKind::Inclusion(inclusion) => {
                 let mut inclusion = inclusion.clone();
                 inclusion.target = Box::new(inclusion.target.desugar());
-                Symbol::new(SymbolKind::Inclusion(inclusion), self.span, self.id)
+                SymbolKind::Inclusion(inclusion)
             }
             SymbolKind::Extension(extension) => {
                 let mut extension = extension.clone();
                 extension.target = Box::new(extension.target.desugar());
                 extension.members = extension.members.into_iter().map(|member| member.desugar()).collect();
-                Symbol::new(SymbolKind::Extension(extension), self.span, self.id)
+                SymbolKind::Extension(extension)
             }
             SymbolKind::Binding(binding) => {
                 let mut binding = binding.clone();
                 binding.value = binding.value.map(|value| Box::new(value.desugar()));
-                Symbol::new(SymbolKind::Binding(binding), self.span, self.id)
+                SymbolKind::Binding(binding)
             }
             SymbolKind::Structure(structure) => {
                 let mut structure = structure.clone();
                 structure.members = structure.members.into_iter().map(|member| member.desugar()).collect();
-                Symbol::new(SymbolKind::Structure(structure), self.span, self.id)
+                SymbolKind::Structure(structure)
             }
             SymbolKind::Enumeration(enumeration) => {
                 let mut enumeration = enumeration.clone();
                 enumeration.members = enumeration.members.into_iter().map(|member| member.desugar()).collect();
-                Symbol::new(SymbolKind::Enumeration(enumeration), self.span, self.id)
+                SymbolKind::Enumeration(enumeration)
             }
             SymbolKind::Method(method) => {
                 let mut method = method.clone();
                 method.members = method.members.into_iter().map(|member| member.desugar()).collect();
                 method.body = Box::new(method.body.desugar());
                 method.output = method.output.map(|output| Box::new(output.desugar()));
-                Symbol::new(SymbolKind::Method(method), self.span, self.id)
+                SymbolKind::Method(method)
             }
-            _ => Symbol::new(self.kind.clone(), self.span, self.id),
+            _ => self.kind.clone(),
+        };
+
+        Symbol {
+            kind,
+            ..self.clone()
         }
     }
 }

@@ -11,6 +11,8 @@ use {
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn resolve(&self, resolver: &mut Resolver<'symbol>) {
+        println!("Symbol: {:#?}", self);
+
         let mut symbol = self.clone();
         symbol.id = resolver.next_id();
 
