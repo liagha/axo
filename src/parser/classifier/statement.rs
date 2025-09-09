@@ -86,47 +86,29 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn cycle() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::choice([
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "while"
-                    } else {
-                        false
-                    }
-                }).with_ignore(),
-                Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().borrow_span();
+        Classifier::sequence([
+            Classifier::predicate(|token: &Token| {
+                if let TokenKind::Identifier(identifier) = &token.kind {
+                    identifier == "while"
+                } else {
+                    false
+                }
+            }).with_ignore(),
+            Classifier::deferred(Self::element).with_fallback(
+                Classifier::fail(|form: Form<Token, Element, ParseError>| {
+                    let span = form.unwrap_input().borrow_span();
 
-                        ParseError::new(ErrorKind::ExpectedCondition, span)
-                    })
-                ),
-                Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().borrow_span();
+                    ParseError::new(ErrorKind::ExpectedCondition, span)
+                })
+            ),
+            Classifier::deferred(Self::element).with_fallback(
+                Classifier::fail(|form: Form<Token, Element, ParseError>| {
+                    let span = form.unwrap_input().borrow_span();
 
-                        ParseError::new(ErrorKind::ExpectedBody, span)
-                    })
-                )
-            ]),
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "loop"
-                    } else {
-                        false
-                    }
-                }).with_ignore(),
-                Classifier::deferred(Self::element).with_fallback(
-                    Classifier::fail(|form: Form<Token, Element, ParseError>| {
-                        let span = form.unwrap_input().borrow_span();
-
-                        ParseError::new(ErrorKind::ExpectedBody, span)
-                    })
-                ),
-            ]),
-        ], vec![1, 0]).with_transform(
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                })
+            )
+        ]).with_transform(
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence: &[Form<Token<'_>, Element, ParseError>] = form.as_forms();
                 let keyword = sequence[0].unwrap_input();

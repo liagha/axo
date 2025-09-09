@@ -2,7 +2,9 @@ use {
     super::{
         form::Form,
         former::{
-            record::*,
+            record::{
+                Record,
+            },
             Former,
         },
         helper::Formable,
@@ -15,6 +17,7 @@ use {
             },
             Scale,
             Offset,
+            Boolean,
         },
         tracker::{
             Position,
@@ -41,64 +44,64 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             marker,
             position,
             consumed: Vec::new(),
-            record: BLANK,
+            record: Record::Blank,
             form: Form::Blank,
         }
     }
 
     #[inline]
     pub const fn is_panicked(&self) -> bool {
-        self.record == PANICKED
+        matches!(self.record, Record::Panicked)
     }
 
     #[inline]
     pub const fn is_aligned(&self) -> bool {
-        self.record == ALIGNED
+        matches!(self.record, Record::Aligned)
     }
 
     #[inline]
     pub const fn is_failed(&self) -> bool {
-        self.record == FAILED
+        matches!(self.record, Record::Failed)
     }
 
     #[inline]
     pub const fn is_effected(&self) -> bool {
-        matches!(self.record, ALIGNED | FAILED)
+        matches!(self.record, Record::Aligned | Record::Failed)
     }
 
     #[inline]
     pub const fn is_blank(&self) -> bool {
-        self.record == BLANK
+        matches!(self.record, Record::Blank)
     }
 
     #[inline]
     pub const fn is_ignored(&self) -> bool {
-        self.record == IGNORED
+        matches!(self.record, Record::Ignored)
     }
 
     #[inline]
     pub fn set_panic(&mut self) {
-        self.record = PANICKED;
+        self.record = Record::Panicked;
     }
 
     #[inline]
     pub fn set_align(&mut self) {
-        self.record = ALIGNED;
+        self.record = Record::Aligned;
     }
 
     #[inline]
     pub fn set_fail(&mut self) {
-        self.record = FAILED;
+        self.record = Record::Failed;
     }
 
     #[inline]
     pub fn set_empty(&mut self) {
-        self.record = BLANK;
+        self.record = Record::Blank;
     }
 
     #[inline]
     pub fn set_ignore(&mut self) {
-        self.record = IGNORED;
+        self.record = Record::Ignored;
     }
 
     #[inline]
@@ -129,17 +132,8 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(Arc::new(Alternative {
             patterns,
-            perfection: vec![PANICKED, ALIGNED],
-            blacklist: vec![BLANK]
-        }), 0, Position::new(Location::Void))
-    }
-
-    #[inline]
-    pub fn choice<const SIZE: Scale>(patterns: [Self; SIZE], perfection: Vec<Record>) -> Self {
-        Self::new(Arc::new(Alternative {
-            patterns,
-            perfection,
-            blacklist: Vec::new()
+            perfection: vec![Record::Panicked, Record::Aligned],
+            blacklist: vec![Record::Blank]
         }), 0, Position::new(Location::Void))
     }
 
@@ -161,12 +155,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             classifier: Box::new(classifier),
             minimum,
             maximum,
-            update: Vec::new(),
-            accept: vec![PANICKED, ALIGNED, FAILED, IGNORED],
-            consume: vec![PANICKED, ALIGNED, FAILED],
-            halt: Vec::new(),
-            align_on_success: true,
-            empty_on_failure: true,
+            persist: true,
         }), 0, Position::new(Location::Void))
     }
 
@@ -176,27 +165,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             classifier: Box::new(classifier),
             minimum,
             maximum,
-            update: vec![ALIGNED, PANICKED, FAILED],
-            accept: vec![ALIGNED, PANICKED, FAILED, IGNORED],
-            consume: vec![ALIGNED, PANICKED, FAILED],
-            halt: vec![PANICKED, FAILED],
-            align_on_success: false,
-            empty_on_failure: false,
-        }), 0, Position::new(Location::Void))
-    }
-
-    #[inline]
-    pub fn continuous(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
-        Self::new(Arc::new(Repetition {
-            classifier: Box::new(classifier),
-            minimum,
-            maximum,
-            update: vec![ALIGNED, PANICKED, FAILED],
-            accept: vec![ALIGNED, PANICKED, FAILED, IGNORED],
-            consume: vec![ALIGNED, PANICKED, FAILED],
-            halt: Vec::new(),
-            align_on_success: false,
-            empty_on_failure: false,
+            persist: false,
         }), 0, Position::new(Location::Void))
     }
 
@@ -208,7 +177,7 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     }
 
     #[inline]
-    pub fn ranked(classifier: Self, precedence: Record) -> Self {
+    pub fn ranked(classifier: Self, precedence: i8) -> Self {
         Self::new(Arc::new(Ranked {
             classifier: Box::new(classifier),
             precedence,
@@ -435,7 +404,7 @@ impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Form
             marker: classifier.marker,
             position: classifier.position,
             consumed: Vec::new(),
-            record: BLANK,
+            record: Record::Blank,
             form: Form::Blank,
         };
         composer.build(&mut child);
@@ -493,7 +462,7 @@ impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>
                 marker: classifier.marker,
                 position: classifier.position,
                 consumed: Vec::new(),
-                record: BLANK,
+                record: Record::Blank,
                 form: Form::Blank,
             };
             composer.build(&mut child);
@@ -564,7 +533,7 @@ impl<'optional, Input: Formable<'optional>, Output: Formable<'optional>, Failure
             marker: classifier.marker,
             position: classifier.position,
             consumed: Vec::new(),
-            record: BLANK,
+            record: Record::Blank,
             form: Form::Blank,
         };
         composer.build(&mut child);
@@ -594,7 +563,7 @@ impl<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrapper>, Failure: F
             marker: classifier.marker,
             position: classifier.position,
             consumed: Vec::new(),
-            record: BLANK,
+            record: Record::Blank,
             form: Form::Blank,
         };
         composer.build(&mut child);
@@ -610,7 +579,7 @@ impl<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrapper>, Failure: F
 #[derive(Clone)]
 pub struct Ranked<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>> {
     pub classifier: Box<Classifier<'ranked, Input, Output, Failure>>,
-    pub precedence: Record,
+    pub precedence: i8,
 }
 
 impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>> Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure> {
@@ -621,7 +590,7 @@ impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Form
             marker: classifier.marker,
             position: classifier.position,
             consumed: Vec::new(),
-            record: BLANK,
+            record: Record::Blank,
             form: Form::Blank,
         };
         composer.build(&mut child);
@@ -632,9 +601,9 @@ impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Form
         classifier.form = child.form.clone();
 
         if child.is_aligned() {
-            classifier.record = self.precedence.max(ALIGNED);
+            classifier.record = self.precedence.max(Record::Aligned.into()).into();
         } else if child.is_failed() {
-            classifier.record = self.precedence.min(FAILED);
+            classifier.record = self.precedence.min(Record::Failed.into()).into();
         } else {
             classifier.record = child.record;
         }
@@ -660,20 +629,20 @@ impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure
                 marker: index,
                 position,
                 consumed: Vec::new(),
-                record: BLANK,
+                record: Record::Blank,
                 form: Form::Blank,
             };
             composer.build(&mut child);
 
             match child.record {
-                ALIGNED => {
+                Record::Aligned => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
                 }
-                PANICKED | FAILED => {
+                Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
@@ -681,7 +650,7 @@ impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure
                     forms.push(child.form);
                     break;
                 }
-                IGNORED => {
+                Record::Ignored => {
                     index = child.marker;
                     position = child.position;
                 }
@@ -704,12 +673,7 @@ pub struct Repetition<'repetition, Input: Formable<'repetition>, Output: Formabl
     pub classifier: Box<Classifier<'repetition, Input, Output, Failure>>,
     pub minimum: Scale,
     pub maximum: Option<Scale>,
-    pub update: Vec<Record>,
-    pub accept: Vec<Record>,
-    pub consume: Vec<Record>,
-    pub halt: Vec<Record>,
-    pub align_on_success: bool,
-    pub empty_on_failure: bool,
+    pub persist: Boolean,
 }
 
 impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, Failure: Formable<'repetition>> Order<'repetition, Input, Output, Failure> for Repetition<'repetition, Input, Output, Failure> {
@@ -726,7 +690,7 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
                 marker: index,
                 position,
                 consumed: Vec::new(),
-                record: BLANK,
+                record: Record::Blank,
                 form: Form::Blank,
             };
             composer.build(&mut child);
@@ -735,22 +699,71 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
                 break;
             }
 
-            if self.update.contains(&child.record) {
-                classifier.record = child.record;
-            }
+            if self.persist {
+                match child.record {
+                    Record::Panicked => {
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                    }
 
-            if self.accept.contains(&child.record) {
-                index = child.marker;
-                position = child.position;
-            }
+                    Record::Aligned => {
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                    }
 
-            if self.consume.contains(&child.record) {
-                consumed.extend(child.consumed);
-                forms.push(child.form);
-            }
+                    Record::Failed => {
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                    }
 
-            if self.halt.contains(&child.record) {
-                break;
+                    Record::Ignored => {
+                        index = child.marker;
+                        position = child.position;
+                    }
+
+                    _ => {}
+                }
+            } else {
+                match child.record {
+                    Record::Panicked => {
+                        classifier.record = child.record;
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                        break;
+                    }
+
+                    Record::Aligned => {
+                        classifier.record = child.record;
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                    }
+
+                    Record::Failed => {
+                        classifier.record = child.record;
+                        index = child.marker;
+                        position = child.position;
+                        consumed.extend(child.consumed);
+                        forms.push(child.form);
+                        break;
+                    }
+
+                    Record::Ignored => {
+                        index = child.marker;
+                        position = child.position;
+                    }
+
+                    _ => {}
+                }
             }
 
             if let Some(max) = self.maximum {
@@ -761,7 +774,7 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
         }
 
         if forms.len() >= self.minimum {
-            if self.align_on_success {
+            if self.persist {
                 classifier.set_align();
             }
             classifier.marker = index;
@@ -769,7 +782,7 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
             classifier.consumed = consumed;
             classifier.form = Form::multiple(forms);
         } else {
-            if self.empty_on_failure {
+            if self.persist {
                 classifier.set_empty();
             }
         }

@@ -1,11 +1,39 @@
 pub mod record {
-    pub type Record = i8;
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Record {
+        Panicked,
+        Aligned,
+        Failed,
+        Blank,
+        Ignored,
+        Custom(i8),
+    }
 
-    pub const PANICKED: Record = Record::MAX;
-    pub const ALIGNED: Record = 1;
-    pub const FAILED: Record = 0;
-    pub const BLANK: Record = -1;
-    pub const IGNORED: Record = -2;
+    impl Into<i8> for Record {
+        fn into(self) -> i8 {
+            match self {
+                Record::Panicked => 127,
+                Record::Aligned => 1,
+                Record::Failed => 0,
+                Record::Blank => -1,
+                Record::Ignored => -2,
+                Record::Custom(value) => value,
+            }
+        }
+    }
+
+    impl From<i8> for Record {
+        fn from(value: i8) -> Record {
+            match value {
+                127 => Record::Panicked,
+                1 => Record::Aligned,
+                0 => Record::Failed,
+                -1 => Record::Blank,
+                -2 => Record::Ignored,
+                value => Record::Custom(value),
+            }
+        }
+    }
 }
 
 use {
