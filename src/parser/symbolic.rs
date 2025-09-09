@@ -37,25 +37,72 @@ pub struct Symbol<'symbol> {
     pub specifier: Specifier,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Specifier {
     pub entry: Boolean,
     pub interface: Interface,
     pub visibility: Visibility,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Visibility {
     Public,
     Private,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Interface {
     C,
     Rust,
     Axo,
     Compiler
+}
+
+impl Specifier {
+    pub fn apply(&mut self, application: Element<'_>) {
+        match application.kind {
+            ElementKind::Literal(
+                Token {
+                    kind: TokenKind::Identifier(identifier),
+                    ..
+                }
+            ) => {
+                match identifier.as_str().unwrap() {
+                    "public" => {
+                        self.visibility = Visibility::Public;
+                    }
+
+                    "private" => {
+                        self.visibility = Visibility::Private;
+                    }
+
+                    "c" => {
+                        self.interface = Interface::C;
+                    }
+
+                    "rust" => {
+                        self.interface = Interface::Rust;
+                    }
+
+                    "axo" => {
+                        self.interface = Interface::Axo;
+                    }
+
+                    "compiler" => {
+                        self.interface = Interface::Compiler;
+                    }
+
+                    "entry" => {
+                        self.entry = true;
+                    }
+
+                    _ => {}
+                }
+            }
+
+            _ => {}
+        }
+    }
 }
 
 impl Default for Specifier {
@@ -79,11 +126,11 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(&self, members: I) -> Self {
+    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
             scope: Scope { symbols: Set::from_iter(members), parent: None },
             id: self.id,
-            ..self.clone()
+            ..self
         }
     }
 
@@ -91,11 +138,22 @@ impl<'symbol> Symbol<'symbol> {
         self.scope.symbols.extend(members);
     }
 
-    pub fn with_scope(&mut self, scope: Scope<'symbol>) -> Self {
+    pub fn with_scope(self, scope: Scope<'symbol>) -> Self {
         Self {
             scope,
             id: self.id,
-            ..self.clone()
+            ..self
+        }
+    }
+
+    pub fn set_scope(&mut self, scope: Scope<'symbol>) {
+        self.scope = scope;
+    }
+
+    pub fn with_specifier(self, specifier: Specifier) -> Self {
+        Self {
+            specifier,
+            ..self
         }
     }
 

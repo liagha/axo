@@ -8,7 +8,7 @@ mod classifier;
 pub use {
     element::{Element, ElementKind},
     parser::Parser,
-    symbolic::{Symbol, SymbolKind},
+    symbolic::{Symbol, SymbolKind, Specifier},
 };
 
 pub(super) use error::*;

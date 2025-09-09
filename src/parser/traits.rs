@@ -232,9 +232,9 @@ impl<'element> Debug for ElementKind<'element> {
 impl<'symbol> Debug for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
-            write!(f, "{:#?}", self.kind)
+            write!(f, "{:#?} -> {:?}", self.kind, self.specifier)
         } else {
-            write!(f, "{:?} | {:?}", self.kind, self.span)
+            write!(f, "{:?} | {:?} -> {:?}", self.kind, self.span, self.specifier)
         }
     }
 }

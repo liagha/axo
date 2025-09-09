@@ -3,7 +3,7 @@ use {
         super::{
             Element, ElementKind,
             ParseError, Parser,
-            Symbol, SymbolKind,
+            Symbol, SymbolKind, Specifier,
         },
     },
     crate::{
@@ -224,17 +224,34 @@ impl<'parser> Parser<'parser> {
     pub fn structure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("struct"))
-                }),
-                Self::literal(),
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
+                        token.kind == TokenKind::Identifier(Str::from("struct"))
+                    }),
+                    Self::literal(),
+                    Self::group(Classifier::deferred(Self::element)).as_optional(),
+                ]),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input().clone();
-                let name = sequence[1].unwrap_output().clone();
-                let body = sequence[2].unwrap_output().clone();
+                let head = sequence[0].as_forms();
+                let mut specifier = Specifier::default();
+
+                let keyword = head[0].unwrap_input();
+                let name = head[1].unwrap_output().clone();
+
+                println!("head: {:?}", head);
+
+                if let Some(specification) = head.get(2).map(|form| form.unwrap_output()) {
+                    let items = specification.clone().kind.unwrap_delimited().items;
+
+                    items.iter().for_each(|item| {
+                        specifier.apply(item.clone());
+                    })
+                }
+
+                let body = sequence[1].unwrap_output().clone();
 
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
@@ -252,7 +269,7 @@ impl<'parser> Parser<'parser> {
                                 SymbolKind::Structure(Structure::new(Box::new(name), members)),
                                 span,
                                 0
-                            ),
+                            ).with_specifier(specifier),
                         ),
                         span,
                     )
@@ -264,17 +281,31 @@ impl<'parser> Parser<'parser> {
     pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("enum"))
-                }),
-                Self::literal(),
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
+                        token.kind == TokenKind::Identifier(Str::from("enum"))
+                    }),
+                    Self::literal(),
+                    Self::group(Classifier::deferred(Self::element)).as_optional(),
+                ]),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input().clone();
-                let name = sequence[1].unwrap_output().clone();
-                let body = sequence[2].unwrap_output().clone();
+                let head = sequence[0].as_forms();
+                let mut specifier = Specifier::default();
+
+                let keyword = head[0].unwrap_input();
+                let name = head[1].unwrap_output().clone();
+
+                if let Some(specification) = head.get(2).map(|form| form.unwrap_output()) {
+                    let items = specification.clone().kind.unwrap_delimited().items;
+
+                    items.iter().for_each(|item| {
+                        specifier.apply(item.clone());
+                    })
+                }
+                let body = sequence[1].unwrap_output().clone();
 
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
@@ -292,7 +323,7 @@ impl<'parser> Parser<'parser> {
                                 SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
                                 span,
                                 0
-                            ),
+                            ).with_specifier(specifier),
                         ),
                         span,
                     )

@@ -92,10 +92,10 @@ impl<'registry> Registry<'registry> {
             ElementKind::Literal(
                 Token::new(
                     TokenKind::Identifier(identifier),
-                    Span::default(Location::Flag)
+                    Span::void()
                 )
             ),
-            Span::default(Location::Flag)
+            Span::void()
         );
 
         let result = resolver.scope.try_get(&identifier);
@@ -114,10 +114,10 @@ impl<'registry> Registry<'registry> {
             ElementKind::Literal(
                 Token::new(
                     TokenKind::Identifier(Str::from("Verbosity")),
-                    Span::default(Location::Flag)
+                    Span::void()
                 ),
             ),
-            Span::default(Location::Flag)
+            Span::void()
         );
 
         let result = resolver.scope.try_get(&identifier);
@@ -138,10 +138,10 @@ impl<'registry> Registry<'registry> {
             ElementKind::Literal(
                 Token::new(
                     TokenKind::Identifier(Str::from("Path")),
-                    Span::default(Location::Flag)
+                    Span::void()
                 ),
             ),
-            Span::default(Location::Flag)
+            Span::void()
         );
 
         let result = resolver.scope.try_get(&identifier);
@@ -389,7 +389,7 @@ impl<'compiler> Compiler<'compiler> {
             self.registry.resolver.next_id()
         );
 
-        module.with_scope(self.registry.resolver.scope.clone());
+        module.set_scope(self.registry.resolver.scope.clone());
 
         self.registry.resolver.exit();
         self.registry.resolver.define(module.clone());
