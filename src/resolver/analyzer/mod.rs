@@ -1,6 +1,7 @@
 mod analysis;
 mod analyzer;
 mod error;
+mod element;
 
 pub use {
     analyzer::*,

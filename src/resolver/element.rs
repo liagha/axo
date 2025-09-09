@@ -18,6 +18,7 @@ use {
         },
     }
 };
+use crate::resolver::analyzer::Analyzable;
 
 impl<'element> Resolvable<'element> for Element<'element> {
     fn resolve(&self, resolver: &mut Resolver<'element>) {
@@ -95,7 +96,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             | ElementKind::Literal(_) => {}
         }
 
-        let analysis = resolver.analyze(self.clone());
+        let analysis = self.analyze(resolver);
 
         match analysis {
             Ok(analysis) => {
