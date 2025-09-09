@@ -19,9 +19,6 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Literal(literal) => {
                 Type::unit(literal.span)
             }
-            ElementKind::Procedural(_) => {
-                Type::unit(self.span)
-            }
             ElementKind::Delimited(delimited) => {
                 match (delimited.start.kind, delimited.separator.map(|token| token.kind), delimited.end.kind) {
                     (

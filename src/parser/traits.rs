@@ -16,6 +16,7 @@ use {
         tracker::{Span, Spanned},
     },
 };
+use crate::format::Show;
 
 impl<'element> Debug for Element<'element> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -34,13 +35,10 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Literal(literal) => {
                     write!(f, "{:#?}", literal)
                 },
-                ElementKind::Procedural(procedural) => {
-                    write!(f, "Procedural({:#?})", procedural.body)
-                }
                 ElementKind::Delimited(delimited) => {
                     write!(
                         f,
-                        "Delimited({}{:#?}{})",
+                        "Delimited({} - {} - {})",
                         format!("{} ", delimited.start),
                         delimited.items
                             .iter()
@@ -132,9 +130,6 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Literal(literal) => {
                     write!(f, "{:?}", literal)
                 },
-                ElementKind::Procedural(procedural) => {
-                    write!(f, "Procedural({:?})", procedural.body)
-                }
                 ElementKind::Delimited(delimited) => {
                     write!(
                         f,
@@ -232,7 +227,13 @@ impl<'element> Debug for ElementKind<'element> {
 impl<'symbol> Debug for Symbol<'symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
-            write!(f, "{:#?} -> {:?}", self.kind, self.specifier)
+            write!(
+                f,
+                "{:#?} \n{}\n{}",
+                self.kind,
+                format!("Specification: {:#?}", self.specifier).indent(),
+                format!("Generics: {:#?}", self.generic).indent(),
+            )
         } else {
             write!(f, "{:?} | {:?} -> {:?}", self.kind, self.span, self.specifier)
         }
@@ -388,10 +389,6 @@ impl<'element> Hash for ElementKind<'element> {
                 discriminant(self).hash(state);
                 kind.hash(state);
             }
-            ElementKind::Procedural(element) => {
-                discriminant(self).hash(state);
-                element.hash(state);
-            }
 
             ElementKind::Delimited(delimited) => {
                 discriminant(self).hash(state);
@@ -470,7 +467,6 @@ impl<'element> PartialEq for ElementKind<'element> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ElementKind::Literal(a), ElementKind::Literal(b)) => a == b,
-            (ElementKind::Procedural(a), ElementKind::Procedural(b)) => a == b,
 
             (ElementKind::Delimited(a), ElementKind::Delimited(b)) => a == b,
             (ElementKind::Construct(a), ElementKind::Construct(b)) => a == b,
@@ -509,7 +505,6 @@ impl<'element> Clone for ElementKind<'element> {
     fn clone(&self) -> Self {
         match self {
             ElementKind::Literal(kind) => ElementKind::Literal(kind.clone()),
-            ElementKind::Procedural(element) => ElementKind::Procedural(element.clone()),
 
             ElementKind::Delimited(delimited) => ElementKind::Delimited(delimited.clone()),
             ElementKind::Construct(construct) => ElementKind::Construct(construct.clone()),
@@ -546,6 +541,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
+            generic: self.generic.clone(),
             specifier: self.specifier.clone(),
         }
     }

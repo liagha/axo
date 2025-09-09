@@ -23,9 +23,6 @@ impl<'analyzer> Resolver<'analyzer> {
     ) -> Result<Analysis<'analyzer>, AnalyzeError<'analyzer>> {
         match &element.kind {
             ElementKind::Literal(literal) => self.analyze_literal(literal),
-            ElementKind::Procedural(_) => {
-                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
-            }
             ElementKind::Closure(_) => {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
             }

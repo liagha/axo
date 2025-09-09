@@ -6,11 +6,6 @@ use {
 };
 
 #[derive(Debug, Eq)]
-pub struct Procedural<Body> {
-    pub body: Body,
-}
-
-#[derive(Debug, Eq)]
 pub struct Delimited<Delimiter, Item> {
     pub start: Delimiter,
     pub items: Vec<Item>,
@@ -66,13 +61,6 @@ pub struct While<Condition, Body> {
 pub struct Cycle<Clause, Body> {
     pub guard: Clause,
     pub body: Body,
-}
-
-impl<Body> Procedural<Body> {
-    #[inline]
-    pub fn new(body: Body) -> Self {
-        Procedural { body }
-    }
 }
 
 impl<Delimiter, Item> Delimited<Delimiter, Item> {
@@ -146,12 +134,6 @@ impl<Clause, Body> Cycle<Clause, Body> {
     }
 }
 
-impl<Body: Hash> Hash for Procedural<Body> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.body.hash(state);
-    }
-}
-
 impl<Delimiter: Hash, Item: Hash> Hash for Delimited<Delimiter, Item> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.start.hash(state);
@@ -221,12 +203,6 @@ impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
     }
 }
 
-impl<Body: PartialEq> PartialEq for Procedural<Body> {
-    fn eq(&self, other: &Self) -> bool {
-        self.body == other.body
-    }
-}
-
 impl<Delimiter: PartialEq, Item: PartialEq> PartialEq for Delimited<Delimiter, Item> {
     fn eq(&self, other: &Self) -> bool {
         self.start == other.start
@@ -289,12 +265,6 @@ impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body>
 impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
     fn eq(&self, other: &Self) -> bool {
         self.guard == other.guard && self.body == other.body
-    }
-}
-
-impl<Body: Clone> Clone for Procedural<Body> {
-    fn clone(&self) -> Self {
-        Procedural::new(self.body.clone())
     }
 }
 

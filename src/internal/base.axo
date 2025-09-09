@@ -1,16 +1,21 @@
-enum Token {}
+enum Token(compiler) {}
 
-struct Integer {
-    var value: Token,
-    var size: Token,
-    var signed: Boolean,
+struct Integer(compiler) {
+    const value: Token,
+    const size: Token,
+    const signed: Boolean,
 }
 
-struct Float {
-    var value: Token,
-    var size: Token,
+struct Float(compiler) {
+    const value: Token,
+    const size: Token,
 }
 
-struct Boolean {
-    var value: Token,
+struct Boolean(compiler) {
+    const value: Token,
+}
+
+func printf() {}
+
+struct Add(const Left, const Right, const Output, compiler) {
 }

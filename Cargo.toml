@@ -32,5 +32,7 @@ matchete = { path = "../matchete", optional = true }
 walkdir = { version = "2.5.0" }
 inkwell = { version = "0.6.0", features = ["llvm18-1-force-static"], optional = true }
 
-[profile.dev]
-debug = true
+[workspace]
+members = [
+    "src/procedural"
+]

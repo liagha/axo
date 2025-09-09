@@ -34,6 +34,7 @@ pub struct Symbol<'symbol> {
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
+    pub generic: Scope<'symbol>,
     pub specifier: Specifier,
 }
 
@@ -122,6 +123,7 @@ impl<'symbol> Symbol<'symbol> {
             kind: value,
             span,
             scope: Scope::new(),
+            generic: Scope::new(),
             specifier: Specifier::default(),
         }
     }
@@ -148,6 +150,18 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn set_scope(&mut self, scope: Scope<'symbol>) {
         self.scope = scope;
+    }
+
+    pub fn with_generic(self, generic: Scope<'symbol>) -> Self {
+        Self {
+            generic,
+            id: self.id,
+            ..self
+        }
+    }
+
+    pub fn set_generic(&mut self, generic: Scope<'symbol>) {
+        self.generic = generic;
     }
 
     pub fn with_specifier(self, specifier: Specifier) -> Self {

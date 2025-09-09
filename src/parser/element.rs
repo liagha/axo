@@ -17,9 +17,7 @@ pub struct Element<'element> {
 pub enum ElementKind<'element> {
     Literal(Token<'element>),
 
-    Procedural(Procedural<Box<Element<'element>>>),
-
-    Delimited(Delimited<Token<'element>, Element<'element>>), 
+    Delimited(Delimited<Token<'element>, Element<'element>>),
 
     Unary(Unary<Token<'element>, Box<Element<'element>>>),
 
@@ -58,11 +56,6 @@ impl<'element> ElementKind<'element> {
     #[inline]
     pub fn literal(kind: Token<'element>) -> Self {
         ElementKind::Literal(kind)
-    }
-
-    #[inline]
-    pub fn procedural(proc: Procedural<Box<Element<'element>>>) -> Self {
-        ElementKind::Procedural(proc)
     }
 
     #[inline]
@@ -136,11 +129,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn is_procedural(&self) -> bool {
-        matches!(self, ElementKind::Procedural(_))
-    }
-
-    #[inline(always)]
     pub fn is_delimited(&self) -> bool {
         matches!(self, ElementKind::Delimited(_))
     }
@@ -211,15 +199,6 @@ impl<'element> ElementKind<'element> {
         match self {
             ElementKind::Literal(token_kind) => token_kind,
             _ => panic!("called `unwrap_literal` on non-Literal variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_procedural(self) -> Procedural<Box<Element<'element>>> {
-        match self {
-            ElementKind::Procedural(proc) => proc,
-            _ => panic!("called `unwrap_procedural` on non-Procedural variant."),
         }
     }
 
@@ -349,14 +328,6 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_procedural(&self) -> Option<&Procedural<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Procedural(proc) => Some(proc),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
     pub fn try_unwrap_delimited(&self) -> Option<&Delimited<Token<'element>, Element<'element>>> {
         match self {
             ElementKind::Delimited(delimited) => Some(delimited),
@@ -464,14 +435,6 @@ impl<'element> ElementKind<'element> {
     pub fn try_unwrap_literal_mut(&mut self) -> Option<&mut Token<'element>> {
         match self {
             ElementKind::Literal(kind) => Some(kind),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_procedural_mut(&mut self) -> Option<&mut Procedural<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Procedural(proc) => Some(proc),
             _ => None,
         }
     }

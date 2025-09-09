@@ -92,8 +92,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Symbolize(_)
-            | ElementKind::Literal(_)
-            | ElementKind::Procedural(_) => {}
+            | ElementKind::Literal(_) => {}
         }
 
         let analysis = resolver.analyze(self.clone());

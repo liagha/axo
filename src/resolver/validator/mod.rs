@@ -167,10 +167,6 @@ impl<'element> Sugared<'element, Element<'element>> for Element<'element> {
             ElementKind::Symbolize(symbol) => {
                 Element::new(ElementKind::Symbolize(symbol.desugar()), self.span)
             }
-            ElementKind::Procedural(procedural) => {
-                let body = Box::new(procedural.body.desugar());
-                Element::new(ElementKind::Procedural(Procedural::new(body)), self.span)
-            }
             _ => self.clone(),
         }
     }

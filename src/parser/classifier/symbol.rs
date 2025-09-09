@@ -236,18 +236,21 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
+                let mut generic = Scope::new();
                 let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
 
-                println!("head: {:?}", head);
-
                 if let Some(specification) = head.get(2).map(|form| form.unwrap_output()) {
                     let items = specification.clone().kind.unwrap_delimited().items;
 
                     items.iter().for_each(|item| {
-                        specifier.apply(item.clone());
+                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
+                            generic.add(symbol)
+                        } else {
+                            specifier.apply(item.clone());
+                        }
                     })
                 }
 
@@ -269,7 +272,9 @@ impl<'parser> Parser<'parser> {
                                 SymbolKind::Structure(Structure::new(Box::new(name), members)),
                                 span,
                                 0
-                            ).with_specifier(specifier),
+                            )
+                                .with_specifier(specifier)
+                                .with_generic(generic),
                         ),
                         span,
                     )
@@ -293,6 +298,7 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
+                let mut generic = Scope::new();
                 let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
@@ -302,7 +308,11 @@ impl<'parser> Parser<'parser> {
                     let items = specification.clone().kind.unwrap_delimited().items;
 
                     items.iter().for_each(|item| {
-                        specifier.apply(item.clone());
+                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
+                            generic.add(symbol)
+                        } else {
+                            specifier.apply(item.clone());
+                        }
                     })
                 }
                 let body = sequence[1].unwrap_output().clone();
@@ -323,7 +333,9 @@ impl<'parser> Parser<'parser> {
                                 SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
                                 span,
                                 0
-                            ).with_specifier(specifier),
+                            )
+                                .with_specifier(specifier)
+                                .with_generic(generic),
                         ),
                         span,
                     )
