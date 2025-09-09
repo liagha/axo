@@ -24,6 +24,8 @@ pub enum ElementKind<'element> {
     Unary(Unary<Token<'element>, Box<Element<'element>>>),
 
     Binary(Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>),
+    
+    Closure(Closure<Element<'element>, Box<Element<'element>>>),
 
     Index(Index<Box<Element<'element>>, Element<'element>>),
 

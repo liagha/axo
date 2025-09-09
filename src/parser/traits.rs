@@ -61,6 +61,10 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Unary(unary) => {
                     write!(f, "Unary({:#?} {:#?})", unary.operator, unary.operand)
                 },
+                
+                ElementKind::Closure(closure) => {
+                    write!(f, "Closure({:#?} {:#?})", closure.members, closure.body)
+                }
 
                 ElementKind::Index(index) => {
                     write!(f, "Index({:#?}[{:#?}])", index.target, index.members)
@@ -155,6 +159,10 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Unary(unary) => {
                     write!(f, "Unary({:?} {:?})", unary.operator, unary.operand)
                 },
+
+                ElementKind::Closure(closure) => {
+                    write!(f, "Closure({:#?} {:#?})", closure.members, closure.body)
+                }
 
                 ElementKind::Index(index) => {
                     write!(f, "Index({:?}[{:?}])", index.target, index.members)
@@ -403,6 +411,11 @@ impl<'element> Hash for ElementKind<'element> {
                 discriminant(self).hash(state);
                 unary.hash(state);
             }
+            
+            ElementKind::Closure(closure) => {
+                discriminant(self).hash(state);
+                closure.hash(state);
+            }
 
             ElementKind::Index(index) => {
                 discriminant(self).hash(state);
@@ -503,6 +516,8 @@ impl<'element> Clone for ElementKind<'element> {
 
             ElementKind::Binary(binary) => ElementKind::Binary(binary.clone()),
             ElementKind::Unary(unary) => ElementKind::Unary(unary.clone()),
+            
+            ElementKind::Closure(closure) => ElementKind::Closure(closure.clone()),
 
             ElementKind::Index(index) => ElementKind::Index(index.clone()),
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
@@ -531,6 +546,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
+            specifier: self.specifier.clone(),
         }
     }
 }

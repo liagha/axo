@@ -320,8 +320,30 @@ impl<'parser> Parser<'parser> {
         left
     }
 
+    pub fn closure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+        Classifier::sequence([
+            Self::angled(Classifier::deferred(Self::element)),
+            Classifier::deferred(Self::element),
+        ]).with_transform(|form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+            let sequence = form.collect_outputs();
+            let members = sequence[0].clone().kind.unwrap_delimited().items;
+            let body = sequence[1].clone();
+            let span = Span::merge(&members.clone().span(), &body.span);
+
+            Ok(Form::output(Element::new(
+                ElementKind::Closure(
+                    Closure::new(
+                        members,
+                        Box::new(body),
+                    )
+                ),
+                span,
+            )))
+        })
+    }
+    
     pub fn expression() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
+        Classifier::alternative([Self::closure(), Self::binary(), Self::unary(), Self::primary()])
     }
 
     pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {

@@ -12,29 +12,27 @@ use {
         super::{ErrorKind, Element, ElementKind, ParseError, Parser}
     },
 };
+use crate::scanner::OperatorKind;
 
 impl<'parser> Parser<'parser> {
-    pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn create_delimiter(
+        left: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
+        right: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
+        separator: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
+        separator_error: impl Fn() -> ParseError<'parser> + 'parser,
+        unclosed_error: impl Fn() -> ParseError<'parser> + 'parser,
+        item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
+    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                }),
+                left,
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
                         Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::default(Location::Flag);
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Comma,
-                                    )),
-                                    span,
-                                )
+                            separator,
+                            Classifier::fail(move |_form: Form<Token, Element, ParseError>| {
+                                separator_error()
                             }),
                         ),
                         item.as_optional(),
@@ -43,17 +41,9 @@ impl<'parser> Parser<'parser> {
                     None,
                 ),
                 Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::default(Location::Flag);
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            )),
-                            span,
-                        )
+                    right,
+                    Classifier::fail(move |_form: Form<Token, Element, ParseError>| {
+                        unclosed_error()
                     }),
                 ),
             ]),
@@ -87,392 +77,267 @@ impl<'parser> Parser<'parser> {
                     )))
                 }
             },
+        )
+    }
+
+    pub fn angled(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Operator(OperatorKind::LeftAngle)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Operator(OperatorKind::RightAngle)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
+            }),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Comma,
+                    )),
+                    span,
+                )
+            },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(
+                        TokenKind::Operator(
+                            OperatorKind::LeftAngle
+                        )
+                    ),
+                    span,
+                )
+            },
+            item,
+        )
+    }
+
+    pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
+            }),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Comma,
+                    )),
+                    span,
+                )
+            },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 
     pub fn block(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
-                }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::default(Location::Flag);
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Semicolon,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::default(Location::Flag);
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            )),
-                            span,
-                        )
-                    }),
-                ),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
+            }),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Semicolon,
+                    )),
+                    span,
+                )
             },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 
     pub fn group(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
+            }),
+            Classifier::with_order(
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+                    token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
                 }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::with_order(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Classifier::branch(
-                                Classifier::ignore(),
-                                Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                    let span = Span::default(Location::Flag);
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                            PunctuationKind::Comma,
-                                        )),
-                                        span,
-                                    )
-                                }),
-                            ),
-                        ),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
-                    }),
+                Classifier::branch(
+                    Classifier::ignore(),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftParenthesis,
+                            ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                PunctuationKind::Comma,
                             )),
                             span,
                         )
                     }),
                 ),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
+            ),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Comma,
+                    )),
+                    span,
+                )
             },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 
     pub fn sequence(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
+            }),
+            Classifier::with_order(
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+                    token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
                 }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::with_order(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            }),
-                            Classifier::branch(
-                                Classifier::ignore(),
-                                Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                    let span = Span::default(Location::Flag);
-                                    ParseError::new(
-                                        ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                            PunctuationKind::Semicolon,
-                                        )),
-                                        span,
-                                    )
-                                }),
-                            ),
-                        ),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
-                    }),
+                Classifier::branch(
+                    Classifier::ignore(),
                     Classifier::fail(|_form: Form<Token, Element, ParseError>| {
                         let span = Span::default(Location::Flag);
                         ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftParenthesis,
+                            ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                                PunctuationKind::Semicolon,
                             )),
                             span,
                         )
                     }),
                 ),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
+            ),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Semicolon,
+                    )),
+                    span,
+                )
             },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 
     pub fn collection(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::default(Location::Flag);
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Comma,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::default(Location::Flag);
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBracket,
-                            )),
-                            span,
-                        )
-                    }),
-                ),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
+            }),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Comma,
+                    )),
+                    span,
+                )
             },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 
     pub fn series(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
-                }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::default(Location::Flag);
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Semicolon,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::default(Location::Flag);
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBracket,
-                            )),
-                            span,
-                        )
-                    }),
-                ),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
+        Self::create_delimiter(
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
+            }),
+            Classifier::predicate(|token: &Token| {
+                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
+            }),
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
+                        PunctuationKind::Semicolon,
+                    )),
+                    span,
+                )
             },
+            || {
+                let span = Span::default(Location::Flag);
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    span,
+                )
+            },
+            item,
         )
     }
 

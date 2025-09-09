@@ -73,6 +73,9 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Binary(binary) => {
                 (&*binary.left).infer()
             }
+            ElementKind::Closure(closure) => {
+                Type::unit(self.span)
+            }
             ElementKind::Index(_) => {
                 Type::unit(self.span)
             }

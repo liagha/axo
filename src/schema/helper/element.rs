@@ -26,6 +26,12 @@ pub struct Binary<Left, Operator, Right> {
 }
 
 #[derive(Debug, Eq)]
+pub struct Closure<Member, Body> {
+    pub members: Vec<Member>,
+    pub body: Body,
+}
+
+#[derive(Debug, Eq)]
 pub struct Unary<Operator, Operand> {
     pub operator: Operator,
     pub operand: Operand,
@@ -84,6 +90,13 @@ impl<Left, Operator, Right> Binary<Left, Operator, Right> {
             operator,
             right,
         }
+    }
+}
+
+impl<Member, Body> Closure<Member, Body> {
+    #[inline]
+    pub fn new(members: Vec<Member>, body: Body) -> Self {
+        Closure { members, body }
     }
 }
 
@@ -153,6 +166,13 @@ impl<Left: Hash, Operator: Hash, Right: Hash> Hash for Binary<Left, Operator, Ri
         self.left.hash(state);
         self.operator.hash(state);
         self.right.hash(state);
+    }
+}
+
+impl<Member: Hash, Body: Hash> Hash for Closure<Member, Body> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.members.hash(state);
+        self.body.hash(state);
     }
 }
 
@@ -226,6 +246,12 @@ for Binary<Left, Operator, Right>
     }
 }
 
+impl<Member: PartialEq, Body: PartialEq> PartialEq for Closure<Member, Body> {
+    fn eq(&self, other: &Self) -> bool {
+        self.members == other.members && self.body == other.body
+    }
+}
+
 impl<Operator: PartialEq, Operand: PartialEq> PartialEq for Unary<Operator, Operand> {
     fn eq(&self, other: &Self) -> bool {
         self.operator == other.operator && self.operand == other.operand
@@ -290,6 +316,12 @@ impl<Left: Clone, Operator: Clone, Right: Clone> Clone for Binary<Left, Operator
             self.operator.clone(),
             self.right.clone(),
         )
+    }
+}
+
+impl<Member: Clone, Body: Clone> Clone for Closure<Member, Body> {
+    fn clone(&self) -> Self {
+        Closure::new(self.members.clone(), self.body.clone())
     }
 }
 

@@ -26,6 +26,9 @@ impl<'analyzer> Resolver<'analyzer> {
             ElementKind::Procedural(_) => {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
             }
+            ElementKind::Closure(_) => {
+                Err(AnalyzeError::new(ErrorKind::UnImplemented, element.span))
+            }
             ElementKind::Delimited(delimited) => {
                 match element.kind {
                     ElementKind::Delimited(delimited) => {

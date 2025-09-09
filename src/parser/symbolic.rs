@@ -34,18 +34,38 @@ pub struct Symbol<'symbol> {
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
+    pub specifier: Specifier,
 }
 
+#[derive(Clone, Copy)]
 pub struct Specifier {
     pub entry: Boolean,
     pub interface: Interface,
+    pub visibility: Visibility,
 }
 
+#[derive(Clone, Copy)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
+#[derive(Clone, Copy)]
 pub enum Interface {
     C,
     Rust,
     Axo,
     Compiler
+}
+
+impl Default for Specifier {
+    fn default() -> Self {
+        Self {
+            entry: false,
+            interface: Interface::Axo,
+            visibility: Visibility::Public,
+        }
+    }
 }
 
 impl<'symbol> Symbol<'symbol> {
@@ -55,6 +75,7 @@ impl<'symbol> Symbol<'symbol> {
             kind: value,
             span,
             scope: Scope::new(),
+            specifier: Specifier::default(),
         }
     }
 

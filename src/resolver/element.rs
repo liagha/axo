@@ -47,6 +47,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Unary(unary) => unary.operand.resolve(resolver),
+            
+            ElementKind::Closure(closure) => {
+                closure.body.resolve(resolver);
+            }
 
             ElementKind::Conditional(conditioned) => {
                 conditioned.guard.resolve(resolver);
