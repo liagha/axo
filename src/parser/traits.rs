@@ -38,8 +38,9 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Delimited(delimited) => {
                     write!(
                         f,
-                        "Delimited({} - {} - {})",
-                        format!("{} ", delimited.start),
+                        "Delimited({}-{}, {})",
+                        delimited.start.to_string(),
+                        delimited.end.to_string(),
                         delimited.items
                             .iter()
                             .map(|item| format!("{:#?}", item))
@@ -49,7 +50,6 @@ impl<'element> Debug for ElementKind<'element> {
                                     |separator| format!("{} ", separator)
                                 ).unwrap_or(" ".to_string())
                             ),
-                        format!("{} ", delimited.end)
                     )
                 }
 
@@ -85,18 +85,18 @@ impl<'element> Debug for ElementKind<'element> {
                 ElementKind::Delimited(delimited) => {
                     write!(
                         f,
-                        "Delimited({}{:#?}{})",
-                        format!("{} ", delimited.start),
+                        "Delimited({}-{}, {})",
+                        delimited.start.to_string(),
+                        delimited.end.to_string(),
                         delimited.items
                             .iter()
-                            .map(|item| format!("{:?}", item))
+                            .map(|item| format!("{:#?}", item))
                             .collect::<Vec<_>>()
                             .join(
                                 &*delimited.clone().separator.map(
                                     |separator| format!("{} ", separator)
                                 ).unwrap_or(" ".to_string())
                             ),
-                        format!("{} ", delimited.end)
                     )
                 }
 

@@ -42,7 +42,7 @@ impl<'parser> Parser<'parser> {
                         | TokenKind::Float(_)
                         | TokenKind::Integer(_)
                 ) || if let TokenKind::Identifier(identifier) = &token.kind {
-                    !["loop", "if", "while", "var", "const", "struct", "enum", "func", "impl", "module"].contains(&identifier.unwrap_str())
+                    !["var", "const", "struct", "enum", "func", "module"].contains(&identifier.unwrap_str())
                 } else {
                     false
                 }
@@ -55,21 +55,6 @@ impl<'parser> Parser<'parser> {
                 ))
             },
         )
-    }
-
-    pub fn whitespace() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Classifier::predicate(
-            |token: &Token| {
-                matches!(
-                    token.kind,
-                    TokenKind::Comment(_)
-                        | TokenKind::Punctuation(PunctuationKind::Newline)
-                        | TokenKind::Punctuation(PunctuationKind::Tab)
-                        | TokenKind::Punctuation(PunctuationKind::Indentation(_))
-                        | TokenKind::Punctuation(PunctuationKind::Space)
-                )
-            },
-        )])
     }
 
     pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
@@ -221,9 +206,7 @@ impl<'parser> Parser<'parser> {
         Classifier::alternative([
             Classifier::with_transform(
                 Classifier::sequence([
-                    Classifier::alternative([
-                        Self::unary(),
-                    ]),
+                    Self::unary(),
                     Classifier::repetition(
                         Classifier::sequence([
                             Classifier::predicate(move |token: &Token| {
@@ -237,9 +220,7 @@ impl<'parser> Parser<'parser> {
                                     false
                                 }
                             }),
-                            Classifier::alternative([
-                                Self::unary(),
-                            ])
+                            Self::unary(),
                         ]),
                         1,
                         None,
@@ -320,8 +301,8 @@ impl<'parser> Parser<'parser> {
 
     pub fn closure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::sequence([
-            Self::angled(Classifier::deferred(Self::element)),
-            Classifier::deferred(Self::element),
+            Self::group(Classifier::deferred(Self::element)),
+            Self::block(Classifier::deferred(Self::element)),
         ]).with_transform(|form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
             let sequence = form.collect_outputs();
             let members = sequence[0].clone().kind.unwrap_delimited().items;

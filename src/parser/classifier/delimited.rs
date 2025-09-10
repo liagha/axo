@@ -14,60 +14,6 @@ use {
 };
 
 impl<'parser> Parser<'parser> {
-    pub fn angled(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Operator(OperatorKind::LeftAngle)
-                }),
-                item.as_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([
-                        Classifier::predicate(|token: &Token| {
-                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                        }),
-                        item.as_optional(),
-                    ]),
-                    0,
-                    None,
-                ),
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Operator(OperatorKind::RightAngle)
-                }),
-            ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-                let start = delimiters.first().unwrap();
-                let end = delimiters.last().unwrap();
-                let span = Span::merge(&start.span, &end.span);
-
-                if delimiters.len() == 2 {
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            None,
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                } else {
-                    let separator = delimiters[1].clone();
-                    Ok(Form::output(Element::new(
-                        ElementKind::delimited(Delimited::new(
-                            start.clone(),
-                            elements.clone(),
-                            Some(separator),
-                            end.clone(),
-                        )),
-                        span,
-                    )))
-                }
-            },
-        )
-    }
-
     pub fn bundle(item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
@@ -488,7 +434,6 @@ impl<'parser> Parser<'parser> {
 
     pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::angled(Classifier::deferred(Self::element)),
             Self::bundle(Classifier::deferred(Self::element)),
             Self::block(Classifier::deferred(Self::element)),
             Self::group(Classifier::deferred(Self::element)),

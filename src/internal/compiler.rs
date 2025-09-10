@@ -406,7 +406,7 @@ impl<'compiler> Compiler<'compiler> {
         let verbosity = Registry::get_verbosity(&mut self.registry.resolver);
         let mut logger = CompileLogger::new(verbosity, targets.len());
 
-        {
+        /*{
             let target = Location::File(Str::from("/Users/ali/Projects/axo/src/internal/base.axo"));
 
             let tokens = {
@@ -420,7 +420,7 @@ impl<'compiler> Compiler<'compiler> {
             };
 
             self.registry.resolver.execute(elements.clone(), &logger);
-        }
+        }*/
 
         for target in targets {
             logger.set_current(target.to_string());
