@@ -57,9 +57,9 @@ pub enum Instruction<'analysis> {
 
     // Control Flow Related
     Block(Vec<Analysis<'analysis>>),
-    Conditional(Conditional<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
-    While(While<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
-    Cycle(Cycle<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Conditional(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    While(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
+    Cycle(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Return(Option<Box<Analysis<'analysis>>>),
     Break(Option<Box<Analysis<'analysis>>>),
     Continue(Option<Box<Analysis<'analysis>>>),

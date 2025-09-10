@@ -222,7 +222,6 @@ impl<'parser> Parser<'parser> {
             Classifier::with_transform(
                 Classifier::sequence([
                     Classifier::alternative([
-                        Self::statement(),
                         Self::unary(),
                     ]),
                     Classifier::repetition(
@@ -239,7 +238,6 @@ impl<'parser> Parser<'parser> {
                                 }
                             }),
                             Classifier::alternative([
-                                Self::statement(),
                                 Self::unary(),
                             ])
                         ]),
@@ -348,7 +346,6 @@ impl<'parser> Parser<'parser> {
 
     pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::statement(),
             Self::expression()
         ])
     }

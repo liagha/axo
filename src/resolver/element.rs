@@ -53,45 +53,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 closure.body.resolve(resolver);
             }
 
-            ElementKind::Conditional(conditioned) => {
-                conditioned.guard.resolve(resolver);
-                resolver.enter();
-                conditioned.then.resolve(resolver);
-                resolver.exit();
-
-                if let Some(alternate) = conditioned.alternate {
-                    resolver.enter();
-                    alternate.resolve(resolver);
-                    resolver.exit();
-                }
-            }
-
-            ElementKind::While(repeat) => {
-                if let Some(condition) = repeat.guard {
-                    condition.resolve(resolver);
-                }
-                resolver.enter();
-                repeat.body.resolve(resolver);
-                resolver.exit();
-            }
-
-            ElementKind::Cycle(walk) => {
-                walk.guard.resolve(resolver);
-
-                let parent = replace(&mut resolver.scope, Scope::new());
-                resolver.scope.attach(parent);
-
-                resolver.enter();
-                walk.body.resolve(resolver);
-                resolver.exit();
-            }
-
-            ElementKind::Return(value) | ElementKind::Break(value) | ElementKind::Continue(value) => {
-                if let Some(value) = value {
-                    value.resolve(resolver);
-                }
-            }
-
             ElementKind::Symbolize(_)
             | ElementKind::Literal(_) => {}
         }

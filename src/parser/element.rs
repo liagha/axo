@@ -31,19 +31,7 @@ pub enum ElementKind<'element> {
 
     Construct(Structure<Box<Element<'element>>, Element<'element>>),
 
-    Conditional(Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>),
-
-    While(While<Box<Element<'element>>, Box<Element<'element>>>),
-
-    Cycle(Cycle<Box<Element<'element>>, Box<Element<'element>>>),
-
     Symbolize(Symbol<'element>),
-
-    Return(Option<Box<Element<'element>>>),
-
-    Break(Option<Box<Element<'element>>>),
-
-    Continue(Option<Box<Element<'element>>>),
 }
 
 impl<'element> Element<'element> {
@@ -89,38 +77,8 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn conditional(conditional: Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::Conditional(conditional)
-    }
-
-    #[inline]
-    pub fn repeat(repeat: While<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::While(repeat)
-    }
-
-    #[inline]
-    pub fn iterate(iterate: Cycle<Box<Element<'element>>, Box<Element<'element>>>) -> Self {
-        ElementKind::Cycle(iterate)
-    }
-
-    #[inline]
     pub fn symbolize(symbol: Symbol<'element>) -> Self {
         ElementKind::Symbolize(symbol)
-    }
-
-    #[inline]
-    pub fn produce(element: Option<Box<Element<'element>>>) -> Self {
-        ElementKind::Return(element)
-    }
-
-    #[inline]
-    pub fn abort(element: Option<Box<Element<'element>>>) -> Self {
-        ElementKind::Break(element)
-    }
-
-    #[inline]
-    pub fn pass(element: Option<Box<Element<'element>>>) -> Self {
-        ElementKind::Continue(element)
     }
 
     #[inline(always)]
@@ -159,38 +117,8 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn is_conditional(&self) -> bool {
-        matches!(self, ElementKind::Conditional(_))
-    }
-
-    #[inline(always)]
-    pub fn is_repeat(&self) -> bool {
-        matches!(self, ElementKind::While(_))
-    }
-
-    #[inline(always)]
-    pub fn is_iterate(&self) -> bool {
-        matches!(self, ElementKind::Cycle(_))
-    }
-
-    #[inline(always)]
     pub fn is_symbolize(&self) -> bool {
         matches!(self, ElementKind::Symbolize(_))
-    }
-
-    #[inline(always)]
-    pub fn is_produce(&self) -> bool {
-        matches!(self, ElementKind::Return(_))
-    }
-
-    #[inline(always)]
-    pub fn is_abort(&self) -> bool {
-        matches!(self, ElementKind::Break(_))
-    }
-
-    #[inline(always)]
-    pub fn is_pass(&self) -> bool {
-        matches!(self, ElementKind::Continue(_))
     }
 
     #[inline]
@@ -258,64 +186,10 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_conditional(self) -> Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::Conditional(conditional) => conditional,
-            _ => panic!("called `unwrap_conditional` on non-Conditional variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_repeat(self) -> While<Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::While(repeat) => repeat,
-            _ => panic!("called `unwrap_repeat` on non-Repeat variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_iterate(self) -> Cycle<Box<Element<'element>>, Box<Element<'element>>> {
-        match self {
-            ElementKind::Cycle(iterate) => iterate,
-            _ => panic!("called `unwrap_iterate` on non-Iterate variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
     pub fn unwrap_symbolize(self) -> Symbol<'element> {
         match self {
             ElementKind::Symbolize(symbol) => symbol,
             _ => panic!("called `unwrap_symbolize` on non-Symbolize variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_produce(self) -> Option<Box<Element<'element>>> {
-        match self {
-            ElementKind::Return(element) => element,
-            _ => panic!("called `unwrap_produce` on non-Produce variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_abort(self) -> Option<Box<Element<'element>>> {
-        match self {
-            ElementKind::Break(element) => element,
-            _ => panic!("called `unwrap_abort` on non-Abort variant."),
-        }
-    }
-
-    #[inline]
-    #[track_caller]
-    pub fn unwrap_pass(self) -> Option<Box<Element<'element>>> {
-        match self {
-            ElementKind::Continue(element) => element,
-            _ => panic!("called `unwrap_pass` on non-Pass variant."),
         }
     }
 
@@ -376,57 +250,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_conditional(&self) -> Option<&Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Conditional(conditional) => Some(conditional),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_repeat(&self) -> Option<&While<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::While(repeat) => Some(repeat),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_iterate(&self) -> Option<&Cycle<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Cycle(iterate) => Some(iterate),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
     pub fn try_unwrap_symbolize(&self) -> Option<&Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_produce(&self) -> Option<&Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Return(element) => Some(element),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_abort(&self) -> Option<&Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Break(element) => Some(element),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_pass(&self) -> Option<&Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Continue(element) => Some(element),
             _ => None,
         }
     }
@@ -488,57 +314,9 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_conditional_mut(&mut self) -> Option<&mut Conditional<Box<Element<'element>>, Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Conditional(conditional) => Some(conditional),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_repeat_mut(&mut self) -> Option<&mut While<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::While(repeat) => Some(repeat),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_iterate_mut(&mut self) -> Option<&mut Cycle<Box<Element<'element>>, Box<Element<'element>>>> {
-        match self {
-            ElementKind::Cycle(iterate) => Some(iterate),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
     pub fn try_unwrap_symbolize_mut(&mut self) -> Option<&mut Symbol<'element>> {
         match self {
             ElementKind::Symbolize(symbol) => Some(symbol),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_produce_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Return(element) => Some(element),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_abort_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Break(element) => Some(element),
-            _ => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn try_unwrap_pass_mut(&mut self) -> Option<&mut Option<Box<Element<'element>>>> {
-        match self {
-            ElementKind::Continue(element) => Some(element),
             _ => None,
         }
     }

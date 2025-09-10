@@ -3,7 +3,7 @@ use crate::parser::{Element, ElementKind};
 use crate::resolver::analyzer::{Analysis, Analyzable, AnalyzeError, ErrorKind, Instruction};
 use crate::resolver::Resolver;
 use crate::scanner::{OperatorKind, PunctuationKind, TokenKind};
-use crate::schema::{Conditional, Cycle, Index, Invoke, Structure, While};
+use crate::schema::*;
 
 impl<'element> Analyzable<'element> for Element<'element> {
     fn analyze(&self, resolver: &Resolver<'element>) -> Result<Analysis<'element>, AnalyzeError<'element>> {
@@ -692,64 +692,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     }
                 }
             }
-            ElementKind::Conditional(conditional) => {
-                let condition = conditional.guard.analyze(resolver)?;
-                let then = conditional.then.analyze(resolver)?;
-
-                let alternate = conditional
-                    .alternate
-                    .clone()
-                    .map(|alternate| alternate.analyze(resolver))
-                    .transpose()?;
-
-                Ok(Analysis::new(Instruction::Conditional(Conditional::new(
-                    Box::new(condition),
-                    Box::new(then),
-                    alternate.map(Box::new),
-                ))))
-            }
-            ElementKind::While(repeat) => {
-                let condition = repeat
-                    .guard
-                    .clone()
-                    .map(|guard| guard.analyze(resolver))
-                    .transpose()?;
-                let body = repeat.body.analyze(resolver)?;
-                Ok(Analysis::new(Instruction::While(While::new(
-                    condition.map(Box::new),
-                    Box::new(body),
-                ))))
-            }
-            ElementKind::Cycle(cycle) => {
-                let clause = cycle.guard.analyze(resolver)?;
-                let body = cycle.body.analyze(resolver)?;
-                Ok(Analysis::new(Instruction::Cycle(Cycle::new(
-                    Box::new(clause),
-                    Box::new(body),
-                ))))
-            }
             ElementKind::Symbolize(symbol) => symbol.analyze(resolver),
-            ElementKind::Return(output) => {
-                let output = output
-                    .clone()
-                    .map(|output| output.analyze(resolver))
-                    .transpose()?;
-                Ok(Analysis::new(Instruction::Return(output.map(Box::new))))
-            }
-            ElementKind::Break(output) => {
-                let output = output
-                    .clone()
-                    .map(|output| output.analyze(resolver))
-                    .transpose()?;
-                Ok(Analysis::new(Instruction::Break(output.map(Box::new))))
-            }
-            ElementKind::Continue(output) => {
-                let output = output
-                    .clone()
-                    .map(|output| output.analyze(resolver))
-                    .transpose()?;
-                Ok(Analysis::new(Instruction::Continue(output.map(Box::new))))
-            }
         }
     }
 } 

@@ -71,59 +71,11 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "Invoke({:#?}({:#?}))", invoke.target, invoke.members)
                 },
 
-                ElementKind::Conditional(cond) => {
-                    write!(f, "Conditional({:#?} | Then: {:#?}", cond.guard, cond.then)?;
-
-                    if let Some(else_expr) = &cond.alternate {
-                        write!(f, " | Else: {:#?}", else_expr)?;
-                    }
-
-                    write!(f, ")")
-                }
-                ElementKind::While(repeat) => {
-                    if let Some(condition) = &repeat.guard {
-                        write!(f, "While({:#?} | {:#?})", condition, repeat.body)
-                    } else {
-                        write!(f, "Loop({:#?})", repeat.body)
-                    }
-                },
-                ElementKind::Cycle(walk) => {
-                    write!(f, "For({:#?} in {:#?})", walk.guard, walk.body)
-                },
-
                 ElementKind::Construct(construct) => {
                     write!(f, "Constructor({:#?} | {:#?})", construct.target, construct.members)
                 },
 
                 ElementKind::Symbolize(symbol) => write!(f, "+ {:#?}", symbol),
-
-                ElementKind::Return(element) => {
-                    write!(f, "Return")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:#?})", element)?;
-                    }
-
-                    Ok(())
-                }
-                ElementKind::Break(element) => {
-                    write!(f, "Break")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:#?})", element)?;
-                    }
-
-                    Ok(())
-                }
-                ElementKind::Continue(element) => {
-                    write!(f, "Continue")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:#?})", element)?;
-                    }
-
-                    Ok(())
-                }
             }
         } else {
             match self {
@@ -166,59 +118,11 @@ impl<'element> Debug for ElementKind<'element> {
                     write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.members)
                 },
 
-                ElementKind::Conditional(cond) => {
-                    write!(f, "Conditional({:?} | Then: {:?}", cond.guard, cond.then)?;
-
-                    if let Some(else_expr) = &cond.alternate {
-                        write!(f, " | Else: {:?}", else_expr)?;
-                    }
-
-                    write!(f, ")")
-                }
-                ElementKind::While(repeat) => {
-                    if let Some(condition) = &repeat.guard {
-                        write!(f, "While({:?} | {:?})", condition, repeat.body)
-                    } else {
-                        write!(f, "Loop({:?})", repeat.body)
-                    }
-                },
-                ElementKind::Cycle(walk) => {
-                    write!(f, "For({:?} in {:?})", walk.guard, walk.body)
-                },
-
                 ElementKind::Construct(construct) => {
                     write!(f, "Constructor({:?} | {:?})", construct.target, construct.members)
                 },
 
                 ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),
-
-                ElementKind::Return(element) => {
-                    write!(f, "Return")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:?})", element)?;
-                    }
-
-                    Ok(())
-                }
-                ElementKind::Break(element) => {
-                    write!(f, "Break")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:?})", element)?;
-                    }
-
-                    Ok(())
-                }
-                ElementKind::Continue(element) => {
-                    write!(f, "Continue")?;
-
-                    if let Some(element) = element {
-                        write!(f, "({:?})", element)?;
-                    }
-
-                    Ok(())
-                }
             }
         }
     }
@@ -423,35 +327,9 @@ impl<'element> Hash for ElementKind<'element> {
                 invoke.hash(state);
             }
 
-            ElementKind::Conditional(conditioned) => {
-                discriminant(self).hash(state);
-                conditioned.hash(state);
-            }
-            ElementKind::While(repeat) => {
-                discriminant(self).hash(state);
-                repeat.hash(state);
-            }
-            ElementKind::Cycle(walk) => {
-                discriminant(self).hash(state);
-                walk.hash(state);
-            }
-
             ElementKind::Symbolize(symbol) => {
                 discriminant(self).hash(state);
                 symbol.hash(state);
-            }
-
-            ElementKind::Return(element) => {
-                discriminant(self).hash(state);
-                element.hash(state);
-            }
-            ElementKind::Break(element) => {
-                discriminant(self).hash(state);
-                element.hash(state);
-            }
-            ElementKind::Continue(element) => {
-                discriminant(self).hash(state);
-                element.hash(state);
             }
         }
     }
@@ -477,15 +355,7 @@ impl<'element> PartialEq for ElementKind<'element> {
             (ElementKind::Index(a), ElementKind::Index(b)) => a == b,
             (ElementKind::Invoke(a), ElementKind::Invoke(b)) => a == b,
 
-            (ElementKind::Conditional(a), ElementKind::Conditional(b)) => a == b,
-            (ElementKind::While(a), ElementKind::While(b)) => a == b,
-            (ElementKind::Cycle(a), ElementKind::Cycle(b)) => a == b,
-
             (ElementKind::Symbolize(a), ElementKind::Symbolize(b)) => a == b,
-
-            (ElementKind::Return(a), ElementKind::Return(b)) => a == b,
-            (ElementKind::Break(a), ElementKind::Break(b)) => a == b,
-            (ElementKind::Continue(a), ElementKind::Continue(b)) => a == b,
 
             _ => false,
         }
@@ -517,15 +387,7 @@ impl<'element> Clone for ElementKind<'element> {
             ElementKind::Index(index) => ElementKind::Index(index.clone()),
             ElementKind::Invoke(invoke) => ElementKind::Invoke(invoke.clone()),
 
-            ElementKind::Conditional(conditioned) => ElementKind::Conditional(conditioned.clone()),
-            ElementKind::While(repeat) => ElementKind::While(repeat.clone()),
-            ElementKind::Cycle(walk) => ElementKind::Cycle(walk.clone()),
-
             ElementKind::Symbolize(symbol) => ElementKind::Symbolize(symbol.clone()),
-
-            ElementKind::Return(element) => ElementKind::Return(element.clone()),
-            ElementKind::Break(element) => ElementKind::Break(element.clone()),
-            ElementKind::Continue(element) => ElementKind::Continue(element.clone()),
         }
     }
 }

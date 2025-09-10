@@ -87,25 +87,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 Type::new(TypeKind::Structure(structure), self.span)
             }
-            ElementKind::Conditional(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::While(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Cycle(_) => {
-                Type::unit(self.span)
-            }
             ElementKind::Symbolize(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Return(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Break(_) => {
-                Type::unit(self.span)
-            }
-            ElementKind::Continue(_) => {
                 Type::unit(self.span)
             }
         }

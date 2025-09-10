@@ -44,25 +44,6 @@ pub struct Invoke<Target, Argument> {
     pub members: Vec<Argument>,
 }
 
-#[derive(Debug, Eq)]
-pub struct Conditional<Condition, Then, Alternate> {
-    pub guard: Condition,
-    pub then: Then,
-    pub alternate: Option<Alternate>,
-}
-
-#[derive(Debug, Eq)]
-pub struct While<Condition, Body> {
-    pub guard: Option<Condition>,
-    pub body: Body,
-}
-
-#[derive(Debug, Eq)]
-pub struct Cycle<Clause, Body> {
-    pub guard: Clause,
-    pub body: Body,
-}
-
 impl<Delimiter, Item> Delimited<Delimiter, Item> {
     #[inline]
     pub fn new(start: Delimiter, items: Vec<Item>, separator: Option<Delimiter>, end: Delimiter) -> Self {
@@ -106,31 +87,6 @@ impl<Target, Argument> Invoke<Target, Argument> {
     #[inline]
     pub fn new(target: Target, arguments: Vec<Argument>) -> Self {
         Invoke { target, members: arguments }
-    }
-}
-
-impl<Condition, Then, Alternate> Conditional<Condition, Then, Alternate> {
-    #[inline]
-    pub fn new(condition: Condition, then: Then, alternate: Option<Alternate>) -> Self {
-        Conditional {
-            guard: condition,
-            then,
-            alternate,
-        }
-    }
-}
-
-impl<Condition, Body> While<Condition, Body> {
-    #[inline]
-    pub fn new(condition: Option<Condition>, body: Body) -> Self {
-        While { guard: condition, body }
-    }
-}
-
-impl<Clause, Body> Cycle<Clause, Body> {
-    #[inline]
-    pub fn new(clause: Clause, body: Body) -> Self {
-        Cycle { guard: clause, body }
     }
 }
 
@@ -179,30 +135,6 @@ impl<Target: Hash, Argument: Hash> Hash for Invoke<Target, Argument> {
     }
 }
 
-impl<Condition: Hash, Then: Hash, Alternate: Hash> Hash
-for Conditional<Condition, Then, Alternate>
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.guard.hash(state);
-        self.then.hash(state);
-        self.alternate.hash(state);
-    }
-}
-
-impl<Condition: Hash, Body: Hash> Hash for While<Condition, Body> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.guard.hash(state);
-        self.body.hash(state);
-    }
-}
-
-impl<Clause: Hash, Body: Hash> Hash for Cycle<Clause, Body> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.guard.hash(state);
-        self.body.hash(state);
-    }
-}
-
 impl<Delimiter: PartialEq, Item: PartialEq> PartialEq for Delimited<Delimiter, Item> {
     fn eq(&self, other: &Self) -> bool {
         self.start == other.start
@@ -243,28 +175,6 @@ impl<Target: PartialEq, Value: PartialEq> PartialEq for Index<Target, Value> {
 impl<Target: PartialEq, Argument: PartialEq> PartialEq for Invoke<Target, Argument> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.members == other.members
-    }
-}
-
-impl<Condition: PartialEq, Then: PartialEq, Alternate: PartialEq> PartialEq
-for Conditional<Condition, Then, Alternate>
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.guard == other.guard
-            && self.then == other.then
-            && self.alternate == other.alternate
-    }
-}
-
-impl<Condition: PartialEq, Body: PartialEq> PartialEq for While<Condition, Body> {
-    fn eq(&self, other: &Self) -> bool {
-        self.guard == other.guard && self.body == other.body
-    }
-}
-
-impl<Clause: PartialEq, Body: PartialEq> PartialEq for Cycle<Clause, Body> {
-    fn eq(&self, other: &Self) -> bool {
-        self.guard == other.guard && self.body == other.body
     }
 }
 
@@ -310,29 +220,5 @@ impl<Target: Clone, Value: Clone> Clone for Index<Target, Value> {
 impl<Target: Clone, Argument: Clone> Clone for Invoke<Target, Argument> {
     fn clone(&self) -> Self {
         Invoke::new(self.target.clone(), self.members.clone())
-    }
-}
-
-impl<Condition: Clone, Then: Clone, Alternate: Clone> Clone
-for Conditional<Condition, Then, Alternate>
-{
-    fn clone(&self) -> Self {
-        Conditional::new(
-            self.guard.clone(),
-            self.then.clone(),
-            self.alternate.clone(),
-        )
-    }
-}
-
-impl<Condition: Clone, Body: Clone> Clone for While<Condition, Body> {
-    fn clone(&self) -> Self {
-        While::new(self.guard.clone(), self.body.clone())
-    }
-}
-
-impl<Clause: Clone, Body: Clone> Clone for Cycle<Clause, Body> {
-    fn clone(&self) -> Self {
-        Cycle::new(self.guard.clone(), self.body.clone())
     }
 }
