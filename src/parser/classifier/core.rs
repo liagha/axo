@@ -73,7 +73,7 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::delimited(), Self::literal()])
+        Classifier::alternative([Self::closure(), Self::delimited(), Self::literal()])
     }
 
     pub fn prefixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
@@ -341,12 +341,13 @@ impl<'parser> Parser<'parser> {
     }
     
     pub fn expression() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::closure(), Self::binary(), Self::unary(), Self::primary()])
+        Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
     }
 
     pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::expression()
+            Self::expression(),
+            Self::symbolization(),
         ])
     }
 

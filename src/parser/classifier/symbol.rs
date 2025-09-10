@@ -229,7 +229,6 @@ impl<'parser> Parser<'parser> {
                         token.kind == TokenKind::Identifier(Str::from("struct"))
                     }),
                     Self::literal(),
-                    Self::group(Classifier::deferred(Self::element)).as_optional(),
                 ]),
                 Classifier::deferred(Self::element),
             ]),
@@ -242,25 +241,17 @@ impl<'parser> Parser<'parser> {
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
 
-                if let Some(specification) = head.get(2).map(|form| form.unwrap_output()) {
-                    let items = specification.clone().kind.unwrap_delimited().items;
-
-                    items.iter().for_each(|item| {
-                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
-                            generic.add(symbol)
-                        } else {
-                            specifier.apply(item.clone());
-                        }
-                    })
-                }
-
                 let body = sequence[1].unwrap_output().clone();
 
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(symbol),
-                        _ => None,
+                        _ => {
+                            specifier.apply(element.clone());
+
+                            None
+                        },
                     })
                     .collect();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
@@ -291,7 +282,6 @@ impl<'parser> Parser<'parser> {
                         token.kind == TokenKind::Identifier(Str::from("enum"))
                     }),
                     Self::literal(),
-                    Self::group(Classifier::deferred(Self::element)).as_optional(),
                 ]),
                 Classifier::deferred(Self::element),
             ]),
@@ -304,24 +294,17 @@ impl<'parser> Parser<'parser> {
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
 
-                if let Some(specification) = head.get(2).map(|form| form.unwrap_output()) {
-                    let items = specification.clone().kind.unwrap_delimited().items;
-
-                    items.iter().for_each(|item| {
-                        if let ElementKind::Symbolize(symbol) = item.kind.clone() {
-                            generic.add(symbol)
-                        } else {
-                            specifier.apply(item.clone());
-                        }
-                    })
-                }
                 let body = sequence[1].unwrap_output().clone();
 
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(symbol),
-                        _ => None,
+                        _ => {
+                            specifier.apply(element.clone());
+
+                            None
+                        },
                     })
                     .collect();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());

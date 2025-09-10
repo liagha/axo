@@ -81,16 +81,7 @@ pub struct Inspect<'inspector, Input: Formable<'inspector>, Output: Formable<'in
 impl<'inspector, Input: Formable<'inspector>, Output: Formable<'inspector>, Failure: Formable<'inspector>> Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'inspector, Input, Output, Failure>, classifier: &mut Classifier<'inspector, Input, Output, Failure>) {
-        let classifier_clone = Classifier {
-            order: classifier.order.clone(),
-            marker: classifier.marker,
-            position: classifier.position,
-            consumed: classifier.consumed.clone(),
-            record: classifier.record,
-            form: classifier.form.clone(),
-        };
-
-        let order = (self.inspector)(classifier_clone);
+        let order = (self.inspector)(classifier.clone());
         order.order(composer, classifier);
     }
 }

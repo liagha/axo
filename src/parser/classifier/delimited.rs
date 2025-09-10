@@ -23,39 +23,17 @@ impl<'parser> Parser<'parser> {
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::void();
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Comma,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
+                        Classifier::predicate(|token: &Token| {
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
+                        }),
                         item.as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Operator(OperatorKind::RightAngle)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::void();
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(
-                                TokenKind::Operator(OperatorKind::LeftAngle)
-                            ),
-                            span,
-                        )
-                    }),
-                ),
+                Classifier::predicate(|token: &Token| {
+                    token.kind == TokenKind::Operator(OperatorKind::RightAngle)
+                }),
             ]),
             move |form| {
                 let delimiters = form.collect_inputs();
@@ -99,39 +77,17 @@ impl<'parser> Parser<'parser> {
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::void();
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Comma,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
+                        Classifier::predicate(|token: &Token| {
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
+                        }),
                         item.as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::void();
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            )),
-                            span,
-                        )
-                    }),
-                ),
+                Classifier::predicate(|token: &Token| {
+                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
+                }),
             ]),
             move |form| {
                 let delimiters = form.collect_inputs();
@@ -175,39 +131,17 @@ impl<'parser> Parser<'parser> {
                 item.as_optional(),
                 Classifier::persistence(
                     Classifier::sequence([
-                        Classifier::with_fallback(
-                            Classifier::predicate(|token: &Token| {
-                                token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            }),
-                            Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                                let span = Span::void();
-                                ParseError::new(
-                                    ErrorKind::MissingSeparator(TokenKind::Punctuation(
-                                        PunctuationKind::Semicolon,
-                                    )),
-                                    span,
-                                )
-                            }),
-                        ),
+                        Classifier::predicate(|token: &Token| {
+                            token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
+                        }),
                         item.as_optional(),
                     ]),
                     0,
                     None,
                 ),
-                Classifier::with_fallback(
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
-                    }),
-                    Classifier::fail(|_form: Form<Token, Element, ParseError>| {
-                        let span = Span::void();
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
-                                PunctuationKind::LeftBrace,
-                            )),
-                            span,
-                        )
-                    }),
-                ),
+                Classifier::predicate(|token: &Token| {
+                    token.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
+                }),
             ]),
             move |form| {
                 let delimiters = form.collect_inputs();
@@ -554,6 +488,7 @@ impl<'parser> Parser<'parser> {
 
     pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
+            Self::angled(Classifier::deferred(Self::element)),
             Self::bundle(Classifier::deferred(Self::element)),
             Self::block(Classifier::deferred(Self::element)),
             Self::group(Classifier::deferred(Self::element)),

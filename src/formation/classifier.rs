@@ -34,6 +34,7 @@ pub struct Classifier<'classifier, Input: Formable<'classifier>, Output: Formabl
     pub consumed: Vec<Input>,
     pub record: Record,
     pub form: Form<'classifier, Input, Output, Failure>,
+    pub depth: Scale,
 }
 
 impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, Failure: Formable<'classifier>> Classifier<'classifier, Input, Output, Failure> {
@@ -46,6 +47,20 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
+            depth: 0,
+        }
+    }
+
+    #[inline]
+    pub fn new_with_depth(classifier: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>, marker: Offset, position: Position<'classifier>, depth: Scale) -> Self {
+        Self {
+            order: classifier,
+            marker,
+            position,
+            consumed: Vec::new(),
+            record: Record::Blank,
+            form: Form::Blank,
+            depth,
         }
     }
 
@@ -102,6 +117,19 @@ impl<'classifier, Input: Formable<'classifier>, Output: Formable<'classifier>, F
     #[inline]
     pub fn set_ignore(&mut self) {
         self.record = Record::Ignored;
+    }
+
+    #[inline]
+    fn create_child(&self, order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>) -> Self {
+        Self {
+            order,
+            marker: self.marker,
+            position: self.position,
+            consumed: Vec::new(),
+            record: Record::Blank,
+            form: Form::Blank,
+            depth: self.depth + 1,
+        }
     }
 
     #[inline]
@@ -399,14 +427,7 @@ pub struct Negate<'negate, Input: Formable<'negate>, Output: Formable<'negate>, 
 impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Formable<'negate>> Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'negate, Input, Output, Failure>, classifier: &mut Classifier<'negate, Input, Output, Failure>) {
-        let mut child = Classifier {
-            order: self.classifier.order.clone(),
-            marker: classifier.marker,
-            position: classifier.position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: Form::Blank,
-        };
+        let mut child = classifier.create_child(self.classifier.order.clone());
         composer.build(&mut child);
 
         if child.is_aligned() {
@@ -457,14 +478,7 @@ impl<'alternative, Input: Formable<'alternative>, Output: Formable<'alternative>
         let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
 
         for pattern in &self.patterns {
-            let mut child = Classifier {
-                order: pattern.order.clone(),
-                marker: classifier.marker,
-                position: classifier.position,
-                consumed: Vec::new(),
-                record: Record::Blank,
-                form: Form::Blank,
-            };
+            let mut child = classifier.create_child(pattern.order.clone());
             composer.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
@@ -510,6 +524,7 @@ impl<'deferred, Input: Formable<'deferred>, Output: Formable<'deferred>, Failure
         let mut resolved = (self.function)();
         resolved.marker = classifier.marker;
         resolved.position = classifier.position;
+        resolved.depth = classifier.depth + 1;
         composer.build(&mut resolved);
 
         classifier.marker = resolved.marker;
@@ -528,14 +543,7 @@ pub struct Optional<'optional, Input: Formable<'optional>, Output: Formable<'opt
 impl<'optional, Input: Formable<'optional>, Output: Formable<'optional>, Failure: Formable<'optional>> Order<'optional, Input, Output, Failure> for Optional<'optional, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'optional, Input, Output, Failure>, classifier: &mut Classifier<'optional, Input, Output, Failure>) {
-        let mut child = Classifier {
-            order: self.classifier.order.clone(),
-            marker: classifier.marker,
-            position: classifier.position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: Form::Blank,
-        };
+        let mut child = classifier.create_child(self.classifier.order.clone());
         composer.build(&mut child);
 
         if child.is_effected() {
@@ -558,14 +566,7 @@ pub struct Wrapper<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrappe
 impl<'wrapper, Input: Formable<'wrapper>, Output: Formable<'wrapper>, Failure: Formable<'wrapper>> Order<'wrapper, Input, Output, Failure> for Wrapper<'wrapper, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'wrapper, Input, Output, Failure>, classifier: &mut Classifier<'wrapper, Input, Output, Failure>) {
-        let mut child = Classifier {
-            order: self.classifier.order.clone(),
-            marker: classifier.marker,
-            position: classifier.position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: Form::Blank,
-        };
+        let mut child = classifier.create_child(self.classifier.order.clone());
         composer.build(&mut child);
 
         classifier.marker = child.marker;
@@ -585,14 +586,7 @@ pub struct Ranked<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, 
 impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>> Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure> {
     #[inline]
     fn order(&self, composer: &mut Former<'_, 'ranked, Input, Output, Failure>, classifier: &mut Classifier<'ranked, Input, Output, Failure>) {
-        let mut child = Classifier {
-            order: self.classifier.order.clone(),
-            marker: classifier.marker,
-            position: classifier.position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: Form::Blank,
-        };
+        let mut child = classifier.create_child(self.classifier.order.clone());
         composer.build(&mut child);
 
         classifier.marker = child.marker;
@@ -631,6 +625,7 @@ impl<'sequence, Input: Formable<'sequence>, Output: Formable<'sequence>, Failure
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
+                depth: classifier.depth + 1,
             };
             composer.build(&mut child);
 
@@ -692,6 +687,7 @@ impl<'repetition, Input: Formable<'repetition>, Output: Formable<'repetition>, F
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
+                depth: classifier.depth + 1,
             };
             composer.build(&mut child);
 

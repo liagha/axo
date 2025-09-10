@@ -1,17 +1,20 @@
 enum Token(compiler) {}
 
-struct Integer(compiler) {
+struct Integer {
+    compiler,
     const value: Token,
     const size: Token,
     const signed: Boolean,
 }
 
-struct Float(compiler) {
+struct Float {
+    compiler,
     const value: Token,
     const size: Token,
 }
 
-struct Boolean(compiler) {
+struct Boolean {
+    compiler,
     const value: Token,
 }
 
