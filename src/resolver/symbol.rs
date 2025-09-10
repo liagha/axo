@@ -3,11 +3,15 @@ use {
         Resolver, Resolvable,
     },
     crate::{
+        data::{
+            Boolean,
+        },
         parser::{
             Symbol, SymbolKind,
         },
     }
 };
+use crate::resolver::scope::Scope;
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn resolve(&self, resolver: &mut Resolver<'symbol>) {
@@ -38,6 +42,39 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
             _ => {
                 resolver.scope.add(symbol);
+            }
+        }
+    }
+
+    fn scope(&self, resolver: &mut Resolver<'symbol>) -> Scope<'symbol> {
+        self.scope.clone()
+    }
+
+    fn is_instance(&self, resolver: &mut Resolver<'symbol>) -> Boolean {
+        match &self.kind {
+            SymbolKind::Inclusion(_) => {
+                false
+            }
+            SymbolKind::Extension(_) => {
+                false
+            }
+            SymbolKind::Binding(_) => {
+                true
+            }
+            SymbolKind::Structure(_) => {
+                false
+            }
+            SymbolKind::Enumeration(_) => {
+                true
+            }
+            SymbolKind::Method(_) => {
+                true
+            }
+            SymbolKind::Module(_) => {
+                true
+            }
+            SymbolKind::Preference(_) => {
+                true
             }
         }
     }

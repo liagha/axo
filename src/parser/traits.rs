@@ -133,10 +133,19 @@ impl<'symbol> Debug for Symbol<'symbol> {
         if f.alternate() {
             write!(
                 f,
-                "{:#?} \n{}\n{}",
+                "{:#?}{}{}{}",
                 self.kind,
-                format!("Specification: {:#?}", self.specifier).indent(),
-                format!("Generics: {:#?}", self.generic).indent(),
+                if self.scope.is_empty() {
+                    "".into()
+                } else {
+                    format!("\nScope: {:#?}", self.scope).indent()
+                },
+                format!("\nSpecification: {:#?}", self.specifier).indent(),
+                if self.scope.is_empty() {
+                    "".into()
+                } else {
+                    format!("\nGenerics: {:#?}", self.generic).indent()
+                }
             )
         } else {
             write!(f, "{:?} | {:?} -> {:?}", self.kind, self.span, self.specifier)

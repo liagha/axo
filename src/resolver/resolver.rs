@@ -1,6 +1,5 @@
-use broccli::{xprintln, Color};
-use matchete::{Assessor, Scheme};
 use {
+    matchete::{Assessor, Scheme},
     super::{
         error::{
             ErrorKind,
@@ -20,7 +19,8 @@ use {
             Span,
         },
         scanner::{
-            Token, TokenKind
+            Token, TokenKind,
+            OperatorKind,
         },
         parser::{
             Element, ElementKind,
@@ -28,7 +28,9 @@ use {
         },
         schema::*,
         data::{
+            Str,
             Scale,
+            Boolean,
             memory::{
                 replace,
             }
@@ -41,8 +43,6 @@ use {
         format::Debug,
     },
 };
-use crate::data::Str;
-use crate::scanner::OperatorKind;
 
 pub type Id = usize;
 
@@ -69,6 +69,8 @@ impl Clone for Resolver<'_> {
 
 pub trait Resolvable<'resolvable> {
     fn resolve(&self, resolver: &mut Resolver<'resolvable>);
+    fn scope(&self, resolver: &mut Resolver<'resolvable>) -> Scope<'resolvable>;
+    fn is_instance(&self, resolver: &mut Resolver<'resolvable>) -> Boolean;
 }
 
 impl<'resolver> Resolver<'resolver> {
@@ -88,6 +90,11 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn enter(&mut self) {
         let parent = replace(&mut self.scope, Scope::new());
+        self.scope.attach(parent);
+    }
+
+    pub fn enter_scope(&mut self, scope: Scope<'resolver>) {
+        let parent = replace(&mut self.scope, scope);
         self.scope.attach(parent);
     }
 

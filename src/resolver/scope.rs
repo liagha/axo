@@ -5,7 +5,9 @@ use {
         data::{Offset, Scale},
         internal::hash::Set,
         parser::Symbol,
-        data::Str,
+        data::{
+            Str, Boolean,
+        },
         parser::{Element, ElementKind, SymbolKind},
         resolver::{
             ErrorKind, ResolveError,
@@ -29,6 +31,10 @@ impl<'scope> Scope<'scope> {
             symbols: Set::new(),
             parent: None,
         }
+    }
+    
+    pub fn is_empty(&self) -> Boolean {
+        self.symbols.is_empty()
     }
 
     pub fn with_parent(parent: Scope<'scope>) -> Self {
@@ -159,7 +165,7 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.5)
+            .floor(0.75)
             .dimension(&mut affinity, 0.6)
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Additive);
@@ -224,7 +230,7 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.5)
+            .floor(0.75)
             .dimension(&mut affinity, 0.6)
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Additive);

@@ -38,11 +38,23 @@ pub struct Symbol<'symbol> {
     pub specifier: Specifier,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Specifier {
     pub entry: Boolean,
     pub interface: Interface,
     pub visibility: Visibility,
+}
+
+impl Debug for Specifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
+        write!(f, "{:?}", self.visibility)?;
+
+        if self.entry {
+            write!(f, ", Entry")?;
+        }
+
+        write!(f, ", {:?}", self.interface)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
