@@ -173,7 +173,7 @@ pub struct Affinity {
 
 impl Affinity {
     pub fn new() -> Self {
-        Affinity { shaping: 0.9, binding: 0.1 }
+        Affinity { shaping: 0.5, binding: 0.5 }
     }
 }
 
@@ -277,7 +277,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     let score =
                         (undefined.len() as f64 / members.len() as f64)
                             * (missing.len() as f64 / candidates.len() as f64)
-                            .min(1.0) * self.binding;
+                            .min(1.0).max(0.0) * self.binding;
 
                     if !missing.is_empty() {
                         return Err(

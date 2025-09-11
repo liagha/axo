@@ -1,3 +1,4 @@
+use matchete::Resembler;
 use {
     matchete::{Assessor, Scheme},
     super::resolver::Id,
@@ -121,70 +122,7 @@ impl<'scope> Scope<'scope> {
     }
 
     pub fn try_get(&mut self, target: &Element<'scope>) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
-        if let Element {
-            kind: ElementKind::Literal(
-                Token {
-                    kind: TokenKind::Identifier(identifier),
-                    ..
-                }
-            ),
-            ..
-        } = target {
-            if identifier == "package" {
-                let identifier = Element::new(
-                    ElementKind::Literal(
-                        Token::new(
-                            TokenKind::Identifier(
-                                *identifier,
-                            ),
-                            Span::void()
-                        ),
-                    ),
-                    Span::void()
-                );
-
-                let package = Symbol::new(
-                    SymbolKind::Module(
-                        Module::new(Box::new(identifier))
-                    ),
-                    Span::void(),
-                    0
-                ).with_scope(
-                    self.root().clone()
-                );
-
-                return Ok(
-                    package
-                );
-            }
-        }
-
-        let candidates = self.all();
-
-        let mut aligner = Aligner::new();
-        let mut affinity = Affinity::new();
-
-        let mut assessor = Assessor::new()
-            .floor(0.6)
-            .dimension(&mut affinity, 0.6)
-            .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Multiplicative);
-
-        let champion = assessor.champion(target, &candidates);
-
-        if let Some(champion) = champion {
-            Ok(champion)
-        } else {
-            let mut errors = assessor.errors.clone();
-            if errors.is_empty() {
-                errors.push(ResolveError {
-                    kind: ErrorKind::UndefinedSymbol { query: target.brand().unwrap().clone() },
-                    span: target.span.clone(),
-                    hints: Vec::new(),
-                });
-            }
-            Err(errors)
-        }
+        Self::try_lookup(target, self)
     }
 
     pub fn try_lookup(target: &Element<'scope>, scope: &Scope<'scope>) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
@@ -230,12 +168,14 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.6)
+            .floor(0.5)
             .dimension(&mut affinity, 0.6)
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Multiplicative);
 
-        let champion = assessor.champion(target, &*scope.all());
+        let candidates = &*scope.all();
+
+        let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {
             Ok(champion)

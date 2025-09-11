@@ -35,11 +35,6 @@ use {
                 replace,
             }
         },
-        resolver::{
-            matcher::{
-                Affinity, Aligner,
-            },
-        },
         format::Debug,
     },
 };

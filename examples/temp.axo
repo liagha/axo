@@ -1,1 +1,9 @@
 package.test.Test { x }
+
+struct Test {
+    const fuck,
+    const nigga,
+}
+
+Test { }
+

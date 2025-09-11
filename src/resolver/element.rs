@@ -51,10 +51,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Construct(construct) => {
-                // for member in &construct.members {
-                //    member.resolve(resolver);
-                //}
-
                 resolver.get(&self)
             }
 
