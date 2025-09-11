@@ -274,6 +274,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         .filter(|member| !members.contains(member))
                         .collect::<Vec<_>>();
 
+                    let score =
+                        (undefined.len() as f64 / members.len() as f64)
+                            * (missing.len() as f64 / candidates.len() as f64)
+                            .min(1.0) * self.binding;
+
                     if !missing.is_empty() {
                         return Err(
                             ResolveError {

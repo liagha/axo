@@ -14,7 +14,7 @@ use {
 use crate::resolver::scope::Scope;
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
-    fn resolve(&self, resolver: &mut Resolver<'symbol>) {
+    fn resolve(&self, resolver: &mut Resolver<'symbol>) -> Option<Symbol<'symbol>> {
         let mut symbol = self.clone();
         symbol.id = resolver.next_id();
 
@@ -44,10 +44,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 resolver.scope.add(symbol);
             }
         }
-    }
 
-    fn scope(&self, resolver: &mut Resolver<'symbol>) -> Scope<'symbol> {
-        self.scope.clone()
+        Some(self.clone())
     }
 
     fn is_instance(&self, resolver: &mut Resolver<'symbol>) -> Boolean {

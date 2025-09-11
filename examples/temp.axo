@@ -1,1 +1,1 @@
-package.test.Test { }
+package.test.Test { x }

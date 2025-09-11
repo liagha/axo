@@ -68,8 +68,7 @@ impl Clone for Resolver<'_> {
 }
 
 pub trait Resolvable<'resolvable> {
-    fn resolve(&self, resolver: &mut Resolver<'resolvable>);
-    fn scope(&self, resolver: &mut Resolver<'resolvable>) -> Scope<'resolvable>;
+    fn resolve(&self, resolver: &mut Resolver<'resolvable>) -> Option<Symbol<'resolvable>>;
     fn is_instance(&self, resolver: &mut Resolver<'resolvable>) -> Boolean;
 }
 

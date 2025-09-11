@@ -12,7 +12,7 @@ use {
             memory::replace,
         },
         parser::{
-            Element, ElementKind,
+            Symbol, Element, ElementKind,
         },
         scanner::{
             OperatorKind,
@@ -22,26 +22,40 @@ use {
 };
 
 impl<'element> Resolvable<'element> for Element<'element> {
-    fn resolve(&self, resolver: &mut Resolver<'element>) {
+    fn resolve(&self, resolver: &mut Resolver<'element>) -> Option<Symbol<'element>> {
+        let analysis = self.analyze(resolver);
+
+        match analysis {
+            Ok(analysis) => {
+                resolver.output.push(analysis);
+            }
+            Err(error) => {
+                let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
+                resolver.errors.push(error);
+            }
+        }
+
         match &self.kind {
             ElementKind::Delimited(delimited) => {
                 resolver.enter();
-                delimited.items.iter().for_each(|item| item.resolve(resolver));
+                delimited.items.iter().for_each(|item| {
+                    item.resolve(resolver);
+                });
                 resolver.exit();
+
+                None
             }
 
             ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => {
-                resolver.get(&self);
+                resolver.get(&self)
             }
 
             ElementKind::Construct(construct) => {
-                construct.target.resolve(resolver);
+                // for member in &construct.members {
+                //    member.resolve(resolver);
+                //}
 
-                for member in &construct.members {
-                    member.resolve(resolver);
-                }
-
-                resolver.get(&self);
+                resolver.get(&self)
             }
 
             ElementKind::Invoke(invoke) => {
@@ -51,28 +65,40 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     argument.resolve(resolver);
                 }
 
-                resolver.get(&self);
+                resolver.get(&self)
             }
 
             ElementKind::Index(index) => {
                 index.target.resolve(resolver);
 
-                index.members.iter().for_each(|member| member.resolve(resolver));
+                index.members.iter().for_each(|member| {
+                    member.resolve(resolver);
+                });
 
-                resolver.get(&self);
+                resolver.get(&self)
             }
 
             ElementKind::Binary(binary) => {
                 match binary.operator {
                     Token { kind: TokenKind::Operator(OperatorKind::Dot), .. } => {
-                        let scope = binary.left.scope(resolver);
+                        if let Some(symbol) = binary.left.resolve(resolver) {
+                            resolver.enter_scope(symbol.scope);
 
-                        resolver.lookup(&binary.right, &scope);
+                            let resolved = binary.right.resolve(resolver);
+
+                            resolver.exit();
+
+                            resolved
+                        } else {
+                            None
+                        }
                     }
 
                     _ => {
                         binary.left.resolve(resolver);
                         binary.right.resolve(resolver);
+
+                        None
                     }
                 }
             }
@@ -91,85 +117,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 closure.body.resolve(resolver);
 
                 resolver.exit();
+
+                None
             }
 
             ElementKind::Symbolize(symbol) => {
-                symbol.resolve(resolver);
+                symbol.resolve(resolver)
             }
 
-            ElementKind::Literal(_) => {}
-        }
-
-        let analysis = self.analyze(resolver);
-
-        match analysis {
-            Ok(analysis) => {
-                resolver.output.push(analysis);
-            }
-            Err(error) => {
-                let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
-                resolver.errors.push(error);
-            }
-        }
-    }
-
-    fn scope(&self, resolver: &mut Resolver<'element>) -> Scope<'element> {
-        match &self.kind {
-            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => {
-                if let Some(symbol) = resolver.get(self) {
-                    symbol.scope(resolver)
-                } else {
-                    Scope::new()
-                }
-            }
             ElementKind::Literal(_) => {
-                Scope::new()
-            }
-            ElementKind::Delimited(_) => {
-                Scope::new()
-            }
-            ElementKind::Unary(_) => {
-                Scope::new()
-            }
-            ElementKind::Binary(binary) => {
-                match &binary.operator {
-                    Token { kind: TokenKind::Operator(OperatorKind::Dot), .. } => {
-                        if !binary.left.is_instance(resolver) {
-                            if let Some(symbol) = resolver.get(&binary.left) {
-                                let scope = symbol.scope(resolver);
-
-                                if let Some(symbol) = resolver.lookup(&binary.right, &scope) {
-                                    symbol.scope(resolver)
-                                } else {
-                                    Scope::new()
-                                }
-                            } else {
-                                Scope::new()
-                            }
-                        } else {
-                            Scope::new()
-                        }
-                    }
-
-                    _ => {
-                        Scope::new()
-                    }
-                }
-            }
-            ElementKind::Closure(_) => {
-                Scope::new()
-            }
-            ElementKind::Index(_) => {
-                Scope::new()
-            }
-            ElementKind::Invoke(_) => {
-                Scope::new()
-            }
-            ElementKind::Construct(_) => {
-                Scope::new()
-            }
-            ElementKind::Symbolize(_) => {
-                Scope::new()
+                None
             }
         }
     }
