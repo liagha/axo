@@ -1,6 +1,5 @@
 use {
     crate::{
-        data::Scale,
         internal::operation::asm,
         format::Debug,
     }

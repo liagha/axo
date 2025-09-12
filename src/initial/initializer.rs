@@ -1,26 +1,17 @@
 use {
-    broccli::{xprintln, Color},
-
     crate::{
-        data::{
-            any::{Any, TypeId},
-            memory,
-            Str, Offset, Scale,
-        },
-        format::{Display, Show},
+        data::{Str, Offset, Scale, },
         formation::{
             classifier::Classifier,
             form::Form,
             former::Former,
         },
         internal::{
-            platform::{self, read_dir, current_dir, Path, PathBuf},
-            compiler::{Registry},
-            hash::{DefaultHasher, Hash, Hasher},
+            platform::{self, current_dir, PathBuf},
         },
-        parser::{Element, ParseError, Symbol, SymbolKind},
-        scanner::{OperatorKind, PunctuationKind, Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Position, Span, Spanned},
+        parser::{Element, ParseError},
+        scanner::{PunctuationKind, Scanner, Token, TokenKind},
+        tracker::{Location, Peekable, Position},
     },
     super::{Preference, InitialError},
 };

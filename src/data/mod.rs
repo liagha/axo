@@ -99,7 +99,7 @@ pub mod thread {
     };
 }
 
-use crate::internal::operation::{Add, Sub, Mul, Div, Rem, Neg, BitAnd, BitOr, BitXor, Shl, Shr};
+use crate::internal::operation::{Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, Shl, Shr};
 
 pub trait Number:
 Copy

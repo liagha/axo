@@ -7,12 +7,7 @@ use {
     },
     crate::{
         data::{
-            thread::{Arc, Mutex},
-        },
-        internal::{
-            compiler::{
-                Registry
-            },
+            thread::{Arc},
         },
     }
 };
@@ -54,7 +49,7 @@ pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure:
 
 impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>> Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'fail, Input, Output, Failure>, classifier: &mut Classifier<'fail, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'fail, Input, Output, Failure>, classifier: &mut Classifier<'fail, Input, Output, Failure>) {
         let failure = (self.emitter)(classifier.form.clone());
 
         classifier.set_fail();
@@ -105,7 +100,7 @@ pub struct Panic<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Fail
 
 impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>> Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'panic, Input, Output, Failure>, classifier: &mut Classifier<'panic, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'panic, Input, Output, Failure>, classifier: &mut Classifier<'panic, Input, Output, Failure>) {
         let failure = (self.emitter)(classifier.form.clone());
 
         let form = Form::Failure(failure);
@@ -157,7 +152,7 @@ pub struct Transform<'transform, Input: Formable<'transform>, Output: Formable<'
 
 impl<'transform, Input: Formable<'transform>, Output: Formable<'transform>, Failure: Formable<'transform>> Order<'transform, Input, Output, Failure> for Transform<'transform, Input, Output, Failure> {
     #[inline]
-    fn order(&self, composer: &mut Former<'_, 'transform, Input, Output, Failure>, classifier: &mut Classifier<'transform, Input, Output, Failure>) {
+    fn order(&self, _composer: &mut Former<'_, 'transform, Input, Output, Failure>, classifier: &mut Classifier<'transform, Input, Output, Failure>) {
         if classifier.is_aligned() {
             let result = if let Ok(mut guard) = self.transformer.lock() {
                 let result = guard(classifier.form.clone());

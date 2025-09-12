@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{Offset, Scale, Boolean},
+        data::{Boolean},
         internal::hash::{Hash, Hasher},
     },
 };

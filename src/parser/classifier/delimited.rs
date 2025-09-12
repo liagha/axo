@@ -4,9 +4,9 @@ use {
             classifier::Classifier,
             form::Form,
         },
-        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        scanner::{PunctuationKind, Token, TokenKind},
         schema::*,
-        tracker::{Location, Span, Spanned},
+        tracker::{Span},
     },
     super::{
         super::{ErrorKind, Element, ElementKind, ParseError, Parser}

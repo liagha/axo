@@ -1,12 +1,6 @@
 use {
-    matchete::{
-        Resembler,
-    },
     crate::{
         scanner::Token,
-        data::thread::{
-            Arc, Mutex,
-        },
         format::{self, Display, Formatter},
     }
 };

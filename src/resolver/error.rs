@@ -4,12 +4,13 @@ use {
             Display, Debug, 
             Formatter, Result
         },
-
+        resolver::{
+            analyzer::AnalyzeError,
+            checker::{CheckError},
+        },
         scanner::Token,
     }
 };
-use crate::resolver::analyzer::AnalyzeError;
-use crate::resolver::checker::{CheckError, Type};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {

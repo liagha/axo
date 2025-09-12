@@ -1,13 +1,11 @@
-use matchete::Resembler;
 use {
     matchete::{Assessor, Scheme},
-    super::resolver::Id,
     crate::{
-        data::{Offset, Scale},
+        data::{Scale},
         internal::hash::Set,
         parser::Symbol,
         data::{
-            Str, Boolean,
+            Boolean,
         },
         parser::{Element, ElementKind, SymbolKind},
         resolver::{
@@ -169,9 +167,9 @@ impl<'scope> Scope<'scope> {
 
         let mut assessor = Assessor::new()
             .floor(0.5)
-            .dimension(&mut affinity, 0.6)
-            .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Multiplicative);
+            .dimension(&mut affinity, 0.25)
+            .dimension(&mut aligner, 0.75)
+            .scheme(Scheme::Additive);
 
         let candidates = &*scope.all();
 

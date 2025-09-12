@@ -1,10 +1,8 @@
 use {
     crate::{
-        data::Str,
-        formation::classifier::Classifier,
-        scanner::{Token, TokenKind},
+        scanner::{Token},
         schema::*,
-        tracker::{Span, Spanned},
+        tracker::{Span},
     },
     super::Symbol,
 };

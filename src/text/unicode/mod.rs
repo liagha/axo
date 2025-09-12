@@ -4,7 +4,6 @@ mod common;
 mod range;
 
 pub use {
-    category::*,
     common::*,
     property::*,
     range::*,

@@ -1,6 +1,5 @@
 use {
     crate::{
-        scanner::Token,
         data::{Str, Scale},
         schema::*,
         tracker::Span,

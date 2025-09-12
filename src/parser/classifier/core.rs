@@ -4,8 +4,7 @@ use {
             form::Form,
             classifier::Classifier,
         },
-        data::Str,
-        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        scanner::{PunctuationKind, Token, TokenKind},
         schema::*,
         parser::{
             ErrorKind,
@@ -14,7 +13,6 @@ use {
         },
         tracker::{
             Span, Spanned,
-            Location,
         },
     },
 };

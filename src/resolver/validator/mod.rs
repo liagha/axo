@@ -1,15 +1,9 @@
 use {
     crate::{
         data::Str,
-        internal::hash::Set,
         parser::{Element, ElementKind, Symbol, SymbolKind},
         scanner::{OperatorKind, Token, TokenKind},
         schema::*,
-        tracker::{Location, Position, Span},
-        resolver::{
-            Resolver,
-            scope::Scope,
-        },
     }
 };
 

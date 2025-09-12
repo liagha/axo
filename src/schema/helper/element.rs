@@ -1,6 +1,5 @@
 use {
     crate::{
-        data::{Offset, Scale},
         internal::hash::{Hash, Hasher}
     }
 };

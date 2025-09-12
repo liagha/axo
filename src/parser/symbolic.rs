@@ -16,14 +16,13 @@ use {
             Preference,
         },
         internal::{
-            hash::{Hash, Hasher, Set},
+            hash::{Hash, Set},
         },
         resolver::{
             Id,
             scope::Scope,
         },
         data::{
-            any::{Any, TypeId},
             Boolean,
         },
     }

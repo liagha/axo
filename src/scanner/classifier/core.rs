@@ -93,7 +93,7 @@ impl<'scanner> Scanner<'scanner> {
                     "in" => {
                         TokenKind::Operator(OperatorKind::In)
                     }
-                    identifier => {
+                    _ => {
                         TokenKind::Identifier(content)
                     }
                 };

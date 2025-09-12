@@ -5,10 +5,9 @@ use {
             analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction}
         },
         parser::{
-            Element, ElementKind, Symbol, SymbolKind
+            Symbol, SymbolKind
         }, 
         scanner::{
-            OperatorKind, PunctuationKind,
             Token, TokenKind,
         }, 
         data::{Str},
@@ -21,7 +20,7 @@ pub trait Analyzable<'analyzable> {
 }
 
 impl<'token> Analyzable<'token> for Token<'token> {
-    fn analyze(&self, resolver: &Resolver<'token>) -> Result<Analysis<'token>, AnalyzeError<'token>> {
+    fn analyze(&self, _resolver: &Resolver<'token>) -> Result<Analysis<'token>, AnalyzeError<'token>> {
         match &self.kind {
             TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float { value: float.clone(), size: 64 })),
             TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer { value: integer.clone(), size: 64, signed: true })),

@@ -1,9 +1,5 @@
 use {
-    matchete::{Assessor, Scheme},
     super::{
-        error::{
-            ErrorKind,
-        },
         scope::{
             Scope,
         },
@@ -11,30 +7,14 @@ use {
             Analysis,
         },
         validator::Sugared,
-        checker::Checkable,
         ResolveError,
     },
     crate::{
-        tracker::{
-            Span,
-        },
-        scanner::{
-            Token, TokenKind,
-            OperatorKind,
-        },
         parser::{
             Element, ElementKind,
-            Symbol, SymbolKind,
+            Symbol
         },
-        schema::*,
-        data::{
-            Str,
-            Scale,
-            Boolean,
-            memory::{
-                replace,
-            }
-        },
+        data::{Boolean, memory::{replace}},
         format::Debug,
     },
 };

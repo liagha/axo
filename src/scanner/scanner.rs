@@ -3,15 +3,10 @@ use {
         Character, Token, ScanError,
     },
     crate::{
-        data::{
-            Offset, Scale, Str,
-        },
+        data::{Offset, Scale},
         formation::{
             form::Form,
             former::Former,
-        },
-        internal::{
-            compiler::{Registry},
         },
         tracker::{
             Peekable, Position, Location,

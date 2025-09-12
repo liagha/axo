@@ -11,14 +11,9 @@ use {
             Element, ElementKind,
             Symbol, SymbolKind,
         },
-        reporter::{
-            Hint,
-        },
         resolver::{
             HintKind, ResolveHint,
-            Resolver,
         },
-        schema::*,
         data::{
             Float, Str
         },
@@ -42,7 +37,22 @@ pub struct Aligner<'aligner> {
 
 impl<'aligner> Aligner<'aligner> {
     pub fn new() -> Self {
-        Aligner { assessor: aligner(), perfection: 0.85..1.1, suggestion: 0.3..0.85, }
+        Aligner {
+            assessor: Assessor::new()
+                .dimension(Box::leak(Box::new(Exact)), 0.05)
+                .dimension(Box::leak(Box::new(Relaxed)), 0.05)
+                .dimension(Box::leak(Box::new(Prefix)), 0.15)
+                .dimension(Box::leak(Box::new(Suffix)), 0.1)
+                .dimension(Box::leak(Box::new(Contains)), 0.1)
+                .dimension(Box::leak(Box::new(Keyboard::default())), 0.1)
+                .dimension(Box::leak(Box::new(Words::default())), 0.1)
+                .dimension(Box::leak(Box::new(Phonetic::default())), 0.1)
+                .dimension(Box::leak(Box::new(Sequential::default())), 0.05)
+                .dimension(Box::leak(Box::new(Jaro::default())), 0.1)
+                .dimension(Box::leak(Box::new(Cosine::default())), 0.1)
+                .scheme(Scheme::Additive),
+            perfection: 0.85..1.1, suggestion: 0.3..0.85,
+        }
     }
 }
 
@@ -50,22 +60,6 @@ impl<'aligner> Resembler<Str<'aligner>, Str<'aligner>, ()> for Aligner<'aligner>
     fn resemblance(&mut self, query: &Str, candidate: &Str) -> Result<Resemblance, ()> {
         self.assessor.resemblance(&query.to_string(), &candidate.to_string())
     }
-}
-
-pub fn aligner<'aligner>() -> Assessor<'aligner, String, String, ()> {
-    Assessor::new()
-        .dimension(Box::leak(Box::new(Exact)), 0.05)
-        .dimension(Box::leak(Box::new(Relaxed)), 0.05)
-        .dimension(Box::leak(Box::new(Prefix)), 0.15)
-        .dimension(Box::leak(Box::new(Suffix)), 0.1)
-        .dimension(Box::leak(Box::new(Contains)), 0.1)
-        .dimension(Box::leak(Box::new(Keyboard::default())), 0.1)
-        .dimension(Box::leak(Box::new(Words::default())), 0.1)
-        .dimension(Box::leak(Box::new(Phonetic::default())), 0.1)
-        .dimension(Box::leak(Box::new(Sequential::default())), 0.05)
-        .dimension(Box::leak(Box::new(Jaro::default())), 0.1)
-        .dimension(Box::leak(Box::new(Cosine::default())), 0.1)
-        .scheme(Scheme::Additive)
 }
 
 impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'aligner> {
@@ -173,7 +167,7 @@ pub struct Affinity {
 
 impl Affinity {
     pub fn new() -> Self {
-        Affinity { shaping: 0.5, binding: 0.5 }
+        Affinity { shaping: 0.75, binding: 0.25 }
     }
 }
 

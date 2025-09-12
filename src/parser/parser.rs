@@ -12,9 +12,6 @@ use {
             former::Former,
             classifier::Classifier,
         },
-        internal::{
-            compiler::{Registry},
-        },
         scanner::{
             PunctuationKind, Token, TokenKind
         },

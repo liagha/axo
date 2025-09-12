@@ -70,7 +70,7 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Binary(binary) => {
                 (&*binary.left).infer()
             }
-            ElementKind::Closure(closure) => {
+            ElementKind::Closure(_) => {
                 Type::unit(self.span)
             }
             ElementKind::Index(_) => {

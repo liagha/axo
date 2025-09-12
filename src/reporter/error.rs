@@ -7,10 +7,7 @@ use {
         reporter,
         format::{Display, Debug, Formatter, Result},
         tracker::{Span},
-        data::{
-            Number,
-            Scale, Str,
-        },
+        data::{Number, Str},
     },
 
     broccli::{Color, TextStyle}

@@ -1,17 +1,15 @@
 use {
     crate::{
         data::{
-            any::{Any, TypeId},
             Str,
         },
         internal::{
-            hash::{Hash, Hasher, DefaultHasher},
+            hash::{Hash},
         },
         formation::{
             classifier::Classifier,
             form::Form,
         },
-        parser::SymbolKind,
         scanner::{Token, TokenKind, OperatorKind},
         tracker::{Span, Spanned},
     },

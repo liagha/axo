@@ -7,7 +7,7 @@ use {
             Char, Str,
         },
         text::{is_alphabetic, is_numeric, is_whitespace, is_alphanumeric},
-        tracker::{Span, Spanned, Position},
+        tracker::{Span, Position},
     },
 };
 

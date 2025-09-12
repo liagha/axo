@@ -11,7 +11,6 @@ use {
         },
     }
 };
-use crate::resolver::scope::Scope;
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn resolve(&self, resolver: &mut Resolver<'symbol>) -> Option<Symbol<'symbol>> {

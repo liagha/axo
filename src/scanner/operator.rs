@@ -2,7 +2,7 @@ use {
     super::Character,
     crate::{
         data::{slice, Str},
-        format::{Debug, Display, Write, Result, Formatter},
+        format::{Debug, Display, Result, Formatter},
     },
     
     OperatorKind::*,

@@ -16,7 +16,6 @@ pub mod helper {
             format::Debug,
             internal::{
                 hash::{Hash},
-                compiler::{Registry},
             },
             tracker::Peekable,
         },

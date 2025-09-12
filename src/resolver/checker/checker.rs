@@ -4,14 +4,9 @@ use {
             ResolveError, Resolver,
             checker::{
                 CheckError,
-                types::{Type, TypeKind},
+                types::{Type},
             },
         },
-        scanner::{PunctuationKind, Token, TokenKind},
-        schema::*,
-        data::Str,
-        internal::hash::Map,
-        parser::{Element, ElementKind, Symbol, SymbolKind},
     },
 };
 

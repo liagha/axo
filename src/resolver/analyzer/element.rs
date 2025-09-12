@@ -13,32 +13,25 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 Err(AnalyzeError::new(ErrorKind::UnImplemented, self.span))
             }
             ElementKind::Delimited(delimited) => {
-                match &self.kind {
-                    ElementKind::Delimited(delimited) => {
-                        match (&delimited.start.kind, delimited.separator.as_ref().map(|token| &token.kind), &delimited.end.kind) {
-                            (
-                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                                None,
-                                TokenKind::Punctuation(PunctuationKind::RightBrace),
-                            ) | (
-                                TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                                Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                                TokenKind::Punctuation(PunctuationKind::RightBrace),
-                            ) => {
-                                let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
-                                    .items
-                                    .iter()
-                                    .map(|item| item.analyze(resolver))
-                                    .collect();
+                match (&delimited.start.kind, delimited.separator.as_ref().map(|token| &token.kind), &delimited.end.kind) {
+                    (
+                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                        None,
+                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                    ) | (
+                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                        TokenKind::Punctuation(PunctuationKind::RightBrace),
+                    ) => {
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
+                            .items
+                            .iter()
+                            .map(|item| item.analyze(resolver))
+                            .collect();
 
-                                Ok(Analysis::new(Instruction::Block(items?)))
-                            }
-
-                            _ => {
-                                Err(AnalyzeError::new(ErrorKind::UnImplemented, self.span))
-                            }
-                        }
+                        Ok(Analysis::new(Instruction::Block(items?)))
                     }
+
                     _ => {
                         Err(AnalyzeError::new(ErrorKind::UnImplemented, self.span))
                     }

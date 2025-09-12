@@ -9,7 +9,6 @@ use {
     crate::{
         resolver::{
             scope::Scope,
-            Id,
         },
         tracker::{
             Span, Spanned,
@@ -23,11 +22,7 @@ use {
             TokenKind,
         },
         schema::*,
-        internal::{
-            hash::{Hash, Hasher, Set},
-        },
-        data::{memory, Str},
-        format::{self, Show, Display, Debug, Formatter},
+        data::{Str},
     },
 };
 
@@ -165,7 +160,7 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input();
                 let constant = keyword.kind == TokenKind::Identifier(Str::from("const"));
                 let mut body = sequence[1].unwrap_output().clone();
-                let mut span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 let mut value = None;
                 let mut annotation = None;
@@ -235,7 +230,7 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
-                let mut generic = Scope::new();
+                let generic = Scope::new();
                 let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
@@ -288,7 +283,7 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
-                let mut generic = Scope::new();
+                let generic = Scope::new();
                 let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
@@ -355,7 +350,8 @@ impl<'parser> Parser<'parser> {
                                 )
                             ))
                         })
-                    ])),
+                    ])
+                ),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
@@ -382,7 +378,7 @@ impl<'parser> Parser<'parser> {
                     let mut variadic = false;
                     let body = sequence[3].unwrap_output().clone();
 
-                    let members: Vec<_> = Self::get_body(body.clone())
+                    let members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),
@@ -413,7 +409,7 @@ impl<'parser> Parser<'parser> {
                     let body = sequence[4].unwrap_output().clone();
                     let mut variadic = false;
 
-                    let members: Vec<_> = Self::get_body(body.clone())
+                    let members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),

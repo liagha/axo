@@ -33,7 +33,7 @@ impl<'pipeline, T> Pipeline<'pipeline, T> {
         Self { data, resolver }
     }
 
-    pub fn then<U, S>(mut self, mut stage: S) -> Pipeline<'pipeline, U>
+    pub fn then<U, S>(self, mut stage: S) -> Pipeline<'pipeline, U>
     where
         S: Stage<'pipeline, T, U>,
     {
@@ -44,7 +44,7 @@ impl<'pipeline, T> Pipeline<'pipeline, T> {
         }
     }
 
-    pub fn then_with<U, F>(mut self, f: F) -> Pipeline<'pipeline, U>
+    pub fn then_with<U, F>(self, f: F) -> Pipeline<'pipeline, U>
     where
         F: FnOnce(&mut Resolver<'pipeline>, T) -> U,
     {
@@ -484,7 +484,7 @@ impl<'initialization> Stage<'initialization, (), Vec<Location<'initialization>>>
 }
 
 impl<'scanner> Scanner<'scanner> {
-    pub fn execute_pipeline(&mut self, resolver: &mut Resolver<'scanner>, location: Location<'scanner>, logger: &CompileLogger) -> Vec<Token<'scanner>> {
+    pub fn execute_pipeline(&mut self, _resolver: &mut Resolver<'scanner>, location: Location<'scanner>, logger: &CompileLogger) -> Vec<Token<'scanner>> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
@@ -508,9 +508,9 @@ impl<'scanner> Scanner<'scanner> {
 }
 
 impl<'parser> Parser<'parser> {
-    pub fn execute(&mut self, resolver: &mut Resolver<'parser>, tokens: Vec<Token<'parser>>, logger: &CompileLogger) -> Vec<Element<'parser>> {
+    pub fn execute(&mut self, _resolver: &mut Resolver<'parser>, tokens: Vec<Token<'parser>>, logger: &CompileLogger) -> Vec<Element<'parser>> {
         let mut timer = DefaultTimer::new_default();
-        timer.start();
+        _ = timer.start();
 
         logger.start("parsing");
 

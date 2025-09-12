@@ -1,16 +1,11 @@
 use {
     super::{
         ErrorKind, ResolveError, Resolver,
-        scope::Scope,
-        checker::Checkable,
         resolver::Resolvable,
         analyzer::Analyzable,
     },
     crate::{
-        data::{
-            Boolean,
-            memory::replace,
-        },
+        data::{Boolean},
         parser::{
             Symbol, Element, ElementKind,
         },
