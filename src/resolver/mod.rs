@@ -1,6 +1,6 @@
 mod error;
 mod hint;
-mod matcher;
+mod assessor;
 mod resolver;
 pub mod analyzer;
 pub mod checker;

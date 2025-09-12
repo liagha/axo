@@ -10,7 +10,7 @@ use {
         parser::{Element, ElementKind, SymbolKind},
         resolver::{
             ErrorKind, ResolveError,
-            matcher::{Affinity, Aligner},
+            assessor::{Affinity, Aligner},
         },
         scanner::{Token, TokenKind},
         tracker::Span,
@@ -166,9 +166,9 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.5)
-            .dimension(&mut affinity, 0.25)
-            .dimension(&mut aligner, 0.75)
+            .floor(0.75)
+            .dimension(&mut affinity, 0.6)
+            .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Additive);
 
         let candidates = &*scope.all();
