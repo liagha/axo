@@ -1,33 +1,18 @@
 use {
-    super::{
-        super::{
-            Element, ElementKind,
-            ParseError, Parser,
-            Symbol, SymbolKind, Specifier,
-        },
-    },
+    super::super::{Element, ElementKind, ParseError, Parser, Specifier, Symbol, SymbolKind},
     crate::{
-        resolver::{
-            scope::Scope,
-        },
-        tracker::{
-            Span, Spanned,
-        },
-        formation::{
-            form::Form,
-            classifier::Classifier,
-        },
-        scanner::{
-            OperatorKind, Token,
-            TokenKind,
-        },
+        data::Str,
+        formation::{classifier::Classifier, form::Form},
+        resolver::scope::Scope,
+        scanner::{OperatorKind, Token, TokenKind},
         schema::*,
-        data::{Str},
+        tracker::{Span, Spanned},
     },
 };
 
 impl<'parser> Parser<'parser> {
-    pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn symbolization(
+    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::inclusion(),
             Self::extension(),
@@ -39,50 +24,47 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    pub fn inclusion() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn inclusion() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
+    {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 token.kind == TokenKind::Identifier(Str::from("use"))
             }),
             Classifier::deferred(Self::element),
-        ]).with_transform(|form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-            let keyword = form.collect_inputs()[0].clone();
-            let inclusion = form.collect_outputs();
+        ])
+        .with_transform(
+            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+                let keyword = form.collect_inputs()[0].clone();
+                let inclusion = form.collect_outputs();
 
-            let span = Span::merge(&keyword.span, &inclusion.clone().span());
+                let span = Span::merge(&keyword.span, &inclusion.clone().span());
 
-            Ok(Form::output(
-                Element::new(
-                    ElementKind::Symbolize(
-                        Symbol::new(
-                            SymbolKind::Inclusion(
-                                Inclusion::new(Box::new(inclusion[0].clone()))
-                            ),
-                            span,
-                            0
-                        ),
-                    ),
-                    span
-                )
-            ))
-        })
+                Ok(Form::output(Element::new(
+                    ElementKind::Symbolize(Symbol::new(
+                        SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()))),
+                        span,
+                        0,
+                    )),
+                    span,
+                )))
+            },
+        )
     }
 
-    pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
+    {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("extend"))
                 }),
                 Self::literal(),
-                Classifier::optional(
-                    Classifier::sequence([
-                        Classifier::predicate(|token: &Token| {
-                            matches!(token.kind, TokenKind::Operator(OperatorKind::Colon))
-                        }),
-                        Self::literal(),
-                    ])
-                ),
+                Classifier::optional(Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
+                        matches!(token.kind, TokenKind::Operator(OperatorKind::Colon))
+                    }),
+                    Self::literal(),
+                ])),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
@@ -103,18 +85,18 @@ impl<'parser> Parser<'parser> {
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Symbolize(
-                                Symbol::new(
-                                    SymbolKind::Extension(Extension::new(Box::new(name), None::<Box<Element<'parser>>>, members)),
-                                    span,
-                                    0
-                                ),
-                            ),
-                            span
-                        )
-                    ))
+                    Ok(Form::output(Element::new(
+                        ElementKind::Symbolize(Symbol::new(
+                            SymbolKind::Extension(Extension::new(
+                                Box::new(name),
+                                None::<Box<Element<'parser>>>,
+                                members,
+                            )),
+                            span,
+                            0,
+                        )),
+                        span,
+                    )))
                 } else if outputs.len() == 3 {
                     let target = outputs[1].clone();
                     let body = outputs[2].clone();
@@ -127,18 +109,18 @@ impl<'parser> Parser<'parser> {
                         .collect();
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Symbolize(
-                                Symbol::new(
-                                    SymbolKind::Extension(Extension::new(Box::new(name), Some(Box::new(target)), members)),
-                                    span,
-                                    0
-                                ),
-                            ),
-                            span
-                        )
-                    ))
+                    Ok(Form::output(Element::new(
+                        ElementKind::Symbolize(Symbol::new(
+                            SymbolKind::Extension(Extension::new(
+                                Box::new(name),
+                                Some(Box::new(target)),
+                                members,
+                            )),
+                            span,
+                            0,
+                        )),
+                        span,
+                    )))
                 } else {
                     unreachable!()
                 }
@@ -168,13 +150,22 @@ impl<'parser> Parser<'parser> {
                 if let ElementKind::Binary(binary) = &body.kind.clone() {
                     match (&*binary.left, &binary.operator, &*binary.right) {
                         (
-                            Element { kind: ElementKind::Binary(binary), .. },
-                            Token { kind: TokenKind::Operator(OperatorKind::Equal), .. },
+                            Element {
+                                kind: ElementKind::Binary(binary),
+                                ..
+                            },
+                            Token {
+                                kind: TokenKind::Operator(OperatorKind::Equal),
+                                ..
+                            },
                             right,
                         ) => {
                             value = Some(Box::new(right.clone()));
 
-                            if matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Colon)) {
+                            if matches!(
+                                binary.operator.kind,
+                                TokenKind::Operator(OperatorKind::Colon)
+                            ) {
                                 body = *binary.left.clone();
                                 annotation = Some(binary.right.clone());
                             }
@@ -182,41 +173,39 @@ impl<'parser> Parser<'parser> {
 
                         (
                             left,
-                            Token { kind: TokenKind::Operator(OperatorKind::Equal), .. },
+                            Token {
+                                kind: TokenKind::Operator(OperatorKind::Equal),
+                                ..
+                            },
                             right,
                         ) => {
                             body = left.clone();
                             value = Some(Box::new(right.clone()));
-                        },
+                        }
 
                         _ => {}
                     }
                 }
 
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::Symbolize(
-                            Symbol::new(
-                                SymbolKind::Binding(
-                                    Binding::new(
-                                        Box::new(body),
-                                        value,
-                                        annotation,
-                                        constant,
-                                    )
-                                ),
-                                span,
-                                0
-                            )
-                        ),
+                Ok(Form::output(Element::new(
+                    ElementKind::Symbolize(Symbol::new(
+                        SymbolKind::Binding(Binding::new(
+                            Box::new(body),
+                            value,
+                            annotation,
+                            constant,
+                        )),
                         span,
-                    )
-                ))
+                        0,
+                    )),
+                    span,
+                )))
             },
         )
     }
 
-    pub fn structure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn structure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
+    {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::sequence([
@@ -246,30 +235,29 @@ impl<'parser> Parser<'parser> {
                             specifier.apply(element.clone());
 
                             None
-                        },
+                        }
                     })
                     .collect();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::Symbolize(
-                            Symbol::new(
-                                SymbolKind::Structure(Structure::new(Box::new(name), members)),
-                                span,
-                                0
-                            )
-                                .with_specifier(specifier)
-                                .with_generic(generic),
-                        ),
-                        span,
-                    )
-                ))
-            }
+                Ok(Form::output(Element::new(
+                    ElementKind::Symbolize(
+                        Symbol::new(
+                            SymbolKind::Structure(Structure::new(Box::new(name), members)),
+                            span,
+                            0,
+                        )
+                        .with_specifier(specifier)
+                        .with_generic(generic),
+                    ),
+                    span,
+                )))
+            },
         )
     }
 
-    pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn enumeration(
+    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::sequence([
@@ -299,26 +287,25 @@ impl<'parser> Parser<'parser> {
                             specifier.apply(element.clone());
 
                             None
-                        },
+                        }
                     })
                     .collect();
+
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::Symbolize(
-                            Symbol::new(
-                                SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
-                                span,
-                                0
-                            )
-                                .with_specifier(specifier)
-                                .with_generic(generic),
-                        ),
-                        span,
-                    )
-                ))
-            }
+                Ok(Form::output(Element::new(
+                    ElementKind::Symbolize(
+                        Symbol::new(
+                            SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
+                            span,
+                            0,
+                        )
+                        .with_specifier(specifier)
+                        .with_generic(generic),
+                    ),
+                    span,
+                )))
+            },
         )
     }
 
@@ -329,29 +316,34 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::literal(),
-                Self::group(
-                    Classifier::alternative([
-                        Classifier::deferred(Self::symbolization),
-                        Classifier::predicate(|token: &Token| {
-                            if let TokenKind::Operator(operator) = &token.kind {
-                                matches!(operator.as_slice(), [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot])
-                            } else {
-                                false
-                            }
-                        }).with_transform(|form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+                Self::group(Classifier::alternative([
+                    Classifier::deferred(Self::symbolization),
+                    Classifier::predicate(|token: &Token| {
+                        if let TokenKind::Operator(operator) = &token.kind {
+                            matches!(
+                                operator.as_slice(),
+                                [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                            )
+                        } else {
+                            false
+                        }
+                    })
+                    .with_transform(
+                        |form: Form<
+                            'parser,
+                            Token<'parser>,
+                            Element<'parser>,
+                            ParseError<'parser>,
+                        >| {
                             let variadic = form.unwrap_input();
 
-                            Ok(Form::output(
-                                Element::new(
-                                    ElementKind::literal(
-                                        variadic.clone()
-                                    ),
-                                    variadic.span
-                                )
-                            ))
-                        })
-                    ])
-                ),
+                            Ok(Form::output(Element::new(
+                                ElementKind::literal(variadic.clone()),
+                                variadic.span,
+                            )))
+                        },
+                    ),
+                ])),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
@@ -359,84 +351,115 @@ impl<'parser> Parser<'parser> {
                         } else {
                             false
                         }
-                    }).with_ignore(),
+                    })
+                    .with_ignore(),
                     Self::literal(),
-                ]).with_transform(|form| {
+                ])
+                .with_transform(|form| {
                     let output = form.as_forms();
 
                     Ok(output[0].clone())
-                }).as_optional(),
+                })
+                .as_optional(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
-                let invoke = sequence[2].unwrap_output().clone();
+                let head = sequence[2].unwrap_output().clone();
+                let mut specifier = Specifier::default();
 
                 if sequence.len() == 4 {
                     let mut variadic = false;
                     let body = sequence[3].unwrap_output().clone();
 
-                    let members: Vec<_> = Self::get_body(invoke.clone())
+                    let members: Vec<_> = Self::get_body(head.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),
-                            _ => {
+                            ElementKind::Literal(Token {
+                                kind: TokenKind::Operator(OperatorKind::Composite(composite)),
+                                ..
+                            }) if composite.as_slice()
+                                == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot] =>
+                            {
                                 variadic = true;
-                                
+
                                 None
-                            },
+                            }
+                            _ => {
+                                specifier.apply(element.clone());
+
+                                None
+                            }
                         })
                         .collect();
-                    
+
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Symbolize(
-                                Symbol::new(
-                                    SymbolKind::Method(Method::new(Box::new(name), members, Box::new(body), None::<Box<Element<'parser>>>, variadic)),
-                                    span,
-                                    0
-                                ),
-                            ),
+                    Ok(Form::output(Element::new(
+                        ElementKind::Symbolize(Symbol::new(
+                            SymbolKind::Method(Method::new(
+                                Box::new(name),
+                                members,
+                                Box::new(body),
+                                None::<Box<Element<'parser>>>,
+                                variadic,
+                            )),
                             span,
-                        )
-                    ))
+                            0,
+                        )),
+                        span,
+                    )))
                 } else {
                     let output = sequence[3].unwrap_output().clone();
                     let body = sequence[4].unwrap_output().clone();
                     let mut variadic = false;
 
-                    let members: Vec<_> = Self::get_body(invoke.clone())
+                    let members: Vec<_> = Self::get_body(head.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),
-                            _ => {
+                            ElementKind::Literal(Token {
+                                kind: TokenKind::Operator(OperatorKind::Composite(composite)),
+                                ..
+                            }) if composite.as_slice()
+                                == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot] =>
+                            {
                                 variadic = true;
 
                                 None
-                            },
+                            }
+                            _ => {
+                                specifier.apply(element.clone());
+
+                                None
+                            }
                         })
                         .collect();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(
-                        Element::new(
-                            ElementKind::Symbolize(
-                                Symbol::new(
-                                    SymbolKind::Method(Method::new(Box::new(name), members, Box::new(body), Some(Box::new(output)), variadic)),
-                                    span,
-                                    0
-                                )
-                            ),
-                            span,
-                        )
-                    ))
+                    Ok(Form::output(Element::new(
+                        ElementKind::Symbolize(
+                            Symbol::new(
+                                SymbolKind::Method(Method::new(
+                                    Box::new(name),
+                                    members,
+                                    Box::new(body),
+                                    Some(Box::new(output)),
+                                    variadic,
+                                )),
+                                span,
+                                0,
+                            )
+                                .with_specifier(specifier),
+                        ),
+                        span,
+                    )))
                 }
-            }
+            },
         )
     }
 
@@ -455,26 +478,21 @@ impl<'parser> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
 
-                let fields = Self::get_body(body.clone()).iter().filter(|item| item.kind.is_symbolize()).map(|item| {
-                    item.kind.clone().unwrap_symbolize().clone()
-                }).collect::<Vec<_>>();
+                let fields = Self::get_body(body.clone())
+                    .iter()
+                    .filter(|item| item.kind.is_symbolize())
+                    .map(|item| item.kind.clone().unwrap_symbolize().clone())
+                    .collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-                let mut symbol = Symbol::new(
-                    SymbolKind::Module(Module::new(Box::new(name))),
-                    span,
-                    0
-                );
+                let mut symbol =
+                    Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, 0);
                 symbol.scope.extend(fields);
 
-                Ok(Form::output(
-                    Element::new(
-                        ElementKind::Symbolize(
-                            symbol,
-                        ),
-                        span,
-                    )
-                ))
-            }
+                Ok(Form::output(Element::new(
+                    ElementKind::Symbolize(symbol),
+                    span,
+                )))
+            },
         )
     }
 }
