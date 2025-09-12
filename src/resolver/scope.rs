@@ -166,10 +166,10 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.75)
+            .floor(0.5)
             .dimension(&mut affinity, 0.6)
             .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Additive);
+            .scheme(Scheme::Multiplicative);
 
         let candidates = &*scope.all();
 

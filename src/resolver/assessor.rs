@@ -51,7 +51,7 @@ impl<'aligner> Aligner<'aligner> {
                 .dimension(Box::leak(Box::new(Jaro::default())), 0.1)
                 .dimension(Box::leak(Box::new(Cosine::default())), 0.1)
                 .scheme(Scheme::Additive),
-            perfection: 0.8..1.1, suggestion: 0.3..0.8,
+            perfection: 0.75..1.1, suggestion: 0.3..0.75,
         }
     }
 }
@@ -265,11 +265,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             1.0
                         };
 
-                        if members.is_empty() {
-                            score += self.binding * self.base;
-                        } else {
-                            score += self.binding * (ratio + self.base).min(1.0);
-                        }
+                        score += self.binding * (ratio + self.base).min(1.0);
 
                         let mut errors = Vec::new();
 
@@ -277,7 +273,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             if !candidates.contains(&member) {
                                 errors.push(
                                     ResolveError {
-                                        kind: ErrorKind::MissingMember {
+                                        kind: ErrorKind::UndefinedMember {
                                             target: method.target.brand().unwrap(),
                                             member: member.clone(),
                                         },
@@ -338,11 +334,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         1.0
                     };
 
-                    if members.is_empty() {
-                        score += self.binding * self.base;
-                    } else {
-                        score += self.binding * (ratio + self.base).min(1.0);
-                    }
+                    score += self.binding * (ratio + self.base).min(1.0);
 
                     let mut errors = Vec::new();
 
@@ -350,7 +342,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         if !candidates.contains(&member) {
                             errors.push(
                                 ResolveError {
-                                    kind: ErrorKind::MissingMember {
+                                    kind: ErrorKind::UndefinedMember {
                                         target: structure.target.brand().unwrap(),
                                         member: member.clone(),
                                     },
