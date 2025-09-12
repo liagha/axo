@@ -1,5 +1,10 @@
 use {
     matchete::{Assessor, Scheme},
+    super::{
+        Id,
+        ErrorKind, ResolveError,
+        assessor::{Affinity, Aligner},
+    },
     crate::{
         data::{Scale},
         internal::hash::Set,
@@ -8,10 +13,6 @@ use {
             Boolean,
         },
         parser::{Element, ElementKind, SymbolKind},
-        resolver::{
-            ErrorKind, ResolveError,
-            assessor::{Affinity, Aligner},
-        },
         scanner::{Token, TokenKind},
         tracker::Span,
         schema::*,
@@ -117,6 +118,14 @@ impl<'scope> Scope<'scope> {
         } else {
             false
         }
+    }
+
+    pub fn get_id(&self, target: Id) -> Option<&Symbol<'scope>> {
+        if let Some(symbol) = self.symbols.iter().find(|s| s.id == target) {
+            return Some(symbol);
+        }
+
+        self.parent.as_ref()?.get_id(target)
     }
 
     pub fn try_get(&mut self, target: &Element<'scope>) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {

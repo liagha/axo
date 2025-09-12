@@ -32,6 +32,7 @@ pub mod tracker;
 
 #[cfg(feature = "internal")]
 pub mod data;
+mod interpreter;
 
 fn main() {
     #[cfg(feature = "internal")]

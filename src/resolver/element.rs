@@ -18,7 +18,7 @@ use {
 
 impl<'element> Resolvable<'element> for Element<'element> {
     fn resolve(&self, resolver: &mut Resolver<'element>) -> Option<Symbol<'element>> {
-        let analysis = self.analyze(resolver);
+        /*let analysis = self.analyze(resolver);
 
         match analysis {
             Ok(analysis) => {
@@ -28,7 +28,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let error = ResolveError::new(ErrorKind::Analyze { error: error.clone() }, error.span);
                 resolver.errors.push(error);
             }
-        }
+        }*/
 
         match &self.kind {
             ElementKind::Delimited(delimited) => {

@@ -34,5 +34,6 @@ inkwell = { version = "0.6.0", features = ["llvm18-1-force-static"], optional = 
 
 [workspace]
 members = [
+    ".",
     "src/procedural"
 ]

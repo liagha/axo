@@ -1,9 +1,1 @@
-package.test.Test { }
-
-struct Test {
-    const fuck,
-    const nigga,
-}
-
-Test { }
-
+use package.test.Test

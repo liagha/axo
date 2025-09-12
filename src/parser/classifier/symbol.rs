@@ -41,7 +41,7 @@ impl<'parser> Parser<'parser> {
 
                 Ok(Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()))),
+                        SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()), 0)),
                         span,
                         0,
                     )),

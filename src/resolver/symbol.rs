@@ -17,14 +17,18 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         let mut symbol = self.clone();
         symbol.id = resolver.next_id();
 
-        match symbol.kind {
-            SymbolKind::Inclusion(_) => {}
+        match &mut symbol.kind {
+            SymbolKind::Inclusion(inclusion) => {
+                if let Some(symbol) = inclusion.target.resolve(resolver) {
+                    resolver.scope.add(symbol);
+                }
+            }
             SymbolKind::Preference(_) => {}
             SymbolKind::Extension(extension) => {
                 let scope = resolver.scope.clone();
 
                 if let Some(mut target) = resolver.lookup(&*extension.target, &scope) {
-                    if let Some(extension) = extension.extension {
+                    if let Some(extension) = &extension.extension {
                         if let Some(found) = resolver.lookup(&*extension, &scope) {
                             if let SymbolKind::Structure(structure) = found.kind {
                                 resolver.scope.remove(&target);

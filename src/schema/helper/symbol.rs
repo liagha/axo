@@ -4,10 +4,12 @@ use {
         internal::hash::{Hash, Hasher},
     },
 };
+use crate::resolver::Id;
 
 #[derive(Debug, Eq)]
-pub struct Inclusion<Target> {
+pub struct Inclusion<Target, Id> {
     pub target: Target,
+    pub id: Id,
 }
 
 #[derive(Debug, Eq)]
@@ -45,10 +47,10 @@ pub struct Module<Target> {
     pub target: Target,
 }
 
-impl<Target> Inclusion<Target> {
+impl<Target, Id> Inclusion<Target, Id> {
     #[inline]
-    pub fn new(target: Target) -> Self {
-        Inclusion { target }
+    pub fn new(target: Target, id: Id) -> Self {
+        Inclusion { target, id }
     }
 }
 
@@ -87,9 +89,10 @@ impl<Target> Module<Target> {
     }
 }
 
-impl<Target: Hash> Hash for Inclusion<Target> {
+impl<Target: Hash, Id: Hash> Hash for Inclusion<Target, Id> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
+        self.id.hash(state);
     }
 }
 
@@ -131,7 +134,7 @@ impl<Target: Hash> Hash for Module<Target> {
     }
 }
 
-impl<Target: PartialEq> PartialEq for Inclusion<Target> {
+impl<Target: PartialEq, Id> PartialEq for Inclusion<Target, Id> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
     }
@@ -173,9 +176,9 @@ impl<Target: PartialEq> PartialEq for Module<Target> {
     }
 }
 
-impl<Target: Clone> Clone for Inclusion<Target> {
+impl<Target: Clone, Id: Clone> Clone for Inclusion<Target, Id> {
     fn clone(&self) -> Self {
-        Inclusion::new(self.target.clone())
+        Inclusion::new(self.target.clone(), self.id.clone())
     }
 }
 
