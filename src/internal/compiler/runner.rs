@@ -50,7 +50,7 @@ impl<'compiler> Compiler<'compiler> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-        self.reporter.finish("compilation", duration, 0);
+        self.reporter.finish("compilation", duration);
 
         #[cfg(feature = "generator")]
         self.run_queue();
@@ -260,7 +260,7 @@ impl<'compiler> Compiler<'compiler> {
 
                         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-                        self.reporter.finish("linking", duration, 0);
+                        self.reporter.finish("linking", duration);
                     }
 
                     if linked && run {
@@ -302,9 +302,7 @@ impl<'compiler> Compiler<'compiler> {
         let mut logger = Reporter::new(verbosity);
 
         for (index, target) in targets.into_iter().enumerate() {
-            logger.set_current(target.to_string());
             self.module(target, index);
-            logger.clear_current();
         }
     }
 }

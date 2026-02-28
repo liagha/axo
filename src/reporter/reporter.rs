@@ -16,8 +16,6 @@ use {
 
 pub struct Reporter {
     pub verbosity: bool,
-    current_target: Option<String>,
-    current_index: usize,
 }
 
 impl Reporter {
@@ -67,26 +65,15 @@ impl Reporter {
     pub fn new(verbosity: bool) -> Self {
         Self {
             verbosity,
-            current_target: None,
-            current_index: 0,
         }
     }
 
     pub fn start(&self, stage: &str) {
         if self.verbosity {
-            if let Some(ref target) = self.current_target {
-                xprintln!(
-                    "Started {} {} {}." => Color::Blue,
-                    format!("`{}`", stage) => Color::White,
-                    target,
-                    self.current_index,
-                );
-            } else {
-                xprintln!(
-                    "Started {}." => Color::Blue,
-                    format!("`{}`", stage) => Color::White,
-                );
-            }
+            xprintln!(
+                "Started {}." => Color::Blue,
+                format!("`{}`", stage) => Color::White,
+            );
             xprintln!();
         }
     }
@@ -114,49 +101,35 @@ impl Reporter {
         }
     }
 
-    pub fn finish(&self, stage: &str, duration: Duration, error_count: usize) {
+    pub fn finish(&self, stage: &str, duration: Duration) {
         if self.verbosity {
-            let target_info = if let Some(ref target) = self.current_target {
-                format!(" {} {}", target, self.current_index)
-            } else {
-                String::new()
-            };
-
-            if error_count > 0 {
-                xprintln!(
-                    "Finished {}{} {}s with {} {}." => Color::Green,
-                    format!("`{}` in", stage) => Color::White,
-                    target_info,
-                    duration.as_secs_f64(),
-                    error_count => Color::Red,
-                    "errors" => Color::Red,
-                );
-            } else {
-                xprintln!(
-                    "Finished {}{} {}s." => Color::Green,
-                    format!("`{}` in", stage) => Color::White,
-                    target_info,
-                    duration.as_secs_f64(),
-                );
-            }
+            xprintln!(
+                "Finished {} {}s." => Color::Green,
+                format!("`{}` in", stage) => Color::White,
+                duration.as_secs_f64(),
+            );
+            
             xprintln!();
         }
     }
 
     pub fn tokens(&self, tokens: &[Token]) {
         if self.verbosity {
-            let body = tokens
+            let tree = tokens
                 .iter()
-                .map(|token| Str::from(format!("{:?}", token)))
+                .map(|token| Str::from(format!("{:#?}", token)))
                 .collect::<Vec<Str>>()
                 .join("\n");
-            xprintln!(
-                "{}{}\n{}" => Color::White,
-                "Tokens" => Color::Blue,
-                ":" => Color::White,
-                body.indent() => Color::White
-            );
-            xprintln!();
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}{}\n{}" => Color::White,
+                    "Tokens" => Color::Cyan,
+                    ":" => Color::White,
+                    tree.indent() => Color::White
+                );
+                xprintln!();
+            }
         }
     }
 
@@ -261,14 +234,5 @@ impl Reporter {
                 xprintln!();
             }
         }
-    }
-
-    pub fn set_current(&mut self, target: String) {
-        self.current_index += 1;
-        self.current_target = Some(target);
-    }
-
-    pub fn clear_current(&mut self) {
-        self.current_target = None;
     }
 }

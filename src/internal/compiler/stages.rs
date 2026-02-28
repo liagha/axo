@@ -67,7 +67,7 @@ impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<Ini
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
         
-        logger.finish("initializing", duration, 0);
+        logger.finish("initializing", duration);
 
         (targets, self.errors.clone())
     }
@@ -101,7 +101,7 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
                 
                 compiler
                     .reporter
-                    .finish("scanning", duration, self.errors.len());
+                    .finish("scanning", duration);
 
                 (self.output.clone(), self.errors.clone())
             }
@@ -139,7 +139,7 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<Pa
         
         compiler
             .reporter
-            .finish("parsing", duration, self.errors.len());
+            .finish("parsing", duration);
 
         (self.output.clone(), self.errors.clone())
     }
@@ -180,7 +180,7 @@ impl<'resolver> Compiler<'resolver>
         let duration = Duration::from_nanos(timer.lap().unwrap());
 
         self.reporter
-            .finish("resolving", duration, self.resolver.errors.len());
+            .finish("resolving", duration);
 
         resolutions
     }
@@ -226,6 +226,6 @@ impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B>
         let duration = Duration::from_nanos(timer.lap().unwrap());
         
         reporter
-            .finish("generating", duration, self.errors.len());
+            .finish("generating", duration);
     }
 }
