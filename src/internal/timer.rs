@@ -494,6 +494,7 @@ where
     }
 
     pub fn start(&mut self) -> TimerResult<()> {
+        
         if self.state == TimerState::Running {
             return Err(TimerError::AlreadyRunning);
         }

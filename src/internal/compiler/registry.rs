@@ -1,5 +1,5 @@
 use {
-    super::{Registry, Resolver},
+    super::{Resolver},
     crate::{
         data::Str,
         parser::{Element, ElementKind, SymbolKind},
@@ -8,13 +8,7 @@ use {
     },
 };
 
-impl<'registry> Registry<'registry> {
-    pub fn new() -> Self {
-        Registry {
-            resolver: Resolver::new(),
-        }
-    }
-
+impl<'registry> Resolver<'registry> {
     fn lookup_value(
         resolver: &mut Resolver<'registry>,
         key: Str<'registry>,

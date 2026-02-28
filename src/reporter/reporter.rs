@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use {
     crate::{
         data::Str,
@@ -14,7 +15,7 @@ use {
 };
 
 pub struct Reporter {
-    verbosity: bool,
+    pub verbosity: bool,
     current_target: Option<String>,
     current_index: usize,
 }
@@ -86,6 +87,29 @@ impl Reporter {
                     format!("`{}`", stage) => Color::White,
                 );
             }
+            xprintln!();
+        }
+    }
+
+    pub fn generate(&self, kind: &str, target: &PathBuf) {
+        if self.verbosity {
+            xprintln!(
+                "Generated {} {}." => Color::Green,
+                format!("({})", kind) => Color::White,
+                format!("`{}`", target.to_string_lossy()) => Color::White
+            );
+
+            xprintln!();
+        }
+    }
+
+    pub fn run(&self, target: &PathBuf) {
+        if self.verbosity {
+            xprintln!(
+                "Running {}." => Color::Blue,
+                format!("`{}`", target.to_string_lossy()) => Color::White
+            );
+
             xprintln!();
         }
     }

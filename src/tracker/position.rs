@@ -29,12 +29,12 @@ impl<'location> Location<'location> {
         }
     }
 
-    pub fn is_ir(&self) -> bool {
+    pub fn has_extension(&self, extension: &str) -> bool {
         match self {
             Location::File(path) => Path::new(path.as_str().unwrap_or(""))
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("ll"))
+                .map(|ext| ext.eq_ignore_ascii_case(extension))
                 .unwrap_or(false),
             _ => false,
         }

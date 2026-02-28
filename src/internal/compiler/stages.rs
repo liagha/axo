@@ -1,37 +1,47 @@
 use {
-    super::{Registry, Resolver, Stage},
+    super::{Resolver, Stage},
     crate::{
         data::Str,
         generator::Backend,
+        initializer::{
+            Initializer,
+            InitialError,
+        },
         internal::{
             compiler::Compiler,
             timer::{DefaultTimer, Duration},
         },
         parser::{
+            Parser,
+            ParseError,
             Element,
-            Symbol, SymbolKind,
-            Parser
+            Symbol,
+            SymbolKind
         },
         reporter::Reporter,
         resolver::Resolution,
-        initializer::{Initializer},
-        scanner::{Scanner, Token},
+        scanner::{
+            Scanner,
+            Token,
+            ErrorKind, 
+            ScanError,
+        },
         tracker::{Location, Peekable, Position, Spanned},
     },
 };
 
-impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
+impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<InitialError<'initializer>>)>
     for Initializer<'initializer>
 {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'initializer>,
         _input: (),
-    ) -> Vec<Location<'initializer>> {
+    ) -> (Vec<Location<'initializer>>, Vec<InitialError<'initializer>>) {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
-        let verbosity = Registry::verbosity(&mut compiler.registry.resolver);
+        let verbosity = Resolver::verbosity(&mut compiler.resolver);
         let logger = Reporter::new(verbosity);
 
         logger.start("initializing");
@@ -48,26 +58,28 @@ impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
                 Symbol::new(
                     SymbolKind::Preference(preference),
                     span,
-                    compiler.registry.resolver.next_id(),
+                    compiler.resolver.next_id(),
                 )
             })
             .collect::<Vec<Symbol>>();
 
-        compiler.registry.resolver.scope.extend(preferences);
+        compiler.resolver.scope.extend(preferences);
 
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
+        let duration = Duration::from_nanos(timer.lap().unwrap());
+        
         logger.finish("initializing", duration, 0);
 
-        targets
+        (targets, self.errors.clone())
     }
 }
 
-impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Scanner<'scanner> {
+impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<ScanError<'scanner>>)> for Scanner<'scanner> {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'scanner>,
         location: Location<'scanner>,
-    ) -> Vec<Token<'scanner>> {
+    ) -> (Vec<Token<'scanner>>, Vec<ScanError<'scanner>>) 
+    {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
@@ -85,30 +97,33 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Sca
                 compiler.reporter.tokens(&self.output);
                 compiler.reporter.errors(&self.errors);
 
-                let duration = Duration::from_nanos(timer.elapsed().unwrap());
-                compiler.reporter.finish("scanning", duration, self.errors.len());
+                let duration = Duration::from_nanos(timer.lap().unwrap());
+                
+                compiler
+                    .reporter
+                    .finish("scanning", duration, self.errors.len());
 
-                self.output.clone()
+                (self.output.clone(), self.errors.clone())
             }
-            
+
             Err(error) => {
-                let kind = crate::scanner::ErrorKind::Tracking(error.clone());
-                let error = crate::scanner::ScanError::new(kind, error.span);
+                let kind = ErrorKind::Tracking(error.clone());
+                let error = ScanError::new(kind, error.span);
 
                 self.errors.push(error);
 
-                Vec::new()
+                (Vec::new(), self.errors.clone())
             }
         }
     }
 }
 
-impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Parser<'parser> {
+impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<ParseError<'parser>>)> for Parser<'parser> {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'parser>,
         tokens: Vec<Token<'parser>>,
-    ) -> Vec<Element<'parser>> {
+    ) -> (Vec<Element<'parser>>, Vec<ParseError<'parser>>) {
         let mut timer = DefaultTimer::new_default();
         _ = timer.start();
 
@@ -120,47 +135,52 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Par
         compiler.reporter.elements(&self.output);
         compiler.reporter.errors(&self.errors);
 
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
-        compiler.reporter.finish("parsing", duration, self.errors.len());
+        let duration = Duration::from_nanos(timer.lap().unwrap());
+        
+        compiler
+            .reporter
+            .finish("parsing", duration, self.errors.len());
 
-        self.output.clone()
+        (self.output.clone(), self.errors.clone())
     }
 }
 
-impl<'resolver> Stage<'resolver, Vec<Element<'resolver>>, Vec<Resolution<'resolver>>> for Resolver<'resolver> {
-    fn execute(
+impl<'resolver> Compiler<'resolver>
+{
+    pub fn execute(
         &mut self,
-        compiler: &mut Compiler<'resolver>,
         elements: Vec<Element<'resolver>>,
     ) -> Vec<Resolution<'resolver>> {
         let mut timer = DefaultTimer::new_default();
         timer.start();
 
-        compiler.reporter.start("resolving");
+        self.reporter.start("resolving");
 
-        self.symbols.clear();
-        self.with_input(elements);
+        self.resolver.symbols.clear();
+        self.resolver.with_input(elements);
 
-        let resolutions = self.process();
+        let resolutions = self.resolver.process();
 
-        let scope_symbols = self.scope.all();
+        let scope_symbols = self.resolver.scope.all();
         for symbol in scope_symbols {
-            if !self
+            if !self.resolver
                 .symbols
                 .iter()
                 .any(|(item, _)| item.brand() == symbol.brand())
             {
-                self.symbols.push((symbol, None));
+                self.resolver.symbols.push((symbol, None));
             }
         }
 
-        compiler.reporter.symbols(&self.symbols);
-        compiler.reporter.resolutions(&*resolutions);
+        self.reporter.symbols(&self.resolver.symbols);
+        self.reporter.resolutions(&*resolutions);
 
-        compiler.reporter.errors(self.errors.as_slice());
+        self.reporter.errors(self.resolver.errors.as_slice());
 
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
-        compiler.reporter.finish("resolving", duration, self.errors.len());
+        let duration = Duration::from_nanos(timer.lap().unwrap());
+
+        self.reporter
+            .finish("resolving", duration, self.resolver.errors.len());
 
         resolutions
     }
@@ -170,14 +190,12 @@ impl<'resolver> Stage<'resolver, Vec<Element<'resolver>>, Vec<Resolution<'resolv
 impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B> {
     pub fn execute(
         &mut self,
-        compiler: &mut Compiler<'resolver>,
+        timer: &mut DefaultTimer,
+        reporter: &Reporter,
         resolutions: Vec<Resolution<'resolver>>,
         output: Option<Str<'resolver>>,
     ) -> () {
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
-        compiler.reporter.start("generating");
+        reporter.start("generating");
 
         self.backend.generate(
             resolutions
@@ -203,9 +221,11 @@ impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B>
             }
         }
 
-        compiler.reporter.errors(self.errors.as_slice());
+        reporter.errors(self.errors.as_slice());
 
-        let duration = Duration::from_nanos(timer.elapsed().unwrap());
-        compiler.reporter.finish("generating", duration, self.errors.len());
+        let duration = Duration::from_nanos(timer.lap().unwrap());
+        
+        reporter
+            .finish("generating", duration, self.errors.len());
     }
 }

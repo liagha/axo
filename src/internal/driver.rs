@@ -134,7 +134,7 @@ impl Driver {
                 "LLVM_SYS_191_PREFIX",
                 "LLVM_SYS_181_PREFIX",
             ])
-                .map(|p| p.join("bin"))
+            .map(|p| p.join("bin"))
         })
     }
 

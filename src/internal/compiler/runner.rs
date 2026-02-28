@@ -1,17 +1,15 @@
 use {
-    super::{Compiler, Registry, Stage},
+    super::{Compiler, Resolver, Stage},
     crate::{
         data::Str,
+        initializer::Initializer,
         internal::{
             platform::create_dir_all,
             platform::PathBuf,
             timer::{DefaultTimer, Duration},
         },
-        initializer::{
-            Initializer,
-        },
         parser::{Element, ElementKind, Symbol, SymbolKind},
-        reporter::{Reporter},
+        reporter::Reporter,
         resolver::{
             analyzer::{symbol as analyze_symbol, Analyzer},
             checker::Type,
@@ -32,13 +30,15 @@ use {
 
 impl<'compiler> Compiler<'compiler> {
     pub fn new() -> Self {
-        let timer = DefaultTimer::new_default();
-        let registry = Registry::new();
+        let mut timer = DefaultTimer::new_default();
+        timer.start();
+
+        let resolver = Resolver::new();
         let reporter = Reporter::new(false);
 
         Compiler {
             timer,
-            registry,
+            resolver,
             reporter,
             #[cfg(feature = "generator")]
             queue: Vec::new(),
@@ -46,39 +46,24 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     pub fn compile(&mut self) {
-        let mut timer = DefaultTimer::new_default();
-        let _ = timer.start();
+        self.pipeline();
 
-        let verbosity = self.pipeline();
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-        if verbosity {
-            let duration = Duration::from_nanos(timer.elapsed().unwrap());
-            xprintln!(
-                "Finished {} {}s." => Color::Green,
-                "`compilation` in" => Color::White,
-                duration.as_secs_f64(),
-            );
-            xprintln!();
-        }
+        self.reporter.finish("compilation", duration, 0);
 
         #[cfg(feature = "generator")]
-        self.run_queue(verbosity);
+        self.run_queue();
     }
 
     #[cfg(feature = "generator")]
-    fn run_queue(&mut self, verbosity: bool) {
+    fn run_queue(&mut self) {
         if self.queue.is_empty() {
             return;
         }
 
         for binary in self.queue.clone() {
-            if verbosity {
-                xprintln!(
-                    "Running {}." => Color::Blue,
-                    format!("`{}`", binary.to_string_lossy()) => Color::White
-                );
-                xprintln!();
-            }
+            self.reporter.run(&binary);
 
             if let Err(error) = Driver::run(&binary) {
                 xprintln!(
@@ -106,9 +91,9 @@ impl<'compiler> Compiler<'compiler> {
             _ => return,
         };
 
-        let executable = Registry::binary(&mut self.registry.resolver, index);
-        let bootstrap = Registry::bootstrap(&mut self.registry.resolver);
-        let run = Registry::run(&mut self.registry.resolver);
+        let executable = Resolver::binary(&mut self.resolver, index);
+        let bootstrap = Resolver::bootstrap(&mut self.resolver);
+        let run = Resolver::run(&mut self.resolver);
         let (_, binary) = Driver::paths(target, name, None, executable);
         let should_link = run || executable.is_some();
 
@@ -152,13 +137,15 @@ impl<'compiler> Compiler<'compiler> {
     }
 
     pub fn module(&mut self, target: Location<'compiler>, index: usize) -> Symbol<'compiler> {
-        self.registry.resolver.enter();
+        self.resolver.enter();
+
+        let context = &inkwell::context::Context::create();
 
         let name = target.name();
         let span = Span::file(Str::from(target.to_string()));
-        let verbosity = Registry::verbosity(&mut self.registry.resolver);
+        let verbosity = Resolver::verbosity(&mut self.resolver);
 
-        if target.is_ir() {
+        if target.has_extension("ll") {
             #[cfg(feature = "generator")]
             self.compile_ir_input(target, index, &name, verbosity);
 
@@ -170,31 +157,31 @@ impl<'compiler> Compiler<'compiler> {
             let mut module = Symbol::new(
                 SymbolKind::Module(Module::new(Box::new(identifier))),
                 span,
-                self.registry.resolver.next_id(),
+                self.resolver.next_id(),
             );
 
-            module.set_scope(self.registry.resolver.scope.clone());
-            self.registry.resolver.exit();
-            self.registry.resolver.define(module.clone());
+            module.set_scope(self.resolver.scope.clone());
+            self.resolver.exit();
+            self.resolver.define(module.clone());
             return module;
         }
 
-        let tokens = {
+        let (tokens, scan_errors) = {
             let mut scanner = crate::scanner::Scanner::new(target);
-            scanner.execute(&mut self, target)
+            scanner.execute(self, target)
         };
 
-        let elements = {
+        let (elements, parse_errors) = {
             let mut parser = crate::parser::Parser::new(target);
-            parser.execute(&mut self, tokens)
+            parser.execute(self, tokens)
         };
 
         let mut analysis = Vec::new();
 
-        let faulty = if scan_count == 0 && parse_count == 0 {
-            let prior = self.registry.resolver.errors.len();
-            analysis = self.registry.resolver.execute(self, elements.clone());
-            self.registry.resolver.errors.len() > prior
+        let faulty = if scan_errors.len() == 0 && parse_errors.len() == 0 {
+            let prior = self.resolver.errors.len();
+            analysis = self.execute(elements.clone());
+            self.resolver.errors.len() > prior
         } else {
             true
         };
@@ -202,14 +189,13 @@ impl<'compiler> Compiler<'compiler> {
         #[cfg(feature = "generator")]
         {
             if !faulty {
-                let context = &inkwell::context::Context::create();
-                let bootstrap = Registry::bootstrap(&mut self.registry.resolver);
+                let bootstrap = Resolver::bootstrap(&mut self.resolver);
                 let backend = crate::generator::Inkwell::new(Str::from(name.clone()), context)
                     .with_bootstrap(bootstrap);
                 let mut generator = Generator::new(backend);
-                let code = Registry::code(&mut self.registry.resolver, index);
-                let executable = Registry::binary(&mut self.registry.resolver, index);
-                let run = Registry::run(&mut self.registry.resolver);
+                let code = Resolver::code(&mut self.resolver, index);
+                let executable = Resolver::binary(&mut self.resolver, index);
+                let run = Resolver::run(&mut self.resolver);
                 let should_link = run || executable.is_some();
 
                 let (code, binary) = Driver::paths(target, &name, code, executable);
@@ -228,10 +214,10 @@ impl<'compiler> Compiler<'compiler> {
                 }
 
                 let mut module_resolutions = Vec::new();
-                for symbol in self.registry.resolver.scope.all() {
+                for symbol in self.resolver.scope.all() {
                     if matches!(symbol.kind, SymbolKind::Module(_)) {
                         if let Ok(analysis) =
-                            analyze_symbol(&symbol, &self.registry.resolver, Analyzer::root())
+                            analyze_symbol(&symbol, &self.resolver, Analyzer::root())
                         {
                             module_resolutions.push(Resolution::new(
                                 None,
@@ -246,18 +232,11 @@ impl<'compiler> Compiler<'compiler> {
                     analysis = module_resolutions;
                 }
 
-                generator.execute(self, analysis, Some(output));
+                generator.execute(&mut self.timer, &self.reporter, analysis, Some(output));
 
                 if generator.errors.is_empty() {
-                    let mut link_timer = DefaultTimer::new_default();
-                    link_timer.start();
-                    if verbosity {
-                        xprintln!(
-                            "Started {}." => Color::Blue,
-                            "`linking`" => Color::White
-                        );
-                        xprintln!();
-                    }
+                    self.reporter.start("linking");
+
                     let linked = if should_link {
                         match Driver::link(&code, &binary, bootstrap) {
                             Ok(()) => true,
@@ -276,27 +255,12 @@ impl<'compiler> Compiler<'compiler> {
                     };
 
                     if linked && verbosity {
-                        xprintln!(
-                            "Generated {} {}." => Color::Green,
-                            "(IR)" => Color::White,
-                            format!("`{}`", code.to_string_lossy()) => Color::White
-                        );
-                        xprintln!();
+                        self.reporter.generate("IR", &code);
+                        self.reporter.generate("executable", &binary);
 
-                        xprintln!(
-                            "Generated {} {}." => Color::Green,
-                            "(executable)" => Color::White,
-                            format!("`{}`", binary.to_string_lossy()) => Color::White
-                        );
-                        xprintln!();
+                        let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-                        let duration = Duration::from_nanos(link_timer.elapsed().unwrap());
-                        xprintln!(
-                            "Finished {} in {}s." => Color::Green,
-                            "`linking`" => Color::White,
-                            duration.as_secs_f64(),
-                        );
-                        xprintln!();
+                        self.reporter.finish("linking", duration, 0);
                     }
 
                     if linked && run {
@@ -314,24 +278,27 @@ impl<'compiler> Compiler<'compiler> {
         let mut module = Symbol::new(
             SymbolKind::Module(Module::new(Box::new(identifier))),
             span,
-            self.registry.resolver.next_id(),
+            self.resolver.next_id(),
         );
 
-        module.set_scope(self.registry.resolver.scope.clone());
+        module.set_scope(self.resolver.scope.clone());
 
-        self.registry.resolver.exit();
-        self.registry.resolver.define(module.clone());
+        self.resolver.exit();
+        self.resolver.define(module.clone());
 
         module
     }
 
-    fn pipeline(&mut self) -> bool {
-        let targets = {
+    fn pipeline(&mut self) {
+        let (targets, initial_errors) = {
             let mut initializer = Initializer::new(Location::Flag);
             initializer.execute(self, ())
         };
 
-        let verbosity = Registry::verbosity(&mut self.registry.resolver);
+        let verbosity = Resolver::verbosity(&mut self.resolver);
+
+        self.reporter.verbosity = verbosity;
+
         let mut logger = Reporter::new(verbosity);
 
         for (index, target) in targets.into_iter().enumerate() {
@@ -339,14 +306,5 @@ impl<'compiler> Compiler<'compiler> {
             self.module(target, index);
             logger.clear_current();
         }
-
-        verbosity
-    }
-
-    pub fn with<Function, Type>(&mut self, pipeline: Function) -> Type
-    where
-        Function: FnOnce(&mut Self) -> Type,
-    {
-        pipeline(self)
     }
 }

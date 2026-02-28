@@ -30,12 +30,12 @@ pub mod platform {
         ffi::{OsStr, OsString},
         fs::{canonicalize, create_dir_all, read_dir, read_to_string, File},
         io::{
-            stdin, stderr, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
+            stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
             StdoutLock, Write,
         },
         path::{Path, PathBuf},
-        ptr::{null, NonNull},
         process::Command,
+        ptr::{null, NonNull},
         sync::OnceLock,
     };
 }
