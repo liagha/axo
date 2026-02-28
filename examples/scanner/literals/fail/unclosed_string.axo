@@ -1,0 +1,2 @@
+const bad = 3 § 4
+print(bad)

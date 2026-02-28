@@ -1,0 +1,2 @@
+const line: String = read_line()
+print(line)

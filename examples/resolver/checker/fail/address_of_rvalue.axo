@@ -1,0 +1,2 @@
+const ptr = &(1 + 2)
+print(ptr)

@@ -1,0 +1,7 @@
+const somev: Option = Some(Integer, 7)
+const nonev: Option = None(Integer, 0)
+
+print(is_some(somev))
+print(is_none(nonev))
+print(or_else(somev, 1))
+print(unwrap(somev))

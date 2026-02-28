@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PREFIX_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_DIR="$(cd "${PREFIX_DIR}/.." && pwd)"
+REAL_LLVM_CONFIG="${REAL_LLVM_CONFIG:-llvm-config-19}"
+TARGET_TRIPLE="${TARGET:-}"
+
+target_dir() {
+  case "${TARGET_TRIPLE}" in
+    x86_64-unknown-linux-gnu) echo "x86_64-linux" ;;
+    aarch64-unknown-linux-gnu) echo "aarch64-linux" ;;
+    x86_64-apple-darwin) echo "x86_64-macos" ;;
+    aarch64-apple-darwin) echo "aarch64-macos" ;;
+    *) echo "" ;;
+  esac
+}
+
+if ! command -v "${REAL_LLVM_CONFIG}" >/dev/null 2>&1; then
+  echo "missing ${REAL_LLVM_CONFIG}" >&2
+  exit 1
+fi
+
+TARGET_DIR="$(target_dir)"
+if [[ -z "${TARGET_DIR}" ]]; then
+  echo "unsupported target: ${TARGET_TRIPLE:-unknown}. set TARGET explicitly." >&2
+  exit 1
+fi
+
+AXO_LLVM_DIR="${REPO_DIR}/llvm/${TARGET_DIR}"
+AXO_LIB_DIR="${AXO_LLVM_DIR}/lib"
+
+if [[ ! -d "${AXO_LIB_DIR}" ]]; then
+  echo "llvm libs not found at ${AXO_LIB_DIR}" >&2
+  exit 1
+fi
+
+args=("$@")
+
+if [[ "${#args[@]}" -eq 1 && "${args[0]}" == "--libdir" ]]; then
+  echo "${AXO_LIB_DIR}"
+  exit 0
+fi
+
+if [[ "${#args[@]}" -eq 2 && "${args[0]}" == "--libnames" && "${args[1]}" == "--link-static" ]]; then
+  raw="$("${REAL_LLVM_CONFIG}" "${args[@]}")"
+  filtered=()
+  for lib in ${raw}; do
+    if [[ -f "${AXO_LIB_DIR}/${lib}" ]]; then
+      filtered+=("${lib}")
+    fi
+  done
+  printf '%s\n' "${filtered[*]}"
+  exit 0
+fi
+
+"${REAL_LLVM_CONFIG}" "${args[@]}"

@@ -1,0 +1,3 @@
+const ptr = alloc(8)
+const broken = ptr + true
+print(broken)

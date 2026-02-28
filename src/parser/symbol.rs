@@ -1,0 +1,228 @@
+use {
+    super::{Element, ElementKind},
+    crate::{
+        data::{Boolean, Identity},
+        format::{Debug, Formatter, Result as FormatResult},
+        initializer::Preference,
+        internal::hash::{Hash, Set},
+        resolver::scope::Scope,
+        scanner::{OperatorKind, Token, TokenKind},
+        schema::*,
+        tracker::Span,
+    },
+};
+
+pub struct Symbol<'symbol> {
+    pub id: Identity,
+    pub usages: Set<Identity>,
+    pub kind: SymbolKind<'symbol>,
+    pub span: Span<'symbol>,
+    pub scope: Scope<'symbol>,
+    pub generic: Scope<'symbol>,
+    pub specifier: Specifier,
+}
+
+#[derive(Clone, Copy)]
+pub struct Specifier {
+    pub entry: Boolean,
+    pub interface: Interface,
+    pub visibility: Visibility,
+}
+
+impl Debug for Specifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
+        write!(f, "{:?}", self.visibility)?;
+
+        if self.entry {
+            write!(f, ", Entry")?;
+        }
+
+        write!(f, ", {:?}", self.interface)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Interface {
+    C,
+    Rust,
+    Axo,
+    Compiler,
+}
+
+impl Specifier {
+    pub fn apply(&mut self, application: Element<'_>) {
+        match application.kind {
+            ElementKind::Literal(Token {
+                kind: TokenKind::Identifier(identifier),
+                ..
+            }) => match identifier.as_str().unwrap() {
+                "public" => {
+                    self.visibility = Visibility::Public;
+                }
+
+                "private" => {
+                    self.visibility = Visibility::Private;
+                }
+
+                "c" => {
+                    self.interface = Interface::C;
+                }
+
+                "rust" => {
+                    self.interface = Interface::Rust;
+                }
+
+                "axo" => {
+                    self.interface = Interface::Axo;
+                }
+
+                "compiler" => {
+                    self.interface = Interface::Compiler;
+                }
+
+                "entry" => {
+                    self.entry = true;
+                }
+
+                _ => {}
+            },
+
+            _ => {}
+        }
+    }
+}
+
+impl Default for Specifier {
+    fn default() -> Self {
+        Self {
+            entry: false,
+            interface: Interface::Axo,
+            visibility: Visibility::Public,
+        }
+    }
+}
+
+impl<'symbol> Symbol<'symbol> {
+    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>, id: Identity) -> Self {
+        Self {
+            id,
+            usages: Default::default(),
+            kind: value,
+            span,
+            scope: Scope::new(),
+            generic: Scope::new(),
+            specifier: Specifier::default(),
+        }
+    }
+
+    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
+        Self {
+            scope: Scope {
+                symbols: Set::from_iter(members),
+                parent: None,
+            },
+            id: self.id,
+            ..self
+        }
+    }
+
+    pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
+        self.scope.symbols.extend(members);
+    }
+
+    pub fn with_scope(self, scope: Scope<'symbol>) -> Self {
+        Self {
+            scope,
+            id: self.id,
+            ..self
+        }
+    }
+
+    pub fn set_scope(&mut self, scope: Scope<'symbol>) {
+        self.scope = scope;
+    }
+
+    pub fn with_generic(self, generic: Scope<'symbol>) -> Self {
+        Self {
+            generic,
+            id: self.id,
+            ..self
+        }
+    }
+
+    pub fn set_generic(&mut self, generic: Scope<'symbol>) {
+        self.generic = generic;
+    }
+
+    pub fn with_specifier(self, specifier: Specifier) -> Self {
+        Self { specifier, ..self }
+    }
+
+    pub fn brand(&self) -> Option<Token<'symbol>> {
+        self.kind.brand()
+    }
+}
+
+#[derive(Clone, PartialEq, Hash)]
+pub enum SymbolKind<'symbol> {
+    Inclusion(Inclusion<Box<Element<'symbol>>, Identity>),
+    Extension(Extension<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>>),
+    Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
+    Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Method(
+        Method<
+            Box<Element<'symbol>>,
+            Symbol<'symbol>,
+            Box<Element<'symbol>>,
+            Option<Box<Element<'symbol>>>,
+        >,
+    ),
+    Module(Module<Box<Element<'symbol>>>),
+    Preference(Preference<'symbol>),
+}
+
+impl<'symbol> SymbolKind<'symbol> {
+    pub fn brand(&self) -> Option<Token<'symbol>> {
+        match self {
+            SymbolKind::Inclusion(inclusion) => inclusion.target.clone().brand(),
+            SymbolKind::Extension(extension) => extension.target.clone().brand(),
+            SymbolKind::Binding(binding) => binding.target.clone().brand(),
+            SymbolKind::Structure(structure) => structure.target.clone().brand(),
+            SymbolKind::Enumeration(enumeration) => enumeration.target.clone().brand(),
+            SymbolKind::Method(method) => method.target.clone().brand(),
+            SymbolKind::Module(module) => module.target.brand().clone(),
+            SymbolKind::Preference(preference) => Some(preference.target.clone()),
+        }
+    }
+}
+
+impl<'symbol> Element<'symbol> {
+    pub fn brand(&self) -> Option<Token<'symbol>> {
+        match &self.kind {
+            ElementKind::Literal(literal) => Some(literal.clone()),
+            ElementKind::Construct(construct) => construct.target.brand(),
+            ElementKind::Index(index) => index.target.brand(),
+            ElementKind::Invoke(invoke) => invoke.target.brand(),
+            ElementKind::Symbolize(symbol) => symbol.brand(),
+            ElementKind::Binary(binary) => match binary.operator.kind {
+                TokenKind::Operator(OperatorKind::Colon) => binary.left.brand().clone(),
+                TokenKind::Operator(OperatorKind::Composite(ref operators))
+                    if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
+                {
+                    binary.right.brand().clone()
+                }
+                TokenKind::Operator(OperatorKind::Equal) => binary.left.brand().clone(),
+                TokenKind::Operator(OperatorKind::Dot) => binary.right.brand().clone(),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}

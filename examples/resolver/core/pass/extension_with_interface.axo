@@ -1,0 +1,14 @@
+struct NumberBox {
+    const value: Integer,
+}
+
+struct Displayable {
+    const marker: Integer,
+}
+
+extend NumberBox: Displayable {
+    func value_of(const this: NumberBox): Integer this.value
+}
+
+const box: NumberBox = NumberBox { value = 7 }
+print(box.value)

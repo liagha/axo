@@ -1,0 +1,2 @@
+const line = read_line("bad")
+print(line)

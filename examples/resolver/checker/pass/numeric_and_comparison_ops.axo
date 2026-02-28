@@ -1,0 +1,16 @@
+const a = 9
+const b = 4
+const add = a + b
+const sub = a - b
+const mul = a * b
+const div = a / b
+const rem = a % b
+const cmp1 = a > b
+const cmp2 = a <= b
+print(add)
+print(sub)
+print(mul)
+print(div)
+print(rem)
+print(cmp1)
+print(cmp2)

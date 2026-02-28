@@ -1,0 +1,30 @@
+use crate::{
+    format::{self, Debug, Display, Formatter},
+    parser::ParseError,
+};
+use crate::tracker::TrackError;
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub enum ErrorKind<'error> {
+    Tracking(TrackError<'error>),
+    ArgumentParse(ParseError<'error>),
+}
+
+impl<'error> Display for ErrorKind<'error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
+        match self {
+            ErrorKind::Tracking(tracker) => {
+                write!(f, "failed to track: {}", tracker)
+            },
+            ErrorKind::ArgumentParse(e) => {
+                write!(f, "failed to parse arguments: {}.", e)
+            }
+        }
+    }
+}
+
+impl<'error> Debug for ErrorKind<'error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
+        write!(f, "{}", self)
+    }
+}

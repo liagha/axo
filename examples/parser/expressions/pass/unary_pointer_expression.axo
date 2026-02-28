@@ -1,0 +1,4 @@
+var value = 41
+const ptr = &value
+const current = *ptr
+print(current)

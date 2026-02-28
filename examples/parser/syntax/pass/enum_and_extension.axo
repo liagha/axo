@@ -1,0 +1,10 @@
+struct Counter {
+    const value: Integer,
+}
+
+extend Counter {
+    func next(const this: Counter): Counter this
+}
+
+const c: Counter = Counter { value = 1 }
+print(c.value)

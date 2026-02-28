@@ -1,0 +1,10 @@
+const a = 10
+const b = 3
+const c = (a + b) * (a - b)
+const d = a % b
+const e = a >= b
+const f = (a > b) && (b < a)
+print(c)
+print(d)
+print(e)
+print(f)

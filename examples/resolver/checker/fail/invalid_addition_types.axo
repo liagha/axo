@@ -1,0 +1,2 @@
+const bad = true + 1
+print(bad)

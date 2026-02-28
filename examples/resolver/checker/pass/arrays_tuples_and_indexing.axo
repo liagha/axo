@@ -1,0 +1,6 @@
+const xs = [10, 20, 30]
+const pair = (4, 9)
+const a = xs[1]
+const b = pair[0]
+print(a)
+print(b)

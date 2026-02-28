@@ -1,0 +1,4 @@
+// scanner should handle comments and spacing
+const a = 1 // inline comment
+const b = 2
+print(a + b)

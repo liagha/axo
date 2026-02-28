@@ -1,0 +1,3 @@
+const ptr: *i8 = alloc(8)
+free(ptr, 8)
+print("ok")

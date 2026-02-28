@@ -1,0 +1,10 @@
+const simple = "line\nbreak"
+const hex = "\x41"
+const oct = "\101"
+const uni = "\u{03A9}"
+const ch = '\n'
+print(simple)
+print(hex)
+print(oct)
+print(uni)
+print(ch)

@@ -1,0 +1,39 @@
+[package]
+name = "axo"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[features]
+default = [
+    "internal",
+    "formation",
+    "initial", "scanner",
+    "parser", "resolver",
+    "generator",
+]
+formation = []
+internal = [
+    "formation",
+    "initial", "scanner",
+    "parser", "resolver",
+    "generator",
+]
+initial = ["formation", "scanner", "parser"]
+scanner = ["formation"]
+parser = ["formation", "scanner"]
+resolver = ["scanner", "parser", "matchete"]
+generator = ["resolver", "inkwell"]
+
+[dependencies]
+broccli = { version = "0.0.22" }
+hashish = { version = "0.0.1" }
+log = { version = "0.4.27"}
+matchete = { version = "0.0.36", optional = true }
+walkdir = { version = "2.5.0" }
+inkwell = { version = "0.8.0", features = ["llvm19-1-prefer-static"], optional = true }
+
+[workspace]
+members = [
+    ".",
+]

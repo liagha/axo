@@ -1,0 +1,7 @@
+const i: Integer = Int64(42)
+const f: Float = Float(i)
+const s: String = String("ok")
+const n: Integer = len(s)
+print(i)
+print(f)
+print(n)

@@ -1,0 +1,157 @@
+use {
+    super::{analyzer::Analysis, checker::Type, scope::Scope, ResolveError},
+    crate::{
+        data::{memory::replace, Boolean, Identity, Str},
+        format::Debug,
+        parser::{Element, ElementKind, Symbol},
+        scanner::Token,
+    },
+};
+
+#[derive(Clone, Debug)]
+pub struct Resolution<'resolution> {
+    pub reference: Option<Identity>,
+    pub typed: Type<'resolution>,
+    pub analysis: Analysis<'resolution>,
+}
+
+impl<'resolution> Resolution<'resolution> {
+    pub fn new(
+        reference: Option<Identity>,
+        typed: Type<'resolution>,
+        analysis: Analysis<'resolution>,
+    ) -> Self {
+        Self {
+            reference,
+            typed,
+            analysis,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Inference<'inference> {
+    pub target: Token<'inference>,
+    pub declared: Option<Type<'inference>>,
+    pub inferred: Option<Type<'inference>>,
+}
+
+impl<'inference> Inference<'inference> {
+    pub fn new(
+        target: Token<'inference>,
+        declared: Option<Type<'inference>>,
+        inferred: Option<Type<'inference>>,
+    ) -> Self {
+        Self {
+            target,
+            declared,
+            inferred,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Resolver<'resolver> {
+    pub counter: Identity,
+    pub scope: Scope<'resolver>,
+    pub input: Vec<Element<'resolver>>,
+    pub output: Vec<Resolution<'resolver>>,
+    pub errors: Vec<ResolveError<'resolver>>,
+    pub symbols: Vec<(Symbol<'resolver>, Option<Inference<'resolver>>)>,
+}
+
+impl Clone for Resolver<'_> {
+    fn clone(&self) -> Self {
+        Self {
+            counter: self.counter,
+            scope: self.scope.clone(),
+            input: self.input.clone(),
+            output: self.output.clone(),
+            errors: self.errors.clone(),
+            symbols: self.symbols.clone(),
+        }
+    }
+}
+
+pub trait Resolvable<'resolvable> {
+    fn resolve(
+        &self,
+        resolver: &mut Resolver<'resolvable>,
+    ) -> Result<Resolution<'resolvable>, Vec<ResolveError<'resolvable>>>;
+    fn is_instance(&self, resolver: &mut Resolver<'resolvable>) -> Boolean;
+}
+
+impl<'resolver> Resolver<'resolver> {
+    pub fn new() -> Self {
+        Self {
+            counter: 0,
+            scope: Scope::new(),
+            input: Vec::new(),
+            output: Vec::new(),
+            errors: Vec::new(),
+            symbols: Vec::new(),
+        }
+    }
+
+    pub fn with_input(&mut self, input: Vec<Element<'resolver>>) {
+        self.input = input;
+    }
+
+    pub fn enter(&mut self) {
+        let parent = replace(&mut self.scope, Scope::new());
+        self.scope.attach(parent);
+    }
+
+    pub fn enter_scope(&mut self, scope: Scope<'resolver>) {
+        let parent = replace(&mut self.scope, scope);
+        self.scope.attach(parent);
+    }
+
+    pub fn exit(&mut self) {
+        if let Some(parent) = self.scope.detach() {
+            self.scope = parent;
+        }
+    }
+
+    pub fn define(&mut self, symbol: Symbol<'resolver>) {
+        self.scope.add(symbol);
+    }
+
+    pub fn next_id(&mut self) -> Identity {
+        let id = self.counter;
+        self.counter += 1;
+        id
+    }
+
+    pub fn process(&mut self) -> Vec<Resolution<'resolver>> {
+        self.prepare();
+        self.symbols.clear();
+
+        let mut output = Vec::new();
+
+        for element in self.input.clone() {
+            match element.resolve(self) {
+                Ok(resolution) => {
+                    output.push(resolution);
+                }
+                Err(errors) => {
+                    self.errors.extend(errors);
+                }
+            }
+        }
+
+        self.output = output.clone();
+
+        output
+    }
+
+    pub fn prepare(&mut self) {
+        for index in 0..self.input.len() {
+            if let ElementKind::Symbolize(symbol) = self.input[index].kind.clone() {
+                if let Err(errors) = symbol.resolve(self) {
+                    self.errors.extend(errors);
+                }
+            }
+        }
+    }
+}

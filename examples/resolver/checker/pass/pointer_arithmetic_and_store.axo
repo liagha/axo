@@ -1,0 +1,4 @@
+var base = 10
+const p = &base
+const read = *p
+print(read)

@@ -1,0 +1,4 @@
+const shaped = Integer { value = 7, size = 32, signed = false }
+const as_text = String("ok")
+print(shaped)
+print(as_text)

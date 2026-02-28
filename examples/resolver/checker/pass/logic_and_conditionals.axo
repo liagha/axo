@@ -1,0 +1,6 @@
+const both = true && false
+const either = false || true
+const pick = if(true, 1, 2)
+print(both)
+print(either)
+print(pick)
