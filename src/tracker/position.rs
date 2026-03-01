@@ -25,10 +25,10 @@ impl<'location> Location<'location> {
     pub fn to_path(&self) -> Result<PathBuf, TrackError<'location>> {
         match self {
             Location::Entry(path) => {
-                let path = PathBuf::from(path.as_str().unwrap());
+                let path = PathBuf::from(path);
 
-                if path.exists() {
-                    Ok(path)
+                if path.clone().exists() {
+                    Ok(path.clone())
                 } else {
                     let kind = ErrorKind::NotFound;
 

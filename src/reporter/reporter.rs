@@ -222,21 +222,27 @@ impl Reporter {
         }
     }
 
+    pub fn error<K, H>(&self, error: &Error<K, H>)
+    where
+        K: Clone + Display,
+        H: Clone + Display,
+    {
+        let (message, details) = error.handle();
+        xprintln!(
+                    "{}\n{}" => Color::Red,
+                    message => Color::White,
+                    details => Color::White
+                );
+        xprintln!();
+    }
+
     pub fn errors<K, H>(&self, errors: &[Error<K, H>])
     where
         K: Clone + Display,
         H: Clone + Display,
     {
-        if !errors.is_empty() {
-            for error in errors {
-                let (message, details) = error.handle();
-                xprintln!(
-                    "{}\n{}" => Color::Red,
-                    message => Color::White,
-                    details => Color::White
-                );
-                xprintln!();
-            }
+        for error in errors {
+            self.error(&error);
         }
     }
 }

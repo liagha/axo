@@ -88,14 +88,12 @@ impl<'scanner> Scanner<'scanner> {
 
     pub fn scan(&mut self) {
         let location = self.position.location;
-        
+
         match location.get_value() {
             Ok(content) => {
                 let characters =
                     Scanner::inspect(Position::new(location), content.chars().collect::<Vec<_>>());
                 self.set_input(characters);
-
-                self.scan();
             }
 
             Err(error) => {

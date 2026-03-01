@@ -220,18 +220,18 @@ impl<'backend> super::Inkwell<'backend> {
     }
 
     fn runtime_strlen_function(&mut self) -> FunctionValue<'backend> {
-        if let Some(function) = self.module.get_function("axo_strlen") {
+        if let Some(function) = self.module.get_function("strlen") {
             return function;
         }
 
         let pointer = self.context.ptr_type(inkwell::AddressSpace::default());
         let function = self.module.add_function(
-            "axo_strlen",
+            "strlen",
             self.context.i64_type().fn_type(&[pointer.into()], false),
             None,
         );
         self.entities
-            .insert(Str::from("axo_strlen"), Entity::Function(function));
+            .insert(Str::from("strlen"), Entity::Function(function));
 
         let caller_block = self.builder.get_insert_block();
         let entry = self.context.append_basic_block(function, "entry");
@@ -306,11 +306,11 @@ impl<'backend> super::Inkwell<'backend> {
         let array_type = self.context.i8_type().array_type(4096);
         let global = self
             .module
-            .get_global("axo_read_line_buffer")
+            .get_global("read_line_buffer")
             .unwrap_or_else(|| {
                 let global = self
                     .module
-                    .add_global(array_type, None, "axo_read_line_buffer");
+                    .add_global(array_type, None, "read_line_buffer");
                 global.set_initializer(&array_type.const_zero());
                 global
             });
@@ -324,7 +324,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i32_type().const_zero(),
                         self.context.i32_type().const_zero(),
                     ],
-                    "axo_read_line_buffer_ptr",
+                    "read_line_buffer_ptr",
                 )
                 .unwrap()
         }
@@ -470,20 +470,20 @@ impl<'backend> super::Inkwell<'backend> {
         key: Str<'backend>,
     ) -> FunctionValue<'backend> {
         match symbol {
-            "axo_print_raw" => self.runtime_print_raw_function(symbol, key, 1),
-            "axo_eprint_raw" => self.runtime_print_raw_function(symbol, key, 2),
-            "axo_println" => self.runtime_println_function(
+            "print_raw" => self.runtime_print_raw_function(symbol, key, 1),
+            "eprint_raw" => self.runtime_print_raw_function(symbol, key, 2),
+            "println" => self.runtime_println_function(
                 symbol,
                 key,
-                "axo_print_raw",
-                Str::from("axo_print_raw"),
+                "print_raw",
+                Str::from("print_raw"),
                 1,
             ),
-            "axo_eprintln" => self.runtime_println_function(
+            "eprintln" => self.runtime_println_function(
                 symbol,
                 key,
-                "axo_eprint_raw",
-                Str::from("axo_eprint_raw"),
+                "eprint_raw",
+                Str::from("eprint_raw"),
                 2,
             ),
             _ => self.runtime_print_raw_function(symbol, key, 1),
@@ -491,16 +491,16 @@ impl<'backend> super::Inkwell<'backend> {
     }
 
     fn runtime_read_line_function(&mut self) -> FunctionValue<'backend> {
-        if let Some(function) = self.module.get_function("axo_read_line") {
+        if let Some(function) = self.module.get_function("read_line") {
             return function;
         }
 
         let pointer = self.context.ptr_type(inkwell::AddressSpace::default());
         let function = self
             .module
-            .add_function("axo_read_line", pointer.fn_type(&[], false), None);
+            .add_function("read_line", pointer.fn_type(&[], false), None);
         self.entities
-            .insert(Str::from("axo_read_line"), Entity::Function(function));
+            .insert(Str::from("read_line"), Entity::Function(function));
 
         let caller_block = self.builder.get_insert_block();
         let entry = self.context.append_basic_block(function, "entry");
@@ -672,9 +672,9 @@ impl<'backend> super::Inkwell<'backend> {
         let array_type = self.context.i8_type().array_type(64);
         let global = self
             .module
-            .get_global("axo_i64_print_buffer")
+            .get_global("i64_print_buffer")
             .unwrap_or_else(|| {
-                let global = self.module.add_global(array_type, None, "axo_i64_print_buffer");
+                let global = self.module.add_global(array_type, None, "i64_print_buffer");
                 global.set_initializer(&array_type.const_zero());
                 global
             });
@@ -688,7 +688,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i32_type().const_zero(),
                         self.context.i32_type().const_zero(),
                     ],
-                    "axo_i64_print_buffer_ptr",
+                    "i64_print_buffer_ptr",
                 )
                 .unwrap()
         }
@@ -698,9 +698,9 @@ impl<'backend> super::Inkwell<'backend> {
         let array_type = self.context.i8_type().array_type(128);
         let global = self
             .module
-            .get_global("axo_f64_print_buffer")
+            .get_global("f64_print_buffer")
             .unwrap_or_else(|| {
-                let global = self.module.add_global(array_type, None, "axo_f64_print_buffer");
+                let global = self.module.add_global(array_type, None, "f64_print_buffer");
                 global.set_initializer(&array_type.const_zero());
                 global
             });
@@ -714,14 +714,14 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i32_type().const_zero(),
                         self.context.i32_type().const_zero(),
                     ],
-                    "axo_f64_print_buffer_ptr",
+                    "f64_print_buffer_ptr",
                 )
                 .unwrap()
         }
     }
 
     fn runtime_i64_to_string_function(&mut self) -> FunctionValue<'backend> {
-        if let Some(function) = self.module.get_function("axo_i64_to_string") {
+        if let Some(function) = self.module.get_function("i64_to_string") {
             return function;
         }
 
@@ -732,9 +732,9 @@ impl<'backend> super::Inkwell<'backend> {
 
         let function = self
             .module
-            .add_function("axo_i64_to_string", pointer.fn_type(&[i64_type.into()], false), None);
+            .add_function("i64_to_string", pointer.fn_type(&[i64_type.into()], false), None);
         self.entities
-            .insert(Str::from("axo_i64_to_string"), Entity::Function(function));
+            .insert(Str::from("i64_to_string"), Entity::Function(function));
 
         let caller_block = self.builder.get_insert_block();
         let entry = self.context.append_basic_block(function, "entry");
@@ -985,7 +985,7 @@ impl<'backend> super::Inkwell<'backend> {
     }
 
     fn runtime_f64_to_string_function(&mut self) -> FunctionValue<'backend> {
-        if let Some(function) = self.module.get_function("axo_f64_to_string") {
+        if let Some(function) = self.module.get_function("f64_to_string") {
             return function;
         }
 
@@ -994,9 +994,9 @@ impl<'backend> super::Inkwell<'backend> {
         let pointer = self.context.ptr_type(inkwell::AddressSpace::default());
         let function = self
             .module
-            .add_function("axo_f64_to_string", pointer.fn_type(&[self.context.f64_type().into()], false), None);
+            .add_function("f64_to_string", pointer.fn_type(&[self.context.f64_type().into()], false), None);
         self.entities
-            .insert(Str::from("axo_f64_to_string"), Entity::Function(function));
+            .insert(Str::from("f64_to_string"), Entity::Function(function));
 
         let caller_block = self.builder.get_insert_block();
         let entry = self.context.append_basic_block(function, "entry");
@@ -1325,10 +1325,10 @@ impl<'backend> super::Inkwell<'backend> {
                     self.emit_pointer_io(symbol, key, bool_str)
                 } else {
                     self.emit_pointer_io(
-                        if symbol == "axo_println" {
-                            "axo_print_raw"
-                        } else if symbol == "axo_eprintln" {
-                            "axo_eprint_raw"
+                        if symbol == "println" {
+                            "print_raw"
+                        } else if symbol == "eprintln" {
+                            "eprint_raw"
                         } else {
                             symbol
                         },
@@ -2040,8 +2040,8 @@ impl<'backend> super::Inkwell<'backend> {
 
         if name == "print" {
             return self.emit_value_io(
-                "axo_println",
-                Str::from("axo_println"),
+                "println",
+                Str::from("println"),
                 &invoke.members,
                 function,
                 true,
@@ -2050,8 +2050,8 @@ impl<'backend> super::Inkwell<'backend> {
 
         if name == "print_raw" {
             return self.emit_value_io(
-                "axo_print_raw",
-                Str::from("axo_print_raw"),
+                "print_raw",
+                Str::from("print_raw"),
                 &invoke.members,
                 function,
                 false,
@@ -2060,8 +2060,8 @@ impl<'backend> super::Inkwell<'backend> {
 
         if name == "eprint" {
             return self.emit_value_io(
-                "axo_eprintln",
-                Str::from("axo_eprintln"),
+                "eprintln",
+                Str::from("eprintln"),
                 &invoke.members,
                 function,
                 true,
@@ -2070,8 +2070,8 @@ impl<'backend> super::Inkwell<'backend> {
 
         if name == "eprint_raw" {
             return self.emit_value_io(
-                "axo_eprint_raw",
-                Str::from("axo_eprint_raw"),
+                "eprint_raw",
+                Str::from("eprint_raw"),
                 &invoke.members,
                 function,
                 false,

@@ -28,15 +28,16 @@ use {
         tracker::{Location, Peekable, Position, Spanned},
     },
 };
+use crate::internal::compiler::CompileError;
 
-impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<InitializeError<'initializer>>)>
+impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
     for Initializer<'initializer>
 {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'initializer>,
         _input: (),
-    ) -> (Vec<Location<'initializer>>, Vec<InitializeError<'initializer>>) {
+    ) -> Vec<Location<'initializer>> {
         let verbosity = Resolver::verbosity(&mut compiler.resolver);
         let logger = Reporter::new(verbosity);
 
@@ -65,16 +66,16 @@ impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<Ini
         
         logger.finish("initializing", duration);
 
-        (targets, self.errors.clone())
+        targets
     }
 }
 
-impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<ScanError<'scanner>>)> for Scanner<'scanner> {
+impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Scanner<'scanner> {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'scanner>,
         location: Location<'scanner>,
-    ) -> (Vec<Token<'scanner>>, Vec<ScanError<'scanner>>) 
+    ) -> Vec<Token<'scanner>> 
     {
         self.set_location(location);
         compiler.reporter.start("scanning");
@@ -82,7 +83,6 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
         self.scan();
 
         compiler.reporter.tokens(&self.output);
-        compiler.reporter.errors(&self.errors);
 
         let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
 
@@ -90,23 +90,31 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
             .reporter
             .finish("scanning", duration);
 
-        (self.output.clone(), self.errors.clone())
+        compiler.errors.extend(
+            self
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Scan(error.clone())
+                })
+        );
+
+        self.output.clone()
     }
 }
 
-impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<ParseError<'parser>>)> for Parser<'parser> {
+impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Parser<'parser> {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'parser>,
         tokens: Vec<Token<'parser>>,
-    ) -> (Vec<Element<'parser>>, Vec<ParseError<'parser>>) {
+    ) -> Vec<Element<'parser>> {
         compiler.reporter.start("parsing");
 
         self.set_input(tokens);
         self.parse();
 
         compiler.reporter.elements(&self.output);
-        compiler.reporter.errors(&self.errors);
 
         let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
         
@@ -114,7 +122,16 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<Pa
             .reporter
             .finish("parsing", duration);
 
-        (self.output.clone(), self.errors.clone())
+        compiler.errors.extend(
+            self
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Parse(error.clone())
+                })
+        );
+
+        self.output.clone()
     }
 }
 
@@ -145,12 +162,19 @@ impl<'resolver> Compiler<'resolver>
         self.reporter.symbols(&self.resolver.symbols);
         self.reporter.resolutions(&*resolutions);
 
-        self.reporter.errors(self.resolver.errors.as_slice());
-
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter
             .finish("resolving", duration);
+
+        self.errors.extend(
+            self.resolver
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Resolve(error.clone())
+                })
+        );
 
         resolutions
     }

@@ -178,6 +178,8 @@ impl<'initializer> Initializer<'initializer> {
 
         scanner.set_location(location);
 
+        scanner.scan();
+
         self.input = scanner.output;
 
         let strained = {
