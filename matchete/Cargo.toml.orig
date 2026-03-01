@@ -1,0 +1,13 @@
+[package]
+name = "matchete"
+version = "0.0.36"
+edition = "2021"
+authors = ["Ali Aghaahmadi <itsaliaghaahmadi@gmail.com>"]
+description = "A fast and flexible matcher for comparing and diffing data structures."
+repository = "https://github.com/liagha/matchete"
+license = "MIT OR Apache-2.0"
+keywords = ["matcher", "cmp", "data", "pattern", "rust"]
+categories = ["development-tools", "parsing"]
+
+[dependencies]
+hashish = { version = "0.0.1" }

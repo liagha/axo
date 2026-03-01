@@ -1,0 +1,5 @@
+func test(const a: Int, const b:Int): Int {
+    return(a + b)
+}
+
+print(test(2, 3))
