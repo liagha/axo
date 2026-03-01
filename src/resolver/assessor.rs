@@ -10,7 +10,6 @@ use {
     matchete::{string::*, Assessment, Assessor, Resemblance, Resembler, Scheme},
 };
 
-#[derive(Debug)]
 pub struct Aligner<'aligner> {
     pub assessor: Assessor<'aligner, String, String, ()>,
     pub perfection: Range<f64>,
@@ -152,11 +151,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     }
                 } else if self.suggestion.contains(&score) {
                     let dominant = self.assessor.dominant();
-                    let how = if let Some(d) = dominant {
-                        format!("{:?}", d.resembler)
-                    } else {
-                        "are similar".to_string()
-                    };
+                    let how = "are similar".to_string();
 
                     Assessment {
                         resemblance: Resemblance::Disparity,
