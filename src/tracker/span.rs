@@ -33,7 +33,7 @@ impl<'span> Span<'span> {
 
     #[inline]
     pub fn file(path: Str<'span>) -> Self {
-        let location = Location::File(path);
+        let location = Location::Entry(path);
 
         match location.get_value() {
             Ok(content) => {

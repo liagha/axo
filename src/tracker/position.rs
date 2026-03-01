@@ -1,48 +1,41 @@
-use crate::tracker::{ErrorKind, Span, TrackError};
-use crate::{
-    data::{from_utf8, slice::from_raw_parts, Offset, Pointer, Scale, Str},
-    internal::{
-        operation::Ordering,
-        platform::{args, read_to_string, Path},
-    },
+use {
+    crate::{
+        data::{from_utf8, slice::from_raw_parts, Offset, Pointer, Scale, Str},
+        internal::{
+            operation::Ordering,
+            platform::{
+                args,
+                read_to_string,
+                PathBuf
+            },
+        },
+        tracker::{ErrorKind, Span, TrackError}
+    }
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Location<'location> {
-    File(Str<'location>),
+    Entry(Str<'location>),
     Raw { ptr: Pointer, len: Scale },
     Void,
     Flag,
 }
 
 impl<'location> Location<'location> {
-    pub fn name(&self) -> String {
+    pub fn to_path(&self) -> Option<PathBuf> {
         match self {
-            Location::File(path) => Path::new(path.as_str().unwrap_or(""))
-                .file_stem()
-                .and_then(|name| name.to_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            Location::Raw { .. } => "raw".to_string(),
-            Location::Void => "void".to_string(),
-            Location::Flag => "flag".to_string(),
-        }
-    }
+            Location::Entry(path) => {
+                let path = PathBuf::from(path.as_str().unwrap());
 
-    pub fn has_extension(&self, extension: &str) -> bool {
-        match self {
-            Location::File(path) => Path::new(path.as_str().unwrap_or(""))
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case(extension))
-                .unwrap_or(false),
-            _ => false,
+                Some(path)
+            }
+            _ => None
         }
     }
 
     pub fn get_value(&self) -> Result<Str<'location>, TrackError<'location>> {
         match self {
-            Location::File(path) => {
+            Location::Entry(path) => {
                 let path = path.as_str().unwrap_or("");
 
                 match read_to_string(path) {
@@ -78,7 +71,7 @@ impl<'location> Location<'location> {
     }
 
     pub fn file(string: Str<'location>) -> Location<'location> {
-        Location::File(string)
+        Location::Entry(string)
     }
 
     pub fn raw<T>(value: &'location T) -> Location<'location>
@@ -128,7 +121,7 @@ impl<'a> Position<'a> {
         Self {
             line,
             column,
-            location: Location::File(path),
+            location: Location::Entry(path),
         }
     }
 
@@ -144,7 +137,7 @@ impl<'a> Position<'a> {
 
     #[inline]
     pub fn set_path(&mut self, path: Str<'a>) {
-        self.location = Location::File(path);
+        self.location = Location::Entry(path);
     }
 
     #[inline]
@@ -165,7 +158,7 @@ impl<'a> Position<'a> {
     #[inline]
     pub fn swap_path(&self, path: Str<'a>) -> Self {
         Self {
-            location: Location::File(path),
+            location: Location::Entry(path),
             ..*self
         }
     }

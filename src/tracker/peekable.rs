@@ -88,7 +88,7 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     }
 
     fn set_path(&mut self, path: Str<'peekable>) {
-        self.position_mut().location = Location::File(path);
+        self.position_mut().location = Location::Entry(path);
     }
 
     fn set_location(&mut self, location: Location<'peekable>) {

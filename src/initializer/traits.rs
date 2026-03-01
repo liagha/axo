@@ -1,6 +1,11 @@
-use crate::data::Str;
-use crate::format::Show;
-use crate::initializer::Preference;
+use {
+    crate::{
+        data::Str,
+        format::Show,
+        initializer::Preference,
+        tracker::{Span, Spanned},
+    }
+};
 
 impl<'preference> Show<'preference> for Preference<'preference> {
     type Verbosity = u8;
@@ -19,5 +24,15 @@ impl<'preference> Show<'preference> for Preference<'preference> {
                 unimplemented!("the verbosity `{}` wasn't implemented for Preference.", verbosity);
             }
         }.into()
+    }
+}
+
+impl<'preference> Spanned<'preference> for Preference<'preference> {
+    fn borrow_span(&self) -> Span<'preference> {
+        self.span.clone()
+    }
+
+    fn span(self) -> Span<'preference> {
+        self.span
     }
 }

@@ -9,7 +9,7 @@ use {
 impl Debug for Location<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Location::File(file) => write!(f, "File({})", file),
+            Location::Entry(file) => write!(f, "File({})", file),
             Location::Raw { ptr, len } => {
                 write!(f, "Raw({:?}, {} => {:?})", ptr, len, self.get_value())
             }
@@ -22,7 +22,7 @@ impl Debug for Location<'_> {
 impl Display for Location<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Location::File(file) => write!(f, "{}", file),
+            Location::Entry(file) => write!(f, "{}", file),
             Location::Raw { ptr, len } => {
                 write!(f, "{:?}", self.get_value())
             }

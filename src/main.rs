@@ -61,6 +61,6 @@ fn main() {
 
         let mut compiler = Compiler::new();
 
-        compiler.compile();
+        compiler.prepare();
     }
 }

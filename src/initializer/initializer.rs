@@ -30,7 +30,9 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'initializer>> {
-        self.index.checked_sub(n).and_then(|current| self.get(current))
+        self.index
+            .checked_sub(n)
+            .and_then(|current| self.get(current))
     }
 
     fn next(
@@ -170,31 +172,32 @@ impl<'initializer> Initializer<'initializer> {
 
     pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
         let location = Location::Flag;
-        
-        match location.get_value() { 
+
+        match location.get_value() {
             Ok(input) => {
-                let tokens = {
+                {
                     let mut scanner = Scanner::new(location);
 
-                    let characters =
-                        Scanner::inspect(Position::new(location), input.chars().collect::<Vec<_>>());
+                    let characters = Scanner::inspect(
+                        Position::new(location),
+                        input.chars().collect::<Vec<_>>(),
+                    );
+
                     scanner.set_input(characters);
                     scanner.scan();
-                    scanner.output
-                };
 
-                self.input = tokens;
-                self.reset();
+                    self.input = scanner.output;
 
-                let strained = {
-                    let length = self.length();
-                    let classifier = Self::filter(length);
-                    let mut former = Former::new(self);
-                    former.form(classifier).collect_inputs()
-                };
+                    let strained = {
+                        let length = self.length();
+                        let classifier = Self::filter(length);
+                        let mut former = Former::new(self);
+                        former.form(classifier).collect_inputs()
+                    };
 
-                self.input = strained;
-                self.reset();
+                    self.input = strained;
+                    self.reset();
+                }
 
                 let mut former = Former::new(self);
 
@@ -217,22 +220,6 @@ impl<'initializer> Initializer<'initializer> {
                     }
                 }
 
-                let has_verbosity = preferences.iter().any(|preference| {
-                    if let TokenKind::Identifier(identifier) = &preference.target.kind {
-                        identifier == "Verbosity"
-                    } else {
-                        false
-                    }
-                });
-
-                if !has_verbosity {
-                    let span = Span::void();
-                    preferences.push(Preference::new(
-                        Token::new(TokenKind::Identifier(Str::from("Verbosity")), span),
-                        Token::new(TokenKind::Boolean(true), span),
-                    ));
-                }
-
                 let targets = preferences
                     .iter()
                     .filter(|preference| {
@@ -245,7 +232,7 @@ impl<'initializer> Initializer<'initializer> {
                     .map(|preference| {
                         let path = preference.clone().value.kind.unwrap_identifier();
 
-                        Location::File(path)
+                        Location::Entry(path)
                     })
                     .collect::<Vec<_>>();
 
@@ -299,7 +286,10 @@ impl<'initializer> Initializer<'initializer> {
                             if let Some(preference) = preferences.get_mut(*pref_index) {
                                 let span = preference.target.span;
                                 preference.target = Token::new(
-                                    TokenKind::Identifier(Str::from(format!("{}({})", key, ordinal))),
+                                    TokenKind::Identifier(Str::from(format!(
+                                        "{}({})",
+                                        key, ordinal
+                                    ))),
                                     span,
                                 );
                             }
@@ -311,13 +301,13 @@ impl<'initializer> Initializer<'initializer> {
 
                 targets
             }
-            
+
             Err(error) => {
                 let kind = super::ErrorKind::Tracking(error.clone());
                 let error = super::InitialError::new(kind, error.span);
-                
+
                 self.errors.push(error);
-                
+
                 Vec::new()
             }
         }

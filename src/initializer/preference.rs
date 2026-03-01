@@ -16,16 +16,6 @@ pub struct Preference<'preference> {
     pub span: Span<'preference>,
 }
 
-impl<'preference> Spanned<'preference> for Preference<'preference> {
-    fn borrow_span(&self) -> Span<'preference> {
-        self.span.clone()
-    }
-
-    fn span(self) -> Span<'preference> {
-        self.span
-    }
-}
-
 impl<'preference> Preference<'preference> {
     pub fn new(target: Token<'preference>, value: Token<'preference>) -> Self {
         let span = Span::merge(&target.borrow_span(), &value.borrow_span());
@@ -54,18 +44,6 @@ impl<'initializer> Initializer<'initializer> {
             }
         }
         result
-    }
-
-    fn dash() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Preference<'initializer>,
-        InitialError<'initializer>,
-    > {
-        Classifier::predicate(|token: &Token| {
-            matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
-        })
-        .with_ignore()
     }
 
     fn path_value() -> Classifier<
@@ -116,7 +94,10 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::with_transform(
             Classifier::sequence([
-                Self::dash(),
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                })
+                .with_ignore(),
                 Classifier::predicate(move |token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         matcher(identifier)
@@ -168,7 +149,10 @@ impl<'initializer> Initializer<'initializer> {
         InitialError<'initializer>,
     > {
         Classifier::sequence([
-            Self::dash(),
+            Classifier::predicate(|token: &Token| {
+                matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+            })
+            .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
                     identifier == "v" || identifier == "verbosity"
@@ -192,9 +176,7 @@ impl<'initializer> Initializer<'initializer> {
                     )))
                 },
             ),
-            Classifier::predicate(|token: &Token| {
-                matches!(token.kind, TokenKind::Integer(_))
-            })
+            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
         ])
         .with_transform(
             move |form: Form<
@@ -206,10 +188,7 @@ impl<'initializer> Initializer<'initializer> {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
                 let value: Token<'initializer> = form.collect_inputs()[1].clone();
 
-                Ok(Form::output(Preference::new(
-                    identifier,
-                    value,
-                )))
+                Ok(Form::output(Preference::new(identifier, value)))
             },
         )
     }
@@ -222,7 +201,10 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::with_transform(
             Classifier::sequence([
-                Self::dash(),
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                })
+                .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "o" || identifier == "output"
@@ -237,7 +219,7 @@ impl<'initializer> Initializer<'initializer> {
                 .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "ll" || identifier == "ir"
+                        identifier == "ir"
                     } else {
                         false
                     }
@@ -286,7 +268,10 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::with_transform(
             Classifier::sequence([
-                Self::dash(),
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                })
+                .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         identifier == "o" || identifier == "output"
@@ -349,7 +334,10 @@ impl<'initializer> Initializer<'initializer> {
         InitialError<'initializer>,
     > {
         Classifier::sequence([
-            Self::dash(),
+            Classifier::predicate(|token: &Token| {
+                matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+            })
+            .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
                     identifier == "r" || identifier == "run"
@@ -399,10 +387,13 @@ impl<'initializer> Initializer<'initializer> {
         InitialError<'initializer>,
     > {
         Classifier::sequence([
-            Self::dash(),
+            Classifier::predicate(|token: &Token| {
+                matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+            })
+            .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
-                    identifier == "bootstrap" || identifier == "bootstrapped"
+                    identifier == "bootstrap"
                 } else {
                     false
                 }
