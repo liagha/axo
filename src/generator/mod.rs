@@ -5,8 +5,10 @@ mod inkwell;
 
 pub use {backend::Backend, error::ErrorKind, generator::Generator, inkwell::Inkwell};
 
-pub(super) use error::*;
+use {
+    crate::reporter::Error,
+    error::*
+};
 
-use crate::reporter::Error;
 
 pub type GenerateError<'error> = Error<'error, ErrorKind>;

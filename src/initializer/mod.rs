@@ -5,8 +5,10 @@ mod traits;
 
 pub use {initializer::Initializer, preference::Preference};
 
-pub(super) use error::*;
 
-use crate::reporter::Error;
+use {
+    crate::reporter::Error,
+    error::*,
+};
 
-pub type InitialError<'error> = Error<'error, ErrorKind<'error>>;
+pub type InitializeError<'error> = Error<'error, ErrorKind<'error>>;

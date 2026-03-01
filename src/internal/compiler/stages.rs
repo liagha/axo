@@ -5,7 +5,7 @@ use {
         generator::Backend,
         initializer::{
             Initializer,
-            InitialError,
+            InitializeError,
         },
         internal::{
             compiler::Compiler,
@@ -23,21 +23,20 @@ use {
         scanner::{
             Scanner,
             Token,
-            ErrorKind, 
             ScanError,
         },
         tracker::{Location, Peekable, Position, Spanned},
     },
 };
 
-impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<InitialError<'initializer>>)>
+impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<InitializeError<'initializer>>)>
     for Initializer<'initializer>
 {
     fn execute(
         &mut self,
         compiler: &mut Compiler<'initializer>,
         _input: (),
-    ) -> (Vec<Location<'initializer>>, Vec<InitialError<'initializer>>) {
+    ) -> (Vec<Location<'initializer>>, Vec<InitializeError<'initializer>>) {
         let verbosity = Resolver::verbosity(&mut compiler.resolver);
         let logger = Reporter::new(verbosity);
 
@@ -80,35 +79,18 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
         self.set_location(location);
         compiler.reporter.start("scanning");
 
-        match location.get_value() {
-            Ok(content) => {
-                let characters =
-                    Scanner::inspect(Position::new(location), content.chars().collect::<Vec<_>>());
-                self.set_input(characters);
+        self.scan();
 
-                self.scan();
+        compiler.reporter.tokens(&self.output);
+        compiler.reporter.errors(&self.errors);
 
-                compiler.reporter.tokens(&self.output);
-                compiler.reporter.errors(&self.errors);
+        let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
 
-                let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
-                
-                compiler
-                    .reporter
-                    .finish("scanning", duration);
+        compiler
+            .reporter
+            .finish("scanning", duration);
 
-                (self.output.clone(), self.errors.clone())
-            }
-
-            Err(error) => {
-                let kind = ErrorKind::Tracking(error.clone());
-                let error = ScanError::new(kind, error.span);
-
-                self.errors.push(error);
-
-                (Vec::new(), self.errors.clone())
-            }
-        }
+        (self.output.clone(), self.errors.clone())
     }
 }
 

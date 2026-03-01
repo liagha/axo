@@ -1,5 +1,5 @@
 use {
-    super::{InitialError, Initializer},
+    super::{InitializeError, Initializer},
     crate::{
         data::Str,
         formation::{classifier::Classifier, form::Form},
@@ -50,7 +50,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -90,7 +90,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::with_transform(
             Classifier::sequence([
@@ -110,7 +110,7 @@ impl<'initializer> Initializer<'initializer> {
                         'initializer,
                         Token<'initializer>,
                         Preference,
-                        InitialError<'initializer>,
+                        InitializeError<'initializer>,
                     >| {
                         let identifier = form.collect_inputs()[0].clone();
                         let span = identifier.span();
@@ -127,7 +127,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
@@ -146,7 +146,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -165,7 +165,7 @@ impl<'initializer> Initializer<'initializer> {
                     'initializer,
                     Token<'initializer>,
                     Preference,
-                    InitialError<'initializer>,
+                    InitializeError<'initializer>,
                 >| {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
@@ -183,7 +183,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
                 let value: Token<'initializer> = form.collect_inputs()[1].clone();
@@ -197,7 +197,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::with_transform(
             Classifier::sequence([
@@ -229,7 +229,7 @@ impl<'initializer> Initializer<'initializer> {
                         'initializer,
                         Token<'initializer>,
                         Preference,
-                        InitialError<'initializer>,
+                        InitializeError<'initializer>,
                     >| {
                         let identifier = form.collect_inputs()[0].clone();
                         let span = identifier.span();
@@ -245,7 +245,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
@@ -264,7 +264,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::with_transform(
             Classifier::sequence([
@@ -296,7 +296,7 @@ impl<'initializer> Initializer<'initializer> {
                         'initializer,
                         Token<'initializer>,
                         Preference,
-                        InitialError<'initializer>,
+                        InitializeError<'initializer>,
                     >| {
                         let identifier = form.collect_inputs()[0].clone();
                         let span = identifier.span();
@@ -312,7 +312,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
@@ -331,7 +331,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -350,7 +350,7 @@ impl<'initializer> Initializer<'initializer> {
                     'initializer,
                     Token<'initializer>,
                     Preference,
-                    InitialError<'initializer>,
+                    InitializeError<'initializer>,
                 >| {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
@@ -367,7 +367,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
                 let span: Span<'initializer> = identifier.clone().span();
@@ -384,7 +384,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -403,7 +403,7 @@ impl<'initializer> Initializer<'initializer> {
                     'initializer,
                     Token<'initializer>,
                     Preference,
-                    InitialError<'initializer>,
+                    InitializeError<'initializer>,
                 >| {
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
@@ -420,7 +420,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
                 let span: Span<'initializer> = identifier.clone().span();
@@ -437,7 +437,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Self::path_preference(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
@@ -448,7 +448,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::with_transform(
             Self::path_value(),
@@ -456,7 +456,7 @@ impl<'initializer> Initializer<'initializer> {
                 'initializer,
                 Token<'initializer>,
                 Preference,
-                InitialError<'initializer>,
+                InitializeError<'initializer>,
             >| {
                 let inputs = form.collect_inputs();
                 if inputs.is_empty() {
@@ -478,7 +478,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Self::path_preference(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"

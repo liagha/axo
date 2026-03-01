@@ -165,7 +165,7 @@ impl Driver {
             .filter(|value| !value.is_empty())
             .map(PathBuf::from);
 
-        let stem = if let Some(path) = target.to_path() {
+        let stem = if let Ok(path) = target.to_path() {
             PathBuf::from(path.file_name().unwrap())
         } else {
             PathBuf::from(module)

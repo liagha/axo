@@ -1,5 +1,5 @@
 use {
-    super::{InitialError, Preference},
+    super::{InitializeError, Preference},
     crate::{
         data::{Offset, Scale, Str},
         formation::{classifier::Classifier, form::Form, former::Former},
@@ -9,13 +9,14 @@ use {
         tracker::{Location, Peekable, Position, Span},
     },
 };
+use crate::initializer::ErrorKind;
 
 pub struct Initializer<'initializer> {
     pub index: Offset,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
     pub output: Vec<Preference<'initializer>>,
-    pub errors: Vec<InitialError<'initializer>>,
+    pub errors: Vec<InitializeError<'initializer>>,
 }
 
 impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'initializer> {
@@ -105,7 +106,7 @@ impl<'initializer> Initializer<'initializer> {
                             | TokenKind::Comment(_)
                     )
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     !matches!(
                         token.kind,
@@ -127,7 +128,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::alternative([
             Self::code(),
@@ -146,7 +147,7 @@ impl<'initializer> Initializer<'initializer> {
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
-        InitialError<'initializer>,
+        InitializeError<'initializer>,
     > {
         Classifier::repetition(Self::preference(), 0, None)
     }
@@ -173,143 +174,121 @@ impl<'initializer> Initializer<'initializer> {
     pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
         let location = Location::Flag;
 
-        match location.get_value() {
-            Ok(input) => {
-                {
-                    let mut scanner = Scanner::new(location);
+        let mut scanner = Scanner::new(location);
 
-                    let characters = Scanner::inspect(
-                        Position::new(location),
-                        input.chars().collect::<Vec<_>>(),
-                    );
+        scanner.set_location(location);
 
-                    scanner.set_input(characters);
-                    scanner.scan();
+        self.input = scanner.output;
 
-                    self.input = scanner.output;
+        let strained = {
+            let length = self.length();
+            let classifier = Self::filter(length);
+            let mut former = Former::new(self);
+            former.form(classifier).collect_inputs()
+        };
 
-                    let strained = {
-                        let length = self.length();
-                        let classifier = Self::filter(length);
-                        let mut former = Former::new(self);
-                        former.form(classifier).collect_inputs()
-                    };
+        self.input = strained;
+        self.reset();
+        let mut former = Former::new(self);
 
-                    self.input = strained;
-                    self.reset();
-                }
+        let mut preferences = Vec::new();
 
-                let mut former = Former::new(self);
+        let classifier = Self::classifier();
 
-                let mut preferences = Vec::new();
+        let forms = former.form(classifier).flatten();
 
-                let classifier = Self::classifier();
-
-                let forms = former.form(classifier).flatten();
-
-                for form in forms {
-                    match form {
-                        Form::Output(output) => preferences.push(output),
-                        Form::Failure(failure) => self.errors.push(failure),
-                        Form::Multiple(multiple) => {
-                            for form in multiple {
-                                preferences.push(form.unwrap_output().clone());
-                            }
-                        }
-                        _ => {}
+        for form in forms {
+            match form {
+                Form::Output(output) => preferences.push(output),
+                Form::Failure(failure) => self.errors.push(failure),
+                Form::Multiple(multiple) => {
+                    for form in multiple {
+                        preferences.push(form.unwrap_output().clone());
                     }
                 }
-
-                let targets = preferences
-                    .iter()
-                    .filter(|preference| {
-                        if let TokenKind::Identifier(identifier) = preference.target.kind {
-                            identifier == Str::from("Input") || identifier.starts_with("Input(")
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|preference| {
-                        let path = preference.clone().value.kind.unwrap_identifier();
-
-                        Location::Entry(path)
-                    })
-                    .collect::<Vec<_>>();
-
-                let input_indexes = preferences
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, preference)| {
-                        if let TokenKind::Identifier(identifier) = preference.target.kind {
-                            identifier == Str::from("Input")
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|(index, _)| index)
-                    .collect::<Vec<_>>();
-
-                if input_indexes.len() > 1 {
-                    for (ordinal, pref_index) in input_indexes.iter().enumerate() {
-                        if let Some(preference) = preferences.get_mut(*pref_index) {
-                            let span = preference.target.span;
-                            preference.target = Token::new(
-                                TokenKind::Identifier(Str::from(format!("Input({})", ordinal))),
-                                span,
-                            );
-                        }
-                    }
-                }
-
-                for key in [
-                    "Output",
-                    "OutputCode",
-                    "OutputBinary",
-                    "OutputIR",
-                    "OutputExec",
-                ] {
-                    let indexes = preferences
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, preference)| {
-                            if let TokenKind::Identifier(identifier) = preference.target.kind {
-                                identifier == Str::from(key)
-                            } else {
-                                false
-                            }
-                        })
-                        .map(|(index, _)| index)
-                        .collect::<Vec<_>>();
-
-                    if indexes.len() > 1 {
-                        for (ordinal, pref_index) in indexes.iter().enumerate() {
-                            if let Some(preference) = preferences.get_mut(*pref_index) {
-                                let span = preference.target.span;
-                                preference.target = Token::new(
-                                    TokenKind::Identifier(Str::from(format!(
-                                        "{}({})",
-                                        key, ordinal
-                                    ))),
-                                    span,
-                                );
-                            }
-                        }
-                    }
-                }
-
-                self.output = preferences;
-
-                targets
-            }
-
-            Err(error) => {
-                let kind = super::ErrorKind::Tracking(error.clone());
-                let error = super::InitialError::new(kind, error.span);
-
-                self.errors.push(error);
-
-                Vec::new()
+                _ => {}
             }
         }
+
+        let targets = preferences
+            .iter()
+            .filter(|preference| {
+                if let TokenKind::Identifier(identifier) = preference.target.kind {
+                    identifier == Str::from("Input") || identifier.starts_with("Input(")
+                } else {
+                    false
+                }
+            })
+            .map(|preference| {
+                let path = preference.clone().value.kind.unwrap_identifier();
+
+                Location::Entry(path)
+            })
+            .collect::<Vec<_>>();
+
+        let input_indexes = preferences
+            .iter()
+            .enumerate()
+            .filter(|(_, preference)| {
+                if let TokenKind::Identifier(identifier) = preference.target.kind {
+                    identifier == Str::from("Input")
+                } else {
+                    false
+                }
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        if input_indexes.len() > 1 {
+            for (ordinal, pref_index) in input_indexes.iter().enumerate() {
+                if let Some(preference) = preferences.get_mut(*pref_index) {
+                    let span = preference.target.span;
+                    preference.target = Token::new(
+                        TokenKind::Identifier(Str::from(format!("Input({})", ordinal))),
+                        span,
+                    );
+                }
+            }
+        }
+
+        for key in [
+            "Output",
+            "OutputCode",
+            "OutputBinary",
+            "OutputIR",
+            "OutputExec",
+        ] {
+            let indexes = preferences
+                .iter()
+                .enumerate()
+                .filter(|(_, preference)| {
+                    if let TokenKind::Identifier(identifier) = preference.target.kind {
+                        identifier == Str::from(key)
+                    } else {
+                        false
+                    }
+                })
+                .map(|(index, _)| index)
+                .collect::<Vec<_>>();
+
+            if indexes.len() > 1 {
+                for (ordinal, pref_index) in indexes.iter().enumerate() {
+                    if let Some(preference) = preferences.get_mut(*pref_index) {
+                        let span = preference.target.span;
+                        preference.target = Token::new(
+                            TokenKind::Identifier(Str::from(format!(
+                                "{}({})",
+                                key, ordinal
+                            ))),
+                            span,
+                        );
+                    }
+                }
+            }
+        }
+
+        self.output = preferences;
+
+        targets
     }
 }

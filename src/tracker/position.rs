@@ -22,23 +22,44 @@ pub enum Location<'location> {
 }
 
 impl<'location> Location<'location> {
-    pub fn to_path(&self) -> Option<PathBuf> {
+    pub fn to_path(&self) -> Result<PathBuf, TrackError<'location>> {
         match self {
             Location::Entry(path) => {
                 let path = PathBuf::from(path.as_str().unwrap());
 
-                Some(path)
+                if path.exists() {
+                    Ok(path)
+                } else {
+                    let kind = ErrorKind::NotFound;
+
+                    Err(
+                        TrackError::new(
+                            kind,
+                            Span::void(),
+                        )
+                    )
+                }
             }
-            _ => None
+            _ => {
+                let kind = ErrorKind::NotAnEntry;
+
+                Err(
+                    TrackError::new(
+                        kind,
+                        Span::void(),
+                    )
+                )
+            }
         }
     }
 
     pub fn get_value(&self) -> Result<Str<'location>, TrackError<'location>> {
         match self {
             Location::Entry(path) => {
-                let path = path.as_str().unwrap_or("");
+                let location = Location::Entry(path.clone());
+                let path = location.to_path()?;
 
-                match read_to_string(path) {
+                match read_to_string(&path) {
                     Ok(content) => Ok(content.into()),
                     Err(error) => {
                         let kind: ErrorKind = error.into();

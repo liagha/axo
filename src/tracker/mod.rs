@@ -4,11 +4,12 @@ mod position;
 mod span;
 pub mod error;
 
-use crate::{data::Scale, format::Display, reporter::Error};
+use {
+    crate::{data::Scale, format::Display, reporter::Error},
+    error::*,
+};
 
 pub use {peekable::*, position::*, span::*};
-
-pub(super) use error::*;
 
 pub trait Spanned<'spanned> {
     #[track_caller]

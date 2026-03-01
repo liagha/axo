@@ -1,3 +1,4 @@
+use std::time::Duration;
 use {
     super::{Character, ScanError, Token},
     crate::{
@@ -6,6 +7,7 @@ use {
         tracker::{Location, Peekable, Position},
     },
 };
+use crate::scanner::error::ErrorKind;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,
@@ -85,6 +87,25 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn scan(&mut self) {
+        let location = self.position.location;
+        
+        match location.get_value() {
+            Ok(content) => {
+                let characters =
+                    Scanner::inspect(Position::new(location), content.chars().collect::<Vec<_>>());
+                self.set_input(characters);
+
+                self.scan();
+            }
+
+            Err(error) => {
+                let kind = ErrorKind::Tracking(error.clone());
+                let error = ScanError::new(kind, error.span);
+
+                self.errors.push(error);
+            }
+        }
+
         let classifier = Self::classifier();
         let mut former = Former::new(self);
 

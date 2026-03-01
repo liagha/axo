@@ -11,8 +11,10 @@ pub use {
     symbol::{Specifier, Symbol, SymbolKind, Visibility},
 };
 
-pub(super) use error::*;
 
-use crate::reporter::Error;
+use {
+    crate::reporter::Error,
+    error::*,
+};
 
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;
