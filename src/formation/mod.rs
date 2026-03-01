@@ -9,16 +9,16 @@ pub mod helper {
         super::{classifier::Classifier, form::Form, order::Order},
         crate::{
             data::thread::{Arc, Mutex},
-            format::Debug,
             internal::hash::Hash,
             tracker::Peekable,
+            format::Show,
         },
     };
 
-    pub trait Formable<'formable>: Clone + Debug + Eq + Hash + PartialEq + 'formable {}
+    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u16> + 'formable {}
 
     impl<'formable, T> Formable<'formable> for T where
-        T: Clone + Debug + Eq + Hash + PartialEq + 'formable
+        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u16> + 'formable
     {
     }
 

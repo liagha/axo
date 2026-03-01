@@ -1,10 +1,12 @@
 use crate::{data::Str, format::Display, internal::hash::Set};
 
 pub trait Show<'show> {
-    fn format(&self) -> Str<'show>;
-    fn indent(&self) -> Str<'show> {
+    type Verbosity;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show>;
+    fn indent(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
-            self.format()
+            self.format(verbosity)
                 .lines()
                 .into_iter()
                 .map(|line| format!("    {}", line))
@@ -15,7 +17,9 @@ pub trait Show<'show> {
 }
 
 impl<'show, Item: Display> Show<'show> for [Item] {
-    fn format(&self) -> Str<'show> {
+    type Verbosity = u16;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
             self.iter()
                 .map(|form| Str::from(form.to_string()))
@@ -26,7 +30,9 @@ impl<'show, Item: Display> Show<'show> for [Item] {
 }
 
 impl<'show, Item: Display> Show<'show> for Set<Item> {
-    fn format(&self) -> Str<'show> {
+    type Verbosity = u16;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
             self.iter()
                 .map(|form| Str::from(form.to_string()))
@@ -37,19 +43,25 @@ impl<'show, Item: Display> Show<'show> for Set<Item> {
 }
 
 impl<'show> Show<'show> for String {
-    fn format(&self) -> Str<'show> {
+    type Verbosity = u16;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(self.clone())
     }
 }
 
 impl<'show> Show<'show> for &'show str {
-    fn format(&self) -> Str<'show> {
+    type Verbosity = u16;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(*self)
     }
 }
 
 impl<'show> Show<'show> for Str<'show> {
-    fn format(&self) -> Str<'show> {
+    type Verbosity = u16;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         *self
     }
 }
