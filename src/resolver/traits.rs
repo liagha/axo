@@ -10,6 +10,10 @@ impl<'scope> Show<'scope> for Scope<'scope> {
             0 => {
                 format!("{}", self.symbols.format(0))
             }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Scope.", verbosity);
+            }
         }.into()
     }
 }

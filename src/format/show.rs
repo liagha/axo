@@ -51,13 +51,13 @@ impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for [Item] {
     }
 }
 
-impl<'show, Item: Display> Show<'show> for Set<Item> {
+impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for Set<Item> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
             self.iter()
-                .map(|form| Str::from(form.to_string()))
+                .map(|form| Str::from(form.format(verbosity)))
                 .collect::<Vec<Str>>()
                 .join(", "),
         )
