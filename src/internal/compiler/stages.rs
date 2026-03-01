@@ -38,9 +38,6 @@ impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<Ini
         compiler: &mut Compiler<'initializer>,
         _input: (),
     ) -> (Vec<Location<'initializer>>, Vec<InitialError<'initializer>>) {
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
         let verbosity = Resolver::verbosity(&mut compiler.resolver);
         let logger = Reporter::new(verbosity);
 
@@ -65,7 +62,7 @@ impl<'initializer> Stage<'initializer, (), (Vec<Location<'initializer>>, Vec<Ini
 
         compiler.resolver.scope.extend(preferences);
 
-        let duration = Duration::from_nanos(timer.lap().unwrap());
+        let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
         
         logger.finish("initializing", duration);
 
@@ -80,9 +77,6 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
         location: Location<'scanner>,
     ) -> (Vec<Token<'scanner>>, Vec<ScanError<'scanner>>) 
     {
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
         self.set_location(location);
         compiler.reporter.start("scanning");
 
@@ -97,7 +91,7 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, (Vec<Token<'scanner>>, Vec<Sc
                 compiler.reporter.tokens(&self.output);
                 compiler.reporter.errors(&self.errors);
 
-                let duration = Duration::from_nanos(timer.lap().unwrap());
+                let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
                 
                 compiler
                     .reporter
@@ -124,9 +118,6 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<Pa
         compiler: &mut Compiler<'parser>,
         tokens: Vec<Token<'parser>>,
     ) -> (Vec<Element<'parser>>, Vec<ParseError<'parser>>) {
-        let mut timer = DefaultTimer::new_default();
-        _ = timer.start();
-
         compiler.reporter.start("parsing");
 
         self.set_input(tokens);
@@ -135,7 +126,7 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, (Vec<Element<'parser>>, Vec<Pa
         compiler.reporter.elements(&self.output);
         compiler.reporter.errors(&self.errors);
 
-        let duration = Duration::from_nanos(timer.lap().unwrap());
+        let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
         
         compiler
             .reporter
@@ -151,9 +142,6 @@ impl<'resolver> Compiler<'resolver>
         &mut self,
         elements: Vec<Element<'resolver>>,
     ) -> Vec<Resolution<'resolver>> {
-        let mut timer = DefaultTimer::new_default();
-        timer.start();
-
         self.reporter.start("resolving");
 
         self.resolver.symbols.clear();
@@ -177,7 +165,7 @@ impl<'resolver> Compiler<'resolver>
 
         self.reporter.errors(self.resolver.errors.as_slice());
 
-        let duration = Duration::from_nanos(timer.lap().unwrap());
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter
             .finish("resolving", duration);
