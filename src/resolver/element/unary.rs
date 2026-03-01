@@ -1,18 +1,18 @@
 use crate::{
     parser::Element,
     resolver::{
-        checker::{CheckError, Checkable, Type, TypeKind},
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     scanner::TokenKind,
     schema::Unary,
 };
+use crate::checker::{CheckError, Checkable, Type, TypeKind};
 
 pub(super) fn resolve_unary<'element>(
     element: &Element<'element>,
     unary: &Unary<crate::scanner::Token<'element>, Box<Element<'element>>>,
     resolver: &mut Resolver<'element>,
-    analysis: crate::resolver::analyzer::Analysis<'element>,
+    analysis: crate::analyzer::Analysis<'element>,
 ) -> Result<Resolution<'element>, Vec<ResolveError<'element>>> {
     let operand = unary.operand.resolve(resolver)?;
     let operator = match &unary.operator.kind {
@@ -21,7 +21,7 @@ pub(super) fn resolve_unary<'element>(
             return Err(vec![ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::InvalidOperation(
+                        crate::checker::ErrorKind::InvalidOperation(
                             unary.operator.clone(),
                         ),
                         unary.operator.span,
@@ -38,7 +38,7 @@ pub(super) fn resolve_unary<'element>(
                 return Err(vec![ResolveError::new(
                     ErrorKind::Check {
                         error: CheckError::new(
-                            crate::resolver::checker::ErrorKind::InvalidOperation(
+                            crate::checker::ErrorKind::InvalidOperation(
                                 unary.operator.clone(),
                             ),
                             unary.operator.span,
@@ -57,7 +57,7 @@ pub(super) fn resolve_unary<'element>(
                 return Err(vec![ResolveError::new(
                     ErrorKind::Check {
                         error: CheckError::new(
-                            crate::resolver::checker::ErrorKind::Mismatch(
+                            crate::checker::ErrorKind::Mismatch(
                                 Type::pointer(
                                     Type::new(TypeKind::Infer, element.span),
                                     element.span,

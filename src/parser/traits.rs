@@ -163,13 +163,13 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                     if self.scope.is_empty() {
                         "".into()
                     } else {
-                        format!("\nScope: {:#?}", self.scope).indent(verbosity)
+                        format!("\nScope: {}", self.scope.format(verbosity)).indent(verbosity)
                     },
-                    format!("\nSpecification: {:#?}", self.specifier).indent(verbosity),
+                    format!("\nSpecification: {}", self.specifier.format(verbosity)).indent(verbosity),
                     if self.scope.is_empty() {
                         "".into()
                     } else {
-                        format!("\nGenerics: {:#?}", self.generic).indent(verbosity)
+                        format!("\nGenerics: {}", self.generic.format(verbosity)).indent(verbosity)
                     }
                 )
             }
@@ -333,6 +333,10 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                         )
                     }
                 }
+            }
+            
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for SymbolKind.", verbosity);
             }
         }.into()
     }

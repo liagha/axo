@@ -1,20 +1,20 @@
 use crate::{
     parser::{Element, ElementKind, SymbolKind},
     resolver::{
-        analyzer::{AnalyzeError, ErrorKind as AnalyzeErrorKind},
-        checker::{CheckError, Checkable},
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     scanner::{OperatorKind, Token, TokenKind},
     schema::Binary,
     tracker::Span,
 };
+use crate::analyzer::{AnalyzeError, ErrorKind as AnalyzeErrorKind};
+use crate::checker::{CheckError, Checkable};
 
 pub(super) fn resolve_binary<'element>(
     element: &Element<'element>,
     binary: &Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>,
     resolver: &mut Resolver<'element>,
-    analysis: crate::resolver::analyzer::Analysis<'element>,
+    analysis: crate::analyzer::Analysis<'element>,
 ) -> Result<Resolution<'element>, Vec<ResolveError<'element>>> {
     let is_namespace = match &binary.operator.kind {
         TokenKind::Operator(operator) => {
@@ -60,7 +60,7 @@ pub(super) fn resolve_binary<'element>(
 
             let left_type = left.typed.clone();
             let field_type = match left_type.kind {
-                crate::resolver::checker::TypeKind::Structure(structure) => {
+                crate::checker::TypeKind::Structure(structure) => {
                     let struct_name = structure.target.clone();
                     let identifier = Element::new(
                         ElementKind::Literal(Token::new(
@@ -95,7 +95,7 @@ pub(super) fn resolve_binary<'element>(
 
                     if let Some(field_symbol) = field_symbol {
                         let inferred: Result<
-                            crate::resolver::checker::Type<'element>,
+                            crate::checker::Type<'element>,
                             CheckError<'element>,
                         > = field_symbol.infer();
                         inferred.map_err(|error| {

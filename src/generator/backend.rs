@@ -1,7 +1,5 @@
-use {
-    crate::resolver::analyzer::{Analysis, Instruction},
-    inkwell::values::{BasicValueEnum, FunctionValue},
-};
+use inkwell::values::{BasicValueEnum, FunctionValue};
+use crate::analyzer::{Analysis, Instruction};
 
 pub trait Backend<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>);

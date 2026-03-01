@@ -3,10 +3,6 @@ use {
     crate::{
         data::Str,
         generator::Backend,
-        resolver::{
-            analyzer::{Analysis, Instruction},
-            checker::TypeKind,
-        },
         schema::{Index, Structure},
     },
     inkwell::{
@@ -14,6 +10,8 @@ use {
         values::{BasicValueEnum, FunctionValue},
     },
 };
+use crate::analyzer::{Analysis, Instruction};
+use crate::checker::TypeKind;
 
 impl<'backend> super::Inkwell<'backend> {
     fn cast_value(

@@ -3,8 +3,6 @@ use {
     crate::{
         data::Str,
         generator::{ErrorKind, GenerateError},
-        resolver::analyzer::{Analysis, Instruction},
-        resolver::checker::TypeKind,
         schema::*,
         tracker::Span,
     },
@@ -13,6 +11,8 @@ use {
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
+use crate::analyzer::{Analysis, Instruction};
+use crate::checker::TypeKind;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
@@ -123,7 +123,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let pointee = self.pointer_pointee_type(&value);
         let result = match &value.instruction {
-            crate::resolver::analyzer::Instruction::Array(elements) => {
+            crate::analyzer::Instruction::Array(elements) => {
                 let (value, element_type) = self.build_array(elements.clone(), function);
                 self.array_elements.insert(target.clone(), element_type);
                 value
@@ -219,7 +219,7 @@ impl<'backend> super::Inkwell<'backend> {
         let signed = self.infer_signedness(&value_analysis);
         let pointee = self.pointer_pointee_type(&value_analysis);
         let value = match &value_analysis.instruction {
-            crate::resolver::analyzer::Instruction::Array(elements) => {
+            crate::analyzer::Instruction::Array(elements) => {
                 let (value, element_type) = self.build_array(elements.clone(), function);
                 self.array_elements
                     .insert(binding.target.clone(), element_type);

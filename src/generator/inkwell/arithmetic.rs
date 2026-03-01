@@ -1,8 +1,8 @@
 use {
     super::Backend,
-    crate::resolver::analyzer::Analysis,
     inkwell::values::{BasicValueEnum, FunctionValue},
 };
+use crate::analyzer::Analysis;
 
 impl<'backend> super::Inkwell<'backend> {
     fn coerce_numeric_pair(

@@ -9,7 +9,7 @@ use {
     },
 };
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Preference<'preference> {
     pub target: Token<'preference>,
     pub value: Token<'preference>,

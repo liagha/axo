@@ -3,10 +3,6 @@ use {
     crate::{
         data::Str,
         internal::hash::Map,
-        resolver::{
-            analyzer::{Analysis, Instruction},
-            checker::TypeKind,
-        },
         schema::*,
     },
     inkwell::{
@@ -15,6 +11,8 @@ use {
         FloatPredicate, InlineAsmDialect, IntPredicate,
     },
 };
+use crate::analyzer::{Analysis, Instruction};
+use crate::checker::TypeKind;
 
 impl<'backend> super::Inkwell<'backend> {
     fn has_terminator(&self) -> bool {

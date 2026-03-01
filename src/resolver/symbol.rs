@@ -1,22 +1,20 @@
-use crate::resolver::{
-    analyzer::{Analysis, Analyzable},
-    checker::{CheckError, Checkable, Type, TypeKind},
-    ErrorKind,
-};
+use crate::resolver::ErrorKind;
 use {
     super::{
-        checker::{annotation_type, compatible, unify},
         scope::Scope,
         Inference, Resolution, Resolvable, ResolveError, Resolver,
     },
     crate::{
         data::{Boolean, Str},
-        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+        parser::{ElementKind, Symbol, SymbolKind, Visibility},
         scanner::{OperatorKind, Token, TokenKind},
         schema::Binary,
         tracker::Span,
     },
 };
+use crate::analyzer::Analyzable;
+use crate::checker::{annotation_type, unify};
+use crate::checker::{CheckError, Checkable, Type};
 
 fn symbol_name<'symbol>(symbol: &Symbol<'symbol>) -> Option<Str<'symbol>> {
     symbol.brand().and_then(|token| match token.kind {
@@ -142,8 +140,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 {
                     return Err(vec![ResolveError::new(
                         ErrorKind::Analyze {
-                            error: crate::resolver::analyzer::AnalyzeError::new(
-                                crate::resolver::analyzer::ErrorKind::InvalidOperation(
+                            error: crate::analyzer::AnalyzeError::new(
+                                crate::analyzer::ErrorKind::InvalidOperation(
                                     Token::new(
                                         TokenKind::Identifier(Str::from("extend")),
                                         extension.target.span,
@@ -233,7 +231,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                             return Err(vec![ResolveError::new(
                                 ErrorKind::Check {
                                     error: CheckError::new(
-                                        crate::resolver::checker::ErrorKind::Mismatch(
+                                        crate::checker::ErrorKind::Mismatch(
                                             declared,
                                             inferred.clone(),
                                         ),

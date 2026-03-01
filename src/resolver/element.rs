@@ -4,8 +4,6 @@ mod unary;
 
 use {
     super::{
-        analyzer::{Analyzable, AnalyzeError, ErrorKind as AnalyzeErrorKind},
-        checker::{Checkable, Type},
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     crate::{
@@ -15,7 +13,8 @@ use {
         schema::*,
     },
 };
-
+use crate::analyzer::{Analyzable, AnalyzeError, ErrorKind as AnalyzeErrorKind};
+use crate::checker::{Checkable, Type};
 use self::{binary::resolve_binary, invoke::resolve_invoke, unary::resolve_unary};
 
 impl<'element> Element<'element> {

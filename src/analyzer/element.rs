@@ -1,13 +1,12 @@
 use crate::{
     data::Str,
     parser::{Element, ElementKind},
-    resolver::{
-        analyzer::{Analysis, Analyzable, AnalyzeError, ErrorKind, Instruction},
-        Resolver,
-    },
-    scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+    resolver::Resolver,
+    scanner::{PunctuationKind, Token, TokenKind},
     schema::*,
 };
+use crate::analyzer::{Analysis, Analyzable, AnalyzeError, ErrorKind, Instruction};
+use crate::format::Show;
 
 mod operation;
 
@@ -315,7 +314,7 @@ pub(crate) fn analyze<'element>(
             let target = constructor
                 .target
                 .brand()
-                .map(|s| s.to_string())
+                .map(|s| s.format(1))
                 .unwrap_or_default();
 
             let members: Vec<Box<Analysis<'element>>> = constructor
@@ -324,7 +323,7 @@ pub(crate) fn analyze<'element>(
                 .map(|member| analyze(member, resolver, context).map(Box::new))
                 .collect::<Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>>>()?;
 
-            match target.as_str() {
+            match target.as_str().unwrap() {
                 "Integer" => {
                     let mut value_opt = None;
                     let mut size_opt = None;

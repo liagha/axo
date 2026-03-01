@@ -2,6 +2,8 @@ use crate::{
     format::{Debug, Display, Formatter, Result},
     scanner::TokenKind,
 };
+use crate::data::Str;
+use crate::format::Show;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
@@ -13,27 +15,35 @@ pub enum ErrorKind<'error> {
     UnexpectedToken(TokenKind<'error>),
 }
 
-impl<'error> Display for ErrorKind<'error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl<'error> Show<'error> for ErrorKind<'error> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match self {
-            ErrorKind::ExpectedCondition => write!(f, "expected condition."),
-            ErrorKind::UnexpectedPunctuation => write!(f, "unexpected punctuation."),
-            ErrorKind::ExpectedBody => write!(f, "expected body."),
+            ErrorKind::ExpectedCondition => "expected condition.".to_string(),
+            ErrorKind::UnexpectedPunctuation => "unexpected punctuation.".to_string(),
+            ErrorKind::ExpectedBody => "expected body.".to_string(),
             ErrorKind::MissingSeparator(kind) => {
-                write!(f, "expected separator `{:?}`.", kind)
+                format!("expected separator `{}`.", kind.format(verbosity))
             }
             ErrorKind::UnclosedDelimiter(delimiter) => {
-                write!(f, "unclosed delimiter `{:?}`.", delimiter)
+                format!("unclosed delimiter `{}`.", delimiter.format(verbosity))
             }
             ErrorKind::UnexpectedToken(token) => {
-                write!(f, "unexpected token `{:?}`.", token)
+                format!("unexpected token `{}`.", token.format(verbosity))
             }
-        }
+        }.into()
+    }
+}
+
+impl<'error> Display for ErrorKind<'error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.format(0))
     }
 }
 
 impl<'error> Debug for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self)
+        write!(f, "{}", self.format(0))
     }
 }

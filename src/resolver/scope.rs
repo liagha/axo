@@ -17,7 +17,7 @@ use {
     matchete::{Assessor, Scheme},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Scope<'scope> {
     pub symbols: Set<Symbol<'scope>>,
     pub parent: Option<Box<Scope<'scope>>>,

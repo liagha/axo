@@ -2,17 +2,18 @@ use crate::{
     data::Str,
     parser::{Element, ElementKind, Symbol, SymbolKind},
     resolver::{
-        analyzer::{
-            element::{analyze, Analyzer},
-            Analysis, AnalyzeError, ErrorKind, Instruction,
-        },
-        checker::{Checkable, Type, TypeKind},
         scope::Scope,
         Resolver,
     },
     scanner::{Token, TokenKind},
     schema::*,
 };
+use crate::analyzer::{
+    element::{analyze, Analyzer},
+    Analysis, AnalyzeError, ErrorKind, Instruction,
+};
+use crate::checker::{Checkable, Type, TypeKind};
+use crate::format::Show;
 
 pub trait Analyzable<'analyzable> {
     fn analyze(
@@ -76,7 +77,7 @@ pub(crate) fn symbol<'symbol>(
                 .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
             let analyzed = Binding::new(
-                Str::from(target_token.to_string()),
+                Str::from(target_token.format(0)),
                 value.map(Box::new),
                 annotation,
                 binding.constant,
@@ -92,7 +93,7 @@ pub(crate) fn symbol<'symbol>(
                 .collect();
 
             let analyzed = Structure::new(
-                Str::from(structure.target.brand().unwrap().to_string()),
+                Str::from(structure.target.brand().unwrap().format(0)),
                 members?,
             );
 
@@ -106,7 +107,7 @@ pub(crate) fn symbol<'symbol>(
                 .collect();
 
             let analyzed = Structure::new(
-                Str::from(enumeration.target.brand().unwrap().to_string()),
+                Str::from(enumeration.target.brand().unwrap().format(0)),
                 members?,
             );
 
@@ -128,7 +129,7 @@ pub(crate) fn symbol<'symbol>(
                 .transpose()?;
 
             let analyzed = Method::new(
-                Str::from(method.target.brand().unwrap().to_string()),
+                Str::from(method.target.brand().unwrap().format(0)),
                 members?,
                 Box::new(body),
                 output,
@@ -151,7 +152,7 @@ pub(crate) fn symbol<'symbol>(
                 .collect();
 
             Ok(Analysis::new(Instruction::Module(
-                Str::from(target.to_string()),
+                Str::from(target.format(0)),
                 members?,
             )))
         }

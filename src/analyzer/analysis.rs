@@ -1,8 +1,8 @@
 use crate::{
     data::{Boolean, Char, Float, Integer, Scale, Str},
-    resolver::checker::TypeKind,
     schema::*,
 };
+use crate::checker::TypeKind;
 
 #[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {

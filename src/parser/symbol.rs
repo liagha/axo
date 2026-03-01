@@ -11,6 +11,8 @@ use {
         tracker::Span,
     },
 };
+use crate::data::Str;
+use crate::format::Show;
 
 pub struct Symbol<'symbol> {
     pub id: Identity,
@@ -29,15 +31,28 @@ pub struct Specifier {
     pub visibility: Visibility,
 }
 
-impl Debug for Specifier {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
-        write!(f, "{:?}", self.visibility)?;
-
-        if self.entry {
-            write!(f, ", Entry")?;
-        }
-
-        write!(f, ", {:?}", self.interface)
+impl<'show> Show<'show> for Specifier {
+    type Verbosity = u8;
+    
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity { 
+            0 => {
+                format!(
+                    "{:?}{}{}",
+                    self.visibility,
+                    if self.entry {
+                        ", Entry".to_string()
+                    } else {
+                        "".to_string()
+                    },
+                    format!(", {:?}", self.interface)
+                )
+            }
+            
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Specifier.", verbosity);
+            }
+        }.into()
     }
 }
 

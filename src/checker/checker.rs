@@ -1,5 +1,5 @@
+use crate::checker::{types::Type, CheckError};
 use crate::resolver::{
-    checker::{types::Type, CheckError},
     ResolveError, Resolver,
 };
 
@@ -13,7 +13,7 @@ impl<'resolver> Resolver<'resolver> {
             let error = ResolveError::new(
                 crate::resolver::ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::Mismatch(target, source.clone()),
+                        crate::checker::ErrorKind::Mismatch(target, source.clone()),
                         source.span,
                     ),
                 },

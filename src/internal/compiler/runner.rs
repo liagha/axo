@@ -10,11 +10,7 @@ use {
         },
         parser::{Element, ElementKind, Symbol, SymbolKind},
         reporter::Reporter,
-        resolver::{
-            analyzer::{symbol as analyze_symbol, Analyzer},
-            checker::Type,
-            Resolution,
-        },
+        resolver::Resolution,
         scanner::{Token, TokenKind},
         schema::*,
         tracker::{Location, Span},
@@ -27,6 +23,8 @@ use {
     crate::generator::{Backend, Generator},
     crate::internal::driver::Driver,
 };
+use crate::analyzer::{symbol as analyze_symbol, Analyzer};
+use crate::checker::Type;
 
 impl<'compiler> Compiler<'compiler> {
     pub fn new() -> Self {
@@ -34,7 +32,7 @@ impl<'compiler> Compiler<'compiler> {
         timer.start();
 
         let resolver = Resolver::new();
-        let reporter = Reporter::new(false);
+        let reporter = Reporter::new(0);
 
         Compiler {
             timer,
@@ -84,7 +82,6 @@ impl<'compiler> Compiler<'compiler> {
         target: Location<'compiler>,
         index: usize,
         name: &str,
-        verbosity: bool,
     ) {
         let source = match target {
             Location::File(path) => PathBuf::from(path.as_str().unwrap_or("")),
@@ -97,13 +94,7 @@ impl<'compiler> Compiler<'compiler> {
         let (_, binary) = Driver::paths(target, name, None, executable);
         let should_link = run || executable.is_some();
 
-        if verbosity {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`linking`" => Color::White
-            );
-            xprintln!();
-        }
+        self.reporter.start("linking");
 
         let linked = if should_link {
             match Driver::link(&source, &binary, bootstrap) {
@@ -122,13 +113,8 @@ impl<'compiler> Compiler<'compiler> {
             true
         };
 
-        if linked && verbosity {
-            xprintln!(
-                "Generated {} {}." => Color::Green,
-                "(executable)" => Color::White,
-                format!("`{}`", binary.to_string_lossy()) => Color::White
-            );
-            xprintln!();
+        if linked {
+            self.reporter.generate("executable", &binary);
         }
 
         if linked && run {
@@ -147,7 +133,7 @@ impl<'compiler> Compiler<'compiler> {
 
         if target.has_extension("ll") {
             #[cfg(feature = "generator")]
-            self.compile_ir_input(target, index, &name, verbosity);
+            self.compile_ir_input(target, index, &name);
 
             let identifier = Element::new(
                 ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(name)), span)),
@@ -254,7 +240,7 @@ impl<'compiler> Compiler<'compiler> {
                         true
                     };
 
-                    if linked && verbosity {
+                    if linked {
                         self.reporter.generate("IR", &code);
                         self.reporter.generate("executable", &binary);
 

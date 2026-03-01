@@ -1,0 +1,67 @@
+use {
+    crate::{format::Display, scanner::Token},
+    std::fmt::Formatter,
+};
+use crate::data::Str;
+use crate::format::Show;
+
+#[derive(Clone)]
+pub enum ErrorKind<'error> {
+    InvalidOperation(Token<'error>),
+    InvalidType,
+    InvalidPrimitiveArity {
+        name: String,
+        expected: String,
+        found: usize,
+    },
+    InvalidPrimitiveContext {
+        name: String,
+        expected: String,
+    },
+    Unimplemented,
+}
+
+impl<'error> Show<'error> for ErrorKind<'error> {
+    type Verbosity = u8;
+    
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+        match verbosity { 
+            0 => {
+                match self {
+                    ErrorKind::InvalidOperation(token) => {
+                        format!("invalid operation token: {}.", token.format(verbosity))
+                    }
+                    ErrorKind::InvalidType => {
+                        "invalid type.".to_string()
+                    }
+                    ErrorKind::InvalidPrimitiveArity {
+                        name,
+                        expected,
+                        found,
+                    } => {
+                        format!(
+                            "invalid '{}' arity: expected {}, found {}.",
+                            name, expected, found,
+                        )
+                    }
+                    ErrorKind::InvalidPrimitiveContext { name, expected } => {
+                        format!("invalid '{}' usage: expected {}.", name, expected)
+                    }
+                    ErrorKind::Unimplemented => {
+                        "unimplemented operation.".to_string()
+                    }
+                }.into()
+            }
+            
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Analyzer::ErrorKind.", verbosity);
+            }
+        }
+    }
+}
+
+impl<'error> Display for ErrorKind<'error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.format(1))
+    }
+}

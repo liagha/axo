@@ -1,6 +1,4 @@
-pub mod analyzer;
 mod assessor;
-pub mod checker;
 mod element;
 mod error;
 mod hint;
@@ -8,6 +6,7 @@ mod primitives;
 mod resolver;
 pub mod scope;
 mod symbol;
+mod traits;
 
 pub use resolver::*;
 

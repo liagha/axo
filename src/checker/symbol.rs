@@ -1,18 +1,19 @@
 use crate::{
     data::Str,
     parser::{Element, ElementKind, Symbol, SymbolKind},
-    resolver::checker::{
-        annotation_type, compatible, unify, CheckError, Checkable, ErrorKind, Type, TypeKind,
-    },
     scanner::{Token, TokenKind},
     schema::*,
 };
+use crate::checker::{
+    annotation_type, compatible, unify, CheckError, Checkable, ErrorKind, Type, TypeKind,
+};
+use crate::format::Show;
 
 fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> {
     annotation_type(element)
 }
 
-fn invalid<'symbol>(token: Token<'symbol>) -> CheckError<'symbol> {
+fn invalid(token: Token) -> CheckError {
     CheckError::new(ErrorKind::InvalidOperation(token.clone()), token.span)
 }
 
@@ -132,7 +133,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let structure = Structure::new(
-                    Str::from(structure.target.brand().unwrap().to_string()),
+                    Str::from(structure.target.brand().unwrap().format(0)),
                     members?,
                 );
 
@@ -146,7 +147,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let enumeration = Structure::new(
-                    Str::from(enumeration.target.brand().unwrap().to_string()),
+                    Str::from(enumeration.target.brand().unwrap().format(0)),
                     members?,
                 );
 
@@ -179,7 +180,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 };
 
                 let method = Method::new(
-                    Str::from(method.target.brand().unwrap().to_string()),
+                    Str::from(method.target.brand().unwrap().format(0)),
                     members?,
                     Box::new(body),
                     output,

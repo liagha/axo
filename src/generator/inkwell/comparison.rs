@@ -1,11 +1,11 @@
 use {
     super::Backend,
-    crate::resolver::analyzer::Analysis,
     inkwell::{
         values::{BasicValueEnum, FunctionValue},
         FloatPredicate, IntPredicate,
     },
 };
+use crate::analyzer::Analysis;
 
 impl<'backend> super::Inkwell<'backend> {
     pub fn equal(

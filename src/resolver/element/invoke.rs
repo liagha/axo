@@ -2,19 +2,19 @@ use crate::{
     data::Str,
     parser::Element,
     resolver::{
-        checker::{unify, CheckError, Checkable, Type},
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     scanner::{Token, TokenKind},
     schema::Invoke,
     tracker::Span,
 };
+use crate::checker::{unify, CheckError, Checkable, Type};
 
 pub(super) fn resolve_invoke<'element>(
     element: &Element<'element>,
     invoke: &Invoke<Box<Element<'element>>, Element<'element>>,
     resolver: &mut Resolver<'element>,
-    analysis: crate::resolver::analyzer::Analysis<'element>,
+    analysis: crate::analyzer::Analysis<'element>,
 ) -> Result<Resolution<'element>, Vec<ResolveError<'element>>> {
     let symbol = resolver.scope.try_get(element)?;
 
@@ -32,7 +32,7 @@ pub(super) fn resolve_invoke<'element>(
             vec![ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::InvalidOperation(token),
+                        crate::checker::ErrorKind::InvalidOperation(token),
                         span,
                     ),
                 },
@@ -43,7 +43,7 @@ pub(super) fn resolve_invoke<'element>(
             vec![ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::Mismatch(expected, actual),
+                        crate::checker::ErrorKind::Mismatch(expected, actual),
                         span,
                     ),
                 },
@@ -153,7 +153,7 @@ pub(super) fn resolve_invoke<'element>(
         )
     );
 
-    if let crate::resolver::checker::TypeKind::Method(method) = &typ.kind {
+    if let crate::checker::TypeKind::Method(method) = &typ.kind {
         let expected = method.members.len();
         let provided = invoke.members.len();
         if (!method.variadic && provided != expected) || (method.variadic && provided < expected) {
@@ -164,7 +164,7 @@ pub(super) fn resolve_invoke<'element>(
             invoke_errors.push(ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::InvalidOperation(token),
+                        crate::checker::ErrorKind::InvalidOperation(token),
                         invoke.target.span,
                     ),
                 },
@@ -184,7 +184,7 @@ pub(super) fn resolve_invoke<'element>(
                             invoke_errors.push(ResolveError::new(
                                 ErrorKind::Check {
                                     error: CheckError::new(
-                                        crate::resolver::checker::ErrorKind::Mismatch(
+                                        crate::checker::ErrorKind::Mismatch(
                                             (**expected_type).clone(),
                                             actual.clone(),
                                         ),
@@ -210,7 +210,7 @@ pub(super) fn resolve_invoke<'element>(
             invoke_errors.push(ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::InvalidOperation(token),
+                        crate::checker::ErrorKind::InvalidOperation(token),
                         invoke.target.span,
                     ),
                 },
@@ -222,7 +222,7 @@ pub(super) fn resolve_invoke<'element>(
                 invoke_errors.push(ResolveError::new(
                     ErrorKind::Check {
                         error: CheckError::new(
-                            crate::resolver::checker::ErrorKind::Mismatch(
+                            crate::checker::ErrorKind::Mismatch(
                                 Type::integer(64, true, invoke.members[0].span),
                                 size,
                             ),
@@ -244,7 +244,7 @@ pub(super) fn resolve_invoke<'element>(
             invoke_errors.push(ResolveError::new(
                 ErrorKind::Check {
                     error: CheckError::new(
-                        crate::resolver::checker::ErrorKind::InvalidOperation(token),
+                        crate::checker::ErrorKind::InvalidOperation(token),
                         invoke.target.span,
                     ),
                 },
@@ -256,9 +256,9 @@ pub(super) fn resolve_invoke<'element>(
                 invoke_errors.push(ResolveError::new(
                     ErrorKind::Check {
                         error: CheckError::new(
-                            crate::resolver::checker::ErrorKind::Mismatch(
+                            crate::checker::ErrorKind::Mismatch(
                                 Type::pointer(
-                                    Type::new(crate::resolver::checker::TypeKind::Infer, invoke.members[0].span),
+                                    Type::new(crate::checker::TypeKind::Infer, invoke.members[0].span),
                                     invoke.members[0].span,
                                 ),
                                 ptr,
@@ -275,7 +275,7 @@ pub(super) fn resolve_invoke<'element>(
                 invoke_errors.push(ResolveError::new(
                     ErrorKind::Check {
                         error: CheckError::new(
-                            crate::resolver::checker::ErrorKind::Mismatch(
+                            crate::checker::ErrorKind::Mismatch(
                                 Type::integer(64, true, invoke.members[1].span),
                                 size,
                             ),
@@ -292,9 +292,9 @@ pub(super) fn resolve_invoke<'element>(
         return Err(invoke_errors);
     }
 
-    let output_type = if let crate::resolver::checker::TypeKind::Method(method) = &typ.kind {
+    let output_type = if let crate::checker::TypeKind::Method(method) = &typ.kind {
         if matches!(primitive.as_deref(), Some("alloc")) {
-            Type::pointer(Type::new(crate::resolver::checker::TypeKind::Infer, element.span), element.span)
+            Type::pointer(Type::new(crate::checker::TypeKind::Infer, element.span), element.span)
         } else if matches!(primitive.as_deref(), Some("or_else")) && invoke.members.len() == 2 {
             invoke.members[1].resolve(resolver)?.typed
         } else {

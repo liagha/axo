@@ -1,16 +1,13 @@
 use crate::{
     parser::Element,
-    resolver::{
-        analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction},
-        Resolver,
-    },
+    resolver::Resolver,
     scanner::{OperatorKind, Token, TokenKind},
     schema::{Binary, Unary},
 };
-
+use crate::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
 use super::{analyze, Analyzer};
 
-pub(super) fn binary<'binary>(
+pub(crate) fn binary<'binary>(
     node: &Binary<Box<Element<'binary>>, Token<'binary>, Box<Element<'binary>>>,
     resolver: &Resolver<'binary>,
     context: Analyzer,
@@ -222,7 +219,7 @@ pub(super) fn binary<'binary>(
     }
 }
 
-pub(super) fn analyze_unary<'unary>(
+pub(crate) fn analyze_unary<'unary>(
     node: &Unary<Token<'unary>, Box<Element<'unary>>>,
     resolver: &Resolver<'unary>,
     context: Analyzer,

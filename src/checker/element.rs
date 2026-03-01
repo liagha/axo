@@ -1,11 +1,12 @@
 use crate::{
     data::{Boolean, Scale, Str},
     parser::{Element, ElementKind},
-    resolver::checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     schema::*,
     tracker::Span,
 };
+use crate::checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind};
+use crate::format::Show;
 
 fn mismatch<'element>(
     left: Type<'element>,
@@ -701,7 +702,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     .collect();
 
                 let structure = Structure::new(
-                    Str::from(construct.target.brand().unwrap().to_string()),
+                    Str::from(construct.target.brand().unwrap().format(0)),
                     members?,
                 );
 

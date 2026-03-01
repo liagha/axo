@@ -10,7 +10,6 @@ use {
     },
 };
 
-#[derive(Debug)]
 pub struct Initializer<'initializer> {
     pub index: Offset,
     pub position: Position<'initializer>,

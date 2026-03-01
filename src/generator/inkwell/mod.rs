@@ -16,10 +16,6 @@ use {
             hash::Map,
             platform::{File, Write},
         },
-        resolver::{
-            analyzer::{Analysis, Instruction},
-            checker::TypeKind,
-        },
         tracker::Span,
     },
     inkwell::{
@@ -31,6 +27,8 @@ use {
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
+use crate::analyzer::{Analysis, Instruction};
+use crate::checker::TypeKind;
 
 #[derive(Clone)]
 pub enum Entity<'backend> {

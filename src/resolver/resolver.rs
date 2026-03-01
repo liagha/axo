@@ -1,12 +1,14 @@
 use {
-    super::{analyzer::Analysis, checker::Type, scope::Scope, ResolveError},
+    super::{scope::Scope, ResolveError},
     crate::{
-        data::{memory::replace, Boolean, Identity, Str},
+        data::{memory::replace, Boolean, Identity},
         format::Debug,
         parser::{Element, ElementKind, Symbol},
         scanner::Token,
     },
 };
+use crate::analyzer::Analysis;
+use crate::checker::Type;
 
 #[derive(Clone, Debug)]
 pub struct Resolution<'resolution> {
@@ -29,7 +31,7 @@ impl<'resolution> Resolution<'resolution> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Inference<'inference> {
     pub target: Token<'inference>,
     pub declared: Option<Type<'inference>>,
@@ -50,7 +52,6 @@ impl<'inference> Inference<'inference> {
     }
 }
 
-#[derive(Debug)]
 pub struct Resolver<'resolver> {
     pub counter: Identity,
     pub scope: Scope<'resolver>,

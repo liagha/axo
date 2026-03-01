@@ -54,13 +54,13 @@ impl<'registry> Resolver<'registry> {
         Self::lookup_value(resolver, identifier)
     }
 
-    pub fn verbosity(resolver: &mut Resolver<'registry>) -> bool {
+    pub fn verbosity(resolver: &mut Resolver<'registry>) -> u8 {
         match Self::lookup_value(resolver, Str::from("Verbosity")) {
             Some(Token {
-                kind: TokenKind::Boolean(value),
+                kind: TokenKind::Integer(value),
                 ..
-            }) => value,
-            _ => false,
+            }) => value as u8,
+            _ => 0,
         }
     }
 

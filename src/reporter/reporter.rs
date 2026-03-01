@@ -7,15 +7,15 @@ use {
         internal::timer::Duration,
         parser::Element,
         reporter::Error,
-        resolver::checker::{Type, TypeKind},
         resolver::{Inference, Resolution},
         scanner::Token,
     },
     broccli::{xprintln, Color},
 };
+use crate::checker::{Type, TypeKind};
 
 pub struct Reporter {
-    pub verbosity: bool,
+    pub verbosity: u8,
 }
 
 impl Reporter {
@@ -62,14 +62,18 @@ impl Reporter {
         }
     }
 
-    pub fn new(verbosity: bool) -> Self {
+    pub fn new(verbosity: u8) -> Self {
         Self {
             verbosity,
         }
     }
+    
+    pub fn is_verbose(&self) -> bool {
+        self.verbosity > 0
+    }
 
     pub fn start(&self, stage: &str) {
-        if self.verbosity {
+        if self.is_verbose() {
             xprintln!(
                 "Started {}." => Color::Blue,
                 format!("`{}`", stage) => Color::White,
@@ -79,7 +83,7 @@ impl Reporter {
     }
 
     pub fn generate(&self, kind: &str, target: &PathBuf) {
-        if self.verbosity {
+        if self.is_verbose() {
             xprintln!(
                 "Generated {} {}." => Color::Green,
                 format!("({})", kind) => Color::White,
@@ -91,7 +95,7 @@ impl Reporter {
     }
 
     pub fn run(&self, target: &PathBuf) {
-        if self.verbosity {
+        if self.is_verbose() {
             xprintln!(
                 "Running {}." => Color::Blue,
                 format!("`{}`", target.to_string_lossy()) => Color::White
@@ -102,7 +106,7 @@ impl Reporter {
     }
 
     pub fn finish(&self, stage: &str, duration: Duration) {
-        if self.verbosity {
+        if self.is_verbose() {
             xprintln!(
                 "Finished {} {}s." => Color::Green,
                 format!("`{}` in", stage) => Color::White,
@@ -114,10 +118,10 @@ impl Reporter {
     }
 
     pub fn tokens(&self, tokens: &[Token]) {
-        if self.verbosity {
+        if self.is_verbose() {
             let tree = tokens
                 .iter()
-                .map(|token| Str::from(format!("{:#?}", token)))
+                .map(|token| Str::from(format!("{}", token.format(self.verbosity))))
                 .collect::<Vec<Str>>()
                 .join("\n");
 
@@ -126,7 +130,7 @@ impl Reporter {
                     "{}{}\n{}" => Color::White,
                     "Tokens" => Color::Cyan,
                     ":" => Color::White,
-                    tree.indent() => Color::White
+                    tree.indent(self.verbosity) => Color::White
                 );
                 xprintln!();
             }
@@ -134,10 +138,10 @@ impl Reporter {
     }
 
     pub fn elements(&self, elements: &[Element]) {
-        if self.verbosity {
+        if self.is_verbose() {
             let tree = elements
                 .iter()
-                .map(|element| Str::from(format!("{:#?}", element)))
+                .map(|element| Str::from(format!("{}", element.format(self.verbosity))))
                 .collect::<Vec<Str>>()
                 .join("\n");
 
@@ -146,7 +150,7 @@ impl Reporter {
                     "{}{}\n{}" => Color::White,
                     "Elements" => Color::Cyan,
                     ":" => Color::White,
-                    tree.indent() => Color::White
+                    tree.indent(self.verbosity) => Color::White
                 );
                 xprintln!();
             }
@@ -160,10 +164,10 @@ impl Reporter {
             Option<Inference<'reporter>>,
         )],
     ) {
-        if self.verbosity {
+        if self.is_verbose() {
             let mut tree = String::new();
             for (symbol, maybe_inference) in symbols {
-                tree.push_str(&format!("{:#?}", symbol));
+                tree.push_str(&format!("{}", symbol.format(self.verbosity)));
                 if let Some(inference) = maybe_inference {
                     let declared = inference
                         .declared
@@ -188,7 +192,7 @@ impl Reporter {
                     "{}{}\n{}" => Color::White,
                     "Symbols" => Color::Blue,
                     ":" => Color::White,
-                    Str::from(tree).indent() => Color::White,
+                    Str::from(tree).indent(self.verbosity) => Color::White,
                 );
                 xprintln!();
             }
@@ -196,7 +200,7 @@ impl Reporter {
     }
 
     pub fn resolutions(&self, resolutions: &[Resolution]) {
-        if self.verbosity {
+        if self.is_verbose() {
             let tree = resolutions
                 .iter()
                 .map(|resolution| Str::from(format!("{:#?}", resolution.analysis.instruction)))
@@ -208,7 +212,7 @@ impl Reporter {
                     "{}{}\n{}" => Color::White,
                     "Analyses" => Color::Cyan,
                     ":" => Color::White,
-                    tree.indent() => Color::White,
+                    tree.indent(self.verbosity) => Color::White,
                 );
                 xprintln!();
             } else {

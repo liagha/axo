@@ -1,9 +1,9 @@
 use crate::{
     data::Scale,
     parser::{Element, ElementKind},
-    resolver::checker::{Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
 };
+use crate::checker::{Type, TypeKind};
 
 fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
     match (&expected.kind, &actual.kind) {
