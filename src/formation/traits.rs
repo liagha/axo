@@ -9,7 +9,7 @@ use {
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Show<'form>
     for Form<'form, Input, Output, Failure>
 {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'form> {
         match verbosity {
@@ -39,7 +39,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
                 }
             }
             _ => {
-                Str::from("")
+                unimplemented!("the verbosity `{}` wasn't implemented for Form.", verbosity);
             }
         }
     }

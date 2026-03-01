@@ -15,10 +15,10 @@ pub mod helper {
         },
     };
 
-    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u16> + 'formable {}
+    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + 'formable {}
 
     impl<'formable, T> Formable<'formable> for T where
-        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u16> + 'formable
+        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + 'formable
     {
     }
 

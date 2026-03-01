@@ -225,7 +225,7 @@ impl Reporter {
     {
         if !errors.is_empty() {
             for error in errors {
-                let (message, details) = error.format();
+                let (message, details) = error.handle();
                 xprintln!(
                     "{}\n{}" => Color::Red,
                     message => Color::White,

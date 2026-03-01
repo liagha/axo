@@ -7,8 +7,56 @@ use {
     },
 };
 
+impl<'character> Show<'character> for Character<'character> {
+    type Verbosity = u8;
+    
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'character> {
+        match verbosity {
+            0 => {
+                format!("{}", self.value)
+            }
+            
+            1 => {
+                format!("Character({})", self.value)
+            }
+            
+            2 => {
+                format!("Character({}, {:?})", self.value, self.span)
+            }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Character.", verbosity);
+            }
+        }.into()
+    }
+}
+
+impl<'token> Show<'token> for Token<'token> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
+        match verbosity {
+            0 => {
+                format!("{}", self.kind.format(verbosity))
+            }
+
+            1 => {
+                format!("{}", self.kind.format(verbosity))
+            }
+
+            2 => {
+                format!("{:?} | {:?}", self.kind.format(verbosity), self.span)
+            }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Token.", verbosity);
+            }
+        }.into()
+    }
+}
+
 impl<'token> Show<'token> for TokenKind<'token> {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
         match verbosity { 
@@ -41,31 +89,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
             }
             
             _ => {
-                unimplemented!("the verbosity wasn't implemented for TokenKind.");
-            }
-        }.into()
-    }
-}
-
-impl<'token> Show<'token> for Token<'token> {
-    type Verbosity = u16;
-    
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
-        match verbosity { 
-            0 => {
-                format!("{}", self.kind.format(verbosity))
-            }
-            
-            1 => {
-                format!("{}", self.kind.format(verbosity))
-            }
-            
-            2 => {
-                format!("{:?} | {:?}", self.kind.format(verbosity), self.span)
-            }
-
-            _ => {
-                unimplemented!("the verbosity wasn't implemented for Token.");
+                unimplemented!("the verbosity `{}` wasn't implemented for TokenKind.", verbosity);
             }
         }.into()
     }

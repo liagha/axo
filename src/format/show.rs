@@ -16,13 +16,13 @@ pub trait Show<'show> {
     }
 }
 
-impl<'show, Item: Display> Show<'show> for [Item] {
-    type Verbosity = u16;
+impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for [Item] {
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
             self.iter()
-                .map(|form| Str::from(form.to_string()))
+                .map(|form| Str::from(form.format(verbosity)))
                 .collect::<Vec<Str>>()
                 .join(", "),
         )
@@ -30,7 +30,7 @@ impl<'show, Item: Display> Show<'show> for [Item] {
 }
 
 impl<'show, Item: Display> Show<'show> for Set<Item> {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(
@@ -43,7 +43,7 @@ impl<'show, Item: Display> Show<'show> for Set<Item> {
 }
 
 impl<'show> Show<'show> for String {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(self.clone())
@@ -51,7 +51,7 @@ impl<'show> Show<'show> for String {
 }
 
 impl<'show> Show<'show> for &'show str {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(*self)
@@ -59,7 +59,7 @@ impl<'show> Show<'show> for &'show str {
 }
 
 impl<'show> Show<'show> for Str<'show> {
-    type Verbosity = u16;
+    type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         *self

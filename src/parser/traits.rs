@@ -11,307 +11,330 @@ use {
         tracker::{Span, Spanned},
     },
 };
+use crate::data::Str;
 
-impl<'element> Debug for Element<'element> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if f.alternate() {
-            write!(f, "{:#?}", self.kind)
-        } else {
-            write!(f, "{:?} | {:?}", self.kind, self.span)
-        }
+impl<'element> Show<'element> for Element<'element> {
+    type Verbosity = u8;
+    
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
+        match verbosity {
+            0 => {
+                format!("{}", self.kind.format(verbosity))
+            }
+            
+            1 => {
+                format!("{} | {:?}", self.kind.format(verbosity), self.span)
+            }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Element.", verbosity);
+            }
+        }.into()
     }
 }
 
-impl<'element> Debug for ElementKind<'element> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if f.alternate() {
-            match self {
-                ElementKind::Literal(literal) => {
-                    write!(f, "{:#?}", literal)
-                }
-                ElementKind::Delimited(delimited) => {
-                    write!(
-                        f,
-                        "Delimited({}-{},{})",
-                        delimited.start.to_string(),
-                        delimited.end.to_string(),
-                        delimited
-                            .members
-                            .iter()
-                            .map(|item| format!(" {:#?}", item))
-                            .collect::<Vec<_>>()
-                            .join(
-                                &*delimited
-                                    .clone()
-                                    .separator
-                                    .map(|separator| format!(" {}", separator))
-                                    .unwrap_or(" ".to_string())
-                            ),
-                    )
-                }
+impl<'element> Show<'element> for ElementKind<'element> {
+    type Verbosity = u8;
+    
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
+        match verbosity {
+            0 => {
+                match self {
+                    ElementKind::Literal(literal) => {
+                        format!("{}", literal.format(verbosity))
+                    }
+                    ElementKind::Delimited(delimited) => {
+                        format!(
+                            "Delimited({}-{},{})",
+                            delimited.start.format(verbosity),
+                            delimited.end.format(verbosity),
+                            delimited
+                                .members
+                                .iter()
+                                .map(|item| format!(" {}", item.format(verbosity)))
+                                .collect::<Vec<_>>()
+                                .join(
+                                    &*delimited
+                                        .clone()
+                                        .separator
+                                        .map(|separator| format!(" {}", separator.format(verbosity)))
+                                        .unwrap_or(" ".to_string())
+                                ),
+                        )
+                    }
 
-                ElementKind::Binary(binary) => {
-                    write!(
-                        f,
-                        "Binary({:#?} {:#?} {:#?})",
-                        binary.left, binary.operator, binary.right
-                    )
-                }
-                ElementKind::Unary(unary) => {
-                    write!(f, "Unary({:#?} {:#?})", unary.operator, unary.operand)
-                }
+                    ElementKind::Binary(binary) => {
+                        format!(
+                            "Binary({} {} {})",
+                            binary.left.format(verbosity), binary.operator.format(verbosity), binary.right.format(verbosity)
+                        )
+                    }
+                    ElementKind::Unary(unary) => {
+                        format!("Unary({} {})", unary.operator.format(verbosity), unary.operand.format(verbosity))
+                    }
 
-                ElementKind::Index(index) => {
-                    write!(f, "Index({:#?}[{:#?}])", index.target, index.members)
-                }
-                ElementKind::Invoke(invoke) => {
-                    write!(f, "Invoke({:#?}({:#?}))", invoke.target, invoke.members)
-                }
+                    ElementKind::Index(index) => {
+                        format!("Index({}[{}])", index.target.format(verbosity), index.members.format(verbosity))
+                    }
+                    ElementKind::Invoke(invoke) => {
+                        format!("Invoke({}({}))", invoke.target.format(verbosity), invoke.members.format(verbosity))
+                    }
 
-                ElementKind::Construct(construct) => {
-                    write!(
-                        f,
-                        "Constructor({:#?} | {:#?})",
-                        construct.target, construct.members
-                    )
+                    ElementKind::Construct(construct) => {
+                        format!(
+                            "Constructor({} | {})",
+                            construct.target.format(verbosity), construct.members.format(verbosity)
+                        )
+                    }
+ 
+                    ElementKind::Symbolize(symbol) => format!("{}", symbol.format(verbosity)),
                 }
-
-                ElementKind::Symbolize(symbol) => write!(f, "+ {:#?}", symbol),
             }
-        } else {
-            match self {
-                ElementKind::Literal(literal) => {
-                    write!(f, "{:?}", literal)
-                }
-                ElementKind::Delimited(delimited) => {
-                    write!(
-                        f,
-                        "Delimited({}-{}, {})",
-                        delimited.start.to_string(),
-                        delimited.end.to_string(),
-                        delimited
-                            .members
-                            .iter()
-                            .map(|item| format!("{:#?}", item))
-                            .collect::<Vec<_>>()
-                            .join(
-                                &*delimited
-                                    .clone()
-                                    .separator
-                                    .map(|separator| format!("{} ", separator))
-                                    .unwrap_or(" ".to_string())
-                            ),
-                    )
-                }
 
-                ElementKind::Binary(binary) => {
-                    write!(
-                        f,
-                        "Binary({:?} {:?} {:?})",
-                        binary.left, binary.operator, binary.right
-                    )
-                }
-                ElementKind::Unary(unary) => {
-                    write!(f, "Unary({:?} {:?})", unary.operator, unary.operand)
-                }
+            1 => {
+                match self {
+                    ElementKind::Literal(literal) => {
+                        format!("{:?}", literal.format(verbosity))
+                    }
+                    ElementKind::Delimited(delimited) => {
+                        format!(
+                            "Delimited({}-{}, {})",
+                            delimited.start.format(verbosity),
+                            delimited.end.format(verbosity),
+                            delimited
+                                .members
+                                .iter()
+                                .map(|item| format!("{}", item.format(verbosity)))
+                                .collect::<Vec<_>>()
+                                .join(
+                                    &*delimited
+                                        .clone()
+                                        .separator
+                                        .map(|separator| format!("{} ", separator.format(verbosity)))
+                                        .unwrap_or(" ".to_string())
+                                ),
+                        )
+                    }
 
-                ElementKind::Index(index) => {
-                    write!(f, "Index({:?}[{:?}])", index.target, index.members)
-                }
-                ElementKind::Invoke(invoke) => {
-                    write!(f, "Invoke({:?}({:?}))", invoke.target, invoke.members)
-                }
+                    ElementKind::Binary(binary) => {
+                        format!(
+                            "Binary({} {} {})",
+                            binary.left.format(verbosity), binary.operator.format(verbosity), binary.right.format(verbosity)
+                        )
+                    }
+                    ElementKind::Unary(unary) => {
+                        format!("Unary({:?} {:?})", unary.operator.format(verbosity), unary.operand.format(verbosity))
+                    }
 
-                ElementKind::Construct(construct) => {
-                    write!(
-                        f,
-                        "Constructor({:?} | {:?})",
-                        construct.target, construct.members
-                    )
-                }
+                    ElementKind::Index(index) => {
+                        format!("Index({:?}[{:?}])", index.target.format(verbosity), index.members.format(verbosity))
+                    }
+                    ElementKind::Invoke(invoke) => {
+                        format!("Invoke({:?}({:?}))", invoke.target.format(verbosity), invoke.members.format(verbosity))
+                    }
 
-                ElementKind::Symbolize(symbol) => write!(f, "+ {:?}", symbol),
+                    ElementKind::Construct(construct) => {
+                        format!(
+                            "Constructor({:?} | {:?})",
+                            construct.target.format(verbosity), construct.members.format(verbosity)
+                        )
+                    }
+
+                    ElementKind::Symbolize(symbol) => format!("+ {}", symbol.format(verbosity)),
+                }
             }
-        }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for ElementKind.", verbosity);
+            }
+        }.into()
+    }   
+}
+
+impl<'symbol> Show<'symbol> for Symbol<'symbol> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
+        match verbosity {
+            0 => {
+                format!(
+                    "{}{}{}{}",
+                    self.kind.format(verbosity),
+                    if self.scope.is_empty() {
+                        "".into()
+                    } else {
+                        format!("\nScope: {:#?}", self.scope).indent(verbosity)
+                    },
+                    format!("\nSpecification: {:#?}", self.specifier).indent(verbosity),
+                    if self.scope.is_empty() {
+                        "".into()
+                    } else {
+                        format!("\nGenerics: {:#?}", self.generic).indent(verbosity)
+                    }
+                )
+            }
+
+            1 => {
+                format!(
+                    "{} | {:?} -> {}",
+                    self.kind.format(verbosity), self.span, self.specifier.format(verbosity)
+                )
+            }
+
+            _ => {
+                unimplemented!("the verbosity `{}` wasn't implemented for Symbol.", verbosity);
+            }
+        }.into()
     }
 }
 
-impl<'symbol> Debug for Symbol<'symbol> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if f.alternate() {
-            write!(
-                f,
-                "{:#?}{}{}{}",
-                self.kind,
-                if self.scope.is_empty() {
-                    "".into()
-                } else {
-                    format!("\nScope: {:#?}", self.scope).indent()
-                },
-                format!("\nSpecification: {:#?}", self.specifier).indent(),
-                if self.scope.is_empty() {
-                    "".into()
-                } else {
-                    format!("\nGenerics: {:#?}", self.generic).indent()
-                }
-            )
-        } else {
-            write!(
-                f,
-                "{:?} | {:?} -> {:?}",
-                self.kind, self.span, self.specifier
-            )
-        }
-    }
-}
+impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
+    type Verbosity = u8;
 
-impl<'symbol> Debug for SymbolKind<'symbol> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if f.alternate() {
-            match self {
-                SymbolKind::Inclusion(inclusion) => {
-                    write!(f, "Inclusion({:#?})", inclusion.target)
-                }
-                SymbolKind::Extension(extension) => {
-                    write!(f, "Extension(")?;
-
-                    if let Some(extension) = &extension.extension {
-                        write!(f, "{:#?}, ", extension)?;
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
+        match verbosity {
+            0 => {
+                match self {
+                    SymbolKind::Inclusion(inclusion) => {
+                        format!("Inclusion({})", inclusion.target.format(verbosity))
                     }
-
-                    write!(f, "{:#?}, {:#?})", extension.target, extension.members)
-                }
-                SymbolKind::Binding(binding) => {
-                    write!(
-                        f,
-                        "Binding({} {:#?}",
-                        if binding.constant {
-                            "Constant"
-                        } else {
-                            "Variable"
-                        },
-                        binding.target
-                    )?;
-
-                    if let Some(annotation) = &binding.annotation {
-                        write!(f, " : {:#?}", annotation)?;
+                    SymbolKind::Extension(extension) => {
+                        format!(
+                            "Extension({}{}",
+                            if let Some(extension) = &extension.extension {
+                                format!("{}, ", extension.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
+                        )
                     }
-
-                    if let Some(value) = &binding.value {
-                        write!(f, " = {:#?}", value)?;
+                    SymbolKind::Binding(binding) => {
+                        format!(
+                            "Binding({} {}{}{})",
+                            if binding.constant {
+                                "Constant"
+                            } else {
+                                "Variable"
+                            },
+                            binding.target.format(verbosity),
+                            if let Some(annotation) = &binding.annotation {
+                                format!(" : {}", annotation.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            if let Some(value) = &binding.value {
+                                format!(" = {}", value.format(verbosity))
+                            } else {
+                                "".to_string()
+                            }
+                        )
                     }
-
-                    write!(f, ")")
-                }
-                SymbolKind::Structure(structure) => {
-                    write!(
-                        f,
-                        "Structure({:#?} {:#?})",
-                        structure.target, structure.members
-                    )
-                }
-                SymbolKind::Enumeration(enumeration) => {
-                    write!(
-                        f,
-                        "Enumeration({:#?} {:#?})",
-                        enumeration.target, enumeration.members
-                    )
-                }
-                SymbolKind::Method(method) => {
-                    write!(
-                        f,
-                        "Method({:#?} {:#?}{} -> {:#?} : {:#?})",
-                        method.target,
-                        method.members,
-                        if method.variadic { "- Variadic" } else { "" },
-                        method.output,
-                        method.body
-                    )
-                }
-                SymbolKind::Module(module) => {
-                    write!(f, "Module({:#?})", module.target)
-                }
-                SymbolKind::Preference(preference) => {
-                    write!(
-                        f,
-                        "Preference({:#?}, {:#?})",
-                        preference.target, preference.value
-                    )
+                    SymbolKind::Structure(structure) => {
+                        format!(
+                            "Structure({} {})",
+                            structure.target.format(verbosity), structure.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Enumeration(enumeration) => {
+                        format!(
+                            "Enumeration({} {})",
+                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Method(method) => {
+                        format!(
+                            "Method({} {}{} -> {} : {})",
+                            method.target.format(verbosity),
+                            method.members.format(verbosity),
+                            if method.variadic { "- Variadic" } else { "" },
+                            method.output.format(verbosity),
+                            method.body.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Module(module) => {
+                        format!("Module({})", module.target.format(verbosity))
+                    }
+                    SymbolKind::Preference(preference) => {
+                        format!(
+                            "Preference({}, {})",
+                            preference.target.format(verbosity), preference.value.format(verbosity)
+                        )
+                    }
                 }
             }
-        } else {
-            match self {
-                SymbolKind::Inclusion(inclusion) => {
-                    write!(f, "Inclusion({:?})", inclusion.target)
-                }
-                SymbolKind::Extension(extension) => {
-                    write!(f, "Extension(")?;
 
-                    if let Some(extension) = &extension.extension {
-                        write!(f, "{:?}, ", extension)?;
+            1 => {
+                match self {
+                    SymbolKind::Inclusion(inclusion) => {
+                        format!("Inclusion({})", inclusion.target.format(verbosity))
                     }
-
-                    write!(f, "{:?}, {:?})", extension.target, extension.members)
-                }
-                SymbolKind::Binding(binding) => {
-                    write!(
-                        f,
-                        "Binding({} {:?}",
-                        if binding.constant {
-                            "Constant"
-                        } else {
-                            "Variable"
-                        },
-                        binding.target
-                    )?;
-
-                    if let Some(annotation) = &binding.annotation {
-                        write!(f, " : {:?}", annotation)?;
+                    SymbolKind::Extension(extension) => {
+                        format!(
+                            "Extension({}{}",
+                            if let Some(extension) = &extension.extension {
+                                format!("{}, ", extension.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
+                        )
                     }
-
-                    if let Some(value) = &binding.value {
-                        write!(f, " = {:?}", value)?;
+                    SymbolKind::Binding(binding) => {
+                        format!(
+                            "Binding({} {}{}{})",
+                            if binding.constant {
+                                "Constant"
+                            } else {
+                                "Variable"
+                            },
+                            binding.target.format(verbosity),
+                            if let Some(annotation) = &binding.annotation {
+                                format!(" : {}", annotation.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            if let Some(value) = &binding.value {
+                                format!(" = {}", value.format(verbosity))
+                            } else {
+                                "".to_string()
+                            }
+                        )
                     }
-
-                    write!(f, ")")
-                }
-                SymbolKind::Structure(structure) => {
-                    write!(
-                        f,
-                        "Structure({:?} {:?})",
-                        structure.target, structure.members
-                    )
-                }
-                SymbolKind::Enumeration(enumeration) => {
-                    write!(
-                        f,
-                        "Enumeration({:?} {:?})",
-                        enumeration.target, enumeration.members
-                    )
-                }
-                SymbolKind::Method(method) => {
-                    write!(
-                        f,
-                        "Method({:?} {:?}{} -> {:?} : {:?})",
-                        method.target,
-                        method.members,
-                        if method.variadic { "- Variadic" } else { "" },
-                        method.output,
-                        method.body
-                    )
-                }
-                SymbolKind::Module(module) => {
-                    write!(f, "Module({:?})", module.target)
-                }
-                SymbolKind::Preference(preference) => {
-                    write!(
-                        f,
-                        "Preference({:?}, {:?})",
-                        preference.target, preference.value
-                    )
+                    SymbolKind::Structure(structure) => {
+                        format!(
+                            "Structure({} {})",
+                            structure.target.format(verbosity), structure.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Enumeration(enumeration) => {
+                        format!(
+                            "Enumeration({} {})",
+                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Method(method) => {
+                        format!(
+                            "Method({} {}{} -> {} : {})",
+                            method.target.format(verbosity),
+                            method.members.format(verbosity),
+                            if method.variadic { "- Variadic" } else { "" },
+                            method.output.format(verbosity),
+                            method.body.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Module(module) => {
+                        format!("Module({})", module.target.format(verbosity))
+                    }
+                    SymbolKind::Preference(preference) => {
+                        format!(
+                            "Preference({}, {})",
+                            preference.target.format(verbosity), preference.value.format(verbosity)
+                        )
+                    }
                 }
             }
-        }
+        }.into()
     }
 }
 
@@ -448,12 +471,6 @@ impl<'symbol> Clone for Symbol<'symbol> {
             generic: self.generic.clone(),
             specifier: self.specifier.clone(),
         }
-    }
-}
-
-impl<'symbol> Display for Symbol<'symbol> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
-        write!(f, "{:?}", self)
     }
 }
 

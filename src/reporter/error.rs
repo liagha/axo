@@ -8,6 +8,7 @@ use {
     },
     broccli::{Color, TextStyle},
 };
+use crate::format::Show;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Error<'error, K, H = Str<'error>>
@@ -27,15 +28,21 @@ where
 {
 }
 
-impl<'error, K, H> Debug for Error<'error, K, H>
+impl<'error, K, H> Show<'error> for Error<'error, K, H>
 where
     K: Clone + Display,
     H: Clone + Display,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let (msg, details) = self.format();
+    type Verbosity = u8;
 
-        write!(f, "{} \n {}", msg, details)
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+        match verbosity {
+            _ => {
+                let (msg, details) = self.handle();
+
+                format!("{} \n {}", msg, details).into()
+            }
+        }
     }
 }
 
@@ -45,9 +52,17 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let (msg, details) = self.format();
+        write!(f, "{}", self.format(0))
+    }
+}
 
-        write!(f, "{} \n {}", msg, details)
+impl<'error, K, H> Debug for Error<'error, K, H>
+where
+    K: Clone + Display,
+    H: Clone + Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.format(1))
     }
 }
 
@@ -64,7 +79,7 @@ where
         }
     }
 
-    pub fn format(&self) -> (Str<'error>, Str<'error>) {
+    pub fn handle(&self) -> (Str<'error>, Str<'error>) {
         let mut messages = String::new();
         let mut details = String::new();
 
