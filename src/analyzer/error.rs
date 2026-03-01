@@ -25,8 +25,12 @@ impl<'error> Show<'error> for ErrorKind<'error> {
     type Verbosity = u8;
     
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
-        match verbosity { 
+        match verbosity {
             0 => {
+                "".to_string()
+            }
+
+            1 => {
                 match self {
                     ErrorKind::InvalidOperation(token) => {
                         format!("invalid operation token: {}.", token.format(verbosity))
@@ -50,13 +54,13 @@ impl<'error> Show<'error> for ErrorKind<'error> {
                     ErrorKind::Unimplemented => {
                         "unimplemented operation.".to_string()
                     }
-                }.into()
+                }
             }
             
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for Analyzer::ErrorKind.", verbosity);
             }
-        }
+        }.into()
     }
 }
 

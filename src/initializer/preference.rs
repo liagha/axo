@@ -171,7 +171,7 @@ impl<'initializer> Initializer<'initializer> {
             Self::dash(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
-                    identifier == "v" || identifier == "verbose"
+                    identifier == "v" || identifier == "verbosity"
                 } else {
                     false
                 }
@@ -192,56 +192,9 @@ impl<'initializer> Initializer<'initializer> {
                     )))
                 },
             ),
-        ])
-        .with_transform(
-            move |form: Form<
-                'initializer,
-                Token<'initializer>,
-                Preference,
-                InitialError<'initializer>,
-            >| {
-                let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
-                let span: Span<'initializer> = identifier.clone().span();
-
-                Ok(Form::output(Preference::new(
-                    identifier,
-                    Token::new(TokenKind::Boolean(true), span),
-                )))
-            },
-        )
-    }
-
-    pub fn quiet() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Preference<'initializer>,
-        InitialError<'initializer>,
-    > {
-        Classifier::sequence([
-            Self::dash(),
             Classifier::predicate(|token: &Token| {
-                if let TokenKind::Identifier(identifier) = &token.kind {
-                    identifier == "q" || identifier == "quiet"
-                } else {
-                    false
-                }
+                matches!(token.kind, TokenKind::Integer(_))
             })
-            .with_transform(
-                move |form: Form<
-                    'initializer,
-                    Token<'initializer>,
-                    Preference,
-                    InitialError<'initializer>,
-                >| {
-                    let identifier = form.collect_inputs()[0].clone();
-                    let span = identifier.span();
-
-                    Ok(Form::Input(Token::new(
-                        TokenKind::Identifier(Str::from("Verbosity")),
-                        span,
-                    )))
-                },
-            ),
         ])
         .with_transform(
             move |form: Form<
@@ -251,11 +204,11 @@ impl<'initializer> Initializer<'initializer> {
                 InitialError<'initializer>,
             >| {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
-                let span: Span<'initializer> = identifier.clone().span();
+                let value: Token<'initializer> = form.collect_inputs()[1].clone();
 
                 Ok(Form::output(Preference::new(
                     identifier,
-                    Token::new(TokenKind::Boolean(false), span),
+                    value,
                 )))
             },
         )

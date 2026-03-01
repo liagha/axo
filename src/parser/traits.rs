@@ -19,10 +19,14 @@ impl<'element> Show<'element> for Element<'element> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
+                "".to_string()
+            }
+
+            1 => {
                 format!("{}", self.kind.format(verbosity))
             }
             
-            1 => {
+            2 => {
                 format!("{} | {:?}", self.kind.format(verbosity), self.span)
             }
 
@@ -39,6 +43,10 @@ impl<'element> Show<'element> for ElementKind<'element> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
+                "".to_string()
+            }
+
+            1 => {
                 match self {
                     ElementKind::Literal(literal) => {
                         format!("{}", literal.format(verbosity))
@@ -91,7 +99,7 @@ impl<'element> Show<'element> for ElementKind<'element> {
                 }
             }
 
-            1 => {
+            2 => {
                 match self {
                     ElementKind::Literal(literal) => {
                         format!("{:?}", literal.format(verbosity))
@@ -157,6 +165,10 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
         match verbosity {
             0 => {
+                "".to_string()
+            }
+
+            1 => {
                 format!(
                     "{}{}{}{}",
                     self.kind.format(verbosity),
@@ -174,7 +186,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                 )
             }
 
-            1 => {
+            2 => {
                 format!(
                     "{} | {:?} -> {}",
                     self.kind.format(verbosity), self.span, self.specifier.format(verbosity)
@@ -194,74 +206,7 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
         match verbosity {
             0 => {
-                match self {
-                    SymbolKind::Inclusion(inclusion) => {
-                        format!("Inclusion({})", inclusion.target.format(verbosity))
-                    }
-                    SymbolKind::Extension(extension) => {
-                        format!(
-                            "Extension({}{}",
-                            if let Some(extension) = &extension.extension {
-                                format!("{}, ", extension.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
-                        )
-                    }
-                    SymbolKind::Binding(binding) => {
-                        format!(
-                            "Binding({} {}{}{})",
-                            if binding.constant {
-                                "Constant"
-                            } else {
-                                "Variable"
-                            },
-                            binding.target.format(verbosity),
-                            if let Some(annotation) = &binding.annotation {
-                                format!(" : {}", annotation.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            if let Some(value) = &binding.value {
-                                format!(" = {}", value.format(verbosity))
-                            } else {
-                                "".to_string()
-                            }
-                        )
-                    }
-                    SymbolKind::Structure(structure) => {
-                        format!(
-                            "Structure({} {})",
-                            structure.target.format(verbosity), structure.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Enumeration(enumeration) => {
-                        format!(
-                            "Enumeration({} {})",
-                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Method(method) => {
-                        format!(
-                            "Method({} {}{} -> {} : {})",
-                            method.target.format(verbosity),
-                            method.members.format(verbosity),
-                            if method.variadic { "- Variadic" } else { "" },
-                            method.output.format(verbosity),
-                            method.body.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Module(module) => {
-                        format!("Module({})", module.target.format(verbosity))
-                    }
-                    SymbolKind::Preference(preference) => {
-                        format!(
-                            "Preference({}, {})",
-                            preference.target.format(verbosity), preference.value.format(verbosity)
-                        )
-                    }
-                }
+                "".to_string()
             }
 
             1 => {
@@ -319,7 +264,7 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                             method.target.format(verbosity),
                             method.members.format(verbosity),
                             if method.variadic { "- Variadic" } else { "" },
-                            method.output.format(verbosity),
+                            method.output.clone().map(|value| *value).format(verbosity),
                             method.body.format(verbosity)
                         )
                     }
@@ -334,7 +279,78 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                     }
                 }
             }
-            
+
+            2 => {
+                match self {
+                    SymbolKind::Inclusion(inclusion) => {
+                        format!("Inclusion({})", inclusion.target.format(verbosity))
+                    }
+                    SymbolKind::Extension(extension) => {
+                        format!(
+                            "Extension({}{}",
+                            if let Some(extension) = &extension.extension {
+                                format!("{}, ", extension.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
+                        )
+                    }
+                    SymbolKind::Binding(binding) => {
+                        format!(
+                            "Binding({} {}{}{})",
+                            if binding.constant {
+                                "Constant"
+                            } else {
+                                "Variable"
+                            },
+                            binding.target.format(verbosity),
+                            if let Some(annotation) = &binding.annotation {
+                                format!(" : {}", annotation.format(verbosity))
+                            } else {
+                                "".to_string()
+                            },
+                            if let Some(value) = &binding.value {
+                                format!(" = {}", value.format(verbosity))
+                            } else {
+                                "".to_string()
+                            }
+                        )
+                    }
+                    SymbolKind::Structure(structure) => {
+                        format!(
+                            "Structure({} {})",
+                            structure.target.format(verbosity), structure.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Enumeration(enumeration) => {
+                        format!(
+                            "Enumeration({} {})",
+                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Method(method) => {
+                        format!(
+                            "Method({} {}{} -> {} : {})",
+                            method.target.format(verbosity),
+                            method.members.format(verbosity),
+                            if method.variadic { "- Variadic" } else { "" },
+                            method.output.clone().map(|value| *value).format(verbosity),
+                            method.body.format(verbosity)
+                        )
+                    }
+                    SymbolKind::Module(module) => {
+                        format!("Module({})", module.target.format(verbosity))
+                    }
+                    SymbolKind::Preference(preference) => {
+                        format!(
+                            "Preference({}, {})",
+                            preference.target.format(verbosity), preference.value.format(verbosity)
+                        )
+                    }
+                }
+            }
+
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for SymbolKind.", verbosity);
             }

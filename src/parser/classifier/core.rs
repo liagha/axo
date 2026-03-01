@@ -314,7 +314,7 @@ impl<'parser> Parser<'parser> {
     {
         Classifier::with_fail(
             Classifier::anything(),
-            |form: Form<Token, Element, ParseError>| {
+            |form: Form<Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let token = form.unwrap_input();
 
                 ParseError::new(

@@ -13,26 +13,30 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'form> {
         match verbosity {
+            0 => {
+                "".to_string()
+            }
+
             1 => {
                 match self.clone() {
                     Form::Blank => {
-                        Str::from("Blank")
+                        "Blank".to_string()
                     }
 
                     Form::Input(input) => {
-                        Str::from(format!("Input({})", input.format(verbosity)))
+                        (format!("Input({})", input.format(verbosity)))
                     }
 
                     Form::Output(output) => {
-                        Str::from(format!("Output({})", output.format(verbosity)))
+                        (format!("Output({})", output.format(verbosity)))
                     }
 
                     Form::Multiple(forms) => {
-                        Str::from(format!("Multiple({})", forms.format(verbosity)))
+                        (format!("Multiple({})", forms.format(verbosity)))
                     }
 
                     Form::Failure(error) => {
-                        Str::from(format!("Failure({})", error.format(verbosity)))
+                        (format!("Failure({})", error.format(verbosity)))
                     }
 
                     Form::_Phantom(_) => unreachable!(),
@@ -41,7 +45,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for Form.", verbosity);
             }
-        }
+        }.into()
     }
 }
 

@@ -9,17 +9,17 @@ use {
 
 impl<'character> Show<'character> for Character<'character> {
     type Verbosity = u8;
-    
+
     fn format(&self, verbosity: Self::Verbosity) -> Str<'character> {
         match verbosity {
             0 => {
                 format!("{}", self.value)
             }
-            
+
             1 => {
                 format!("Character({})", self.value)
             }
-            
+
             2 => {
                 format!("Character({}, {:?})", self.value, self.span)
             }

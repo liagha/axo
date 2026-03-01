@@ -130,7 +130,6 @@ impl<'initializer> Initializer<'initializer> {
         Classifier::alternative([
             Self::code(),
             Self::binary(),
-            Self::quiet(),
             Self::verbosity(),
             Self::run(),
             Self::bootstrap(),

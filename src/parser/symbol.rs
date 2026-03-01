@@ -35,8 +35,12 @@ impl<'show> Show<'show> for Specifier {
     type Verbosity = u8;
     
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity { 
+        match verbosity {
             0 => {
+                "".to_string()
+            }
+
+            1 => {
                 format!(
                     "{:?}{}{}",
                     self.visibility,
