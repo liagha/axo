@@ -33,7 +33,7 @@ pub struct Specifier {
 
 impl<'show> Show<'show> for Specifier {
     type Verbosity = u8;
-    
+
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => {
@@ -52,7 +52,7 @@ impl<'show> Show<'show> for Specifier {
                     format!(", {:?}", self.interface)
                 )
             }
-            
+
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for Specifier.", verbosity);
             }
@@ -78,9 +78,9 @@ impl Specifier {
     pub fn apply(&mut self, application: Element<'_>) {
         match application.kind {
             ElementKind::Literal(Token {
-                kind: TokenKind::Identifier(identifier),
-                ..
-            }) => match identifier.as_str().unwrap() {
+                                     kind: TokenKind::Identifier(identifier),
+                                     ..
+                                 }) => match identifier.as_str().unwrap() {
                 "public" => {
                     self.visibility = Visibility::Public;
                 }
@@ -140,7 +140,7 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
+    pub fn with_members<I: IntoIterator<Item=Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
             scope: Scope {
                 symbols: Set::from_iter(members),
@@ -233,10 +233,10 @@ impl<'symbol> Element<'symbol> {
             ElementKind::Binary(binary) => match binary.operator.kind {
                 TokenKind::Operator(OperatorKind::Colon) => binary.left.brand().clone(),
                 TokenKind::Operator(OperatorKind::Composite(ref operators))
-                    if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
-                {
-                    binary.right.brand().clone()
-                }
+                if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
+                    {
+                        binary.right.brand().clone()
+                    }
                 TokenKind::Operator(OperatorKind::Equal) => binary.left.brand().clone(),
                 TokenKind::Operator(OperatorKind::Dot) => binary.right.brand().clone(),
                 _ => None,

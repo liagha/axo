@@ -1,20 +1,22 @@
-use crate::resolver::ErrorKind;
 use {
     super::{
         scope::Scope,
         Inference, Resolution, Resolvable, ResolveError, Resolver,
     },
     crate::{
-        data::{Boolean, Str},
+        analyzer::Analyzable,
+        checker::{
+            annotation_type, unify,
+            Type,
+            CheckError, Checkable,
+        },
+        data::{Binary, Boolean, Str},
         parser::{ElementKind, Symbol, SymbolKind, Visibility},
+        resolver::ErrorKind,
         scanner::{OperatorKind, Token, TokenKind},
         tracker::Span,
     },
 };
-use crate::analyzer::Analyzable;
-use crate::checker::{annotation_type, unify};
-use crate::checker::{CheckError, Checkable, Type};
-use crate::data::Binary;
 
 fn symbol_name<'symbol>(symbol: &Symbol<'symbol>) -> Option<Str<'symbol>> {
     symbol.brand().and_then(|token| match token.kind {
@@ -69,9 +71,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         resolver: &mut Resolver<'symbol>,
     ) -> Result<Resolution<'symbol>, Vec<ResolveError<'symbol>>> {
         let mut symbol = self.clone();
+        let generic = symbol.generic.clone();
+
         let id = resolver.next_id();
         symbol.id = id.clone();
-        let generic = symbol.generic.clone();
 
         match &mut symbol.kind {
             SymbolKind::Inclusion(inclusion) => {
@@ -86,6 +89,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                         ..
                     })
                 );
+
                 if !valid_import_path {
                     let token = inclusion.target.brand().unwrap_or(Token::new(
                         TokenKind::Identifier(Str::from("use")),

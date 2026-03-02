@@ -31,9 +31,9 @@ impl<'parser> Parser<'parser> {
                 SymbolKind::Binding(binding) => {
                     binding.constant
                         && binding
-                            .annotation
-                            .as_ref()
-                            .is_some_and(|annotation| Self::is_type_annotation(annotation))
+                        .annotation
+                        .as_ref()
+                        .is_some_and(|annotation| Self::is_type_annotation(annotation))
                 }
                 _ => false,
             };
@@ -48,8 +48,7 @@ impl<'parser> Parser<'parser> {
         (runtime, generic)
     }
 
-    pub fn symbolization(
-    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::inclusion(),
             Self::extension(),
@@ -69,23 +68,23 @@ impl<'parser> Parser<'parser> {
             }),
             Classifier::deferred(Self::element),
         ])
-        .with_transform(
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let keyword = form.collect_inputs()[0].clone();
-                let inclusion = form.collect_outputs();
+            .with_transform(
+                |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
+                    let keyword = form.collect_inputs()[0].clone();
+                    let inclusion = form.collect_outputs();
 
-                let span = Span::merge(&keyword.span, &inclusion.clone().span());
+                    let span = Span::merge(&keyword.span, &inclusion.clone().span());
 
-                Ok(Form::output(Element::new(
-                    ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()), 0)),
+                    Ok(Form::output(Element::new(
+                        ElementKind::Symbolize(Symbol::new(
+                            SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()), 0)),
+                            span,
+                            0,
+                        )),
                         span,
-                        0,
-                    )),
-                    span,
-                )))
-            },
-        )
+                    )))
+                },
+            )
     }
 
     pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
@@ -134,7 +133,7 @@ impl<'parser> Parser<'parser> {
                                 span,
                                 0,
                             )
-                            .with_generic(generic),
+                                .with_generic(generic),
                         ),
                         span,
                     )))
@@ -162,7 +161,7 @@ impl<'parser> Parser<'parser> {
                                 span,
                                 0,
                             )
-                            .with_generic(generic),
+                                .with_generic(generic),
                         ),
                         span,
                     )))
@@ -338,8 +337,8 @@ impl<'parser> Parser<'parser> {
                             span,
                             0,
                         )
-                        .with_specifier(specifier)
-                        .with_generic(generic),
+                            .with_specifier(specifier)
+                            .with_generic(generic),
                     ),
                     span,
                 )))
@@ -347,8 +346,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn enumeration(
-    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::sequence([
@@ -390,8 +388,8 @@ impl<'parser> Parser<'parser> {
                             span,
                             0,
                         )
-                        .with_specifier(specifier)
-                        .with_generic(generic),
+                            .with_specifier(specifier)
+                            .with_generic(generic),
                     ),
                     span,
                 )))
@@ -418,21 +416,21 @@ impl<'parser> Parser<'parser> {
                             false
                         }
                     })
-                    .with_transform(
-                        |form: Form<
-                            'parser,
-                            Token<'parser>,
-                            Element<'parser>,
-                            ParseError<'parser>,
-                        >| {
-                            let variadic = form.unwrap_input();
+                        .with_transform(
+                            |form: Form<
+                                'parser,
+                                Token<'parser>,
+                                Element<'parser>,
+                                ParseError<'parser>,
+                            >| {
+                                let variadic = form.unwrap_input();
 
-                            Ok(Form::output(Element::new(
-                                ElementKind::literal(variadic.clone()),
-                                variadic.span,
-                            )))
-                        },
-                    ),
+                                Ok(Form::output(Element::new(
+                                    ElementKind::literal(variadic.clone()),
+                                    variadic.span,
+                                )))
+                            },
+                        ),
                 ])),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -442,15 +440,15 @@ impl<'parser> Parser<'parser> {
                             false
                         }
                     })
-                    .with_ignore(),
+                        .with_ignore(),
                     Self::literal(),
                 ])
-                .with_transform(|form| {
-                    let output = form.as_forms();
+                    .with_transform(|form| {
+                        let output = form.as_forms();
 
-                    Ok(output[0].clone())
-                })
-                .as_optional(),
+                        Ok(output[0].clone())
+                    })
+                    .as_optional(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
@@ -491,7 +489,7 @@ impl<'parser> Parser<'parser> {
                                 span,
                                 0,
                             )
-                            .with_generic(generic),
+                                .with_generic(generic),
                         ),
                         span,
                     )))
@@ -528,7 +526,7 @@ impl<'parser> Parser<'parser> {
                                 span,
                                 0,
                             )
-                            .with_generic(generic),
+                                .with_generic(generic),
                         ),
                         span,
                     )))

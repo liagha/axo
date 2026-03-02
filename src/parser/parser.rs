@@ -95,7 +95,7 @@ impl<'parser> Parser<'parser> {
                             | TokenKind::Comment(_)
                     )
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     !matches!(
                         token.kind,

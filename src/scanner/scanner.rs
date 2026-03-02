@@ -86,7 +86,7 @@ impl<'scanner> Scanner<'scanner> {
         }
     }
 
-    pub fn scan(&mut self) {
+    pub fn prepare(&mut self) {
         let location = self.position.location;
 
         match location.get_value() {
@@ -104,6 +104,9 @@ impl<'scanner> Scanner<'scanner> {
             }
         }
 
+    }
+
+    pub fn scan(&mut self) {
         let classifier = Self::classifier();
         let mut former = Former::new(self);
 

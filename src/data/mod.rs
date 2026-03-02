@@ -82,20 +82,20 @@ pub mod thread {
 use crate::internal::operation::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
 
 pub trait Number:
-    Copy
-    + Default
-    + PartialEq
-    + PartialOrd
-    + Add<Output = Self>
-    + Sub<Output = Self>
-    + Mul<Output = Self>
-    + Div<Output = Self>
-    + Rem<Output = Self>
-    + BitAnd<Output = Self>
-    + BitOr<Output = Self>
-    + BitXor<Output = Self>
-    + Shl<u32, Output = Self>
-    + Shr<u32, Output = Self>
+Copy
++ Default
++ PartialEq
++ PartialOrd
++ Add<Output=Self>
++ Sub<Output=Self>
++ Mul<Output=Self>
++ Div<Output=Self>
++ Rem<Output=Self>
++ BitAnd<Output=Self>
++ BitOr<Output=Self>
++ BitXor<Output=Self>
++ Shl<u32, Output=Self>
++ Shr<u32, Output=Self>
 {
     fn zero() -> Self;
     fn one() -> Self;

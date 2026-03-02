@@ -5,7 +5,7 @@ mod error;
 
 pub use {analysis::*, analyzer::*};
 
-pub(crate) use {analyzer::symbol, element::Analyzer, error::*};
+pub(crate) use error::*;
 
 use crate::reporter::Error;
 

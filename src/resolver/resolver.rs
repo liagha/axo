@@ -59,6 +59,8 @@ pub struct Resolver<'resolver> {
     pub output: Vec<Resolution<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
     pub symbols: Vec<(Symbol<'resolver>, Option<Inference<'resolver>>)>,
+    pub cycle: bool,
+    pub method: bool,
 }
 
 impl Clone for Resolver<'_> {
@@ -70,6 +72,8 @@ impl Clone for Resolver<'_> {
             output: self.output.clone(),
             errors: self.errors.clone(),
             symbols: self.symbols.clone(),
+            cycle: false,
+            method: false,
         }
     }
 }
@@ -91,6 +95,8 @@ impl<'resolver> Resolver<'resolver> {
             output: Vec::new(),
             errors: Vec::new(),
             symbols: Vec::new(),
+            cycle: false,
+            method: false,
         }
     }
 
@@ -124,32 +130,15 @@ impl<'resolver> Resolver<'resolver> {
         id
     }
 
-    pub fn process(&mut self) -> Vec<Resolution<'resolver>> {
-        self.prepare();
+    pub fn resolve(&mut self) {
         self.symbols.clear();
-
-        let mut output = Vec::new();
 
         for element in self.input.clone() {
             match element.resolve(self) {
                 Ok(resolution) => {
-                    output.push(resolution);
+                    self.output.push(resolution);
                 }
                 Err(errors) => {
-                    self.errors.extend(errors);
-                }
-            }
-        }
-
-        self.output = output.clone();
-
-        output
-    }
-
-    pub fn prepare(&mut self) {
-        for index in 0..self.input.len() {
-            if let ElementKind::Symbolize(symbol) = self.input[index].kind.clone() {
-                if let Err(errors) = symbol.resolve(self) {
                     self.errors.extend(errors);
                 }
             }

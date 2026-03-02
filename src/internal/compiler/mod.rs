@@ -3,9 +3,9 @@ mod stages;
 
 use {
     crate::{
-        analyzer::{symbol as analyze_symbol, Analyzer},
-        checker::Type,
         data::*,
+        checker::Type,
+        analyzer::Analyzable,
         initializer::{
             Initializer,
             InitializeError,
@@ -15,6 +15,7 @@ use {
             timer::{DefaultTimer, Duration},
         },
         parser::{
+            Parser,
             Element, ElementKind,
             Symbol, SymbolKind,
             ParseError,
@@ -26,6 +27,7 @@ use {
             ResolveError,
         },
         scanner::{
+            Scanner,
             Token, TokenKind,
             ScanError,
         },
@@ -39,7 +41,7 @@ use {
 
 #[cfg(feature = "generator")]
 use crate::{
-    generator::{Backend, Generator},
+    generator::{Backend, Generator, Inkwell},
     internal::driver::Driver,
 };
 
@@ -126,8 +128,6 @@ impl<'compiler> Compiler<'compiler> {
     pub fn build(&mut self, target: Location<'compiler>, index: usize) {
         self.resolver.enter();
 
-        let context = &inkwell::context::Context::create();
-
         let span = Span::file(Str::from(target.to_string()));
 
         let path = match target.clone().to_path() {
@@ -152,7 +152,6 @@ impl<'compiler> Compiler<'compiler> {
                 let child_loc = Location::file(Str::from(child_path));
                 self.build(child_loc, index);
             }
-            return;
         } else {
             let extension = path.extension().unwrap().to_str().unwrap();
 
@@ -173,7 +172,7 @@ impl<'compiler> Compiler<'compiler> {
                                 Ok(()) => true,
                                 Err(error) => {
                                     xprintln!(
-                                        "Linker error while producing `{}`: {}" => Color::Red,
+                                        "linker error while producing `{}`: {}" => Color::Red,
                                         binary.to_string_lossy(),
                                         error.to_string()
                                     );
@@ -197,12 +196,12 @@ impl<'compiler> Compiler<'compiler> {
 
                 "axo" => {
                     let tokens = {
-                        let mut scanner = crate::scanner::Scanner::new(target);
+                        let mut scanner = Scanner::new(target);
                         scanner.execute(self, target)
                     };
 
                     let elements = {
-                        let mut parser = crate::parser::Parser::new(target);
+                        let mut parser = Parser::new(target);
                         parser.execute(self, tokens)
                     };
 
@@ -218,89 +217,92 @@ impl<'compiler> Compiler<'compiler> {
 
                     #[cfg(feature = "generator")]
                     {
-                        if !faulty {
-                            let bootstrap = Resolver::bootstrap(&mut self.resolver);
-                            let backend = crate::generator::Inkwell::new(Str::from(name), context)
-                                .with_bootstrap(bootstrap);
-                            let mut generator = Generator::new(backend);
-                            let code = Resolver::code(&mut self.resolver, index);
-                            let executable = Resolver::binary(&mut self.resolver, index);
-                            let run = Resolver::run(&mut self.resolver);
-                            let should_link = run || executable.is_some();
+                        let bootstrap = Resolver::bootstrap(&mut self.resolver);
+                        let context = &inkwell::context::Context::create();
+                        let backend = Inkwell::new(Str::from(name), context)
+                            .with_bootstrap(bootstrap);
 
-                            let (code, binary) = Driver::paths(target, &name, code, executable);
-                            let output = Str::from(code.to_string_lossy().to_string());
-                            if let Some(parent) = code.parent() {
-                                if !parent.as_os_str().is_empty() {
-                                    if let Err(error) = create_dir_all(parent) {
-                                        xprintln!(
+                        let mut generator = Generator::new(backend);
+
+                        let code = Resolver::code(&mut self.resolver, index);
+                        let executable = Resolver::binary(&mut self.resolver, index);
+                        let run = Resolver::run(&mut self.resolver);
+
+                        let should_link = run || executable.is_some();
+
+                        let (code, binary) = Driver::paths(target, &name, code, executable);
+                        let output = Str::from(code.to_string_lossy().to_string());
+
+                        if let Some(parent) = code.parent() {
+                            if !parent.as_os_str().is_empty() {
+                                if let Err(error) = create_dir_all(parent) {
+                                    xprintln!(
                                             "Output directory error for `{}`: {}" => Color::Red,
                                             parent.to_string_lossy(),
                                             error.to_string()
                                         );
-                                        xprintln!();
-                                    }
+                                    xprintln!();
                                 }
                             }
+                        }
 
-                            let mut module_resolutions = Vec::new();
-                            for symbol in self.resolver.scope.all() {
-                                if matches!(symbol.kind, SymbolKind::Module(_)) {
-                                    if let Ok(analysis) =
-                                        analyze_symbol(&symbol, &self.resolver, Analyzer::root())
-                                    {
-                                        module_resolutions.push(Resolution::new(
-                                            None,
-                                            Type::unit(Span::void()),
-                                            analysis,
-                                        ));
-                                    }
+                        let mut module_resolutions = Vec::new();
+                        for symbol in self.resolver.scope.all() {
+                            if matches!(symbol.kind, SymbolKind::Module(_)) {
+                                if let Ok(analysis) =
+                                    symbol.analyze(&mut self.resolver)
+                                {
+                                    module_resolutions.push(Resolution::new(
+                                        None,
+                                        Type::unit(Span::void()),
+                                        analysis,
+                                    ));
                                 }
                             }
-                            if !module_resolutions.is_empty() {
-                                module_resolutions.extend(analysis);
-                                analysis = module_resolutions;
-                            }
+                        }
+                        if !module_resolutions.is_empty() {
+                            module_resolutions.extend(analysis);
+                            analysis = module_resolutions;
+                        }
 
-                            generator.execute(
-                                &mut self.timer,
-                                &self.reporter,
-                                analysis,
-                                Some(output),
-                            );
+                        generator.execute(
+                            &mut self.timer,
+                            &self.reporter,
+                            analysis,
+                            Some(output),
+                        );
 
-                            if generator.errors.is_empty() {
-                                self.reporter.start("linking");
+                        if generator.errors.is_empty() {
+                            self.reporter.start("linking");
 
-                                let linked = if should_link {
-                                    match Driver::link(&code, &binary, bootstrap) {
-                                        Ok(()) => true,
-                                        Err(error) => {
-                                            xprintln!(
+                            let linked = if should_link {
+                                match Driver::link(&code, &binary, bootstrap) {
+                                    Ok(()) => true,
+                                    Err(error) => {
+                                        xprintln!(
                                                 "Linker error while producing `{}`: {}" => Color::Red,
                                                 binary.to_string_lossy(),
                                                 error.to_string()
                                             );
-                                            xprintln!();
-                                            false
-                                        }
+                                        xprintln!();
+                                        false
                                     }
-                                } else {
-                                    true
-                                };
-
-                                if linked {
-                                    self.reporter.generate("IR", &code);
-                                    self.reporter.generate("executable", &binary);
-
-                                    let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-                                    self.reporter.finish("linking", duration);
                                 }
+                            } else {
+                                true
+                            };
 
-                                if linked && run {
-                                    self.queue.push(binary.clone());
-                                }
+                            if linked {
+                                self.reporter.generate("IR", &code);
+                                self.reporter.generate("executable", &binary);
+
+                                let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+                                self.reporter.finish("linking", duration);
+                            }
+
+                            if linked && run {
+                                self.queue.push(binary.clone());
                             }
                         }
                     }

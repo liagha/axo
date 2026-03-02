@@ -16,7 +16,7 @@ pub trait Show<'show> {
     }
 }
 
-impl<'show, T: Show<'show, Verbosity = u8>> Show<'show> for Option<T> {
+impl<'show, T: Show<'show, Verbosity=u8>> Show<'show> for Option<T> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
@@ -30,7 +30,7 @@ impl<'show, T: Show<'show, Verbosity = u8>> Show<'show> for Option<T> {
     }
 }
 
-impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for [Item] {
+impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for [Item] {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
@@ -43,7 +43,7 @@ impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for [Item] {
     }
 }
 
-impl<'show, Item: Show<'show, Verbosity = u8>> Show<'show> for Set<Item> {
+impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for Set<Item> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {

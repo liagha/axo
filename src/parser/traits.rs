@@ -15,7 +15,7 @@ use crate::data::Str;
 
 impl<'element> Show<'element> for Element<'element> {
     type Verbosity = u8;
-    
+
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
@@ -25,7 +25,7 @@ impl<'element> Show<'element> for Element<'element> {
             1 => {
                 format!("{}", self.kind.format(verbosity))
             }
-            
+
             2 => {
                 format!("{} | {:?}", self.kind.format(verbosity), self.span)
             }
@@ -39,7 +39,7 @@ impl<'element> Show<'element> for Element<'element> {
 
 impl<'element> Show<'element> for ElementKind<'element> {
     type Verbosity = u8;
-    
+
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
@@ -94,7 +94,7 @@ impl<'element> Show<'element> for ElementKind<'element> {
                             construct.target.format(verbosity), construct.members.format(verbosity)
                         )
                     }
- 
+
                     ElementKind::Symbolize(symbol) => format!("{}", symbol.format(verbosity)),
                 }
             }
@@ -156,7 +156,7 @@ impl<'element> Show<'element> for ElementKind<'element> {
                 unimplemented!("the verbosity `{}` wasn't implemented for ElementKind.", verbosity);
             }
         }.into()
-    }   
+    }
 }
 
 impl<'symbol> Show<'symbol> for Symbol<'symbol> {

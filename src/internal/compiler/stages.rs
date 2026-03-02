@@ -63,7 +63,7 @@ impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
         compiler.resolver.scope.extend(preferences);
 
         let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
-        
+
         logger.finish("initializing", duration);
 
         targets
@@ -75,11 +75,12 @@ impl<'scanner> Stage<'scanner, Location<'scanner>, Vec<Token<'scanner>>> for Sca
         &mut self,
         compiler: &mut Compiler<'scanner>,
         location: Location<'scanner>,
-    ) -> Vec<Token<'scanner>> 
+    ) -> Vec<Token<'scanner>>
     {
         self.set_location(location);
         compiler.reporter.start("scanning");
 
+        self.prepare();
         self.scan();
 
         compiler.reporter.tokens(&self.output);
@@ -117,7 +118,7 @@ impl<'parser> Stage<'parser, Vec<Token<'parser>>, Vec<Element<'parser>>> for Par
         compiler.reporter.elements(&self.output);
 
         let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
-        
+
         compiler
             .reporter
             .finish("parsing", duration);
@@ -146,7 +147,7 @@ impl<'resolver> Compiler<'resolver>
         self.resolver.symbols.clear();
         self.resolver.with_input(elements);
 
-        let resolutions = self.resolver.process();
+        self.resolver.resolve();
 
         let scope_symbols = self.resolver.scope.all();
         for symbol in scope_symbols {
@@ -160,7 +161,7 @@ impl<'resolver> Compiler<'resolver>
         }
 
         self.reporter.symbols(&self.resolver.symbols);
-        self.reporter.resolutions(&*resolutions);
+        self.reporter.resolutions(&*self.resolver.output);
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -176,7 +177,7 @@ impl<'resolver> Compiler<'resolver>
                 })
         );
 
-        resolutions
+        self.resolver.output.clone()
     }
 }
 
@@ -218,7 +219,7 @@ impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B>
         reporter.errors(self.errors.as_slice());
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
-        
+
         reporter
             .finish("generating", duration);
     }

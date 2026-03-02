@@ -136,7 +136,7 @@ impl<Delimiter: PartialEq, Item: PartialEq> PartialEq for Delimited<Delimiter, I
 }
 
 impl<Left: PartialEq, Operator: PartialEq, Right: PartialEq> PartialEq
-    for Binary<Left, Operator, Right>
+for Binary<Left, Operator, Right>
 {
     fn eq(&self, other: &Self) -> bool {
         self.left == other.left && self.operator == other.operator && self.right == other.right

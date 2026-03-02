@@ -60,22 +60,22 @@ impl<'parser> Parser<'parser> {
             }),
             Self::primary(),
         ])
-        .with_transform(|form: Form<Token, Element, ParseError>| {
-            let prefixes = form.collect_inputs();
-            let operand = form.collect_outputs()[0].clone();
-            let mut unary = operand.clone();
+            .with_transform(|form: Form<Token, Element, ParseError>| {
+                let prefixes = form.collect_inputs();
+                let operand = form.collect_outputs()[0].clone();
+                let mut unary = operand.clone();
 
-            for prefix in prefixes {
-                let span = Span::merge(&prefix.borrow_span(), &unary.borrow_span());
+                for prefix in prefixes {
+                    let span = Span::merge(&prefix.borrow_span(), &unary.borrow_span());
 
-                unary = Element::new(
-                    ElementKind::unary(Unary::new(prefix, Box::new(unary))),
-                    span,
-                );
-            }
+                    unary = Element::new(
+                        ElementKind::unary(Unary::new(prefix, Box::new(unary))),
+                        span,
+                    );
+                }
 
-            Ok(Form::output(unary))
-        })
+                Ok(Form::output(unary))
+            })
     }
 
     pub fn suffixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
@@ -335,7 +335,7 @@ impl<'parser> Parser<'parser> {
                             | TokenKind::Punctuation(PunctuationKind::Semicolon)
                     )
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Self::structure(),
                 Self::enumeration(),
                 Self::symbolization(),

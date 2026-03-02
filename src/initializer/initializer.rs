@@ -178,6 +178,7 @@ impl<'initializer> Initializer<'initializer> {
 
         scanner.set_location(location);
 
+        scanner.prepare();
         scanner.scan();
 
         self.input = scanner.output;

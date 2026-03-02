@@ -29,7 +29,7 @@ pub enum ErrorKind<'error> {
 
 impl<'error> Show<'error> for ErrorKind<'error> {
     type Verbosity = u8;
-    
+
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match verbosity {
             0 => {
@@ -62,7 +62,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
                     }
                 }
             }
-            
+
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for Analyzer::ErrorKind.", verbosity);
             }

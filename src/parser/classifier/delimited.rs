@@ -21,7 +21,7 @@ impl<'parser> Parser<'parser> {
                     | TokenKind::Punctuation(PunctuationKind::Semicolon)
             )
         })
-        .as_optional();
+            .as_optional();
 
         Classifier::with_transform(
             Classifier::sequence([

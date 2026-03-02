@@ -59,7 +59,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
-        match verbosity { 
+        match verbosity {
             0 => {
                 match self {
                     TokenKind::Boolean(boolean) => format!("{}", boolean),
@@ -72,8 +72,8 @@ impl<'token> Show<'token> for TokenKind<'token> {
                     TokenKind::Character(character) => format!("'{}'", character),
                     TokenKind::Comment(comment) => format!("//{}", comment),
                 }
-            }  
-            
+            }
+
             1 => {
                 match self {
                     TokenKind::Boolean(boolean) => format!("Boolean({})", boolean),
@@ -87,7 +87,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
                     TokenKind::Comment(comment) => format!("Comment({})", comment),
                 }
             }
-            
+
             _ => {
                 unimplemented!("the verbosity `{}` wasn't implemented for TokenKind.", verbosity);
             }

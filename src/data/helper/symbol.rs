@@ -146,7 +146,7 @@ impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
 }
 
 impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
-    for Method<Target, Parameter, Body, Output>
+for Method<Target, Parameter, Body, Output>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -169,7 +169,7 @@ impl<Target: PartialEq, Identity> PartialEq for Inclusion<Target, Identity> {
 }
 
 impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq
-    for Extension<Target, Interface, Member>
+for Extension<Target, Interface, Member>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.members == other.members
@@ -177,7 +177,7 @@ impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq
 }
 
 impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq
-    for Binding<Target, Value, Type>
+for Binding<Target, Value, Type>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -194,7 +194,7 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field>
 }
 
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq
-    for Method<Target, Parameter, Body, Output>
+for Method<Target, Parameter, Body, Output>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -217,7 +217,7 @@ impl<Target: Clone, Identity: Clone> Clone for Inclusion<Target, Identity> {
 }
 
 impl<Interface: Clone, Target: Clone, Member: Clone> Clone
-    for Extension<Target, Interface, Member>
+for Extension<Target, Interface, Member>
 {
     fn clone(&self) -> Self {
         Extension::new(
@@ -246,7 +246,7 @@ impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
 }
 
 impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
-    for Method<Target, Parameter, Body, Output>
+for Method<Target, Parameter, Body, Output>
 {
     fn clone(&self) -> Self {
         Method::new(
