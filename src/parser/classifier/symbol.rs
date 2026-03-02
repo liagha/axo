@@ -8,7 +8,7 @@ use {
         tracker::{Span, Spanned},
     },
 };
-use crate::data::schema::*;
+use crate::data::*;
 
 impl<'parser> Parser<'parser> {
     fn is_type_annotation(element: &Element<'parser>) -> bool {

@@ -1,6 +1,6 @@
 use crate::data::{Boolean, Char, Float, Integer, Scale, Str};
 use crate::checker::TypeKind;
-use crate::data::schema::*;
+use crate::data::*;
 
 #[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {

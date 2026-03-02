@@ -7,7 +7,7 @@ use {
         tracker::Span,
     },
 };
-use crate::data::schema::{Binding, Delimited, Method, Module};
+use crate::data::{Binding, Delimited, Method, Module};
 
 pub fn builtin<'resolver>(
     target: &Element<'resolver>,

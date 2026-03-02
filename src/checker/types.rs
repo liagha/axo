@@ -2,7 +2,7 @@ use crate::{
     data::{Boolean, Scale, Str},
     tracker::Span,
 };
-use crate::data::schema::*;
+use crate::data::*;
 
 #[derive(Clone, Debug)]
 pub struct Type<'ty> {

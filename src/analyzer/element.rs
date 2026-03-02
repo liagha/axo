@@ -5,7 +5,7 @@ use crate::{
     scanner::{PunctuationKind, Token, TokenKind},
 };
 use crate::analyzer::{Analysis, Analyzable, AnalyzeError, ErrorKind, Instruction};
-use crate::data::schema::*;
+use crate::data::*;
 use crate::format::Show;
 
 mod operation;

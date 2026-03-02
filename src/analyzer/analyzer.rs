@@ -12,7 +12,7 @@ use crate::analyzer::{
     Analysis, AnalyzeError, ErrorKind, Instruction,
 };
 use crate::checker::{Checkable, Type, TypeKind};
-use crate::data::schema::*;
+use crate::data::*;
 use crate::format::Show;
 
 pub trait Analyzable<'analyzable> {

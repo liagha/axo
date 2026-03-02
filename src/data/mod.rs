@@ -1,12 +1,12 @@
 mod float;
 mod string;
-pub mod schema;
+mod helper;
+pub use {helper::element::*, helper::symbol::*};
 
 pub use {
     float::Float,
     string::{from_utf8, FromStr, Str, Utf8Error},
 };
-
 pub type Identity = usize;
 pub type Char = char;
 pub type Boolean = bool;

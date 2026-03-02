@@ -12,7 +12,7 @@ use {
 };
 use crate::analyzer::{Analysis, Instruction};
 use crate::checker::TypeKind;
-use crate::data::schema::*;
+use crate::data::*;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {

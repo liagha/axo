@@ -6,7 +6,7 @@ use crate::{
     scanner::TokenKind,
 };
 use crate::checker::{CheckError, Checkable, Type, TypeKind};
-use crate::data::schema::Unary;
+use crate::data::Unary;
 
 pub(super) fn resolve_unary<'element>(
     element: &Element<'element>,

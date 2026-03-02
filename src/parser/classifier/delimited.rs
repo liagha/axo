@@ -6,7 +6,7 @@ use {
         tracker::Span,
     },
 };
-use crate::data::schema::*;
+use crate::data::*;
 
 impl<'parser> Parser<'parser> {
     fn delimited_form(

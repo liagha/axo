@@ -10,7 +10,7 @@ use {
         tracker::Span,
     },
 };
-use crate::data::schema::*;
+use crate::data::*;
 use crate::data::Str;
 use crate::format::Show;
 

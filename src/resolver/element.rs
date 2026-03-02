@@ -14,7 +14,7 @@ use {
 };
 use crate::analyzer::{Analyzable, AnalyzeError, ErrorKind as AnalyzeErrorKind};
 use crate::checker::{Checkable, Type};
-use crate::data::schema::*;
+use crate::data::*;
 use self::{binary::resolve_binary, invoke::resolve_invoke, unary::resolve_unary};
 
 impl<'element> Element<'element> {

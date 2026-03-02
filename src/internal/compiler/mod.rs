@@ -26,7 +26,7 @@ use crate::{
     generator::{Backend, Generator},
     internal::driver::Driver,
 };
-use crate::data::schema::*;
+use crate::data::*;
 use crate::initializer::InitializeError;
 use crate::parser::ParseError;
 use crate::resolver::ResolveError;

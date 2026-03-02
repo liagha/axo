@@ -11,7 +11,7 @@ use {
 };
 use crate::analyzer::{Analysis, Instruction};
 use crate::checker::TypeKind;
-use crate::data::schema::{Index, Structure};
+use crate::data::{Index, Structure};
 
 impl<'backend> super::Inkwell<'backend> {
     fn cast_value(

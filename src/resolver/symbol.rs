@@ -14,7 +14,7 @@ use {
 use crate::analyzer::Analyzable;
 use crate::checker::{annotation_type, unify};
 use crate::checker::{CheckError, Checkable, Type};
-use crate::data::schema::Binary;
+use crate::data::Binary;
 
 fn symbol_name<'symbol>(symbol: &Symbol<'symbol>) -> Option<Str<'symbol>> {
     symbol.brand().and_then(|token| match token.kind {

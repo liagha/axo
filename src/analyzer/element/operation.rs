@@ -4,7 +4,7 @@ use crate::{
     scanner::{OperatorKind, Token, TokenKind},
 };
 use crate::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
-use crate::data::schema::{Binary, Unary};
+use crate::data::{Binary, Unary};
 use super::{analyze, Analyzer};
 
 pub(crate) fn binary<'binary>(

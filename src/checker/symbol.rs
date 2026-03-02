@@ -6,7 +6,7 @@ use crate::{
 use crate::checker::{
     annotation_type, compatible, unify, CheckError, Checkable, ErrorKind, Type, TypeKind,
 };
-use crate::data::schema::*;
+use crate::data::*;
 use crate::format::Show;
 
 fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> {

@@ -4,7 +4,7 @@ use crate::{
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Span, Spanned},
 };
-use crate::data::schema::*;
+use crate::data::*;
 
 impl<'parser> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {

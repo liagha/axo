@@ -8,7 +8,7 @@ use crate::{
 };
 use crate::analyzer::{AnalyzeError, ErrorKind as AnalyzeErrorKind};
 use crate::checker::{CheckError, Checkable};
-use crate::data::schema::Binary;
+use crate::data::Binary;
 
 pub(super) fn resolve_binary<'element>(
     element: &Element<'element>,

@@ -8,7 +8,7 @@ use crate::{
     tracker::Span,
 };
 use crate::checker::{unify, CheckError, Checkable, Type};
-use crate::data::schema::Invoke;
+use crate::data::Invoke;
 
 pub(super) fn resolve_invoke<'element>(
     element: &Element<'element>,
