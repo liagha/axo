@@ -3,6 +3,12 @@ use crate::{
     tracker::{Location, Position},
 };
 
+pub struct Peeker<'peeker, Input> {
+    pub index: Offset,
+    pub position: Position<'peeker>,
+    pub input: Input,
+}
+
 pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn length(&self) -> Scale;
     fn remaining(&self) -> Scale {
