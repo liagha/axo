@@ -1,7 +1,7 @@
 use {
     super::{
         scope::Scope,
-        Inference, Resolution, Resolvable, ResolveError, Resolver,
+        Resolution, Resolvable, ResolveError, Resolver,
     },
     crate::{
         analyzer::Analyzable,
@@ -198,68 +198,15 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             )]
         })?;
 
-        let typ = match &self.kind {
-            SymbolKind::Binding(binding) => {
-                let declared = binding
-                    .annotation
-                    .as_ref()
-                    .and_then(|value| annotation_type(value));
-                let inferred = binding
-                    .value
-                    .as_ref()
-                    .map(|value| value.resolve(resolver).map(|resolution| resolution.typed))
-                    .transpose()?;
-
-                let target = binding.target.brand().unwrap_or_else(|| {
-                    Token::new(
-                        TokenKind::Identifier(Str::from("<anonymous>")),
-                        Span::void(),
-                    )
-                });
-                let inference = Inference::new(target, declared.clone(), inferred.clone());
-                if let Some(index) = resolver
-                    .symbols
-                    .iter()
-                    .position(|(symbol, _)| symbol.brand() == self.brand())
-                {
-                    resolver.symbols[index] = (self.clone(), Some(inference));
-                } else {
-                    resolver.symbols.push((self.clone(), Some(inference)));
-                }
-
-                match (declared, inferred) {
-                    (Some(declared), Some(inferred)) => {
-                        if let Some(unified) = unify(&declared, &inferred) {
-                            unified
-                        } else {
-                            return Err(vec![ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::Mismatch(
-                                            declared,
-                                            inferred.clone(),
-                                        ),
-                                        inferred.span,
-                                    ),
-                                },
-                                inferred.span,
-                            )]);
-                        }
-                    }
-                    (Some(declared), None) => declared,
-                    (None, Some(inferred)) => inferred,
-                    (None, None) => Type::unit(self.span),
-                }
-            }
-            _ => self.infer().map_err(|error| {
+        let typ =
+             self.infer().map_err(|error| {
                 vec![ResolveError::new(
                     ErrorKind::Check {
                         error: error.clone(),
                     },
                     error.span,
                 )]
-            })?,
-        };
+            })?;
 
         let resolution = Resolution::new(Some(id), typ, analysis);
 

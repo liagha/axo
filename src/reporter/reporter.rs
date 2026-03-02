@@ -10,7 +10,7 @@ use {
         },
         parser::Element,
         reporter::Error,
-        resolver::{Inference, Resolution},
+        resolver::{Resolution},
         scanner::Token,
     },
     broccli::{xprintln, Color},
@@ -161,31 +161,14 @@ impl Reporter {
 
     pub fn symbols<'reporter>(
         &self,
-        symbols: &[(
-            crate::parser::Symbol<'reporter>,
-            Option<Inference<'reporter>>,
-        )],
+        symbols: &[
+            crate::parser::Symbol<'reporter>
+        ],
     ) {
         if self.is_verbose() {
             let mut tree = String::new();
-            for (symbol, maybe_inference) in symbols {
+            for symbol in symbols {
                 tree.push_str(&format!("{}", symbol.format(self.verbosity)));
-                if let Some(inference) = maybe_inference {
-                    let declared = inference
-                        .declared
-                        .as_ref()
-                        .map(Self::describe_type)
-                        .unwrap_or_else(|| "None".to_string());
-                    let inferred = inference
-                        .inferred
-                        .as_ref()
-                        .map(Self::describe_type)
-                        .unwrap_or_else(|| "None".to_string());
-                    tree.push_str(&format!(
-                        "\n  Inference(declared: {}, inferred: {}).",
-                        declared, inferred
-                    ));
-                }
                 tree.push('\n');
             }
 

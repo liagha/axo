@@ -31,34 +31,12 @@ impl<'resolution> Resolution<'resolution> {
     }
 }
 
-#[derive(Clone)]
-pub struct Inference<'inference> {
-    pub target: Token<'inference>,
-    pub declared: Option<Type<'inference>>,
-    pub inferred: Option<Type<'inference>>,
-}
-
-impl<'inference> Inference<'inference> {
-    pub fn new(
-        target: Token<'inference>,
-        declared: Option<Type<'inference>>,
-        inferred: Option<Type<'inference>>,
-    ) -> Self {
-        Self {
-            target,
-            declared,
-            inferred,
-        }
-    }
-}
-
 pub struct Resolver<'resolver> {
     pub counter: Identity,
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
     pub output: Vec<Resolution<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
-    pub symbols: Vec<(Symbol<'resolver>, Option<Inference<'resolver>>)>,
     pub cycle: bool,
     pub method: bool,
 }
@@ -71,7 +49,6 @@ impl Clone for Resolver<'_> {
             input: self.input.clone(),
             output: self.output.clone(),
             errors: self.errors.clone(),
-            symbols: self.symbols.clone(),
             cycle: false,
             method: false,
         }
@@ -94,7 +71,6 @@ impl<'resolver> Resolver<'resolver> {
             input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
-            symbols: Vec::new(),
             cycle: false,
             method: false,
         }
@@ -131,8 +107,6 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn resolve(&mut self) {
-        self.symbols.clear();
-
         for element in self.input.clone() {
             match element.resolve(self) {
                 Ok(resolution) => {

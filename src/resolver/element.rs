@@ -115,22 +115,6 @@ impl<'element> Element<'element> {
             _ => false,
         }
     }
-
-    fn inference(&self, resolver: &Resolver<'element>) -> Option<Type<'element>> {
-        let token = self.brand()?;
-
-        resolver
-            .symbols
-            .iter()
-            .rev()
-            .find_map(|(symbol, inference)| {
-                if symbol.brand() == Some(token.clone()) {
-                    inference.as_ref().and_then(|item| item.inferred.clone())
-                } else {
-                    None
-                }
-            })
-    }
 }
 
 impl<'element> Resolvable<'element> for Element<'element> {
@@ -169,14 +153,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 Ok(Resolution::new(None, typ, analysis))
             }
 
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(_),
-                                     ..
-                                 }) => {
-                if let Some(typ) = self.inference(resolver) {
-                    return Ok(Resolution::new(None, typ, analysis));
-                }
-
+            ElementKind::Literal(
+                Token {
+                    kind: TokenKind::Identifier(_),
+                    ..
+                }) 
+            => {
                 let symbol = resolver.scope.try_get(&self)?;
 
                 let typ = symbol.infer().map_err(|error| {

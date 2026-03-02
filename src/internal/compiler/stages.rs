@@ -144,23 +144,13 @@ impl<'resolver> Compiler<'resolver>
     ) -> Vec<Resolution<'resolver>> {
         self.reporter.start("resolving");
 
-        self.resolver.symbols.clear();
         self.resolver.with_input(elements);
 
         self.resolver.resolve();
 
         let scope_symbols = self.resolver.scope.all();
-        for symbol in scope_symbols {
-            if !self.resolver
-                .symbols
-                .iter()
-                .any(|(item, _)| item.brand() == symbol.brand())
-            {
-                self.resolver.symbols.push((symbol, None));
-            }
-        }
 
-        self.reporter.symbols(&self.resolver.symbols);
+        self.reporter.symbols(&self.resolver.scope.all());
         self.reporter.resolutions(&*self.resolver.output);
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
