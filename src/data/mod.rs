@@ -1,11 +1,14 @@
 mod float;
 mod string;
 mod helper;
-pub use {helper::element::*, helper::symbol::*};
 
 pub use {
     float::Float,
     string::{from_utf8, FromStr, Str, Utf8Error},
+    helper::{
+        element::*,
+        symbol::*,
+    },
 };
 
 pub type Identity = usize;

@@ -1,9 +1,15 @@
 use {
-    crate::{format::Display, scanner::Token},
-    std::fmt::Formatter,
+    crate::{
+        format::{
+            Show,
+            Display,
+            Formatter,
+            Result
+        },
+        data::Str,
+        scanner::Token
+    },
 };
-use crate::data::Str;
-use crate::format::Show;
 
 #[derive(Clone)]
 pub enum ErrorKind<'error> {
@@ -65,7 +71,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 }
 
 impl<'error> Display for ErrorKind<'error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.format(1))
     }
 }

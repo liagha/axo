@@ -26,7 +26,8 @@ pub mod operation {
 pub mod platform {
     pub use std::{
         alloc::{alloc, dealloc, realloc, Layout},
-        env::{args, current_dir, current_exe, var},
+        env::{
+            args, current_dir, current_exe, var},
         ffi::{OsStr, OsString},
         fs::{canonicalize, create_dir_all, read_dir, read_to_string, File},
         io::{

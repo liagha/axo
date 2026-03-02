@@ -5,18 +5,34 @@ use {
     crate::{
         analyzer::{symbol as analyze_symbol, Analyzer},
         checker::Type,
-        data::Str,
-        initializer::Initializer,
+        data::*,
+        initializer::{
+            Initializer,
+            InitializeError,
+        },
         internal::{
-            platform::{create_dir_all, PathBuf},
+            platform::{create_dir_all, read_dir, PathBuf},
             timer::{DefaultTimer, Duration},
         },
-        parser::{Element, ElementKind, Symbol, SymbolKind},
+        parser::{
+            Element, ElementKind,
+            Symbol, SymbolKind,
+            ParseError,
+        },
         reporter::Reporter,
         resolver::Resolution,
-        resolver::Resolver,
-        scanner::{Token, TokenKind},
-        tracker::{Location, Span},
+        resolver::{
+            Resolver,
+            ResolveError,
+        },
+        scanner::{
+            Token, TokenKind,
+            ScanError,
+        },
+        tracker::{
+            Location, Span,
+            TrackError,
+        },
     },
     broccli::{xprintln, Color},
 };
@@ -26,12 +42,6 @@ use crate::{
     generator::{Backend, Generator},
     internal::driver::Driver,
 };
-use crate::data::*;
-use crate::initializer::InitializeError;
-use crate::parser::ParseError;
-use crate::resolver::ResolveError;
-use crate::scanner::ScanError;
-use crate::tracker::TrackError;
 
 pub trait Stage<'stage, Input, Output> {
     fn execute(&mut self, compiler: &mut Compiler<'stage>, input: Input) -> Output;
@@ -136,7 +146,7 @@ impl<'compiler> Compiler<'compiler> {
         let verbosity = Resolver::verbosity(&mut self.resolver);
 
         if path.is_dir() {
-            for entry in std::fs::read_dir(&path).unwrap() {
+            for entry in read_dir(&path).unwrap() {
                 let entry = entry.unwrap();
                 let child_path = entry.path();
                 let child_loc = Location::file(Str::from(child_path));

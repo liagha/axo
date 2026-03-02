@@ -1,13 +1,13 @@
-use std::time::Duration;
 use {
     super::{Character, ScanError, Token},
     crate::{
         data::{Offset, Scale},
+        internal::timer::Duration,
         formation::{form::Form, former::Former},
         tracker::{Location, Peekable, Position},
+        scanner::error::ErrorKind,
     },
 };
-use crate::scanner::error::ErrorKind;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,

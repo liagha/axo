@@ -4,14 +4,12 @@ use {
 };
 
 #[derive(Debug)]
-pub struct IoError {
+pub struct IOError {
     kind: io::ErrorKind,
     code: Option<i32>,
 }
 
-pub type Result<T> = std::result::Result<T, IoError>;
-
-impl IoError {
+impl IOError {
     #[inline]
     pub fn kind(&self) -> io::ErrorKind {
         self.kind
@@ -23,7 +21,7 @@ impl IoError {
     }
 }
 
-impl From<io::Error> for IoError {
+impl From<io::Error> for IOError {
     fn from(value: io::Error) -> Self {
         Self {
             kind: value.kind(),
@@ -38,7 +36,7 @@ pub struct Stdout {
 
 impl Stdout {
     #[inline]
-    pub fn write_all(&mut self, bytes: &[u8]) -> Result<()> {
+    pub fn write_all(&mut self, bytes: &[u8]) -> Result<(), IOError> {
         write_all(&mut self.inner, bytes)
     }
 }
@@ -49,9 +47,9 @@ pub struct Stdin {
 
 impl Stdin {
     #[inline]
-    pub fn read_line(&mut self) -> Result<Utf8String> {
+    pub fn read_line(&mut self) -> Result<Utf8String, IOError> {
         let mut line = String::new();
-        self.inner.read_line(&mut line).map_err(IoError::from)?;
+        self.inner.read_line(&mut line).map_err(IOError::from)?;
         if line.ends_with('\n') {
             line.pop();
             if line.ends_with('\r') {
@@ -81,56 +79,56 @@ pub fn stdin() -> Stdin {
 }
 
 #[inline]
-pub fn write_stdout(bytes: &[u8]) -> Result<()> {
+pub fn write_stdout(bytes: &[u8]) -> Result<(), IOError> {
     let mut stream = stdout();
     stream.write_all(bytes)
 }
 
 #[inline]
-pub fn write_stderr(bytes: &[u8]) -> Result<()> {
+pub fn write_stderr(bytes: &[u8]) -> Result<(), IOError> {
     let mut stderr = io::stderr().lock();
     write_all(&mut stderr, bytes)
 }
 
 #[inline]
-pub fn print(text: &str) -> Result<()> {
+pub fn print(text: &str) -> Result<(), IOError> {
     println(text)
 }
 
 #[inline]
-pub fn println(text: &str) -> Result<()> {
+pub fn println(text: &str) -> Result<(), IOError> {
     print_raw(text)?;
     write_stdout(b"\n")
 }
 
 #[inline]
-pub fn print_raw(text: &str) -> Result<()> {
+pub fn print_raw(text: &str) -> Result<(), IOError> {
     write_stdout(text.as_bytes())
 }
 
 #[inline]
-pub fn eprint(text: &str) -> Result<()> {
+pub fn eprint(text: &str) -> Result<(), IOError> {
     eprintln(text)
 }
 
 #[inline]
-pub fn eprintln(text: &str) -> Result<()> {
+pub fn eprintln(text: &str) -> Result<(), IOError> {
     eprint_raw(text)?;
     write_stderr(b"\n")
 }
 
 #[inline]
-pub fn eprint_raw(text: &str) -> Result<()> {
+pub fn eprint_raw(text: &str) -> Result<(), IOError> {
     write_stderr(text.as_bytes())
 }
 
 #[inline]
-pub fn read_line() -> Result<Utf8String> {
+pub fn read_line() -> Result<Utf8String, IOError> {
     let mut stream = stdin();
     stream.read_line()
 }
 
-fn write_all<W: Write>(writer: &mut W, bytes: &[u8]) -> Result<()> {
+fn write_all<W: Write>(writer: &mut W, bytes: &[u8]) -> Result<(), IOError> {
     let mut written = 0usize;
 
     while written < bytes.len() {
@@ -140,7 +138,7 @@ fn write_all<W: Write>(writer: &mut W, bytes: &[u8]) -> Result<()> {
             }
             Ok(count) => {
                 written = written.checked_add(count).ok_or_else(|| {
-                    IoError::from(io::Error::new(
+                    IOError::from(io::Error::new(
                         io::ErrorKind::Other,
                         "write length overflow",
                     ))

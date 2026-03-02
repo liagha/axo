@@ -246,7 +246,7 @@ impl<'string> Display for Str<'string> {
 }
 
 impl<'string> Debug for Str<'string> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
         write!(f, "\"{}\"", self)
     }
 }

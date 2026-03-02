@@ -1,5 +1,9 @@
-use std::fmt::{write, Display};
-use std::io::{Error as IOError, ErrorKind as IOKind};
+use {
+    crate::{
+        format::{Result, Display, Formatter},
+        internal::platform::{Error as IOError, ErrorKind as IOKind},
+    }
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
@@ -33,7 +37,7 @@ pub enum ErrorKind {
 }
 
 impl Display for ErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::NotAnEntry => write!(f, "not an entry."),
             ErrorKind::EmptyVoid => write!(f, "can't get the value of a void."),

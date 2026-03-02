@@ -1,10 +1,13 @@
-use std::path::PathBuf;
 use {
     crate::{
         data::Str,
         format::Display,
         format::Show,
-        internal::timer::Duration,
+        checker::{Type, TypeKind},
+        internal::{
+            timer::Duration,
+            platform::PathBuf,
+        },
         parser::Element,
         reporter::Error,
         resolver::{Inference, Resolution},
@@ -12,7 +15,6 @@ use {
     },
     broccli::{xprintln, Color},
 };
-use crate::checker::{Type, TypeKind};
 
 pub struct Reporter {
     pub verbosity: u8,

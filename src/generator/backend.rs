@@ -1,5 +1,12 @@
-use inkwell::values::{BasicValueEnum, FunctionValue};
-use crate::analyzer::{Analysis, Instruction};
+use {
+    inkwell::{
+        values::{BasicValueEnum, FunctionValue}
+    },
+    crate::{
+        analyzer::{Analysis, Instruction},
+        internal::platform::Error as IOError,
+    }
+};
 
 pub trait Backend<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>);
@@ -12,7 +19,7 @@ pub trait Backend<'backend> {
 
     fn print(&self);
 
-    fn write(&self, filename: &str) -> std::io::Result<()>;
+    fn write(&self, filename: &str) -> Result<(), IOError>;
 
     fn take_errors(&mut self) -> Vec<crate::generator::GenerateError<'backend>>;
 }
