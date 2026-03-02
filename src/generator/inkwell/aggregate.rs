@@ -3,7 +3,6 @@ use {
     crate::{
         data::Str,
         generator::Backend,
-        schema::{Index, Structure},
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
@@ -12,6 +11,7 @@ use {
 };
 use crate::analyzer::{Analysis, Instruction};
 use crate::checker::TypeKind;
+use crate::data::schema::{Index, Structure};
 
 impl<'backend> super::Inkwell<'backend> {
     fn cast_value(

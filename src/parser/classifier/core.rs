@@ -2,9 +2,9 @@ use crate::{
     formation::{classifier::Classifier, form::Form},
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
-    schema::*,
     tracker::{Span, Spanned},
 };
+use crate::data::schema::*;
 
 impl<'parser> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {

@@ -9,14 +9,12 @@ use {
         data::{Boolean, Identity},
         internal::hash::Set,
         parser::Symbol,
-        parser::{Element, ElementKind, SymbolKind},
-        scanner::{Token, TokenKind},
-        schema::*,
-        tracker::Span,
+        parser::Element,
+        scanner::TokenKind
+        ,
     },
     matchete::{Assessor, Scheme},
 };
-
 #[derive(Clone)]
 pub struct Scope<'scope> {
     pub symbols: Set<Symbol<'scope>>,

@@ -3,7 +3,6 @@ use {
     crate::{
         data::Str,
         internal::hash::Map,
-        schema::*,
     },
     inkwell::{
         types::BasicType,
@@ -13,6 +12,7 @@ use {
 };
 use crate::analyzer::{Analysis, Instruction};
 use crate::checker::TypeKind;
+use crate::data::schema::*;
 
 impl<'backend> super::Inkwell<'backend> {
     fn has_terminator(&self) -> bool {

@@ -6,13 +6,13 @@ use crate::{
         Resolver,
     },
     scanner::{Token, TokenKind},
-    schema::*,
 };
 use crate::analyzer::{
     element::{analyze, Analyzer},
     Analysis, AnalyzeError, ErrorKind, Instruction,
 };
 use crate::checker::{Checkable, Type, TypeKind};
+use crate::data::schema::*;
 use crate::format::Show;
 
 pub trait Analyzable<'analyzable> {

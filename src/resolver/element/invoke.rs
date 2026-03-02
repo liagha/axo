@@ -5,10 +5,10 @@ use crate::{
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     scanner::{Token, TokenKind},
-    schema::Invoke,
     tracker::Span,
 };
 use crate::checker::{unify, CheckError, Checkable, Type};
+use crate::data::schema::Invoke;
 
 pub(super) fn resolve_invoke<'element>(
     element: &Element<'element>,

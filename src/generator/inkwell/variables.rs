@@ -3,7 +3,6 @@ use {
     crate::{
         data::Str,
         generator::{ErrorKind, GenerateError},
-        schema::*,
         tracker::Span,
     },
     inkwell::{
@@ -13,6 +12,7 @@ use {
 };
 use crate::analyzer::{Analysis, Instruction};
 use crate::checker::TypeKind;
+use crate::data::schema::*;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {

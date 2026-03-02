@@ -1,5 +1,6 @@
 mod float;
 mod string;
+pub mod schema;
 
 pub use {
     float::Float,
@@ -15,7 +16,7 @@ pub type Scale = usize;
 pub type Integer = i128;
 
 pub mod any {
-    pub use core::any::{Any, TypeId};
+    pub use core::any::Any;
 }
 
 pub mod character {
@@ -62,7 +63,7 @@ pub mod memory {
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, transmute},
+        mem::{discriminant, replace},
     };
 }
 

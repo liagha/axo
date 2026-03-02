@@ -5,10 +5,10 @@ use {
         formation::{classifier::Classifier, form::Form},
         resolver::scope::Scope,
         scanner::{OperatorKind, Token, TokenKind},
-        schema::*,
         tracker::{Span, Spanned},
     },
 };
+use crate::data::schema::*;
 
 impl<'parser> Parser<'parser> {
     fn is_type_annotation(element: &Element<'parser>) -> bool {

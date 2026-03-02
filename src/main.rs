@@ -22,9 +22,6 @@ mod format;
 pub mod reporter;
 
 #[cfg(feature = "internal")]
-pub mod schema;
-
-#[cfg(feature = "internal")]
 pub mod text;
 
 #[cfg(feature = "internal")]

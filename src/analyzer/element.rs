@@ -3,9 +3,9 @@ use crate::{
     parser::{Element, ElementKind},
     resolver::Resolver,
     scanner::{PunctuationKind, Token, TokenKind},
-    schema::*,
 };
 use crate::analyzer::{Analysis, Analyzable, AnalyzeError, ErrorKind, Instruction};
+use crate::data::schema::*;
 use crate::format::Show;
 
 mod operation;

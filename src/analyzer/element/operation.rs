@@ -2,9 +2,9 @@ use crate::{
     parser::Element,
     resolver::Resolver,
     scanner::{OperatorKind, Token, TokenKind},
-    schema::{Binary, Unary},
 };
 use crate::analyzer::{Analysis, AnalyzeError, ErrorKind, Instruction};
+use crate::data::schema::{Binary, Unary};
 use super::{analyze, Analyzer};
 
 pub(crate) fn binary<'binary>(

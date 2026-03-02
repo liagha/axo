@@ -1,8 +1,8 @@
 use crate::{
     data::{Boolean, Scale, Str},
-    schema::*,
     tracker::Span,
 };
+use crate::data::schema::*;
 
 #[derive(Clone, Debug)]
 pub struct Type<'ty> {

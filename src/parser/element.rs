@@ -1,7 +1,8 @@
 use {
     super::Symbol,
-    crate::{data::Identity, scanner::Token, schema::*, tracker::Span},
+    crate::{data::Identity, scanner::Token, tracker::Span},
 };
+use crate::data::schema::*;
 
 pub struct Element<'element> {
     pub kind: ElementKind<'element>,

@@ -64,7 +64,7 @@ impl<'location> Location<'location> {
                     Err(error) => {
                         let kind: ErrorKind = error.into();
 
-                        Err(TrackError::new(kind, Span::file(Str::from(path))))
+                        Err(TrackError::new(kind, Span::void()))
                     }
                 }
             }

@@ -10,11 +10,11 @@ use {
         data::Boolean,
         parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
         scanner::{OperatorKind, Token, TokenKind},
-        schema::*,
     },
 };
 use crate::analyzer::{Analyzable, AnalyzeError, ErrorKind as AnalyzeErrorKind};
 use crate::checker::{Checkable, Type};
+use crate::data::schema::*;
 use self::{binary::resolve_binary, invoke::resolve_invoke, unary::resolve_unary};
 
 impl<'element> Element<'element> {

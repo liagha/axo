@@ -4,10 +4,10 @@ use {
         data::Str,
         parser::{Element, ElementKind, Symbol, SymbolKind},
         scanner::{PunctuationKind, Token, TokenKind},
-        schema::{Binding, Delimited, Method, Module},
         tracker::Span,
     },
 };
+use crate::data::schema::{Binding, Delimited, Method, Module};
 
 pub fn builtin<'resolver>(
     target: &Element<'resolver>,

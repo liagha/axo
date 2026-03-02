@@ -2,10 +2,10 @@ use crate::{
     data::{Boolean, Scale, Str},
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
-    schema::*,
     tracker::Span,
 };
 use crate::checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind};
+use crate::data::schema::*;
 use crate::format::Show;
 
 fn mismatch<'element>(

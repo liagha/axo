@@ -4,9 +4,9 @@ use crate::{
         ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
     },
     scanner::TokenKind,
-    schema::Unary,
 };
 use crate::checker::{CheckError, Checkable, Type, TypeKind};
+use crate::data::schema::Unary;
 
 pub(super) fn resolve_unary<'element>(
     element: &Element<'element>,

@@ -8,7 +8,6 @@ use {
         data::Str,
         initializer::Initializer,
         internal::{
-            logger::Logger,
             platform::{create_dir_all, PathBuf},
             timer::{DefaultTimer, Duration},
         },
@@ -17,7 +16,6 @@ use {
         resolver::Resolution,
         resolver::Resolver,
         scanner::{Token, TokenKind},
-        schema::*,
         tracker::{Location, Span},
     },
     broccli::{xprintln, Color},
@@ -28,6 +26,7 @@ use crate::{
     generator::{Backend, Generator},
     internal::driver::Driver,
 };
+use crate::data::schema::*;
 use crate::initializer::InitializeError;
 use crate::parser::ParseError;
 use crate::resolver::ResolveError;
@@ -137,7 +136,13 @@ impl<'compiler> Compiler<'compiler> {
         let verbosity = Resolver::verbosity(&mut self.resolver);
 
         if path.is_dir() {
-
+            for entry in std::fs::read_dir(&path).unwrap() {
+                let entry = entry.unwrap();
+                let child_path = entry.path();
+                let child_loc = Location::file(Str::from(child_path));
+                self.build(child_loc, index);
+            }
+            return;
         } else {
             let extension = path.extension().unwrap().to_str().unwrap();
 

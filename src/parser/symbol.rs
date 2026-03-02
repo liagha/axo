@@ -2,15 +2,15 @@ use {
     super::{Element, ElementKind},
     crate::{
         data::{Boolean, Identity},
-        format::{Debug, Formatter, Result as FormatResult},
+        format::Debug,
         initializer::Preference,
         internal::hash::{Hash, Set},
         resolver::scope::Scope,
         scanner::{OperatorKind, Token, TokenKind},
-        schema::*,
         tracker::Span,
     },
 };
+use crate::data::schema::*;
 use crate::data::Str;
 use crate::format::Show;
 
