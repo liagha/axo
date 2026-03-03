@@ -8,6 +8,7 @@ use {
         scanner::error::ErrorKind,
     },
 };
+use crate::data::Str;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,
@@ -124,6 +125,25 @@ impl<'scanner> Scanner<'scanner> {
 
                 _ => {}
             }
+        }
+    }
+
+    #[inline]
+    pub fn scan_string(string: Str<'scanner>) -> Result<Vec<Token<'scanner>>, Vec<ScanError<'scanner>>> {
+        let location = Location::Entry(Str::from(file!()));
+        let mut scanner = Scanner::new(location);
+
+        let characters =
+            Scanner::inspect(Position::new(location), string.chars().collect::<Vec<_>>());
+
+        scanner.set_input(characters);
+
+        scanner.scan();
+
+        if scanner.errors.is_empty() {
+            Ok(scanner.output)
+        } else {
+            Err(scanner.errors)
         }
     }
 }

@@ -108,37 +108,31 @@ impl<'scanner> Scanner<'scanner> {
     {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.is_numeric()),
+                Classifier::predicate(|c: &Character| c.value == '-').as_optional(),
                 Classifier::persistence(
                     Classifier::alternative([
                         Classifier::predicate(|c: &Character| c.is_numeric()),
+                        Classifier::literal('.'),
                         Classifier::literal('_').with_ignore(),
                     ]),
                     0,
                     None,
-                ),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::literal('.'),
-                    Classifier::persistence(
-                        Classifier::alternative([
+                ).as_optional(),
+                Classifier::optional(
+                    Classifier::sequence([
+                        Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
+                        Classifier::optional(
+                            Classifier::predicate(|c: &Character| {
+                                matches!(c.value, '+' | '-')
+                            })
+                        ),
+                        Classifier::persistence(
                             Classifier::predicate(|c: &Character| c.is_numeric()),
-                            Classifier::literal('_').with_ignore(),
-                        ]),
-                        1,
-                        None,
-                    ),
-                ])),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
-                    Classifier::optional(Classifier::predicate(|c: &Character| {
-                        matches!(c.value, '+' | '-')
-                    })),
-                    Classifier::persistence(
-                        Classifier::predicate(|c: &Character| c.is_numeric()),
-                        1,
-                        None,
-                    ),
-                ])),
+                            1,
+                            None,
+                        ),
+                    ])
+                ),
             ]),
             |form| {
                 let inputs = form.collect_inputs();

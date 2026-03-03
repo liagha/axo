@@ -6,6 +6,7 @@ mod punctuation;
 mod scanner;
 mod token;
 mod traits;
+mod tests;
 
 pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*};
 

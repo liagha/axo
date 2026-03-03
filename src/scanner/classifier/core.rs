@@ -13,7 +13,7 @@ use {
 impl<'scanner> Scanner<'scanner> {
     fn string() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
         Classifier::sequence([
-            Classifier::literal('"'),
+            Classifier::literal('"').with_ignore(),
             Classifier::repetition(
                 Classifier::alternative([
                     Classifier::predicate(|c: &Character| !matches!(c.value, '"' | '\\')),
@@ -22,7 +22,7 @@ impl<'scanner> Scanner<'scanner> {
                 0,
                 None,
             ),
-            Classifier::literal('"'),
+            Classifier::literal('"').with_ignore(),
         ])
         .with_transform(
             move |form: Form<
@@ -33,6 +33,13 @@ impl<'scanner> Scanner<'scanner> {
             >| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
+
+                // Check for escape errors in the form
+                let failures = form.collect_failures();
+                eprintln!("Failures count: {}", failures.len());
+                if !failures.is_empty() {
+                    return Err(failures[0].clone());
+                }
 
                 Ok(Form::output(Token::new(
                     TokenKind::String(content),
@@ -45,7 +52,7 @@ impl<'scanner> Scanner<'scanner> {
     fn backtick() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>
     {
         Classifier::sequence([
-            Classifier::literal('`'),
+            Classifier::literal('`').with_ignore(),
             Classifier::repetition(
                 Classifier::alternative([
                     Classifier::predicate(|c: &Character| !matches!(c.value, '`' | '\\')),
@@ -54,7 +61,7 @@ impl<'scanner> Scanner<'scanner> {
                 0,
                 None,
             ),
-            Classifier::literal('`'),
+            Classifier::literal('`').with_ignore(),
         ])
         .with_transform(
             move |form: Form<
@@ -65,6 +72,12 @@ impl<'scanner> Scanner<'scanner> {
             >| {
                 let inputs = form.collect_inputs();
                 let content = inputs.clone().into_iter().collect::<Str>();
+
+                // Check for escape errors in the form
+                let failures = form.collect_failures();
+                if !failures.is_empty() {
+                    return Err(failures[0].clone());
+                }
 
                 Ok(Form::output(Token::new(
                     TokenKind::String(content),
