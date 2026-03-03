@@ -1,0 +1,2 @@
+const bad = "\u{110000}"
+print(bad)

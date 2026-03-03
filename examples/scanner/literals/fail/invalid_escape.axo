@@ -1,0 +1,2 @@
+const bad = "invalid\xGG"
+print(bad)
