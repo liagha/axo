@@ -1,11 +1,13 @@
-use crate::{
-    data::Scale,
-    parser::{Element, ElementKind},
-    scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+use {
+    crate::{
+        data::Scale,
+        parser::{Element, ElementKind},
+        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        checker::{Type, TypeKind},
+    },
 };
-use crate::checker::{Type, TypeKind};
 
-fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
+pub fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
     match (&expected.kind, &actual.kind) {
         (TypeKind::Infer, _) => Some(actual.clone()),
         (_, TypeKind::Infer) => Some(expected.clone()),
@@ -13,7 +15,7 @@ fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Opt
             TypeKind::Pointer { to: expected_to },
             TypeKind::Pointer { to: actual_to },
         ) => {
-            let unified = unify_types(expected_to, actual_to)?;
+            let unified = unify(expected_to, actual_to)?;
             Some(Type::pointer(unified, expected.span))
         }
         (
@@ -26,7 +28,7 @@ fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Opt
                 size: actual_size,
             },
         ) if expected_size == actual_size => {
-            let unified = unify_types(expected_member, actual_member)?;
+            let unified = unify(expected_member, actual_member)?;
             Some(Type::new(
                 TypeKind::Array {
                     member: Box::new(unified),
@@ -40,12 +42,12 @@ fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Opt
         {
             let mut unified = Vec::with_capacity(expected_members.len());
             for (expected_member, actual_member) in expected_members.iter().zip(actual_members.iter()) {
-                unified.push(unify_types(expected_member, actual_member)?);
+                unified.push(unify(expected_member, actual_member)?);
             }
             Some(Type::new(TypeKind::Tuple { members: unified }, expected.span))
         }
         (TypeKind::Type(expected_inner), TypeKind::Type(actual_inner)) => {
-            let unified = unify_types(expected_inner, actual_inner)?;
+            let unified = unify(expected_inner, actual_inner)?;
             Some(Type::new(TypeKind::Type(Box::new(unified)), expected.span))
         }
         (
@@ -72,7 +74,7 @@ fn unify_types<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Opt
     }
 }
 
-pub(crate) fn annotation_type<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> {
+pub fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> {
     match &element.kind {
         ElementKind::Literal(Token {
             kind: TokenKind::Identifier(name),
@@ -108,7 +110,7 @@ pub(crate) fn annotation_type<'symbol>(element: &Element<'symbol>) -> Option<Typ
                 if delimited.members.len() != 2 {
                     return None;
                 }
-                let member = annotation_type(&delimited.members[0])?;
+                let member = annotation(&delimited.members[0])?;
                 let size = match delimited.members[1].kind {
                     ElementKind::Literal(Token {
                         kind: TokenKind::Integer(value),
@@ -130,7 +132,7 @@ pub(crate) fn annotation_type<'symbol>(element: &Element<'symbol>) -> Option<Typ
                 TokenKind::Punctuation(PunctuationKind::RightParenthesis),
             ) => {
                 let members: Option<Vec<Type<'symbol>>> =
-                    delimited.members.iter().map(annotation_type).collect();
+                    delimited.members.iter().map(annotation).collect();
                 Some(Type::new(
                     TypeKind::Tuple { members: members? },
                     element.span,
@@ -140,7 +142,7 @@ pub(crate) fn annotation_type<'symbol>(element: &Element<'symbol>) -> Option<Typ
         },
         ElementKind::Unary(unary) => {
             if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
-                let item = annotation_type(&unary.operand)?;
+                let item = annotation(&unary.operand)?;
                 Some(Type::pointer(item, element.span))
             } else {
                 None
@@ -148,12 +150,4 @@ pub(crate) fn annotation_type<'symbol>(element: &Element<'symbol>) -> Option<Typ
         }
         _ => None,
     }
-}
-
-pub(crate) fn compatible<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> bool {
-    unify_types(expected, actual).is_some()
-}
-
-pub(crate) fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
-    unify_types(expected, actual)
 }

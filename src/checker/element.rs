@@ -1,27 +1,15 @@
 use crate::{
-    data::{Boolean, Scale, Str},
+    data::*,
+    checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind},
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
+    format::Show,
 };
-use crate::checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind};
-use crate::data::*;
-use crate::format::Show;
 
 fn invalid(operator: Token) -> CheckError {
     let span = operator.span;
     CheckError::new(ErrorKind::InvalidOperation(operator), span)
-}
-
-fn compatible<'element>(left: &Type<'element>, right: &Type<'element>) -> bool {
-    unify(left, right).is_some()
-}
-
-fn target<'element>(element: &Element<'element>) -> Option<Str<'element>> {
-    element.brand().and_then(|token| match token.kind {
-        TokenKind::Identifier(name) => Some(name),
-        _ => None,
-    })
 }
 
 impl<'element> Checkable<'element> for Element<'element> {
@@ -143,7 +131,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 match operator.as_slice() {
                     [OperatorKind::Equal] => {
-                        if compatible(&left, &right) {
+                        if unify(&left, &right).is_some() {
                             Ok(left)
                         } else {
                             Err(
@@ -373,7 +361,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     | [OperatorKind::LeftAngle, OperatorKind::Equal]
                     | [OperatorKind::RightAngle]
                     | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        if compatible(&left, &right) {
+                        if unify(&left, &right).is_some() {
                             Ok(Type::boolean(binary.operator.span))
                         } else {
                             Err(
@@ -442,7 +430,11 @@ impl<'element> Checkable<'element> for Element<'element> {
                 }
             }
             ElementKind::Invoke(invoke) => {
-                let primitive = target(&invoke.target).and_then(|name| name.as_str());
+                let primitive = invoke.target.brand().and_then(|token| match token.kind {
+                    TokenKind::Identifier(name) => Some(name),
+                    _ => None,
+                })
+                    .and_then(|name| name.as_str());
 
                 match primitive {
                     Some("if") => {
@@ -541,56 +533,6 @@ impl<'element> Checkable<'element> for Element<'element> {
                         invoke.members[3].infer()?;
 
                         Ok(Type::unit(self.span))
-                    }
-                    Some("is_some" | "is_none") => {
-                        if invoke.members.len() != 1 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("is_some")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
-                        invoke.members[0].infer()?;
-                        Ok(Type::boolean(self.span))
-                    }
-                    Some("unwrap") => {
-                        if invoke.members.len() != 1 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("unwrap")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
-                        invoke.members[0].infer()?;
-                        Ok(Type::new(TypeKind::Infer, self.span))
-                    }
-                    Some("or_else") => {
-                        if invoke.members.len() != 2 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("or_else")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
-                        invoke.members[0].infer()?;
-                        let fallback = invoke.members[1].infer()?;
-                        Ok(fallback)
-                    }
-                    Some("Some" | "None") => {
-                        if invoke.members.len() != 2 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("Some")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
-                        invoke.members[0].infer()?;
-                        invoke.members[1].infer()?;
-                        Ok(Type::new(TypeKind::Infer, self.span))
                     }
                     Some("print" | "eprint") => {
                         if invoke.members.len() != 1 {

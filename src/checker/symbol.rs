@@ -1,21 +1,14 @@
-use crate::{
-    data::Str,
-    parser::{Element, ElementKind, Symbol, SymbolKind},
-    scanner::{Token, TokenKind},
+use {
+    crate::{
+        parser::{Element, ElementKind, Symbol, SymbolKind},
+        scanner::{Token, TokenKind},
+        checker::{
+            annotation, unify, CheckError, Checkable, ErrorKind, Type, TypeKind,
+        },
+        data::*,
+        format::Show,
+    },
 };
-use crate::checker::{
-    annotation_type, compatible, unify, CheckError, Checkable, ErrorKind, Type, TypeKind,
-};
-use crate::data::*;
-use crate::format::Show;
-
-fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> {
-    annotation_type(element)
-}
-
-fn invalid(token: Token) -> CheckError {
-    CheckError::new(ErrorKind::InvalidOperation(token.clone()), token.span)
-}
 
 fn returns<'symbol>(
     element: &Element<'symbol>,
@@ -41,11 +34,11 @@ fn returns<'symbol>(
                             TokenKind::Identifier(Str::from("return")),
                             element.span,
                         ));
-                        return Err(invalid(token));
+                        return Err(CheckError::new(ErrorKind::InvalidOperation(token.clone()), token.span));
                     }
                 };
 
-                if compatible(expected, &actual) {
+                if unify(expected, &actual).is_some() {
                     return Ok(true);
                 }
 
@@ -167,7 +160,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let output = if let Some(expected) = declared_output.clone() {
                     let explicit_return = returns(&method.body, &expected)?;
 
-                    if !explicit_return && !compatible(&expected, &body) {
+                    if !explicit_return && !unify(&expected, &body).is_some() {
                         return Err(CheckError::new(
                             ErrorKind::Mismatch(expected.clone(), body.clone()),
                             body.span,

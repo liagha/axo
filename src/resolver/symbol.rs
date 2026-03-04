@@ -6,7 +6,7 @@ use {
     crate::{
         analyzer::Analyzable,
         checker::{
-            annotation_type, unify,
+            annotation, unify,
             Type,
             CheckError, Checkable,
         },
