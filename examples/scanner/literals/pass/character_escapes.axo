@@ -25,10 +25,6 @@ const esc_tab = "\t"
 const esc_vertical = "\v"
 const esc_null = "\0"
 
-// Alphanumeric escapes
-const esc_alpha = "\c"
-const esc_z = "\z"
-
 // Octal escapes - various lengths
 const oct_1 = "\1"
 const oct_2 = "\12"

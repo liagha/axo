@@ -19,7 +19,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_escapes() {
+    fn simple_escapes() {
         let escapes = r#""\\" "\"" "\'" "\a" "\b" "\e" "\f" "\n" "\r" "\t" "\v" "\0""#;
 
         let result = Scanner::scan_string(Str::from(escapes));
@@ -66,8 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_octal_escapes() {
-
+    fn octal_escapes() {
         let escapes = r#""\1" "\7" "\10" "\17" "\77" "\377""#;
 
         let result = Scanner::scan_string(Str::from(escapes));
@@ -102,8 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hex_escapes() {
-
+    fn hex_escapes() {
         let escapes = r#""\x41" "\xff" "\xFF" "\x0f" "\X00""#;
 
         let result = Scanner::scan_string(Str::from(escapes));
@@ -137,8 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unicode_escape_braces() {
-
+    fn unicode_escape_braces() {
         let escapes = r#""\u{0}" "\u{7F}" "\u{03A9}" "\u{0041}" "\U{1F600}" "\u{10FFFF}""#;
 
         let result = Scanner::scan_string(Str::from(escapes));
@@ -173,8 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unicode_escape_simple() {
-
+    fn unicode_escape_simple() {
         let escapes = r#""\u0041" "\u0000" "\u007F" "\U0042" "\uFFFF""#;
 
         let result = Scanner::scan_string(Str::from(escapes));
@@ -208,8 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixed_escapes() {
-
+    fn mixed_escapes() {
         let test = r#""\n\t\v\rA\u{42}\u0043\104""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -241,8 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn test_character_escapes() {
-
+    fn character_escapes() {
         let test = r#"'\n' '\t' '\r' '\'' '\\'"'"'\x41'"#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -276,8 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn test_escapes_in_context() {
-
+    fn escapes_in_context() {
         let test = r#""Hello\nWorld" "\tTabbed\t" "\x20Space""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -309,8 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_octal_boundary_cases() {
-
+    fn octal_boundary_cases() {
         let test = r#""\000" "\777""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -340,8 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hex_variants() {
-
+    fn hex_variants() {
         let test = r#""\x0" "\x00" "\xFF" "\xFF" "\x12""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -375,8 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn test_octal_single_digit() {
-
+    fn octal_single_digit() {
         let test = r#""\0" "\1" "\2" "\3" "\4" "\5" "\6" "\7""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -409,8 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unicode_brace_variations() {
-
+    fn unicode_brace_variations() {
         let test = r#""\u{A}" "\u{AB}" "\u{ABC}" "\U{ABC}" "\U{12345}""#;
 
         let result = Scanner::scan_string(Str::from(test));
@@ -438,8 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_backslash_at_end() {
-
+    fn backslash_at_end() {
         let test = r#""ending with \\""#;
 
         let result = Scanner::scan_string(Str::from(test));
