@@ -25,7 +25,7 @@ impl<'character> Show<'character> for Character<'character> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Character.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }
@@ -89,7 +89,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for TokenKind.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }

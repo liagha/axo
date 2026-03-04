@@ -43,7 +43,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
                 }
             }
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Form.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }

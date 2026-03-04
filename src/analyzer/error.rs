@@ -64,7 +64,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Analyzer::ErrorKind.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }

@@ -31,7 +31,7 @@ impl<'element> Show<'element> for Element<'element> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Element.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }
@@ -153,7 +153,7 @@ impl<'element> Show<'element> for ElementKind<'element> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for ElementKind.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }
@@ -194,7 +194,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Symbol.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }
@@ -352,7 +352,7 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for SymbolKind.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }

@@ -54,7 +54,7 @@ impl<'show> Show<'show> for Specifier {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Specifier.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }
