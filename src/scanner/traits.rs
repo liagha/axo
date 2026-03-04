@@ -49,7 +49,7 @@ impl<'token> Show<'token> for Token<'token> {
             }
 
             _ => {
-                unimplemented!("the verbosity `{}` wasn't implemented for Token.", verbosity);
+                self.format(verbosity - 1).to_string()
             }
         }.into()
     }

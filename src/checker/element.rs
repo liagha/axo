@@ -24,23 +24,6 @@ fn target<'element>(element: &Element<'element>) -> Option<Str<'element>> {
     })
 }
 
-fn addressable(element: &Element) -> bool {
-    match &element.kind {
-        ElementKind::Literal(Token {
-            kind: TokenKind::Identifier(_),
-            ..
-        }) => true,
-        ElementKind::Index(_) => true,
-        ElementKind::Binary(binary) => {
-            matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
-        }
-        ElementKind::Unary(unary) => {
-            matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star))
-        }
-        _ => false,
-    }
-}
-
 impl<'element> Checkable<'element> for Element<'element> {
     fn infer(&self) -> Result<Type<'element>, CheckError<'element>> {
         match self.kind.clone() {
@@ -57,6 +40,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Unary(unary) => {
                 let operand = unary.operand.infer()?;
+
                 let operator = match unary.operator.kind.clone() {
                     TokenKind::Operator(operator) => operator,
                     _ => return Err(invalid(unary.operator)),
@@ -109,7 +93,22 @@ impl<'element> Checkable<'element> for Element<'element> {
                         }
                     }
                     [OperatorKind::Ampersand] => {
-                        if addressable(&unary.operand) {
+                        let addressable = match &unary.operand.kind {
+                            ElementKind::Literal(Token {
+                                                     kind: TokenKind::Identifier(_),
+                                                     ..
+                                                 }) => true,
+                            ElementKind::Index(_) => true,
+                            ElementKind::Binary(binary) => {
+                                matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
+                            }
+                            ElementKind::Unary(unary) => {
+                                matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star))
+                            }
+                            _ => false,
+                        };
+
+                        if addressable {
                             Ok(Type::pointer(operand, self.span))
                         } else {
                             Err(invalid(unary.operator))
@@ -398,14 +397,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                 }
 
                 let target = index.target.infer()?;
-                let index_type = index.members[0].infer()?;
+                let ty = index.members[0].infer()?;
 
-                if !index_type.is_integer() {
+                if !ty.is_integer() {
                     return Err(
                         CheckError::new(
                             ErrorKind::Mismatch(
                                 Type::integer(64, true, self.span),
-                                index_type,
+                                ty,
                             ),
                             self.span,
                         )

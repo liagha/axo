@@ -1,20 +1,25 @@
-use crate::{
-    format::{Debug, Display, Formatter, Result},
-    text::numeral::ParseNumberError,
+use {
+    super::{
+        Character,  
+    },
+    crate::{
+        format::{Debug, Display, Formatter, Result},
+        tracker::TrackError,
+        text::numeral::ParseNumberError,
+    }
 };
-use crate::tracker::TrackError;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
     Tracking(TrackError<'error>),
-    InvalidCharacter(CharacterError),
+    InvalidCharacter(CharacterError<'error>),
     InvalidEscape(EscapeError),
     NumberParse(ParseNumberError),
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub enum CharacterError {
-    Unexpected(char),
+pub enum CharacterError<'error> {
+    Unexpected(Character<'error>),
     OutOfRange,
     Surrogate,
 }
@@ -33,7 +38,7 @@ impl<'error> Display for ErrorKind<'error> {
         match self {
             ErrorKind::Tracking(tracker) => write!(f, "{}", tracker),
             ErrorKind::InvalidCharacter(e) => match e {
-                CharacterError::Unexpected(ch) => write!(f, "unexpected character `{}`.", ch),
+                CharacterError::Unexpected(ch) => write!(f, "unexpected character `{}`.", ch.value),
                 CharacterError::OutOfRange => write!(f, "character code point out of range."),
                 CharacterError::Surrogate => write!(f, "character is surrogate code point."),
             },

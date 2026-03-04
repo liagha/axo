@@ -125,7 +125,7 @@ impl Reporter {
                 .iter()
                 .map(|token| Str::from(format!("{}", token.format(self.verbosity))))
                 .collect::<Vec<Str>>()
-                .join("\n");
+                .join(", ");
 
             if !tree.is_empty() {
                 xprintln!(
@@ -134,6 +134,7 @@ impl Reporter {
                     ":" => Color::White,
                     tree.indent(self.verbosity) => Color::White
                 );
+
                 xprintln!();
             }
         }

@@ -37,13 +37,6 @@ impl<'scanner> Scanner<'scanner> {
                     let inputs = form.collect_inputs();
                     let content = inputs.clone().into_iter().collect::<Str>();
 
-                    // Check for escape errors in the form
-                    let failures = form.collect_failures();
-                    eprintln!("Failures count: {}", failures.len());
-                    if !failures.is_empty() {
-                        return Err(failures[0].clone());
-                    }
-
                     Ok(Form::output(Token::new(
                         TokenKind::String(content),
                         inputs.borrow_span(),
@@ -75,12 +68,6 @@ impl<'scanner> Scanner<'scanner> {
                 >| {
                     let inputs = form.collect_inputs();
                     let content = inputs.clone().into_iter().collect::<Str>();
-
-                    // Check for escape errors in the form
-                    let failures = form.collect_failures();
-                    if !failures.is_empty() {
-                        return Err(failures[0].clone());
-                    }
 
                     Ok(Form::output(Token::new(
                         TokenKind::String(content),
@@ -249,7 +236,7 @@ impl<'scanner> Scanner<'scanner> {
                 let ch: &Character = form.unwrap_input();
 
                 ScanError::new(
-                    ErrorKind::InvalidCharacter(CharacterError::Unexpected(ch.value)),
+                    ErrorKind::InvalidCharacter(CharacterError::Unexpected(*ch)),
                     ch.span,
                 )
             }),
