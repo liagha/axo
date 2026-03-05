@@ -43,119 +43,48 @@ impl<'element> Show<'element> for ElementKind<'element> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
-                "".to_string()
+                "".into()
             }
 
             1 => {
                 match self {
                     ElementKind::Literal(literal) => {
-                        format!("{}", literal.format(verbosity))
+                        literal.format(verbosity)
                     }
+                    
                     ElementKind::Delimited(delimited) => {
-                        format!(
-                            "Delimited({}-{},{})",
-                            delimited.start.format(verbosity),
-                            delimited.end.format(verbosity),
-                            delimited
-                                .members
-                                .iter()
-                                .map(|item| format!(" {}", item.format(verbosity)))
-                                .collect::<Vec<_>>()
-                                .join(
-                                    &*delimited
-                                        .clone()
-                                        .separator
-                                        .map(|separator| format!(" {}", separator.format(verbosity)))
-                                        .unwrap_or(" ".to_string())
-                                ),
-                        )
+                        delimited.format(verbosity)
                     }
 
                     ElementKind::Binary(binary) => {
-                        format!(
-                            "Binary({} {} {})",
-                            binary.left.format(verbosity), binary.operator.format(verbosity), binary.right.format(verbosity)
-                        )
+                        binary.format(verbosity)
                     }
                     ElementKind::Unary(unary) => {
-                        format!("Unary({} {})", unary.operator.format(verbosity), unary.operand.format(verbosity))
+                        unary.format(verbosity)
                     }
 
                     ElementKind::Index(index) => {
-                        format!("Index({}[{}])", index.target.format(verbosity), index.members.format(verbosity))
+                        index.format(verbosity)
                     }
+                    
                     ElementKind::Invoke(invoke) => {
-                        format!("Invoke({}({}))", invoke.target.format(verbosity), invoke.members.format(verbosity))
+                        invoke.format(verbosity)
                     }
 
                     ElementKind::Construct(construct) => {
-                        format!(
-                            "Constructor({} | {})",
-                            construct.target.format(verbosity), construct.members.format(verbosity)
-                        )
+                        construct.format(verbosity)
                     }
 
-                    ElementKind::Symbolize(symbol) => format!("{}", symbol.format(verbosity)),
-                }
-            }
-
-            2 => {
-                match self {
-                    ElementKind::Literal(literal) => {
-                        format!("{:?}", literal.format(verbosity))
-                    }
-                    ElementKind::Delimited(delimited) => {
-                        format!(
-                            "Delimited({}-{}, {})",
-                            delimited.start.format(verbosity),
-                            delimited.end.format(verbosity),
-                            delimited
-                                .members
-                                .iter()
-                                .map(|item| format!("{}", item.format(verbosity)))
-                                .collect::<Vec<_>>()
-                                .join(
-                                    &*delimited
-                                        .clone()
-                                        .separator
-                                        .map(|separator| format!("{} ", separator.format(verbosity)))
-                                        .unwrap_or(" ".to_string())
-                                ),
-                        )
-                    }
-
-                    ElementKind::Binary(binary) => {
-                        format!(
-                            "Binary({} {} {})",
-                            binary.left.format(verbosity), binary.operator.format(verbosity), binary.right.format(verbosity)
-                        )
-                    }
-                    ElementKind::Unary(unary) => {
-                        format!("Unary({:?} {:?})", unary.operator.format(verbosity), unary.operand.format(verbosity))
-                    }
-
-                    ElementKind::Index(index) => {
-                        format!("Index({:?}[{:?}])", index.target.format(verbosity), index.members.format(verbosity))
-                    }
-                    ElementKind::Invoke(invoke) => {
-                        format!("Invoke({:?}({:?}))", invoke.target.format(verbosity), invoke.members.format(verbosity))
-                    }
-
-                    ElementKind::Construct(construct) => {
-                        format!(
-                            "Constructor({:?} | {:?})",
-                            construct.target.format(verbosity), construct.members.format(verbosity)
-                        )
-                    }
-
-                    ElementKind::Symbolize(symbol) => format!("+ {}", symbol.format(verbosity)),
+                    ElementKind::Symbolize(symbol) => {
+                        symbol.format(verbosity)
+                    },
                 }
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity - 1)
             }
-        }.into()
+        }
     }
 }
 

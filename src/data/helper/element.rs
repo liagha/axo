@@ -1,3 +1,5 @@
+use crate::data::Str;
+use crate::format::Show;
 use crate::internal::hash::{Hash, Hasher};
 
 #[derive(Debug, Eq)]
@@ -193,5 +195,108 @@ impl<Target: Clone, Value: Clone> Clone for Index<Target, Value> {
 impl<Target: Clone, Argument: Clone> Clone for Invoke<Target, Argument> {
     fn clone(&self) -> Self {
         Invoke::new(self.target.clone(), self.members.clone())
+    }
+}
+
+impl<'show, Delimiter: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Delimited<Delimiter, Member> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "Delimited({} | {})[{}]({})",
+                    self.start.format(verbosity),
+                    self.separator.format(verbosity),
+                    self.members.format(verbosity),
+                    self.end.format(verbosity),
+                ).into()
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
+    }
+}
+
+impl<'show, Left: Show<'show, Verbosity = u8>, Operator: Show<'show, Verbosity = u8>, Right: Show<'show, Verbosity = u8>> Show<'show> for Binary<Left, Operator, Right> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "Binary({} {} {})",
+                    self.left.format(verbosity),
+                    self.operator.format(verbosity),
+                    self.right.format(verbosity)
+                ).into()
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
+    }
+}
+
+impl<'show, Operator: Show<'show, Verbosity = u8>, Operand: Show<'show, Verbosity = u8>> Show<'show> for Unary<Operator, Operand> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "Unary({} {})",
+                    self.operator.format(verbosity),
+                    self.operand.format(verbosity)
+                ).into()
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
+    }
+}
+
+impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Index<Target, Member> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "Index({})[{}]",
+                    self.target.format(verbosity),
+                    self.members.format(verbosity),
+                ).into()
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
+    }
+}
+
+impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Invoke<Target, Member> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "Invoke({})[{}]",
+                    self.target.format(verbosity),
+                    self.members.format(verbosity),
+                ).into()
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
     }
 }

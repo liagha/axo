@@ -200,18 +200,10 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                         )
                     }
                     Instruction::Index(index) => {
-                        format!(
-                            "Index({})[{}]",
-                            index.target.format(verbosity),
-                            index.members.format(verbosity),
-                        )
+                        index.format(verbosity).to_string()
                     }
                     Instruction::Invoke(invoke) => {
-                        format!(
-                            "Invoke({})[{}]",
-                            invoke.target.format(verbosity),
-                            invoke.members.format(verbosity),
-                        )
+                        invoke.format(verbosity).to_string()
                     }
                     Instruction::Block(block) => {
                         format!("Block({})", block.format(verbosity))

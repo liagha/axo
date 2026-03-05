@@ -16,6 +16,14 @@ pub trait Show<'show> {
     }
 }
 
+impl<'show, T: Show<'show, Verbosity=u8>> Show<'show> for Box<T>  {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        (**self).format(verbosity)
+    }
+}
+
 impl<'show, T: Show<'show, Verbosity=u8>> Show<'show> for Option<T> {
     type Verbosity = u8;
 

@@ -2,11 +2,12 @@ use crate::{
     data::{Boolean, Identity},
     internal::hash::{Hash, Hasher},
 };
+use crate::format::Show;
 
 #[derive(Debug, Eq)]
 pub struct Inclusion<Target, Identity> {
     pub target: Target,
-    pub id: Identity,
+    pub identity: Identity,
 }
 
 #[derive(Debug, Eq)]
@@ -47,7 +48,7 @@ pub struct Module<Target> {
 impl<Target, Identity> Inclusion<Target, Identity> {
     #[inline]
     pub fn new(target: Target, id: Identity) -> Self {
-        Inclusion { target, id }
+        Inclusion { target, identity: id }
     }
 }
 
@@ -118,7 +119,7 @@ impl<Target> Module<Target> {
 impl<Target: Hash, Identity: Hash> Hash for Inclusion<Target, Identity> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-        self.id.hash(state);
+        self.identity.hash(state);
     }
 }
 
@@ -212,7 +213,7 @@ impl<Target: PartialEq> PartialEq for Module<Target> {
 
 impl<Target: Clone, Identity: Clone> Clone for Inclusion<Target, Identity> {
     fn clone(&self) -> Self {
-        Inclusion::new(self.target.clone(), self.id.clone())
+        Inclusion::new(self.target.clone(), self.identity.clone())
     }
 }
 
