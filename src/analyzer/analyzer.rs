@@ -33,7 +33,7 @@ fn annotation_type_kind<'symbol>(
             .and_then(|name| {
                 TypeKind::from_name(name).or_else(|| {
                     if name == "Type" {
-                        Some(TypeKind::Type(Box::new(Type::new(TypeKind::Infer, *span))))
+                        Some(TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))))
                     } else {
                         None
                     }
@@ -118,10 +118,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::new(Instruction::Binding(analyzed)))
             }
             SymbolKind::Structure(structure) => {
-                let members: Result<Vec<Box<Analysis<'symbol>>>, AnalyzeError<'symbol>> = structure
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver).map(Box::new))
+                    .map(|member| member.analyze(resolver))
                     .collect();
 
                 let analyzed = Structure::new(
@@ -132,10 +132,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::new(Instruction::Structure(analyzed)))
             }
             SymbolKind::Enumeration(enumeration) => {
-                let members: Result<Vec<Box<Analysis<'symbol>>>, AnalyzeError<'symbol>> = enumeration
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = enumeration
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver).map(Box::new))
+                    .map(|member| member.analyze(resolver))
                     .collect();
 
                 let analyzed = Structure::new(
@@ -146,10 +146,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::new(Instruction::Enumeration(analyzed)))
             }
             SymbolKind::Method(method) => {
-                let members: Result<Vec<Box<Analysis<'symbol>>>, AnalyzeError<'symbol>> = method
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = method
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver).map(Box::new))
+                    .map(|member| member.analyze(resolver))
                     .collect();
 
                 let body = method.body.analyze(resolver)?;

@@ -21,7 +21,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                 TokenKind::Boolean(_) => Ok(Type::boolean(literal.span)),
                 TokenKind::String(_) => Ok(Type::string(literal.span)),
                 TokenKind::Character(_) => Ok(Type::character(literal.span)),
-                _ => Ok(Type::new(TypeKind::Infer, literal.span)),
+                _ => Ok(Type::new(TypeKind::Unknown, literal.span)),
             },
 
             ElementKind::Delimited(delimited) => delimited.infer(),
@@ -104,12 +104,12 @@ impl<'element> Checkable<'element> for Element<'element> {
                     }
                     [OperatorKind::Star] => match operand.kind {
                         TypeKind::Pointer { to } => Ok(*to),
-                        TypeKind::Infer => Ok(Type::new(TypeKind::Infer, self.span)),
+                        TypeKind::Unknown => Ok(Type::new(TypeKind::Unknown, self.span)),
                         _ => {
                             Err(
                                 CheckError::new(
                                     ErrorKind::Mismatch(
-                                        Type::pointer(Type::new(TypeKind::Infer, self.span), self.span),
+                                        Type::pointer(Type::new(TypeKind::Unknown, self.span), self.span),
                                         operand,
                                     ),
                                     self.span
@@ -171,7 +171,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             return Ok(left);
                         }
                         if left.is_infer() && right.is_infer() {
-                            return Ok(Type::new(TypeKind::Infer, binary.operator.span));
+                            return Ok(Type::new(TypeKind::Unknown, binary.operator.span));
                         }
                         match (&left.kind, &right.kind) {
                             (
@@ -242,7 +242,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             return Ok(left);
                         }
                         if left.is_infer() && right.is_infer() {
-                            return Ok(Type::new(TypeKind::Infer, binary.operator.span));
+                            return Ok(Type::new(TypeKind::Unknown, binary.operator.span));
                         }
                         match (&left.kind, &right.kind) {
                             (
@@ -285,7 +285,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             return Ok(left);
                         }
                         if left.is_infer() && right.is_infer() {
-                            return Ok(Type::new(TypeKind::Infer, binary.operator.span));
+                            return Ok(Type::new(TypeKind::Unknown, binary.operator.span));
                         }
                         match (&left.kind, &right.kind) {
                             (
@@ -675,7 +675,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             )
                         }
 
-                        Ok(Type::pointer(Type::new(TypeKind::Infer, self.span), self.span))
+                        Ok(Type::pointer(Type::new(TypeKind::Unknown, self.span), self.span))
                     }
                     Some("free") => {
                         if invoke.members.len() != 2 {
@@ -692,7 +692,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             return Err(
                                 CheckError::new(
                                     ErrorKind::Mismatch(
-                                        Type::pointer(Type::new(TypeKind::Infer, self.span), self.span),
+                                        Type::pointer(Type::new(TypeKind::Unknown, self.span), self.span),
                                         ptr
                                     ),
                                     invoke.members[0].span,
@@ -716,7 +716,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                         Ok(Type::unit(self.span))
                     }
-                    _ => Ok(Type::new(TypeKind::Infer, self.span)),
+                    _ => Ok(Type::new(TypeKind::Unknown, self.span)),
                 }
             }
             ElementKind::Construct(construct) => {
@@ -819,11 +819,11 @@ impl<'element> Checkable<'element> for Element<'element> {
                                             Some(TypeKind::Integer { bits, signed }) => Some(Type::integer(bits, signed, self.span)),
                                             Some(TypeKind::Float { bits }) => Some(Type::float(bits, self.span)),
                                             Some(TypeKind::Boolean) => Some(Type::boolean(self.span)),
-                                            Some(TypeKind::Char) => Some(Type::character(self.span)),
+                                            Some(TypeKind::Character) => Some(Type::character(self.span)),
                                             Some(_) | None => match name {
                                                 "String" => Some(Type::string(self.span)),
                                                 "Type" => Some(Type::new(
-                                                    TypeKind::Type(Box::new(Type::new(TypeKind::Infer, self.span))),
+                                                    TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, self.span))),
                                                     self.span,
                                                 )),
                                                 _ => None,
@@ -912,7 +912,7 @@ impl<'delimited> Checkable<'delimited> for Delimited<Token<'delimited>, Element<
                 if self.members.is_empty() {
                     return Ok(Type::new(
                         TypeKind::Array {
-                            member: Box::new(Type::new(TypeKind::Infer, Span::void())),
+                            member: Box::new(Type::new(TypeKind::Unknown, Span::void())),
                             size: 0,
                         },
                         Span::void(),

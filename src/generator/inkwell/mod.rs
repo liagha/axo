@@ -75,7 +75,7 @@ impl<'backend> Inkwell<'backend> {
                 _ => self.context.f64_type().into(),
             },
             TypeKind::Boolean => self.context.bool_type().into(),
-            TypeKind::Char => self.context.i8_type().into(),
+            TypeKind::Character => self.context.i8_type().into(),
             TypeKind::Pointer { .. } => self.context.ptr_type(inkwell::AddressSpace::default()).into(),
             TypeKind::Structure(structure) | TypeKind::Enumeration(structure) => self
                 .structs

@@ -9,8 +9,8 @@ use {
 
 pub fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
     match (&expected.kind, &actual.kind) {
-        (TypeKind::Infer, _) => Some(actual.clone()),
-        (_, TypeKind::Infer) => Some(expected.clone()),
+        (TypeKind::Unknown, _) => Some(actual.clone()),
+        (_, TypeKind::Unknown) => Some(expected.clone()),
         (
             TypeKind::Pointer { to: expected_to },
             TypeKind::Pointer { to: actual_to },
@@ -85,15 +85,15 @@ pub fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> 
                 Some(TypeKind::Integer { bits, signed }) => Some(Type::integer(bits, signed, *span)),
                 Some(TypeKind::Float { bits }) => Some(Type::float(bits, *span)),
                 Some(TypeKind::Boolean) => Some(Type::boolean(*span)),
-                Some(TypeKind::Char) => Some(Type::character(*span)),
+                Some(TypeKind::Character) => Some(Type::character(*span)),
                 Some(_) | None => match name {
                     "String" => Some(Type::string(*span)),
-                    "Infer" => Some(Type::new(TypeKind::Infer, *span)),
+                    "Infer" => Some(Type::new(TypeKind::Unknown, *span)),
                     "Type" => Some(Type::new(
-                        TypeKind::Type(Box::new(Type::new(TypeKind::Infer, *span))),
+                        TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))),
                         *span,
                     )),
-                    _ => Some(Type::new(TypeKind::Infer, *span)),
+                    _ => Some(Type::new(TypeKind::Unknown, *span)),
                 },
             }
         }

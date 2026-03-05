@@ -39,8 +39,8 @@ pub enum Instruction<'analysis> {
     Character {
         value: Char,
     },
-    Array(Vec<Box<Analysis<'analysis>>>),
-    Tuple(Vec<Box<Analysis<'analysis>>>),
+    Array(Vec<Analysis<'analysis>>),
+    Tuple(Vec<Analysis<'analysis>>),
 
     Add(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Subtract(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
@@ -67,8 +67,8 @@ pub enum Instruction<'analysis> {
     Greater(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
-    Index(Index<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
-    Invoke(Invoke<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>>),
+    Index(Index<Box<Analysis<'analysis>>, Analysis<'analysis>>),
+    Invoke(Invoke<Box<Analysis<'analysis>>, Analysis<'analysis>>),
 
     Block(Vec<Analysis<'analysis>>),
     Conditional(
@@ -84,16 +84,16 @@ pub enum Instruction<'analysis> {
 
     Usage(Str<'analysis>),
     Access(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Constructor(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Constructor(Structure<Str<'analysis>, Analysis<'analysis>>),
     Assign(Str<'analysis>, Box<Analysis<'analysis>>),
     Store(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, TypeKind<'analysis>>),
-    Structure(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
-    Enumeration(Structure<Str<'analysis>, Box<Analysis<'analysis>>>),
+    Structure(Structure<Str<'analysis>, Analysis<'analysis>>),
+    Enumeration(Structure<Str<'analysis>, Analysis<'analysis>>),
     Method(
         Method<
             Str<'analysis>,
-            Box<Analysis<'analysis>>,
+            Analysis<'analysis>,
             Box<Analysis<'analysis>>,
             Option<Box<Analysis<'analysis>>>,
         >,

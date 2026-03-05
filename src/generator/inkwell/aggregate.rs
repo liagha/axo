@@ -93,7 +93,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn define_structure(
         &mut self,
-        structure: Structure<Str<'backend>, Box<Analysis<'backend>>>,
+        structure: Structure<Str<'backend>, Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
         let name = structure.target.clone();
         if self.structs.get(&name).is_some() {
@@ -127,7 +127,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn constructor(
         &mut self,
-        structure: Structure<Str<'backend>, Box<Analysis<'backend>>>,
+        structure: Structure<Str<'backend>, Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let name = structure.target.clone();
@@ -267,7 +267,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub(crate) fn build_array(
         &mut self,
-        elements: Vec<Box<Analysis<'backend>>>,
+        elements: Vec<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> (BasicValueEnum<'backend>, BasicTypeEnum<'backend>) {
         if elements.is_empty() {
@@ -321,7 +321,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn array(
         &mut self,
-        elements: Vec<Box<Analysis<'backend>>>,
+        elements: Vec<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let (value, _) = self.build_array(elements, function);
@@ -330,7 +330,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn tuple(
         &mut self,
-        elements: Vec<Box<Analysis<'backend>>>,
+        elements: Vec<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let mut values = Vec::with_capacity(elements.len());
@@ -357,7 +357,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn index(
         &mut self,
-        index: Index<Box<Analysis<'backend>>, Box<Analysis<'backend>>>,
+        index: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if index.members.is_empty() {

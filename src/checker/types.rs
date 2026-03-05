@@ -36,7 +36,7 @@ impl<'ty> Type<'ty> {
     }
 
     pub fn character(span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Char, span)
+        Self::new(TypeKind::Character, span)
     }
 
     pub fn pointer(to: Type<'ty>, span: Span<'ty>) -> Self {
@@ -56,7 +56,7 @@ impl<'ty> Type<'ty> {
     }
 
     pub fn is_infer(&self) -> bool {
-        matches!(self.kind, TypeKind::Infer)
+        matches!(self.kind, TypeKind::Unknown)
     }
 
     pub fn is_pointer(&self) -> bool {
@@ -70,11 +70,11 @@ pub enum TypeKind<'ty> {
     Float { bits: Scale },
     Boolean,
     String,
-    Char,
+    Character,
     Pointer { to: Box<Type<'ty>> },
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
-    Infer,
+    Unknown,
 
     Type(Box<Type<'ty>>),
 
@@ -121,7 +121,7 @@ impl<'ty> TypeKind<'ty> {
             "Float32" => Some(Self::Float { bits: 32 }),
             "Float64" => Some(Self::Float { bits: 64 }),
             "Bool" => Some(Self::Boolean),
-            "Char" | "Character" => Some(Self::Char),
+            "Char" | "Character" => Some(Self::Character),
             "String" => Some(Self::String),
             "Integer" => Some(Self::Integer {
                 bits: 64,

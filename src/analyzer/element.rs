@@ -75,11 +75,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightBracket),
                     ) => {
-                        let items: Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>> =
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                             delimited
                                 .members
                                 .iter()
-                                .map(|item| item.analyze(resolver).map(Box::new))
+                                .map(|item| item.analyze(resolver))
                                 .collect();
 
                         Ok(Analysis::new(Instruction::Array(items?)))
@@ -92,12 +92,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         if delimited.members.len() == 1 {
                             delimited.members[0].analyze(resolver)
                         } else {
-                            let items: Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>> =
+                            let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                                 delimited
                                     .members
                                     .iter()
-                                    .map(|item| item.analyze(resolver).map(Box::new))
+                                    .map(|item| item.analyze(resolver))
                                     .collect();
+                            
                             Ok(Analysis::new(Instruction::Tuple(items?)))
                         }
                     }
@@ -106,11 +107,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         Some(_),
                         TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                     ) => {
-                        let items: Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>> =
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                             delimited
                                 .members
                                 .iter()
-                                .map(|item| item.analyze(resolver).map(Box::new))
+                                .map(|item| item.analyze(resolver))
                                 .collect();
 
                         Ok(Analysis::new(Instruction::Tuple(items?)))
@@ -126,11 +127,12 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
             ElementKind::Index(index) => {
                 let target = index.target.analyze(resolver)?;
-                let indexes: Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>> = index
+                let indexes: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = index
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver).map(Box::new))
+                    .map(|member| member.analyze(resolver))
                     .collect();
+                
                 Ok(Analysis::new(Instruction::Index(Index::new(
                     Box::new(target),
                     indexes?,
@@ -267,11 +269,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     }
                     _ => {
                         let target = invoke.target.analyze(resolver)?;
-                        let arguments: Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>> = invoke
+                        
+                        let arguments: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = invoke
                             .members
                             .iter()
-                            .map(|member| member.analyze(resolver).map(Box::new))
+                            .map(|member| member.analyze(resolver))
                             .collect();
+                        
                         Ok(Analysis::new(Instruction::Invoke(Invoke::new(
                             Box::new(target),
                             arguments?,
@@ -287,11 +291,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .map(|s| s.format(1))
                     .unwrap_or_default();
 
-                let members: Vec<Box<Analysis<'element>>> = constructor
+                let members: Vec<Analysis<'element>> = constructor
                     .members
                     .iter()
-                    .map(|member| member.analyze(resolver).map(Box::new))
-                    .collect::<Result<Vec<Box<Analysis<'element>>>, AnalyzeError<'element>>>()?;
+                    .map(|member| member.analyze(resolver))
+                    .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
 
                 match target.as_str().unwrap() {
                     "Integer" => {

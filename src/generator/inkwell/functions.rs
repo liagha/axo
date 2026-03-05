@@ -624,7 +624,7 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         symbol: &str,
         key: Str<'backend>,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let callee = self.runtime_string_io_function(symbol, key);
@@ -1286,7 +1286,7 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         symbol: &str,
         key: Str<'backend>,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
         newline: bool,
     ) -> BasicValueEnum<'backend> {
@@ -1436,7 +1436,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     fn emit_len(
         &mut self,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let value = arguments
@@ -1460,7 +1460,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     fn emit_write(
         &mut self,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if arguments.len() < 2 {
@@ -1509,7 +1509,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     fn emit_alloc(
         &mut self,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let size_value = arguments
@@ -1593,7 +1593,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     fn emit_free(
         &mut self,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if arguments.len() < 2 {
@@ -1655,7 +1655,7 @@ impl<'backend> super::Inkwell<'backend> {
     fn primitive_cast(
         &mut self,
         name: &str,
-        arguments: &[Box<Analysis<'backend>>],
+        arguments: &[Analysis<'backend>],
         function: FunctionValue<'backend>,
     ) -> Option<BasicValueEnum<'backend>> {
         let arg = arguments
@@ -1794,7 +1794,7 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         method: Method<
             Str<'backend>,
-            Box<Analysis<'backend>>,
+            Analysis<'backend>,
             Box<Analysis<'backend>>,
             Option<Box<Analysis<'backend>>>,
         >,
@@ -2031,7 +2031,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn invoke(
         &mut self,
-        invoke: Invoke<Box<Analysis<'backend>>, Box<Analysis<'backend>>>,
+        invoke: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let name = Self::invoke_target_name(&invoke.target.instruction)

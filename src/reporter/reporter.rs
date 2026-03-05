@@ -27,7 +27,7 @@ impl Reporter {
             TypeKind::Float { bits } => format!("Float(bits={})", bits),
             TypeKind::Boolean => "Bool".to_string(),
             TypeKind::String => "String".to_string(),
-            TypeKind::Char => "Char".to_string(),
+            TypeKind::Character => "Char".to_string(),
             TypeKind::Pointer { to } => {
                 format!("Pointer(to={})", Self::describe_type(to))
             }
@@ -46,7 +46,7 @@ impl Reporter {
                     .join(", ");
                 format!("Tuple({})", members)
             }
-            TypeKind::Infer => "Infer".to_string(),
+            TypeKind::Unknown => "Infer".to_string(),
             TypeKind::Type(item) => format!("Type({})", Self::describe_type(item)),
             TypeKind::Structure(structure) => format!(
                 "Structure({})",
@@ -189,7 +189,7 @@ impl Reporter {
         if self.is_verbose() {
             let tree = resolutions
                 .iter()
-                .map(|resolution| Str::from(format!("{:#?}", resolution.analysis.instruction)))
+                .map(|resolution| Str::from(format!("{}", resolution.analysis.format(self.verbosity))))
                 .collect::<Vec<Str>>()
                 .join("\n");
 
@@ -200,9 +200,6 @@ impl Reporter {
                     ":" => Color::White,
                     tree.indent(self.verbosity) => Color::White,
                 );
-                xprintln!();
-            } else {
-                xprintln!("no Analyses" => Color::Cyan);
                 xprintln!();
             }
         }

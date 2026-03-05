@@ -4,6 +4,7 @@ mod error;
 mod semantics;
 mod symbol;
 mod types;
+mod traits;
 
 pub use {checker::*, types::*};
 

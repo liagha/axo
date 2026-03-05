@@ -222,7 +222,7 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                             } else {
                                 "".to_string()
                             },
-                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
+                            format!("{})[{}]", extension.target.format(verbosity), extension.members.format(verbosity))
                         )
                     }
                     SymbolKind::Binding(binding) => {

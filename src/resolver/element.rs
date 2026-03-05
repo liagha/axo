@@ -431,7 +431,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     error: CheckError::new(
                                         crate::checker::ErrorKind::Mismatch(
                                             Type::pointer(
-                                                Type::new(TypeKind::Infer, invoke.members[0].span),
+                                                Type::new(TypeKind::Unknown, invoke.members[0].span),
                                                 invoke.members[0].span,
                                             ),
                                             ptr,
@@ -467,7 +467,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 let output_type = if let TypeKind::Method(method) = &typ.kind {
                     if matches!(primitive.as_deref(), Some("alloc")) {
-                        Type::pointer(Type::new(TypeKind::Infer, self.span), self.span)
+                        Type::pointer(Type::new(TypeKind::Unknown, self.span), self.span)
                     } else if matches!(primitive.as_deref(), Some("or_else")) && invoke.members.len() == 2 {
                         invoke.members[1].resolve(resolver)?.typed
                     } else {
@@ -649,14 +649,14 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     }
                     [OperatorKind::Star] => match operand.typed.kind {
                         TypeKind::Pointer { to } => *to,
-                        TypeKind::Infer => Type::new(TypeKind::Infer, self.span),
+                        TypeKind::Unknown => Type::new(TypeKind::Unknown, self.span),
                         _ => {
                             return Err(vec![ResolveError::new(
                                 ErrorKind::Check {
                                     error: CheckError::new(
                                         crate::checker::ErrorKind::Mismatch(
                                             Type::pointer(
-                                                Type::new(TypeKind::Infer, self.span),
+                                                Type::new(TypeKind::Unknown, self.span),
                                                 self.span,
                                             ),
                                             operand.typed,
