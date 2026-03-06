@@ -101,14 +101,4 @@ impl<'registry> Resolver<'registry> {
             _ => false,
         }
     }
-
-    pub fn bootstrap(resolver: &mut Resolver<'registry>) -> bool {
-        match Self::lookup_value(resolver, Str::from("Bootstrap")) {
-            Some(Token {
-                kind: TokenKind::Boolean(value),
-                ..
-            }) => value,
-            _ => false,
-        }
-    }
 }

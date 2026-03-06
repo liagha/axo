@@ -6,15 +6,12 @@ use {
     crate::{
         analyzer::Analyzable,
         checker::{
-            annotation, unify,
-            Type,
-            CheckError, Checkable,
+            Checkable,
         },
         data::{Binary, Boolean, Str},
         parser::{ElementKind, Symbol, SymbolKind, Visibility},
         resolver::ErrorKind,
         scanner::{OperatorKind, Token, TokenKind},
-        tracker::Span,
     },
 };
 
@@ -107,7 +104,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 if let Ok(found) = inclusion.target.resolve_path(resolver) {
                     if let SymbolKind::Module(_) = found.kind {
                         for member in found.scope.symbols.iter() {
-                            if matches!(member.specifier.visibility, Visibility::Private) {
+                            if matches!(member.visibility, Visibility::Private) {
                                 continue;
                             }
 
@@ -115,7 +112,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                                 import_errors.push(error);
                             }
                         }
-                    } else if matches!(found.specifier.visibility, Visibility::Private) {
+                    } else if matches!(found.visibility, Visibility::Private) {
                         let token = found.brand().unwrap_or(Token::new(
                             TokenKind::Identifier(Str::from("<private>")),
                             found.span,

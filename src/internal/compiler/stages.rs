@@ -29,6 +29,7 @@ use {
     },
 };
 use crate::internal::compiler::CompileError;
+use crate::parser::Visibility;
 
 impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
     for Initializer<'initializer>
@@ -53,9 +54,10 @@ impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
                 let span = preference.borrow_span();
 
                 Symbol::new(
+                    compiler.resolver.next_id(),
                     SymbolKind::Preference(preference),
                     span,
-                    compiler.resolver.next_id(),
+                    Visibility::Public,
                 )
             })
             .collect::<Vec<Symbol>>();

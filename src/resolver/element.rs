@@ -49,7 +49,7 @@ impl<'element> Element<'element> {
                 resolver.exit();
                 if matches!(left.kind, SymbolKind::Module(_)) {
                     if let Ok(ref member) = right {
-                        if matches!(member.specifier.visibility, Visibility::Private) {
+                        if matches!(member.visibility, Visibility::Private) {
                             let token = member.brand().unwrap_or(Token::new(
                                 TokenKind::Identifier(Str::from("<private>")),
                                 member.span,
@@ -305,26 +305,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 };
 
                 let mut invoke_errors = Vec::new();
-                let is_builtin_primitive = matches!(
-        primitive.as_deref(),
-        Some(
-            "print"
-                | "print_raw"
-                | "eprint"
-                | "eprint_raw"
-                | "read_line"
-                | "len"
-                | "write"
-                | "alloc"
-                | "free"
-                | "is_some"
-                | "is_none"
-                | "Some"
-                | "None"
-                | "unwrap"
-                | "or_else"
-        )
-    );
 
                 if let TypeKind::Method(method) = &typ.kind {
                     let expected = method.members.len();
@@ -344,121 +324,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             invoke.target.span,
                         ));
                     }
-
-                    if !is_builtin_primitive {
-                        for (argument, expected_type) in invoke.members.iter().zip(method.members.iter()) {
-                            match argument.resolve(resolver) {
-                                Ok(actual_resolution) => {
-                                    let actual = actual_resolution.typed;
-                                    let compatible = **expected_type == actual
-                                        || (expected_type.is_numeric() && actual.is_numeric())
-                                        || unify(expected_type, &actual).is_some();
-                                    if !compatible {
-                                        invoke_errors.push(ResolveError::new(
-                                            ErrorKind::Check {
-                                                error: CheckError::new(
-                                                    crate::checker::ErrorKind::Mismatch(
-                                                        (**expected_type).clone(),
-                                                        actual.clone(),
-                                                    ),
-                                                    argument.span,
-                                                ),
-                                            },
-                                            argument.span,
-                                        ));
-                                    }
-                                }
-                                Err(errors) => invoke_errors.extend(errors),
-                            }
-                        }
-                    }
-                }
-
-                if matches!(primitive.as_deref(), Some("alloc")) {
-                    if invoke.members.len() != 1 {
-                        let token = invoke.target.brand().unwrap_or(Token::new(
-                            TokenKind::Identifier(Str::from("alloc")),
-                            invoke.target.span,
-                        ));
-                        invoke_errors.push(ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::InvalidOperation(token),
-                                    invoke.target.span,
-                                ),
-                            },
-                            invoke.target.span,
-                        ));
-                    } else {
-                        let size = invoke.members[0].resolve(resolver)?.typed;
-                        if !size.is_integer() {
-                            invoke_errors.push(ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::Mismatch(
-                                            Type::integer(64, true, invoke.members[0].span),
-                                            size,
-                                        ),
-                                        invoke.members[0].span,
-                                    ),
-                                },
-                                invoke.members[0].span,
-                            ));
-                        }
-                    }
-                }
-
-                if matches!(primitive.as_deref(), Some("free")) {
-                    if invoke.members.len() != 2 {
-                        let token = invoke.target.brand().unwrap_or(Token::new(
-                            TokenKind::Identifier(Str::from("free")),
-                            invoke.target.span,
-                        ));
-                        invoke_errors.push(ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::InvalidOperation(token),
-                                    invoke.target.span,
-                                ),
-                            },
-                            invoke.target.span,
-                        ));
-                    } else {
-                        let ptr = invoke.members[0].resolve(resolver)?.typed;
-                        if !ptr.is_pointer() {
-                            invoke_errors.push(ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::Mismatch(
-                                            Type::pointer(
-                                                Type::new(TypeKind::Unknown, invoke.members[0].span),
-                                                invoke.members[0].span,
-                                            ),
-                                            ptr,
-                                        ),
-                                        invoke.members[0].span,
-                                    ),
-                                },
-                                invoke.members[0].span,
-                            ));
-                        }
-
-                        let size = invoke.members[1].resolve(resolver)?.typed;
-                        if !size.is_integer() {
-                            invoke_errors.push(ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::Mismatch(
-                                            Type::integer(64, true, invoke.members[1].span),
-                                            size,
-                                        ),
-                                        invoke.members[1].span,
-                                    ),
-                                },
-                                invoke.members[1].span,
-                            ));
-                        }
-                    }
                 }
 
                 if !invoke_errors.is_empty() {
@@ -466,13 +331,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 }
 
                 let output_type = if let TypeKind::Method(method) = &typ.kind {
-                    if matches!(primitive.as_deref(), Some("alloc")) {
-                        Type::pointer(Type::new(TypeKind::Unknown, self.span), self.span)
-                    } else if matches!(primitive.as_deref(), Some("or_else")) && invoke.members.len() == 2 {
-                        invoke.members[1].resolve(resolver)?.typed
-                    } else {
-                        *method.output.clone()
-                    }
+                    *method.output.clone()
                 } else {
                     typ
                 };

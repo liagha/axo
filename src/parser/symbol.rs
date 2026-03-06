@@ -1,7 +1,7 @@
 use {
     super::{Element, ElementKind},
     crate::{
-        data::{Boolean, Identity},
+        data::*,
         format::Debug,
         initializer::Preference,
         internal::hash::{Hash, Set},
@@ -10,9 +10,6 @@ use {
         tracker::Span,
     },
 };
-use crate::data::*;
-use crate::data::Str;
-use crate::format::Show;
 
 pub struct Symbol<'symbol> {
     pub id: Identity,
@@ -21,13 +18,6 @@ pub struct Symbol<'symbol> {
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
     pub generic: Scope<'symbol>,
-    pub specifier: Specifier,
-}
-
-#[derive(Clone, Copy)]
-pub struct Specifier {
-    pub entry: Boolean,
-    pub interface: Interface,
     pub visibility: Visibility,
 }
 
@@ -37,77 +27,16 @@ pub enum Visibility {
     Private,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Interface {
-    C,
-    Rust,
-    Axo,
-    Compiler,
-}
-
-impl Specifier {
-    pub fn apply(&mut self, application: Element<'_>) {
-        match application.kind {
-            ElementKind::Literal(
-                Token {
-                    kind: TokenKind::Identifier(identifier),
-                    ..
-                }
-            ) => {
-                match identifier.as_str().unwrap().to_lowercase().as_str() {
-                    "public" => {
-                        self.visibility = Visibility::Public;
-                    }
-
-                    "private" => {
-                        self.visibility = Visibility::Private;
-                    }
-
-                    "c" => {
-                        self.interface = Interface::C;
-                    }
-
-                    "axo" => {
-                        self.interface = Interface::Axo;
-                    }
-
-                    "compiler" => {
-                        self.interface = Interface::Compiler;
-                    }
-
-                    "entry" => {
-                        self.entry = true;
-                    }
-
-                    _ => {}
-                }
-            },
-
-            _ => {}
-        }
-    }
-}
-
-impl Default for Specifier {
-    fn default() -> Self {
-        Self {
-            entry: false,
-            interface: Interface::Axo,
-            visibility: Visibility::Public,
-        }
-    }
-}
-
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(value: SymbolKind<'symbol>, span: Span<'symbol>, id: Identity) -> Self {
+    pub fn new(id: Identity, kind: SymbolKind<'symbol>, span: Span<'symbol>, visibility: Visibility) -> Self {
         Self {
             id,
             usages: Default::default(),
-            kind: value,
+            kind,
             span,
             scope: Scope::new(),
             generic: Scope::new(),
-            specifier: Specifier::default(),
+            visibility,
         }
     }
 
@@ -141,17 +70,12 @@ impl<'symbol> Symbol<'symbol> {
     pub fn with_generic(self, generic: Scope<'symbol>) -> Self {
         Self {
             generic,
-            id: self.id,
             ..self
         }
     }
 
     pub fn set_generic(&mut self, generic: Scope<'symbol>) {
         self.generic = generic;
-    }
-
-    pub fn with_specifier(self, specifier: Specifier) -> Self {
-        Self { specifier, ..self }
     }
 
     pub fn brand(&self) -> Option<Token<'symbol>> {

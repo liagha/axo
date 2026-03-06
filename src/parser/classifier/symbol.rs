@@ -1,14 +1,14 @@
 use {
-    super::super::{Element, ElementKind, ParseError, Parser, Specifier, Symbol, SymbolKind},
+    super::super::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind},
     crate::{
-        data::Str,
+        data::*,
         formation::{classifier::Classifier, form::Form},
         resolver::scope::Scope,
         scanner::{OperatorKind, Token, TokenKind},
         tracker::{Span, Spanned},
     },
 };
-use crate::data::*;
+use crate::parser::Visibility;
 
 impl<'parser> Parser<'parser> {
     fn is_type_annotation(element: &Element<'parser>) -> bool {
@@ -26,6 +26,7 @@ impl<'parser> Parser<'parser> {
     ) -> (Vec<Symbol<'parser>>, Scope<'parser>) {
         let mut runtime = Vec::new();
         let mut generic = Scope::new();
+        
         for member in members {
             let is_generic = match &member.kind {
                 SymbolKind::Binding(binding) => {
@@ -77,9 +78,10 @@ impl<'parser> Parser<'parser> {
 
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(Symbol::new(
+                            0,
                             SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()), 0)),
                             span,
-                            0,
+                            Visibility::Private,
                         )),
                         span,
                     )))
@@ -125,13 +127,14 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
+                                0,
                                 SymbolKind::Extension(Extension::new(
                                     Box::new(name),
                                     None::<Box<Element<'parser>>>,
                                     members,
                                 )),
                                 span,
-                                0,
+                                Visibility::Public,
                             )
                                 .with_generic(generic),
                         ),
@@ -153,13 +156,14 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
+                                0,
                                 SymbolKind::Extension(Extension::new(
                                     Box::new(name),
                                     Some(Box::new(target)),
                                     members,
                                 )),
                                 span,
-                                0,
+                                Visibility::Public,
                             )
                                 .with_generic(generic),
                         ),
@@ -278,16 +282,21 @@ impl<'parser> Parser<'parser> {
                 }
 
                 Ok(Form::output(Element::new(
-                    ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Binding(Binding::new(
-                            Box::new(body),
-                            value,
-                            annotation,
-                            constant,
-                        )),
-                        span,
-                        0,
-                    )),
+                    ElementKind::Symbolize(
+                        Symbol::new(
+                            0,
+                            SymbolKind::Binding(
+                                Binding::new(
+                                    Box::new(body),
+                                    value,
+                                    annotation,
+                                    constant,
+                                )
+                            ),
+                            span,
+                            Visibility::Private,
+                        )
+                    ),
                     span,
                 )))
             },
@@ -309,35 +318,55 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
-                let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
 
                 let body = sequence[1].unwrap_output().clone();
+                
+                let mut visibility = Visibility::Public;
 
-                let parsed_members: Vec<_> = Self::get_body(body.clone())
+                let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(symbol),
-                        _ => {
-                            specifier.apply(element.clone());
+                        ElementKind::Literal(
+                            Token {
+                                kind: TokenKind::Identifier(identifier),
+                                ..
+                            }
+                        ) => {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
 
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
+
+                                _ => {}
+                            }
+                            
+                            None
+                        },
+                        _ => {
                             None
                         }
                     })
                     .collect();
-                let (members, generic) = Self::split_generic_members(parsed_members);
+                
+                let (members, generic) = Self::split_generic_members(members);
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
+                            0,
                             SymbolKind::Structure(Structure::new(Box::new(name), members)),
                             span,
-                            0,
+                            visibility,
                         )
-                            .with_specifier(specifier)
                             .with_generic(generic),
                     ),
                     span,
@@ -361,20 +390,39 @@ impl<'parser> Parser<'parser> {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
                 let generic = Scope::new();
-                let mut specifier = Specifier::default();
 
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
 
                 let body = sequence[1].unwrap_output().clone();
 
+                let mut visibility = Visibility::Public;
+
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(symbol),
-                        _ => {
-                            specifier.apply(element.clone());
+                        ElementKind::Literal(
+                            Token {
+                                kind: TokenKind::Identifier(identifier),
+                                ..
+                            }
+                        ) => {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
 
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
+
+                                _ => {}
+                            }
+
+                            None
+                        },
+                        _ => {
                             None
                         }
                     })
@@ -384,11 +432,11 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
+                            0,
                             SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
                             span,
-                            0,
+                            visibility,
                         )
-                            .with_specifier(specifier)
                             .with_generic(generic),
                     ),
                     span,
@@ -456,14 +504,53 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
+                
+                let mut visibility = Visibility::Private;
+                let mut interface = Interface::Axo;
+                let mut entry = false;
+                let mut variadic = false;
 
                 if sequence.len() == 4 {
-                    let mut variadic = false;
-
                     let parsed_members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),
+                            ElementKind::Literal(
+                                Token {
+                                    kind: TokenKind::Identifier(identifier),
+                                    ..
+                                }
+                            ) => {
+                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                    "public" => {
+                                        visibility = Visibility::Public;
+                                    }
+
+                                    "private" => {
+                                        visibility = Visibility::Private;
+                                    }
+
+                                    "c" => {
+                                        interface = Interface::C;
+                                    }
+
+                                    "axo" => {
+                                        interface = Interface::Axo;
+                                    }
+
+                                    "compiler" => {
+                                        interface = Interface::Compiler;
+                                    }
+
+                                    "entry" => {
+                                        entry = true;
+                                    }
+
+                                    _ => {}
+                                }
+                                
+                                None
+                            },
                             _ => {
                                 variadic = true;
 
@@ -479,15 +566,18 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
+                                0,
                                 SymbolKind::Method(Method::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),
                                     None::<Box<Element<'parser>>>,
+                                    interface,
                                     variadic,
+                                    entry
                                 )),
                                 span,
-                                0,
+                                visibility,
                             )
                                 .with_generic(generic),
                         ),
@@ -495,12 +585,52 @@ impl<'parser> Parser<'parser> {
                     )))
                 } else {
                     let output = sequence[3].unwrap_output().clone();
+                    
+                    let mut visibility = Visibility::Private;
+                    let mut interface = Interface::Axo;
+                    let mut entry = false;
                     let mut variadic = false;
 
                     let parsed_members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
                             ElementKind::Symbolize(symbol) => Some(symbol),
+                            ElementKind::Literal(
+                                Token {
+                                    kind: TokenKind::Identifier(identifier),
+                                    ..
+                                }
+                            ) => {
+                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                    "public" => {
+                                        visibility = Visibility::Public;
+                                    }
+
+                                    "private" => {
+                                        visibility = Visibility::Private;
+                                    }
+
+                                    "c" => {
+                                        interface = Interface::C;
+                                    }
+
+                                    "axo" => {
+                                        interface = Interface::Axo;
+                                    }
+
+                                    "compiler" => {
+                                        interface = Interface::Compiler;
+                                    }
+
+                                    "entry" => {
+                                        entry = true;
+                                    }
+
+                                    _ => {}
+                                }
+                                
+                                None
+                            },
                             _ => {
                                 variadic = true;
 
@@ -516,15 +646,18 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
+                                0,
                                 SymbolKind::Method(Method::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),
                                     Some(Box::new(output)),
+                                    interface,
                                     variadic,
+                                    entry,
                                 )),
                                 span,
-                                0,
+                                visibility,
                             )
                                 .with_generic(generic),
                         ),
@@ -557,7 +690,7 @@ impl<'parser> Parser<'parser> {
                     .collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol =
-                    Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, 0);
+                    Symbol::new(0, SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
                 symbol.scope.extend(fields);
 
                 Ok(Form::output(Element::new(

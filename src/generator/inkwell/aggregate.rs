@@ -60,7 +60,7 @@ impl<'backend> super::Inkwell<'backend> {
             Analysis::Usage(name) => name
                 .as_str()
                 .and_then(TypeKind::from_name)
-                .map(|kind| self.llvm_type_from_type_kind(&kind))
+                .map(|kind| self.llvm_type(&kind))
                 .or_else(|| self.structs.get(name).map(|kind| (*kind).into())),
             Analysis::Array(items) => {
                 if items.len() != 2 {
@@ -112,7 +112,7 @@ impl<'backend> super::Inkwell<'backend> {
                 let field_type = binding
                     .annotation
                     .as_ref()
-                    .map(|annotation| self.llvm_type_from_type_kind(annotation))
+                    .map(|annotation| self.llvm_type(annotation))
                     .unwrap_or_else(|| self.context.i64_type().into());
                 field_types.push(field_type);
             }

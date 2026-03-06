@@ -8,7 +8,7 @@ mod traits;
 pub use {
     element::{Element, ElementKind},
     parser::Parser,
-    symbol::{Specifier, Symbol, SymbolKind, Visibility},
+    symbol::{Symbol, SymbolKind, Visibility},
 };
 
 

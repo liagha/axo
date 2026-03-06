@@ -150,7 +150,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         errors: Vec::new(),
                     }
                 } else if self.suggestion.contains(&score) {
-                    let dominant = self.assessor.dominant();
                     let how = "are similar".to_string();
 
                     Assessment {

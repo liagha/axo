@@ -1,5 +1,4 @@
-use crate::data::Str;
-use super::{Backend, GenerateError, Inkwell};
+use super::{Backend, GenerateError};
 
 pub struct Generator<'generator, B: Backend<'generator>> {
     pub backend: B,

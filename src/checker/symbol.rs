@@ -177,7 +177,9 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     members?,
                     Box::new(body),
                     output,
+                    method.interface,
                     method.variadic,
+                    method.entry,
                 );
 
                 Ok(Type::new(TypeKind::Method(method), self.span))

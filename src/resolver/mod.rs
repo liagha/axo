@@ -2,7 +2,6 @@ mod assessor;
 mod element;
 mod error;
 mod hint;
-mod primitives;
 mod resolver;
 pub mod scope;
 mod symbol;

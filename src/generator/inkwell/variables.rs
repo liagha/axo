@@ -230,7 +230,7 @@ impl<'backend> super::Inkwell<'backend> {
         let declared_kind = binding
             .annotation
             .as_ref()
-            .map(|annotation| self.llvm_type_from_type_kind(annotation))
+            .map(|annotation| self.llvm_type(annotation))
             .unwrap_or_else(|| value.get_type());
         let casted = if value.get_type() == declared_kind {
             value

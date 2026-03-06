@@ -52,7 +52,7 @@ fn annotation_type_kind<'symbol>(
 impl<'token> Analyzable<'token> for Token<'token> {
     fn analyze(
         &self,
-        resolver: &mut Resolver<'token>,
+        _resolver: &mut Resolver<'token>,
     ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
         match &self.kind {
             TokenKind::Float(float) => Ok(Analysis::Float {
@@ -165,7 +165,9 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     members?,
                     Box::new(body),
                     output,
+                    method.interface,
                     method.variadic,
+                    method.entry,
                 );
 
                 Ok(Analysis::Method(analyzed))

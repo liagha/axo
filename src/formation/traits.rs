@@ -20,19 +20,19 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
                     }
 
                     Form::Input(input) => {
-                        (format!("Input({})", input.format(verbosity)))
+                        format!("Input({})", input.format(verbosity))
                     }
 
                     Form::Output(output) => {
-                        (format!("Output({})", output.format(verbosity)))
+                        format!("Output({})", output.format(verbosity))
                     }
 
                     Form::Multiple(forms) => {
-                        (format!("Multiple({})", forms.format(verbosity)))
+                        format!("Multiple({})", forms.format(verbosity))
                     }
 
                     Form::Failure(error) => {
-                        (format!("Failure({})", error.format(verbosity)))
+                        format!("Failure({})", error.format(verbosity))
                     }
 
                     Form::_Phantom(_) => unreachable!(),

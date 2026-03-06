@@ -74,22 +74,11 @@ impl Driver {
         None
     }
 
-    fn compile(compiler: &Path, code: &Path, binary: &Path, bootstrap: bool) -> Result<()> {
+    fn compile(compiler: &Path, code: &Path, binary: &Path) -> Result<()> {
         let mut command = Command::new(compiler);
         command.arg(code);
-        let compiler_name = compiler
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
         if let Some(linker) = Self::linker().as_deref().and_then(Self::linker_flag) {
             command.arg(format!("-fuse-ld={}", linker));
-        }
-        if bootstrap {
-            command
-                .arg("-nostdlib")
-                .arg("-nodefaultlibs")
-                .arg("-nostartfiles")
-                .arg("-Wl,-e,_start");
         }
         #[cfg(target_os = "macos")]
         if let Some(root) = Self::sysroot() {
@@ -200,7 +189,7 @@ impl Driver {
         (code, executable)
     }
 
-    pub fn link(code: &Path, binary: &Path, bootstrap: bool) -> Result<()> {
+    pub fn link(code: &Path, binary: &Path) -> Result<()> {
         if let Some(parent) = binary.parent() {
             if !parent.as_os_str().is_empty() {
                 create_dir_all(parent)?;
@@ -225,7 +214,7 @@ impl Driver {
                 continue;
             }
 
-            match Self::compile(&candidate, code, binary, bootstrap) {
+            match Self::compile(&candidate, code, binary) {
                 Ok(()) => return Ok(()),
                 Err(error) => failures.push(format!("{}: {}", candidate.display(), error)),
             }

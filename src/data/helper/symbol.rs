@@ -1,10 +1,10 @@
-use crate::data::Str;
-use crate::format::Show;
-use crate::{
-    data::{Boolean, Identity},
-    internal::hash::{Hash, Hasher},
+use {
+    crate::{
+        format::Show,
+        data::{Boolean, Str},
+        internal::hash::{Hash, Hasher},
+    },
 };
-use std::process::Output;
 
 #[derive(Debug, Eq)]
 pub struct Inclusion<Target, Identity> {
@@ -33,19 +33,30 @@ pub struct Structure<Target, Field> {
     pub members: Vec<Field>,
 }
 
+#[derive(Debug)]
+pub struct Module<Target> {
+    pub target: Target,
+}
+
 #[derive(Debug, Eq)]
 pub struct Method<Target, Parameter, Body, Output> {
     pub target: Target,
     pub members: Vec<Parameter>,
     pub body: Body,
     pub output: Output,
+    pub interface: Interface,
     pub variadic: Boolean,
+    pub entry: Boolean,
 }
 
-#[derive(Debug)]
-pub struct Module<Target> {
-    pub target: Target,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Interface {
+    C,
+    Rust,
+    Axo,
+    Compiler,
 }
+
 
 impl<Target, Identity> Inclusion<Target, Identity> {
     #[inline]
@@ -99,17 +110,21 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
     #[inline]
     pub fn new(
         target: Target,
-        parameters: Vec<Parameter>,
+        members: Vec<Parameter>,
         body: Body,
         output: Output,
-        variadic: bool,
+        interface: Interface,
+        variadic: Boolean,
+        entry: Boolean,
     ) -> Self {
         Method {
             target,
-            members: parameters,
+            members,
             body,
             output,
+            interface,
             variadic,
+            entry,
         }
     }
 }
@@ -260,7 +275,9 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
             self.members.clone(),
             self.body.clone(),
             self.output.clone(),
+            self.interface.clone(),
             self.variadic.clone(),
+            self.entry.clone(),
         )
     }
 }
@@ -334,7 +351,7 @@ impl<
                     "".to_string()
                 },
                 if let Some(value) = &self.value {
-                    format!(" = {}", self.value.format(verbosity))
+                    format!(" = {}", value.format(verbosity))
                 } else {
                     "".to_string()
                 }

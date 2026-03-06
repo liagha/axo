@@ -50,14 +50,13 @@ pub struct Inkwell<'backend> {
     struct_fields: Map<Str<'backend>, Vec<Str<'backend>>>,
     array_elements: Map<Str<'backend>, BasicTypeEnum<'backend>>,
     modules: crate::internal::hash::Set<Str<'backend>>,
-    bootstrap: bool,
     errors: Vec<GenerateError<'backend>>,
     loop_headers: Vec<BasicBlock<'backend>>,
     loop_exits: Vec<BasicBlock<'backend>>,
 }
 
 impl<'backend> Inkwell<'backend> {
-    pub(crate) fn llvm_type_from_type_kind(
+    pub fn llvm_type(
         &self,
         kind: &TypeKind<'backend>,
     ) -> BasicTypeEnum<'backend> {
@@ -67,7 +66,7 @@ impl<'backend> Inkwell<'backend> {
                 16 => self.context.i16_type().into(),
                 32 => self.context.i32_type().into(),
                 64 => self.context.i64_type().into(),
-                _ => self.context.i64_type().into(),
+                size => self.context.custom_width_int_type(*size as u32).into(),
             },
             TypeKind::Float { bits } => match bits {
                 32 => self.context.f32_type().into(),
@@ -99,16 +98,10 @@ impl<'backend> Inkwell<'backend> {
             struct_fields: Default::default(),
             array_elements: Default::default(),
             modules: Default::default(),
-            bootstrap: false,
             errors: Vec::new(),
             loop_headers: Vec::new(),
             loop_exits: Vec::new(),
         }
-    }
-
-    pub fn with_bootstrap(mut self, bootstrap: bool) -> Self {
-        self.bootstrap = bootstrap;
-        self
     }
 
     fn name(instruction: &Analysis<'backend>) -> &'static str {
@@ -175,7 +168,7 @@ impl<'backend> Inkwell<'backend> {
         self.context.i64_type().const_zero().into()
     }
 
-    pub(crate) fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
+    pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
         match &analysis {
             Analysis::Integer { signed, .. } => Some(*signed),
             Analysis::Usage(identifier) => match self.entities.get(identifier) {
@@ -266,10 +259,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         {
             self.builder
                 .build_return(Some(&self.context.i32_type().const_zero()));
-        }
-
-        if self.bootstrap {
-            self.emit_bootstrap_start(function);
         }
 
         let _ = self.module.verify();

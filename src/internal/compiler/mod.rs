@@ -44,6 +44,7 @@ use crate::{
     generator::{Backend, Generator, Inkwell},
     internal::driver::Driver,
 };
+use crate::parser::Visibility;
 
 pub trait Stage<'stage, Input, Output> {
     fn execute(&mut self, compiler: &mut Compiler<'stage>, input: Input) -> Output;
@@ -100,8 +101,6 @@ impl<'compiler> Compiler<'compiler> {
         let verbosity = Resolver::verbosity(&mut self.resolver);
 
         self.reporter.verbosity = verbosity;
-
-        let mut logger = Reporter::new(verbosity);
 
         for (index, target) in targets.into_iter().enumerate() {
             self.build(target, index);
@@ -160,7 +159,6 @@ impl<'compiler> Compiler<'compiler> {
                     #[cfg(feature = "generator")]
                     {
                         let executable = Resolver::binary(&mut self.resolver, index);
-                        let bootstrap = Resolver::bootstrap(&mut self.resolver);
                         let run = Resolver::run(&mut self.resolver);
                         let (_, binary) = Driver::paths(target, name, None, executable);
                         let should_link = run || executable.is_some();
@@ -168,7 +166,7 @@ impl<'compiler> Compiler<'compiler> {
                         self.reporter.start("linking");
 
                         let linked = if should_link {
-                            match Driver::link(&path, &binary, bootstrap) {
+                            match Driver::link(&path, &binary) {
                                 Ok(()) => true,
                                 Err(error) => {
                                     xprintln!(
@@ -217,10 +215,8 @@ impl<'compiler> Compiler<'compiler> {
 
                     #[cfg(feature = "generator")]
                     {
-                        let bootstrap = Resolver::bootstrap(&mut self.resolver);
                         let context = &inkwell::context::Context::create();
-                        let backend = Inkwell::new(Str::from(name), context)
-                            .with_bootstrap(bootstrap);
+                        let backend = Inkwell::new(Str::from(name), context);
 
                         let mut generator = Generator::new(backend);
 
@@ -276,7 +272,7 @@ impl<'compiler> Compiler<'compiler> {
                             self.reporter.start("linking");
 
                             let linked = if should_link {
-                                match Driver::link(&code, &binary, bootstrap) {
+                                match Driver::link(&code, &binary) {
                                     Ok(()) => true,
                                     Err(error) => {
                                         xprintln!(
@@ -321,9 +317,10 @@ impl<'compiler> Compiler<'compiler> {
         );
 
         let mut module = Symbol::new(
+            self.resolver.next_id(),
             SymbolKind::Module(Module::new(Box::new(identifier))),
             span,
-            self.resolver.next_id(),
+            Visibility::Public,
         );
 
         module.set_scope(self.resolver.scope.clone());

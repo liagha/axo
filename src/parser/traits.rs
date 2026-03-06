@@ -3,7 +3,6 @@ use {
     super::{Element, ElementKind, Symbol, SymbolKind},
     crate::{
         data::memory::discriminant,
-        format::{self, Debug, Display, Formatter},
         internal::{
             hash::{Hash, Hasher},
             operation::Ordering,
@@ -12,7 +11,6 @@ use {
     },
 };
 use crate::data::Str;
-use crate::parser::Specifier;
 
 impl<'element> Show<'element> for Element<'element> {
     type Verbosity = u8;
@@ -84,9 +82,9 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
         match verbosity {
             0 => {
                 format!(
-                    "{}: {}{}{}",
+                    "{}: {:?}, {}{}",
                     self.kind.format(verbosity),
-                    self.specifier.format(verbosity),
+                    self.visibility,
                     if self.scope.is_empty() {
                         "".into()
                     } else {
@@ -97,13 +95,6 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                     } else {
                         format!("\nGenerics: {}", self.generic.format(verbosity)).indent(verbosity)
                     }
-                )
-            }
-
-            2 => {
-                format!(
-                    "{} | {:?} -> {}",
-                    self.kind.format(verbosity), self.span, self.specifier.format(verbosity)
                 )
             }
 
@@ -151,31 +142,6 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                 }
             }
         }
-    }
-}
-
-impl<'show> Show<'show> for Specifier {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => {
-                format!(
-                    "{:?}{}{}",
-                    self.visibility,
-                    if self.entry {
-                        ", Entry".to_string()
-                    } else {
-                        "".to_string()
-                    },
-                    format!(", {:?}", self.interface)
-                )
-            }
-
-            _ => {
-                self.format(verbosity - 1).to_string()
-            }
-        }.into()
     }
 }
 
@@ -310,7 +276,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
             span: self.span.clone(),
             scope: self.scope.clone(),
             generic: self.generic.clone(),
-            specifier: self.specifier.clone(),
+            visibility: self.visibility.clone(),
         }
     }
 }
