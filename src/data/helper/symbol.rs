@@ -1,8 +1,10 @@
+use crate::data::Str;
+use crate::format::Show;
 use crate::{
     data::{Boolean, Identity},
     internal::hash::{Hash, Hasher},
 };
-use crate::format::Show;
+use std::process::Output;
 
 #[derive(Debug, Eq)]
 pub struct Inclusion<Target, Identity> {
@@ -48,7 +50,10 @@ pub struct Module<Target> {
 impl<Target, Identity> Inclusion<Target, Identity> {
     #[inline]
     pub fn new(target: Target, id: Identity) -> Self {
-        Inclusion { target, identity: id }
+        Inclusion {
+            target,
+            identity: id,
+        }
     }
 }
 
@@ -147,7 +152,7 @@ impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
 }
 
 impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
-for Method<Target, Parameter, Body, Output>
+    for Method<Target, Parameter, Body, Output>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -170,7 +175,7 @@ impl<Target: PartialEq, Identity> PartialEq for Inclusion<Target, Identity> {
 }
 
 impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq
-for Extension<Target, Interface, Member>
+    for Extension<Target, Interface, Member>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.members == other.members
@@ -178,7 +183,7 @@ for Extension<Target, Interface, Member>
 }
 
 impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq
-for Binding<Target, Value, Type>
+    for Binding<Target, Value, Type>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -195,7 +200,7 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field>
 }
 
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq
-for Method<Target, Parameter, Body, Output>
+    for Method<Target, Parameter, Body, Output>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -218,7 +223,7 @@ impl<Target: Clone, Identity: Clone> Clone for Inclusion<Target, Identity> {
 }
 
 impl<Interface: Clone, Target: Clone, Member: Clone> Clone
-for Extension<Target, Interface, Member>
+    for Extension<Target, Interface, Member>
 {
     fn clone(&self) -> Self {
         Extension::new(
@@ -247,7 +252,7 @@ impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
 }
 
 impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
-for Method<Target, Parameter, Body, Output>
+    for Method<Target, Parameter, Body, Output>
 {
     fn clone(&self) -> Self {
         Method::new(
@@ -263,5 +268,144 @@ for Method<Target, Parameter, Body, Output>
 impl<Target: Clone> Clone for Module<Target> {
     fn clone(&self) -> Self {
         Module::new(self.target.clone())
+    }
+}
+
+impl<'show, Target: Show<'show, Verbosity = u8>, Identity> Show<'show>
+    for Inclusion<Target, Identity>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!("Inclusion({})", self.target.format(verbosity)).into(),
+
+            _ => self.format(verbosity - 1),
+        }
+    }
+}
+
+impl<
+        'show,
+        Target: Show<'show, Verbosity = u8>,
+        Interface: Show<'show, Verbosity = u8>,
+        Member: Show<'show, Verbosity = u8>,
+    > Show<'show> for Extension<Target, Interface, Member>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!(
+                "Extension({}{})[{}]",
+                self.target.format(verbosity),
+                if let Some(extension) = &self.extension {
+                    format!(" | {}", extension.format(verbosity))
+                } else {
+                    "".to_string()
+                },
+                self.members.format(verbosity)
+            )
+            .into(),
+
+            _ => self.format(verbosity - 1),
+        }
+    }
+}
+
+impl<
+        'show,
+        Target: Show<'show, Verbosity = u8>,
+        Value: Show<'show, Verbosity = u8>,
+        Type: Show<'show, Verbosity = u8>,
+    > Show<'show> for Binding<Target, Value, Type>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!(
+                "Binding({}{}{}{})",
+                self.target.format(verbosity),
+                if self.constant { "Constant | " } else { "" },
+                if let Some(annotation) = &self.annotation {
+                    format!(" : {}", annotation.format(verbosity))
+                } else {
+                    "".to_string()
+                },
+                if let Some(value) = &self.value {
+                    format!(" = {}", self.value.format(verbosity))
+                } else {
+                    "".to_string()
+                }
+            )
+            .into(),
+
+            _ => self.format(verbosity - 1),
+        }
+    }
+}
+
+impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show>
+    for Structure<Target, Member>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!(
+                "Structure({})[{}]",
+                self.target.format(verbosity),
+                self.members.format(verbosity)
+            )
+            .into(),
+
+            _ => self.format(verbosity - 1),
+        }
+    }
+}
+
+impl<
+        'show,
+        Target: Show<'show, Verbosity = u8>,
+        Parameter: Show<'show, Verbosity = u8>,
+        Body: Show<'show, Verbosity = u8>,
+        Output: Show<'show, Verbosity = u8>,
+    > Show<'show> for Method<Target, Parameter, Body, Output>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!(
+                "Method({} : {})[{}{}]{{{}}}",
+                self.target.format(verbosity),
+                self.output.format(verbosity),
+                if self.variadic { "Variadic | " } else { "" },
+                self.members.format(verbosity),
+                self.body.format(verbosity)
+            )
+            .into(),
+
+            _ => self.format(verbosity - 1),
+        }
+    }
+}
+
+impl<'show, Target: Show<'show, Verbosity = u8>> Show<'show>
+for Module<Target>
+{
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => format!(
+                "Module({})",
+                self.target.format(verbosity),
+            )
+                .into(),
+
+            _ => self.format(verbosity - 1),
+        }
     }
 }

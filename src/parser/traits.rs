@@ -135,155 +135,41 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
-                match self {
-                    SymbolKind::Inclusion(inclusion) => {
-                        format!("Inclusion({})", inclusion.target.format(verbosity))
-                    }
-                    SymbolKind::Extension(extension) => {
-                        format!(
-                            "Extension({}{}",
-                            if let Some(extension) = &extension.extension {
-                                format!("{}, ", extension.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            format!("{})[{}]", extension.target.format(verbosity), extension.members.format(verbosity))
-                        )
-                    }
-                    SymbolKind::Binding(binding) => {
-                        format!(
-                            "Binding({} {}{}{})",
-                            if binding.constant {
-                                "Constant"
-                            } else {
-                                "Variable"
-                            },
-                            binding.target.format(verbosity),
-                            if let Some(annotation) = &binding.annotation {
-                                format!(" : {}", annotation.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            if let Some(value) = &binding.value {
-                                format!(" = {}", value.format(verbosity))
-                            } else {
-                                "".to_string()
-                            }
-                        )
-                    }
-                    SymbolKind::Structure(structure) => {
-                        format!(
-                            "Structure({} {})",
-                            structure.target.format(verbosity), structure.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Enumeration(enumeration) => {
-                        format!(
-                            "Enumeration({} {})",
-                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Method(method) => {
-                        format!(
-                            "Method({} {}{} -> {} : {})",
-                            method.target.format(verbosity),
-                            method.members.format(verbosity),
-                            if method.variadic { "- Variadic" } else { "" },
-                            method.output.clone().map(|value| *value).format(verbosity),
-                            method.body.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Module(module) => {
-                        format!("Module({})", module.target.format(verbosity))
-                    }
-                    SymbolKind::Preference(preference) => {
-                        format!(
-                            "Preference({}, {})",
-                            preference.target.format(verbosity), preference.value.format(verbosity)
-                        )
-                    }
-                }
-            }
-
-            2 => {
-                match self {
-                    SymbolKind::Inclusion(inclusion) => {
-                        format!("Inclusion({})", inclusion.target.format(verbosity))
-                    }
-                    SymbolKind::Extension(extension) => {
-                        format!(
-                            "Extension({}{}",
-                            if let Some(extension) = &extension.extension {
-                                format!("{}, ", extension.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            format!("{}, {})", extension.target.format(verbosity), extension.members.format(verbosity))
-                        )
-                    }
-                    SymbolKind::Binding(binding) => {
-                        format!(
-                            "Binding({} {}{}{})",
-                            if binding.constant {
-                                "Constant"
-                            } else {
-                                "Variable"
-                            },
-                            binding.target.format(verbosity),
-                            if let Some(annotation) = &binding.annotation {
-                                format!(" : {}", annotation.format(verbosity))
-                            } else {
-                                "".to_string()
-                            },
-                            if let Some(value) = &binding.value {
-                                format!(" = {}", value.format(verbosity))
-                            } else {
-                                "".to_string()
-                            }
-                        )
-                    }
-                    SymbolKind::Structure(structure) => {
-                        format!(
-                            "Structure({} {})",
-                            structure.target.format(verbosity), structure.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Enumeration(enumeration) => {
-                        format!(
-                            "Enumeration({} {})",
-                            enumeration.target.format(verbosity), enumeration.members.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Method(method) => {
-                        format!(
-                            "Method({} {}{} -> {} : {})",
-                            method.target.format(verbosity),
-                            method.members.format(verbosity),
-                            if method.variadic { "- Variadic" } else { "" },
-                            method.output.clone().map(|value| *value).format(verbosity),
-                            method.body.format(verbosity)
-                        )
-                    }
-                    SymbolKind::Module(module) => {
-                        format!("Module({})", module.target.format(verbosity))
-                    }
-                    SymbolKind::Preference(preference) => {
-                        format!(
-                            "Preference({}, {})",
-                            preference.target.format(verbosity), preference.value.format(verbosity)
-                        )
-                    }
-                }
+                "".into()
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                match self {
+                    SymbolKind::Inclusion(inclusion) => {
+                        inclusion.format(verbosity)
+                    }
+                    SymbolKind::Extension(extension) => {
+                        extension.format(verbosity)
+                    }
+                    SymbolKind::Binding(binding) => {
+                        binding.format(verbosity)
+                    }
+                    SymbolKind::Structure(structure) => {
+                        structure.format(verbosity)
+                    }
+                    SymbolKind::Enumeration(enumeration) => {
+                        enumeration.format(verbosity)
+                    }
+                    SymbolKind::Method(method) => {
+                        method.format(verbosity)
+                    }
+                    SymbolKind::Module(module) => {
+                        module.format(verbosity)
+                    }
+                    SymbolKind::Preference(preference) => {
+                        format!(
+                            "Preference({}, {})",
+                            preference.target.format(verbosity), preference.value.format(verbosity)
+                        ).into()
+                    }
+                }
             }
-        }.into()
+        }
     }
 }
 
