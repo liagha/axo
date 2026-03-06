@@ -1,6 +1,6 @@
 use {
     crate::{
-        data::{from_utf8, slice::from_raw_parts, Offset, Pointer, Scale, Str},
+        data::{Offset, Str},
         internal::{
             operation::Ordering,
             platform::{
@@ -16,7 +16,6 @@ use {
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Location<'location> {
     Entry(Str<'location>),
-    Raw { ptr: Pointer, len: Scale },
     Void,
     Flag,
 }
@@ -68,13 +67,6 @@ impl<'location> Location<'location> {
                     }
                 }
             }
-            Location::Raw { ptr, len, .. } => {
-                let slice = unsafe { from_raw_parts(*ptr, *len) };
-                match from_utf8(slice) {
-                    Ok(s) => Ok(s.into()),
-                    Err(e) => Ok(String::from_utf8_lossy(slice).to_string().into()),
-                }
-            }
             Location::Flag => Ok(args()
                 .skip(1)
                 .map(|arg| {
@@ -93,17 +85,6 @@ impl<'location> Location<'location> {
 
     pub fn file(string: Str<'location>) -> Location<'location> {
         Location::Entry(string)
-    }
-
-    pub fn raw<T>(value: &'location T) -> Location<'location>
-    where
-        T: AsRef<[u8]> + ?Sized,
-    {
-        let bytes = value.as_ref();
-        Location::Raw {
-            ptr: bytes.as_ptr(),
-            len: bytes.len(),
-        }
     }
 
     pub fn flag() -> Location<'location> {

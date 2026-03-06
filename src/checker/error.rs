@@ -18,10 +18,10 @@ impl<'error> Show<'error> for ErrorKind<'error> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match self {
             ErrorKind::Mismatch(this, other) => {
-                format!("expected {:?} but got {:?}.", this, other)
+                format!("expected `{}` but got `{}`.", this.format(verbosity), other.format(verbosity))
             }
             ErrorKind::InvalidOperation(token) => {
-                format!("invalid operation for operand types: {}.", token.format(verbosity))
+                format!("invalid operation for operand types: `{}`.", token.format(verbosity))
             }
         }.into()
     }

@@ -298,7 +298,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap()
             };
             if let Some(casted) = self.cast_value(value, element_type) {
-                self.builder.build_store(slot, casted);
+                let _ = self.builder.build_store(slot, casted);
             }
         }
 

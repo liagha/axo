@@ -5,7 +5,6 @@ use {
         generator::Backend,
         initializer::{
             Initializer,
-            InitializeError,
         },
         internal::{
             compiler::Compiler,
@@ -13,7 +12,6 @@ use {
         },
         parser::{
             Parser,
-            ParseError,
             Element,
             Symbol,
             SymbolKind
@@ -23,9 +21,8 @@ use {
         scanner::{
             Scanner,
             Token,
-            ScanError,
         },
-        tracker::{Location, Peekable, Position, Spanned},
+        tracker::{Location, Peekable, Spanned},
     },
 };
 use crate::internal::compiler::CompileError;
@@ -149,8 +146,6 @@ impl<'resolver> Compiler<'resolver>
         self.resolver.with_input(elements);
 
         self.resolver.resolve();
-
-        let scope_symbols = self.resolver.scope.all();
 
         self.reporter.symbols(&self.resolver.scope.all());
         self.reporter.resolutions(&*self.resolver.output);

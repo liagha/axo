@@ -1,14 +1,12 @@
 use {
     super::{Character, ScanError, Token},
     crate::{
-        data::{Offset, Scale},
-        internal::timer::Duration,
+        data::{Str, Offset, Scale},
         formation::{form::Form, former::Former},
         tracker::{Location, Peekable, Position},
         scanner::error::ErrorKind,
     },
 };
-use crate::data::Str;
 
 pub struct Scanner<'scanner> {
     pub index: Offset,

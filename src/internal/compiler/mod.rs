@@ -15,7 +15,6 @@ use {
             timer::{DefaultTimer, Duration},
         },
         parser::{
-            Parser,
             Element, ElementKind,
             Symbol, SymbolKind,
             ParseError,
@@ -41,10 +40,10 @@ use {
 
 #[cfg(feature = "generator")]
 use crate::{
-    generator::{Backend, Generator, Inkwell},
+    generator::{Generator, Inkwell},
     internal::driver::Driver,
 };
-use crate::parser::Visibility;
+use crate::parser::{Parser, Visibility};
 
 pub trait Stage<'stage, Input, Output> {
     fn execute(&mut self, compiler: &mut Compiler<'stage>, input: Input) -> Output;
@@ -70,7 +69,7 @@ pub struct Compiler<'compiler> {
 impl<'compiler> Compiler<'compiler> {
     pub fn new() -> Self {
         let mut timer = DefaultTimer::new_default();
-        timer.start();
+        let _ = timer.start();
 
         let resolver = Resolver::new();
         let reporter = Reporter::new(0);
@@ -127,7 +126,14 @@ impl<'compiler> Compiler<'compiler> {
     pub fn build(&mut self, target: Location<'compiler>, index: usize) {
         self.resolver.enter();
 
-        let span = Span::file(Str::from(target.to_string()));
+        let span = match Span::file(Str::from(target.to_string())) {
+            Ok(span) => span,
+            Err(error) => {
+                self.errors.push(CompileError::Track(error));
+
+                return;
+            }
+        };
 
         let path = match target.clone().to_path() {
             Ok(path) => {
@@ -141,8 +147,6 @@ impl<'compiler> Compiler<'compiler> {
         };
 
         let name = path.file_name().unwrap().to_str().unwrap();
-
-        let verbosity = Resolver::verbosity(&mut self.resolver);
 
         if path.is_dir() {
             for entry in read_dir(&path).unwrap() {
@@ -203,15 +207,7 @@ impl<'compiler> Compiler<'compiler> {
                         parser.execute(self, tokens)
                     };
 
-                    let mut analysis = Vec::new();
-
-                    let faulty = if self.errors.is_empty() {
-                        let prior = self.resolver.errors.len();
-                        analysis = self.execute(elements.clone());
-                        self.resolver.errors.len() > prior
-                    } else {
-                        true
-                    };
+                    let mut analysis = self.execute(elements.clone());
 
                     #[cfg(feature = "generator")]
                     {

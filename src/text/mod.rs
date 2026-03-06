@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 pub mod numeral;
 pub mod unicode;
 

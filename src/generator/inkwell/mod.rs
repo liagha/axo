@@ -257,7 +257,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             .and_then(|block| block.get_terminator())
             .is_none()
         {
-            self.builder
+            let _ = self.builder
                 .build_return(Some(&self.context.i32_type().const_zero()));
         }
 

@@ -210,7 +210,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         Ok(resolution)
     }
 
-    fn is_instance(&self, resolver: &mut Resolver<'symbol>) -> Boolean {
+    fn is_instance(&self, _resolver: &mut Resolver<'symbol>) -> Boolean {
         match &self.kind {
             SymbolKind::Inclusion(_) => false,
             SymbolKind::Extension(_) => false,

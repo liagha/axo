@@ -136,7 +136,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 resolver.enter();
 
                 delimited.members.iter().for_each(|item| {
-                    item.resolve(resolver);
+                    let _ = item.resolve(resolver);
                 });
 
                 resolver.exit();
@@ -173,7 +173,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 Ok(Resolution::new(Some(symbol.id), typ, analysis))
             }
 
-            ElementKind::Construct(construct) => {
+            ElementKind::Construct(_construct) => {
                 let symbol = resolver.scope.try_get(&self)?;
 
                 let typ = symbol.infer().map_err(|error| {
@@ -339,7 +339,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 Ok(Resolution::new(Some(symbol.id), output_type, analysis))
             },
 
-            ElementKind::Index(index) => {
+            ElementKind::Index(_index) => {
                 let symbol = resolver.scope.try_get(&self)?;
 
                 let typ = symbol.infer().map_err(|error| {

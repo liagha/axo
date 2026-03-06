@@ -9,11 +9,14 @@ use crate::data::Str;
 impl<'ty> Show<'ty> for Type<'ty> {
     type Verbosity = u8;
 
-    #[allow(unconditional_recursion)]
     fn format(&self, verbosity: Self::Verbosity) -> Str<'ty> {
         match verbosity {
             0 => {
-                format!("Type({})", self.format(verbosity))
+                format!("{}", self.kind.format(verbosity))
+            }
+
+            1 => {
+                format!("Type({})", self.kind.format(verbosity))
             }
 
             _ => {
@@ -51,8 +54,8 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Array { .. } => {
                         format!("Array")
                     }
-                    TypeKind::Tuple { .. } => {
-                        format!("Tuple")
+                    TypeKind::Tuple { members } => {
+                        format!("Tuple({})", members.format(verbosity))
                     }
                     TypeKind::Unknown => {
                         format!("Unknown")

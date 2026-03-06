@@ -1,4 +1,4 @@
-use crate::{data::Str, format::Display, internal::hash::Set};
+use crate::{data::Str, internal::hash::Set};
 
 pub trait Show<'show> {
     type Verbosity;
@@ -67,7 +67,7 @@ impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for Set<Item> {
 impl<'show> Show<'show> for String {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, _verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(self.clone())
     }
 }
@@ -75,7 +75,7 @@ impl<'show> Show<'show> for String {
 impl<'show> Show<'show> for &'show str {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, _verbosity: Self::Verbosity) -> Str<'show> {
         Str::from(*self)
     }
 }
@@ -83,7 +83,7 @@ impl<'show> Show<'show> for &'show str {
 impl<'show> Show<'show> for Str<'show> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, _verbosity: Self::Verbosity) -> Str<'show> {
         *self
     }
 }

@@ -3,13 +3,11 @@ use {
     crate::{
         data::{Offset, Scale, Str},
         formation::{classifier::Classifier, form::Form, former::Former},
-        internal::platform::{self, current_dir, PathBuf},
         parser::{Element, ParseError},
         scanner::{PunctuationKind, Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Position, Span},
+        tracker::{Location, Peekable, Position},
     },
 };
-use crate::initializer::ErrorKind;
 
 pub struct Initializer<'initializer> {
     pub index: Offset,
@@ -150,25 +148,6 @@ impl<'initializer> Initializer<'initializer> {
         InitializeError<'initializer>,
     > {
         Classifier::repetition(Self::preference(), 0, None)
-    }
-
-    fn visit() -> Result<Vec<PathBuf>, platform::Error> {
-        use walkdir::WalkDir;
-
-        let files: Vec<PathBuf> = WalkDir::new(current_dir()?.as_os_str())
-            .into_iter()
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_type().is_file())
-            .filter(|entry| {
-                entry
-                    .path()
-                    .extension()
-                    .map_or(false, |extension| extension == "axo")
-            })
-            .map(|entry| entry.path().to_path_buf())
-            .collect();
-
-        Ok(files)
     }
 
     pub fn initialize(&mut self) -> Vec<Location<'initializer>> {

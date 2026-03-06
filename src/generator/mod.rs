@@ -7,7 +7,6 @@ pub use {backend::Backend, error::ErrorKind, generator::Generator, inkwell::Inkw
 
 use {
     crate::reporter::Error,
-    error::*
 };
 
 

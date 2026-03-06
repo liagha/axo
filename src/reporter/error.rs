@@ -160,7 +160,7 @@ where
                 (Str::from(messages), Str::from(details))
             }
             
-            Err(error) => {
+            Err(_error) => {
                 (Str::from(messages), Str::from(""))
             }
         }

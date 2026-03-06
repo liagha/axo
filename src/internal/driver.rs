@@ -85,6 +85,7 @@ impl Driver {
             command.arg("-isysroot").arg(root);
         }
         command.arg("-o").arg(binary);
+        command.arg("-lc");
 
         let output = command.output();
 

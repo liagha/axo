@@ -3,12 +3,11 @@ use {
     crate::{
         data::{memory::replace, Boolean, Identity},
         format::Debug,
-        parser::{Element, ElementKind, Symbol},
-        scanner::Token,
+        parser::{Element, Symbol},
+        analyzer::Analysis,
+        checker::Type,
     },
 };
-use crate::analyzer::Analysis;
-use crate::checker::Type;
 
 #[derive(Clone, Debug)]
 pub struct Resolution<'resolution> {

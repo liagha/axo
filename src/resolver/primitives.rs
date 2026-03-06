@@ -7,7 +7,7 @@ use {
         tracker::Span,
     },
 };
-use crate::data::{Binding, Delimited, Interface, Method, Module};
+use crate::data::{Delimited, Interface, Method, Module};
 use crate::parser::Visibility;
 
 pub fn builtin<'resolver>(
@@ -56,116 +56,6 @@ fn compiler<'resolver>(scope: &Scope<'resolver>) -> Symbol<'resolver> {
         Visibility::Public,
     )
     .with_scope(scope.root().clone())
-}
-
-fn parameter<'resolver>(name: &'static str, annotation: &'static str) -> Symbol<'resolver> {
-    let parameter_target = Element::new(
-        ElementKind::Literal(Token::new(
-            TokenKind::Identifier(Str::from(name)),
-            Span::void(),
-        )),
-        Span::void(),
-    );
-
-    let parameter_annotation = Element::new(
-        ElementKind::Literal(Token::new(
-            TokenKind::Identifier(Str::from(annotation)),
-            Span::void(),
-        )),
-        Span::void(),
-    );
-
-    Symbol::new(
-        0,
-        SymbolKind::Binding(Binding::new(
-            Box::new(parameter_target),
-            None::<Box<Element<'resolver>>>,
-            Some(Box::new(parameter_annotation)),
-            false,
-        )),
-        Span::void(),
-        Visibility::Public,
-    )
-}
-
-fn typed_method_with_params<'resolver>(
-    name: &'static str,
-    params: &[(&'static str, &'static str)],
-    output: &'static str,
-) -> Symbol<'resolver> {
-    let target = Element::new(
-        ElementKind::Literal(Token::new(
-            TokenKind::Identifier(Str::from(name)),
-            Span::void(),
-        )),
-        Span::void(),
-    );
-
-    let members = params
-        .iter()
-        .map(|(param, annotation)| parameter(param, annotation))
-        .collect::<Vec<_>>();
-
-    let output_annotation = Element::new(
-        ElementKind::Literal(Token::new(
-            TokenKind::Identifier(Str::from(output)),
-            Span::void(),
-        )),
-        Span::void(),
-    );
-
-    let body = match output {
-        "Integer" => Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Integer(0), Span::void())),
-            Span::void(),
-        ),
-        "Float" => Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Integer(0), Span::void())),
-            Span::void(),
-        ),
-        "Boolean" => Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Boolean(false), Span::void())),
-            Span::void(),
-        ),
-        "Character" => Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Character('a'), Span::void())),
-            Span::void(),
-        ),
-        "String" => Element::new(
-            ElementKind::Literal(Token::new(TokenKind::String(Str::from("")), Span::void())),
-            Span::void(),
-        ),
-        _ => Element::new(
-            ElementKind::Delimited(Delimited::new(
-                Token::new(
-                    TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                    Span::void(),
-                ),
-                Vec::new(),
-                None,
-                Token::new(
-                    TokenKind::Punctuation(PunctuationKind::RightBrace),
-                    Span::void(),
-                ),
-            )),
-            Span::void(),
-        ),
-    };
-
-    Symbol::new(
-        0,
-        SymbolKind::Method(Method::new(
-            Box::new(target),
-            members,
-            Box::new(body),
-            Some(Box::new(output_annotation)),
-            Interface::Compiler,
-            false,
-            false,
-        )),
-        Span::void(),
-        Visibility::Public,
-    )
 }
 
 fn method<'resolver>(name: &'static str) -> Symbol<'resolver> {

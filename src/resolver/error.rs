@@ -1,6 +1,6 @@
 use {
     crate::{
-        format::{Show, Debug, Display, Formatter, Result},
+        format::{Show, Display, Formatter, Result},
         scanner::Token,
         analyzer::AnalyzeError,
         checker::CheckError,

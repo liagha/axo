@@ -737,7 +737,7 @@ impl<'delimited> Checkable<'delimited> for Delimited<Token<'delimited>, Element<
                     ));
                 }
 
-                let mut inner = self.members[0].infer()?;
+                let inner = self.members[0].infer()?;
 
                 for member in self.members.iter().skip(1) {
                     let current = member.infer()?;

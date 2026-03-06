@@ -171,7 +171,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             self.span,
                         )?;
 
-                        let loop_context = resolver.cycle = true;
                         let condition = invoke.members[0].analyze(resolver)?;
                         let body = invoke.members[1].analyze(resolver)?;
 

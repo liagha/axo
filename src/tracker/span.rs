@@ -5,6 +5,7 @@ use {
         internal::{hash::Hash, operation::Ordering},
     },
 };
+use crate::tracker::TrackError;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Span<'span> {
@@ -32,7 +33,7 @@ impl<'span> Span<'span> {
     }
 
     #[inline]
-    pub fn file(path: Str<'span>) -> Self {
+    pub fn file(path: Str<'span>) -> Result<Self, TrackError<'span>> {
         let location = Location::Entry(path);
 
         match location.get_value() {
@@ -51,11 +52,11 @@ impl<'span> Span<'span> {
                     location,
                 };
 
-                Self::new(start, end)
+                Ok(Self::new(start, end))
             }
 
             Err(error) => {
-                Self::void()
+                Err(error)
             }
         }
     }

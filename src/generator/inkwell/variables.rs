@@ -134,7 +134,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(Entity::Variable { pointer, .. }) = self.entities.get(&target) {
             let slot = *pointer;
-            self.builder.build_store(slot, result);
+            let _ = self.builder.build_store(slot, result);
             self.entities.insert(
                 target.clone(),
                 Entity::Variable {
@@ -146,7 +146,7 @@ impl<'backend> super::Inkwell<'backend> {
             );
         } else {
             let pointer = self.build_entry_alloca(function, result.get_type(), &target);
-            self.builder.build_store(pointer, result);
+            let _ = self.builder.build_store(pointer, result);
             self.entities.insert(
                 target.clone(),
                 Entity::Variable {
@@ -169,7 +169,7 @@ impl<'backend> super::Inkwell<'backend> {
         let result = self.analysis(*value.clone(), function);
         if let Some((pointer, kind)) = self.lvalue_pointer(&target, function) {
             if result.get_type() == kind {
-                self.builder.build_store(pointer, result);
+                let _ = self.builder.build_store(pointer, result);
             } else if result.is_int_value() && kind.is_int_type() {
                 let casted = self
                     .builder
@@ -177,7 +177,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
-                self.builder.build_store(pointer, casted);
+                let _ = self.builder.build_store(pointer, casted);
             } else if result.is_float_value() && kind.is_float_type() {
                 let casted = self
                     .builder
@@ -189,9 +189,9 @@ impl<'backend> super::Inkwell<'backend> {
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
-                self.builder.build_store(pointer, casted);
+                let _ = self.builder.build_store(pointer, casted);
             } else {
-                self.builder.build_store(pointer, result);
+                let _ = self.builder.build_store(pointer, result);
             }
         }
         result
@@ -258,7 +258,7 @@ impl<'backend> super::Inkwell<'backend> {
             value
         };
         let pointer = self.build_entry_alloca(function, declared_kind, &binding.target);
-        self.builder.build_store(pointer, casted);
+        let _ = self.builder.build_store(pointer, casted);
         let signed = binding
             .annotation
             .as_ref()

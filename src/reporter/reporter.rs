@@ -3,7 +3,6 @@ use {
         data::Str,
         format::Display,
         format::Show,
-        checker::{Type, TypeKind},
         internal::{
             timer::Duration,
             platform::PathBuf,
@@ -21,49 +20,6 @@ pub struct Reporter {
 }
 
 impl Reporter {
-    fn describe_type(typ: &Type) -> String {
-        match &typ.kind {
-            TypeKind::Integer { bits, signed } => format!("Int(bits={}, signed={})", bits, signed),
-            TypeKind::Float { bits } => format!("Float(bits={})", bits),
-            TypeKind::Boolean => "Bool".to_string(),
-            TypeKind::String => "String".to_string(),
-            TypeKind::Character => "Char".to_string(),
-            TypeKind::Pointer { to } => {
-                format!("Pointer(to={})", Self::describe_type(to))
-            }
-            TypeKind::Array { member, size } => {
-                format!(
-                    "Array(member={}, size={})",
-                    Self::describe_type(member),
-                    size
-                )
-            }
-            TypeKind::Tuple { members } => {
-                let members = members
-                    .iter()
-                    .map(Self::describe_type)
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                format!("Tuple({})", members)
-            }
-            TypeKind::Unknown => "Infer".to_string(),
-            TypeKind::Type(item) => format!("Type({})", Self::describe_type(item)),
-            TypeKind::Structure(structure) => format!(
-                "Structure({})",
-                structure.target.as_str().unwrap_or("UnknownStructure"),
-            ),
-            TypeKind::Enumeration(enumeration) => format!(
-                "Enumeration({})",
-                enumeration.target.as_str().unwrap_or("UnknownEnumeration"),
-            ),
-            TypeKind::Method(method) => format!(
-                "Method({}, output={})",
-                method.target.as_str().unwrap_or("UnknownMethod"),
-                Self::describe_type(&method.output),
-            ),
-        }
-    }
-
     pub fn new(verbosity: u8) -> Self {
         Self {
             verbosity,
