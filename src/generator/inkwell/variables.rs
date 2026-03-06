@@ -10,18 +10,18 @@ use {
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
-use crate::analyzer::{Analysis, Instruction};
+use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
 use crate::data::*;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis.instruction {
-            Instruction::Usage(name) => match self.entities.get(name) {
+        match &analysis {
+            Analysis::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { kind, .. }) => Some(*kind),
                 _ => None,
             },
-            Instruction::Dereference(operand) => self.pointer_pointee_type(operand),
+            Analysis::Dereference(operand) => self.pointer_pointee_type(operand),
             _ => None,
         }
     }
@@ -30,13 +30,13 @@ impl<'backend> super::Inkwell<'backend> {
         &self,
         analysis: &Analysis<'backend>,
     ) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis.instruction {
-            Instruction::Usage(name) => match self.entities.get(name) {
+        match &analysis {
+            Analysis::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { pointee, .. }) => *pointee,
                 _ => None,
             },
-            Instruction::AddressOf(operand) => self.lvalue_type(operand),
-            Instruction::Dereference(operand) => {
+            Analysis::AddressOf(operand) => self.lvalue_type(operand),
+            Analysis::Dereference(operand) => {
                 self.pointer_pointee_type(operand).and_then(|kind| {
                     if kind.is_pointer_type() {
                         None
@@ -54,14 +54,14 @@ impl<'backend> super::Inkwell<'backend> {
         analysis: &Analysis<'backend>,
         function: FunctionValue<'backend>,
     ) -> Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)> {
-        match &analysis.instruction {
-            Instruction::Usage(name) => match self.entities.get(name) {
+        match &analysis {
+            Analysis::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { pointer, kind, .. }) => Some((*pointer, *kind)),
                 _ => None,
             },
-            Instruction::Dereference(operand) => {
+            Analysis::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand)?;
-                let value = self.instruction(operand.instruction.clone(), function);
+                let value = self.analysis(*operand.clone(), function);
                 match value {
                     BasicValueEnum::PointerValue(pointer) => Some((pointer, pointee)),
                     _ => None,
@@ -89,7 +89,7 @@ impl<'backend> super::Inkwell<'backend> {
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let pointee = self.pointer_pointee_type(&operand);
-        let value = self.instruction(operand.instruction.clone(), function);
+        let value = self.analysis(*operand.clone(), function);
         match (value, pointee) {
             (BasicValueEnum::PointerValue(pointer), Some(kind)) => self
                 .builder
@@ -122,13 +122,13 @@ impl<'backend> super::Inkwell<'backend> {
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let pointee = self.pointer_pointee_type(&value);
-        let result = match &value.instruction {
-            crate::analyzer::Instruction::Array(elements) => {
+        let result = match &*value {
+            Analysis::Array(elements) => {
                 let (value, element_type) = self.build_array(elements.clone(), function);
                 self.array_elements.insert(target.clone(), element_type);
                 value
             }
-            _ => self.instruction(value.instruction.clone(), function),
+            _ => self.analysis(*value.clone(), function),
         };
         let signed = self.infer_signedness(&value);
 
@@ -166,7 +166,7 @@ impl<'backend> super::Inkwell<'backend> {
         value: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let result = self.instruction(value.instruction.clone(), function);
+        let result = self.analysis(*value.clone(), function);
         if let Some((pointer, kind)) = self.lvalue_pointer(&target, function) {
             if result.get_type() == kind {
                 self.builder.build_store(pointer, result);
@@ -218,14 +218,14 @@ impl<'backend> super::Inkwell<'backend> {
 
         let signed = self.infer_signedness(&value_analysis);
         let pointee = self.pointer_pointee_type(&value_analysis);
-        let value = match &value_analysis.instruction {
-            crate::analyzer::Instruction::Array(elements) => {
+        let value = match &*value_analysis {
+            Analysis::Array(elements) => {
                 let (value, element_type) = self.build_array(elements.clone(), function);
                 self.array_elements
                     .insert(binding.target.clone(), element_type);
                 value
             }
-            _ => self.instruction(value_analysis.instruction.clone(), function),
+            _ => self.analysis(*value_analysis.clone(), function),
         };
         let declared_kind = binding
             .annotation

@@ -3,7 +3,7 @@ use {
         values::{BasicValueEnum, FunctionValue}
     },
     crate::{
-        analyzer::{Analysis, Instruction},
+        analyzer::{Analysis},
         internal::platform::Error as IOError,
     }
 };
@@ -11,9 +11,9 @@ use {
 pub trait Backend<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>);
 
-    fn instruction(
+    fn analysis(
         &mut self,
-        instruction: Instruction<'backend>,
+        instruction: Analysis<'backend>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend>;
 

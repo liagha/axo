@@ -1,4 +1,4 @@
-use crate::analyzer::{Analysis, Instruction};
+use crate::analyzer::Analysis;
 use crate::data::Str;
 use crate::format::Show;
 
@@ -8,23 +8,8 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'analysis> {
         match verbosity {
             0 => {
-                format!("{}", self.instruction.format(verbosity))
-            }
-
-            _ => self.format(verbosity - 1).to_string(),
-        }
-        .into()
-    }
-}
-
-impl<'analysis> Show<'analysis> for Instruction<'analysis> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'analysis> {
-        match verbosity {
-            0 => {
                 match self {
-                    Instruction::Integer {
+                    Analysis::Integer {
                         value,
                         size,
                         signed,
@@ -36,179 +21,179 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             value
                         )
                     }
-                    Instruction::Float { value, size } => {
+                    Analysis::Float { value, size } => {
                         format!("Float[{}]({})", size, value)
                     }
-                    Instruction::Boolean { value } => {
+                    Analysis::Boolean { value } => {
                         format!("Boolean({})", value)
                     }
-                    Instruction::String { value } => {
+                    Analysis::String { value } => {
                         format!("String({})", value)
                     }
-                    Instruction::Character { value } => {
+                    Analysis::Character { value } => {
                         format!("Character({})", value)
                     }
-                    Instruction::Array(array) => {
+                    Analysis::Array(array) => {
                         format!("Array({})", array.format(verbosity))
                     }
-                    Instruction::Tuple(tuple) => {
+                    Analysis::Tuple(tuple) => {
                         format!("Tuple({})", tuple.format(verbosity))
                     }
-                    Instruction::Add(left, right) => {
+                    Analysis::Add(left, right) => {
                         format!(
                             "Add({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Subtract(left, right) => {
+                    Analysis::Subtract(left, right) => {
                         format!(
                             "Subtract({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Multiply(left, right) => {
+                    Analysis::Multiply(left, right) => {
                         format!(
                             "Multiply({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Divide(left, right) => {
+                    Analysis::Divide(left, right) => {
                         format!(
                             "Divide({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Modulus(left, right) => {
+                    Analysis::Modulus(left, right) => {
                         format!(
                             "Modulus({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::LogicalAnd(left, right) => {
+                    Analysis::LogicalAnd(left, right) => {
                         format!(
                             "Logical(And)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::LogicalOr(left, right) => {
+                    Analysis::LogicalOr(left, right) => {
                         format!(
                             "Logical(Or)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::LogicalNot(target) => {
+                    Analysis::LogicalNot(target) => {
                         format!("Logical(Not)({})", target.format(verbosity))
                     }
-                    Instruction::LogicalXOr(left, right) => {
+                    Analysis::LogicalXOr(left, right) => {
                         format!(
                             "Logical(XOr)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::BitwiseAnd(left, right) => {
+                    Analysis::BitwiseAnd(left, right) => {
                         format!(
                             "Bitwise(And)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::BitwiseOr(left, right) => {
+                    Analysis::BitwiseOr(left, right) => {
                         format!(
                             "Bitwise(Or)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::BitwiseNot(value) => {
+                    Analysis::BitwiseNot(value) => {
                         format!("Bitwise(Not)({})", value.format(verbosity))
                     }
-                    Instruction::BitwiseXOr(left, right) => {
+                    Analysis::BitwiseXOr(left, right) => {
                         format!(
                             "Bitwise(XOr)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::ShiftLeft(left, right) => {
+                    Analysis::ShiftLeft(left, right) => {
                         format!(
                             "Shift(Left)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::ShiftRight(left, right) => {
+                    Analysis::ShiftRight(left, right) => {
                         format!(
                             "Shift(Right)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::AddressOf(value) => {
+                    Analysis::AddressOf(value) => {
                         format!("Address({})", value.format(verbosity))
                     }
-                    Instruction::Dereference(value) => {
+                    Analysis::Dereference(value) => {
                         format!("Dereference({})", value.format(verbosity))
                     }
-                    Instruction::Equal(left, right) => {
+                    Analysis::Equal(left, right) => {
                         format!(
                             "Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::NotEqual(left, right) => {
+                    Analysis::NotEqual(left, right) => {
                         format!(
                             "Equal(Not)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Less(left, right) => {
+                    Analysis::Less(left, right) => {
                         format!(
                             "Less({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::LessOrEqual(left, right) => {
+                    Analysis::LessOrEqual(left, right) => {
                         format!(
                             "Less/Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Greater(left, right) => {
+                    Analysis::Greater(left, right) => {
                         format!(
                             "Greater({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::GreaterOrEqual(left, right) => {
+                    Analysis::GreaterOrEqual(left, right) => {
                         format!(
                             "Greater/Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
                         )
                     }
-                    Instruction::Index(index) => {
+                    Analysis::Index(index) => {
                         index.format(verbosity).to_string()
                     }
-                    Instruction::Invoke(invoke) => {
+                    Analysis::Invoke(invoke) => {
                         invoke.format(verbosity).to_string()
                     }
-                    Instruction::Block(block) => {
+                    Analysis::Block(block) => {
                         format!("Block({})", block.format(verbosity))
                     }
-                    Instruction::Conditional(condition, then, alternate) => {
+                    Analysis::Conditional(condition, then, alternate) => {
                         format!(
                             "Conditional({}, {}, {})",
                             condition.format(verbosity),
@@ -216,21 +201,21 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             alternate.format(verbosity)
                         )
                     }
-                    Instruction::While(condition, then) => {
+                    Analysis::While(condition, then) => {
                         format!(
                             "While({}, {})",
                             condition.format(verbosity),
                             then.format(verbosity)
                         )
                     }
-                    Instruction::Cycle(condition, then) => {
+                    Analysis::Cycle(condition, then) => {
                         format!(
                             "Cycle({}, {})",
                             condition.format(verbosity),
                             then.format(verbosity)
                         )
                     }
-                    Instruction::Return(value) => {
+                    Analysis::Return(value) => {
                         format!(
                             "Return{}",
                             if let Some(value) = value {
@@ -240,7 +225,7 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             }
                         )
                     }
-                    Instruction::Break(value) => {
+                    Analysis::Break(value) => {
                         format!(
                             "Break{}",
                             if let Some(value) = value {
@@ -250,7 +235,7 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             }
                         )
                     }
-                    Instruction::Continue(value) => {
+                    Analysis::Continue(value) => {
                         format!(
                             "Continue{}",
                             if let Some(value) = value {
@@ -260,38 +245,38 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             }
                         )
                     }
-                    Instruction::Usage(target) => {
+                    Analysis::Usage(target) => {
                         format!("Usage({})", target.format(verbosity))
                     }
-                    Instruction::Access(target, value) => {
+                    Analysis::Access(target, value) => {
                         format!(
                             "Access({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
                         )
                     }
-                    Instruction::Constructor(constructor) => {
+                    Analysis::Constructor(constructor) => {
                         format!(
                             "Constructor({})[{}]",
                             constructor.target.format(verbosity),
                             constructor.members.format(verbosity)
                         )
                     }
-                    Instruction::Assign(target, value) => {
+                    Analysis::Assign(target, value) => {
                         format!(
                             "Assign({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
                         )
                     }
-                    Instruction::Store(target, value) => {
+                    Analysis::Store(target, value) => {
                         format!(
                             "Store({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
                         )
                     }
-                    Instruction::Binding(binding) => {
+                    Analysis::Binding(binding) => {
                         format!(
                             "Binding[{}]({}{}){}",
                             if let Some(annotation) = &binding.annotation { annotation.format(verbosity) } else { "".into() },
@@ -304,21 +289,21 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             }
                         )
                     }
-                    Instruction::Structure(structure) => {
+                    Analysis::Structure(structure) => {
                         format!(
                             "Structure({})[{}]",
                             structure.target.format(verbosity),
                             structure.members.format(verbosity)
                         )
                     }
-                    Instruction::Enumeration(enumeration) => {
+                    Analysis::Enumeration(enumeration) => {
                         format!(
                             "Enumeration({})[{}]",
                             enumeration.target.format(verbosity),
                             enumeration.members.format(verbosity)
                         )
                     }
-                    Instruction::Method(method) => {
+                    Analysis::Method(method) => {
                         format!(
                             "Method({})[{}{}]{{{}}}",
                             method.target.format(verbosity),
@@ -327,7 +312,7 @@ impl<'analysis> Show<'analysis> for Instruction<'analysis> {
                             method.body.format(verbosity)
                         )
                     }
-                    Instruction::Module(name, members) => {
+                    Analysis::Module(name, members) => {
                         format!(
                             "Module({})[{}]",
                             name.format(verbosity),

@@ -11,8 +11,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         BasicValueEnum::from(
             self.builder
@@ -27,8 +27,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         BasicValueEnum::from(
             self.builder
                 .build_or(left.into_int_value(), right.into_int_value(), "bitwise_or")
@@ -41,7 +41,7 @@ impl<'backend> super::Inkwell<'backend> {
         operand: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let operand_value = self.instruction(operand.instruction, function);
+        let operand_value = self.analysis(*operand, function);
         BasicValueEnum::from(
             self.builder
                 .build_not(operand_value.into_int_value(), "bitwise_not")
@@ -55,8 +55,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         BasicValueEnum::from(
             self.builder
                 .build_xor(left.into_int_value(), right.into_int_value(), "bitwise_xor")
@@ -70,8 +70,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         BasicValueEnum::from(
             self.builder
                 .build_left_shift(left.into_int_value(), right.into_int_value(), "shift_left")
@@ -90,8 +90,8 @@ impl<'backend> super::Inkwell<'backend> {
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         BasicValueEnum::from(
             self.builder
                 .build_right_shift(

@@ -2,25 +2,14 @@ use crate::data::{Boolean, Char, Float, Integer, Scale, Str};
 use crate::checker::TypeKind;
 use crate::data::*;
 
-#[derive(Clone, Debug)]
-pub struct Analysis<'analysis> {
-    pub instruction: Instruction<'analysis>,
-}
-
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(instruction: Instruction<'analysis>) -> Self {
-        Analysis { instruction }
-    }
-
     pub fn unit() -> Self {
-        Analysis {
-            instruction: Instruction::Tuple(Vec::new()),
-        }
+        Analysis::Tuple(Vec::new())
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum Instruction<'analysis> {
+pub enum Analysis<'analysis> {
     Integer {
         value: Integer,
         size: Scale,
@@ -101,15 +90,15 @@ pub enum Instruction<'analysis> {
     Module(Str<'analysis>, Vec<Analysis<'analysis>>),
 }
 
-impl<'analysis> Instruction<'analysis> {
+impl<'analysis> Analysis<'analysis> {
     pub fn is_value(&self) -> bool {
         matches!(
             self,
-            Instruction::Integer { .. }
-                | Instruction::Float { .. }
-                | Instruction::Boolean { .. }
-                | Instruction::String { .. }
-                | Instruction::Character { .. }
+            Analysis::Integer { .. }
+                | Analysis::Float { .. }
+                | Analysis::Boolean { .. }
+                | Analysis::String { .. }
+                | Analysis::Character { .. }
         )
     }
 }

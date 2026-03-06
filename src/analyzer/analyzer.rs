@@ -1,7 +1,7 @@
 use crate::{
     data::*,
     analyzer::{
-        Analysis, AnalyzeError, ErrorKind, Instruction,
+        Analysis, AnalyzeError, ErrorKind,
     },
     checker::{Checkable, Type, TypeKind},
     format::Show,
@@ -55,26 +55,26 @@ impl<'token> Analyzable<'token> for Token<'token> {
         resolver: &mut Resolver<'token>,
     ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
         match &self.kind {
-            TokenKind::Float(float) => Ok(Analysis::new(Instruction::Float {
+            TokenKind::Float(float) => Ok(Analysis::Float {
                 value: float.clone(),
                 size: 64,
-            })),
-            TokenKind::Integer(integer) => Ok(Analysis::new(Instruction::Integer {
+            }),
+            TokenKind::Integer(integer) => Ok(Analysis::Integer {
                 value: integer.clone(),
                 size: 64,
                 signed: true,
-            })),
-            TokenKind::Boolean(boolean) => Ok(Analysis::new(Instruction::Boolean {
+            }),
+            TokenKind::Boolean(boolean) => Ok(Analysis::Boolean {
                 value: boolean.clone(),
-            })),
-            TokenKind::String(string) => Ok(Analysis::new(Instruction::String {
+            }),
+            TokenKind::String(string) => Ok(Analysis::String {
                 value: string.clone(),
-            })),
-            TokenKind::Character(character) => Ok(Analysis::new(Instruction::Character {
+            }),
+            TokenKind::Character(character) => Ok(Analysis::Character {
                 value: character.clone(),
-            })),
+            }),
             TokenKind::Identifier(identifier) => {
-                Ok(Analysis::new(Instruction::Usage(identifier.clone())))
+                Ok(Analysis::Usage(identifier.clone()))
             }
             TokenKind::Operator(_) => Ok(Analysis::unit()),
             TokenKind::Punctuation(_) => Ok(Analysis::unit()),
@@ -115,7 +115,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     binding.constant,
                 );
 
-                Ok(Analysis::new(Instruction::Binding(analyzed)))
+                Ok(Analysis::Binding(analyzed))
             }
             SymbolKind::Structure(structure) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
@@ -129,7 +129,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     members?,
                 );
 
-                Ok(Analysis::new(Instruction::Structure(analyzed)))
+                Ok(Analysis::Structure(analyzed))
             }
             SymbolKind::Enumeration(enumeration) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = enumeration
@@ -143,7 +143,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     members?,
                 );
 
-                Ok(Analysis::new(Instruction::Enumeration(analyzed)))
+                Ok(Analysis::Enumeration(analyzed))
             }
             SymbolKind::Method(method) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = method
@@ -168,7 +168,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     method.variadic,
                 );
 
-                Ok(Analysis::new(Instruction::Method(analyzed)))
+                Ok(Analysis::Method(analyzed))
             }
             SymbolKind::Module(module) => {
                 let target = module
@@ -183,10 +183,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                Ok(Analysis::new(Instruction::Module(
+                Ok(Analysis::Module(
                     Str::from(target.format(0)),
                     members?,
-                )))
+                ))
             }
             SymbolKind::Preference(_) => Ok(Analysis::unit()),
         }

@@ -1,7 +1,7 @@
 use {
     crate::{
         data::*,
-        analyzer::{Analyzable, Analysis, AnalyzeError, ErrorKind, Instruction},
+        analyzer::{Analyzable, Analysis, AnalyzeError, ErrorKind},
         format::Show,
         parser::{Element, ElementKind},
         resolver::Resolver,
@@ -68,7 +68,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             .map(|item| item.analyze(resolver))
                             .collect();
 
-                        Ok(Analysis::new(Instruction::Block(items?)))
+                        Ok(Analysis::Block(items?))
                     }
                     (
                         TokenKind::Punctuation(PunctuationKind::LeftBracket),
@@ -82,7 +82,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 .map(|item| item.analyze(resolver))
                                 .collect();
 
-                        Ok(Analysis::new(Instruction::Array(items?)))
+                        Ok(Analysis::Array(items?))
                     }
                     (
                         TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
@@ -99,7 +99,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                     .map(|item| item.analyze(resolver))
                                     .collect();
                             
-                            Ok(Analysis::new(Instruction::Tuple(items?)))
+                            Ok(Analysis::Tuple(items?))
                         }
                     }
                     (
@@ -114,7 +114,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 .map(|item| item.analyze(resolver))
                                 .collect();
 
-                        Ok(Analysis::new(Instruction::Tuple(items?)))
+                        Ok(Analysis::Tuple(items?))
                     }
 
                     _ => Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
@@ -133,10 +133,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .map(|member| member.analyze(resolver))
                     .collect();
                 
-                Ok(Analysis::new(Instruction::Index(Index::new(
+                Ok(Analysis::Index(Index::new(
                     Box::new(target),
                     indexes?,
-                ))))
+                )))
             }
 
             ElementKind::Invoke(invoke) => {
@@ -156,11 +156,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let then = invoke.members[1].analyze(resolver)?;
                         let otherwise = invoke.members[2].analyze(resolver)?;
 
-                        Ok(Analysis::new(Instruction::Conditional(
+                        Ok(Analysis::Conditional(
                             Box::new(condition),
                             Box::new(then),
                             Box::new(otherwise),
-                        )))
+                        ))
                     }
                     Some("while") => {
                         arity(
@@ -175,10 +175,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let condition = invoke.members[0].analyze(resolver)?;
                         let body = invoke.members[1].analyze(resolver)?;
 
-                        Ok(Analysis::new(Instruction::While(
+                        Ok(Analysis::While(
                             Box::new(condition),
                             Box::new(body),
-                        )))
+                        ))
                     }
                     Some("for") => {
                         arity(
@@ -194,14 +194,14 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let step = invoke.members[2].analyze(resolver)?;
                         let body = invoke.members[3].analyze(resolver)?;
 
-                        let while_body = Analysis::new(Instruction::Block(vec![body, step]));
-                        Ok(Analysis::new(Instruction::Block(vec![
+                        let while_body = Analysis::Block(vec![body, step]);
+                        Ok(Analysis::Block(vec![
                             init,
-                            Analysis::new(Instruction::While(
+                            Analysis::While(
                                 Box::new(condition),
                                 Box::new(while_body),
-                            )),
-                        ])))
+                            ),
+                        ]))
                     }
                     Some("break") => {
                         arity(
@@ -220,7 +220,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 self.span,
                             ));
                         }
-                        Ok(Analysis::new(Instruction::Break(None)))
+                        Ok(Analysis::Break(None))
                     }
                     Some("continue") => {
                         arity(
@@ -241,7 +241,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             ));
                         }
 
-                        Ok(Analysis::new(Instruction::Continue(None)))
+                        Ok(Analysis::Continue(None))
                     }
                     Some("return") => {
                         arity(
@@ -265,7 +265,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         } else {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
                         };
-                        Ok(Analysis::new(Instruction::Return(value)))
+                        Ok(Analysis::Return(value))
                     }
                     _ => {
                         let target = invoke.target.analyze(resolver)?;
@@ -276,10 +276,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             .map(|member| member.analyze(resolver))
                             .collect();
                         
-                        Ok(Analysis::new(Instruction::Invoke(Invoke::new(
+                        Ok(Analysis::Invoke(Invoke::new(
                             Box::new(target),
                             arguments?,
-                        ))))
+                        )))
                     }
                 }
             },
@@ -304,25 +304,25 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let mut signed_opt = None;
 
                         for member in &members {
-                            if let Instruction::Assign(field_name, field_value) = &member.instruction {
+                            if let Analysis::Assign(field_name, field_value) = &member {
                                 match field_name.as_str().unwrap() {
                                     "value" => {
-                                        if let Instruction::Integer { value, .. } =
-                                            &field_value.instruction
+                                        if let Analysis::Integer { value, .. } =
+                                            &**field_value
                                         {
                                             value_opt = Some(value.clone());
                                         }
                                     }
                                     "size" => {
-                                        if let Instruction::Integer { value: size, .. } =
-                                            &field_value.instruction
+                                        if let Analysis::Integer { value: size, .. } =
+                                            &**field_value
                                         {
                                             size_opt = Some(*size);
                                         }
                                     }
                                     "signed" => {
-                                        if let Instruction::Boolean { value: signed } =
-                                            &field_value.instruction
+                                        if let Analysis::Boolean { value: signed } =
+                                            &**field_value
                                         {
                                             signed_opt = Some(*signed);
                                         }
@@ -334,11 +334,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                         match (value_opt, size_opt, signed_opt) {
                             (Some(value), Some(size), Some(signed)) => {
-                                Ok(Analysis::new(Instruction::Integer {
+                                Ok(Analysis::Integer {
                                     value,
                                     size: size.try_into().unwrap(),
                                     signed,
-                                }))
+                                })
                             }
                             _ => Err(AnalyzeError::new(
                                 ErrorKind::InvalidType,
@@ -351,18 +351,18 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let mut size_opt = None;
 
                         for member in &members {
-                            if let Instruction::Assign(field_name, field_value) = &member.instruction {
+                            if let Analysis::Assign(field_name, field_value) = &member {
                                 match field_name.as_str().unwrap() {
                                     "value" => {
-                                        if let Instruction::Float { value, .. } =
-                                            &field_value.instruction
+                                        if let Analysis::Float { value, .. } =
+                                            &**field_value
                                         {
                                             value_opt = Some(value.clone());
                                         }
                                     }
                                     "size" => {
-                                        if let Instruction::Integer { value: size, .. } =
-                                            &field_value.instruction
+                                        if let Analysis::Integer { value: size, .. } =
+                                            &**field_value
                                         {
                                             size_opt = Some(*size);
                                         }
@@ -373,10 +373,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         }
 
                         match (value_opt, size_opt) {
-                            (Some(value), Some(size)) => Ok(Analysis::new(Instruction::Float {
+                            (Some(value), Some(size)) => Ok(Analysis::Float {
                                 value,
                                 size: size.try_into().unwrap(),
-                            })),
+                            }),
                             _ => Err(AnalyzeError::new(
                                 ErrorKind::InvalidType,
                                 constructor.target.span,
@@ -387,9 +387,9 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let mut value_opt = None;
 
                         for member in &members {
-                            if let Instruction::Assign(field_name, field_value) = &member.instruction {
+                            if let Analysis::Assign(field_name, field_value) = &member {
                                 if field_name.as_str().unwrap() == "value" {
-                                    if let Instruction::Boolean { value } = &field_value.instruction {
+                                    if let Analysis::Boolean { value } = &**field_value {
                                         value_opt = Some(*value);
                                     }
                                 }
@@ -397,7 +397,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         }
 
                         match value_opt {
-                            Some(value) => Ok(Analysis::new(Instruction::Boolean { value })),
+                            Some(value) => Ok(Analysis::Boolean { value }),
                             _ => Err(AnalyzeError::new(
                                 ErrorKind::InvalidType,
                                 constructor.target.span,
@@ -406,7 +406,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     }
                     _ => {
                         let analyzed = Structure::new(Str::from(target), members);
-                        Ok(Analysis::new(Instruction::Constructor(analyzed)))
+                        Ok(Analysis::Constructor(analyzed))
                     }
                 }
             }
@@ -425,25 +425,25 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                     let target = self.left.analyze(resolver)?;
                     let member = self.right.analyze(resolver)?;
 
-                    Ok(Analysis::new(Instruction::Access(
+                    Ok(Analysis::Access(
                         Box::new(target),
                         Box::new(member),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Equal] => {
                     let target = self.left.analyze(resolver)?;
                     let value = self.right.analyze(resolver)?;
 
-                    match &target.instruction {
-                        Instruction::Usage(target_name) => Ok(Analysis::new(Instruction::Assign(
+                    match &target {
+                        Analysis::Usage(target_name) => Ok(Analysis::Assign(
                             target_name.clone(),
                             Box::new(value),
-                        ))),
-                        Instruction::Dereference(_) => Ok(Analysis::new(Instruction::Store(
+                        )),
+                        Analysis::Dereference(_) => Ok(Analysis::Store(
                             Box::new(target),
                             Box::new(value),
-                        ))),
+                        )),
                         _ => Err(AnalyzeError::new(
                             ErrorKind::InvalidOperation(self.operator.clone()),
                             self.operator.span,
@@ -454,163 +454,163 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Plus] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Add(
+                    Ok(Analysis::Add(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Minus] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Subtract(
+                    Ok(Analysis::Subtract(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Star] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Multiply(
+                    Ok(Analysis::Multiply(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Slash] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Divide(
+                    Ok(Analysis::Divide(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Percent] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Modulus(
+                    Ok(Analysis::Modulus(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::LogicalAnd(
+                    Ok(Analysis::LogicalAnd(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Pipe, OperatorKind::Pipe] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::LogicalOr(
+                    Ok(Analysis::LogicalOr(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Caret] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::LogicalXOr(
+                    Ok(Analysis::LogicalXOr(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Ampersand] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::BitwiseAnd(
+                    Ok(Analysis::BitwiseAnd(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Pipe] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::BitwiseOr(
+                    Ok(Analysis::BitwiseOr(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::ShiftLeft(
+                    Ok(Analysis::ShiftLeft(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::ShiftRight(
+                    Ok(Analysis::ShiftRight(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Equal, OperatorKind::Equal] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Equal(
+                    Ok(Analysis::Equal(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::Exclamation, OperatorKind::Equal] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::NotEqual(
+                    Ok(Analysis::NotEqual(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::LeftAngle] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Less(
+                    Ok(Analysis::Less(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::LeftAngle, OperatorKind::Equal] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::LessOrEqual(
+                    Ok(Analysis::LessOrEqual(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::RightAngle] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::Greater(
+                    Ok(Analysis::Greater(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 [OperatorKind::RightAngle, OperatorKind::Equal] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::new(Instruction::GreaterOrEqual(
+                    Ok(Analysis::GreaterOrEqual(
                         Box::new(left),
                         Box::new(right),
-                    )))
+                    ))
                 }
 
                 _ => Err(AnalyzeError::new(
@@ -635,22 +635,22 @@ impl<'unary> Analyzable<'unary> for Unary<Token<'unary>, Box<Element<'unary>>> {
 
             return match operator.as_slice() {
                 [OperatorKind::Exclamation] => {
-                    Ok(Analysis::new(Instruction::LogicalNot(Box::new(operand))))
+                    Ok(Analysis::LogicalNot(Box::new(operand)))
                 }
-                [OperatorKind::Tilde] => Ok(Analysis::new(Instruction::BitwiseNot(Box::new(operand)))),
+                [OperatorKind::Tilde] => Ok(Analysis::BitwiseNot(Box::new(operand))),
                 [OperatorKind::Plus] => Ok(operand),
-                [OperatorKind::Minus] => Ok(Analysis::new(Instruction::Subtract(
-                    Box::new(Analysis::new(Instruction::Integer {
+                [OperatorKind::Minus] => Ok(Analysis::Subtract(
+                    Box::new(Analysis::Integer {
                         value: 0,
                         size: 64,
                         signed: true,
-                    })),
+                    }),
                     Box::new(operand),
-                ))),
+                )),
                 [OperatorKind::Ampersand] => {
-                    Ok(Analysis::new(Instruction::AddressOf(Box::new(operand))))
+                    Ok(Analysis::AddressOf(Box::new(operand)))
                 }
-                [OperatorKind::Star] => Ok(Analysis::new(Instruction::Dereference(Box::new(operand)))),
+                [OperatorKind::Star] => Ok(Analysis::Dereference(Box::new(operand))),
                 _ => Err(AnalyzeError::new(
                     ErrorKind::InvalidOperation(self.operator.clone()),
                     self.operator.span,

@@ -9,7 +9,7 @@ use {
         values::{BasicValueEnum, FunctionValue},
     },
 };
-use crate::analyzer::{Analysis, Instruction};
+use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
 use crate::data::{Index, Structure};
 
@@ -56,24 +56,24 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         analysis: &Analysis<'backend>,
     ) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis.instruction {
-            Instruction::Usage(name) => name
+        match &analysis {
+            Analysis::Usage(name) => name
                 .as_str()
                 .and_then(TypeKind::from_name)
                 .map(|kind| self.llvm_type_from_type_kind(&kind))
                 .or_else(|| self.structs.get(name).map(|kind| (*kind).into())),
-            Instruction::Array(items) => {
+            Analysis::Array(items) => {
                 if items.len() != 2 {
                     return None;
                 }
                 let member = self.annotation_type(&items[0])?;
-                let size = match &items[1].instruction {
-                    Instruction::Integer { value, .. } => *value as u32,
+                let size = match &items[1] {
+                    Analysis::Integer { value, .. } => *value as u32,
                     _ => return None,
                 };
                 Some(member.array_type(size).into())
             }
-            Instruction::Tuple(items) => {
+            Analysis::Tuple(items) => {
                 let mut members = Vec::with_capacity(items.len());
                 for item in items {
                     members.push(self.annotation_type(item)?);
@@ -82,7 +82,7 @@ impl<'backend> super::Inkwell<'backend> {
                 let struct_type = self.context.struct_type(&types, false);
                 Some(struct_type.into())
             }
-            Instruction::Dereference(item) => self.annotation_type(item).map(|_| {
+            Analysis::Dereference(item) => self.annotation_type(item).map(|_| {
                 self.context
                     .ptr_type(inkwell::AddressSpace::default())
                     .into()
@@ -106,7 +106,7 @@ impl<'backend> super::Inkwell<'backend> {
         let mut field_names = Vec::new();
 
         for member in &structure.members {
-            if let Instruction::Binding(binding) = &member.instruction {
+            if let Analysis::Binding(binding) = &member {
                 let field_name = binding.target.clone();
                 field_names.push(field_name.clone());
                 let field_type = binding
@@ -146,11 +146,11 @@ impl<'backend> super::Inkwell<'backend> {
         let mut value = struct_type.get_undef();
         let mut positional_index = 0usize;
         for member in structure.members {
-            match member.instruction {
-                Instruction::Assign(field, assigned) => {
+            match member {
+                Analysis::Assign(field, assigned) => {
                     if let Some(index) = field_names.iter().position(|name| name == &field) {
                         let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                        let field_value = self.instruction(assigned.instruction.clone(), function);
+                        let field_value = self.analysis(*assigned.clone(), function);
                         if let Some(casted) = self.cast_value(field_value, field_type) {
                             value = self
                                 .builder
@@ -167,7 +167,7 @@ impl<'backend> super::Inkwell<'backend> {
                     let index = positional_index;
                     positional_index += 1;
                     let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                    let field_value = self.instruction(other, function);
+                    let field_value = self.analysis(other, function);
                     if let Some(casted) = self.cast_value(field_value, field_type) {
                         value = self
                             .builder
@@ -188,22 +188,22 @@ impl<'backend> super::Inkwell<'backend> {
         member: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        if let Instruction::Usage(name) = &target.instruction {
+        if let Analysis::Usage(name) = &*target {
             if self.modules.contains(name) || name.as_str() == Some("stdin") {
-                match &member.instruction {
-                    Instruction::Usage(name) => return self.usage(name.clone()),
-                    Instruction::Invoke(invoke) => return self.invoke(invoke.clone(), function),
+                match &*member {
+                    Analysis::Usage(name) => return self.usage(name.clone()),
+                    Analysis::Invoke(invoke) => return self.invoke(invoke.clone(), function),
                     _ => {}
                 }
             }
         }
 
-        let field_name = match &member.instruction {
-            Instruction::Usage(name) => name.clone(),
+        let field_name = match &*member {
+            Analysis::Usage(name) => name.clone(),
             _ => return self.context.i64_type().const_zero().into(),
         };
 
-        if let Instruction::Usage(target_name) = &target.instruction {
+        if let Analysis::Usage(target_name) = &*target {
             if let Some(Entity::Variable { pointer, kind, .. }) = self.entities.get(target_name) {
                 if kind.is_struct_type() {
                     let struct_type = kind.into_struct_type();
@@ -239,7 +239,7 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        let target_value = self.instruction(target.instruction, function);
+        let target_value = self.analysis(*target, function);
         if let BasicValueEnum::StructValue(struct_value) = target_value {
             if let Some(struct_name) = self.structs.iter().find_map(|(name, kind)| {
                 if kind.as_basic_type_enum() == struct_value.get_type().as_basic_type_enum() {
@@ -281,7 +281,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         let mut values = Vec::with_capacity(elements.len());
         for element in elements {
-            let value = self.instruction(element.instruction, function);
+            let value = self.analysis(element, function);
             values.push(value);
         }
 
@@ -337,7 +337,7 @@ impl<'backend> super::Inkwell<'backend> {
         let mut types = Vec::with_capacity(elements.len());
 
         for element in elements {
-            let value = self.instruction(element.instruction, function);
+            let value = self.analysis(element, function);
             types.push(value.get_type());
             values.push(value);
         }
@@ -364,11 +364,11 @@ impl<'backend> super::Inkwell<'backend> {
             return self.context.i64_type().const_zero().into();
         }
 
-        let target_instruction = index.target.instruction.clone();
-        let target = self.instruction(target_instruction, function);
-        let idx_value = self.instruction(index.members[0].instruction.clone(), function);
+        let target_instruction = index.target.clone();
+        let target = self.analysis(*target_instruction, function);
+        let idx_value = self.analysis(index.members[0].clone(), function);
 
-        if let Instruction::Usage(name) = &index.target.instruction {
+        if let Analysis::Usage(name) = &*index.target {
             if let Some(element_type) = self.array_elements.get(name) {
                 if let BasicValueEnum::PointerValue(pointer) = target {
                     if let BasicValueEnum::IntValue(idx) = idx_value {

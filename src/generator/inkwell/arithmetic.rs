@@ -55,8 +55,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         let (left, right, floating) = self.coerce_numeric_pair(left, right, "add");
 
@@ -81,8 +81,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         let (left, right, floating) = self.coerce_numeric_pair(left, right, "subtract");
 
@@ -111,8 +111,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         let (left, right, floating) = self.coerce_numeric_pair(left, right, "multiply");
 
@@ -147,8 +147,8 @@ impl<'backend> super::Inkwell<'backend> {
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
 
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         let (left, right, floating) = self.coerce_numeric_pair(left, right, "divide");
 
@@ -195,8 +195,8 @@ impl<'backend> super::Inkwell<'backend> {
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
 
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
 
         let (left, right, floating) = self.coerce_numeric_pair(left, right, "modulus");
 

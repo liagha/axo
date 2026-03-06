@@ -14,8 +14,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -47,8 +47,8 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -85,8 +85,8 @@ impl<'backend> super::Inkwell<'backend> {
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -127,8 +127,8 @@ impl<'backend> super::Inkwell<'backend> {
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -169,8 +169,8 @@ impl<'backend> super::Inkwell<'backend> {
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -211,8 +211,8 @@ impl<'backend> super::Inkwell<'backend> {
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.instruction(left.instruction, function);
-        let right = self.instruction(right.instruction, function);
+        let left = self.analysis(*left, function);
+        let right = self.analysis(*right, function);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder

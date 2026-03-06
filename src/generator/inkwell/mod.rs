@@ -27,7 +27,7 @@ use {
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
-use crate::analyzer::{Analysis, Instruction};
+use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
 
 #[derive(Clone)]
@@ -111,63 +111,63 @@ impl<'backend> Inkwell<'backend> {
         self
     }
 
-    fn name(instruction: &Instruction<'backend>) -> &'static str {
+    fn name(instruction: &Analysis<'backend>) -> &'static str {
         match instruction {
-            Instruction::Integer { .. } => "Integer",
-            Instruction::Float { .. } => "Float",
-            Instruction::Boolean { .. } => "Boolean",
-            Instruction::String { .. } => "String",
-            Instruction::Character { .. } => "Character",
-            Instruction::Array(_) => "Array",
-            Instruction::Tuple(_) => "Tuple",
-            Instruction::Add(..) => "Add",
-            Instruction::Subtract(..) => "Subtract",
-            Instruction::Multiply(..) => "Multiply",
-            Instruction::Divide(..) => "Divide",
-            Instruction::Modulus(..) => "Modulus",
-            Instruction::LogicalAnd(..) => "LogicalAnd",
-            Instruction::LogicalOr(..) => "LogicalOr",
-            Instruction::LogicalNot(..) => "LogicalNot",
-            Instruction::LogicalXOr(..) => "LogicalXOr",
-            Instruction::BitwiseAnd(..) => "BitwiseAnd",
-            Instruction::BitwiseOr(..) => "BitwiseOr",
-            Instruction::BitwiseNot(..) => "BitwiseNot",
-            Instruction::BitwiseXOr(..) => "BitwiseXOr",
-            Instruction::ShiftLeft(..) => "ShiftLeft",
-            Instruction::ShiftRight(..) => "ShiftRight",
-            Instruction::AddressOf(..) => "AddressOf",
-            Instruction::Dereference(..) => "Dereference",
-            Instruction::Equal(..) => "Equal",
-            Instruction::NotEqual(..) => "NotEqual",
-            Instruction::Less(..) => "Less",
-            Instruction::LessOrEqual(..) => "LessOrEqual",
-            Instruction::Greater(..) => "Greater",
-            Instruction::GreaterOrEqual(..) => "GreaterOrEqual",
-            Instruction::Index(_) => "Index",
-            Instruction::Invoke(_) => "Invoke",
-            Instruction::Block(_) => "Block",
-            Instruction::Conditional(..) => "Conditional",
-            Instruction::While(..) => "While",
-            Instruction::Cycle(..) => "Cycle",
-            Instruction::Return(_) => "Return",
-            Instruction::Break(_) => "Break",
-            Instruction::Continue(_) => "Continue",
-            Instruction::Usage(_) => "Usage",
-            Instruction::Access(..) => "Access",
-            Instruction::Constructor(_) => "Constructor",
-            Instruction::Assign(..) => "Assign",
-            Instruction::Store(..) => "Store",
-            Instruction::Binding(_) => "Binding",
-            Instruction::Structure(_) => "Structure",
-            Instruction::Enumeration(_) => "Enumeration",
-            Instruction::Method(_) => "Method",
-            Instruction::Module(_, _) => "Module",
+            Analysis::Integer { .. } => "Integer",
+            Analysis::Float { .. } => "Float",
+            Analysis::Boolean { .. } => "Boolean",
+            Analysis::String { .. } => "String",
+            Analysis::Character { .. } => "Character",
+            Analysis::Array(_) => "Array",
+            Analysis::Tuple(_) => "Tuple",
+            Analysis::Add(..) => "Add",
+            Analysis::Subtract(..) => "Subtract",
+            Analysis::Multiply(..) => "Multiply",
+            Analysis::Divide(..) => "Divide",
+            Analysis::Modulus(..) => "Modulus",
+            Analysis::LogicalAnd(..) => "LogicalAnd",
+            Analysis::LogicalOr(..) => "LogicalOr",
+            Analysis::LogicalNot(..) => "LogicalNot",
+            Analysis::LogicalXOr(..) => "LogicalXOr",
+            Analysis::BitwiseAnd(..) => "BitwiseAnd",
+            Analysis::BitwiseOr(..) => "BitwiseOr",
+            Analysis::BitwiseNot(..) => "BitwiseNot",
+            Analysis::BitwiseXOr(..) => "BitwiseXOr",
+            Analysis::ShiftLeft(..) => "ShiftLeft",
+            Analysis::ShiftRight(..) => "ShiftRight",
+            Analysis::AddressOf(..) => "AddressOf",
+            Analysis::Dereference(..) => "Dereference",
+            Analysis::Equal(..) => "Equal",
+            Analysis::NotEqual(..) => "NotEqual",
+            Analysis::Less(..) => "Less",
+            Analysis::LessOrEqual(..) => "LessOrEqual",
+            Analysis::Greater(..) => "Greater",
+            Analysis::GreaterOrEqual(..) => "GreaterOrEqual",
+            Analysis::Index(_) => "Index",
+            Analysis::Invoke(_) => "Invoke",
+            Analysis::Block(_) => "Block",
+            Analysis::Conditional(..) => "Conditional",
+            Analysis::While(..) => "While",
+            Analysis::Cycle(..) => "Cycle",
+            Analysis::Return(_) => "Return",
+            Analysis::Break(_) => "Break",
+            Analysis::Continue(_) => "Continue",
+            Analysis::Usage(_) => "Usage",
+            Analysis::Access(..) => "Access",
+            Analysis::Constructor(_) => "Constructor",
+            Analysis::Assign(..) => "Assign",
+            Analysis::Store(..) => "Store",
+            Analysis::Binding(_) => "Binding",
+            Analysis::Structure(_) => "Structure",
+            Analysis::Enumeration(_) => "Enumeration",
+            Analysis::Method(_) => "Method",
+            Analysis::Module(_, _) => "Module",
         }
     }
 
-    fn unsupported(&mut self, instruction: Instruction<'backend>) -> BasicValueEnum<'backend> {
+    fn unsupported(&mut self, instruction: Analysis<'backend>) -> BasicValueEnum<'backend> {
         self.errors.push(GenerateError::new(
-            ErrorKind::UnsupportedInstruction {
+            ErrorKind::UnsupportedAnalysis {
                 instruction: Self::name(&instruction),
             },
             Span::void(),
@@ -176,14 +176,14 @@ impl<'backend> Inkwell<'backend> {
     }
 
     pub(crate) fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
-        match &analysis.instruction {
-            Instruction::Integer { signed, .. } => Some(*signed),
-            Instruction::Usage(identifier) => match self.entities.get(identifier) {
+        match &analysis {
+            Analysis::Integer { signed, .. } => Some(*signed),
+            Analysis::Usage(identifier) => match self.entities.get(identifier) {
                 Some(Entity::Variable { signed, .. }) => *signed,
                 _ => None,
             },
-            Instruction::Assign(_, value) => self.infer_signedness(value),
-            Instruction::Binding(binding) => binding
+            Analysis::Assign(_, value) => self.infer_signedness(value),
+            Analysis::Binding(binding) => binding
                 .value
                 .as_ref()
                 .and_then(|value| self.infer_signedness(value)),
@@ -221,15 +221,15 @@ impl<'backend> Inkwell<'backend> {
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
-            if let Instruction::Structure(structure) = &analysis.instruction {
+            if let Analysis::Structure(structure) = &analysis {
                 self.define_structure(structure.clone());
             }
         }
 
         for analysis in &analyses {
-            if let Instruction::Method(_) = analysis.instruction {
-                self.instruction(
-                    analysis.instruction.clone(),
+            if let Analysis::Method(_) = analysis {
+                self.analysis(
+                    analysis.clone(),
                     self.module.add_function(
                         "dummy",
                         self.context.void_type().fn_type(&[], false),
@@ -253,8 +253,8 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             {
                 break;
             }
-            if !matches!(analysis.instruction, Instruction::Method(_)) {
-                self.instruction(analysis.instruction, function);
+            if !matches!(analysis, Analysis::Method(_)) {
+                self.analysis(analysis, function);
             }
         }
 
@@ -275,68 +275,68 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         let _ = self.module.verify();
     }
 
-    fn instruction(
+    fn analysis(
         &mut self,
-        instruction: Instruction<'backend>,
+        instruction: Analysis<'backend>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         match instruction {
-            Instruction::Integer {
+            Analysis::Integer {
                 value,
                 size,
                 signed,
             } => self.integer(value, size, signed),
-            Instruction::Float { value, size } => self.float(value, size),
-            Instruction::Boolean { value } => self.boolean(value),
-            Instruction::String { value } => self.string(value),
-            Instruction::Character { value } => self.character(value),
-            Instruction::Array(values) => self.array(values, function),
-            Instruction::Tuple(values) => self.tuple(values, function),
-            Instruction::Add(left, right) => self.add(left, right, function),
-            Instruction::Subtract(left, right) => self.subtract(left, right, function),
-            Instruction::Multiply(left, right) => self.multiply(left, right, function),
-            Instruction::Divide(left, right) => self.divide(left, right, function),
-            Instruction::Modulus(left, right) => self.modulus(left, right, function),
-            Instruction::LogicalAnd(left, right) => self.logical_and(left, right, function),
-            Instruction::LogicalOr(left, right) => self.logical_or(left, right, function),
-            Instruction::LogicalNot(operand) => self.logical_not(operand, function),
-            Instruction::LogicalXOr(left, right) => self.logical_xor(left, right, function),
-            Instruction::BitwiseAnd(left, right) => self.bitwise_and(left, right, function),
-            Instruction::BitwiseOr(left, right) => self.bitwise_or(left, right, function),
-            Instruction::BitwiseNot(operand) => self.bitwise_not(operand, function),
-            Instruction::BitwiseXOr(left, right) => self.bitwise_xor(left, right, function),
-            Instruction::ShiftLeft(left, right) => self.shift_left(left, right, function),
-            Instruction::ShiftRight(left, right) => self.shift_right(left, right, function),
-            Instruction::AddressOf(operand) => self.address_of(operand, function),
-            Instruction::Dereference(operand) => self.dereference(operand, function),
-            Instruction::Equal(left, right) => self.equal(left, right, function),
-            Instruction::NotEqual(left, right) => self.not_equal(left, right, function),
-            Instruction::Less(left, right) => self.less(left, right, function),
-            Instruction::LessOrEqual(left, right) => self.less_or_equal(left, right, function),
-            Instruction::Greater(left, right) => self.greater(left, right, function),
-            Instruction::GreaterOrEqual(left, right) => {
+            Analysis::Float { value, size } => self.float(value, size),
+            Analysis::Boolean { value } => self.boolean(value),
+            Analysis::String { value } => self.string(value),
+            Analysis::Character { value } => self.character(value),
+            Analysis::Array(values) => self.array(values, function),
+            Analysis::Tuple(values) => self.tuple(values, function),
+            Analysis::Add(left, right) => self.add(left, right, function),
+            Analysis::Subtract(left, right) => self.subtract(left, right, function),
+            Analysis::Multiply(left, right) => self.multiply(left, right, function),
+            Analysis::Divide(left, right) => self.divide(left, right, function),
+            Analysis::Modulus(left, right) => self.modulus(left, right, function),
+            Analysis::LogicalAnd(left, right) => self.logical_and(left, right, function),
+            Analysis::LogicalOr(left, right) => self.logical_or(left, right, function),
+            Analysis::LogicalNot(operand) => self.logical_not(operand, function),
+            Analysis::LogicalXOr(left, right) => self.logical_xor(left, right, function),
+            Analysis::BitwiseAnd(left, right) => self.bitwise_and(left, right, function),
+            Analysis::BitwiseOr(left, right) => self.bitwise_or(left, right, function),
+            Analysis::BitwiseNot(operand) => self.bitwise_not(operand, function),
+            Analysis::BitwiseXOr(left, right) => self.bitwise_xor(left, right, function),
+            Analysis::ShiftLeft(left, right) => self.shift_left(left, right, function),
+            Analysis::ShiftRight(left, right) => self.shift_right(left, right, function),
+            Analysis::AddressOf(operand) => self.address_of(operand, function),
+            Analysis::Dereference(operand) => self.dereference(operand, function),
+            Analysis::Equal(left, right) => self.equal(left, right, function),
+            Analysis::NotEqual(left, right) => self.not_equal(left, right, function),
+            Analysis::Less(left, right) => self.less(left, right, function),
+            Analysis::LessOrEqual(left, right) => self.less_or_equal(left, right, function),
+            Analysis::Greater(left, right) => self.greater(left, right, function),
+            Analysis::GreaterOrEqual(left, right) => {
                 self.greater_or_equal(left, right, function)
             }
-            Instruction::Index(index) => self.index(index, function),
-            Instruction::Usage(identifier) => self.usage(identifier),
-            Instruction::Access(target, member) => self.access(target, member, function),
-            Instruction::Constructor(structure) => self.constructor(structure, function),
-            Instruction::Assign(target, value) => self.assign(target, value, function),
-            Instruction::Store(target, value) => self.store(target, value, function),
-            Instruction::Binding(binding) => self.binding(binding, function),
-            Instruction::Block(analyses) => self.block(analyses, function),
-            Instruction::Conditional(condition, then, otherwise) => {
+            Analysis::Index(index) => self.index(index, function),
+            Analysis::Usage(identifier) => self.usage(identifier),
+            Analysis::Access(target, member) => self.access(target, member, function),
+            Analysis::Constructor(structure) => self.constructor(structure, function),
+            Analysis::Assign(target, value) => self.assign(target, value, function),
+            Analysis::Store(target, value) => self.store(target, value, function),
+            Analysis::Binding(binding) => self.binding(binding, function),
+            Analysis::Block(analyses) => self.block(analyses, function),
+            Analysis::Conditional(condition, then, otherwise) => {
                 self.conditional(condition, then, otherwise, function)
             }
-            Instruction::While(condition, body) => self.r#while(condition, body, function),
-            Instruction::Structure(structure) => self.define_structure(structure),
-            Instruction::Module(name, analyses) => self.module(name, analyses, function),
-            Instruction::Method(method) => self.method(method),
-            Instruction::Invoke(invoke) => self.invoke(invoke, function),
-            Instruction::Return(value) => self.r#return(value, function),
-            Instruction::Break(value) => self.r#break(value, function),
-            Instruction::Continue(value) => self.r#continue(value, function),
-            Instruction::Cycle(condition, body) => self.cycle(condition, body, function),
+            Analysis::While(condition, body) => self.r#while(condition, body, function),
+            Analysis::Structure(structure) => self.define_structure(structure),
+            Analysis::Module(name, analyses) => self.module(name, analyses, function),
+            Analysis::Method(method) => self.method(method),
+            Analysis::Invoke(invoke) => self.invoke(invoke, function),
+            Analysis::Return(value) => self.r#return(value, function),
+            Analysis::Break(value) => self.r#break(value, function),
+            Analysis::Continue(value) => self.r#continue(value, function),
+            Analysis::Cycle(condition, body) => self.cycle(condition, body, function),
             other => self.unsupported(other),
         }
     }

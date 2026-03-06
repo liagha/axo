@@ -10,7 +10,7 @@ use {
         FloatPredicate, InlineAsmDialect, IntPredicate,
     },
 };
-use crate::analyzer::{Analysis, Instruction};
+use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
 use crate::data::*;
 
@@ -630,7 +630,7 @@ impl<'backend> super::Inkwell<'backend> {
         let callee = self.runtime_string_io_function(symbol, key);
         let value = arguments
             .first()
-            .map(|argument| self.instruction(argument.instruction.clone(), function));
+            .map(|argument| self.analysis(argument.clone(), function));
 
         let pointer = match value {
             Some(value) if value.is_pointer_value() => value.into_pointer_value(),
@@ -1292,7 +1292,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let value = arguments
             .first()
-            .map(|argument| self.instruction(argument.instruction.clone(), function));
+            .map(|argument| self.analysis(argument.clone(), function));
 
         let Some(value) = value else {
             return self.emit_string_io(symbol, key, arguments, function);
@@ -1441,7 +1441,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let value = arguments
             .first()
-            .map(|argument| self.instruction(argument.instruction.clone(), function));
+            .map(|argument| self.analysis(argument.clone(), function));
         let pointer = match value {
             Some(value) if value.is_pointer_value() => value.into_pointer_value(),
             _ => self
@@ -1467,10 +1467,10 @@ impl<'backend> super::Inkwell<'backend> {
             return self.context.i64_type().const_zero().into();
         }
 
-        let fd_value = self.instruction(arguments[0].instruction.clone(), function);
+        let fd_value = self.analysis(arguments[0].clone(), function);
         let fd = self.to_i64(fd_value, "write_fd");
 
-        let text_value = self.instruction(arguments[1].instruction.clone(), function);
+        let text_value = self.analysis(arguments[1].clone(), function);
         let pointer = match text_value {
             value if value.is_pointer_value() => value.into_pointer_value(),
             _ => self
@@ -1514,7 +1514,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let size_value = arguments
             .first()
-            .map(|argument| self.instruction(argument.instruction.clone(), function))
+            .map(|argument| self.analysis(argument.clone(), function))
             .unwrap_or_else(|| self.context.i64_type().const_zero().into());
         let size = self.to_i64(size_value, "alloc_size");
 
@@ -1599,9 +1599,9 @@ impl<'backend> super::Inkwell<'backend> {
         if arguments.len() < 2 {
             return self.context.i64_type().const_zero().into();
         }
-        let ptr_value = self.instruction(arguments[0].instruction.clone(), function);
+        let ptr_value = self.analysis(arguments[0].clone(), function);
         let ptr = self.to_i64(ptr_value, "free_ptr");
-        let size_value = self.instruction(arguments[1].instruction.clone(), function);
+        let size_value = self.analysis(arguments[1].clone(), function);
         let size = self.to_i64(size_value, "free_size");
         let fn_ty = self.context.i64_type().fn_type(
             &[
@@ -1644,10 +1644,10 @@ impl<'backend> super::Inkwell<'backend> {
         self.context.i64_type().const_zero().into()
     }
 
-    fn invoke_target_name(instruction: &Instruction<'backend>) -> Option<Str<'backend>> {
+    fn invoke_target_name(instruction: &Analysis<'backend>) -> Option<Str<'backend>> {
         match instruction {
-            Instruction::Usage(name) => Some(*name),
-            Instruction::Access(_, member) => Self::invoke_target_name(&member.instruction),
+            Analysis::Usage(name) => Some(*name),
+            Analysis::Access(_, member) => Self::invoke_target_name(&member),
             _ => None,
         }
     }
@@ -1660,7 +1660,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Option<BasicValueEnum<'backend>> {
         let arg = arguments
             .first()
-            .map(|value| self.instruction(value.instruction.clone(), function));
+            .map(|value| self.analysis(value.clone(), function));
 
         match name {
             "Int64" => Some(match arg {
@@ -1779,7 +1779,7 @@ impl<'backend> super::Inkwell<'backend> {
                 break;
             }
             let current_block = self.builder.get_insert_block();
-            self.instruction(analysis.instruction, function);
+            self.analysis(analysis, function);
             if let Some(block) = current_block {
                 self.builder.position_at_end(block);
             }
@@ -1801,7 +1801,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let mut parameters = vec![];
         for member in &method.members {
-            if let Instruction::Binding(bind) = &member.instruction {
+            if let Analysis::Binding(bind) = &member {
                 let kind = bind
                     .annotation
                     .as_ref()
@@ -1814,8 +1814,8 @@ impl<'backend> super::Inkwell<'backend> {
             parameters.iter().map(|kind| (*kind).into()).collect();
 
         let return_type: Option<inkwell::types::BasicTypeEnum<'backend>> = method.output.as_ref().map(
-            |output| match &output.instruction {
-                Instruction::Usage(name) => {
+            |output| match &**output {
+                Analysis::Usage(name) => {
                     if let Some(kind) = name.as_str().and_then(TypeKind::from_name) {
                         if matches!(kind, TypeKind::Tuple { ref members } if members.len() == 0) {
                             return None;
@@ -1856,7 +1856,7 @@ impl<'backend> super::Inkwell<'backend> {
         self.builder.position_at_end(entry_block);
 
         for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
-            if let Instruction::Binding(bind) = &member.instruction {
+            if let Analysis::Binding(bind) = &member {
                 let name = bind.target.as_str().unwrap();
                 let allocate = self.build_entry_alloca(function, param_val.get_type(), name);
                 self.builder.build_store(allocate, param_val);
@@ -1879,7 +1879,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.loop_headers.clear();
         self.loop_exits.clear();
-        let body_result = self.instruction(method.body.instruction.clone(), function);
+        let body_result = self.analysis(*method.body.clone(), function);
 
         if self
             .builder
@@ -1912,7 +1912,7 @@ impl<'backend> super::Inkwell<'backend> {
             if self.has_terminator() {
                 break;
             }
-            last = self.instruction(analysis.instruction, function);
+            last = self.analysis(analysis, function);
         }
         last
     }
@@ -1928,7 +1928,7 @@ impl<'backend> super::Inkwell<'backend> {
             return self.context.i64_type().const_zero().into();
         }
 
-        let condition = self.instruction(condition.instruction, function);
+        let condition = self.analysis(*condition, function);
         let condition = self.truthy(condition);
 
         let then_block = self.context.append_basic_block(function, "if_then");
@@ -1940,7 +1940,7 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap();
 
         self.builder.position_at_end(then_block);
-        let then_value = self.instruction(then.instruction, function);
+        let then_value = self.analysis(*then, function);
         let then_end = self.builder.get_insert_block();
         let then_reaches_merge = !self.has_terminator();
         if then_reaches_merge {
@@ -1950,7 +1950,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         self.builder.position_at_end(else_block);
-        let else_value = self.instruction(otherwise.instruction, function);
+        let else_value = self.analysis(*otherwise, function);
         let else_end = self.builder.get_insert_block();
         let else_reaches_merge = !self.has_terminator();
         if else_reaches_merge {
@@ -1997,7 +1997,7 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap();
 
         self.builder.position_at_end(condition_block);
-        let condition = self.instruction(condition.instruction, function);
+        let condition = self.analysis(*condition, function);
         let condition = self.truthy(condition);
         self.builder
             .build_conditional_branch(condition, body_block, end_block)
@@ -2006,7 +2006,7 @@ impl<'backend> super::Inkwell<'backend> {
         self.builder.position_at_end(body_block);
         self.loop_headers.push(condition_block);
         self.loop_exits.push(end_block);
-        self.instruction(body.instruction, function);
+        self.analysis(*body, function);
         self.loop_exits.pop();
         self.loop_headers.pop();
 
@@ -2034,7 +2034,7 @@ impl<'backend> super::Inkwell<'backend> {
         invoke: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let name = Self::invoke_target_name(&invoke.target.instruction)
+        let name = Self::invoke_target_name(&invoke.target)
             .and_then(|value| value.as_str())
             .unwrap_or("");
 
@@ -2102,7 +2102,7 @@ impl<'backend> super::Inkwell<'backend> {
             return value;
         }
 
-        if let Instruction::Usage(target_name) = &invoke.target.instruction {
+        if let Analysis::Usage(target_name) = &*invoke.target {
             let option = self.entities.get(target_name).and_then(|entity| {
                 if let Entity::Function(func) = entity {
                     Some(*func)
@@ -2114,7 +2114,7 @@ impl<'backend> super::Inkwell<'backend> {
             if let Some(value) = option {
                 let mut arguments = vec![];
                 for argument in &invoke.members {
-                    let value = self.instruction(argument.instruction.clone(), function);
+                    let value = self.analysis(argument.clone(), function);
                     arguments.push(value.into());
                 }
                 let result = self.builder.build_call(value, &arguments, "call").unwrap();
@@ -2138,7 +2138,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         match value {
             Some(item) => {
-                let result = self.instruction(item.instruction, function);
+                let result = self.analysis(*item, function);
                 if function.get_type().get_return_type().is_none() {
                     self.builder.build_return(None);
                     self.context.i64_type().const_zero().into()
@@ -2161,7 +2161,7 @@ impl<'backend> super::Inkwell<'backend> {
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if let Some(item) = value {
-            self.instruction(item.instruction, function);
+            self.analysis(*item, function);
         }
 
         if self.has_terminator() {
@@ -2181,7 +2181,7 @@ impl<'backend> super::Inkwell<'backend> {
         function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if let Some(item) = value {
-            self.instruction(item.instruction, function);
+            self.analysis(*item, function);
         }
 
         if self.has_terminator() {
