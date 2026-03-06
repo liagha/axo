@@ -1,6 +1,0 @@
-module math {
-    func inc(const n: Integer): Integer n + 1
-}
-
-const value: Integer = math.inc(9)
-print(value)

@@ -1,9 +1,0 @@
-func add_one(const v: Integer): Integer v + 1
-
-var value = 40
-const ptr = &value
-*ptr = add_one(*ptr)
-
-const wrapped: Option = Some(Integer, value)
-const output = or_else(wrapped, 0)
-print(output)

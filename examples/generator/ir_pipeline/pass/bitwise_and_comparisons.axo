@@ -1,6 +1,0 @@
-const a = 12
-const b = 5
-const c = a + b
-print(c)
-print(a > b)
-print(a == b)

@@ -1,3 +1,0 @@
-print("hello from runtime")
-print_raw("raw")
-print(" line")

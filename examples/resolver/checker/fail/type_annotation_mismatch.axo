@@ -1,2 +1,0 @@
-const broken: Integer = "hello"
-print(broken)

@@ -1,6 +1,0 @@
-func choose(const n: Integer): Integer {
-    if(n > 0, return(n), return(0))
-}
-
-const out = choose(9)
-print(out)

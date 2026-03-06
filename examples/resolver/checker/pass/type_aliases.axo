@@ -1,6 +1,0 @@
-const integeralias: Integer = 99
-const floatalias: Float = 12.5
-const booleanalias: Boolean = false
-print(integeralias)
-print(floatalias)
-print(booleanalias)

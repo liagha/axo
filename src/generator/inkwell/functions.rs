@@ -1414,7 +1414,20 @@ impl<'backend> super::Inkwell<'backend> {
         };
 
         let name = method.target.as_str().unwrap();
-        let function = self.module.add_function(name, function_type, None);
+        
+        // Determine linkage based on interface
+        let linkage = if matches!(method.interface, Interface::C) {
+            inkwell::module::Linkage::External
+        } else {
+            inkwell::module::Linkage::Internal
+        };
+        
+        let function = self.module.add_function(name, function_type, Some(linkage));
+        
+        // Set section for C interface functions to ensure proper linking
+        if matches!(method.interface, Interface::C) {
+            function.set_section(Some(".text"));
+        }
 
         let previous_entities = self.entities.clone();
         let mut scoped_entities = Map::default();

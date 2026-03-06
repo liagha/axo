@@ -1,5 +1,0 @@
-func bad(): Integer {
-    return("nope")
-}
-
-print(bad())

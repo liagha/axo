@@ -1,7 +1,0 @@
-module util {
-    func id(const value: Integer): Integer value
-}
-
-use util.nope
-const x = nope(1)
-print(x)

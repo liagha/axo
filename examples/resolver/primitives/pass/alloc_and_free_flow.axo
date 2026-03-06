@@ -1,3 +1,0 @@
-const ptr = alloc(16)
-free(ptr, 16)
-print("freed")

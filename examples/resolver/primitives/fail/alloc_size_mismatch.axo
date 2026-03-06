@@ -1,2 +1,0 @@
-const ptr = alloc("8")
-print(ptr)

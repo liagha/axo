@@ -26,7 +26,7 @@ impl<'parser> Parser<'parser> {
     ) -> (Vec<Symbol<'parser>>, Scope<'parser>) {
         let mut runtime = Vec::new();
         let mut generic = Scope::new();
-        
+
         for member in members {
             let is_generic = match &member.kind {
                 SymbolKind::Binding(binding) => {
@@ -323,7 +323,7 @@ impl<'parser> Parser<'parser> {
                 let name = head[1].unwrap_output().clone();
 
                 let body = sequence[1].unwrap_output().clone();
-                
+
                 let mut visibility = Visibility::Public;
 
                 let members: Vec<_> = Self::get_body(body.clone())
@@ -347,7 +347,7 @@ impl<'parser> Parser<'parser> {
 
                                 _ => {}
                             }
-                            
+
                             None
                         },
                         _ => {
@@ -355,7 +355,7 @@ impl<'parser> Parser<'parser> {
                         }
                     })
                     .collect();
-                
+
                 let (members, generic) = Self::split_generic_members(members);
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -460,6 +460,8 @@ impl<'parser> Parser<'parser> {
                                 operator.as_slice(),
                                 [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
                             )
+                        } else if let TokenKind::Identifier(_) = &token.kind {
+                            true
                         } else {
                             false
                         }
@@ -504,7 +506,7 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
-                
+
                 let mut visibility = Visibility::Private;
                 let mut interface = Interface::Axo;
                 let mut entry = false;
@@ -548,7 +550,7 @@ impl<'parser> Parser<'parser> {
 
                                     _ => {}
                                 }
-                                
+
                                 None
                             },
                             _ => {
@@ -585,7 +587,7 @@ impl<'parser> Parser<'parser> {
                     )))
                 } else {
                     let output = sequence[3].unwrap_output().clone();
-                    
+
                     let mut visibility = Visibility::Private;
                     let mut interface = Interface::Axo;
                     let mut entry = false;
@@ -628,7 +630,7 @@ impl<'parser> Parser<'parser> {
 
                                     _ => {}
                                 }
-                                
+
                                 None
                             },
                             _ => {

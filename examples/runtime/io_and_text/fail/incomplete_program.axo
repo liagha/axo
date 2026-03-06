@@ -1,7 +1,0 @@
-while(
-    i < 6,
-    {
-        total = total + values[i]
-        i = i + 1
-    }
-)

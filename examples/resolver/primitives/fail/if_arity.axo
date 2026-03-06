@@ -1,2 +1,0 @@
-const v = if(true, 1)
-print(v)

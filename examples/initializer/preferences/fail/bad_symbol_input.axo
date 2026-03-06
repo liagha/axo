@@ -1,2 +1,0 @@
-const left = 1
-const bad = left § 2

@@ -1,3 +1,0 @@
-const count = write(1, "runtime write")
-eprint(count)
-eprint_raw("\n")

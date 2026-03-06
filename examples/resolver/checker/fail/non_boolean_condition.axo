@@ -1,2 +1,0 @@
-const bad = if(1, 2, 3)
-print(bad)

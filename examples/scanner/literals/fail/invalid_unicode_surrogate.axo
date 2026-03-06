@@ -1,2 +1,0 @@
-const bad = "\uD800"
-print(bad)

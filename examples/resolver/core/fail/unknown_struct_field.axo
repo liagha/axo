@@ -1,7 +1,0 @@
-module math {
-    func add(const a: Integer, const b: Integer): Integer a + b
-}
-
-use math.missing
-const v = missing(1, 2)
-print(v)

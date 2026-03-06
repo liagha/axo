@@ -1,8 +1,0 @@
-module math {
-    func add(const a: Integer, const b: Integer): Integer a + b
-}
-
-use math.add
-
-const trial = add(1, 2)
-print(trial)

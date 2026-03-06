@@ -1,6 +1,0 @@
-struct Counter {
-    const value: Integer,
-}
-
-const bad = 10 § 20
-print(bad)

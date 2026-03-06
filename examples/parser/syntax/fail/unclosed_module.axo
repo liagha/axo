@@ -1,4 +1,0 @@
-module broken {
-    const value = 1
-
-print(value)

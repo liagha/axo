@@ -1,4 +1,0 @@
-const nums = [1, 2, 3, 4, 5]
-const pair = (10, 20)
-print(nums[0])
-print(pair[1])

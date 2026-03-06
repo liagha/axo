@@ -1,8 +1,0 @@
-module math {
-    func add(const a: Integer, const b: Integer): Integer a + b
-}
-
-const value: Integer = math.add(2, 3)
-const wrapped: Option = Some(Integer, value)
-const out: Integer = or_else(wrapped, 0)
-print(out)

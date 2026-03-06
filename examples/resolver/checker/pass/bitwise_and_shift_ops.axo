@@ -1,8 +1,0 @@
-const band = 12 & 3
-const bor = 12 | 3
-const shl = 12 << 1
-const shr = 12 >> 1
-print(band)
-print(bor)
-print(shl)
-print(shr)

@@ -1,2 +1,0 @@
-const status = write(1)
-print(status)

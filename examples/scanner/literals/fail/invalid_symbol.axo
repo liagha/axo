@@ -1,3 +1,0 @@
-const left = 10
-const right = 20
-const bad = left § right

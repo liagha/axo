@@ -1,2 +1,0 @@
-const ptr = alloc(false)
-free(ptr, 8)

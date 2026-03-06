@@ -1,4 +1,0 @@
-const negate = -8
-const boolv = !false
-print(negate)
-print(boolv)

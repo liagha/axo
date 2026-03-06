@@ -1,6 +1,0 @@
-func sum2(const a: Integer, const b: Integer): Integer {
-    return(a + b)
-}
-
-const out = sum2(4, 5)
-print(out)

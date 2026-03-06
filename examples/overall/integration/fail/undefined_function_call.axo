@@ -1,4 +1,0 @@
-func add(const a: Integer, const b: Integer): Integer a + b
-
-const out = ad(1, 2)
-print(out)

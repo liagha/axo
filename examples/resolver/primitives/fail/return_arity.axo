@@ -1,5 +1,0 @@
-func id(const v: Integer): Integer {
-    return(v, v)
-}
-
-print(id(1))

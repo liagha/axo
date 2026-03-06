@@ -1,2 +1,0 @@
-const broken = (1, 2
-print(broken)

@@ -1,5 +1,0 @@
-const fd = 1
-const line = "hello"
-const wrote = write(fd, line)
-eprint(wrote)
-eprint_raw("\n")

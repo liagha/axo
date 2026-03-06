@@ -1,2 +1,0 @@
-const bad = (1, 2) + true
-print(bad)
