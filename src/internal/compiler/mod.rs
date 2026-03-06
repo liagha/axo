@@ -162,20 +162,20 @@ impl<'compiler> Compiler<'compiler> {
                 "ll" => {
                     #[cfg(feature = "generator")]
                     {
-                        let executable = Resolver::binary(&mut self.resolver, index);
+                        let executable = Resolver::executable(&mut self.resolver, index);
                         let run = Resolver::run(&mut self.resolver);
-                        let (_, binary) = Driver::paths(target, name, None, executable);
-                        let should_link = run || executable.is_some();
+                        let (_, executable) = Driver::paths(target, name, None, executable);
+                        let should_link = run;
 
                         self.reporter.start("linking");
 
                         let linked = if should_link {
-                            match Driver::link(&path, &binary) {
+                            match Driver::link(&path, &executable) {
                                 Ok(()) => true,
                                 Err(error) => {
                                     xprintln!(
                                         "linker error while producing `{}`: {}" => Color::Red,
-                                        binary.to_string_lossy(),
+                                        executable.to_string_lossy(),
                                         error.to_string()
                                     );
                                     xprintln!();
@@ -187,11 +187,11 @@ impl<'compiler> Compiler<'compiler> {
                         };
 
                         if linked {
-                            self.reporter.generate("executable", &binary);
+                            self.reporter.generate("executable", &executable);
                         }
 
                         if linked && run {
-                            self.queue.push(binary);
+                            self.queue.push(executable);
                         }
                     }
                 }
@@ -216,16 +216,16 @@ impl<'compiler> Compiler<'compiler> {
 
                         let mut generator = Generator::new(backend);
 
-                        let code = Resolver::code(&mut self.resolver, index);
-                        let executable = Resolver::binary(&mut self.resolver, index);
+                        let schema = Resolver::schema(&mut self.resolver, index);
+                        let executable = Resolver::executable(&mut self.resolver, index);
                         let run = Resolver::run(&mut self.resolver);
 
                         let should_link = run || executable.is_some();
 
-                        let (code, binary) = Driver::paths(target, &name, code, executable);
-                        let output = Str::from(code.to_string_lossy().to_string());
+                        let (schema, executable) = Driver::paths(target, &name, schema, executable);
+                        let output = Str::from(schema.to_string_lossy().to_string());
 
-                        if let Some(parent) = code.parent() {
+                        if let Some(parent) = schema.parent() {
                             if !parent.as_os_str().is_empty() {
                                 if let Err(error) = create_dir_all(parent) {
                                     xprintln!(
@@ -268,12 +268,12 @@ impl<'compiler> Compiler<'compiler> {
                             self.reporter.start("linking");
 
                             let linked = if should_link {
-                                match Driver::link(&code, &binary) {
+                                match Driver::link(&schema, &executable) {
                                     Ok(()) => true,
                                     Err(error) => {
                                         xprintln!(
                                                 "Linker error while producing `{}`: {}" => Color::Red,
-                                                binary.to_string_lossy(),
+                                                executable.to_string_lossy(),
                                                 error.to_string()
                                             );
                                         xprintln!();
@@ -285,8 +285,8 @@ impl<'compiler> Compiler<'compiler> {
                             };
 
                             if linked {
-                                self.reporter.generate("IR", &code);
-                                self.reporter.generate("executable", &binary);
+                                self.reporter.generate("IR", &schema);
+                                self.reporter.generate("executable", &executable);
 
                                 let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -294,7 +294,7 @@ impl<'compiler> Compiler<'compiler> {
                             }
 
                             if linked && run {
-                                self.queue.push(binary.clone());
+                                self.queue.push(executable.clone());
                             }
                         }
                     }
@@ -330,13 +330,13 @@ impl<'compiler> Compiler<'compiler> {
             return;
         }
 
-        for binary in self.queue.clone() {
-            self.reporter.run(&binary);
+        for executable in self.queue.clone() {
+            self.reporter.run(&executable);
 
-            if let Err(error) = Driver::run(&binary) {
+            if let Err(error) = Driver::run(&executable) {
                 xprintln!(
                     "Run error for `{}`: {}" => Color::Red,
-                    binary.to_string_lossy(),
+                    executable.to_string_lossy(),
                     error.to_string()
                 );
                 xprintln!();

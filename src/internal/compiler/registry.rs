@@ -77,18 +77,13 @@ impl<'registry> Resolver<'registry> {
         Str::default()
     }
 
-    pub fn output(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
-        Self::path(resolver, "Output", index)
-    }
-
-    pub fn code(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
-        Self::path(resolver, "OutputCode", index)
+    pub fn schema(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
+        Self::path(resolver, "OutputSchema", index)
             .or_else(|| Self::path(resolver, "OutputIR", index))
     }
 
-    pub fn binary(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
-        Self::path(resolver, "OutputBinary", index)
-            .or_else(|| Self::path(resolver, "OutputExec", index))
+    pub fn executable(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
+        Self::path(resolver, "OutputExec", index)
             .or_else(|| Self::path(resolver, "Output", index))
     }
 

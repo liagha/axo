@@ -210,15 +210,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             invoke.members.is_empty(),
                             self.span,
                         )?;
-                        if !resolver.cycle {
-                            return Err(AnalyzeError::new(
-                                ErrorKind::InvalidPrimitiveContext {
-                                    name: "break".to_string(),
-                                    expected: "inside loop body".to_string(),
-                                },
-                                self.span,
-                            ));
-                        }
                         Ok(Analysis::Break(None))
                     }
                     Some("continue") => {
@@ -230,16 +221,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             self.span,
                         )?;
 
-                        if !resolver.cycle {
-                            return Err(AnalyzeError::new(
-                                ErrorKind::InvalidPrimitiveContext {
-                                    name: "continue".to_string(),
-                                    expected: "inside loop body".to_string(),
-                                },
-                                self.span,
-                            ));
-                        }
-
                         Ok(Analysis::Continue(None))
                     }
                     Some("return") => {
@@ -250,20 +231,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             invoke.members.len() <= 1,
                             self.span,
                         )?;
-                        if !resolver.method {
-                            return Err(AnalyzeError::new(
-                                ErrorKind::InvalidPrimitiveContext {
-                                    name: "return".to_string(),
-                                    expected: "inside function body".to_string(),
-                                },
-                                self.span,
-                            ));
-                        }
+
                         let value = if invoke.members.is_empty() {
                             None
                         } else {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
                         };
+
                         Ok(Analysis::Return(value))
                     }
                     _ => {

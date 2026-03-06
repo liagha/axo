@@ -74,17 +74,20 @@ impl Driver {
         None
     }
 
-    fn compile(compiler: &Path, code: &Path, binary: &Path) -> Result<()> {
+    fn compile(compiler: &Path, schema: &Path, executable: &Path) -> Result<()> {
         let mut command = Command::new(compiler);
-        command.arg(code);
+        
+        command.arg(schema);
+        
         if let Some(linker) = Self::linker().as_deref().and_then(Self::linker_flag) {
             command.arg(format!("-fuse-ld={}", linker));
         }
+        
         #[cfg(target_os = "macos")]
         if let Some(root) = Self::sysroot() {
             command.arg("-isysroot").arg(root);
         }
-        command.arg("-o").arg(binary);
+        command.arg("-o").arg(executable);
         command.arg("-lc");
 
         let output = command.output();
@@ -103,7 +106,7 @@ impl Driver {
         }
     }
 
-    fn binary(mut path: PathBuf) -> PathBuf {
+    fn executable(mut path: PathBuf) -> PathBuf {
         if cfg!(target_os = "windows") && path.extension().is_none() {
             path.set_extension("exe");
         }
@@ -141,14 +144,15 @@ impl Driver {
     pub fn paths<'driver>(
         target: Location<'driver>,
         module: &str,
-        code: Option<Str<'driver>>,
+        schema: Option<Str<'driver>>,
         executable: Option<Str<'driver>>,
     ) -> (PathBuf, PathBuf) {
-        let code = code
+        let schema = schema
             .as_ref()
             .and_then(|value| value.as_str())
             .filter(|value| !value.is_empty())
             .map(PathBuf::from);
+        
         let executable = executable
             .as_ref()
             .and_then(|value| value.as_str())
@@ -160,38 +164,39 @@ impl Driver {
         } else {
             PathBuf::from(module)
         };
+
         let default_base = Path::new("lab").join(stem);
 
         let executable = match executable {
-            Some(path) => Self::binary(path),
-            None => match &code {
+            Some(path) => Self::executable(path),
+            None => match &schema {
                 Some(path) => {
-                    let mut binary = path.clone();
-                    binary.set_extension("");
-                    if binary.as_os_str().is_empty() {
+                    let mut executable = path.clone();
+                    executable.set_extension("");
+                    if executable.as_os_str().is_empty() {
                         PathBuf::from(module)
                     } else {
-                        Self::binary(binary)
+                        Self::executable(executable)
                     }
                 }
-                None => Self::binary(default_base),
+                None => Self::executable(default_base),
             },
         };
 
-        let code = match code {
+        let schema = match schema {
             Some(path) => path,
             None => {
-                let mut code = executable.clone();
-                code.set_extension("ll");
-                code
+                let mut schema = executable.clone();
+                schema.set_extension("ll");
+                schema
             }
         };
 
-        (code, executable)
+        (schema, executable)
     }
 
-    pub fn link(code: &Path, binary: &Path) -> Result<()> {
-        if let Some(parent) = binary.parent() {
+    pub fn link(schema: &Path, executable: &Path) -> Result<()> {
+        if let Some(parent) = executable.parent() {
             if !parent.as_os_str().is_empty() {
                 create_dir_all(parent)?;
             }
@@ -215,7 +220,7 @@ impl Driver {
                 continue;
             }
 
-            match Self::compile(&candidate, code, binary) {
+            match Self::compile(&candidate, schema, executable) {
                 Ok(()) => return Ok(()),
                 Err(error) => failures.push(format!("{}: {}", candidate.display(), error)),
             }
@@ -225,7 +230,7 @@ impl Driver {
             return Err(Error::new(
                 ErrorKind::Other,
                 format!(
-                    "failed to link generated code with available compilers:\n{}",
+                    "failed to link generated schema with available compilers:\n{}",
                     failures.join("\n")
                 ),
             ));
@@ -233,16 +238,16 @@ impl Driver {
 
         Err(Error::new(
             ErrorKind::Other,
-            "no compiler frontend found (`clang` not available). Install clang to link generated code.",
+            "no compiler frontend found (`clang` not available). Install clang to link generated schema.",
         ))
     }
 
-    pub fn run(binary: &Path) -> Result<()> {
-        let resolved = canonicalize(binary).unwrap_or_else(|_| {
-            if binary.is_relative() {
-                Path::new(".").join(binary)
+    pub fn run(executable: &Path) -> Result<()> {
+        let resolved = canonicalize(executable).unwrap_or_else(|_| {
+            if executable.is_relative() {
+                Path::new(".").join(executable)
             } else {
-                binary.to_path_buf()
+                executable.to_path_buf()
             }
         });
 
@@ -252,7 +257,7 @@ impl Driver {
         } else {
             Err(Error::new(
                 ErrorKind::Other,
-                format!("binary exited with status: {}", status),
+                format!("executable exited with status: {}", status),
             ))
         }
     }

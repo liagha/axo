@@ -13,7 +13,7 @@ impl Display for ErrorKind {
             ErrorKind::UnsupportedAnalysis { instruction } => {
                 write!(
                     f,
-                    "unsupported instruction in code generation: {}.",
+                    "unsupported instruction in schema generation: {}.",
                     instruction
                 )
             }

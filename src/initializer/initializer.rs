@@ -129,7 +129,7 @@ impl<'initializer> Initializer<'initializer> {
         InitializeError<'initializer>,
     > {
         Classifier::alternative([
-            Self::code(),
+            Self::schema(),
             Self::binary(),
             Self::verbosity(),
             Self::run(),

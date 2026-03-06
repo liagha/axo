@@ -193,7 +193,7 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn code() -> Classifier<
+    pub fn schema() -> Classifier<
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,

@@ -36,8 +36,6 @@ pub struct Resolver<'resolver> {
     pub input: Vec<Element<'resolver>>,
     pub output: Vec<Resolution<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
-    pub cycle: bool,
-    pub method: bool,
 }
 
 impl Clone for Resolver<'_> {
@@ -48,8 +46,6 @@ impl Clone for Resolver<'_> {
             input: self.input.clone(),
             output: self.output.clone(),
             errors: self.errors.clone(),
-            cycle: false,
-            method: false,
         }
     }
 }
@@ -70,8 +66,6 @@ impl<'resolver> Resolver<'resolver> {
             input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
-            cycle: false,
-            method: false,
         }
     }
 
