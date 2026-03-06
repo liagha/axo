@@ -326,8 +326,8 @@ impl<
         match verbosity {
             0 => format!(
                 "Binding({}{}{}{})",
-                self.target.format(verbosity),
                 if self.constant { "Constant | " } else { "" },
+                self.target.format(verbosity),
                 if let Some(annotation) = &self.annotation {
                     format!(" : {}", annotation.format(verbosity))
                 } else {

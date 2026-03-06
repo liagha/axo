@@ -33,10 +33,6 @@ impl<'error> Show<'error> for ErrorKind<'error> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
                 match self {
                     ErrorKind::InvalidOperation(token) => {
                         format!("invalid operation token: {}.", token.format(verbosity))

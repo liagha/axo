@@ -14,10 +14,6 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     fn format(&self, verbosity: Self::Verbosity) -> Str<'form> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
                 match self.clone() {
                     Form::Blank => {
                         "Blank".to_string()

@@ -31,35 +31,6 @@ pub struct Specifier {
     pub visibility: Visibility,
 }
 
-impl<'show> Show<'show> for Specifier {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => {
-                "".to_string()
-            }
-
-            1 => {
-                format!(
-                    "{:?}{}{}",
-                    self.visibility,
-                    if self.entry {
-                        ", Entry".to_string()
-                    } else {
-                        "".to_string()
-                    },
-                    format!(", {:?}", self.interface)
-                )
-            }
-
-            _ => {
-                self.format(verbosity - 1).to_string()
-            }
-        }.into()
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum Visibility {
     Public,
@@ -77,39 +48,39 @@ pub enum Interface {
 impl Specifier {
     pub fn apply(&mut self, application: Element<'_>) {
         match application.kind {
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(identifier),
-                                     ..
-                                 }) => match identifier.as_str().unwrap() {
-                "public" => {
-                    self.visibility = Visibility::Public;
+            ElementKind::Literal(
+                Token {
+                    kind: TokenKind::Identifier(identifier),
+                    ..
                 }
+            ) => {
+                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                    "public" => {
+                        self.visibility = Visibility::Public;
+                    }
 
-                "private" => {
-                    self.visibility = Visibility::Private;
+                    "private" => {
+                        self.visibility = Visibility::Private;
+                    }
+
+                    "c" => {
+                        self.interface = Interface::C;
+                    }
+
+                    "axo" => {
+                        self.interface = Interface::Axo;
+                    }
+
+                    "compiler" => {
+                        self.interface = Interface::Compiler;
+                    }
+
+                    "entry" => {
+                        self.entry = true;
+                    }
+
+                    _ => {}
                 }
-
-                "c" => {
-                    self.interface = Interface::C;
-                }
-
-                "rust" => {
-                    self.interface = Interface::Rust;
-                }
-
-                "axo" => {
-                    self.interface = Interface::Axo;
-                }
-
-                "compiler" => {
-                    self.interface = Interface::Compiler;
-                }
-
-                "entry" => {
-                    self.entry = true;
-                }
-
-                _ => {}
             },
 
             _ => {}

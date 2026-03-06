@@ -12,6 +12,7 @@ use {
     },
 };
 use crate::data::Str;
+use crate::parser::Specifier;
 
 impl<'element> Show<'element> for Element<'element> {
     type Verbosity = u8;
@@ -19,15 +20,7 @@ impl<'element> Show<'element> for Element<'element> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
                 format!("{}", self.kind.format(verbosity))
-            }
-
-            2 => {
-                format!("{} | {:?}", self.kind.format(verbosity), self.span)
             }
 
             _ => {
@@ -43,10 +36,6 @@ impl<'element> Show<'element> for ElementKind<'element> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
         match verbosity {
             0 => {
-                "".into()
-            }
-
-            1 => {
                 match self {
                     ElementKind::Literal(literal) => {
                         literal.format(verbosity)
@@ -94,19 +83,15 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
                 format!(
-                    "{}{}{}{}",
+                    "{}: {}{}{}",
                     self.kind.format(verbosity),
+                    self.specifier.format(verbosity),
                     if self.scope.is_empty() {
                         "".into()
                     } else {
-                        format!("\nScope: {}", self.scope.format(verbosity)).indent(verbosity)
+                        format!("\n{}", self.scope.format(verbosity)).indent(verbosity)
                     },
-                    format!("\nSpecification: {}", self.specifier.format(verbosity)).indent(verbosity),
                     if self.scope.is_empty() {
                         "".into()
                     } else {
@@ -134,10 +119,6 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
         match verbosity {
-            0 => {
-                "".into()
-            }
-
             _ => {
                 match self {
                     SymbolKind::Inclusion(inclusion) => {
@@ -170,6 +151,31 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                 }
             }
         }
+    }
+}
+
+impl<'show> Show<'show> for Specifier {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        match verbosity {
+            0 => {
+                format!(
+                    "{:?}{}{}",
+                    self.visibility,
+                    if self.entry {
+                        ", Entry".to_string()
+                    } else {
+                        "".to_string()
+                    },
+                    format!(", {:?}", self.interface)
+                )
+            }
+
+            _ => {
+                self.format(verbosity - 1).to_string()
+            }
+        }.into()
     }
 }
 

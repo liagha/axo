@@ -13,10 +13,6 @@ impl<'preference> Show<'preference> for Preference<'preference> {
     fn format(&self, verbosity: Self::Verbosity) -> Str<'preference> {
         match verbosity {
             0 => {
-                "".to_string()
-            }
-
-            1 => {
                 format!("Preference({}, {}, {:?})", self.target.format(verbosity), self.value.format(verbosity), self.span)
             }
 
