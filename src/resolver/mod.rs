@@ -6,6 +6,7 @@ mod resolver;
 pub mod scope;
 mod symbol;
 mod traits;
+mod primitives;
 
 pub use resolver::*;
 

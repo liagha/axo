@@ -14,6 +14,8 @@ use {
     },
     matchete::{Assessor, Scheme},
 };
+use crate::resolver::primitives::builtin;
+
 #[derive(Clone)]
 pub struct Scope<'scope> {
     pub symbols: Set<Symbol<'scope>>,
@@ -171,6 +173,10 @@ impl<'scope> Scope<'scope> {
         target: &Element<'scope>,
         scope: &Scope<'scope>,
     ) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
+        if let Some(symbol) = builtin(target, scope) {
+            return Ok(symbol);
+        }
+
         if let Some(symbol) = Self::exact_lookup(target, scope) {
             return Ok(symbol);
         }
