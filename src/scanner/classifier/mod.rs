@@ -133,7 +133,7 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::persistence(
                 Classifier::predicate(|c: &Character| c.is_operator()),
                 1,
-                Some(1),
+                Some(3),
             ),
             |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
                 let inputs = form.collect_inputs();

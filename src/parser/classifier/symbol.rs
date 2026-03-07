@@ -1,5 +1,5 @@
 use {
-    super::super::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind},
+    super::super::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
     crate::{
         data::*,
         formation::{classifier::Classifier, form::Form},
@@ -8,20 +8,9 @@ use {
         tracker::{Span, Spanned},
     },
 };
-use crate::parser::Visibility;
 
 impl<'parser> Parser<'parser> {
-    fn is_type_annotation(element: &Element<'parser>) -> bool {
-        matches!(
-            element.kind,
-            ElementKind::Literal(Token {
-                kind: TokenKind::Identifier(name),
-                ..
-            }) if name == Str::from("Type")
-        )
-    }
-
-    fn split_generic_members(
+    fn split_members(
         members: Vec<Symbol<'parser>>,
     ) -> (Vec<Symbol<'parser>>, Scope<'parser>) {
         let mut runtime = Vec::new();
@@ -30,11 +19,7 @@ impl<'parser> Parser<'parser> {
         for member in members {
             let is_generic = match &member.kind {
                 SymbolKind::Binding(binding) => {
-                    binding.constant
-                        && binding
-                        .annotation
-                        .as_ref()
-                        .is_some_and(|annotation| Self::is_type_annotation(annotation))
+                    binding.kind == BindingKind::Generic
                 }
                 _ => false,
             };
@@ -120,7 +105,7 @@ impl<'parser> Parser<'parser> {
                             _ => None,
                         })
                         .collect();
-                    let (members, generic) = Self::split_generic_members(parsed_members);
+                    let (members, generic) = Self::split_members(parsed_members);
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -150,7 +135,7 @@ impl<'parser> Parser<'parser> {
                             _ => None,
                         })
                         .collect();
-                    let (members, generic) = Self::split_generic_members(parsed_members);
+                    let (members, generic) = Self::split_members(parsed_members);
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                     Ok(Form::output(Element::new(
@@ -182,13 +167,34 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("var"))
                         || token.kind == TokenKind::Identifier(Str::from("const"))
+                        || token.kind == TokenKind::Identifier(Str::from("generic"))
                 }),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
-                let constant = keyword.kind == TokenKind::Identifier(Str::from("const"));
+
+                let kind = if let TokenKind::Identifier(identifier) = keyword.kind {
+                    match identifier.as_str().unwrap() {
+                        "const" => {
+                            BindingKind::Constant
+                        }
+
+                        "var" => {
+                            BindingKind::Variable
+                        }
+
+                        "generic" => {
+                            BindingKind::Generic
+                        }
+
+                        _ => BindingKind::Constant
+                    }
+                } else {
+                    BindingKind::Constant
+                };
+
                 let mut body = sequence[1].unwrap_output().clone();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
@@ -243,8 +249,6 @@ impl<'parser> Parser<'parser> {
                         }
 
                         _ => {
-                            // Normalize cases like `x: T = a || b` where precedence can produce
-                            // `((x: T = a) || b)` so bindings still capture target/annotation/value.
                             if let ElementKind::Binary(assigned) = &binary.left.kind {
                                 if matches!(
                                     assigned.operator.kind,
@@ -290,7 +294,7 @@ impl<'parser> Parser<'parser> {
                                     Box::new(body),
                                     value,
                                     annotation,
-                                    constant,
+                                    kind,
                                 )
                             ),
                             span,
@@ -356,7 +360,7 @@ impl<'parser> Parser<'parser> {
                     })
                     .collect();
 
-                let (members, generic) = Self::split_generic_members(members);
+                let (members, generic) = Self::split_members(members);
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(Element::new(
@@ -452,53 +456,56 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::literal(),
-                Self::group(Classifier::alternative([
-                    Classifier::deferred(Self::symbolization),
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Operator(operator) = &token.kind {
-                            matches!(
-                                operator.as_slice(),
-                                [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
-                            )
-                        } else if let TokenKind::Identifier(_) = &token.kind {
-                            true
-                        } else {
-                            false
-                        }
-                    })
-                        .with_transform(
-                            |form: Form<
-                                'parser,
-                                Token<'parser>,
-                                Element<'parser>,
-                                ParseError<'parser>,
-                            >| {
-                                let variadic = form.unwrap_input();
+                Self::group(
+                    Classifier::alternative(
+                        [
+                            Classifier::deferred(Self::symbolization),
+                            Classifier::predicate(|token: &Token| {
+                                if let TokenKind::Operator(operator) = &token.kind {
+                                    matches!(
+                                    operator.as_slice(),
+                                    [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                                )
+                                } else if let TokenKind::Identifier(_) = &token.kind {
+                                    true
+                                } else {
+                                    false
+                                }
+                            }).with_transform(
+                                |form: Form<
+                                    'parser,
+                                    Token<'parser>,
+                                    Element<'parser>,
+                                    ParseError<'parser>,
+                                >| {
+                                    let input = form.unwrap_input();
 
-                                Ok(Form::output(Element::new(
-                                    ElementKind::literal(variadic.clone()),
-                                    variadic.span,
-                                )))
-                            },
-                        ),
-                ])),
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Operator(operator) = &token.kind {
-                            matches!(operator, OperatorKind::Colon)
-                        } else {
-                            false
-                        }
-                    })
-                        .with_ignore(),
-                    Self::literal(),
-                ])
-                    .with_transform(|form| {
-                        let output = form.as_forms();
+                                    Ok(Form::output(Element::new(
+                                        ElementKind::literal(input.clone()),
+                                        input.span,
+                                    )))
+                                },
+                            ),
+                        ]
+                    )
+                ),
+                Classifier::sequence(
+                    [
+                        Classifier::predicate(|token: &Token| {
+                            if let TokenKind::Operator(operator) = &token.kind {
+                                matches!(operator, OperatorKind::Colon)
+                            } else {
+                                false
+                            }
+                        })
+                            .with_ignore(),
+                        Self::literal(),
+                    ]
+                ).with_transform(|form| {
+                    let output = form.as_forms();
 
-                        Ok(output[0].clone())
-                    })
-                    .as_optional(),
+                    Ok(output[0].clone())
+                }).as_optional(),
                 Classifier::deferred(Self::element),
             ]),
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
@@ -512,55 +519,56 @@ impl<'parser> Parser<'parser> {
                 let mut entry = false;
                 let mut variadic = false;
 
-                if sequence.len() == 4 {
-                    let parsed_members: Vec<_> = Self::get_body(invoke.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
-                            ElementKind::Literal(
-                                Token {
-                                    kind: TokenKind::Identifier(identifier),
-                                    ..
-                                }
-                            ) => {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                    "public" => {
-                                        visibility = Visibility::Public;
-                                    }
-
-                                    "private" => {
-                                        visibility = Visibility::Private;
-                                    }
-
-                                    "c" => {
-                                        interface = Interface::C;
-                                    }
-
-                                    "axo" => {
-                                        interface = Interface::Axo;
-                                    }
-
-                                    "compiler" => {
-                                        interface = Interface::Compiler;
-                                    }
-
-                                    "entry" => {
-                                        entry = true;
-                                    }
-
-                                    _ => {}
-                                }
-
-                                None
-                            },
-                            _ => {
-                                variadic = true;
-
-                                None
+                let parsed_members: Vec<_> = Self::get_body(invoke.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(symbol),
+                        ElementKind::Literal(
+                            Token {
+                                kind: TokenKind::Identifier(identifier),
+                                ..
                             }
-                        })
-                        .collect();
-                    let (members, generic) = Self::split_generic_members(parsed_members);
+                        ) => {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
+
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
+
+                                "c" => {
+                                    interface = Interface::C;
+                                }
+
+                                "axo" => {
+                                    interface = Interface::Axo;
+                                }
+
+                                "compiler" => {
+                                    interface = Interface::Compiler;
+                                }
+
+                                "entry" => {
+                                    entry = true;
+                                }
+
+                                _ => {}
+                            }
+
+                            None
+                        },
+                        _ => {
+                            variadic = true;
+
+                            None
+                        }
+                    })
+                    .collect();
+
+                if sequence.len() == 4 {
+                    let (members, generic) = Self::split_members(parsed_members);
                     let body = sequence[3].unwrap_output().clone();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
@@ -588,59 +596,7 @@ impl<'parser> Parser<'parser> {
                 } else {
                     let output = sequence[3].unwrap_output().clone();
 
-                    let mut visibility = Visibility::Private;
-                    let mut interface = Interface::Axo;
-                    let mut entry = false;
-                    let mut variadic = false;
-
-                    let parsed_members: Vec<_> = Self::get_body(invoke.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
-                            ElementKind::Literal(
-                                Token {
-                                    kind: TokenKind::Identifier(identifier),
-                                    ..
-                                }
-                            ) => {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                    "public" => {
-                                        visibility = Visibility::Public;
-                                    }
-
-                                    "private" => {
-                                        visibility = Visibility::Private;
-                                    }
-
-                                    "c" => {
-                                        interface = Interface::C;
-                                    }
-
-                                    "axo" => {
-                                        interface = Interface::Axo;
-                                    }
-
-                                    "compiler" => {
-                                        interface = Interface::Compiler;
-                                    }
-
-                                    "entry" => {
-                                        entry = true;
-                                    }
-
-                                    _ => {}
-                                }
-
-                                None
-                            },
-                            _ => {
-                                variadic = true;
-
-                                None
-                            }
-                        })
-                        .collect();
-                    let (members, generic) = Self::split_generic_members(parsed_members);
+                    let (members, generic) = Self::split_members(parsed_members);
                     let body = sequence[4].unwrap_output().clone();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());

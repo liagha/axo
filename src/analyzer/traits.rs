@@ -19,179 +19,179 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             size,
                             if *signed { "Signed | " } else { "" },
                             value
-                        )
+                        ).into()
                     }
                     Analysis::Float { value, size } => {
-                        format!("Float[{}]({})", size, value)
+                        format!("Float[{}]({})", size, value).into()
                     }
                     Analysis::Boolean { value } => {
-                        format!("Boolean({})", value)
+                        format!("Boolean({})", value).into()
                     }
                     Analysis::String { value } => {
-                        format!("String({})", value)
+                        format!("String({})", value).into()
                     }
                     Analysis::Character { value } => {
-                        format!("Character({})", value)
+                        format!("Character({})", value).into()
                     }
                     Analysis::Array(array) => {
-                        format!("Array({})", array.format(verbosity))
+                        format!("Array({})", array.format(verbosity)).into()
                     }
                     Analysis::Tuple(tuple) => {
-                        format!("Tuple({})", tuple.format(verbosity))
+                        format!("Tuple({})", tuple.format(verbosity)).into()
                     }
                     Analysis::Add(left, right) => {
                         format!(
                             "Add({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Subtract(left, right) => {
                         format!(
                             "Subtract({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Multiply(left, right) => {
                         format!(
                             "Multiply({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Divide(left, right) => {
                         format!(
                             "Divide({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Modulus(left, right) => {
                         format!(
                             "Modulus({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::LogicalAnd(left, right) => {
                         format!(
                             "Logical(And)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::LogicalOr(left, right) => {
                         format!(
                             "Logical(Or)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::LogicalNot(target) => {
-                        format!("Logical(Not)({})", target.format(verbosity))
+                        format!("Logical(Not)({})", target.format(verbosity)).into()
                     }
                     Analysis::LogicalXOr(left, right) => {
                         format!(
                             "Logical(XOr)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::BitwiseAnd(left, right) => {
                         format!(
                             "Bitwise(And)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::BitwiseOr(left, right) => {
                         format!(
                             "Bitwise(Or)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::BitwiseNot(value) => {
-                        format!("Bitwise(Not)({})", value.format(verbosity))
+                        format!("Bitwise(Not)({})", value.format(verbosity)).into()
                     }
                     Analysis::BitwiseXOr(left, right) => {
                         format!(
                             "Bitwise(XOr)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::ShiftLeft(left, right) => {
                         format!(
                             "Shift(Left)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::ShiftRight(left, right) => {
                         format!(
                             "Shift(Right)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::AddressOf(value) => {
-                        format!("Address({})", value.format(verbosity))
+                        format!("Address({})", value.format(verbosity)).into()
                     }
                     Analysis::Dereference(value) => {
-                        format!("Dereference({})", value.format(verbosity))
+                        format!("Dereference({})", value.format(verbosity)).into()
                     }
                     Analysis::Equal(left, right) => {
                         format!(
                             "Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::NotEqual(left, right) => {
                         format!(
                             "Equal(Not)({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Less(left, right) => {
                         format!(
                             "Less({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::LessOrEqual(left, right) => {
                         format!(
                             "Less/Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Greater(left, right) => {
                         format!(
                             "Greater({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::GreaterOrEqual(left, right) => {
                         format!(
                             "Greater/Equal({}, {})",
                             left.format(verbosity),
                             right.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Index(index) => {
-                        index.format(verbosity).to_string()
+                        index.format(verbosity)
                     }
                     Analysis::Invoke(invoke) => {
-                        invoke.format(verbosity).to_string()
+                        invoke.format(verbosity)
                     }
                     Analysis::Block(block) => {
-                        format!("Block({})", block.format(verbosity))
+                        format!("Block({})", block.format(verbosity)).into()
                     }
                     Analysis::Conditional(condition, then, alternate) => {
                         format!(
@@ -199,21 +199,21 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             condition.format(verbosity),
                             then.format(verbosity),
                             alternate.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::While(condition, then) => {
                         format!(
                             "While({}, {})",
                             condition.format(verbosity),
                             then.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Cycle(condition, then) => {
                         format!(
                             "Cycle({}, {})",
                             condition.format(verbosity),
                             then.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Return(value) => {
                         format!(
@@ -223,7 +223,7 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             } else {
                                 String::new()
                             }
-                        )
+                        ).into()
                     }
                     Analysis::Break(value) => {
                         format!(
@@ -233,7 +233,7 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             } else {
                                 String::new()
                             }
-                        )
+                        ).into()
                     }
                     Analysis::Continue(value) => {
                         format!(
@@ -243,87 +243,58 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             } else {
                                 String::new()
                             }
-                        )
+                        ).into()
                     }
                     Analysis::Usage(target) => {
-                        format!("Usage({})", target.format(verbosity))
+                        format!("Usage({})", target.format(verbosity)).into()
                     }
                     Analysis::Access(target, value) => {
                         format!(
                             "Access({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Constructor(constructor) => {
-                        format!(
-                            "Constructor({})[{}]",
-                            constructor.target.format(verbosity),
-                            constructor.members.format(verbosity)
-                        )
+                        constructor.format(verbosity)
                     }
                     Analysis::Assign(target, value) => {
                         format!(
                             "Assign({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Store(target, value) => {
                         format!(
                             "Store({})({})",
                             target.format(verbosity),
                             value.format(verbosity)
-                        )
+                        ).into()
                     }
                     Analysis::Binding(binding) => {
-                        format!(
-                            "Binding[{}]({}{}){}",
-                            if let Some(annotation) = &binding.annotation { annotation.format(verbosity) } else { "".into() },
-                            if binding.constant { "Constant | " } else { "" },
-                            binding.target.format(verbosity),
-                            if let Some(value) = &binding.value {
-                                format!("({})", value.format(verbosity))
-                            } else {
-                                String::new()
-                            }
-                        )
+                        binding.format(verbosity)
                     }
                     Analysis::Structure(structure) => {
-                        format!(
-                            "Structure({})[{}]",
-                            structure.target.format(verbosity),
-                            structure.members.format(verbosity)
-                        )
+                        structure.format(verbosity)
                     }
                     Analysis::Enumeration(enumeration) => {
-                        format!(
-                            "Enumeration({})[{}]",
-                            enumeration.target.format(verbosity),
-                            enumeration.members.format(verbosity)
-                        )
+                        enumeration.format(verbosity)
                     }
                     Analysis::Method(method) => {
-                        format!(
-                            "Method({})[{}{}]{{{}}}",
-                            method.target.format(verbosity),
-                            if method.variadic { "Variadic | " } else { "" },
-                            method.members.format(verbosity),
-                            method.body.format(verbosity)
-                        )
+                        method.format(verbosity)
                     }
                     Analysis::Module(name, members) => {
                         format!(
                             "Module({})[{}]",
                             name.format(verbosity),
                             members.format(verbosity)
-                        )
+                        ).into()
                     }
                 }
             },
 
-            _ => self.format(verbosity - 1).to_string(),
+            _ => self.format(verbosity - 1),
         }
-        .into()
     }
 }

@@ -112,7 +112,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Str::from(target_token.format(0)),
                     value.map(Box::new),
                     annotation,
-                    binding.constant,
+                    binding.kind,
                 );
 
                 Ok(Analysis::Binding(analyzed))

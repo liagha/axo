@@ -24,7 +24,14 @@ pub struct Binding<Target, Value, Type> {
     pub target: Target,
     pub value: Option<Value>,
     pub annotation: Option<Type>,
-    pub constant: Boolean,
+    pub kind: BindingKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BindingKind {
+    Constant,
+    Variable,
+    Generic,
 }
 
 #[derive(Debug, Eq)]
@@ -85,13 +92,13 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
         target: Target,
         value: Option<Value>,
         annotation: Option<Type>,
-        constant: bool,
+        kind: BindingKind,
     ) -> Self {
         Binding {
             target,
             value,
             annotation,
-            constant,
+            kind,
         }
     }
 }
@@ -155,7 +162,7 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
         self.target.hash(state);
         self.value.hash(state);
         self.annotation.hash(state);
-        self.constant.hash(state);
+        self.kind.hash(state);
     }
 }
 
@@ -204,7 +211,7 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq
         self.target == other.target
             && self.value == other.value
             && self.annotation == other.annotation
-            && self.constant == other.constant
+            && self.kind == other.kind
     }
 }
 
@@ -255,7 +262,7 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
             self.target.clone(),
             self.value.clone(),
             self.annotation.clone(),
-            self.constant,
+            self.kind.clone(),
         )
     }
 }
@@ -342,8 +349,8 @@ impl<
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => format!(
-                "Binding({}{}{}{})",
-                if self.constant { "Constant | " } else { "" },
+                "Binding({:?} | {}{}{})",
+                self.kind,
                 self.target.format(verbosity),
                 if let Some(annotation) = &self.annotation {
                     format!(" : {}", annotation.format(verbosity))
@@ -395,7 +402,8 @@ impl<
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => format!(
-                "Method({} : {})[{}{}]{{{}}}",
+                "Method({}{} : {})[{}{}]{{{}}}",
+                format!("{:?} | ", self.interface),
                 self.target.format(verbosity),
                 self.output.format(verbosity),
                 if self.variadic { "Variadic | " } else { "" },

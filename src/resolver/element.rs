@@ -304,6 +304,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     })?
                 };
 
+                let mut arguments = Vec::new();
+                for (idx, arg) in invoke.members.iter().enumerate() {
+                    let arg_resolution = arg.resolve(resolver)?;
+                    arguments.push((idx, arg_resolution));
+                }
+
                 let mut invoke_errors = Vec::new();
 
                 if let TypeKind::Method(method) = &typ.kind {
@@ -323,6 +329,30 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             },
                             invoke.target.span,
                         ));
+                    }
+
+                    // Check argument types
+                    for (idx, resolution) in &arguments {
+                        let arg_idx = *idx;
+                        if arg_idx < method.members.len() {
+                            let expected_type = &method.members[arg_idx];
+                            let actual_type = &resolution.typed;
+
+                            if unify(actual_type, expected_type).is_none() {
+                                invoke_errors.push(ResolveError::new(
+                                    ErrorKind::Check {
+                                        error: CheckError::new(
+                                            crate::checker::ErrorKind::Mismatch(
+                                                (**expected_type).clone(),
+                                                actual_type.clone(),
+                                            ),
+                                            actual_type.span,
+                                        ),
+                                    },
+                                    actual_type.span,
+                                ));
+                            }
+                        }
                     }
                 }
 
