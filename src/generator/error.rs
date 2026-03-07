@@ -4,7 +4,6 @@ use crate::format::Display;
 pub enum ErrorKind {
     UnsupportedAnalysis { instruction: &'static str },
     InvalidModule { reason: String },
-    OutputWriteFailure { path: String, reason: String },
 }
 
 impl Display for ErrorKind {
@@ -19,9 +18,6 @@ impl Display for ErrorKind {
             }
             ErrorKind::InvalidModule { reason } => {
                 write!(f, "invalid LLVM module: {}.", reason)
-            }
-            ErrorKind::OutputWriteFailure { path, reason } => {
-                write!(f, "failed to write output `{}`: {}.", path, reason)
             }
         }
     }

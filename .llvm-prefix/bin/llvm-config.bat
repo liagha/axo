@@ -19,10 +19,10 @@ if "%TARGET_DIR%"=="" (
   exit /b 1
 )
 
-set AXO_LIB_DIR=%REPO_DIR%\llvm\%TARGET_DIR%\lib
+set LIB_DIR=%REPO_DIR%\llvm\%TARGET_DIR%\lib
 
 if "%1"=="--libdir" (
-  echo %AXO_LIB_DIR%
+  echo %LIB_DIR%
   exit /b 0
 )
 

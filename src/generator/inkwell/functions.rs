@@ -317,7 +317,7 @@ impl<'backend> super::Inkwell<'backend> {
         for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
             if let Analysis::Binding(bind) = &member {
                 let name = bind.target.as_str().unwrap();
-                let allocate = self.build_entry_alloca(function, param_val.get_type(), name);
+                let allocate = self.build_entry(function, param_val.get_type(), name);
                 let _ = self.builder.build_store(allocate, param_val);
                 let signed = if param_val.get_type().is_int_type() {
                     Some(true)

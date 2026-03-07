@@ -145,7 +145,7 @@ impl<'backend> super::Inkwell<'backend> {
                 },
             );
         } else {
-            let pointer = self.build_entry_alloca(function, result.get_type(), &target);
+            let pointer = self.build_entry(function, result.get_type(), &target);
             let _ = self.builder.build_store(pointer, result);
             self.entities.insert(
                 target.clone(),
@@ -257,7 +257,7 @@ impl<'backend> super::Inkwell<'backend> {
         } else {
             value
         };
-        let pointer = self.build_entry_alloca(function, declared_kind, &binding.target);
+        let pointer = self.build_entry(function, declared_kind, &binding.target);
         let _ = self.builder.build_store(pointer, casted);
         let signed = binding
             .annotation

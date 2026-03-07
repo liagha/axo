@@ -7,14 +7,16 @@ use {
             Initializer,
         },
         internal::{
-            compiler::Compiler,
-            timer::{DefaultTimer, Duration},
+            compiler::{Compiler, CompileError},
+            platform::{File, Write},
+            timer::{Duration},
         },
         parser::{
             Parser,
             Element,
             Symbol,
-            SymbolKind
+            SymbolKind,
+            Visibility,
         },
         reporter::Reporter,
         resolver::Resolution,
@@ -22,11 +24,11 @@ use {
             Scanner,
             Token,
         },
-        tracker::{Location, Peekable, Spanned},
+        tracker::{self, TrackError, Span, Location, Peekable, Spanned},
     },
 };
-use crate::internal::compiler::CompileError;
-use crate::parser::Visibility;
+
+use crate::generator::{Generator, Inkwell};
 
 impl<'initializer> Stage<'initializer, (), Vec<Location<'initializer>>>
     for Initializer<'initializer>
@@ -169,15 +171,14 @@ impl<'resolver> Compiler<'resolver>
 }
 
 #[cfg(feature = "generator")]
-impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B> {
+impl<'resolver> Generator<'resolver, Inkwell<'resolver>> {
     pub fn execute(
         &mut self,
-        timer: &mut DefaultTimer,
-        reporter: &Reporter,
+        compiler: &mut Compiler,
         resolutions: Vec<Resolution<'resolver>>,
         output: Option<Str<'resolver>>,
     ) -> () {
-        reporter.start("generating");
+        compiler.reporter.start("generating");
 
         self.backend.generate(
             resolutions
@@ -186,28 +187,38 @@ impl<'resolver, B: Backend<'resolver>> crate::generator::Generator<'resolver, B>
                 .collect::<Vec<_>>(),
         );
 
-        self.errors.extend(self.backend.take_errors());
+        self.errors.extend(self.backend.errors.clone());
 
         if let Some(output) = output {
             let path = output.as_str().unwrap_or("");
+
             if !path.is_empty() {
-                if let Err(error) = self.backend.write(path) {
-                    self.errors.push(crate::generator::GenerateError::new(
-                        crate::generator::ErrorKind::OutputWriteFailure {
-                            path: path.to_string(),
-                            reason: error.to_string(),
-                        },
-                        crate::tracker::Span::void(),
-                    ));
+                let content = self.backend.module.print_to_string().to_string();
+
+
+                match File::create(path) {
+                    Ok(mut file) => {
+                        if let Err(error) = file.write_all(content.to_string().as_bytes()) {
+                            compiler.errors.push(
+                                CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                            )
+                        }
+                    }
+
+                    Err(error) => {
+                        compiler.errors.push(
+                            CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                        )
+                    }
                 }
             }
         }
 
-        reporter.errors(self.errors.as_slice());
+        compiler.reporter.errors(self.errors.as_slice());
 
-        let duration = Duration::from_nanos(timer.lap().unwrap());
+        let duration = Duration::from_nanos(compiler.timer.lap().unwrap());
 
-        reporter
+        compiler.reporter
             .finish("generating", duration);
     }
 }

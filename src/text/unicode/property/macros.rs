@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! char_property {
     (
-        use crate::axo_text::EnumeratedCharProperty;
+        use crate::text::EnumeratedCharProperty;
 
         $(#[$prop_meta:meta])*
         pub enum $prop_name:ident {

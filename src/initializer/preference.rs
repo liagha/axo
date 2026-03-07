@@ -219,7 +219,7 @@ impl<'initializer> Initializer<'initializer> {
                 .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "ir"
+                        identifier == "sch" || identifier == "schema"
                     } else {
                         false
                     }
@@ -260,7 +260,7 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn binary() -> Classifier<
+    pub fn executable() -> Classifier<
         'initializer,
         Token<'initializer>,
         Preference<'initializer>,
@@ -286,7 +286,7 @@ impl<'initializer> Initializer<'initializer> {
                 .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == "executable" || identifier == "exec"
+                        identifier == "exec" || identifier == "executable"
                     } else {
                         false
                     }

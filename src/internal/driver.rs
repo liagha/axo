@@ -49,7 +49,7 @@ impl Driver {
     }
 
     fn linker() -> Option<PathBuf> {
-        let direct = Self::env_path(&["AXO_LINKER_PATH", "LD"]);
+        let direct = Self::env_path(&["AXO_LINKER", "LD"]);
         if direct.is_some() {
             return direct;
         }
@@ -203,12 +203,15 @@ impl Driver {
         }
 
         let mut candidates: Vec<PathBuf> = Vec::new();
-        if let Some(explicit) = Self::env_path(&["AXO_CLANG_PATH", "CC"]) {
+
+        if let Some(explicit) = Self::env_path(&["CLANG_PATH", "CC"]) {
             candidates.push(explicit);
         }
+
         if let Some(clang) = Self::from_prefix() {
             candidates.push(clang);
         }
+
         candidates.push(PathBuf::from("clang-19"));
         candidates.push(PathBuf::from("clang"));
         candidates.push(PathBuf::from("cc"));

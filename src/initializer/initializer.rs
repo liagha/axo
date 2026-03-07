@@ -130,7 +130,7 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::alternative([
             Self::schema(),
-            Self::binary(),
+            Self::executable(),
             Self::verbosity(),
             Self::run(),
             Self::bootstrap(),

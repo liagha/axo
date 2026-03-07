@@ -11,12 +11,10 @@ use {
     super::Backend,
     crate::{
         data::Str,
-        generator::{ErrorKind, GenerateError},
+        generator::{GenerateError},
         internal::{
             hash::Map,
-            platform::{File, Write},
         },
-        tracker::Span,
     },
     inkwell::{
         basic_block::BasicBlock,
@@ -29,6 +27,7 @@ use {
 };
 use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
+use crate::internal::hash::Set;
 
 #[derive(Clone)]
 pub enum Entity<'backend> {
@@ -44,13 +43,13 @@ pub enum Entity<'backend> {
 pub struct Inkwell<'backend> {
     context: &'backend Context,
     builder: Builder<'backend>,
-    module: Module<'backend>,
+    pub module: Module<'backend>,
     entities: Map<Str<'backend>, Entity<'backend>>,
     structs: Map<Str<'backend>, StructType<'backend>>,
     struct_fields: Map<Str<'backend>, Vec<Str<'backend>>>,
     array_elements: Map<Str<'backend>, BasicTypeEnum<'backend>>,
-    modules: crate::internal::hash::Set<Str<'backend>>,
-    errors: Vec<GenerateError<'backend>>,
+    modules: Set<Str<'backend>>,
+    pub errors: Vec<GenerateError<'backend>>,
     loop_headers: Vec<BasicBlock<'backend>>,
     loop_exits: Vec<BasicBlock<'backend>>,
 }
@@ -104,70 +103,6 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    fn name(instruction: &Analysis<'backend>) -> &'static str {
-        match instruction {
-            Analysis::Integer { .. } => "Integer",
-            Analysis::Float { .. } => "Float",
-            Analysis::Boolean { .. } => "Boolean",
-            Analysis::String { .. } => "String",
-            Analysis::Character { .. } => "Character",
-            Analysis::Array(_) => "Array",
-            Analysis::Tuple(_) => "Tuple",
-            Analysis::Add(..) => "Add",
-            Analysis::Subtract(..) => "Subtract",
-            Analysis::Multiply(..) => "Multiply",
-            Analysis::Divide(..) => "Divide",
-            Analysis::Modulus(..) => "Modulus",
-            Analysis::LogicalAnd(..) => "LogicalAnd",
-            Analysis::LogicalOr(..) => "LogicalOr",
-            Analysis::LogicalNot(..) => "LogicalNot",
-            Analysis::LogicalXOr(..) => "LogicalXOr",
-            Analysis::BitwiseAnd(..) => "BitwiseAnd",
-            Analysis::BitwiseOr(..) => "BitwiseOr",
-            Analysis::BitwiseNot(..) => "BitwiseNot",
-            Analysis::BitwiseXOr(..) => "BitwiseXOr",
-            Analysis::ShiftLeft(..) => "ShiftLeft",
-            Analysis::ShiftRight(..) => "ShiftRight",
-            Analysis::AddressOf(..) => "AddressOf",
-            Analysis::Dereference(..) => "Dereference",
-            Analysis::Equal(..) => "Equal",
-            Analysis::NotEqual(..) => "NotEqual",
-            Analysis::Less(..) => "Less",
-            Analysis::LessOrEqual(..) => "LessOrEqual",
-            Analysis::Greater(..) => "Greater",
-            Analysis::GreaterOrEqual(..) => "GreaterOrEqual",
-            Analysis::Index(_) => "Index",
-            Analysis::Invoke(_) => "Invoke",
-            Analysis::Block(_) => "Block",
-            Analysis::Conditional(..) => "Conditional",
-            Analysis::While(..) => "While",
-            Analysis::Cycle(..) => "Cycle",
-            Analysis::Return(_) => "Return",
-            Analysis::Break(_) => "Break",
-            Analysis::Continue(_) => "Continue",
-            Analysis::Usage(_) => "Usage",
-            Analysis::Access(..) => "Access",
-            Analysis::Constructor(_) => "Constructor",
-            Analysis::Assign(..) => "Assign",
-            Analysis::Store(..) => "Store",
-            Analysis::Binding(_) => "Binding",
-            Analysis::Structure(_) => "Structure",
-            Analysis::Enumeration(_) => "Enumeration",
-            Analysis::Method(_) => "Method",
-            Analysis::Module(_, _) => "Module",
-        }
-    }
-
-    fn unsupported(&mut self, instruction: Analysis<'backend>) -> BasicValueEnum<'backend> {
-        self.errors.push(GenerateError::new(
-            ErrorKind::UnsupportedAnalysis {
-                instruction: Self::name(&instruction),
-            },
-            Span::void(),
-        ));
-        self.context.i64_type().const_zero().into()
-    }
-
     pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
         match &analysis {
             Analysis::Integer { signed, .. } => Some(*signed),
@@ -184,13 +119,14 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    pub(crate) fn build_entry_alloca(
+    pub fn build_entry(
         &mut self,
         function: FunctionValue<'backend>,
         kind: BasicTypeEnum<'backend>,
-        name: &str,
+        name: Str<'backend>,
     ) -> PointerValue<'backend> {
         let previous = self.builder.get_insert_block();
+        
         let entry = function
             .get_first_basic_block()
             .unwrap_or_else(|| self.context.append_basic_block(function, "entry"));
@@ -201,7 +137,7 @@ impl<'backend> Inkwell<'backend> {
             self.builder.position_at_end(entry);
         }
 
-        let allocation = self.builder.build_alloca(kind, name).unwrap();
+        let allocation = self.builder.build_alloca(kind, &*name).unwrap();
 
         if let Some(block) = previous {
             self.builder.position_at_end(block);
@@ -326,23 +262,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             Analysis::Break(value) => self.r#break(value, function),
             Analysis::Continue(value) => self.r#continue(value, function),
             Analysis::Cycle(condition, body) => self.cycle(condition, body, function),
-            other => self.unsupported(other),
+            Analysis::Enumeration(_) => {
+                unimplemented!("")
+            }
         }
-    }
-
-    fn print(&self) {
-        let content = self.module.print_to_string();
-        println!("{}", content.to_string());
-    }
-
-    fn write(&self, filename: &str) -> std::io::Result<()> {
-        let content = self.module.print_to_string();
-        let mut file = File::create(filename)?;
-        file.write_all(content.to_string().as_bytes())?;
-        Ok(())
-    }
-
-    fn take_errors(&mut self) -> Vec<GenerateError<'backend>> {
-        core::mem::take(&mut self.errors)
     }
 }

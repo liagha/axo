@@ -1,7 +1,7 @@
 use crate::{char_property, text::unicode::TotalCharProperty};
 
 char_property! {
-    use crate::axo_text::EnumeratedCharProperty;
+    use crate::text::EnumeratedCharProperty;
 
     pub enum GeneralCategory {
         abbr => "gc";

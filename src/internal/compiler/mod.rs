@@ -258,8 +258,7 @@ impl<'compiler> Compiler<'compiler> {
                         }
 
                         generator.execute(
-                            &mut self.timer,
-                            &self.reporter,
+                            self,
                             analysis,
                             Some(output),
                         );
