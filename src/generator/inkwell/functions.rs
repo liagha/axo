@@ -251,7 +251,21 @@ impl<'backend> super::Inkwell<'backend> {
                 let kind = bind
                     .annotation
                     .as_ref()
-                    .map(|annotation| self.llvm_type(annotation))
+                    .map(|annotation| {
+                        let llvm_kind = self.llvm_type(annotation);
+                        // For C functions, convert String and Character to pointers
+                        if matches!(method.interface, Interface::C) {
+                            if let TypeKind::String = annotation {
+                                self.context.ptr_type(inkwell::AddressSpace::default()).into()
+                            } else if let TypeKind::Character = annotation {
+                                self.context.i8_type().into()
+                            } else {
+                                llvm_kind
+                            }
+                        } else {
+                            llvm_kind
+                        }
+                    })
                     .unwrap_or_else(|| self.context.i64_type().into());
                 parameters.push(kind);
             }
@@ -280,80 +294,86 @@ impl<'backend> super::Inkwell<'backend> {
         ).flatten();
 
         let function_type = match return_type {
-            Some(kind) => kind.fn_type(&parameter_types, false),
-            None => self.context.void_type().fn_type(&parameter_types, false),
+            Some(kind) => kind.fn_type(&parameter_types, method.variadic),
+            None => self.context.void_type().fn_type(&parameter_types, method.variadic),
         };
 
         let name = method.target.as_str().unwrap();
         
-        let linkage = if matches!(method.interface, Interface::C) {
-            inkwell::module::Linkage::External
-        } else {
-            inkwell::module::Linkage::Internal
-        };
-        
-        let function = self.module.add_function(name, function_type, Some(linkage));
-        
-        if matches!(method.interface, Interface::C) {
+        let function = if matches!(method.interface, Interface::C) {
+            // C interface functions are declared as external - no body generated
+            let function = self.module.add_function(
+                name,
+                function_type,
+                Some(inkwell::module::Linkage::External),
+            );
             function.set_section(Some(".text"));
-        }
+            self.entities
+                .insert(method.target.clone(), Entity::Function(function));
+            function
+        } else {
+            let function = self.module.add_function(
+                name,
+                function_type,
+                Some(inkwell::module::Linkage::Internal),
+            );
 
-        let previous_entities = self.entities.clone();
-        let mut scoped_entities = Map::default();
-        for (name, entity) in previous_entities.iter() {
-            if let Entity::Function(function) = entity {
-                scoped_entities.insert((*name).clone(), Entity::Function(function.clone()));
+            let previous_entities = self.entities.clone();
+            let mut scoped_entities = Map::default();
+            for (name, entity) in previous_entities.iter() {
+                if let Entity::Function(function) = entity {
+                    scoped_entities.insert((*name).clone(), Entity::Function(function.clone()));
+                }
             }
-        }
-        self.entities = scoped_entities;
-        self.entities
-            .insert(method.target.clone(), Entity::Function(function));
+            self.entities = scoped_entities;
+            self.entities
+                .insert(method.target.clone(), Entity::Function(function));
 
-        let entry_block = self.context.append_basic_block(function, "entry");
-        self.builder.position_at_end(entry_block);
+            let entry_block = self.context.append_basic_block(function, "entry");
+            self.builder.position_at_end(entry_block);
+            function
+        };
 
-        for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
-            if let Analysis::Binding(bind) = &member {
-                let allocate = self.build_entry(function, param_val.get_type(), bind.target);
-                let _ = self.builder.build_store(allocate, param_val);
-                let signed = if param_val.get_type().is_int_type() {
-                    Some(true)
+        if !matches!(method.interface, Interface::C) {
+            for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
+                if let Analysis::Binding(bind) = &member {
+                    let allocate = self.build_entry(function, param_val.get_type(), bind.target);
+                    let _ = self.builder.build_store(allocate, param_val);
+                    let signed = if param_val.get_type().is_int_type() {
+                        Some(true)
+                    } else {
+                        None
+                    };
+                    self.entities.insert(
+                        bind.target.clone(),
+                        Entity::Variable {
+                            pointer: allocate,
+                            kind: param_val.get_type(),
+                            pointee: None,
+                            signed,
+                        },
+                    );
+                }
+            }
+
+            self.loop_headers.clear();
+            self.loop_exits.clear();
+            let body_result = self.analysis(*method.body.clone(), function);
+
+            if self
+                .builder
+                .get_insert_block()
+                .and_then(|block| block.get_terminator())
+                .is_none()
+            {
+                if return_type.is_none() {
+                    let _ = self.builder.build_return(None);
                 } else {
-                    None
-                };
-                self.entities.insert(
-                    bind.target.clone(),
-                    Entity::Variable {
-                        pointer: allocate,
-                        kind: param_val.get_type(),
-                        pointee: None,
-                        signed,
-                    },
-                );
+                    let value = self.coerce(function, body_result);
+                    let _ = self.builder.build_return(Some(&value));
+                }
             }
         }
-
-        self.loop_headers.clear();
-        self.loop_exits.clear();
-        let body_result = self.analysis(*method.body.clone(), function);
-
-        if self
-            .builder
-            .get_insert_block()
-            .and_then(|block| block.get_terminator())
-            .is_none()
-        {
-            if return_type.is_none() {
-                let _ = self.builder.build_return(None);
-            } else {
-                let value = self.coerce(function, body_result);
-                let _ = self.builder.build_return(Some(&value));
-            }
-        }
-
-        self.entities = previous_entities;
-        self.entities
-            .insert(method.target.clone(), Entity::Function(function));
 
         self.context.i64_type().const_zero().into()
     }

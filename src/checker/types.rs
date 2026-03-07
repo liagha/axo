@@ -129,6 +129,7 @@ impl<'ty> TypeKind<'ty> {
             }),
             "Float" => Some(Self::Float { bits: 64 }),
             "Boolean" => Some(Self::Boolean),
+            "Pointer" => Some(Self::Pointer { to: Box::from(Type::new(Self::Unknown, Span::void())) }),
             _ => None,
         }
     }
