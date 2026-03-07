@@ -112,9 +112,6 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
         match verbosity {
             _ => {
                 match self {
-                    SymbolKind::Extension(extension) => {
-                        extension.format(verbosity)
-                    }
                     SymbolKind::Binding(binding) => {
                         binding.format(verbosity)
                     }

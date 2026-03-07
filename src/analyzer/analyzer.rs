@@ -91,7 +91,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
         resolver: &mut Resolver<'symbol>,
     ) -> Result<Analysis<'symbol>, AnalyzeError<'symbol>> {
         match &self.kind {
-            SymbolKind::Extension(_) => Ok(Analysis::unit()),
             SymbolKind::Binding(binding) => {
                 let value = binding
                     .value
