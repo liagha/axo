@@ -286,7 +286,6 @@ impl<'backend> super::Inkwell<'backend> {
 
         let name = method.target.as_str().unwrap();
         
-        // Determine linkage based on interface
         let linkage = if matches!(method.interface, Interface::C) {
             inkwell::module::Linkage::External
         } else {
@@ -295,7 +294,6 @@ impl<'backend> super::Inkwell<'backend> {
         
         let function = self.module.add_function(name, function_type, Some(linkage));
         
-        // Set section for C interface functions to ensure proper linking
         if matches!(method.interface, Interface::C) {
             function.set_section(Some(".text"));
         }
@@ -316,8 +314,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
             if let Analysis::Binding(bind) = &member {
-                let name = bind.target.as_str().unwrap();
-                let allocate = self.build_entry(function, param_val.get_type(), name);
+                let allocate = self.build_entry(function, param_val.get_type(), bind.target);
                 let _ = self.builder.build_store(allocate, param_val);
                 let signed = if param_val.get_type().is_int_type() {
                     Some(true)
