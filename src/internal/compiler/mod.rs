@@ -54,10 +54,6 @@ use crate::analyzer::Analyzer;
 use crate::generator::Backend;
 use crate::tracker;
 
-pub trait Stage<'stage, Input, Output> {
-    fn execute(&mut self, session: &mut Session<'stage>, input: Input) -> Output;
-}
-
 pub enum CompileError<'error> {
     Initialize(InitializeError<'error>),
     Scan(ScanError<'error>),
