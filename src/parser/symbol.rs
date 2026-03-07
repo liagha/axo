@@ -85,7 +85,6 @@ impl<'symbol> Symbol<'symbol> {
 
 #[derive(Clone, PartialEq, Hash)]
 pub enum SymbolKind<'symbol> {
-    Extension(Extension<Box<Element<'symbol>>, Box<Element<'symbol>>, Symbol<'symbol>>),
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
@@ -104,7 +103,6 @@ pub enum SymbolKind<'symbol> {
 impl<'symbol> SymbolKind<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match self {
-            SymbolKind::Extension(extension) => extension.target.clone().brand(),
             SymbolKind::Binding(binding) => binding.target.clone().brand(),
             SymbolKind::Structure(structure) => structure.target.clone().brand(),
             SymbolKind::Enumeration(enumeration) => enumeration.target.clone().brand(),

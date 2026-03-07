@@ -7,13 +7,6 @@ use {
 };
 
 #[derive(Debug, Eq)]
-pub struct Extension<Target, Interface, Member> {
-    pub target: Target,
-    pub extension: Option<Interface>,
-    pub members: Vec<Member>,
-}
-
-#[derive(Debug, Eq)]
 pub struct Binding<Target, Value, Type> {
     pub target: Target,
     pub value: Option<Value>,
@@ -58,17 +51,6 @@ pub enum Interface {
     Compiler,
 }
 
-
-impl<Target, Interface, Member> Extension<Target, Interface, Member> {
-    #[inline]
-    pub fn new(target: Target, extension: Option<Interface>, members: Vec<Member>) -> Self {
-        Extension {
-            target,
-            extension,
-            members,
-        }
-    }
-}
 
 impl<Target, Value, Type> Binding<Target, Value, Type> {
     #[inline]
@@ -127,13 +109,6 @@ impl<Target> Module<Target> {
     }
 }
 
-impl<Interface: Hash, Target: Hash, Member: Hash> Hash for Extension<Target, Interface, Member> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.target.hash(state);
-        self.members.hash(state);
-    }
-}
-
 impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -164,14 +139,6 @@ impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
 impl<Target: Hash> Hash for Module<Target> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-    }
-}
-
-impl<Interface: PartialEq, Target: PartialEq, Member: PartialEq> PartialEq
-    for Extension<Target, Interface, Member>
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.target == other.target && self.members == other.members
     }
 }
 
@@ -206,18 +173,6 @@ impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq
 impl<Target: PartialEq> PartialEq for Module<Target> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
-    }
-}
-
-impl<Interface: Clone, Target: Clone, Member: Clone> Clone
-    for Extension<Target, Interface, Member>
-{
-    fn clone(&self) -> Self {
-        Extension::new(
-            self.target.clone(),
-            self.extension.clone(),
-            self.members.clone(),
-        )
     }
 }
 
@@ -257,34 +212,6 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
 impl<Target: Clone> Clone for Module<Target> {
     fn clone(&self) -> Self {
         Module::new(self.target.clone())
-    }
-}
-
-impl<
-        'show,
-        Target: Show<'show, Verbosity = u8>,
-        Interface: Show<'show, Verbosity = u8>,
-        Member: Show<'show, Verbosity = u8>,
-    > Show<'show> for Extension<Target, Interface, Member>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!(
-                "Extension({}{})[{}]",
-                self.target.format(verbosity),
-                if let Some(extension) = &self.extension {
-                    format!(" | {}", extension.format(verbosity))
-                } else {
-                    "".to_string()
-                },
-                self.members.format(verbosity)
-            )
-            .into(),
-
-            _ => self.format(verbosity - 1),
-        }
     }
 }
 

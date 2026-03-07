@@ -36,100 +36,12 @@ impl<'parser> Parser<'parser> {
 
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::extension(),
             Self::binding(),
             Self::structure(),
             Self::enumeration(),
             Self::method(),
             Self::module(),
         ])
-    }
-
-    pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
-    {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("extend"))
-                }),
-                Self::literal(),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Operator(OperatorKind::Colon))
-                    }),
-                    Self::literal(),
-                ])),
-                Classifier::deferred(Self::element),
-            ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let keyword = form.collect_inputs()[0].clone();
-                let outputs = form.collect_outputs().clone();
-                let name = outputs[0].clone();
-
-                if outputs.len() == 2 {
-                    let body = outputs[1].clone();
-
-                    let parsed_members: Vec<_> = Self::get_body(body.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
-                            _ => None,
-                        })
-                        .collect();
-                    let (members, generic) = Self::split_members(parsed_members);
-
-                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-
-                    Ok(Form::output(Element::new(
-                        ElementKind::Symbolize(
-                            Symbol::new(
-                                0,
-                                SymbolKind::Extension(Extension::new(
-                                    Box::new(name),
-                                    None::<Box<Element<'parser>>>,
-                                    members,
-                                )),
-                                span,
-                                Visibility::Public,
-                            )
-                                .with_generic(generic),
-                        ),
-                        span,
-                    )))
-                } else if outputs.len() == 3 {
-                    let target = outputs[1].clone();
-                    let body = outputs[2].clone();
-                    let parsed_members: Vec<_> = Self::get_body(body.clone())
-                        .into_iter()
-                        .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
-                            _ => None,
-                        })
-                        .collect();
-                    let (members, generic) = Self::split_members(parsed_members);
-                    let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-
-                    Ok(Form::output(Element::new(
-                        ElementKind::Symbolize(
-                            Symbol::new(
-                                0,
-                                SymbolKind::Extension(Extension::new(
-                                    Box::new(name),
-                                    Some(Box::new(target)),
-                                    members,
-                                )),
-                                span,
-                                Visibility::Public,
-                            )
-                                .with_generic(generic),
-                        ),
-                        span,
-                    )))
-                } else {
-                    unreachable!()
-                }
-            },
-        )
     }
 
     pub fn binding() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
