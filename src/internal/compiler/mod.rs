@@ -40,7 +40,6 @@ use {
     broccli::{xprintln, Color},
 };
 
-#[cfg(feature = "generator")]
 use {
     inkwell::context::Context,
     crate::{
@@ -73,7 +72,6 @@ pub struct Session<'session> {
     pub analyzers: Map<Identity, Analyzer<'session>>,
     pub generator: Generator<'session, Inkwell<'session>>,
     pub errors: Vec<CompileError<'session>>,
-    #[cfg(feature = "generator")]
     queue: Vec<PathBuf>,
 }
 
@@ -153,7 +151,6 @@ impl<'session> Session<'session> {
             analyzers: Map::new(),
             generator,
             errors,
-            #[cfg(feature = "generator")]
             queue: Vec::new(),
         }
     }
@@ -177,7 +174,6 @@ impl<'session> Session<'session> {
 
         self.reporter.finish("compilation", duration);
 
-        #[cfg(feature = "generator")]
         self.run();
     }
 
@@ -424,7 +420,6 @@ impl<'session> Session<'session> {
         (schema, executable)
     }
     
-    #[cfg(feature = "generator")]
     fn run(&mut self) {
         if self.queue.is_empty() {
             return;

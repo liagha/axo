@@ -1,5 +1,3 @@
-//#![allow(unused)]
-
 #[cfg(feature = "formation")]
 pub mod formation;
 #[cfg(feature = "generator")]
