@@ -9,7 +9,6 @@ use {
         },
         parser::Element,
         reporter::Error,
-        resolver::{Resolution},
         scanner::Token,
     },
     broccli::{xprintln, Color},
@@ -135,26 +134,6 @@ impl Reporter {
                     "Symbols" => Color::Blue,
                     ":" => Color::White,
                     Str::from(tree).indent(self.verbosity) => Color::White,
-                );
-                xprintln!();
-            }
-        }
-    }
-
-    pub fn resolutions(&self, resolutions: &[Resolution]) {
-        if self.is_verbose() {
-            let tree = resolutions
-                .iter()
-                .map(|resolution| Str::from(format!("{}", resolution.analysis.format(self.verbosity))))
-                .collect::<Vec<Str>>()
-                .join("\n");
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}{}\n{}" => Color::White,
-                    "Analyses" => Color::Cyan,
-                    ":" => Color::White,
-                    tree.indent(self.verbosity) => Color::White,
                 );
                 xprintln!();
             }

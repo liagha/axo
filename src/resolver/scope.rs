@@ -1,6 +1,7 @@
 use {
     super::{
         assessor::{Affinity, Aligner},
+        Resolver,
         ErrorKind, ResolveError,
     },
     crate::{
@@ -10,11 +11,9 @@ use {
         parser::Symbol,
         parser::Element,
         scanner::TokenKind
-        ,
     },
     matchete::{Assessor, Scheme},
 };
-use crate::resolver::primitives::builtin;
 
 #[derive(Clone)]
 pub struct Scope<'scope> {
@@ -31,33 +30,6 @@ impl<'scope> Scope<'scope> {
             span: target.span.clone(),
             hints: Vec::new(),
         }]
-    }
-
-    fn exact_lookup(target: &Element<'scope>, scope: &Scope<'scope>) -> Option<Symbol<'scope>> {
-        let query = target.brand().and_then(|token| match token.kind {
-            TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
-            _ => None,
-        })?;
-
-        let mut current = Some(scope);
-        while let Some(active) = current {
-            if let Some(symbol) = active.symbols.iter().find(|candidate| {
-                candidate
-                    .brand()
-                    .and_then(|token| match token.kind {
-                        TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
-                        _ => None,
-                    })
-                    .as_deref()
-                    == Some(query.as_str())
-            }) {
-                return Some(symbol.clone());
-            }
-
-            current = active.parent.as_deref();
-        }
-
-        None
     }
 
     pub fn new() -> Self {
@@ -154,30 +126,23 @@ impl<'scope> Scope<'scope> {
         }
     }
 
-    pub fn get_id(&self, target: Identity) -> Option<&Symbol<'scope>> {
+    pub fn get_identity(&self, target: Identity) -> Option<&Symbol<'scope>> {
         if let Some(symbol) = self.symbols.iter().find(|s| s.id == target) {
             return Some(symbol);
         }
 
-        self.parent.as_ref()?.get_id(target)
+        self.parent.as_ref()?.get_identity(target)
     }
 
-    pub fn try_get(
+    pub fn lookup(
         &mut self,
         target: &Element<'scope>,
     ) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
-        Self::try_lookup(target, self)
-    }
-
-    pub fn try_lookup(
-        target: &Element<'scope>,
-        scope: &Scope<'scope>,
-    ) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
-        if let Some(symbol) = builtin(target, scope) {
+        if let Some(symbol) = Resolver::builtin(target, self) {
             return Ok(symbol);
         }
 
-        if let Some(symbol) = Self::exact_lookup(target, scope) {
+        if let Some(symbol) = Self::get(target, self) {
             return Ok(symbol);
         }
 
@@ -190,7 +155,7 @@ impl<'scope> Scope<'scope> {
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Multiplicative);
 
-        let candidates = &*scope.all();
+        let candidates = &*self.all();
 
         let champion = assessor.champion(target, candidates);
 
@@ -205,5 +170,34 @@ impl<'scope> Scope<'scope> {
         } else {
             Err(assessor.errors.clone())
         }
+
+    }
+
+    fn get(target: &Element<'scope>, scope: &Scope<'scope>) -> Option<Symbol<'scope>> {
+        let query = target.brand().and_then(|token| match token.kind {
+            TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
+            _ => None,
+        })?;
+
+        let mut current = Some(scope);
+
+        while let Some(active) = current {
+            if let Some(symbol) = active.symbols.iter().find(|candidate| {
+                candidate
+                    .brand()
+                    .and_then(|token| match token.kind {
+                        TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
+                        _ => None,
+                    })
+                    .as_deref()
+                    == Some(query.as_str())
+            }) {
+                return Some(symbol.clone());
+            }
+
+            current = active.parent.as_deref();
+        }
+
+        None
     }
 }

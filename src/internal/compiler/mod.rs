@@ -1,26 +1,27 @@
 mod registry;
-mod stages;
 
+use std::io::Write;
 use {
     crate::{
         data::*,
-        checker::Type,
-        analyzer::Analyzable,
         initializer::{
             Initializer,
             InitializeError,
         },
         internal::{
-            platform::{create_dir_all, read_dir, PathBuf},
+            platform::{PathBuf, File},
+            hash::{
+                Map,
+            },
             timer::{DefaultTimer, Duration},
         },
         parser::{
             Element, ElementKind,
             Symbol, SymbolKind,
             ParseError,
+            Parser, Visibility,
         },
         reporter::Reporter,
-        resolver::Resolution,
         resolver::{
             Resolver,
             ResolveError,
@@ -33,20 +34,28 @@ use {
         tracker::{
             Location, Span,
             TrackError,
+            Spanned,
         },
     },
     broccli::{xprintln, Color},
 };
 
 #[cfg(feature = "generator")]
-use crate::{
-    generator::{Generator, Inkwell},
-    internal::driver::Driver,
+use {
+    inkwell::context::Context,
+    crate::{
+        generator::{Generator, Inkwell},
+        internal::driver::Driver,
+        resolver::scope::Scope,
+        tracker::Peekable,
+    }
 };
-use crate::parser::{Parser, Visibility};
+use crate::analyzer::Analyzer;
+use crate::generator::Backend;
+use crate::tracker;
 
 pub trait Stage<'stage, Input, Output> {
-    fn execute(&mut self, compiler: &mut Compiler<'stage>, input: Input) -> Output;
+    fn execute(&mut self, session: &mut Session<'stage>, input: Input) -> Output;
 }
 
 pub enum CompileError<'error> {
@@ -57,38 +66,45 @@ pub enum CompileError<'error> {
     Track(TrackError<'error>),
 }
 
-pub struct Compiler<'compiler> {
+pub struct Session<'session> {
     pub timer: DefaultTimer,
     pub reporter: Reporter,
-    pub resolver: Resolver<'compiler>,
-    pub errors: Vec<CompileError<'compiler>>,
+    pub inputs: Map<Identity, Location<'session>>,
+    pub initializer: Initializer<'session>,
+    pub scanners: Map<Identity, Scanner<'session>>,
+    pub parsers: Map<Identity, Parser<'session>>,
+    pub resolver: Resolver<'session>,
+    pub analyzers: Map<Identity, Analyzer<'session>>,
+    pub generator: Generator<'session, Inkwell<'session>>,
+    pub errors: Vec<CompileError<'session>>,
     #[cfg(feature = "generator")]
     queue: Vec<PathBuf>,
 }
 
-impl<'compiler> Compiler<'compiler> {
-    pub fn new() -> Self {
+impl<'session> Session<'session> {
+    pub fn start() -> Self {
         let mut timer = DefaultTimer::new_default();
         let _ = timer.start();
 
-        let resolver = Resolver::new();
-        let reporter = Reporter::new(0);
-
-        Compiler {
-            timer,
-            resolver,
-            reporter,
-            errors: vec![],
-            #[cfg(feature = "generator")]
-            queue: Vec::new(),
-        }
-    }
-
-    pub fn compile(&mut self) {
         let mut initializer = Initializer::new(Location::Flag);
-        let targets = initializer.execute(self, ());
+        let mut resolver = Resolver::new();
 
-        self.errors.extend(
+        let verbosity = Resolver::verbosity(&mut resolver);
+        let logger = Reporter::new(verbosity);
+
+        logger.start("initializing");
+
+        let mut inputs = Map::new();
+
+        initializer.initialize().iter().for_each(|target| {
+            let identity = resolver.next_identity();
+
+            inputs.insert(identity, target.clone());
+        });
+
+        let mut errors = Vec::new();
+
+        errors.extend(
             initializer
                 .errors
                 .iter()
@@ -97,13 +113,59 @@ impl<'compiler> Compiler<'compiler> {
                 })
         );
 
-        let verbosity = Resolver::verbosity(&mut self.resolver);
+        let preferences = initializer
+            .output
+            .clone()
+            .into_iter()
+            .map(|preference| {
+                let span = preference.borrow_span();
 
-        self.reporter.verbosity = verbosity;
+                Symbol::new(
+                    resolver.next_identity(),
+                    SymbolKind::Preference(preference),
+                    span,
+                    Visibility::Public,
+                )
+            })
+            .collect::<Vec<Symbol>>();
 
-        for (index, target) in targets.into_iter().enumerate() {
-            self.build(target, index);
+        resolver.scope.extend(preferences);
+        
+        let name = resolver.input();
+
+        let duration = Duration::from_nanos(timer.lap().unwrap());
+
+        let verbosity = Resolver::verbosity(&mut resolver);
+
+        let reporter = Reporter::new(verbosity);
+
+        let context = Context::create();
+        let backend = Inkwell::new(Str::from(name), &context);
+
+        let generator = Generator::new(backend);
+
+        logger.finish("initializing", duration);
+
+        Session {
+            timer,
+            reporter,
+            inputs,
+            initializer,
+            scanners: Map::new(),
+            parsers: Map::new(),
+            resolver,
+            analyzers: Map::new(),
+            generator,
+            errors,
+            #[cfg(feature = "generator")]
+            queue: Vec::new(),
         }
+    }
+
+    pub fn compile(&mut self) {
+        self.scan();
+        self.parse();
+        self.register();
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -123,206 +185,249 @@ impl<'compiler> Compiler<'compiler> {
         self.run();
     }
 
-    pub fn build(&mut self, target: Location<'compiler>, index: usize) {
-        self.resolver.enter();
+    pub fn scan(&mut self) {
+        for (identity, location) in &self.inputs {
+            let mut scanner = Scanner::new(*location);
+            
+            self.reporter.start("scanning");
 
-        let span = match Span::file(Str::from(target.to_string())) {
-            Ok(span) => span,
-            Err(error) => {
-                self.errors.push(CompileError::Track(error));
+            scanner.prepare();
+            scanner.scan();
 
-                return;
-            }
-        };
+            self.reporter.tokens(&scanner.output);
 
-        let path = match target.clone().to_path() {
-            Ok(path) => {
-                path
-            },
-            Err(error) => {
-                self.errors.push(CompileError::Track(error));
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-                return;
-            }
-        };
+            self
+                .reporter
+                .finish("scanning", duration);
 
-        let name = path.file_name().unwrap().to_str().unwrap();
+            self.errors.extend(
+                scanner
+                    .errors
+                    .iter()
+                    .map(|error| {
+                        CompileError::Scan(error.clone())
+                    })
+            );
+            
+            self.scanners.insert(*identity, scanner);
+        }
+    }
 
-        if path.is_dir() {
-            for entry in read_dir(&path).unwrap() {
-                let entry = entry.unwrap();
-                let child_path = entry.path();
-                let child_loc = Location::file(Str::from(child_path));
-                self.build(child_loc, index);
-            }
-        } else {
-            let extension = path.extension().unwrap().to_str().unwrap();
+    pub fn parse(&mut self) {
+        for (identity, location) in &self.inputs {
+            let mut parser = Parser::new(*location);
+            
+            self.reporter.start("parsing");
 
-            match extension {
-                "ll" => {
-                    #[cfg(feature = "generator")]
-                    {
-                        let executable = Resolver::executable(&mut self.resolver, index);
-                        let run = Resolver::run(&mut self.resolver);
-                        let (_, executable) = Driver::paths(target, name, None, executable);
-                        let should_link = run;
+            let tokens = self.scanners.get(identity).unwrap().output.clone();
+            
+            parser.set_input(tokens);
+            parser.parse();
 
-                        self.reporter.start("linking");
+            self.reporter.elements(&parser.output);
 
-                        let linked = if should_link {
-                            match Driver::link(&path, &executable) {
-                                Ok(()) => true,
-                                Err(error) => {
-                                    xprintln!(
-                                        "linker error while producing `{}`: {}" => Color::Red,
-                                        executable.to_string_lossy(),
-                                        error.to_string()
-                                    );
-                                    xprintln!();
-                                    false
-                                }
-                            }
-                        } else {
-                            true
-                        };
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-                        if linked {
-                            self.reporter.generate("executable", &executable);
-                        }
+            self
+                .reporter
+                .finish("parsing", duration);
 
-                        if linked && run {
-                            self.queue.push(executable);
+            self.errors.extend(
+                parser
+                    .errors
+                    .iter()
+                    .map(|error| {
+                        CompileError::Parse(error.clone())
+                    })
+            );
+        }
+    }
+
+    pub fn register(&mut self) {
+        for (identity, location) in &self.inputs {
+            let stem = Str::from(location.stem().unwrap());
+            let span = Span::file(location.to_path().unwrap().into()).unwrap();
+
+            let head = Element::new(
+                ElementKind::Literal(
+                    Token::new(
+                        TokenKind::Identifier(stem),
+                        span,
+                    )
+                ),
+                span,
+            ).into();
+
+            let elements = &mut self.parsers.get_mut(identity).unwrap().output;
+
+            let mut scope = Scope::new();
+
+            elements
+                .iter_mut()
+                .for_each(
+                    |element| {
+                        if let ElementKind::Symbolize(symbol) = &mut element.kind {
+                            let identity = self.resolver.next_identity();
+                            
+                            symbol.id = identity;
+                            element.reference = Some(identity);
+                            
+                            scope.symbols.insert(symbol.clone());
                         }
                     }
+                );
+            
+            let module = Module::new(head);
+
+            let symbol = Symbol::new(
+                *identity,
+                SymbolKind::Module(module),
+                span,
+                Visibility::Public,
+            ).with_scope(scope);
+
+            self.resolver.add(symbol);
+        }
+    }
+    
+    pub fn resolve(&mut self) {
+        for (identity, _location) in &self.inputs {
+            let elements = self.parsers.get(identity).unwrap().output.clone();
+            let module = self.resolver.scope.get_identity(*identity).unwrap();
+            
+            self.resolver.enter_scope(module.scope.clone());
+            
+            self.resolver.set_input(elements);
+            
+            self.resolver.resolve();
+            
+            self.resolver.exit();
+        }
+    }
+    
+    pub fn analyzer(&mut self) {
+        for (identity, _location) in &self.inputs {
+            let elements = self.parsers.get(identity).unwrap().output.clone();
+            let mut analyzer = Analyzer::new(&mut self.resolver, elements);
+
+            analyzer.analyze();
+            
+            self.analyzers.insert(*identity, analyzer);
+        }
+    }
+    
+    pub fn generate(&mut self) {
+        for (identity, location) in &self.inputs {
+            let analysis = self.analyzers.get(identity).unwrap().output.clone();
+            let schema = Resolver::schema(&mut self.resolver, *identity);
+            let executable = Resolver::executable(&mut self.resolver, *identity);
+            let run = Resolver::run(&mut self.resolver);
+
+            let should_link = run || executable.is_some();
+
+            let (schema, executable) = Self::output(*location, schema, executable);
+            let output = Str::from(schema.to_string_lossy().to_string());
+
+            self.reporter.start("generating");
+
+            self.generator.backend.generate(analysis);
+
+            self.generator.errors.extend(self.generator.backend.errors.clone());
+
+            let path = output.as_str().unwrap_or("");
+
+            if !path.is_empty() {
+                let content = self.generator.backend.module.print_to_string().to_string();
+
+
+                match File::create(path) {
+                    Ok(mut file) => {
+                        if let Err(error) = file.write_all(content.to_string().as_bytes()) {
+                            self.errors.push(
+                                CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                            )
+                        }
+                    }
+
+                    Err(error) => {
+                        self.errors.push(
+                            CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                        )
+                    }
                 }
+            }
 
-                "axo" => {
-                    let tokens = {
-                        let mut scanner = Scanner::new(target);
-                        scanner.execute(self, target)
-                    };
+            self.reporter.errors(self.generator.errors.as_slice());
 
-                    let elements = {
-                        let mut parser = Parser::new(target);
-                        parser.execute(self, tokens)
-                    };
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-                    let mut analysis = self.execute(elements.clone());
+            self.reporter
+                .finish("generating", duration);
 
-                    #[cfg(feature = "generator")]
-                    {
-                        let context = &inkwell::context::Context::create();
-                        let backend = Inkwell::new(Str::from(name), context);
+            if self.generator.errors.is_empty() {
+                self.reporter.start("linking");
 
-                        let mut generator = Generator::new(backend);
-
-                        let schema = Resolver::schema(&mut self.resolver, index);
-                        let executable = Resolver::executable(&mut self.resolver, index);
-                        let run = Resolver::run(&mut self.resolver);
-
-                        let should_link = run || executable.is_some();
-
-                        let (schema, executable) = Driver::paths(target, &name, schema, executable);
-                        let output = Str::from(schema.to_string_lossy().to_string());
-
-                        if let Some(parent) = schema.parent() {
-                            if !parent.as_os_str().is_empty() {
-                                if let Err(error) = create_dir_all(parent) {
-                                    xprintln!(
-                                            "Output directory error for `{}`: {}" => Color::Red,
-                                            parent.to_string_lossy(),
-                                            error.to_string()
-                                        );
-                                    xprintln!();
-                                }
-                            }
-                        }
-
-                        let mut module_resolutions = Vec::new();
-                        for symbol in self.resolver.scope.all() {
-                            if matches!(symbol.kind, SymbolKind::Module(_)) {
-                                if let Ok(analysis) =
-                                    symbol.analyze(&mut self.resolver)
-                                {
-                                    module_resolutions.push(Resolution::new(
-                                        None,
-                                        Type::unit(Span::void()),
-                                        analysis,
-                                    ));
-                                }
-                            }
-                        }
-                        if !module_resolutions.is_empty() {
-                            module_resolutions.extend(analysis);
-                            analysis = module_resolutions;
-                        }
-
-                        generator.execute(
-                            self,
-                            analysis,
-                            Some(output),
-                        );
-
-                        if generator.errors.is_empty() {
-                            self.reporter.start("linking");
-
-                            let linked = if should_link {
-                                match Driver::link(&schema, &executable) {
-                                    Ok(()) => true,
-                                    Err(error) => {
-                                        xprintln!(
+                let linked = if should_link {
+                    match Driver::link(&schema, &executable) {
+                        Ok(()) => true,
+                        Err(error) => {
+                            xprintln!(
                                                 "Linker error while producing `{}`: {}" => Color::Red,
                                                 executable.to_string_lossy(),
                                                 error.to_string()
                                             );
-                                        xprintln!();
-                                        false
-                                    }
-                                }
-                            } else {
-                                true
-                            };
-
-                            if linked {
-                                self.reporter.generate("IR", &schema);
-                                self.reporter.generate("executable", &executable);
-
-                                let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-                                self.reporter.finish("linking", duration);
-                            }
-
-                            if linked && run {
-                                self.queue.push(executable.clone());
-                            }
+                            xprintln!();
+                            false
                         }
                     }
+                } else {
+                    true
+                };
+
+                if linked {
+                    self.reporter.generate("IR", &schema);
+                    self.reporter.generate("executable", &executable);
+
+                    let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+                    self.reporter.finish("linking", duration);
                 }
 
-                _ => {}
+                if linked && run {
+                    self.queue.push(executable.clone());
+                }
             }
         }
-
-        let identifier = Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from(name.to_string())),
-                span,
-            )),
-            span,
-        );
-
-        let mut module = Symbol::new(
-            self.resolver.next_id(),
-            SymbolKind::Module(Module::new(Box::new(identifier))),
-            span,
-            Visibility::Public,
-        );
-
-        module.set_scope(self.resolver.scope.clone());
-        self.resolver.exit();
-        self.resolver.define(module.clone());
     }
+    
+    fn output(location: Location<'session>, schema: Option<Str<'session>>, executable: Option<Str<'session>>) -> (PathBuf, PathBuf) {
+        let schema = if let Some(schema) = schema {
+            PathBuf::from(schema.to_string())
+        } else {
+            let path = location.to_path().unwrap();
+            let parent = path.parent().unwrap();
+            
+            parent.join(location.stem().unwrap()).set_extension("ll");
+            
+            parent.to_path_buf()
+        };
 
+        let executable = if let Some(executable) = executable {
+            PathBuf::from(executable.to_string())
+        } else {
+            let path = location.to_path().unwrap();
+            let parent = path.parent().unwrap();
+
+            let _ = parent.clone().join(location.stem().unwrap());
+
+            parent.to_path_buf()
+        };
+
+        (schema, executable)
+    }
+    
     #[cfg(feature = "generator")]
     fn run(&mut self) {
         if self.queue.is_empty() {

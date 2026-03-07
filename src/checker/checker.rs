@@ -11,12 +11,11 @@ impl<'resolver> Resolver<'resolver> {
     pub fn check(&mut self, target: Type<'resolver>, source: Type<'resolver>) {
         if target != source {
             let error = ResolveError::new(
-                crate::resolver::ErrorKind::Check {
-                    error: CheckError::new(
+                crate::resolver::ErrorKind::Check(CheckError::new(
                         crate::checker::ErrorKind::Mismatch(target, source.clone()),
                         source.span,
                     ),
-                },
+                ),
                 source.span,
             );
 

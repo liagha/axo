@@ -39,7 +39,7 @@ fn main() {
         use {
             data::Str,
             internal::{
-                compiler::Compiler,
+                compiler::Session,
                 logger::{LogInfo, LogPlan, Logger},
             },
             log::Level,
@@ -55,7 +55,7 @@ fn main() {
             return;
         }
 
-        let mut compiler = Compiler::new();
+        let mut compiler = Session::start();
 
         compiler.compile();
     }

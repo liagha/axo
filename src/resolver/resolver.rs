@@ -1,40 +1,15 @@
 use {
     super::{scope::Scope, ResolveError},
     crate::{
-        data::{memory::replace, Boolean, Identity},
-        format::Debug,
+        data::{memory::replace, Identity},
         parser::{Element, Symbol},
-        analyzer::Analysis,
-        checker::Type,
     },
 };
-
-#[derive(Clone, Debug)]
-pub struct Resolution<'resolution> {
-    pub reference: Option<Identity>,
-    pub typed: Type<'resolution>,
-    pub analysis: Analysis<'resolution>,
-}
-
-impl<'resolution> Resolution<'resolution> {
-    pub fn new(
-        reference: Option<Identity>,
-        typed: Type<'resolution>,
-        analysis: Analysis<'resolution>,
-    ) -> Self {
-        Self {
-            reference,
-            typed,
-            analysis,
-        }
-    }
-}
 
 pub struct Resolver<'resolver> {
     pub counter: Identity,
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
-    pub output: Vec<Resolution<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
 }
 
@@ -44,7 +19,6 @@ impl Clone for Resolver<'_> {
             counter: self.counter,
             scope: self.scope.clone(),
             input: self.input.clone(),
-            output: self.output.clone(),
             errors: self.errors.clone(),
         }
     }
@@ -52,10 +26,9 @@ impl Clone for Resolver<'_> {
 
 pub trait Resolvable<'resolvable> {
     fn resolve(
-        &self,
+        &mut self,
         resolver: &mut Resolver<'resolvable>,
-    ) -> Result<Resolution<'resolvable>, Vec<ResolveError<'resolvable>>>;
-    fn is_instance(&self, resolver: &mut Resolver<'resolvable>) -> Boolean;
+    );
 }
 
 impl<'resolver> Resolver<'resolver> {
@@ -64,12 +37,11 @@ impl<'resolver> Resolver<'resolver> {
             counter: 0,
             scope: Scope::new(),
             input: Vec::new(),
-            output: Vec::new(),
             errors: Vec::new(),
         }
     }
 
-    pub fn with_input(&mut self, input: Vec<Element<'resolver>>) {
+    pub fn set_input(&mut self, input: Vec<Element<'resolver>>) {
         self.input = input;
     }
 
@@ -89,26 +61,23 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn define(&mut self, symbol: Symbol<'resolver>) {
+    pub fn add(&mut self, symbol: Symbol<'resolver>) {
         self.scope.add(symbol);
     }
 
-    pub fn next_id(&mut self) -> Identity {
+    pub fn next_identity(&mut self) -> Identity {
         let id = self.counter;
         self.counter += 1;
         id
     }
 
     pub fn resolve(&mut self) {
-        for element in self.input.clone() {
-            match element.resolve(self) {
-                Ok(resolution) => {
-                    self.output.push(resolution);
-                }
-                Err(errors) => {
-                    self.errors.extend(errors);
-                }
-            }
+        let mut input = self.input.clone();
+
+        for element in input.iter_mut() {
+            element.resolve(self);
         }
+
+        self.input = input;
     }
 }

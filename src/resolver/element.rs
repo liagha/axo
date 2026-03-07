@@ -1,611 +1,109 @@
 use {
     super::{
-        ErrorKind, Resolution, Resolvable, ResolveError, Resolver,
+        Resolvable, Resolver,
     },
     crate::{
-        data::*,
-        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+        parser::{Element, ElementKind},
         scanner::{OperatorKind, Token, TokenKind},
-        analyzer::{Analyzable, AnalyzeError, ErrorKind as AnalyzeErrorKind},
-        checker::{unify, CheckError, Checkable, Type, TypeKind},
-        tracker::Span,
     },
 };
 
-impl<'element> Element<'element> {
-    pub(crate) fn resolve_path(
-        &self,
-        resolver: &mut Resolver<'element>,
-    ) -> Result<Symbol<'element>, Vec<ResolveError<'element>>> {
-        match &self.kind {
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(_),
-                                     ..
-                                 })
-            | ElementKind::Construct(_) => resolver.scope.try_get(self),
-            ElementKind::Binary(binary) => {
-                let is_namespace = match &binary.operator.kind {
-                    TokenKind::Operator(operator) => {
-                        matches!(operator.as_slice(), [OperatorKind::Dot])
-                    }
-                    _ => false,
-                };
-
-                if !is_namespace {
-                    return Err(vec![ResolveError::new(
-                        ErrorKind::Analyze {
-                            error: AnalyzeError::new(
-                                AnalyzeErrorKind::InvalidOperation(binary.operator.clone()),
-                                binary.operator.span,
-                            ),
-                        },
-                        binary.operator.span,
-                    )]);
-                }
-
-                let left = binary.left.resolve_path(resolver)?;
-                resolver.enter_scope(left.scope.clone());
-                let right = binary.right.resolve_path(resolver);
-                resolver.exit();
-                if matches!(left.kind, SymbolKind::Module(_)) {
-                    if let Ok(ref member) = right {
-                        if matches!(member.visibility, Visibility::Private) {
-                            let token = member.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("<private>")),
-                                member.span,
-                            ));
-                            return Err(vec![ResolveError::new(
-                                ErrorKind::PrivateSymbol { symbol: token },
-                                member.span,
-                            )]);
-                        }
-                    }
-                }
-                right
-            }
-            _ => Err(vec![ResolveError::new(
-                ErrorKind::Analyze {
-                    error: AnalyzeError::new(
-                        AnalyzeErrorKind::InvalidOperation(Token::new(
-                            TokenKind::Operator(OperatorKind::Dot),
-                            self.span,
-                        )),
-                        self.span,
-                    ),
-                },
-                self.span,
-            )]),
-        }
-    }
-
-    fn filter_context(
-        errors: Vec<ResolveError<'element>>,
-    ) -> Result<(), Vec<ResolveError<'element>>> {
-        let filtered: Vec<ResolveError<'element>> = errors
-            .into_iter()
-            .filter(|error| {
-                !matches!(
-                    &error.kind,
-                    ErrorKind::Analyze { error }
-                        if matches!(&error.kind, AnalyzeErrorKind::InvalidPrimitiveContext { .. })
-                )
-            })
-            .collect();
-
-        if filtered.is_empty() {
-            Ok(())
-        } else {
-            Err(filtered)
-        }
-    }
-
-    fn is_addressable(&self) -> bool {
-        match &self.kind {
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(_),
-                                     ..
-                                 }) => true,
-            ElementKind::Index(_) => true,
-            ElementKind::Binary(binary) => {
-                matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
-            }
-            ElementKind::Unary(unary) => {
-                matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star))
-            }
-            _ => false,
-        }
-    }
-}
-
 impl<'element> Resolvable<'element> for Element<'element> {
     fn resolve(
-        &self,
+        &mut self,
         resolver: &mut Resolver<'element>,
-    ) -> Result<Resolution<'element>, Vec<ResolveError<'element>>> {
-        let analysis = self.analyze(resolver).map_err(|error| {
-            vec![ResolveError::new(
-                ErrorKind::Analyze {
-                    error: error.clone(),
-                },
-                error.span,
-            )]
-        })?;
-
-        match &self.kind {
-            ElementKind::Delimited(delimited) => {
-                resolver.enter();
-
-                delimited.members.iter().for_each(|item| {
-                    let _ = item.resolve(resolver);
-                });
-
-                resolver.exit();
-
-                let typ = delimited.infer().map_err(|error| {
-                    vec![ResolveError::new(
-                        ErrorKind::Check {
-                            error: error.clone(),
-                        },
-                        error.span,
-                    )]
-                })?;
-
-                Ok(Resolution::new(None, typ, analysis))
-            }
-
+    ) {
+        match &mut self.kind {
             ElementKind::Literal(
                 Token {
                     kind: TokenKind::Identifier(_),
                     ..
-                }) 
+                })
             => {
-                let symbol = resolver.scope.try_get(&self)?;
+                match resolver.scope.lookup(&self) {
+                    Ok(symbol) => {
+                        self.reference = Some(symbol.id);
+                    }
 
-                let typ = symbol.infer().map_err(|error| {
-                    vec![ResolveError::new(
-                        ErrorKind::Check {
-                            error: error.clone(),
-                        },
-                        error.span,
-                    )]
-                })?;
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
+                    }
+                }
+            }
 
-                Ok(Resolution::new(Some(symbol.id), typ, analysis))
+            ElementKind::Literal(_) => {}
+
+            ElementKind::Delimited(delimited) => {
+                resolver.enter();
+
+                delimited.members.iter_mut().for_each(|item| {
+                    item.resolve(resolver);
+                });
+
+                resolver.exit();
             }
 
             ElementKind::Construct(_construct) => {
-                let symbol = resolver.scope.try_get(&self)?;
+                match resolver.scope.lookup(&self) {
+                    Ok(symbol) => {
+                        self.reference = Some(symbol.id);
+                    }
 
-                let typ = symbol.infer().map_err(|error| {
-                    vec![ResolveError::new(
-                        ErrorKind::Check {
-                            error: error.clone(),
-                        },
-                        error.span,
-                    )]
-                })?;
-
-                Ok(Resolution::new(Some(symbol.id), typ, analysis))
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
+                    }
+                }
             }
 
-            ElementKind::Invoke(invoke) => {
-                let symbol = resolver.scope.try_get(self)?;
-
-                let primitive = invoke.target.brand().and_then(|token| match token.kind {
-                    TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
-                    _ => None,
-                });
-
-                let typ = if matches!(primitive.as_deref(), Some("if" | "while" | "for")) {
-                    let invalid = |name: &'static str, span: Span<'element>| {
-                        let token = invoke
-                            .target
-                            .brand()
-                            .unwrap_or(Token::new(TokenKind::Identifier(Str::from(name)), span));
-                        vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::InvalidOperation(token),
-                                    span,
-                                ),
-                            },
-                            span,
-                        )]
-                    };
-                    let mismatch = |expected: Type<'element>, actual: Type<'element>, span: Span<'element>| {
-                        vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::Mismatch(expected, actual),
-                                    span,
-                                ),
-                            },
-                            span,
-                        )]
-                    };
-
-                    match primitive.as_deref() {
-                        Some("if") => {
-                            if invoke.members.len() != 3 {
-                                return Err(invalid("if", invoke.target.span));
-                            }
-
-                            let condition = invoke.members[0].resolve(resolver)?.typed;
-                            if !condition.is_boolean() {
-                                return Err(mismatch(
-                                    Type::boolean(invoke.members[0].span),
-                                    condition,
-                                    invoke.members[0].span,
-                                ));
-                            }
-
-                            let then = invoke.members[1].resolve(resolver)?.typed;
-                            let otherwise = invoke.members[2].resolve(resolver)?.typed;
-
-                            if let Some(unified) = unify(&then, &otherwise) {
-                                unified
-                            } else {
-                                return Err(mismatch(then, otherwise, invoke.members[2].span));
-                            }
-                        }
-                        Some("while") => {
-                            if invoke.members.len() != 2 {
-                                return Err(invalid("while", invoke.target.span));
-                            }
-
-                            let condition = invoke.members[0].resolve(resolver)?.typed;
-                            if !condition.is_boolean() {
-                                return Err(mismatch(
-                                    Type::boolean(invoke.members[0].span),
-                                    condition,
-                                    invoke.members[0].span,
-                                ));
-                            }
-
-                            if let Err(errors) = invoke.members[1].resolve(resolver) {
-                                Element::filter_context(errors)?;
-                            }
-                            Type::unit(self.span)
-                        }
-                        Some("for") => {
-                            if invoke.members.len() != 4 {
-                                return Err(invalid("for", invoke.target.span));
-                            }
-
-                            invoke.members[0].resolve(resolver)?;
-
-                            let condition = invoke.members[1].resolve(resolver)?.typed;
-                            if !condition.is_boolean() {
-                                return Err(mismatch(
-                                    Type::boolean(invoke.members[1].span),
-                                    condition,
-                                    invoke.members[1].span,
-                                ));
-                            }
-
-                            if let Err(errors) = invoke.members[2].resolve(resolver) {
-                                Element::filter_context(errors)?;
-                            }
-                            if let Err(errors) = invoke.members[3].resolve(resolver) {
-                                Element::filter_context(errors)?;
-                            }
-                            Type::unit(self.span)
-                        }
-                        _ => Type::unit(self.span),
-                    }
-                } else {
-                    symbol.infer().map_err(|error| {
-                        vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: error.clone(),
-                            },
-                            error.span,
-                        )]
-                    })?
-                };
-
-                let mut arguments = Vec::new();
-                for (idx, arg) in invoke.members.iter().enumerate() {
-                    let arg_resolution = arg.resolve(resolver)?;
-                    arguments.push((idx, arg_resolution));
-                }
-
-                let mut invoke_errors = Vec::new();
-
-                if let TypeKind::Method(method) = &typ.kind {
-                    let expected = method.members.len();
-                    let provided = invoke.members.len();
-                    if (!method.variadic && provided != expected) || (method.variadic && provided < expected) {
-                        let token = invoke.target.brand().unwrap_or(Token::new(
-                            TokenKind::Identifier(Str::from("invoke")),
-                            invoke.target.span,
-                        ));
-                        invoke_errors.push(ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::InvalidOperation(token),
-                                    invoke.target.span,
-                                ),
-                            },
-                            invoke.target.span,
-                        ));
+            ElementKind::Invoke(_invoke) => {
+                match resolver.scope.lookup(&self) {
+                    Ok(symbol) => {
+                        self.reference = Some(symbol.id);
                     }
 
-                    // Check argument types
-                    for (idx, resolution) in &arguments {
-                        let arg_idx = *idx;
-                        if arg_idx < method.members.len() {
-                            let expected_type = &method.members[arg_idx];
-                            let actual_type = &resolution.typed;
-
-                            if unify(actual_type, expected_type).is_none() {
-                                invoke_errors.push(ResolveError::new(
-                                    ErrorKind::Check {
-                                        error: CheckError::new(
-                                            crate::checker::ErrorKind::Mismatch(
-                                                (**expected_type).clone(),
-                                                actual_type.clone(),
-                                            ),
-                                            actual_type.span,
-                                        ),
-                                    },
-                                    actual_type.span,
-                                ));
-                            }
-                        }
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
                     }
                 }
-
-                if !invoke_errors.is_empty() {
-                    return Err(invoke_errors);
-                }
-
-                let output_type = if let TypeKind::Method(method) = &typ.kind {
-                    *method.output.clone()
-                } else {
-                    typ
-                };
-
-                Ok(Resolution::new(Some(symbol.id), output_type, analysis))
             },
 
             ElementKind::Index(_index) => {
-                let symbol = resolver.scope.try_get(&self)?;
+                match resolver.scope.lookup(&self) {
+                    Ok(symbol) => {
+                        self.reference = Some(symbol.id);
+                    }
 
-                let typ = symbol.infer().map_err(|error| {
-                    vec![ResolveError::new(
-                        ErrorKind::Check {
-                            error: error.clone(),
-                        },
-                        error.span,
-                    )]
-                })?;
-
-                Ok(Resolution::new(Some(symbol.id), typ, analysis))
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
+                    }
+                }
             }
 
             ElementKind::Binary(binary) => {
-                if matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot)) {
-                    let left = binary.left.resolve(resolver)?;
+                binary.left.resolve(resolver);
 
-                    if let Some(id) = left.reference {
-                        let symbol = match resolver.scope.get_id(id).cloned() {
-                            Some(symbol) => symbol,
-                            None => binary.left.resolve_path(resolver)?,
-                        };
+                match binary.operator.kind {
+                    TokenKind::Operator(OperatorKind::Dot) => {
+                        if let Some(reference) = binary.left.reference {
+                            if let Some(symbol) = resolver.scope.get_identity(reference) {
+                                resolver.enter_scope(symbol.scope.clone());
 
-                        resolver.enter_scope(symbol.scope.clone());
+                                binary.right.resolve(resolver);
 
-                        let resolved = binary.right.resolve(resolver);
-
-                        resolver.exit();
-
-                        resolved
-                    } else {
-                        let field = match &binary.right.kind {
-                            ElementKind::Literal(Token {
-                                                     kind: TokenKind::Identifier(name),
-                                                     ..
-                                                 }) => name.clone(),
-                            _ => {
-                                return Err(vec![ResolveError::new(
-                                    ErrorKind::Analyze {
-                                        error: AnalyzeError::new(
-                                            AnalyzeErrorKind::InvalidOperation(binary.operator.clone()),
-                                            binary.operator.span,
-                                        ),
-                                    },
-                                    binary.operator.span,
-                                )]);
+                                resolver.exit();
                             }
-                        };
+                        }
 
-                        let left_type = left.typed.clone();
-                        let field_type = match left_type.kind {
-                            TypeKind::Structure(structure) => {
-                                let struct_name = structure.target.clone();
-                                let identifier = Element::new(
-                                    ElementKind::Literal(Token::new(
-                                        TokenKind::Identifier(struct_name),
-                                        Span::void(),
-                                    )),
-                                    Span::void(),
-                                );
-                                let struct_symbol = resolver
-                                    .scope
-                                    .try_get(&identifier)
-                                    .map_err(|errors| errors)?;
-
-                                let field_symbol = match struct_symbol.kind {
-                                    SymbolKind::Structure(structure) => structure
-                                        .members
-                                        .iter()
-                                        .find(|symbol| match &symbol.kind {
-                                            SymbolKind::Binding(binding) => binding
-                                                .target
-                                                .brand()
-                                                .and_then(|token| match token.kind {
-                                                    TokenKind::Identifier(name) => Some(name == field),
-                                                    _ => None,
-                                                })
-                                                .unwrap_or(false),
-                                            _ => false,
-                                        })
-                                        .cloned(),
-                                    _ => None,
-                                };
-
-                                if let Some(field_symbol) = field_symbol {
-                                    let inferred: Result<
-                                        Type<'element>,
-                                        CheckError<'element>,
-                                    > = field_symbol.infer();
-                                    inferred.map_err(|error| {
-                                        vec![ResolveError::new(
-                                            ErrorKind::Check {
-                                                error: error.clone(),
-                                            },
-                                            error.span,
-                                        )]
-                                    })?
-                                } else {
-                                    return Err(vec![ResolveError::new(
-                                        ErrorKind::UndefinedSymbol {
-                                            query: Token::new(TokenKind::Identifier(field), binary.right.span),
-                                        },
-                                        binary.right.span,
-                                    )]);
-                                }
-                            }
-                            _ => left_type.clone(),
-                        };
-
-                        Ok(Resolution::new(None, field_type, analysis))
+                        self.reference = binary.right.reference;
                     }
-                } else {
-                    binary.left.resolve(resolver)?;
-                    binary.right.resolve(resolver)?;
 
-                    let typ = self.infer().map_err(|error| {
-                        vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: error.clone(),
-                            },
-                            error.span,
-                        )]
-                    })?;
-
-                    Ok(Resolution::new(None, typ, analysis))
+                    _ => {}
                 }
             },
 
-            ElementKind::Unary(unary) => {
-                let operand = unary.operand.resolve(resolver)?;
-                let operator = match &unary.operator.kind {
-                    TokenKind::Operator(operator) => operator,
-                    _ => {
-                        return Err(vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: CheckError::new(
-                                    crate::checker::ErrorKind::InvalidOperation(
-                                        unary.operator.clone(),
-                                    ),
-                                    unary.operator.span,
-                                ),
-                            },
-                            unary.operator.span,
-                        )]);
-                    }
-                };
+            ElementKind::Unary(_unary) => {},
 
-                let typ = match operator.as_slice() {
-                    [OperatorKind::Ampersand] => {
-                        if !unary.operand.is_addressable() {
-                            return Err(vec![ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::InvalidOperation(
-                                            unary.operator.clone(),
-                                        ),
-                                        unary.operator.span,
-                                    ),
-                                },
-                                unary.operator.span,
-                            )]);
-                        }
-
-                        Type::pointer(operand.typed, self.span)
-                    }
-                    [OperatorKind::Star] => match operand.typed.kind {
-                        TypeKind::Pointer { to } => *to,
-                        TypeKind::Unknown => Type::new(TypeKind::Unknown, self.span),
-                        _ => {
-                            return Err(vec![ResolveError::new(
-                                ErrorKind::Check {
-                                    error: CheckError::new(
-                                        crate::checker::ErrorKind::Mismatch(
-                                            Type::pointer(
-                                                Type::new(TypeKind::Unknown, self.span),
-                                                self.span,
-                                            ),
-                                            operand.typed,
-                                        ),
-                                        self.span,
-                                    ),
-                                },
-                                self.span,
-                            )]);
-                        }
-                    },
-                    _ => self.infer().map_err(|error| {
-                        vec![ResolveError::new(
-                            ErrorKind::Check {
-                                error: error.clone(),
-                            },
-                            error.span,
-                        )]
-                    })?,
-                };
-
-                Ok(Resolution::new(None, typ, analysis))
-            },
-
-            ElementKind::Symbolize(symbol) => symbol.resolve(resolver),
-
-            ElementKind::Literal(_) => {
-                let typ = self.infer().map_err(|error| {
-                    vec![ResolveError::new(
-                        ErrorKind::Check {
-                            error: error.clone(),
-                        },
-                        error.span,
-                    )]
-                })?;
-
-                Ok(Resolution::new(None, typ, analysis))
-            }
-        }
-    }
-
-    fn is_instance(&self, resolver: &mut Resolver<'element>) -> Boolean {
-        match &self.kind {
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(_),
-                                     ..
-                                 }) => false,
-            ElementKind::Unary(Unary { operand, .. }) => operand.is_instance(resolver),
-            ElementKind::Binary(
-                Binary {
-                    left,
-                    operator:
-                    Token {
-                        kind: TokenKind::Operator(OperatorKind::Dot),
-                        ..
-                    },
-                    ..
-                }) => left.is_instance(resolver),
-            ElementKind::Symbolize(symbol) => symbol.is_instance(resolver),
-            _ => true,
+            ElementKind::Symbolize(_symbol) => {},
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::data::*;
 pub struct Element<'element> {
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
-    pub id: Identity,
+    pub reference: Option<Identity>,
 }
 
 pub enum ElementKind<'element> {
@@ -30,7 +30,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { kind, span, id: 0 }
+        Element { kind, span, reference: None }
     }
 }
 

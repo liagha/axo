@@ -438,14 +438,6 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 match primitive {
                     Some("if") => {
-                        if invoke.members.len() != 3 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("if")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
                         let condition = invoke.members[0].infer()?;
 
                         if !condition.is_boolean() {

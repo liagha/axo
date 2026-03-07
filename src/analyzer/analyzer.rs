@@ -7,46 +7,48 @@ use crate::{
     format::Show,
     parser::{Element, ElementKind, Symbol, SymbolKind},
     resolver::{
-        scope::Scope,
         Resolver,
     },
     scanner::{Token, TokenKind},
 };
+
+pub struct Analyzer<'analyzer> {
+    pub resolver: &'analyzer mut Resolver<'analyzer>,
+    pub input: Vec<Element<'analyzer>>,
+    pub output: Vec<Analysis<'analyzer>>,
+    pub errors: Vec<AnalyzeError<'analyzer>>,
+}
+
+impl<'analyzer> Analyzer<'analyzer> {
+    pub fn new(resolver: &'analyzer mut Resolver<'analyzer>, input: Vec<Element<'analyzer>>) -> Self {
+        Self {
+            resolver,
+            input,
+            output: Vec::new(),
+            errors: Vec::new(),
+        }    
+    }
+    
+    pub fn analyze(&mut self) {
+        for element in self.input.iter_mut() {
+            match element.analyze(self.resolver) {
+                Ok(analysis) => {
+                    self.output.push(analysis);
+                }
+                
+                Err(error) => {
+                    self.errors.push(error);
+                }
+            }
+        }
+    }
+}
 
 pub trait Analyzable<'analyzable> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'analyzable>,
     ) -> Result<Analysis<'analyzable>, AnalyzeError<'analyzable>>;
-}
-
-fn annotation_type_kind<'symbol>(
-    element: &Element<'symbol>,
-    resolver: &Resolver<'symbol>,
-) -> Option<TypeKind<'symbol>> {
-    match &element.kind {
-        ElementKind::Literal(Token {
-            kind: TokenKind::Identifier(identifier),
-            span,
-        }) => identifier
-            .as_str()
-            .and_then(|name| {
-                TypeKind::from_name(name).or_else(|| {
-                    if name == "Type" {
-                        Some(TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .or_else(|| {
-                Scope::try_lookup(element, &resolver.scope)
-                    .ok()
-                    .and_then(|symbol| symbol.infer().ok())
-                    .map(|item| item.kind)
-            }),
-        _ => None,
-    }
 }
 
 impl<'token> Analyzable<'token> for Token<'token> {
@@ -89,7 +91,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
         resolver: &mut Resolver<'symbol>,
     ) -> Result<Analysis<'symbol>, AnalyzeError<'symbol>> {
         match &self.kind {
-            SymbolKind::Inclusion(_) => Ok(Analysis::unit()),
             SymbolKind::Extension(_) => Ok(Analysis::unit()),
             SymbolKind::Binding(binding) => {
                 let value = binding
@@ -101,7 +102,31 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let annotation = binding
                     .annotation
                     .as_deref()
-                    .and_then(|value| annotation_type_kind(value, resolver));
+                    .and_then(|value|
+                        match &value.kind {
+                            ElementKind::Literal(Token {
+                                                     kind: TokenKind::Identifier(identifier),
+                                                     span,
+                                                 }) => identifier
+                                .as_str()
+                                .and_then(|name| {
+                                    TypeKind::from_name(name).or_else(|| {
+                                        if name == "Type" {
+                                            Some(TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                })
+                                .or_else(|| {
+                                    resolver.scope.lookup(value)
+                                        .ok()
+                                        .and_then(|symbol| symbol.infer().ok())
+                                        .map(|item| item.kind)
+                                }),
+                            _ => None,
+                        }
+                    );
 
                 let target_token = binding
                     .target

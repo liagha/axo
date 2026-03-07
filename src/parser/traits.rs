@@ -112,9 +112,6 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
         match verbosity {
             _ => {
                 match self {
-                    SymbolKind::Inclusion(inclusion) => {
-                        inclusion.format(verbosity)
-                    }
                     SymbolKind::Extension(extension) => {
                         extension.format(verbosity)
                     }
@@ -239,7 +236,7 @@ impl<'element> Clone for Element<'element> {
         Element {
             kind: self.kind.clone(),
             span: self.span.clone(),
-            id: self.id,
+            reference: self.reference,
         }
     }
 }

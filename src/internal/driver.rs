@@ -1,9 +1,7 @@
 use {
-    crate::data::Str,
     crate::internal::platform::{
         canonicalize, create_dir_all, var, Command, Error, ErrorKind, Path, PathBuf, Result,
     },
-    crate::tracker::Location,
 };
 
 pub struct Driver;
@@ -139,60 +137,6 @@ impl Driver {
             }
         }
         None
-    }
-
-    pub fn paths<'driver>(
-        target: Location<'driver>,
-        module: &str,
-        schema: Option<Str<'driver>>,
-        executable: Option<Str<'driver>>,
-    ) -> (PathBuf, PathBuf) {
-        let schema = schema
-            .as_ref()
-            .and_then(|value| value.as_str())
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from);
-        
-        let executable = executable
-            .as_ref()
-            .and_then(|value| value.as_str())
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from);
-
-        let stem = if let Ok(path) = target.to_path() {
-            PathBuf::from(path.file_name().unwrap())
-        } else {
-            PathBuf::from(module)
-        };
-
-        let default_base = Path::new("lab").join(stem);
-
-        let executable = match executable {
-            Some(path) => Self::executable(path),
-            None => match &schema {
-                Some(path) => {
-                    let mut executable = path.clone();
-                    executable.set_extension("");
-                    if executable.as_os_str().is_empty() {
-                        PathBuf::from(module)
-                    } else {
-                        Self::executable(executable)
-                    }
-                }
-                None => Self::executable(default_base),
-            },
-        };
-
-        let schema = match schema {
-            Some(path) => path,
-            None => {
-                let mut schema = executable.clone();
-                schema.set_extension("ll");
-                schema
-            }
-        };
-
-        (schema, executable)
     }
 
     pub fn link(schema: &Path, executable: &Path) -> Result<()> {

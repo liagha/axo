@@ -6,6 +6,7 @@ use {
             platform::{
                 args,
                 read_to_string,
+                Path,
                 PathBuf
             },
         },
@@ -83,7 +84,27 @@ impl<'location> Location<'location> {
         }
     }
 
-    pub fn file(string: Str<'location>) -> Location<'location> {
+    pub fn stem(&self) -> Option<&str> {
+        match self {
+            Location::Entry(path) => {
+                let path = Path::new(path);
+                path.file_stem()?.to_str()
+            }
+            _ => None,
+        }
+    }
+
+    pub fn extension(&self) -> Option<&str> {
+        match self {
+            Location::Entry(path) => {
+                let path = Path::new(path);
+                path.extension()?.to_str()
+            }
+            _ => None,
+        }
+    }
+
+    pub fn entry(string: Str<'location>) -> Location<'location> {
         Location::Entry(string)
     }
 

@@ -36,7 +36,6 @@ impl<'parser> Parser<'parser> {
 
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::inclusion(),
             Self::extension(),
             Self::binding(),
             Self::structure(),
@@ -44,34 +43,6 @@ impl<'parser> Parser<'parser> {
             Self::method(),
             Self::module(),
         ])
-    }
-
-    pub fn inclusion() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
-    {
-        Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
-                token.kind == TokenKind::Identifier(Str::from("use"))
-            }),
-            Classifier::deferred(Self::element),
-        ])
-            .with_transform(
-                |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                    let keyword = form.collect_inputs()[0].clone();
-                    let inclusion = form.collect_outputs();
-
-                    let span = Span::merge(&keyword.span, &inclusion.clone().span());
-
-                    Ok(Form::output(Element::new(
-                        ElementKind::Symbolize(Symbol::new(
-                            0,
-                            SymbolKind::Inclusion(Inclusion::new(Box::new(inclusion[0].clone()), 0)),
-                            span,
-                            Visibility::Private,
-                        )),
-                        span,
-                    )))
-                },
-            )
     }
 
     pub fn extension() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>

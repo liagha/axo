@@ -88,7 +88,6 @@ fn returns<'symbol>(
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn infer(&self) -> Result<Type<'symbol>, CheckError<'symbol>> {
         match &self.kind {
-            SymbolKind::Inclusion(_) => Ok(Type::unit(self.span)),
             SymbolKind::Extension(_) => Ok(Type::unit(self.span)),
             SymbolKind::Binding(binding) => {
                 let declared = binding

@@ -7,12 +7,6 @@ use {
 };
 
 #[derive(Debug, Eq)]
-pub struct Inclusion<Target, Identity> {
-    pub target: Target,
-    pub identity: Identity,
-}
-
-#[derive(Debug, Eq)]
 pub struct Extension<Target, Interface, Member> {
     pub target: Target,
     pub extension: Option<Interface>,
@@ -64,16 +58,6 @@ pub enum Interface {
     Compiler,
 }
 
-
-impl<Target, Identity> Inclusion<Target, Identity> {
-    #[inline]
-    pub fn new(target: Target, id: Identity) -> Self {
-        Inclusion {
-            target,
-            identity: id,
-        }
-    }
-}
 
 impl<Target, Interface, Member> Extension<Target, Interface, Member> {
     #[inline]
@@ -143,13 +127,6 @@ impl<Target> Module<Target> {
     }
 }
 
-impl<Target: Hash, Identity: Hash> Hash for Inclusion<Target, Identity> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.target.hash(state);
-        self.identity.hash(state);
-    }
-}
-
 impl<Interface: Hash, Target: Hash, Member: Hash> Hash for Extension<Target, Interface, Member> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -187,12 +164,6 @@ impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
 impl<Target: Hash> Hash for Module<Target> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
-    }
-}
-
-impl<Target: PartialEq, Identity> PartialEq for Inclusion<Target, Identity> {
-    fn eq(&self, other: &Self) -> bool {
-        self.target == other.target
     }
 }
 
@@ -235,12 +206,6 @@ impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq
 impl<Target: PartialEq> PartialEq for Module<Target> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
-    }
-}
-
-impl<Target: Clone, Identity: Clone> Clone for Inclusion<Target, Identity> {
-    fn clone(&self) -> Self {
-        Inclusion::new(self.target.clone(), self.identity.clone())
     }
 }
 
@@ -292,20 +257,6 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
 impl<Target: Clone> Clone for Module<Target> {
     fn clone(&self) -> Self {
         Module::new(self.target.clone())
-    }
-}
-
-impl<'show, Target: Show<'show, Verbosity = u8>, Identity> Show<'show>
-    for Inclusion<Target, Identity>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!("Inclusion({})", self.target.format(verbosity)).into(),
-
-            _ => self.format(verbosity - 1),
-        }
     }
 }
 

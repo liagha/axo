@@ -30,12 +30,8 @@ pub enum ErrorKind<'error> {
     InvalidImportPath {
         query: Token<'error>,
     },
-    Analyze {
-        error: AnalyzeError<'error>,
-    },
-    Check {
-        error: CheckError<'error>,
-    },
+    Analyze(AnalyzeError<'error>),
+    Check(CheckError<'error>),
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -68,10 +64,10 @@ impl<'error> Show<'error> for ErrorKind<'error> {
                     query.format(verbosity)
                 )
             }
-            ErrorKind::Analyze { error } => {
+            ErrorKind::Analyze(error) => {
                 format!("{}", error.kind)
             }
-            ErrorKind::Check { error } => {
+            ErrorKind::Check(error) => {
                 format!("{}", error.kind)
             }
         }.into()

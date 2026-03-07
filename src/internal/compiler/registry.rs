@@ -7,10 +7,11 @@ use {
         tracker::Span,
     },
 };
+use crate::data::Identity;
 
 impl<'registry> Resolver<'registry> {
     fn lookup_value(
-        resolver: &mut Resolver<'registry>,
+        &mut self,
         key: Str<'registry>,
     ) -> Option<Token<'registry>> {
         let identifier = Element::new(
@@ -18,7 +19,7 @@ impl<'registry> Resolver<'registry> {
             Span::void(),
         );
 
-        let result = resolver.scope.try_get(&identifier).ok()?;
+        let result = self.scope.lookup(&identifier).ok()?;
         if let SymbolKind::Preference(preference) = result.kind {
             Some(preference.value.clone())
         } else {
@@ -27,7 +28,7 @@ impl<'registry> Resolver<'registry> {
     }
 
     fn path(
-        resolver: &mut Resolver<'registry>,
+        &mut self,
         key: &'registry str,
         index: usize,
     ) -> Option<Str<'registry>> {
@@ -38,7 +39,7 @@ impl<'registry> Resolver<'registry> {
             if let Some(Token {
                 kind: TokenKind::Identifier(value),
                 ..
-            }) = Self::lookup_value(resolver, candidate)
+            }) = self.lookup_value(candidate)
             {
                 return Some(value);
             }
@@ -48,14 +49,14 @@ impl<'registry> Resolver<'registry> {
     }
 
     pub fn preference(
-        resolver: &mut Resolver<'registry>,
+        &mut self,
         identifier: Str<'registry>,
     ) -> Option<Token<'registry>> {
-        Self::lookup_value(resolver, identifier)
+        self.lookup_value(identifier)
     }
 
-    pub fn verbosity(resolver: &mut Resolver<'registry>) -> u8 {
-        match Self::lookup_value(resolver, Str::from("Verbosity")) {
+    pub fn verbosity(&mut self) -> u8 {
+        match self.lookup_value(Str::from("Verbosity")) {
             Some(Token {
                 kind: TokenKind::Integer(value),
                 ..
@@ -64,12 +65,12 @@ impl<'registry> Resolver<'registry> {
         }
     }
 
-    pub fn input(resolver: &mut Resolver<'registry>) -> Str<'registry> {
+    pub fn input(&mut self) -> Str<'registry> {
         for candidate in [Str::from("Input"), Str::from("Input(0)")] {
             if let Some(Token {
                 kind: TokenKind::Identifier(path),
                 ..
-            }) = Self::lookup_value(resolver, candidate)
+            }) = self.lookup_value(candidate)
             {
                 return path;
             }
@@ -77,18 +78,18 @@ impl<'registry> Resolver<'registry> {
         Str::default()
     }
 
-    pub fn schema(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
-        Self::path(resolver, "OutputSchema", index)
-            .or_else(|| Self::path(resolver, "OutputIR", index))
+    pub fn schema(&mut self, identity: Identity) -> Option<Str<'registry>> {
+        Self::path(self, "OutputSchema", identity)
+            .or_else(|| Self::path(self, "OutputIR", identity))
     }
 
-    pub fn executable(resolver: &mut Resolver<'registry>, index: usize) -> Option<Str<'registry>> {
-        Self::path(resolver, "OutputExec", index)
-            .or_else(|| Self::path(resolver, "Output", index))
+    pub fn executable(&mut self, identity: Identity) -> Option<Str<'registry>> {
+        Self::path(self, "OutputExec", identity)
+            .or_else(|| Self::path(self, "Output", identity))
     }
 
-    pub fn run(resolver: &mut Resolver<'registry>) -> bool {
-        match Self::lookup_value(resolver, Str::from("Run")) {
+    pub fn run(&mut self) -> bool {
+        match self.lookup_value(Str::from("Run")) {
             Some(Token {
                 kind: TokenKind::Boolean(value),
                 ..
