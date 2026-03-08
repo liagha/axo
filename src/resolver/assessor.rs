@@ -16,7 +16,7 @@ pub struct Aligner<'aligner> {
     pub suggestion: Range<f64>,
 }
 
-impl<'aligner> Aligner<'aligner> {
+impl Aligner<'_> {
     pub fn new() -> Self {
         Aligner {
             assessor: Assessor::new()
@@ -238,7 +238,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                 let mut errors = Vec::new();
                 let mut bound: Vec<Token> = Vec::new();
-                let mut positional_cursor = 0usize;
+                let mut positional_cursor = 0;
 
                 for member in &invoke.members {
                     match member.brand() {

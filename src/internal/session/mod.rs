@@ -256,7 +256,7 @@ impl<'session> Session<'session> {
             .iter()
             .map(|(identity, location)| {
                 let stem = Str::from(location.stem().unwrap().to_string());
-                let span = Span::file(location.to_path().unwrap().into()).unwrap();
+                let span = Span::file(Str::from(location.to_string())).unwrap();
 
                 let head = Element::new(
                     ElementKind::Literal(

@@ -135,7 +135,7 @@ impl<'scope> Scope<'scope> {
         let mut affinity = Affinity::new();
 
         let mut assessor = Assessor::new()
-            .floor(0.5)
+            .floor(0.9)
             .dimension(&mut affinity, 0.6)
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Multiplicative);
@@ -145,11 +145,7 @@ impl<'scope> Scope<'scope> {
         let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {
-            if assessor.errors.is_empty() {
-                Ok(champion)
-            } else {
-                Err(assessor.errors.clone())
-            }
+            Ok(champion)
         } else if assessor.errors.is_empty() {
             Err(vec![ResolveError {
                 kind: ErrorKind::UndefinedSymbol {

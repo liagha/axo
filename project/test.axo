@@ -1,3 +1,0 @@
-func print(const string: String) {}
-
-print()

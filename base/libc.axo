@@ -1,3 +1,0 @@
-func write(c, const fd: Integer, const buf: *UInt8, const len: UInt64): Integer {}
-
-write(1, "test", 4)

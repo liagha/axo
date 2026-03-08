@@ -349,7 +349,10 @@ impl<'parser> Parser<'parser> {
                             }
                         })
                             .with_ignore(),
-                        Self::literal(),
+                        Classifier::alternative([
+                            Self::prefixed(),
+                            Self::literal(),
+                        ]),
                     ]
                 ).with_transform(|form| {
                     let output = form.as_forms();

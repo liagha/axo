@@ -253,7 +253,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .as_ref()
                     .map(|annotation| {
                         let llvm_kind = self.llvm_type(annotation);
-                        // For C functions, convert String and Character to pointers
+
                         if matches!(method.interface, Interface::C) {
                             if let TypeKind::String = annotation {
                                 self.context.ptr_type(inkwell::AddressSpace::default()).into()
