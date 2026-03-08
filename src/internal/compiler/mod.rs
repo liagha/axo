@@ -305,10 +305,6 @@ impl<'session> Session<'session> {
             self.resolver.resolve();
             
             self.resolver.exit();
-
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self.reporter.finish("resolving", duration);
         }
 
         self.reporter.symbols(&self.resolver.scope.all());
@@ -321,6 +317,10 @@ impl<'session> Session<'session> {
                     CompileError::Resolve(error.clone())
                 })
         );
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.reporter.finish("resolving", duration);
     }
     
     pub fn analyze(&mut self) {
