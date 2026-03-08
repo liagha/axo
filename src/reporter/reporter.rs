@@ -13,6 +13,7 @@ use {
     },
     broccli::{xprintln, Color},
 };
+use crate::analyzer::Analysis;
 
 pub struct Reporter {
     pub verbosity: u8,
@@ -132,6 +133,32 @@ impl Reporter {
                 xprintln!(
                     "{}{}\n{}" => Color::White,
                     "Symbols" => Color::Blue,
+                    ":" => Color::White,
+                    Str::from(tree).indent(self.verbosity) => Color::White,
+                );
+                xprintln!();
+            }
+        }
+    }
+
+    pub fn analysis<'reporter>(
+        &self,
+        analysis: &[
+            Analysis<'reporter>
+        ],
+    ) {
+        if self.is_verbose() {
+            let mut tree = String::new();
+
+            for analysis in analysis {
+                tree.push_str(&format!("{}", analysis.format(self.verbosity)));
+                tree.push('\n');
+            }
+
+            if !tree.is_empty() {
+                xprintln!(
+                    "{}{}\n{}" => Color::White,
+                    "Analysis" => Color::Blue,
                     ":" => Color::White,
                     Str::from(tree).indent(self.verbosity) => Color::White,
                 );

@@ -308,9 +308,7 @@ impl<'session> Session<'session> {
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-            self
-                .reporter
-                .finish("parsing", duration);
+            self.reporter.finish("resolving", duration);
         }
 
         self.reporter.symbols(&self.resolver.scope.all());
@@ -329,11 +327,19 @@ impl<'session> Session<'session> {
         let identities: Vec<_> = self.inputs.keys().copied().collect();
         
         for identity in identities {
+            self.reporter.start("analyzing");
+
             let elements = self.parsers.get(&identity).unwrap().output.clone();
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
-            
+
+            self.reporter.analysis(&*analyzer.output);
+
             self.analyzers.insert(identity, analyzer);
+
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+            self.reporter.finish("analyzing", duration);
         }
     }
     

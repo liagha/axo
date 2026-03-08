@@ -104,13 +104,6 @@ impl Driver {
         }
     }
 
-    fn executable(mut path: PathBuf) -> PathBuf {
-        if cfg!(target_os = "windows") && path.extension().is_none() {
-            path.set_extension("exe");
-        }
-        path
-    }
-
     fn from_prefix() -> Option<PathBuf> {
         Self::llvm_bindir()
             .and_then(|bindir| Self::first_existing_in(&bindir, &Self::CLANG_CANDIDATES))
