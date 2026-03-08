@@ -305,7 +305,7 @@ impl<'session> Session<'session> {
             let module = self.resolver.scope.get_identity(*identity).unwrap();
             
             self.resolver.enter_scope(module.scope.clone());
-            
+
             self.resolver.set_input(elements);
             
             self.resolver.resolve();

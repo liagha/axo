@@ -37,7 +37,7 @@ fn main() {
         use {
             data::Str,
             internal::{
-                compiler::Session,
+                session::Session,
                 logger::{LogInfo, LogPlan, Logger},
             },
             log::Level,

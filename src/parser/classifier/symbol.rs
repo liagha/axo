@@ -316,12 +316,7 @@ impl<'parser> Parser<'parser> {
                         [
                             Classifier::deferred(Self::symbolization),
                             Classifier::predicate(|token: &Token| {
-                                if let TokenKind::Operator(operator) = &token.kind {
-                                    matches!(
-                                    operator.as_slice(),
-                                    [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
-                                )
-                                } else if let TokenKind::Identifier(_) = &token.kind {
+                                if let TokenKind::Identifier(_) = &token.kind {
                                     true
                                 } else {
                                     false
@@ -372,7 +367,6 @@ impl<'parser> Parser<'parser> {
                 let mut visibility = Visibility::Private;
                 let mut interface = Interface::Axo;
                 let mut entry = false;
-                let mut variadic = false;
 
                 let members: Vec<_> = Self::get_body(invoke.clone())
                     .into_iter()
@@ -415,8 +409,6 @@ impl<'parser> Parser<'parser> {
                             None
                         },
                         _ => {
-                            variadic = true;
-
                             None
                         }
                     })
@@ -437,7 +429,6 @@ impl<'parser> Parser<'parser> {
                                     Box::new(body),
                                     None::<Box<Element<'parser>>>,
                                     interface,
-                                    variadic,
                                     entry
                                 )),
                                 span,
@@ -463,7 +454,6 @@ impl<'parser> Parser<'parser> {
                                     Box::new(body),
                                     Some(Box::new(output)),
                                     interface,
-                                    variadic,
                                     entry,
                                 )),
                                 span,

@@ -1,3 +1,3 @@
-func printf(c, const format: String, ...) {}
+func write(c, const fd: Integer, const buf: *UInt8, const len: UInt64): Integer {}
 
-printf("test")
+write(1, "test", 4)

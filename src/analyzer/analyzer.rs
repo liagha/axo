@@ -198,7 +198,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Box::new(body),
                     output,
                     method.interface,
-                    method.variadic,
                     method.entry,
                 );
 

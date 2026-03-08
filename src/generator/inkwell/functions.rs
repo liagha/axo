@@ -294,14 +294,13 @@ impl<'backend> super::Inkwell<'backend> {
         ).flatten();
 
         let function_type = match return_type {
-            Some(kind) => kind.fn_type(&parameter_types, method.variadic),
-            None => self.context.void_type().fn_type(&parameter_types, method.variadic),
+            Some(kind) => kind.fn_type(&parameter_types, false),
+            None => self.context.void_type().fn_type(&parameter_types, false),
         };
 
         let name = method.target.as_str().unwrap();
         
         let function = if matches!(method.interface, Interface::C) {
-            // C interface functions are declared as external - no body generated
             let function = self.module.add_function(
                 name,
                 function_type,

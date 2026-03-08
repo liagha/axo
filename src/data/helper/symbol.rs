@@ -39,7 +39,6 @@ pub struct Method<Target, Parameter, Body, Output> {
     pub body: Body,
     pub output: Output,
     pub interface: Interface,
-    pub variadic: Boolean,
     pub entry: Boolean,
 }
 
@@ -87,7 +86,6 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
         body: Body,
         output: Output,
         interface: Interface,
-        variadic: Boolean,
         entry: Boolean,
     ) -> Self {
         Method {
@@ -96,7 +94,6 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
             body,
             output,
             interface,
-            variadic,
             entry,
         }
     }
@@ -203,7 +200,6 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
             self.body.clone(),
             self.output.clone(),
             self.interface.clone(),
-            self.variadic.clone(),
             self.entry.clone(),
         )
     }
@@ -280,11 +276,10 @@ impl<
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => format!(
-                "Method({}{} : {})[{}{}]{{ {} }}",
+                "Method({} : {})[{}{}]{{ {} }}",
                 format!("{:?} | ", self.interface),
                 self.target.format(verbosity),
                 self.output.format(verbosity),
-                if self.variadic { "Variadic | " } else { "" },
                 self.members.format(verbosity),
                 self.body.format(verbosity)
             )

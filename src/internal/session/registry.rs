@@ -20,6 +20,7 @@ impl<'registry> Resolver<'registry> {
         );
 
         let result = self.scope.lookup(&identifier).ok()?;
+
         if let SymbolKind::Preference(preference) = result.kind {
             Some(preference.value.clone())
         } else {
@@ -61,7 +62,7 @@ impl<'registry> Resolver<'registry> {
                 kind: TokenKind::Integer(value),
                 ..
             }) => value as u8,
-            _ => 0,
+            _ => 1,
         }
     }
 
