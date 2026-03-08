@@ -165,7 +165,7 @@ impl<'session> Session<'session> {
         self.register();
         self.resolve();
         self.analyze();
-        //self.generate();
+        self.generate();
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -182,7 +182,7 @@ impl<'session> Session<'session> {
 
         self.reporter.finish("compilation", duration);
 
-        //self.run();
+        self.run();
     }
 
     pub fn scan(&mut self) {
