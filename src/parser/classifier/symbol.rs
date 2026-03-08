@@ -3,37 +3,12 @@ use {
     crate::{
         data::*,
         formation::{classifier::Classifier, form::Form},
-        resolver::scope::Scope,
         scanner::{OperatorKind, Token, TokenKind},
         tracker::{Span, Spanned},
     },
 };
 
 impl<'parser> Parser<'parser> {
-    fn split_members(
-        members: Vec<Symbol<'parser>>,
-    ) -> (Vec<Symbol<'parser>>, Scope<'parser>) {
-        let mut runtime = Vec::new();
-        let mut generic = Scope::new();
-
-        for member in members {
-            let is_generic = match &member.kind {
-                SymbolKind::Binding(binding) => {
-                    binding.kind == BindingKind::Generic
-                }
-                _ => false,
-            };
-
-            if is_generic {
-                generic.add(member);
-            } else {
-                runtime.push(member);
-            }
-        }
-
-        (runtime, generic)
-    }
-
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::binding(),
@@ -311,7 +286,7 @@ impl<'parser> Parser<'parser> {
                         }
                     })
                     .collect();
-                
+
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(Element::new(
@@ -474,7 +449,6 @@ impl<'parser> Parser<'parser> {
                 } else {
                     let output = sequence[3].unwrap_output().clone();
 
-                    let (members, generic) = Self::split_members(members);
                     let body = sequence[4].unwrap_output().clone();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());

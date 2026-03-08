@@ -1,8 +1,3 @@
 func printf(c, const format: String, ...) {}
-func malloc(c, const size: Int64): Pointer {}
-func free(c, const ptr: Pointer) {}
-
-const pointer = malloc(8)
-free(pointer)
 
 printf("test")

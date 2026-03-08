@@ -496,36 +496,6 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                         Ok(Type::unit(self.span))
                     }
-                    Some("for") => {
-                        if invoke.members.len() != 4 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("for")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
-
-                        invoke.members[0].infer()?;
-
-                        let condition = invoke.members[1].infer()?;
-
-                        if !condition.is_boolean() {
-                            return Err(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        Type::boolean(self.span),
-                                        condition,
-                                    ),
-                                    invoke.members[1].span,
-                                )
-                            )
-                        }
-
-                        invoke.members[2].infer()?;
-                        invoke.members[3].infer()?;
-
-                        Ok(Type::unit(self.span))
-                    }
                     _ => Ok(Type::new(TypeKind::Unknown, self.span)),
                 }
             }

@@ -1,12 +1,9 @@
-use crate::data::{Boolean, Char, Float, Integer, Scale, Str};
-use crate::checker::TypeKind;
-use crate::data::*;
-
-impl<'analysis> Analysis<'analysis> {
-    pub fn unit() -> Self {
-        Analysis::Tuple(Vec::new())
+use {
+    crate::{
+        data::*,
+        checker::TypeKind,
     }
-}
+};
 
 #[derive(Clone, Debug)]
 pub enum Analysis<'analysis> {
@@ -91,14 +88,7 @@ pub enum Analysis<'analysis> {
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn is_value(&self) -> bool {
-        matches!(
-            self,
-            Analysis::Integer { .. }
-                | Analysis::Float { .. }
-                | Analysis::Boolean { .. }
-                | Analysis::String { .. }
-                | Analysis::Character { .. }
-        )
+    pub fn unit() -> Self {
+        Analysis::Tuple(Vec::new())
     }
 }

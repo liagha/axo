@@ -9,35 +9,6 @@ use {
     },
 };
 
-fn primitive<'element>(target: &Element<'element>) -> Option<&'element str> {
-    let token = target.brand()?;
-    match token.kind {
-        TokenKind::Identifier(identifier) => identifier.as_str(),
-        _ => None,
-    }
-}
-
-fn arity<'element>(
-    name: &str,
-    members: usize,
-    expected: &str,
-    valid: bool,
-    span: crate::tracker::Span<'element>,
-) -> Result<(), AnalyzeError<'element>> {
-    if valid {
-        Ok(())
-    } else {
-        Err(AnalyzeError::new(
-            ErrorKind::InvalidPrimitiveArity {
-                name: name.to_string(),
-                expected: expected.to_string(),
-                found: members,
-            },
-            span,
-        ))
-    }
-}
-
 impl<'element> Analyzable<'element> for Element<'element> {
     fn analyze(
         &self,
@@ -59,7 +30,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     )
                     | (
                         TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                     ) => {
                         let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
@@ -70,6 +41,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                         Ok(Analysis::Block(items?))
                     }
+
                     (
                         TokenKind::Punctuation(PunctuationKind::LeftBracket),
                         _,
@@ -84,9 +56,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                         Ok(Analysis::Array(items?))
                     }
+
                     (
                         TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                        None,
+                        _,
                         TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                     ) => {
                         if delimited.members.len() == 1 {
@@ -101,20 +74,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             
                             Ok(Analysis::Tuple(items?))
                         }
-                    }
-                    (
-                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                        Some(_),
-                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
-                    ) => {
-                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
-                            delimited
-                                .members
-                                .iter()
-                                .map(|item| item.analyze(resolver))
-                                .collect();
-
-                        Ok(Analysis::Tuple(items?))
                     }
 
                     _ => Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
@@ -140,18 +99,14 @@ impl<'element> Analyzable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                let name = primitive(&invoke.target);
+                let name = if let Some(TokenKind::Identifier(name)) = invoke.target.brand().map(|token| token.kind) {
+                    name
+                } else {
+                    unimplemented!("expected the head to be Identifier.")
+                };
 
-                match name {
+                match name.as_str() {
                     Some("if") => {
-                        arity(
-                            "if",
-                            invoke.members.len(),
-                            "3 arguments",
-                            invoke.members.len() == 3,
-                            self.span,
-                        )?;
-
                         let condition = invoke.members[0].analyze(resolver)?;
                         let then = invoke.members[1].analyze(resolver)?;
                         let otherwise = invoke.members[2].analyze(resolver)?;
@@ -163,14 +118,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         ))
                     }
                     Some("while") => {
-                        arity(
-                            "while",
-                            invoke.members.len(),
-                            "2 arguments",
-                            invoke.members.len() == 2,
-                            self.span,
-                        )?;
-
                         let condition = invoke.members[0].analyze(resolver)?;
                         let body = invoke.members[1].analyze(resolver)?;
 
@@ -179,63 +126,29 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             Box::new(body),
                         ))
                     }
-                    Some("for") => {
-                        arity(
-                            "for",
-                            invoke.members.len(),
-                            "4 arguments",
-                            invoke.members.len() == 4,
-                            self.span,
-                        )?;
-
-                        let init = invoke.members[0].analyze(resolver)?;
-                        let condition = invoke.members[1].analyze(resolver)?;
-                        let step = invoke.members[2].analyze(resolver)?;
-                        let body = invoke.members[3].analyze(resolver)?;
-
-                        let while_body = Analysis::Block(vec![body, step]);
-                        Ok(Analysis::Block(vec![
-                            init,
-                            Analysis::While(
-                                Box::new(condition),
-                                Box::new(while_body),
-                            ),
-                        ]))
-                    }
                     Some("break") => {
-                        arity(
-                            "break",
-                            invoke.members.len(),
-                            "0 arguments",
-                            invoke.members.is_empty(),
-                            self.span,
-                        )?;
-                        Ok(Analysis::Break(None))
+                        let value = if invoke.members.len() == 1 {
+                            Some(Box::new(invoke.members[0].analyze(resolver)?))
+                        } else {
+                            None
+                        };
+
+                        Ok(Analysis::Break(value))
                     }
                     Some("continue") => {
-                        arity(
-                            "continue",
-                            invoke.members.len(),
-                            "0 arguments",
-                            invoke.members.is_empty(),
-                            self.span,
-                        )?;
+                        let value = if invoke.members.len() == 1 {
+                            Some(Box::new(invoke.members[0].analyze(resolver)?))
+                        } else {
+                            None
+                        };
 
-                        Ok(Analysis::Continue(None))
+                        Ok(Analysis::Continue(value))
                     }
                     Some("return") => {
-                        arity(
-                            "return",
-                            invoke.members.len(),
-                            "0 or 1 arguments",
-                            invoke.members.len() <= 1,
-                            self.span,
-                        )?;
-
-                        let value = if invoke.members.is_empty() {
-                            None
-                        } else {
+                        let value = if invoke.members.len() == 1 {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
+                        } else {
+                            None
                         };
 
                         Ok(Analysis::Return(value))
@@ -427,6 +340,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Plus] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::Add(
                         Box::new(left),
                         Box::new(right),
@@ -436,6 +350,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Minus] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::Subtract(
                         Box::new(left),
                         Box::new(right),
@@ -445,6 +360,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Star] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::Multiply(
                         Box::new(left),
                         Box::new(right),
@@ -454,6 +370,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Slash] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::Divide(
                         Box::new(left),
                         Box::new(right),
@@ -463,6 +380,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Percent] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::Modulus(
                         Box::new(left),
                         Box::new(right),
@@ -472,6 +390,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::LogicalAnd(
                         Box::new(left),
                         Box::new(right),
@@ -481,6 +400,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Pipe, OperatorKind::Pipe] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::LogicalOr(
                         Box::new(left),
                         Box::new(right),
@@ -490,6 +410,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Caret] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::LogicalXOr(
                         Box::new(left),
                         Box::new(right),
@@ -499,6 +420,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Ampersand] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::BitwiseAnd(
                         Box::new(left),
                         Box::new(right),
@@ -508,6 +430,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::Pipe] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::BitwiseOr(
                         Box::new(left),
                         Box::new(right),
@@ -517,6 +440,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                 [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => {
                     let left = self.left.analyze(resolver)?;
                     let right = self.right.analyze(resolver)?;
+
                     Ok(Analysis::ShiftLeft(
                         Box::new(left),
                         Box::new(right),

@@ -55,24 +55,34 @@ impl<'token> Analyzable<'token> for Token<'token> {
         _resolver: &mut Resolver<'token>,
     ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
         match &self.kind {
-            TokenKind::Float(float) => Ok(Analysis::Float {
-                value: float.clone(),
-                size: 64,
-            }),
-            TokenKind::Integer(integer) => Ok(Analysis::Integer {
-                value: integer.clone(),
-                size: 64,
-                signed: true,
-            }),
-            TokenKind::Boolean(boolean) => Ok(Analysis::Boolean {
-                value: boolean.clone(),
-            }),
-            TokenKind::String(string) => Ok(Analysis::String {
-                value: string.clone(),
-            }),
-            TokenKind::Character(character) => Ok(Analysis::Character {
-                value: character.clone(),
-            }),
+            TokenKind::Float(float) => {
+                Ok(Analysis::Float {
+                    value: float.clone(),
+                    size: 64,
+                })
+            },
+            TokenKind::Integer(integer) => {
+                Ok(Analysis::Integer {
+                    value: integer.clone(),
+                    size: 64,
+                    signed: true,
+                })
+            },
+            TokenKind::Boolean(boolean) => {
+                Ok(Analysis::Boolean {
+                    value: boolean.clone(),
+                })
+            },
+            TokenKind::String(string) => {
+                Ok(Analysis::String {
+                    value: string.clone(),
+                })
+            },
+            TokenKind::Character(character) => {
+                Ok(Analysis::Character {
+                    value: character.clone(),
+                })
+            },
             TokenKind::Identifier(identifier) => {
                 Ok(Analysis::Usage(identifier.clone()))
             }

@@ -34,7 +34,6 @@ impl<'resolver> Resolver<'resolver> {
             "Integer" => Some(Resolver::method("Integer", "Integer")),
             "if" => Some(Resolver::statement("if")),
             "while" => Some(Resolver::statement("while")),
-            "for" => Some(Resolver::statement("for")),
             "break" => Some(Resolver::statement("break")),
             "continue" => Some(Resolver::statement("continue")),
             "return" => Some(Resolver::statement("return")),
