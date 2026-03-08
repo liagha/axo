@@ -82,5 +82,5 @@ impl<'item, T: Spanned<'item>, const N: Scale> Spanned<'item> for [T; N] {
     }
 }
 
-pub type TrackError<'error> = Error<'error, ErrorKind>;
+pub type TrackError<'error> = Error<'error, ErrorKind<'error>>;
 

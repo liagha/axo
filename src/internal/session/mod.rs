@@ -167,7 +167,7 @@ impl<'session> Session<'session> {
         self.scan();
         self.parse();
         self.register();
-        //self.resolve();
+        self.resolve();
         self.analyze();
         self.generate();
 
@@ -371,15 +371,19 @@ impl<'session> Session<'session> {
             match File::create(&schema) {
                 Ok(mut file) => {
                     if let Err(error) = file.write_all(self.generator.backend.module.print_to_string().to_string().as_bytes()) {
+                        let location = Location::Entry(Str::from(schema.clone()));
+
                         self.errors.push(
-                            CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                            CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, location), Span::void()))
                         )
                     }
                 }
 
                 Err(error) => {
+                    let location = Location::Entry(Str::from(schema.clone()));
+
                     self.errors.push(
-                        CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                        CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, location), Span::void()))
                     )
                 }
             }

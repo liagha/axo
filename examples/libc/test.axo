@@ -1,0 +1,1 @@
+compiler.libc.write(compiler.libc.STDOUT, "test", 4)

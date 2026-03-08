@@ -110,8 +110,8 @@ func read_line(c, const buf: *UInt8, const max_len: UInt64): Integer {
     return(i)  // returns number of chars read
 }
 
-var buf: [UInt8; 1024]
+//var buf: [UInt8; 1024]
 
-var n: Integer = read_line(buf, 1024)
+//var n: Integer = read_line(buf, 1024)
 
-write(STDOUT, buf, n)
+//write(STDOUT, buf, n)

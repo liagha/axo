@@ -30,7 +30,7 @@ impl<'location> Location<'location> {
                 if path.clone().exists() {
                     Ok(path.clone())
                 } else {
-                    let kind = ErrorKind::NotFound;
+                    let kind = ErrorKind::NotFound(*self);
 
                     Err(
                         TrackError::new(
@@ -41,7 +41,7 @@ impl<'location> Location<'location> {
                 }
             }
             _ => {
-                let kind = ErrorKind::NotAnEntry;
+                let kind = ErrorKind::NotAnEntry(*self);
 
                 Err(
                     TrackError::new(
@@ -62,7 +62,7 @@ impl<'location> Location<'location> {
                 match read_to_string(&path) {
                     Ok(content) => Ok(content.into()),
                     Err(error) => {
-                        let kind: ErrorKind = error.into();
+                        let kind = ErrorKind::from_io(error, *self);
 
                         Err(TrackError::new(kind, Span::void()))
                     }
@@ -80,7 +80,7 @@ impl<'location> Location<'location> {
                 .collect::<Vec<String>>()
                 .join(" ")
                 .into()),
-            Location::Void => Err(TrackError::new(ErrorKind::EmptyVoid, Span::void())),
+            Location::Void => Err(TrackError::new(ErrorKind::EmptyVoid(*self), Span::void())),
         }
     }
 
