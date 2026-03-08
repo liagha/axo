@@ -159,6 +159,9 @@ impl<'session> Session<'session> {
         self.scan();
         self.parse();
         self.register();
+        self.resolve();
+        self.analyze();
+        self.generate();
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -299,7 +302,7 @@ impl<'session> Session<'session> {
         }
     }
     
-    pub fn analyzer(&mut self) {
+    pub fn analyze(&mut self) {
         for (identity, _location) in &self.inputs {
             let elements = self.parsers.get(identity).unwrap().output.clone();
             let mut analyzer = Analyzer::new(&mut self.resolver, elements);
