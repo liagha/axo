@@ -19,7 +19,7 @@ use {
     inkwell::{
         basic_block::BasicBlock,
         builder::Builder,
-        context::Context,
+        context::ContextRef,
         module::Module,
         types::{BasicTypeEnum, StructType},
         values::{BasicValueEnum, FunctionValue, PointerValue},
@@ -41,7 +41,7 @@ pub enum Entity<'backend> {
 }
 
 pub struct Inkwell<'backend> {
-    context: &'backend Context,
+    context: ContextRef<'backend>,
     builder: Builder<'backend>,
     pub module: Module<'backend>,
     entities: Map<Str<'backend>, Entity<'backend>>,
@@ -84,7 +84,7 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    pub fn new(name: Str<'backend>, context: &'backend Context) -> Self {
+    pub fn new(name: Str<'backend>, context: ContextRef<'backend>) -> Self {
         let builder = context.create_builder();
         let module = context.create_module(&name);
 

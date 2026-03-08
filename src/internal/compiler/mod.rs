@@ -41,7 +41,6 @@ use {
 };
 
 use {
-    inkwell::context::Context,
     crate::{
         generator::{Generator, Inkwell},
         internal::driver::Driver,
@@ -133,8 +132,12 @@ impl<'session> Session<'session> {
 
         let reporter = Reporter::new(verbosity);
 
-        let context = Context::create();
-        let backend = Inkwell::new(Str::from(name), &context);
+        let context = inkwell::context::Context::create();
+        let context_ref = unsafe { 
+            inkwell::context::ContextRef::new(context.raw()) 
+        };
+        
+        let backend = Inkwell::new(Str::from(name), context_ref);
 
         let generator = Generator::new(backend);
 
