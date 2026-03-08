@@ -240,58 +240,61 @@ impl<'session> Session<'session> {
                         CompileError::Parse(error.clone())
                     })
             );
+
+            self.parsers.insert(*identity, parser);
         }
     }
 
     pub fn register(&mut self) {
-        for (identity, location) in &self.inputs {
-            let stem = Str::from(location.stem().unwrap());
-            let span = Span::file(location.to_path().unwrap().into()).unwrap();
+        let modules: Vec<_> = self.inputs
+            .iter()
+            .map(|(identity, location)| {
+                let stem = Str::from(location.stem().unwrap().to_string());
+                let span = Span::file(location.to_path().unwrap().into()).unwrap();
 
-            let head = Element::new(
-                ElementKind::Literal(
-                    Token::new(
-                        TokenKind::Identifier(stem),
-                        span,
-                    )
-                ),
-                span,
-            ).into();
+                let head = Element::new(
+                    ElementKind::Literal(
+                        Token::new(
+                            TokenKind::Identifier(stem),
+                            span,
+                        )
+                    ),
+                    span,
+                ).into();
 
-            let elements = &mut self.parsers.get_mut(identity).unwrap().output;
+                let elements = &mut self.parsers.get_mut(identity).unwrap().output;
 
-            let mut scope = Scope::new();
+                let mut scope = Scope::new();
 
-            elements
-                .iter_mut()
-                .for_each(
-                    |element| {
-                        if let ElementKind::Symbolize(symbol) = &mut element.kind {
-                            let identity = self.resolver.next_identity();
-                            
-                            symbol.id = identity;
-                            element.reference = Some(identity);
-                            
-                            scope.symbols.insert(symbol.clone());
-                        }
+                for element in elements.iter_mut() {
+                    if let ElementKind::Symbolize(symbol) = &mut element.kind {
+                        let symbol_id = self.resolver.next_identity();
+                        symbol.id = symbol_id;
+                        element.reference = Some(symbol_id);
+                        scope.symbols.insert(symbol.clone());
                     }
-                );
-            
-            let module = Module::new(head);
+                }
+                
+                let symbol = Symbol::new(
+                    *identity,
+                    SymbolKind::Module(Module::new(head)),
+                    span,
+                    Visibility::Public,
+                ).with_scope(scope);
 
-            let symbol = Symbol::new(
-                *identity,
-                SymbolKind::Module(module),
-                span,
-                Visibility::Public,
-            ).with_scope(scope);
+                symbol
+            })
+            .collect();
 
-            self.resolver.add(symbol);
+        for module in modules {
+            self.resolver.add(module);
         }
     }
     
     pub fn resolve(&mut self) {
         for (identity, _location) in &self.inputs {
+            self.reporter.start("resolving");
+
             let elements = self.parsers.get(identity).unwrap().output.clone();
             let module = self.resolver.scope.get_identity(*identity).unwrap();
             
@@ -302,17 +305,35 @@ impl<'session> Session<'session> {
             self.resolver.resolve();
             
             self.resolver.exit();
+
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+            self
+                .reporter
+                .finish("parsing", duration);
         }
+
+        self.reporter.symbols(&self.resolver.scope.all());
+
+        self.errors.extend(
+                self.resolver
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Resolve(error.clone())
+                })
+        );
     }
     
     pub fn analyze(&mut self) {
-        for (identity, _location) in &self.inputs {
-            let elements = self.parsers.get(identity).unwrap().output.clone();
-            let mut analyzer = Analyzer::new(&mut self.resolver, elements);
-
-            analyzer.analyze();
+        let identities: Vec<_> = self.inputs.keys().copied().collect();
+        
+        for identity in identities {
+            let elements = self.parsers.get(&identity).unwrap().output.clone();
+            let mut analyzer = Analyzer::new(elements);
+            analyzer.analyze(&mut self.resolver);
             
-            self.analyzers.insert(*identity, analyzer);
+            self.analyzers.insert(identity, analyzer);
         }
     }
     
@@ -418,7 +439,7 @@ impl<'session> Session<'session> {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
 
-            let _ = parent.clone().join(location.stem().unwrap());
+            let _ = parent.join(location.stem().unwrap());
 
             parent.to_path_buf()
         };

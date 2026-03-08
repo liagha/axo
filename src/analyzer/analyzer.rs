@@ -13,25 +13,23 @@ use crate::{
 };
 
 pub struct Analyzer<'analyzer> {
-    pub resolver: &'analyzer mut Resolver<'analyzer>,
     pub input: Vec<Element<'analyzer>>,
     pub output: Vec<Analysis<'analyzer>>,
     pub errors: Vec<AnalyzeError<'analyzer>>,
 }
 
 impl<'analyzer> Analyzer<'analyzer> {
-    pub fn new(resolver: &'analyzer mut Resolver<'analyzer>, input: Vec<Element<'analyzer>>) -> Self {
+    pub fn new(input: Vec<Element<'analyzer>>) -> Self {
         Self {
-            resolver,
             input,
             output: Vec::new(),
             errors: Vec::new(),
         }    
     }
     
-    pub fn analyze(&mut self) {
+    pub fn analyze(&mut self, resolver: &mut Resolver<'analyzer>) {
         for element in self.input.iter_mut() {
-            match element.analyze(self.resolver) {
+            match element.analyze(resolver) {
                 Ok(analysis) => {
                     self.output.push(analysis);
                 }
