@@ -49,7 +49,7 @@ use {
     }
 };
 use crate::analyzer::Analyzer;
-use crate::generator::Backend;
+use crate::generator::{Backend, GenerateError};
 use crate::tracker;
 
 pub enum CompileError<'error> {
@@ -58,6 +58,7 @@ pub enum CompileError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Track(TrackError<'error>),
+    Generate(GenerateError<'error>),
 }
 
 pub struct Session<'session> {
@@ -164,7 +165,7 @@ impl<'session> Session<'session> {
         self.register();
         self.resolve();
         self.analyze();
-        self.generate();
+        //self.generate();
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -175,12 +176,13 @@ impl<'session> Session<'session> {
                 CompileError::Parse(error) => self.reporter.error(&error),
                 CompileError::Resolve(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
+                CompileError::Generate(error) => self.reporter.error(&error),
             }
         }
 
         self.reporter.finish("compilation", duration);
 
-        self.run();
+        //self.run();
     }
 
     pub fn scan(&mut self) {
@@ -346,14 +348,15 @@ impl<'session> Session<'session> {
     pub fn generate(&mut self) {
         for (identity, location) in &self.inputs {
             let analysis = self.analyzers.get(identity).unwrap().output.clone();
-            let schema = Resolver::schema(&mut self.resolver, *identity);
-            let executable = Resolver::executable(&mut self.resolver, *identity);
+
             let run = Resolver::run(&mut self.resolver);
 
-            let should_link = run || executable.is_some();
-
-            let (schema, executable) = Self::output(*location, schema, executable);
-            let output = Str::from(schema.to_string_lossy().to_string());
+            let (schema, executable) =
+                Self::output(
+                    *location,
+                    Resolver::schema(&mut self.resolver, *identity),
+                    Resolver::executable(&mut self.resolver, *identity)
+                );
 
             self.reporter.start("generating");
 
@@ -361,30 +364,30 @@ impl<'session> Session<'session> {
 
             self.generator.errors.extend(self.generator.backend.errors.clone());
 
-            let path = output.as_str().unwrap_or("");
-
-            if !path.is_empty() {
-                let content = self.generator.backend.module.print_to_string().to_string();
-
-
-                match File::create(path) {
-                    Ok(mut file) => {
-                        if let Err(error) = file.write_all(content.to_string().as_bytes()) {
-                            self.errors.push(
-                                CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
-                            )
-                        }
-                    }
-
-                    Err(error) => {
+            match File::create(&schema) {
+                Ok(mut file) => {
+                    if let Err(error) = file.write_all(self.generator.backend.module.print_to_string().to_string().as_bytes()) {
                         self.errors.push(
                             CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
                         )
                     }
                 }
+
+                Err(error) => {
+                    self.errors.push(
+                        CompileError::Track(TrackError::new(tracker::error::ErrorKind::from(error), Span::void()))
+                    )
+                }
             }
 
-            self.reporter.errors(self.generator.errors.as_slice());
+            self.errors.extend(
+                self.generator
+                    .errors
+                    .iter()
+                    .map(|error| {
+                        CompileError::Generate(error.clone())
+                    })
+            );
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -394,21 +397,17 @@ impl<'session> Session<'session> {
             if self.generator.errors.is_empty() {
                 self.reporter.start("linking");
 
-                let linked = if should_link {
-                    match Driver::link(&schema, &executable) {
-                        Ok(()) => true,
-                        Err(error) => {
-                            xprintln!(
-                                                "Linker error while producing `{}`: {}" => Color::Red,
-                                                executable.to_string_lossy(),
-                                                error.to_string()
-                                            );
-                            xprintln!();
-                            false
-                        }
+                let linked = match Driver::link(&schema, &executable) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        xprintln!(
+                            "Linker error while producing `{}`: {}" => Color::Red,
+                            executable.to_string_lossy(),
+                            error.to_string()
+                        );
+                        xprintln!();
+                        false
                     }
-                } else {
-                    true
                 };
 
                 if linked {
@@ -418,10 +417,10 @@ impl<'session> Session<'session> {
                     let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
                     self.reporter.finish("linking", duration);
-                }
 
-                if linked && run {
-                    self.queue.push(executable.clone());
+                    if run {
+                        self.queue.push(executable.clone());
+                    }
                 }
             }
         }
