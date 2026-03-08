@@ -16,6 +16,14 @@ pub trait Show<'show> {
     }
 }
 
+impl<'show, T: Show<'show, Verbosity=u8>> Show<'show> for &T  {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        (*self).format(verbosity)
+    }
+}
+
 impl<'show, T: Show<'show, Verbosity=u8>> Show<'show> for Box<T>  {
     type Verbosity = u8;
 
@@ -42,12 +50,37 @@ impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for [Item] {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        Str::from(
-            self.iter()
-                .map(|form| Str::from(form.format(verbosity)))
-                .collect::<Vec<Str>>()
-                .join(", "),
-        )
+        match verbosity {
+            0 => {
+                Str::from(
+                    self.iter()
+                        .map(|form| Str::from(form.format(verbosity)))
+                        .collect::<Vec<Str>>()
+                        .join(", "),
+                )
+            }
+
+            1 => {
+                Str::from(
+                    self.iter()
+                        .map(|form| Str::from(form.format(verbosity)))
+                        .collect::<Vec<Str>>()
+                        .join(",\n"),
+                )
+            }
+
+            _ => {
+                self.format(verbosity - 1)
+            }
+        }
+    }
+}
+
+impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for Vec<Item> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+        (&self.as_slice()).format(verbosity)
     }
 }
 
@@ -55,12 +88,7 @@ impl<'show, Item: Show<'show, Verbosity=u8>> Show<'show> for Set<Item> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        Str::from(
-            self.iter()
-                .map(|form| Str::from(form.format(verbosity)))
-                .collect::<Vec<Str>>()
-                .join(", "),
-        )
+        self.iter().collect::<Vec<&Item>>().format(verbosity)
     }
 }
 

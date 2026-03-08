@@ -23,9 +23,6 @@ pub enum ErrorKind<'error> {
         target: Token<'error>,
         member: Token<'error>,
     },
-    UnexpectedMember {
-        target: Token<'error>,
-    }
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -47,10 +44,6 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
             ErrorKind::DefinedMember { target, member } => {
                 format!("the member `{}` is already defined in `{}`.", member.format(verbosity), target.format(verbosity))
-            }
-
-            ErrorKind::UnexpectedMember { target } => {
-                format!("the member is unexpected from `{}`.", target.format(verbosity))
             }
         }.into()
     }

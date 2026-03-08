@@ -104,11 +104,7 @@ impl<'symbol> Element<'symbol> {
     pub fn brand(&self) -> Option<Token<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => {
-                if let TokenKind::Identifier(_) = literal.kind {
                     Some(literal.clone())
-                } else {
-                    None
-                }
             },
             ElementKind::Construct(construct) => construct.target.brand(),
             ElementKind::Index(index) => index.target.brand(),

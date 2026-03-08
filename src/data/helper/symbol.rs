@@ -276,7 +276,7 @@ impl<
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => format!(
-                "Method({} : {})[{}{}]{{ {} }}",
+                "Method({}{} : {})[{}]{{ {} }}",
                 format!("{:?} | ", self.interface),
                 self.target.format(verbosity),
                 self.output.format(verbosity),

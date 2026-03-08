@@ -230,92 +230,43 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             (ElementKind::Invoke(invoke), SymbolKind::Method(method)) => {
                 score += self.shaping;
 
-                let candidates: Vec<Token> = method
-                    .members
-                    .iter()
-                    .flat_map(|member| member.brand())
-                    .collect();
-
                 let mut errors = Vec::new();
-                let mut bound: Vec<Token> = Vec::new();
-                let mut positional_cursor = 0;
-
-                for member in &invoke.members {
-                    match member.brand() {
-                        Some(brand) => {
-                            if bound.contains(&brand) {
-                                errors.push(ResolveError {
-                                    kind: ErrorKind::DefinedMember {
-                                        target: method.target.brand().unwrap(),
-                                        member: brand.clone(),
-                                    },
-                                    span: query.span.clone(),
-                                    hints: Vec::new(),
-                                });
-                            } else if !candidates.contains(&brand) {
-                                errors.push(ResolveError {
-                                    kind: ErrorKind::UndefinedMember {
-                                        target: method.target.brand().unwrap(),
-                                        member: brand.clone(),
-                                    },
-                                    span: query.span.clone(),
-                                    hints: Vec::new(),
-                                });
-                            } else {
-                                bound.push(brand);
-                            }
-                        }
-                        None => {
-                            while positional_cursor < candidates.len()
-                                && bound.contains(&candidates[positional_cursor])
-                            {
-                                positional_cursor += 1;
-                            }
-
-                            if positional_cursor < candidates.len() {
-                                bound.push(candidates[positional_cursor].clone());
-                                positional_cursor += 1;
-                            } else {
-                                errors.push(ResolveError {
-                                    kind: ErrorKind::UnexpectedMember {
-                                        target: method.target.brand().unwrap(),
-                                    },
-                                    span: member.span.clone(),
-                                    hints: Vec::new(),
-                                });
-                            }
-                        }
+                
+                if invoke.members.len() > method.members.len() {
+                    score += (1 - (invoke.members.len() - method.members.len())/invoke.members.len()) as f64;
+                    
+                    for member in invoke.members[method.members.len()..].iter() {
+                        errors.push(
+                            ResolveError::new(
+                                ErrorKind::MissingMember {
+                                    target: invoke.target.brand().unwrap(),
+                                    member: member.brand().unwrap(),
+                                },
+                                member.span.clone(),
+                            )
+                        );
                     }
-                }
+                } else if invoke.members.len() < method.members.len() {
+                    score += (1 - (method.members.len() - invoke.members.len())/method.members.len()) as f64;
 
-                for candidate in &candidates {
-                    if !bound.contains(candidate) {
-                        errors.push(ResolveError {
-                            kind: ErrorKind::MissingMember {
-                                target: method.target.brand().unwrap(),
-                                member: candidate.clone(),
-                            },
-                            span: query.span.clone(),
-                            hints: Vec::new(),
-                        });
+                    for member in method.members[invoke.members.len()..].iter() {
+                        errors.push(
+                            ResolveError::new(
+                                ErrorKind::UndefinedMember {
+                                    target: method.target.brand().unwrap(),
+                                    member: member.brand().unwrap(),
+                                },
+                                member.span.clone(),
+                            )
+                        );
                     }
+                } else { 
+                    score += 1f64;
                 }
-
-                let matching = bound.len();
-                let expected = candidates.len();
-                let ratio = if expected > 0 {
-                    matching as f64 / expected as f64
-                } else {
-                    1.0
-                };
-
-                score += self.binding * ratio;
-
-                if !errors.is_empty() || ratio < 1.0 {
-                    return Assessment {
-                        resemblance: Resemblance::from(score),
-                        errors,
-                    };
+                
+                return Assessment {
+                    resemblance: Resemblance::Partial(score),
+                    errors,
                 }
             }
 

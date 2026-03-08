@@ -7,12 +7,8 @@ impl<'scope> Show<'scope> for Scope<'scope> {
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'scope> {
         match verbosity {
-            0 => {
-                format!("{}", self.symbols.format(0))
-            }
-
             _ => {
-                self.format(verbosity - 1).to_string()
+                format!("{}", self.symbols.format(verbosity))
             }
         }.into()
     }

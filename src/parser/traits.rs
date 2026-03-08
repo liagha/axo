@@ -82,7 +82,19 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
         match verbosity {
             0 => {
                 format!(
-                    "{}: {:?}, {}",
+                    "{}{}",
+                    self.kind.format(verbosity),
+                    if self.scope.is_empty() {
+                        "".into()
+                    } else {
+                        format!("\n{}", self.scope.format(verbosity)).indent(verbosity)
+                    },
+                )
+            }
+
+            1 => {
+                format!(
+                    "{}: {:?}{}",
                     self.kind.format(verbosity),
                     self.visibility,
                     if self.scope.is_empty() {
