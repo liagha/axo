@@ -366,10 +366,15 @@ impl<'parser> Parser<'parser> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
+                
+                let entry = if let ElementKind::Literal(token) = &name.kind {
+                    if let TokenKind::Identifier(identifier) = &token.kind {
+                        identifier == &Str::from("main")
+                    } else { false }
+                } else { false };
 
                 let mut visibility = Visibility::Private;
                 let mut interface = Interface::Axo;
-                let mut entry = false;
 
                 let members: Vec<_> = Self::get_body(invoke.clone())
                     .into_iter()
@@ -402,10 +407,6 @@ impl<'parser> Parser<'parser> {
                                     interface = Interface::Compiler;
                                 }
 
-                                "entry" => {
-                                    entry = true;
-                                }
-
                                 _ => {}
                             }
 
@@ -432,7 +433,7 @@ impl<'parser> Parser<'parser> {
                                     Box::new(body),
                                     None::<Box<Element<'parser>>>,
                                     interface,
-                                    entry
+                                    entry,
                                 )),
                                 span,
                                 visibility,

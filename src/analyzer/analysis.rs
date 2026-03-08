@@ -63,7 +63,6 @@ pub enum Analysis<'analysis> {
         Box<Analysis<'analysis>>,
     ),
     While(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Cycle(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Return(Option<Box<Analysis<'analysis>>>),
     Break(Option<Box<Analysis<'analysis>>>),
     Continue(Option<Box<Analysis<'analysis>>>),

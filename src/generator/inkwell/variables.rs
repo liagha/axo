@@ -7,7 +7,7 @@ use {
     },
     inkwell::{
         types::BasicTypeEnum,
-        values::{BasicValueEnum, FunctionValue, PointerValue},
+        values::{BasicValueEnum, PointerValue},
     },
 };
 use crate::analyzer::Analysis;
@@ -52,7 +52,6 @@ impl<'backend> super::Inkwell<'backend> {
     fn lvalue_pointer(
         &mut self,
         analysis: &Analysis<'backend>,
-        function: FunctionValue<'backend>,
     ) -> Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)> {
         match &analysis {
             Analysis::Usage(name) => match self.entities.get(name) {
@@ -61,7 +60,7 @@ impl<'backend> super::Inkwell<'backend> {
             },
             Analysis::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand)?;
-                let value = self.analysis(*operand.clone(), function);
+                let value = self.analysis(*operand.clone());
                 match value {
                     BasicValueEnum::PointerValue(pointer) => Some((pointer, pointee)),
                     _ => None,
@@ -74,9 +73,8 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn address_of(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        if let Some((pointer, _)) = self.lvalue_pointer(&operand, function) {
+        if let Some((pointer, _)) = self.lvalue_pointer(&operand) {
             pointer.into()
         } else {
             self.context.i64_type().const_zero().into()
@@ -86,10 +84,9 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn dereference(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let pointee = self.pointer_pointee_type(&operand);
-        let value = self.analysis(*operand.clone(), function);
+        let value = self.analysis(*operand.clone());
         match (value, pointee) {
             (BasicValueEnum::PointerValue(pointer), Some(kind)) => self
                 .builder
@@ -119,16 +116,15 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         target: Str<'backend>,
         value: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let pointee = self.pointer_pointee_type(&value);
         let result = match &*value {
             Analysis::Array(elements) => {
-                let (value, element_type) = self.build_array(elements.clone(), function);
+                let (value, element_type) = self.build_array(elements.clone());
                 self.array_elements.insert(target.clone(), element_type);
                 value
             }
-            _ => self.analysis(*value.clone(), function),
+            _ => self.analysis(*value.clone()),
         };
         let signed = self.infer_signedness(&value);
 
@@ -145,7 +141,7 @@ impl<'backend> super::Inkwell<'backend> {
                 },
             );
         } else {
-            let pointer = self.build_entry(function, result.get_type(), target);
+            let pointer = self.build_entry(self.current_function(), result.get_type(), target);
             let _ = self.builder.build_store(pointer, result);
             self.entities.insert(
                 target.clone(),
@@ -164,10 +160,9 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         target: Box<Analysis<'backend>>,
         value: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let result = self.analysis(*value.clone(), function);
-        if let Some((pointer, kind)) = self.lvalue_pointer(&target, function) {
+        let result = self.analysis(*value.clone());
+        if let Some((pointer, kind)) = self.lvalue_pointer(&target) {
             if result.get_type() == kind {
                 let _ = self.builder.build_store(pointer, result);
             } else if result.is_int_value() && kind.is_int_type() {
@@ -200,7 +195,6 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn binding(
         &mut self,
         binding: Binding<Str<'backend>, Box<Analysis<'backend>>, TypeKind<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let value_analysis = match binding.value {
             Some(value) => value,
@@ -220,12 +214,12 @@ impl<'backend> super::Inkwell<'backend> {
         let pointee = self.pointer_pointee_type(&value_analysis);
         let value = match &*value_analysis {
             Analysis::Array(elements) => {
-                let (value, element_type) = self.build_array(elements.clone(), function);
+                let (value, element_type) = self.build_array(elements.clone());
                 self.array_elements
                     .insert(binding.target.clone(), element_type);
                 value
             }
-            _ => self.analysis(*value_analysis.clone(), function),
+            _ => self.analysis(*value_analysis.clone()),
         };
         let declared_kind = binding
             .annotation
@@ -257,7 +251,7 @@ impl<'backend> super::Inkwell<'backend> {
         } else {
             value
         };
-        let pointer = self.build_entry(function, declared_kind, binding.target);
+        let pointer = self.build_entry(self.current_function(), declared_kind, binding.target);
         let _ = self.builder.build_store(pointer, casted);
         let signed = binding
             .annotation

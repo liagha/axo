@@ -208,13 +208,6 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                             then.format(verbosity)
                         ).into()
                     }
-                    Analysis::Cycle(condition, then) => {
-                        format!(
-                            "Cycle({}, {})",
-                            condition.format(verbosity),
-                            then.format(verbosity)
-                        ).into()
-                    }
                     Analysis::Return(value) => {
                         format!(
                             "Return{}",

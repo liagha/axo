@@ -1,6 +1,6 @@
 use {
     inkwell::{
-        values::{BasicValueEnum, FunctionValue}
+        values::{BasicValueEnum}
     },
     crate::{
         analyzer::{Analysis},
@@ -13,6 +13,5 @@ pub trait Backend<'backend> {
     fn analysis(
         &mut self,
         instruction: Analysis<'backend>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend>;
 }

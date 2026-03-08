@@ -1,6 +1,5 @@
 mod registry;
 
-use std::io::Write;
 use {
     crate::{
         data::*,
@@ -9,7 +8,7 @@ use {
             InitializeError,
         },
         internal::{
-            platform::{PathBuf, File},
+            platform::{PathBuf, File, Write},
             hash::{
                 Map,
             },
@@ -39,7 +38,6 @@ use {
             Spanned,
         },
     },
-    broccli::{xprintln, Color},
     inkwell::{
         context::{Context, ContextRef},
     },
@@ -48,7 +46,6 @@ use {
 use {
     crate::{
         generator::{Generator, GenerateError, Backend, Inkwell},
-        internal::driver::Driver,
         resolver::scope::Scope,
         tracker::Peekable,
     }
@@ -75,7 +72,6 @@ pub struct Session<'session> {
     pub generator: Generator<'session, Inkwell<'session>>,
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
-    queue: Vec<PathBuf>,
 }
 
 impl<'session> Session<'session> {
@@ -159,7 +155,6 @@ impl<'session> Session<'session> {
             generator,
             context,
             errors,
-            queue: Vec::new(),
         }
     }
 
@@ -185,8 +180,6 @@ impl<'session> Session<'session> {
         }
 
         self.reporter.finish("compilation", duration);
-
-        self.run();
     }
 
     pub fn scan(&mut self) {
@@ -350,12 +343,12 @@ impl<'session> Session<'session> {
     }
     
     pub fn generate(&mut self) {
-        for (identity, location) in &self.inputs {
+        for (identity, location) in &self.inputs.clone() {
             let analysis = self.analyzers.get(identity).unwrap().output.clone();
 
-            let run = Resolver::run(&mut self.resolver);
+            let _run = Resolver::run(&mut self.resolver);
 
-            let (schema, executable) =
+            let (schema, _executable) =
                 Self::output(
                     *location,
                     Resolver::schema(&mut self.resolver, *identity),
@@ -401,39 +394,9 @@ impl<'session> Session<'session> {
 
             self.reporter
                 .finish("generating", duration);
-
-            if self.generator.errors.is_empty() {
-                self.reporter.start("linking");
-
-                let linked = match Driver::link(&schema, &executable) {
-                    Ok(()) => true,
-                    Err(error) => {
-                        xprintln!(
-                            "Linker error while producing `{}`: {}" => Color::Red,
-                            executable.to_string_lossy(),
-                            error.to_string()
-                        );
-                        xprintln!();
-                        false
-                    }
-                };
-
-                if linked {
-                    self.reporter.generate("IR", &schema);
-                    self.reporter.generate("executable", &executable);
-
-                    let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-                    self.reporter.finish("linking", duration);
-
-                    if run {
-                        self.queue.push(executable.clone());
-                    }
-                }
-            }
         }
     }
-    
+
     fn output(location: Location<'session>, schema: Option<Str<'session>>, executable: Option<Str<'session>>) -> (PathBuf, PathBuf) {
         let schema = if let Some(schema) = schema {
             PathBuf::from(schema.to_string())
@@ -455,26 +418,4 @@ impl<'session> Session<'session> {
 
         (schema, executable)
     }
-    
-    fn run(&mut self) {
-        if self.queue.is_empty() {
-            return;
-        }
-
-        for executable in self.queue.clone() {
-            self.reporter.run(&executable);
-
-            if let Err(error) = Driver::run(&executable) {
-                xprintln!(
-                    "Run error for `{}`: {}" => Color::Red,
-                    executable.to_string_lossy(),
-                    error.to_string()
-                );
-                xprintln!();
-            }
-        }
-
-        self.queue.clear();
-    }
-
 }

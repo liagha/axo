@@ -1,7 +1,7 @@
 use {
     super::Backend,
     inkwell::{
-        values::{BasicValueEnum, FunctionValue},
+        values::{BasicValueEnum},
         FloatPredicate, IntPredicate,
     },
 };
@@ -12,10 +12,10 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -45,10 +45,10 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -78,15 +78,15 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -120,15 +120,15 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -162,15 +162,15 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder
@@ -204,15 +204,15 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
+        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
             .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         if left.is_int_value() && right.is_int_value() {
             BasicValueEnum::from(
                 self.builder

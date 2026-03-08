@@ -1,5 +1,4 @@
 pub mod session;
-pub mod driver;
 pub mod logger;
 pub mod timer;
 

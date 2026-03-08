@@ -1,6 +1,6 @@
 use {
     super::Backend,
-    inkwell::values::{BasicValueEnum, FunctionValue},
+    inkwell::values::{BasicValueEnum},
 };
 use crate::analyzer::Analysis;
 
@@ -9,10 +9,9 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         BasicValueEnum::from(
             self.builder
                 .build_and(left.into_int_value(), right.into_int_value(), "and")
@@ -24,10 +23,9 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         BasicValueEnum::from(
             self.builder
                 .build_or(left.into_int_value(), right.into_int_value(), "or")
@@ -38,9 +36,8 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn logical_not(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let operand_value = self.analysis(*operand, function);
+        let operand_value = self.analysis(*operand);
         BasicValueEnum::from(
             self.builder
                 .build_not(operand_value.into_int_value(), "not")
@@ -52,10 +49,9 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left, function);
-        let right = self.analysis(*right, function);
+        let left = self.analysis(*left);
+        let right = self.analysis(*right);
         BasicValueEnum::from(
             self.builder
                 .build_xor(left.into_int_value(), right.into_int_value(), "xor")

@@ -115,3 +115,5 @@ func read_line(c, const buf: *UInt8, const max_len: UInt64): Integer {
 //var n: Integer = read_line(buf, 1024)
 
 //write(STDOUT, buf, n)
+
+write(STDOUT, "test", 4)

@@ -6,7 +6,7 @@ use {
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
-        values::{BasicValueEnum, FunctionValue},
+        values::{BasicValueEnum},
     },
 };
 use crate::analyzer::Analysis;
@@ -128,7 +128,6 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn constructor(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let name = structure.target.clone();
         let struct_type = match self.structs.get(&name) {
@@ -150,7 +149,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Analysis::Assign(field, assigned) => {
                     if let Some(index) = field_names.iter().position(|name| name == &field) {
                         let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                        let field_value = self.analysis(*assigned.clone(), function);
+                        let field_value = self.analysis(*assigned.clone());
                         if let Some(casted) = self.cast_value(field_value, field_type) {
                             value = self
                                 .builder
@@ -167,7 +166,7 @@ impl<'backend> super::Inkwell<'backend> {
                     let index = positional_index;
                     positional_index += 1;
                     let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                    let field_value = self.analysis(other, function);
+                    let field_value = self.analysis(other);
                     if let Some(casted) = self.cast_value(field_value, field_type) {
                         value = self
                             .builder
@@ -186,13 +185,12 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         target: Box<Analysis<'backend>>,
         member: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if let Analysis::Usage(name) = &*target {
             if self.modules.contains(name) || name.as_str() == Some("stdin") {
                 match &*member {
                     Analysis::Usage(name) => return self.usage(name.clone()),
-                    Analysis::Invoke(invoke) => return self.invoke(invoke.clone(), function),
+                    Analysis::Invoke(invoke) => return self.invoke(invoke.clone()),
                     _ => {}
                 }
             }
@@ -239,7 +237,7 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        let target_value = self.analysis(*target, function);
+        let target_value = self.analysis(*target);
         if let BasicValueEnum::StructValue(struct_value) = target_value {
             if let Some(struct_name) = self.structs.iter().find_map(|(name, kind)| {
                 if kind.as_basic_type_enum() == struct_value.get_type().as_basic_type_enum() {
@@ -268,7 +266,6 @@ impl<'backend> super::Inkwell<'backend> {
     pub(crate) fn build_array(
         &mut self,
         elements: Vec<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> (BasicValueEnum<'backend>, BasicTypeEnum<'backend>) {
         if elements.is_empty() {
             let array_type = self.context.i8_type().array_type(0);
@@ -281,7 +278,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         let mut values = Vec::with_capacity(elements.len());
         for element in elements {
-            let value = self.analysis(element, function);
+            let value = self.analysis(element);
             values.push(value);
         }
 
@@ -322,22 +319,20 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn array(
         &mut self,
         elements: Vec<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
-        let (value, _) = self.build_array(elements, function);
+        let (value, _) = self.build_array(elements);
         value
     }
 
     pub fn tuple(
         &mut self,
         elements: Vec<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let mut values = Vec::with_capacity(elements.len());
         let mut types = Vec::with_capacity(elements.len());
 
         for element in elements {
-            let value = self.analysis(element, function);
+            let value = self.analysis(element);
             types.push(value.get_type());
             values.push(value);
         }
@@ -358,15 +353,14 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn index(
         &mut self,
         index: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if index.members.is_empty() {
             return self.context.i64_type().const_zero().into();
         }
 
         let target_instruction = index.target.clone();
-        let target = self.analysis(*target_instruction, function);
-        let idx_value = self.analysis(index.members[0].clone(), function);
+        let target = self.analysis(*target_instruction);
+        let idx_value = self.analysis(index.members[0].clone());
 
         if let Analysis::Usage(name) = &*index.target {
             if let Some(element_type) = self.array_elements.get(name) {

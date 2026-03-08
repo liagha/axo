@@ -15,7 +15,7 @@ impl<'backend> super::Inkwell<'backend> {
             16 => self.context.i16_type(),
             32 => self.context.i32_type(),
             64 => self.context.i64_type(),
-            _ => self.context.i64_type(),
+            bits => self.context.custom_width_int_type(bits as u32),
         };
 
         let bits = number as u64;

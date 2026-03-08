@@ -102,11 +102,10 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         name: &str,
         arguments: &[Analysis<'backend>],
-        function: FunctionValue<'backend>,
     ) -> Option<BasicValueEnum<'backend>> {
         let arg = arguments
             .first()
-            .map(|value| self.analysis(value.clone(), function));
+            .map(|value| self.analysis(value.clone()));
 
         match name {
             "Int64" => Some(match arg {
@@ -216,7 +215,6 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         name: Str<'backend>,
         analyses: Vec<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         self.modules.insert(name);
         let caller_block = self.builder.get_insert_block();
@@ -225,7 +223,7 @@ impl<'backend> super::Inkwell<'backend> {
                 break;
             }
             let current_block = self.builder.get_insert_block();
-            self.analysis(analysis, function);
+            self.analysis(analysis);
             if let Some(block) = current_block {
                 self.builder.position_at_end(block);
             }
@@ -299,7 +297,7 @@ impl<'backend> super::Inkwell<'backend> {
         };
 
         let name = method.target.as_str().unwrap();
-        
+
         let function = if matches!(method.interface, Interface::C) {
             let function = self.module.add_function(
                 name,
@@ -311,11 +309,13 @@ impl<'backend> super::Inkwell<'backend> {
                 .insert(method.target.clone(), Entity::Function(function));
             function
         } else {
-            let function = self.module.add_function(
-                name,
-                function_type,
-                Some(inkwell::module::Linkage::Internal),
-            );
+            let linkage = if method.entry {
+                Some(inkwell::module::Linkage::External)
+            } else {
+                Some(inkwell::module::Linkage::Internal)
+            };
+
+            let function = self.module.add_function(name, function_type, linkage);
 
             let previous_entities = self.entities.clone();
             let mut scoped_entities = Map::default();
@@ -357,7 +357,7 @@ impl<'backend> super::Inkwell<'backend> {
 
             self.loop_headers.clear();
             self.loop_exits.clear();
-            let body_result = self.analysis(*method.body.clone(), function);
+            let body_result = self.analysis(*method.body.clone());
 
             if self
                 .builder
@@ -380,14 +380,13 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn block(
         &mut self,
         analyses: Vec<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let mut last = self.context.i64_type().const_zero().into();
         for analysis in analyses {
             if self.has_terminator() {
                 break;
             }
-            last = self.analysis(analysis, function);
+            last = self.analysis(analysis);
         }
         last
     }
@@ -397,25 +396,24 @@ impl<'backend> super::Inkwell<'backend> {
         condition: Box<Analysis<'backend>>,
         then: Box<Analysis<'backend>>,
         otherwise: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if self.has_terminator() {
             return self.context.i64_type().const_zero().into();
         }
 
-        let condition = self.analysis(*condition, function);
+        let condition = self.analysis(*condition);
         let condition = self.truthy(condition);
 
-        let then_block = self.context.append_basic_block(function, "if_then");
-        let else_block = self.context.append_basic_block(function, "if_else");
-        let merge_block = self.context.append_basic_block(function, "if_merge");
+        let then_block = self.context.append_basic_block(self.current_function(), "if_then");
+        let else_block = self.context.append_basic_block(self.current_function(), "if_else");
+        let merge_block = self.context.append_basic_block(self.current_function(), "if_merge");
 
         self.builder
             .build_conditional_branch(condition, then_block, else_block)
             .unwrap();
 
         self.builder.position_at_end(then_block);
-        let then_value = self.analysis(*then, function);
+        let then_value = self.analysis(*then);
         let then_end = self.builder.get_insert_block();
         let then_reaches_merge = !self.has_terminator();
         if then_reaches_merge {
@@ -425,7 +423,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         self.builder.position_at_end(else_block);
-        let else_value = self.analysis(*otherwise, function);
+        let else_value = self.analysis(*otherwise);
         let else_end = self.builder.get_insert_block();
         let else_reaches_merge = !self.has_terminator();
         if else_reaches_merge {
@@ -457,22 +455,21 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         condition: Box<Analysis<'backend>>,
         body: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if self.has_terminator() {
             return self.context.i64_type().const_zero().into();
         }
 
-        let condition_block = self.context.append_basic_block(function, "while_condition");
-        let body_block = self.context.append_basic_block(function, "while_body");
-        let end_block = self.context.append_basic_block(function, "while_end");
+        let condition_block = self.context.append_basic_block(self.current_function(), "while_condition");
+        let body_block = self.context.append_basic_block(self.current_function(), "while_body");
+        let end_block = self.context.append_basic_block(self.current_function(), "while_end");
 
         self.builder
             .build_unconditional_branch(condition_block)
             .unwrap();
 
         self.builder.position_at_end(condition_block);
-        let condition = self.analysis(*condition, function);
+        let condition = self.analysis(*condition);
         let condition = self.truthy(condition);
         self.builder
             .build_conditional_branch(condition, body_block, end_block)
@@ -481,7 +478,7 @@ impl<'backend> super::Inkwell<'backend> {
         self.builder.position_at_end(body_block);
         self.loop_headers.push(condition_block);
         self.loop_exits.push(end_block);
-        self.analysis(*body, function);
+        self.analysis(*body);
         self.loop_exits.pop();
         self.loop_headers.pop();
 
@@ -495,25 +492,15 @@ impl<'backend> super::Inkwell<'backend> {
         self.context.i64_type().const_zero().into()
     }
 
-    pub fn cycle(
-        &mut self,
-        condition: Box<Analysis<'backend>>,
-        body: Box<Analysis<'backend>>,
-        function: FunctionValue<'backend>,
-    ) -> BasicValueEnum<'backend> {
-        self.r#while(condition, body, function)
-    }
-
     pub fn invoke(
         &mut self,
         invoke: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         let name = Self::invoke_target_name(&invoke.target)
             .and_then(|value| value.as_str())
             .unwrap_or("");
 
-        if let Some(value) = self.primitive_cast(name, &invoke.members, function) {
+        if let Some(value) = self.primitive_cast(name, &invoke.members) {
             return value;
         }
 
@@ -529,7 +516,7 @@ impl<'backend> super::Inkwell<'backend> {
             if let Some(value) = option {
                 let mut arguments = vec![];
                 for argument in &invoke.members {
-                    let value = self.analysis(argument.clone(), function);
+                    let value = self.analysis(argument.clone());
                     arguments.push(value.into());
                 }
                 let result = self.builder.build_call(value, &arguments, "call").unwrap();
@@ -545,7 +532,6 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn r#return(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if self.has_terminator() {
             return self.context.i64_type().const_zero().into();
@@ -553,12 +539,12 @@ impl<'backend> super::Inkwell<'backend> {
 
         match value {
             Some(item) => {
-                let result = self.analysis(*item, function);
-                if function.get_type().get_return_type().is_none() {
+                let result = self.analysis(*item);
+                if self.current_function().get_type().get_return_type().is_none() {
                     let _ = self.builder.build_return(None);
                     self.context.i64_type().const_zero().into()
                 } else {
-                    let value = self.coerce(function, result);
+                    let value = self.coerce(self.current_function(), result);
                     let _ = self.builder.build_return(Some(&value));
                     value
                 }
@@ -573,10 +559,9 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn r#break(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if let Some(item) = value {
-            self.analysis(*item, function);
+            self.analysis(*item);
         }
 
         if self.has_terminator() {
@@ -593,10 +578,9 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn r#continue(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        function: FunctionValue<'backend>,
     ) -> BasicValueEnum<'backend> {
         if let Some(item) = value {
-            self.analysis(*item, function);
+            self.analysis(*item);
         }
 
         if self.has_terminator() {
@@ -608,5 +592,13 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         self.context.i64_type().const_zero().into()
+    }
+
+    pub fn current_function(&self) -> FunctionValue<'backend> {
+        self.builder
+            .get_insert_block()
+            .unwrap()
+            .get_parent()
+            .unwrap()
     }
 }
