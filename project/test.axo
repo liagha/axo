@@ -1,1 +1,3 @@
-printf("test")
+func print(const string: String) {}
+
+print()

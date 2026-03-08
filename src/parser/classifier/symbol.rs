@@ -243,7 +243,6 @@ impl<'parser> Parser<'parser> {
                     })
                     .collect();
 
-                let (members, generic) = Self::split_members(members);
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(Element::new(
@@ -253,8 +252,7 @@ impl<'parser> Parser<'parser> {
                             SymbolKind::Structure(Structure::new(Box::new(name), members)),
                             span,
                             visibility,
-                        )
-                            .with_generic(generic),
+                        ),
                     ),
                     span,
                 )))
@@ -276,7 +274,6 @@ impl<'parser> Parser<'parser> {
             |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
                 let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
-                let generic = Scope::new();
 
                 let keyword = head[0].unwrap_input();
                 let name = head[1].unwrap_output().clone();
@@ -314,6 +311,7 @@ impl<'parser> Parser<'parser> {
                         }
                     })
                     .collect();
+                
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 Ok(Form::output(Element::new(
@@ -323,8 +321,7 @@ impl<'parser> Parser<'parser> {
                             SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
                             span,
                             visibility,
-                        )
-                            .with_generic(generic),
+                        ),
                     ),
                     span,
                 )))
@@ -402,7 +399,7 @@ impl<'parser> Parser<'parser> {
                 let mut entry = false;
                 let mut variadic = false;
 
-                let parsed_members: Vec<_> = Self::get_body(invoke.clone())
+                let members: Vec<_> = Self::get_body(invoke.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(symbol),
@@ -451,7 +448,6 @@ impl<'parser> Parser<'parser> {
                     .collect();
 
                 if sequence.len() == 4 {
-                    let (members, generic) = Self::split_members(parsed_members);
                     let body = sequence[3].unwrap_output().clone();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
@@ -471,15 +467,14 @@ impl<'parser> Parser<'parser> {
                                 )),
                                 span,
                                 visibility,
-                            )
-                                .with_generic(generic),
+                            ),
                         ),
                         span,
                     )))
                 } else {
                     let output = sequence[3].unwrap_output().clone();
 
-                    let (members, generic) = Self::split_members(parsed_members);
+                    let (members, generic) = Self::split_members(members);
                     let body = sequence[4].unwrap_output().clone();
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
@@ -499,8 +494,7 @@ impl<'parser> Parser<'parser> {
                                 )),
                                 span,
                                 visibility,
-                            )
-                                .with_generic(generic),
+                            ),
                         ),
                         span,
                     )))

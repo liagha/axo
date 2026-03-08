@@ -10,7 +10,6 @@ use {
         internal::hash::Set,
         parser::Symbol,
         parser::Element,
-        scanner::TokenKind
     },
     matchete::{Assessor, Scheme},
 };
@@ -142,10 +141,6 @@ impl<'scope> Scope<'scope> {
             return Ok(symbol);
         }
 
-        if let Some(symbol) = Self::get(target, self) {
-            return Ok(symbol);
-        }
-
         let mut aligner = Aligner::new();
         let mut affinity = Affinity::new();
 
@@ -171,33 +166,5 @@ impl<'scope> Scope<'scope> {
             Err(assessor.errors.clone())
         }
 
-    }
-
-    fn get(target: &Element<'scope>, scope: &Scope<'scope>) -> Option<Symbol<'scope>> {
-        let query = target.brand().and_then(|token| match token.kind {
-            TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
-            _ => None,
-        })?;
-
-        let mut current = Some(scope);
-
-        while let Some(active) = current {
-            if let Some(symbol) = active.symbols.iter().find(|candidate| {
-                candidate
-                    .brand()
-                    .and_then(|token| match token.kind {
-                        TokenKind::Identifier(name) => name.as_str().map(str::to_owned),
-                        _ => None,
-                    })
-                    .as_deref()
-                    == Some(query.as_str())
-            }) {
-                return Some(symbol.clone());
-            }
-
-            current = active.parent.as_deref();
-        }
-
-        None
     }
 }

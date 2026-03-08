@@ -82,7 +82,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
         match verbosity {
             0 => {
                 format!(
-                    "{}: {:?}, {}{}",
+                    "{}: {:?}, {}",
                     self.kind.format(verbosity),
                     self.visibility,
                     if self.scope.is_empty() {
@@ -90,11 +90,6 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                     } else {
                         format!("\n{}", self.scope.format(verbosity)).indent(verbosity)
                     },
-                    if self.scope.is_empty() {
-                        "".into()
-                    } else {
-                        format!("\nGenerics: {}", self.generic.format(verbosity)).indent(verbosity)
-                    }
                 )
             }
 
@@ -269,7 +264,6 @@ impl<'symbol> Clone for Symbol<'symbol> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
-            generic: self.generic.clone(),
             visibility: self.visibility.clone(),
         }
     }

@@ -13,7 +13,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         resolver: &mut Resolver<'symbol>,
     ) {
         let mut symbol = self.clone();
-        let _generic = symbol.generic.clone();
 
         let id = resolver.next_identity();
         symbol.id = id.clone();

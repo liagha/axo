@@ -17,7 +17,6 @@ pub struct Symbol<'symbol> {
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
-    pub generic: Scope<'symbol>,
     pub visibility: Visibility,
 }
 
@@ -35,7 +34,6 @@ impl<'symbol> Symbol<'symbol> {
             kind,
             span,
             scope: Scope::new(),
-            generic: Scope::new(),
             visibility,
         }
     }
@@ -65,17 +63,6 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn set_scope(&mut self, scope: Scope<'symbol>) {
         self.scope = scope;
-    }
-
-    pub fn with_generic(self, generic: Scope<'symbol>) -> Self {
-        Self {
-            generic,
-            ..self
-        }
-    }
-
-    pub fn set_generic(&mut self, generic: Scope<'symbol>) {
-        self.generic = generic;
     }
 
     pub fn brand(&self) -> Option<Token<'symbol>> {
