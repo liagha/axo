@@ -1,39 +1,117 @@
+// ─── Syscall Functions ───────────────────────────────────────────────
 func write(c, const fd: Integer, const buf: *UInt8, const len: UInt64): Integer {}
 func read(c, const fd: Integer, const buf: *UInt8, const count: UInt64): UInt64 {}
 func _exit(c, const status: Integer) {}
-func open(c, const path: String, const flags: Integer, const mode: Integer): Integer {} // Updated signature
+func open(c, const path: String, const flags: Integer, const mode: Integer): Integer {}
 func close(c, const fd: Integer): Integer {}
 func mmap(c, const addr: *UInt8, const length: UInt64, const prot: Integer, const flags: Integer, const fd: Integer, const offset: Int64): *UInt8 {}
 func munmap(c, const addr: *UInt8, const length: UInt64): Integer {}
 func unlink(c, const path: String): Integer {}
 func lseek(c, const fd: Integer, const offset: Int64, const whence: Integer): Int64 {}
 
-// Access Modes
-const O_RDONLY   = 0
-const O_WRONLY   = 1
-const O_RDWR     = 2
+// ─── Standard File Descriptors ───────────────────────────────────────
+const STDIN  = 0
+const STDOUT = 1
+const STDERR = 2
 
-// Creation Flags
-const O_CREAT    = 64       // 0100
-const O_EXCL     = 128      // 0200
-const O_NOCTTY   = 256      // 0400
-const O_TRUNC    = 512      // 01000
+// ─── Exit Status ─────────────────────────────────────────────────────
+const EXIT_SUCCESS = 0
+const EXIT_FAILURE = 1
 
-// File Status Flags
-const O_APPEND   = 1024     // 02000
-const O_NONBLOCK = 2048     // 04000
-const O_DSYNC    = 4096     // 010000
-const O_ASYNC    = 8192     // 020000
-const O_DIRECT   = 16384    // 040000
-const O_LARGEFILE= 32768    // 0100000
-const O_DIRECTORY= 65536    // 0200000
-const O_NOFOLLOW = 131072   // 0400000
-const O_NOATIME  = 262144   // 01000000
-const O_CLOEXEC  = 524288   // 02000000
-const O_SYNC     = 1052672  // 04010000
-const O_PATH     = 2097152  // 010000000
-const O_TMPFILE  = 4259840  // 020200000
+// ─── Open: Access Modes ──────────────────────────────────────────────
+const O_RDONLY    = 0
+const O_WRONLY    = 1
+const O_RDWR      = 2
 
-var flags = O_WRONLY | O_CREAT | O_TRUNC
+// ─── Open: Creation Flags ────────────────────────────────────────────
+const O_CREAT     = 64       // 0100
+const O_EXCL      = 128      // 0200
+const O_NOCTTY    = 256      // 0400
+const O_TRUNC     = 512      // 01000
 
-unlink("/home/ali/Downloads/test.txt")
+// ─── Open: File Status Flags ─────────────────────────────────────────
+const O_APPEND    = 1024     // 02000
+const O_NONBLOCK  = 2048     // 04000
+const O_DSYNC     = 4096     // 010000
+const O_ASYNC     = 8192     // 020000
+const O_DIRECT    = 16384    // 040000
+const O_LARGEFILE = 32768    // 0100000
+const O_DIRECTORY = 65536    // 0200000
+const O_NOFOLLOW  = 131072   // 0400000
+const O_NOATIME   = 262144   // 01000000
+const O_CLOEXEC   = 524288   // 02000000
+const O_SYNC      = 1052672  // 04010000
+const O_PATH      = 2097152  // 010000000
+const O_TMPFILE   = 4259840  // 020200000
+
+// ─── File Permission Bits ────────────────────────────────────────────
+const S_IRWXU = 448  // 0700 - owner:  rwx
+const S_IRUSR = 256  // 0400 - owner:  read
+const S_IWUSR = 128  // 0200 - owner:  write
+const S_IXUSR = 64   // 0100 - owner:  exec
+const S_IRWXG = 56   // 0070 - group:  rwx
+const S_IRGRP = 32   // 0040 - group:  read
+const S_IWGRP = 16   // 0020 - group:  write
+const S_IXGRP = 8    // 0010 - group:  exec
+const S_IRWXO = 7    // 0007 - others: rwx
+const S_IROTH = 4    // 0004 - others: read
+const S_IWOTH = 2    // 0002 - others: write
+const S_IXOTH = 1    // 0001 - others: exec
+
+// ─── lseek: Whence ───────────────────────────────────────────────────
+const SEEK_SET = 0   // Absolute offset
+const SEEK_CUR = 1   // Relative to current position
+const SEEK_END = 2   // Relative to end of file
+
+// ─── mmap: Protection Flags ──────────────────────────────────────────
+const PROT_NONE  = 0  // No access
+const PROT_READ  = 1  // Readable
+const PROT_WRITE = 2  // Writable
+const PROT_EXEC  = 4  // Executable
+
+// ─── mmap: Map Flags ─────────────────────────────────────────────────
+const MAP_SHARED    = 1       // Share changes with other processes
+const MAP_PRIVATE   = 2       // Copy-on-write, changes are private
+const MAP_FIXED     = 16      // Use exact address given
+const MAP_ANONYMOUS = 32      // Not backed by any file
+const MAP_GROWSDOWN = 256     // Stack-like, grows downward
+const MAP_LOCKED    = 8192    // Lock pages in RAM
+const MAP_NORESERVE = 16384   // Don't reserve swap space
+const MAP_POPULATE  = 32768   // Prefault pages into memory
+const MAP_HUGETLB   = 262144  // Use huge pages
+
+// ─── Sentinel Values ─────────────────────────────────────────────────
+const MAP_FAILED = -1  // Returned by mmap on failure
+const INVALID_FD = -1  // Returned by open on failure
+
+func read_line(c, const buf: *UInt8, const max_len: UInt64): Integer {
+    var i: UInt64 = 0
+    var bytes_read: UInt64 = 0
+
+    while(i < max_len - 1, {
+        bytes_read = read(c, STDIN, buf + i, 1)
+
+        // EOF or error
+        if bytes_read <= 0 {
+            break
+        }
+
+        // Stop after newline
+        if buf[i] == '\n' {
+            break  // don't include \n
+        }
+
+        i = i + 1
+    })
+
+    // Null-terminate
+    buf[i] = '\0'
+
+    return(i)  // returns number of chars read
+}
+
+var buf: [UInt8; 1024]
+
+var n: Integer = read_line(buf, 1024)
+
+write(STDOUT, buf, n)
