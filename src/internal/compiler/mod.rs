@@ -72,8 +72,8 @@ pub struct Session<'session> {
     pub parsers: Map<Identity, Parser<'session>>,
     pub resolver: Resolver<'session>,
     pub analyzers: Map<Identity, Analyzer<'session>>,
-    pub context: Context,
     pub generator: Generator<'session, Inkwell<'session>>,
+    pub context: Context,
     pub errors: Vec<CompileError<'session>>,
     queue: Vec<PathBuf>,
 }
@@ -127,7 +127,7 @@ impl<'session> Session<'session> {
             .collect::<Vec<Symbol>>();
 
         resolver.scope.extend(preferences);
-        
+
         let name = resolver.input();
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
@@ -137,10 +137,10 @@ impl<'session> Session<'session> {
         let reporter = Reporter::new(verbosity);
 
         let context = Context::create();
-        let context_ref = unsafe { 
+        let context_ref = unsafe {
             ContextRef::new(context.raw())
         };
-        
+
         let backend = Inkwell::new(Str::from(name), context_ref);
 
         let generator = Generator::new(backend);
@@ -156,8 +156,8 @@ impl<'session> Session<'session> {
             parsers: Map::new(),
             resolver,
             analyzers: Map::new(),
-            context,
             generator,
+            context,
             errors,
             queue: Vec::new(),
         }
