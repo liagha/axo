@@ -21,16 +21,6 @@ pub struct Scope<'scope> {
 }
 
 impl<'scope> Scope<'scope> {
-    fn undefined(target: &Element<'scope>) -> Vec<ResolveError<'scope>> {
-        vec![ResolveError {
-            kind: ErrorKind::UndefinedSymbol {
-                query: target.brand().unwrap().clone(),
-            },
-            span: target.span.clone(),
-            hints: Vec::new(),
-        }]
-    }
-
     pub fn new() -> Self {
         Self {
             symbols: Set::new(),
@@ -154,14 +144,20 @@ impl<'scope> Scope<'scope> {
 
         let champion = assessor.champion(target, candidates);
 
-        if champion.is_some() {
+        if let Some(champion) = champion {
             if assessor.errors.is_empty() {
-                Err(Self::undefined(target))
+                Ok(champion)
             } else {
                 Err(assessor.errors.clone())
             }
         } else if assessor.errors.is_empty() {
-            Err(Self::undefined(target))
+            Err(vec![ResolveError {
+                kind: ErrorKind::UndefinedSymbol {
+                    query: target.brand().unwrap().clone(),
+                },
+                span: target.span.clone(),
+                hints: Vec::new(),
+            }])
         } else {
             Err(assessor.errors.clone())
         }

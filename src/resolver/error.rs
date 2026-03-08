@@ -2,8 +2,6 @@ use {
     crate::{
         format::{Show, Display, Formatter, Result},
         scanner::Token,
-        analyzer::AnalyzeError,
-        checker::CheckError,
         data::Str,
     }
 };
@@ -21,17 +19,13 @@ pub enum ErrorKind<'error> {
         target: Token<'error>,
         member: Token<'error>,
     },
-    ImportConflict {
-        symbol: Token<'error>,
+    DefinedMember {
+        target: Token<'error>,
+        member: Token<'error>,
     },
-    PrivateSymbol {
-        symbol: Token<'error>,
-    },
-    InvalidImportPath {
-        query: Token<'error>,
-    },
-    Analyze(AnalyzeError<'error>),
-    Check(CheckError<'error>),
+    UnexpectedMember {
+        target: Token<'error>,
+    }
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -42,6 +36,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
             ErrorKind::UndefinedSymbol { query } => {
                 format!("undefined symbol: `{}`.", query.format(verbosity))
             }
+
             ErrorKind::MissingMember { target, member } => {
                 format!("the member `{}` is missing from `{}`.", member.format(verbosity), target.format(verbosity))
             }
@@ -49,26 +44,13 @@ impl<'error> Show<'error> for ErrorKind<'error> {
             ErrorKind::UndefinedMember { target, member } => {
                 format!("the member `{}` doesn't exist in `{}`.", member.format(verbosity), target.format(verbosity))
             }
-            ErrorKind::ImportConflict { symbol } => {
-                format!("import conflict: symbol `{}` already exists in this scope.", symbol.format(verbosity))
+
+            ErrorKind::DefinedMember { target, member } => {
+                format!("the member `{}` is already defined in `{}`.", member.format(verbosity), target.format(verbosity))
             }
-            ErrorKind::PrivateSymbol { symbol } => {
-                format!(
-                    "cannot access private symbol `{}` from outside its module.",
-                    symbol.format(verbosity)
-                )
-            }
-            ErrorKind::InvalidImportPath { query } => {
-                format!(
-                    "invalid import path: `{}`. expected `use module.member`.",
-                    query.format(verbosity)
-                )
-            }
-            ErrorKind::Analyze(error) => {
-                format!("{}", error.kind)
-            }
-            ErrorKind::Check(error) => {
-                format!("{}", error.kind)
+
+            ErrorKind::UnexpectedMember { target } => {
+                format!("the member is unexpected from `{}`.", target.format(verbosity))
             }
         }.into()
     }
