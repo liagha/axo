@@ -26,31 +26,33 @@ use {
             Resolver,
             ResolveError,
         },
+        analyzer::Analyzer,
         scanner::{
             Scanner,
             Token, TokenKind,
             ScanError,
         },
         tracker::{
+            self,
             Location, Span,
             TrackError,
             Spanned,
         },
     },
     broccli::{xprintln, Color},
+    inkwell::{
+        context::{Context, ContextRef},
+    },
 };
 
 use {
     crate::{
-        generator::{Generator, Inkwell},
+        generator::{Generator, GenerateError, Backend, Inkwell},
         internal::driver::Driver,
         resolver::scope::Scope,
         tracker::Peekable,
     }
 };
-use crate::analyzer::Analyzer;
-use crate::generator::{Backend, GenerateError};
-use crate::tracker;
 
 pub enum CompileError<'error> {
     Initialize(InitializeError<'error>),
@@ -70,6 +72,7 @@ pub struct Session<'session> {
     pub parsers: Map<Identity, Parser<'session>>,
     pub resolver: Resolver<'session>,
     pub analyzers: Map<Identity, Analyzer<'session>>,
+    pub context: Context,
     pub generator: Generator<'session, Inkwell<'session>>,
     pub errors: Vec<CompileError<'session>>,
     queue: Vec<PathBuf>,
@@ -133,9 +136,9 @@ impl<'session> Session<'session> {
 
         let reporter = Reporter::new(verbosity);
 
-        let context = inkwell::context::Context::create();
+        let context = Context::create();
         let context_ref = unsafe { 
-            inkwell::context::ContextRef::new(context.raw()) 
+            ContextRef::new(context.raw())
         };
         
         let backend = Inkwell::new(Str::from(name), context_ref);
@@ -153,6 +156,7 @@ impl<'session> Session<'session> {
             parsers: Map::new(),
             resolver,
             analyzers: Map::new(),
+            context,
             generator,
             errors,
             queue: Vec::new(),
@@ -433,9 +437,7 @@ impl<'session> Session<'session> {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
             
-            parent.join(location.stem().unwrap()).set_extension("ll");
-            
-            parent.to_path_buf()
+            parent.join(location.stem().unwrap()).with_extension("ll")
         };
 
         let executable = if let Some(executable) = executable {
@@ -444,9 +446,7 @@ impl<'session> Session<'session> {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
 
-            let _ = parent.join(location.stem().unwrap());
-
-            parent.to_path_buf()
+            parent.join(location.stem().unwrap())
         };
 
         (schema, executable)
