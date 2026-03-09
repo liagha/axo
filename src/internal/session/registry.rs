@@ -80,22 +80,6 @@ impl<'registry> Resolver<'registry> {
     }
 
     pub fn schema(&mut self, identity: Identity) -> Option<Str<'registry>> {
-        Self::path(self, "OutputSchema", identity)
-            .or_else(|| Self::path(self, "OutputIR", identity))
-    }
-
-    pub fn executable(&mut self, identity: Identity) -> Option<Str<'registry>> {
-        Self::path(self, "OutputExec", identity)
-            .or_else(|| Self::path(self, "Output", identity))
-    }
-
-    pub fn run(&mut self) -> bool {
-        match self.lookup_value(Str::from("Run")) {
-            Some(Token {
-                kind: TokenKind::Boolean(value),
-                ..
-            }) => value,
-            _ => false,
-        }
+        Self::path(self, "Output", identity)
     }
 }

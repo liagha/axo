@@ -1,7 +1,3 @@
 func main() {
     compiler.libc.write(compiler.libc.STDOUT, "test", 4)
 }
-
-func test() {
-    compiler.libc.write(compiler.libc.STDOUT, "test", 4)
-}

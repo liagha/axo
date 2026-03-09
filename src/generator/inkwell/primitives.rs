@@ -1,9 +1,12 @@
 use {
+    super::{
+        Inkwell,
+    },
     crate::data::{Boolean, Char, Float, Integer, Scale, Str},
     inkwell::values::BasicValueEnum,
 };
 
-impl<'backend> super::Inkwell<'backend> {
+impl<'backend> Inkwell<'backend> {
     pub fn integer(
         &self,
         number: Integer,
@@ -19,6 +22,7 @@ impl<'backend> super::Inkwell<'backend> {
         };
 
         let bits = number as u64;
+
         BasicValueEnum::from(kind.const_int(bits, signed))
     }
 
@@ -28,6 +32,7 @@ impl<'backend> super::Inkwell<'backend> {
             64 => self.context.f64_type(),
             _ => self.context.f64_type(),
         };
+
         BasicValueEnum::from(kind.const_float(number.0))
     }
 
@@ -41,20 +46,13 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn string(&self, value: Str<'backend>) -> BasicValueEnum<'backend> {
         let raw = value.as_str().unwrap_or("");
-        let unquoted = raw
-            .strip_prefix('"')
-            .and_then(|content| content.strip_suffix('"'))
-            .or_else(|| {
-                raw.strip_prefix('`')
-                    .and_then(|content| content.strip_suffix('`'))
-            })
-            .unwrap_or(raw);
 
         let pointer = self
             .builder
-            .build_global_string_ptr(unquoted, "string_literal")
+            .build_global_string_ptr(raw, "string_literal")
             .unwrap()
             .as_pointer_value();
+
         BasicValueEnum::from(pointer)
     }
 }

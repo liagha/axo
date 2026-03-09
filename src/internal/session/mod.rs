@@ -346,13 +346,10 @@ impl<'session> Session<'session> {
         for (identity, location) in &self.inputs.clone() {
             let analysis = self.analyzers.get(identity).unwrap().output.clone();
 
-            let _run = Resolver::run(&mut self.resolver);
-
-            let (schema, _executable) =
+            let schema =
                 Self::output(
                     *location,
                     Resolver::schema(&mut self.resolver, *identity),
-                    Resolver::executable(&mut self.resolver, *identity)
                 );
 
             self.reporter.start("generating");
@@ -397,7 +394,7 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn output(location: Location<'session>, schema: Option<Str<'session>>, executable: Option<Str<'session>>) -> (PathBuf, PathBuf) {
+    fn output(location: Location<'session>, schema: Option<Str<'session>>) -> PathBuf {
         let schema = if let Some(schema) = schema {
             PathBuf::from(schema.to_string())
         } else {
@@ -407,15 +404,6 @@ impl<'session> Session<'session> {
             parent.join(location.stem().unwrap()).with_extension("ll")
         };
 
-        let executable = if let Some(executable) = executable {
-            PathBuf::from(executable.to_string())
-        } else {
-            let path = location.to_path().unwrap();
-            let parent = path.parent().unwrap();
-
-            parent.join(location.stem().unwrap())
-        };
-
-        (schema, executable)
+        schema
     }
 }

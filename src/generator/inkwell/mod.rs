@@ -1,4 +1,4 @@
-mod aggregate;
+mod composite;
 mod arithmetic;
 mod bitwise;
 mod comparison;
@@ -31,6 +31,14 @@ pub enum Entity<'backend> {
         pointee: Option<BasicTypeEnum<'backend>>,
         signed: Option<bool>,
     },
+    Array {
+        pointer: PointerValue<'backend>,
+        element_type: BasicTypeEnum<'backend>,
+    },
+    Struct {
+        struct_type: StructType<'backend>,
+        fields: Vec<Str<'backend>>,
+    },
     Function(FunctionValue<'backend>),
 }
 
@@ -38,12 +46,11 @@ pub struct Inkwell<'backend> {
     context: ContextRef<'backend>,
     builder: Builder<'backend>,
     pub module: Module<'backend>,
+
     entities: Map<Str<'backend>, Entity<'backend>>,
-    structs: Map<Str<'backend>, StructType<'backend>>,
-    struct_fields: Map<Str<'backend>, Vec<Str<'backend>>>,
-    array_elements: Map<Str<'backend>, BasicTypeEnum<'backend>>,
     modules: Set<Str<'backend>>,
     pub errors: Vec<GenerateError<'backend>>,
+
     loop_headers: Vec<BasicBlock<'backend>>,
     loop_exits: Vec<BasicBlock<'backend>>,
 }
@@ -51,30 +58,52 @@ pub struct Inkwell<'backend> {
 impl<'backend> Inkwell<'backend> {
     pub fn llvm_type(&self, kind: &TypeKind<'backend>) -> BasicTypeEnum<'backend> {
         match kind {
-            TypeKind::Integer { bits, .. } => match bits {
-                8 => self.context.i8_type().into(),
-                16 => self.context.i16_type().into(),
-                32 => self.context.i32_type().into(),
-                64 => self.context.i64_type().into(),
-                size => self.context.custom_width_int_type(*size as u32).into(),
+            TypeKind::Integer { bits, .. } => {
+                match bits {
+                    8 => self.context.i8_type().into(),
+                    16 => self.context.i16_type().into(),
+                    32 => self.context.i32_type().into(),
+                    64 => self.context.i64_type().into(),
+                    size => self.context.custom_width_int_type(*size as u32).into(),
+                }
             },
-            TypeKind::Float { bits } => match bits {
-                32 => self.context.f32_type().into(),
-                64 => self.context.f64_type().into(),
-                _ => self.context.f64_type().into(),
+            TypeKind::Float { bits } => {
+                match bits {
+                    32 => self.context.f32_type().into(),
+                    64 => self.context.f64_type().into(),
+                    _ => self.context.f64_type().into(),
+                }
             },
-            TypeKind::Boolean => self.context.bool_type().into(),
-            TypeKind::Character => self.context.i8_type().into(),
-            TypeKind::Pointer { .. } => self
-                .context
-                .ptr_type(inkwell::AddressSpace::default())
-                .into(),
-            TypeKind::Structure(structure) | TypeKind::Enumeration(structure) => self
-                .structs
-                .get(&structure.target)
-                .map(|kind| (*kind).into())
-                .unwrap_or_else(|| self.context.i64_type().into()),
-            _ => self.context.i64_type().into(),
+            TypeKind::Boolean => {
+                self.context.bool_type().into()
+            },
+            TypeKind::Character => {
+                self.context.i8_type().into()
+            },
+            TypeKind::Pointer { .. } => {
+                self
+                    .context
+                    .ptr_type(inkwell::AddressSpace::default())
+                    .into()
+            },
+            TypeKind::Structure(structure) | TypeKind::Enumeration(structure) => {
+                self
+                    .entities
+                    .get(&structure.target)
+                    .and_then(
+                        |entity| {
+                            if let Entity::Struct { struct_type, .. } = entity {
+                                Some((*struct_type).into())
+                            } else {
+                                None
+                            }
+                        }
+                    )
+                    .unwrap_or_else(|| self.context.i64_type().into())
+            },
+            _ => {
+                self.context.i64_type().into()
+            },
         }
     }
 
@@ -87,9 +116,6 @@ impl<'backend> Inkwell<'backend> {
             builder,
             module,
             entities: Default::default(),
-            structs: Default::default(),
-            struct_fields: Default::default(),
-            array_elements: Default::default(),
             modules: Default::default(),
             errors: Vec::new(),
             loop_headers: Vec::new(),
@@ -184,9 +210,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             Analysis::Integer { value, size, signed, } => self.integer(value, size, signed),
             Analysis::Float { value, size } => self.float(value, size),
             Analysis::Boolean { value } => self.boolean(value),
-            Analysis::String { value } => self.string(value),
             Analysis::Character { value } => self.character(value),
-            Analysis::Array(values) => self.array(values),
+            Analysis::String { value } => self.string(value),
+            Analysis::Array(values) => self.array(values).0.into(),
             Analysis::Tuple(values) => self.tuple(values),
             Analysis::Add(left, right) => self.add(left, right),
             Analysis::Subtract(left, right) => self.subtract(left, right),
