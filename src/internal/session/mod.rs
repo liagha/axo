@@ -50,14 +50,16 @@ use {
         tracker::Peekable,
     }
 };
+use crate::checker::{CheckError, Checker};
 
 pub enum CompileError<'error> {
     Initialize(InitializeError<'error>),
     Scan(ScanError<'error>),
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
-    Track(TrackError<'error>),
+    Check(CheckError<'error>),
     Generate(GenerateError<'error>),
+    Track(TrackError<'error>),
 }
 
 pub struct Session<'session> {
@@ -172,8 +174,9 @@ impl<'session> Session<'session> {
                 CompileError::Scan(error) => self.reporter.error(&error),
                 CompileError::Parse(error) => self.reporter.error(&error),
                 CompileError::Resolve(error) => self.reporter.error(&error),
-                CompileError::Track(error) => self.reporter.error(&error),
+                CompileError::Check(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
+                CompileError::Track(error) => self.reporter.error(&error),
             }
         }
 
@@ -316,6 +319,30 @@ impl<'session> Session<'session> {
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter.finish("resolving", duration);
+    }
+
+    pub fn check(&mut self) {
+        self.reporter.start("checking");
+
+        for identity in self.inputs.keys()  {
+            let mut elements = self.parsers.get(identity).unwrap().output.clone();
+            let mut checker = Checker::new(&mut elements);
+
+            checker.check();
+
+            self.errors.extend(
+                checker
+                    .errors
+                    .iter()
+                    .map(|error| {
+                        CompileError::Check(error.clone())
+                    })
+            );
+        }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.reporter.finish("checking", duration);
     }
     
     pub fn analyze(&mut self) {

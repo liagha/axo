@@ -1,7 +1,7 @@
 use crate::{
     data::*,
     analyzer::{
-        Analysis, AnalyzeError, ErrorKind,
+        Analysis, CheckError, ErrorKind,
     },
     format::Show,
     parser::{Element, Symbol, SymbolKind},
@@ -14,7 +14,7 @@ use crate::{
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
     pub output: Vec<Analysis<'analyzer>>,
-    pub errors: Vec<AnalyzeError<'analyzer>>,
+    pub errors: Vec<CheckError<'analyzer>>,
 }
 
 impl<'analyzer> Analyzer<'analyzer> {
@@ -45,14 +45,14 @@ pub trait Analyzable<'analyzable> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'analyzable>,
-    ) -> Result<Analysis<'analyzable>, AnalyzeError<'analyzable>>;
+    ) -> Result<Analysis<'analyzable>, CheckError<'analyzable>>;
 }
 
 impl<'token> Analyzable<'token> for Token<'token> {
     fn analyze(
         &self,
         _resolver: &mut Resolver<'token>,
-    ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
+    ) -> Result<Analysis<'token>, CheckError<'token>> {
         match &self.kind {
             TokenKind::Float(float) => {
                 Ok(Analysis::Float {
@@ -96,7 +96,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'symbol>,
-    ) -> Result<Analysis<'symbol>, AnalyzeError<'symbol>> {
+    ) -> Result<Analysis<'symbol>, CheckError<'symbol>> {
         match &self.kind {
             SymbolKind::Binding(binding) => {
                 let value = binding
@@ -108,7 +108,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let target_token = binding
                     .target
                     .brand()
-                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
+                    .ok_or_else(|| CheckError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
                 let analyzed = Binding::new(
                     Str::from(target_token.format(0)),
@@ -120,7 +120,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::Binding(analyzed))
             }
             SymbolKind::Structure(structure) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
+                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = structure
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -134,7 +134,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::Structure(analyzed))
             }
             SymbolKind::Enumeration(enumeration) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = enumeration
+                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = enumeration
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -148,7 +148,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 Ok(Analysis::Enumeration(analyzed))
             }
             SymbolKind::Method(method) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = method
+                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = method
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -177,9 +177,9 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let target = module
                     .target
                     .brand()
-                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, module.target.span))?;
+                    .ok_or_else(|| CheckError::new(ErrorKind::Unimplemented, module.target.span))?;
 
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self
+                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = self
                     .scope
                     .all()
                     .iter()

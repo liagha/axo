@@ -54,7 +54,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             let members = delimited
                                 .members
                                 .iter()
-                                .map(|member| member.ty)
+                                .map(|member| member.ty.clone())
                                 .collect::<Vec<_>>();
 
                             Ok(
@@ -79,15 +79,17 @@ impl<'element> Checkable<'element> for Element<'element> {
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                     ) => {
                         let mut ty = Type::unit(Span::void());
-                        
-                        for (index, member) in delimited.members.iter_mut().enumerate() {
-                            if index == delimited.members.len() - 1 {
-                                let errors = member.check();
 
+                        let last = delimited.members.len() - 1;
+
+                        for (index, member) in delimited.members.iter_mut().enumerate() {
+                            let errors = member.check();
+
+                            if index == last {
                                 if errors.is_empty() {
-                                    return errors
+                                    return errors;
                                 } else {
-                                    ty = member.ty
+                                    ty = member.ty.clone();
                                 }
                             }
                         }
@@ -117,7 +119,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             )
                         } else {
                             let mut errors = delimited.members[0].check();
-                            let inner = delimited.members[0].ty;
+                            let inner = delimited.members[0].ty.clone();
 
                             for member in delimited.members.iter_mut().skip(1) {
                                 errors.extend(member.check());
@@ -126,8 +128,8 @@ impl<'element> Checkable<'element> for Element<'element> {
                                     errors.push(
                                         CheckError::new(
                                             ErrorKind::Mismatch(
-                                                inner,
-                                                member.ty,
+                                                inner.clone(),
+                                                member.ty.clone(),
                                             ),
                                             member.span,
                                         )
@@ -164,7 +166,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         errors.push(
                             CheckError::new(
                                 ErrorKind::InvalidOperation(
-                                    unary.operator
+                                    unary.operator.clone()
                                 ),
                                 unary.operator.span,
                             )
@@ -184,7 +186,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                                     CheckError::new(
                                         ErrorKind::Mismatch(
                                             Type::boolean(self.span),
-                                            unary.operand.ty,
+                                            unary.operand.ty.clone(),
                                         ),
                                         self.span
                                     )
@@ -194,14 +196,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                     }
                     [OperatorKind::Tilde] => {
                         if unary.operand.ty.is_integer() {
-                            Ok(unary.operand.ty)
+                            Ok(unary.operand.ty.clone())
                         } else {
                             Err(
                                 vec![
                                     CheckError::new(
                                         ErrorKind::Mismatch(
                                             Type::integer(64, true, self.span),
-                                            unary.operand.ty,
+                                            unary.operand.ty.clone(),
                                         ),
                                         self.span,
                                     )
@@ -211,14 +213,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                     }
                     [OperatorKind::Plus] | [OperatorKind::Minus] => {
                         if unary.operand.ty.is_numeric() {
-                            Ok(unary.operand.ty)
+                            Ok(unary.operand.ty.clone())
                         } else {
                             Err(
                                 vec![
                                     CheckError::new(
                                         ErrorKind::Mismatch(
                                             Type::integer(64, true, self.span),
-                                            unary.operand.ty,
+                                            unary.operand.ty.clone(),
                                         ),
                                         self.span,
                                     )
@@ -243,13 +245,13 @@ impl<'element> Checkable<'element> for Element<'element> {
                         };
 
                         if addressable {
-                            Ok(Type::pointer(unary.operand.ty, self.span))
+                            Ok(Type::pointer(unary.operand.ty.clone(), self.span))
                         } else {
                             Err(
                                 vec![
                                     CheckError::new(
                                         ErrorKind::InvalidOperation(
-                                            unary.operator
+                                            unary.operator.clone()
                                         ),
                                         unary.operator.span,
                                     )
@@ -257,7 +259,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             )
                         }
                     }
-                    [OperatorKind::Star] => match unary.operand.ty.kind {
+                    [OperatorKind::Star] => match unary.operand.ty.clone().kind {
                         TypeKind::Pointer { target: to } => Ok(*to),
                         TypeKind::Void => Ok(Type::new(TypeKind::Void, self.span)),
                         _ => {
@@ -266,7 +268,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                                     CheckError::new(
                                         ErrorKind::Mismatch(
                                             Type::pointer(Type::new(TypeKind::Void, self.span), self.span),
-                                            unary.operand.ty,
+                                            unary.operand.ty.clone(),
                                         ),
                                         self.span
                                     )
@@ -279,7 +281,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             vec![
                                 CheckError::new(
                                     ErrorKind::InvalidOperation(
-                                        unary.operator
+                                        unary.operator.clone()
                                     ),
                                     unary.operator.span,
                                 )
@@ -303,7 +305,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         errors.push(
                             CheckError::new(
                                 ErrorKind::InvalidOperation(
-                                    binary.operator
+                                    binary.operator.clone()
                                 ),
                                 binary.operator.span,
                             )
@@ -316,14 +318,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                 match operator.as_slice() {
                     [OperatorKind::Equal] => {
                         if unify(&binary.left.ty, &binary.right.ty).is_some() {
-                            Ok(binary.left.ty)
+                            Ok(binary.left.ty.clone())
                         } else {
                             Err(
                                 vec![
                                     CheckError::new(
                                         ErrorKind::Mismatch(
-                                            binary.left.ty,
-                                            binary.right.ty
+                                            binary.left.ty.clone(),
+                                            binary.right.ty.clone()
                                         ),
                                         binary.operator.span
                                     )
@@ -333,9 +335,9 @@ impl<'element> Checkable<'element> for Element<'element> {
                     }
                     [OperatorKind::Plus] => {
                         if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            Ok(binary.right.ty)
+                            Ok(binary.right.ty.clone())
                         } else if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            Ok(binary.left.ty)
+                            Ok(binary.left.ty.clone())
                         } else if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
                             Ok(Type::new(TypeKind::Void, binary.operator.span))
                         } else {
@@ -361,15 +363,15 @@ impl<'element> Checkable<'element> for Element<'element> {
                                 | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
                                 (TypeKind::Integer { .. } | TypeKind::Float { .. }, TypeKind::Pointer { .. }) => {
                                     binary.right.ty.span = binary.operator.span;
-                                    Ok(binary.right.ty)
+                                    Ok(binary.right.ty.clone())
                                 }
                                 _ => {
                                     Err(
                                         vec![
                                             CheckError::new(
                                                 ErrorKind::Mismatch(
-                                                    binary.left.ty,
-                                                    binary.right.ty
+                                                    binary.left.ty.clone(),
+                                                    binary.right.ty.clone()
                                                 ),
                                                 binary.operator.span
                                             )
@@ -379,45 +381,58 @@ impl<'element> Checkable<'element> for Element<'element> {
                             }
                         }
                     }
-                    [OperatorKind::Minus] => {
-                        if binary.left.ty.is_pointer() && binary.right.ty.is_pointer() {
-                            if binary.left.ty == binary.right.ty {
-                                return Ok(Type::integer(64, true, binary.operator.span));
-                            }
-
-                            return Err(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        binary.left.ty,
-                                        binary.right.ty
-                                    ),
-                                    binary.operator.span
+                  [OperatorKind::Minus] => {
+                      if binary.left.ty.is_pointer() && binary.right.ty.is_pointer() {
+                          if binary.left.ty == binary.right.ty {
+                                Ok(Type::integer(64, true, binary.operator.span))
+                           } else {
+                                Err(
+                                    vec![
+                                        CheckError::new(
+                                            ErrorKind::Mismatch(
+                                                binary.left.ty.clone(),
+                                                binary.right.ty.clone()
+                                            ),
+                                            binary.operator.span
+                                        )
+                                    ]
                                 )
-                            )
-                        }
-
-                        if binary.left.ty.is_pointer() {
+                           }
+                        } else if binary.left.ty.is_pointer() {
                             if binary.right.ty.is_integer() {
                                 binary.left.ty.span = binary.operator.span;
-                                return Ok(binary.left.ty);
+                                Ok(binary.left.ty.clone())
+                            } else {
+                                Err(
+                                    vec![
+                                        CheckError::new(
+                                            ErrorKind::InvalidOperation(
+                                                binary.operator.clone()
+                                            ),
+                                            binary.operator.span,
+                                        )
+                                    ]
+                                )
                             }
-                            return Err(invalid(binary.operator.clone()));
-                        }
-
-                        if binary.right.ty.is_pointer() {
-                            return Err(invalid(binary.operator.clone()));
-                        }
-
-                        if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            return Ok(binary.right.ty);
-                        }
-                        if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            return Ok(binary.left.ty);
-                        }
-                        if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
-                            return Ok(Type::new(TypeKind::Void, binary.operator.span));
-                        }
-                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
+                        } else if binary.right.ty.is_pointer() {
+                            Err(
+                                vec![
+                                    CheckError::new(
+                                        ErrorKind::InvalidOperation(
+                                            binary.operator.clone()
+                                        ),
+                                        binary.operator.span,
+                                    )
+                                ]
+                            )
+                        } else if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
+                            Ok(binary.right.ty.clone())
+                        } else if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
+                            Ok(binary.left.ty.clone())
+                        } else if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
+                            Ok(Type::new(TypeKind::Void, binary.operator.span))
+                        } else {
+                            match (&binary.left.ty.kind, &binary.right.ty.kind) {
                             (
                                 TypeKind::Integer {
                                     size: left_bits,
@@ -439,26 +454,32 @@ impl<'element> Checkable<'element> for Element<'element> {
                             | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
                             _ => {
                                 Err(
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            binary.left.ty,
-                                            binary.right.ty
-                                        ),
-                                        binary.operator.span
-                                    )
+                                    vec![
+                                        CheckError::new(
+                                            ErrorKind::Mismatch(
+                                                binary.left.ty.clone(),
+                                                binary.right.ty.clone()
+                                            ),
+                                            binary.operator.span
+                                        )
+                                    ]
                                 )
                             },
                         }
                     }
+                    }
                     [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
                         if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            return Ok(binary.right.ty);
+                            self.ty = binary.right.ty.clone();
+                            return Vec::new();
                         }
                         if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            return Ok(binary.left.ty);
+                            self.ty = binary.left.ty.clone();
+                            return Vec::new();
                         }
                         if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
-                            return Ok(Type::new(TypeKind::Void, binary.operator.span));
+                            self.ty = Type::new(TypeKind::Void, binary.operator.span);
+                            return Vec::new();
                         }
                         match (&binary.left.ty.kind, &binary.right.ty.kind) {
                             (
@@ -482,13 +503,15 @@ impl<'element> Checkable<'element> for Element<'element> {
                             | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
                             _ => {
                                 Err(
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            binary.left.ty,
-                                            binary.right.ty
-                                        ),
-                                        binary.operator.span
-                                    )
+                                    vec![
+                                        CheckError::new(
+                                            ErrorKind::Mismatch(
+                                                binary.left.ty.clone(),
+                                                binary.right.ty.clone()
+                                            ),
+                                            binary.operator.span
+                                        )
+                                    ]
                                 )
                             },
                         }
@@ -499,16 +522,18 @@ impl<'element> Checkable<'element> for Element<'element> {
                     | [OperatorKind::LeftAngle, OperatorKind::LeftAngle]
                     | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
                         if binary.left.ty.is_integer() && binary.right.ty.is_integer() {
-                            Ok(binary.left.ty)
+                            Ok(binary.left.ty.clone())
                         } else {
                             Err(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        Type::integer(64, true, self.span),
-                                        binary.right.ty
-                                    ),
-                                    self.span,
-                                )
+                                vec![
+                                    CheckError::new(
+                                        ErrorKind::Mismatch(
+                                            Type::integer(64, true, self.span),
+                                            binary.right.ty.clone()
+                                        ),
+                                        self.span,
+                                    )
+                                ]
                             )
                         }
                     }
@@ -518,13 +543,15 @@ impl<'element> Checkable<'element> for Element<'element> {
                             Ok(Type::boolean(binary.operator.span))
                         } else {
                             Err(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        Type::boolean(self.span),
-                                        binary.right.ty
-                                    ),
-                                    self.span
-                                )
+                                vec![
+                                    CheckError::new(
+                                        ErrorKind::Mismatch(
+                                            Type::boolean(self.span),
+                                            binary.right.ty.clone()
+                                        ),
+                                        self.span
+                                    )
+                                ]
                             )
                         }
                     }
@@ -538,41 +565,60 @@ impl<'element> Checkable<'element> for Element<'element> {
                             Ok(Type::boolean(binary.operator.span))
                         } else {
                             Err(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        binary.left.ty,
-                                        binary.right.ty
-                                    ),
-                                    binary.operator.span
-                                )
+                                vec![
+                                    CheckError::new(
+                                        ErrorKind::Mismatch(
+                                            binary.left.ty.clone(),
+                                            binary.right.ty.clone()
+                                        ),
+                                        binary.operator.span
+                                    )
+                                ]
                             )
                         }
                     }
-                    [OperatorKind::Dot] => Ok(binary.right.ty),
-                    _ => Err(invalid(binary.operator)),
+                    [OperatorKind::Dot] => Ok(binary.right.ty.clone()),
+                    _ => Err(
+                        vec![
+                            CheckError::new(
+                                ErrorKind::InvalidOperation(
+                                    binary.operator.clone()
+                                ),
+                                binary.operator.span,
+                            )
+                        ]
+                    ),
                 }
             }
-            ElementKind::Index(index) => {
-                if index.members.is_empty() {
-                    return Ok(Type::unit(self.span));
+           ElementKind::Index(index) => {
+               if index.members.is_empty() {
+                    self.ty = Type::unit(self.span);
+                    return Vec::new();
+               }
+
+                let mut errors = index.target.check();
+                errors.extend(index.members[0].check());
+
+                if !errors.is_empty() {
+                    return errors;
                 }
 
-                let target = index.target.check()?;
-                let ty = index.members[0].check()?;
+                let target_ty = index.target.ty.clone();
+                let index_ty = index.members[0].ty.clone();
 
-                if !ty.is_integer() {
-                    return Err(
+                if !index_ty.is_integer() {
+                    return vec![
                         CheckError::new(
                             ErrorKind::Mismatch(
                                 Type::integer(64, true, self.span),
-                                ty,
+                                index_ty,
                             ),
                             self.span,
                         )
-                    )
+                    ];
                 }
 
-                match target.kind {
+                match target_ty.kind {
                     TypeKind::Array { member, .. } => Ok(*member),
                     TypeKind::Tuple { members } => {
                         if let ElementKind::Literal(Token {
@@ -582,7 +628,8 @@ impl<'element> Checkable<'element> for Element<'element> {
                         {
                             if let Ok(idx) = usize::try_from(*value) {
                                 if idx < members.len() {
-                                    return Ok(members[idx].clone());
+                                    self.ty = members[idx].clone();
+                                    return Vec::new();
                                 }
                             }
                         }
@@ -591,14 +638,28 @@ impl<'element> Checkable<'element> for Element<'element> {
                             TokenKind::Punctuation(PunctuationKind::LeftBracket),
                             self.span,
                         );
-                        Err(invalid(token))
+                        Err(
+                            vec![
+                                CheckError::new(
+                                    ErrorKind::InvalidOperation(token),
+                                    self.span,
+                                )
+                            ]
+                        )
                     }
                     _ => {
                         let token = Token::new(
                             TokenKind::Punctuation(PunctuationKind::LeftBracket),
                             self.span,
                         );
-                        Err(invalid(token))
+                        Err(
+                            vec![
+                                CheckError::new(
+                                    ErrorKind::InvalidOperation(token),
+                                    self.span,
+                                )
+                            ]
+                        )
                     }
                 }
             }
@@ -611,61 +672,59 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 match primitive {
                     Some("if") => {
-                        let condition = invoke.members[0].check()?;
+                        let mut errors = invoke.members[0].check();
 
-                        if !condition.is_boolean() {
-                            return Err(
+                        errors.extend(invoke.members[1].check());
+                        errors.extend(invoke.members[2].check());
+
+                        if !invoke.members[0].ty.is_boolean() {
+                            errors.push(
                                 CheckError::new(
                                     ErrorKind::Mismatch(
                                         Type::boolean(self.span),
-                                        condition,
+                                        invoke.members[0].ty.clone(),
                                     ),
                                     invoke.members[0].span,
                                 )
                             )
                         }
 
-                        let then = invoke.members[1].check()?;
-                        let otherwise = invoke.members[2].check()?;
-
-                        if let Some(unified) = unify(&then, &otherwise) {
+                        if let Some(unified) = unify(&invoke.members[1].ty, &invoke.members[2].ty) {
                             Ok(unified)
                         } else {
-                            Err(
+                            errors.push(
                                 CheckError::new(
                                     ErrorKind::Mismatch(
-                                        then,
-                                        otherwise,
+                                        invoke.members[1].ty.clone(),
+                                        invoke.members[2].ty.clone(),
                                     ),
                                     self.span
                                 )
-                            )
+                            );
+
+                            if errors.is_empty() {
+                                Ok(Type::unit(self.span))
+                            } else {
+                                Err(errors)
+                            }
                         }
                     }
                     Some("while") => {
-                        if invoke.members.len() != 2 {
-                            let token = invoke.target.brand().unwrap_or(Token::new(
-                                TokenKind::Identifier(Str::from("while")),
-                                self.span,
-                            ));
-                            return Err(invalid(token));
-                        }
+                        let mut errors = invoke.members[0].check();
 
-                        let condition = invoke.members[0].check()?;
+                        errors.extend(invoke.members[1].check());
 
-                        if !condition.is_boolean() {
-                            return Err(
+                        if !invoke.members[0].ty.is_boolean() {
+                            errors.push(
                                 CheckError::new(
                                     ErrorKind::Mismatch(
                                         Type::boolean(self.span),
-                                        condition,
+                                        invoke.members[0].ty.clone(),
                                     ),
                                     invoke.members[0].span,
                                 )
                             )
                         }
-
-                        invoke.members[1].check()?;
 
                         Ok(Type::unit(self.span))
                     }
@@ -673,138 +732,37 @@ impl<'element> Checkable<'element> for Element<'element> {
                 }
             }
             ElementKind::Construct(construct) => {
-                if let Some(target) = construct.target.brand() {
-                    if let TokenKind::Identifier(name) = target.kind {
-                        if let Some(name) = name.as_str() {
-                            match name {
-                                "Integer" | "Int32" | "Int64" => {
-                                    let mut size = None;
-                                    let mut signed = None;
+                let members: Result<Vec<Type<'element>>, Vec<CheckError<'element>>> =
+                    construct
+                        .members
+                        .iter_mut()
+                        .map(|field| {
+                            let errors = field.check();
 
-                                    for member in construct.members {
-                                        if let ElementKind::Binary(binary) = &member.kind {
-                                            if let TokenKind::Operator(operator) = &binary.operator.kind {
-                                                if operator.as_slice() != [OperatorKind::Equal] {
-                                                    continue;
-                                                }
-                                            } else {
-                                                continue;
-                                            }
-
-                                            let field = binary.left.brand().and_then(|token| match token.kind {
-                                                TokenKind::Identifier(name) => Some(name),
-                                                _ => None,
-                                            });
-
-                                            match field.as_ref().and_then(|name| name.as_str()) {
-                                                Some("size") => {
-                                                    if let ElementKind::Literal(Token {
-                                                                                    kind: TokenKind::Integer(value),
-                                                                                    ..
-                                                                                }) = binary.right.kind
-                                                    {
-                                                        size = value.try_into().ok();
-                                                    }
-                                                }
-                                                Some("signed") => {
-                                                    if let ElementKind::Literal(Token {
-                                                                                    kind: TokenKind::Boolean(value),
-                                                                                    ..
-                                                                                }) = binary.right.kind
-                                                    {
-                                                        signed = Some(value);
-                                                    }
-                                                }
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-
-                                    return Ok(
-                                        Type::integer(
-                                            if name == "Int32" {
-                                                32
-                                            } else {
-                                                size.unwrap_or(64)
-                                            },
-                                            signed.unwrap_or(true),
-                                            self.span,
-                                        )
-                                    );
-                                }
-
-                                "Float" => {
-                                    let mut size = 64;
-
-                                    for member in construct.members {
-                                        if let ElementKind::Binary(binary) = &member.kind {
-                                            if let TokenKind::Operator(operator) = &binary.operator.kind {
-                                                if operator.as_slice() != [OperatorKind::Equal] {
-                                                    continue;
-                                                }
-                                            } else {
-                                                continue;
-                                            }
-
-                                            let field = binary.left.brand().and_then(|token| match token.kind {
-                                                TokenKind::Identifier(name) => Some(name),
-                                                _ => None,
-                                            });
-
-                                            if matches!(field.as_ref().and_then(|name| name.as_str()), Some("size")) {
-                                                if let ElementKind::Literal(Token {
-                                                                                kind: TokenKind::Integer(value),
-                                                                                ..
-                                                                            }) = binary.right.kind
-                                                {
-                                                    size = value;
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    return Ok(Type::float(size as Scale, self.span));
-                                }
-
-                                _ => {
-                                    let ty =
-                                        match TypeKind::from_name(name) {
-                                            Some(TypeKind::Integer { size: bits, signed }) => Some(Type::integer(bits, signed, self.span)),
-                                            Some(TypeKind::Float { size: bits }) => Some(Type::float(bits, self.span)),
-                                            Some(TypeKind::Boolean) => Some(Type::boolean(self.span)),
-                                            Some(TypeKind::Character) => Some(Type::character(self.span)),
-                                            Some(_) | None => match name {
-                                                "String" => Some(Type::string(self.span)),
-                                                "Type" => Some(Type::new(
-                                                    TypeKind::Type(Box::new(Type::new(TypeKind::Void, self.span))),
-                                                    self.span,
-                                                )),
-                                                _ => None,
-                                            },
-                                        };
-
-                                    if let Some(kind) = ty {
-                                        return Ok(kind);
-                                    }
-                                }
+                            if errors.is_empty() {
+                                Ok(field.ty.clone())
+                            } else {
+                                Err(errors)
                             }
-                        }
+                        })
+                        .collect();
+
+                match members {
+                    Ok(members) => {
+                        let structure = Structure::new(
+                            Str::from(construct.target.brand().unwrap().format(0)),
+                            members,
+                        );
+
+                        Ok(Type::new(TypeKind::Structure(structure), self.span))
+                    }
+
+                    Err(errors) => {
+                        Err(errors)
                     }
                 }
-
-                let members: Result<Vec<Box<Type<'element>>>, CheckError<'element>> = construct
-                    .members
-                    .iter()
-                    .map(|field| field.check().map(Box::new))
-                    .collect();
-
-                let structure = Structure::new(
-                    Str::from(construct.target.brand().unwrap().format(0)),
-                    members?,
-                );
-
-                Ok(Type::new(TypeKind::Structure(structure), self.span))
             }
+
             ElementKind::Symbolize(_) => Ok(Type::unit(self.span)),
         };
         

@@ -1,18 +1,21 @@
-use crate::analyzer::{AnalyzeError};
 use crate::checker::{CheckError};
 use crate::parser::Element;
 
-pub struct Checker<'analyzer> {
-    pub input: &'analyzer mut Vec<Element<'analyzer>>,
-    pub errors: Vec<AnalyzeError<'analyzer>>,
+pub struct Checker<'check, 'source> {
+    pub input: &'check mut Vec<Element<'source>>,
+    pub errors: Vec<CheckError<'source>>,
 }
 
 pub trait Checkable<'checkable> {
     fn check(&mut self) -> Vec<CheckError<'checkable>>;
 }
 
-impl<'resolver> Checker<'resolver> {
-    fn check(&mut self) {
+impl<'check, 'source> Checker<'check, 'source> {
+    pub fn new(input: &'check mut Vec<Element<'source>>) -> Self {
+        Self { input, errors: vec![] }
+    }
+    
+    pub fn check(&mut self) {
         for element in self.input.iter_mut() {
             element.check();
         }

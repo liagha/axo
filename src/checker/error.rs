@@ -5,11 +5,13 @@ use crate::{
 use crate::checker::types::Type;
 use crate::data::Str;
 use crate::format::Show;
+use crate::parser::Element;
 
 #[derive(Clone)]
 pub enum ErrorKind<'error> {
     Mismatch(Type<'error>, Type<'error>),
     InvalidOperation(Token<'error>),
+    InvalidAnnotation(Element<'error>),
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -22,6 +24,9 @@ impl<'error> Show<'error> for ErrorKind<'error> {
             }
             ErrorKind::InvalidOperation(token) => {
                 format!("invalid operation for operand types: `{}`.", token.format(verbosity))
+            }
+            ErrorKind::InvalidAnnotation(element) => {
+                format!("invalid type annotation: `{}`.", element.format(verbosity))
             }
         }.into()
     }

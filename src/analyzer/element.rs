@@ -1,7 +1,7 @@
 use {
     crate::{
         data::*,
-        analyzer::{Analyzable, Analysis, AnalyzeError, ErrorKind},
+        analyzer::{Analyzable, Analysis, CheckError, ErrorKind},
         format::Show,
         parser::{Element, ElementKind},
         resolver::Resolver,
@@ -13,7 +13,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'element>,
-    ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
+    ) -> Result<Analysis<'element>, CheckError<'element>> {
         match &self.kind {
             ElementKind::Literal(literal) => literal.analyze(resolver),
 
@@ -33,7 +33,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                     ) => {
-                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
+                        let items: Result<Vec<Analysis<'element>>, CheckError<'element>> = delimited
                             .members
                             .iter()
                             .map(|item| item.analyze(resolver))
@@ -47,7 +47,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightBracket),
                     ) => {
-                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
+                        let items: Result<Vec<Analysis<'element>>, CheckError<'element>> =
                             delimited
                                 .members
                                 .iter()
@@ -65,7 +65,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         if delimited.members.len() == 1 {
                             delimited.members[0].analyze(resolver)
                         } else {
-                            let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
+                            let items: Result<Vec<Analysis<'element>>, CheckError<'element>> =
                                 delimited
                                     .members
                                     .iter()
@@ -76,7 +76,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         }
                     }
 
-                    _ => Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
+                    _ => Err(CheckError::new(ErrorKind::Unimplemented, self.span)),
                 }
             }
 
@@ -86,7 +86,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
             ElementKind::Index(index) => {
                 let target = index.target.analyze(resolver)?;
-                let indexes: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = index
+                let indexes: Result<Vec<Analysis<'element>>, CheckError<'element>> = index
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -156,7 +156,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     _ => {
                         let target = invoke.target.analyze(resolver)?;
                         
-                        let arguments: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = invoke
+                        let arguments: Result<Vec<Analysis<'element>>, CheckError<'element>> = invoke
                             .members
                             .iter()
                             .map(|member| member.analyze(resolver))
@@ -181,7 +181,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
-                    .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
+                    .collect::<Result<Vec<Analysis<'element>>, CheckError<'element>>>()?;
 
                 match target.as_str().unwrap() {
                     "Integer" => {
@@ -226,7 +226,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                     signed,
                                 })
                             }
-                            _ => Err(AnalyzeError::new(
+                            _ => Err(CheckError::new(
                                 ErrorKind::InvalidType,
                                 constructor.target.span,
                             )),
@@ -263,7 +263,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 value,
                                 size: size.try_into().unwrap(),
                             }),
-                            _ => Err(AnalyzeError::new(
+                            _ => Err(CheckError::new(
                                 ErrorKind::InvalidType,
                                 constructor.target.span,
                             )),
@@ -284,7 +284,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                         match value_opt {
                             Some(value) => Ok(Analysis::Boolean { value }),
-                            _ => Err(AnalyzeError::new(
+                            _ => Err(CheckError::new(
                                 ErrorKind::InvalidType,
                                 constructor.target.span,
                             )),
@@ -304,7 +304,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 }
 
 impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binary>, Box<Element<'binary>>> {
-    fn analyze(&self, resolver: &mut Resolver<'binary>) -> Result<Analysis<'binary>, AnalyzeError<'binary>> {
+    fn analyze(&self, resolver: &mut Resolver<'binary>) -> Result<Analysis<'binary>, CheckError<'binary>> {
         if let TokenKind::Operator(operator) = &self.operator.kind {
             match operator.as_slice() {
                 [OperatorKind::Dot] => {
@@ -330,7 +330,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                             Box::new(target),
                             Box::new(value),
                         )),
-                        _ => Err(AnalyzeError::new(
+                        _ => Err(CheckError::new(
                             ErrorKind::InvalidOperation(self.operator.clone()),
                             self.operator.span,
                         )),
@@ -510,13 +510,13 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
                     ))
                 }
 
-                _ => Err(AnalyzeError::new(
+                _ => Err(CheckError::new(
                     ErrorKind::InvalidOperation(self.operator.clone()),
                     self.operator.span,
                 )),
             }
         } else {
-            Err(AnalyzeError::new(
+            Err(CheckError::new(
                 ErrorKind::InvalidOperation(self.operator.clone()),
                 self.operator.span,
             ))
@@ -526,7 +526,7 @@ impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binar
 }
 
 impl<'unary> Analyzable<'unary> for Unary<Token<'unary>, Box<Element<'unary>>> {
-    fn analyze(&self, resolver: &mut Resolver<'unary>) -> Result<Analysis<'unary>, AnalyzeError<'unary>> {
+    fn analyze(&self, resolver: &mut Resolver<'unary>) -> Result<Analysis<'unary>, CheckError<'unary>> {
         if let TokenKind::Operator(operator) = &self.operator.kind {
             let operand = self.operand.analyze(resolver)?;
 
@@ -548,14 +548,14 @@ impl<'unary> Analyzable<'unary> for Unary<Token<'unary>, Box<Element<'unary>>> {
                     Ok(Analysis::AddressOf(Box::new(operand)))
                 }
                 [OperatorKind::Star] => Ok(Analysis::Dereference(Box::new(operand))),
-                _ => Err(AnalyzeError::new(
+                _ => Err(CheckError::new(
                     ErrorKind::InvalidOperation(self.operator.clone()),
                     self.operator.span,
                 )),
             };
         }
 
-        Err(AnalyzeError::new(
+        Err(CheckError::new(
             ErrorKind::InvalidOperation(self.operator.clone()),
             self.operator.span,
         ))

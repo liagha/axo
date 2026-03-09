@@ -10,4 +10,4 @@ pub(crate) use error::*;
 
 use crate::reporter::Error;
 
-pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
+pub type CheckError<'error> = Error<'error, ErrorKind<'error>>;
