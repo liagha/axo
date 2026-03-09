@@ -124,8 +124,6 @@ impl<'session> Session<'session> {
 
         resolver.scope.extend(preferences);
 
-        let name = resolver.input();
-
         let duration = Duration::from_nanos(timer.lap().unwrap());
 
         let verbosity = Resolver::verbosity(&mut resolver);
@@ -137,7 +135,7 @@ impl<'session> Session<'session> {
             ContextRef::new(context.raw())
         };
 
-        let backend = Inkwell::new(Str::from(name), context_ref);
+        let backend = Inkwell::new(context_ref);
 
         let generator = Generator::new(backend);
 
@@ -183,21 +181,15 @@ impl<'session> Session<'session> {
     }
 
     pub fn scan(&mut self) {
+        self.reporter.start("scanning");
+
         for (identity, location) in &self.inputs {
             let mut scanner = Scanner::new(*location);
-            
-            self.reporter.start("scanning");
 
             scanner.prepare();
             scanner.scan();
 
             self.reporter.tokens(&scanner.output);
-
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self
-                .reporter
-                .finish("scanning", duration);
 
             self.errors.extend(
                 scanner
@@ -210,13 +202,19 @@ impl<'session> Session<'session> {
             
             self.scanners.insert(*identity, scanner);
         }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self
+            .reporter
+            .finish("scanning", duration);
     }
 
     pub fn parse(&mut self) {
+        self.reporter.start("parsing");
+
         for (identity, location) in &self.inputs {
             let mut parser = Parser::new(*location);
-            
-            self.reporter.start("parsing");
 
             let tokens = self.scanners.get(identity).unwrap().output.clone();
             
@@ -224,12 +222,6 @@ impl<'session> Session<'session> {
             parser.parse();
 
             self.reporter.elements(&parser.output);
-
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self
-                .reporter
-                .finish("parsing", duration);
 
             self.errors.extend(
                 parser
@@ -242,6 +234,10 @@ impl<'session> Session<'session> {
 
             self.parsers.insert(*identity, parser);
         }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.reporter.finish("parsing", duration);
     }
 
     pub fn register(&mut self) {
@@ -291,9 +287,9 @@ impl<'session> Session<'session> {
     }
     
     pub fn resolve(&mut self) {
-        for (identity, _location) in &self.inputs {
-            self.reporter.start("resolving");
+        self.reporter.start("resolving");
 
+        for (identity, _location) in &self.inputs {
             let elements = self.parsers.get(identity).unwrap().output.clone();
             let module = self.resolver.scope.get_identity(*identity).unwrap();
             
@@ -344,7 +340,11 @@ impl<'session> Session<'session> {
     
     pub fn generate(&mut self) {
         for (identity, location) in &self.inputs.clone() {
+            let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(identity).unwrap().output.clone();
+            let module = self.generator.backend.context.create_module(stem.as_str().unwrap());
+            self.generator.backend.modules.insert(stem, module);
+            self.generator.backend.current_module = stem.clone();
 
             let schema =
                 Self::output(
@@ -360,7 +360,7 @@ impl<'session> Session<'session> {
 
             match File::create(&schema) {
                 Ok(mut file) => {
-                    if let Err(error) = file.write_all(self.generator.backend.module.print_to_string().to_string().as_bytes()) {
+                    if let Err(error) = file.write_all(self.generator.backend.current_module().print_to_string().to_string().as_bytes()) {
                         let location = Location::Entry(Str::from(schema.clone()));
 
                         self.errors.push(

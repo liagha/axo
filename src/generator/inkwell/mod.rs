@@ -9,7 +9,6 @@ mod variables;
 
 use crate::analyzer::Analysis;
 use crate::checker::TypeKind;
-use crate::internal::hash::Set;
 use {
     super::Backend,
     crate::{data::Str, generator::GenerateError, internal::hash::Map},
@@ -43,12 +42,12 @@ pub enum Entity<'backend> {
 }
 
 pub struct Inkwell<'backend> {
-    context: ContextRef<'backend>,
-    builder: Builder<'backend>,
-    pub module: Module<'backend>,
+    pub context: ContextRef<'backend>,
+    pub builder: Builder<'backend>,
+    pub modules: Map<Str<'backend>, Module<'backend>>,
+    pub current_module: Str<'backend>,
 
     entities: Map<Str<'backend>, Entity<'backend>>,
-    modules: Set<Str<'backend>>,
     pub errors: Vec<GenerateError<'backend>>,
 
     loop_headers: Vec<BasicBlock<'backend>>,
@@ -107,14 +106,13 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    pub fn new(name: Str<'backend>, context: ContextRef<'backend>) -> Self {
+    pub fn new(context: ContextRef<'backend>) -> Self {
         let builder = context.create_builder();
-        let module = context.create_module(&name);
 
         Self {
             context,
             builder,
-            module,
+            current_module: Default::default(),
             entities: Default::default(),
             modules: Default::default(),
             errors: Vec::new(),
@@ -165,6 +163,13 @@ impl<'backend> Inkwell<'backend> {
 
         allocation
     }
+
+    pub fn current_module(&self) -> &Module<'backend> {
+        self
+            .modules
+            .get(&self.current_module)
+            .unwrap()
+    }
 }
 
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
@@ -202,7 +207,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
                 .build_return(Some(&self.context.i32_type().const_zero()));
         }
 
-        let _ = self.module.verify();
+        let _ = self.modules.get(&self.current_module).unwrap().verify();
     }
 
     fn analysis(&mut self, instruction: Analysis<'backend>) -> BasicValueEnum<'backend> {

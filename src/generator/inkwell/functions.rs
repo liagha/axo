@@ -216,7 +216,8 @@ impl<'backend> super::Inkwell<'backend> {
         name: Str<'backend>,
         analyses: Vec<Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
-        self.modules.insert(name);
+        self.modules.insert(name, self.context.create_module(name.as_str().unwrap()));
+
         let caller_block = self.builder.get_insert_block();
         for analysis in analyses {
             if self.has_terminator() {
@@ -299,7 +300,7 @@ impl<'backend> super::Inkwell<'backend> {
         let name = method.target.as_str().unwrap();
 
         let function = if matches!(method.interface, Interface::C) {
-            let function = self.module.add_function(
+            let function = self.current_module().add_function(
                 name,
                 function_type,
                 Some(inkwell::module::Linkage::External),
@@ -315,7 +316,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(inkwell::module::Linkage::Internal)
             };
 
-            let function = self.module.add_function(name, function_type, linkage);
+            let function = self.current_module().add_function(name, function_type, linkage);
 
             let previous_entities = self.entities.clone();
             let mut scoped_entities = Map::default();

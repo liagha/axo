@@ -206,7 +206,7 @@ impl<'backend> super::Inkwell<'backend> {
         member: Box<Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
         if let Analysis::Usage(name) = &*target {
-            if self.modules.contains(name) || name.as_str() == Some("stdin") {
+            if self.modules.contains_key(name) {
                 match &*member {
                     Analysis::Usage(name) => return self.usage(name.clone()),
                     Analysis::Invoke(invoke) => return self.invoke(invoke.clone()),
