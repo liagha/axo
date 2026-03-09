@@ -7,7 +7,6 @@ use {
         scanner::{OperatorKind, Token, TokenKind},
     },
 };
-use crate::checker::Checkable;
 
 impl<'element> Resolvable<'element> for Element<'element> {
     fn resolve(
@@ -23,8 +22,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             => {
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
-                        let annotation = symbol.infer();
-                        
                         self.reference = Some(symbol.id);
                     }
 

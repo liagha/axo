@@ -76,7 +76,7 @@ pub enum SymbolKind<'symbol> {
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Method(
-        Method<
+        Function<
             Box<Element<'symbol>>,
             Symbol<'symbol>,
             Box<Element<'symbol>>,

@@ -33,7 +33,7 @@ pub struct Module<Target> {
 }
 
 #[derive(Debug, Eq)]
-pub struct Method<Target, Parameter, Body, Output> {
+pub struct Function<Target, Parameter, Body, Output> {
     pub target: Target,
     pub members: Vec<Parameter>,
     pub body: Body,
@@ -78,7 +78,7 @@ impl<Target, Field> Structure<Target, Field> {
     }
 }
 
-impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
+impl<Target, Parameter, Body, Output> Function<Target, Parameter, Body, Output> {
     #[inline]
     pub fn new(
         target: Target,
@@ -88,7 +88,7 @@ impl<Target, Parameter, Body, Output> Method<Target, Parameter, Body, Output> {
         interface: Interface,
         entry: Boolean,
     ) -> Self {
-        Method {
+        Function {
             target,
             members,
             body,
@@ -123,7 +123,7 @@ impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
 }
 
 impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
-    for Method<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -157,7 +157,7 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field>
 }
 
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq
-    for Method<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -191,10 +191,10 @@ impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
 }
 
 impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
-    for Method<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn clone(&self) -> Self {
-        Method::new(
+        Function::new(
             self.target.clone(),
             self.members.clone(),
             self.body.clone(),
@@ -269,7 +269,7 @@ impl<
         Parameter: Show<'show, Verbosity = u8>,
         Body: Show<'show, Verbosity = u8>,
         Output: Show<'show, Verbosity = u8>,
-    > Show<'show> for Method<Target, Parameter, Body, Output>
+    > Show<'show> for Function<Target, Parameter, Body, Output>
 {
     type Verbosity = u8;
 

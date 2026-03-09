@@ -427,7 +427,7 @@ impl<'parser> Parser<'parser> {
                         ElementKind::Symbolize(
                             Symbol::new(
                                 0,
-                                SymbolKind::Method(Method::new(
+                                SymbolKind::Method(Function::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),
@@ -452,7 +452,7 @@ impl<'parser> Parser<'parser> {
                         ElementKind::Symbolize(
                             Symbol::new(
                                 0,
-                                SymbolKind::Method(Method::new(
+                                SymbolKind::Method(Function::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),

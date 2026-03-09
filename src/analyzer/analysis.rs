@@ -76,7 +76,7 @@ pub enum Analysis<'analysis> {
     Structure(Structure<Str<'analysis>, Analysis<'analysis>>),
     Enumeration(Structure<Str<'analysis>, Analysis<'analysis>>),
     Method(
-        Method<
+        Function<
             Str<'analysis>,
             Analysis<'analysis>,
             Box<Analysis<'analysis>>,

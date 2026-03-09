@@ -20,11 +20,11 @@ impl<'ty> Type<'ty> {
     }
 
     pub fn integer(bits: Scale, signed: Boolean, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Integer { bits, signed }, span)
+        Self::new(TypeKind::Integer { size: bits, signed }, span)
     }
 
     pub fn float(bits: Scale, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Float { bits }, span)
+        Self::new(TypeKind::Float { size: bits }, span)
     }
 
     pub fn boolean(span: Span<'ty>) -> Self {
@@ -40,7 +40,7 @@ impl<'ty> Type<'ty> {
     }
 
     pub fn pointer(to: Type<'ty>, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Pointer { to: Box::new(to) }, span)
+        Self::new(TypeKind::Pointer { target: Box::new(to) }, span)
     }
 
     pub fn is_numeric(&self) -> bool {
@@ -56,7 +56,7 @@ impl<'ty> Type<'ty> {
     }
 
     pub fn is_infer(&self) -> bool {
-        matches!(self.kind, TypeKind::Unknown)
+        matches!(self.kind, TypeKind::Void)
     }
 
     pub fn is_pointer(&self) -> bool {
@@ -66,70 +66,71 @@ impl<'ty> Type<'ty> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'ty> {
-    Integer { bits: Scale, signed: Boolean },
-    Float { bits: Scale },
+    Integer { size: Scale, signed: Boolean },
+    Float { size: Scale },
     Boolean,
     String,
     Character,
-    Pointer { to: Box<Type<'ty>> },
+    Pointer { target: Box<Type<'ty>> },
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
-    Unknown,
+    Void,
 
-    Type(Box<Type<'ty>>),
+    Type,
 
-    Structure(Structure<Str<'ty>, Box<Type<'ty>>>),
-    Enumeration(Structure<Str<'ty>, Box<Type<'ty>>>),
-    Method(Method<Str<'ty>, Box<Type<'ty>>, Box<Type<'ty>>, Box<Type<'ty>>>),
+    Constructor(Structure<Str<'ty>, Type<'ty>>),
+    Structure(Structure<Str<'ty>, Type<'ty>>),
+    Enumeration(Structure<Str<'ty>, Type<'ty>>),
+    Function(Function<Str<'ty>, Type<'ty>, Box<Type<'ty>>, Box<Type<'ty>>>),
 }
 
 impl<'ty> TypeKind<'ty> {
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "Int8" => Some(Self::Integer {
-                bits: 8,
+                size: 8,
                 signed: true,
             }),
             "Int16" => Some(Self::Integer {
-                bits: 16,
+                size: 16,
                 signed: true,
             }),
             "Int32" => Some(Self::Integer {
-                bits: 32,
+                size: 32,
                 signed: true,
             }),
             "Int64" => Some(Self::Integer {
-                bits: 64,
+                size: 64,
                 signed: true,
             }),
             "UInt8" => Some(Self::Integer {
-                bits: 8,
+                size: 8,
                 signed: false,
             }),
             "UInt16" => Some(Self::Integer {
-                bits: 16,
+                size: 16,
                 signed: false,
             }),
             "UInt32" => Some(Self::Integer {
-                bits: 32,
+                size: 32,
                 signed: false,
             }),
             "UInt64" => Some(Self::Integer {
-                bits: 64,
+                size: 64,
                 signed: false,
             }),
-            "Float32" => Some(Self::Float { bits: 32 }),
-            "Float64" => Some(Self::Float { bits: 64 }),
+            "Float32" => Some(Self::Float { size: 32 }),
+            "Float64" => Some(Self::Float { size: 64 }),
             "Bool" => Some(Self::Boolean),
             "Char" | "Character" => Some(Self::Character),
             "String" => Some(Self::String),
             "Integer" => Some(Self::Integer {
-                bits: 64,
+                size: 64,
                 signed: true,
             }),
-            "Float" => Some(Self::Float { bits: 64 }),
+            "Float" => Some(Self::Float { size: 64 }),
             "Boolean" => Some(Self::Boolean),
-            "Pointer" => Some(Self::Pointer { to: Box::from(Type::new(Self::Unknown, Span::void())) }),
+            "Pointer" => Some(Self::Pointer { target: Box::from(Type::new(Self::Void, Span::void())) }),
             _ => None,
         }
     }

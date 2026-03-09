@@ -34,43 +34,46 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
             0 => {
                 match self {
                     TypeKind::Integer { .. } => {
-                        format!("Integer")
+                        "Integer".to_string()
                     }
                     TypeKind::Float { .. } => {
-                        format!("Float")
+                        "Float".to_string()
                     }
                     TypeKind::Boolean => {
-                        format!("Boolean")
+                        "Boolean".to_string()
                     }
                     TypeKind::String => {
-                        format!("String")
+                        "String".to_string()
                     }
                     TypeKind::Character => {
-                        format!("Character")
+                        "Character".to_string()
                     }
                     TypeKind::Pointer { .. } => {
-                        format!("Pointer")
+                        "Pointer".to_string()
                     }
                     TypeKind::Array { .. } => {
-                        format!("Array")
+                        "Array".to_string()
                     }
                     TypeKind::Tuple { members } => {
                         format!("Tuple({})", members.format(verbosity))
                     }
-                    TypeKind::Unknown => {
-                        format!("Unknown")
+                    TypeKind::Void => {
+                        "Void".to_string()
                     }
-                    TypeKind::Type(_) => {
-                        format!("Type")
+                    TypeKind::Type => {
+                        "Type".to_string()
+                    }
+                    TypeKind::Constructor(_) => {
+                        "Constructor".to_string()
                     }
                     TypeKind::Structure(_) => {
-                        format!("Structure")
+                        "Structure".to_string()
                     }
                     TypeKind::Enumeration(_) => {
-                        format!("Enumeration")
+                        "Enumeration".to_string()
                     }
-                    TypeKind::Method(_) => {
-                        format!("Method")
+                    TypeKind::Function(_) => {
+                        "Method".to_string()
                     }
                 }
             }

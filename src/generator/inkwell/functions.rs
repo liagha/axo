@@ -237,7 +237,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn method(
         &mut self,
-        method: Method<
+        method: Function<
             Str<'backend>,
             Analysis<'backend>,
             Box<Analysis<'backend>>,

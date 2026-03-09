@@ -9,11 +9,11 @@ use {
 
 pub fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Option<Type<'symbol>> {
     match (&expected.kind, &actual.kind) {
-        (TypeKind::Unknown, _) => Some(actual.clone()),
-        (_, TypeKind::Unknown) => Some(expected.clone()),
+        (TypeKind::Void, _) => Some(actual.clone()),
+        (_, TypeKind::Void) => Some(expected.clone()),
         (
-            TypeKind::Pointer { to: expected_to },
-            TypeKind::Pointer { to: actual_to },
+            TypeKind::Pointer { target: expected_to },
+            TypeKind::Pointer { target: actual_to },
         ) => {
             let unified = unify(expected_to, actual_to)?;
             Some(Type::pointer(unified, expected.span))
@@ -46,17 +46,13 @@ pub fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Optio
             }
             Some(Type::new(TypeKind::Tuple { members: unified }, expected.span))
         }
-        (TypeKind::Type(expected_inner), TypeKind::Type(actual_inner)) => {
-            let unified = unify(expected_inner, actual_inner)?;
-            Some(Type::new(TypeKind::Type(Box::new(unified)), expected.span))
-        }
         (
             TypeKind::Integer {
-                bits: expected_bits,
+                size: expected_bits,
                 signed: expected_signed,
             },
             TypeKind::Integer {
-                bits: actual_bits,
+                size: actual_bits,
                 signed: actual_signed,
             },
         ) => Some(Type::integer(
@@ -64,11 +60,11 @@ pub fn unify<'symbol>(expected: &Type<'symbol>, actual: &Type<'symbol>) -> Optio
             *expected_signed || *actual_signed,
             expected.span,
         )),
-        (TypeKind::Float { bits: expected_bits }, TypeKind::Float { bits: actual_bits }) => {
+        (TypeKind::Float { size: expected_bits }, TypeKind::Float { size: actual_bits }) => {
             Some(Type::float((*expected_bits).max(*actual_bits), expected.span))
         }
-        (TypeKind::Float { bits }, TypeKind::Integer { .. })
-        | (TypeKind::Integer { .. }, TypeKind::Float { bits }) => Some(Type::float(*bits, expected.span)),
+        (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
+        | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Some(Type::float(*bits, expected.span)),
         _ if expected == actual => Some(expected.clone()),
         _ => None,
     }
@@ -82,18 +78,18 @@ pub fn annotation<'symbol>(element: &Element<'symbol>) -> Option<Type<'symbol>> 
         }) => {
             let name = name.as_str()?;
             match TypeKind::from_name(name) {
-                Some(TypeKind::Integer { bits, signed }) => Some(Type::integer(bits, signed, *span)),
-                Some(TypeKind::Float { bits }) => Some(Type::float(bits, *span)),
+                Some(TypeKind::Integer { size: bits, signed }) => Some(Type::integer(bits, signed, *span)),
+                Some(TypeKind::Float { size: bits }) => Some(Type::float(bits, *span)),
                 Some(TypeKind::Boolean) => Some(Type::boolean(*span)),
                 Some(TypeKind::Character) => Some(Type::character(*span)),
                 Some(_) | None => match name {
                     "String" => Some(Type::string(*span)),
-                    "Infer" => Some(Type::new(TypeKind::Unknown, *span)),
+                    "Infer" => Some(Type::new(TypeKind::Void, *span)),
                     "Type" => Some(Type::new(
-                        TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))),
+                        TypeKind::Type,
                         *span,
                     )),
-                    _ => Some(Type::new(TypeKind::Unknown, *span)),
+                    _ => Some(Type::new(TypeKind::Void, *span)),
                 },
             }
         }

@@ -28,7 +28,7 @@ fn returns<'symbol>(
             if is_return {
                 let actual = match invoke.members.len() {
                     0 => Type::unit(element.span),
-                    1 => invoke.members[0].infer()?,
+                    1 => invoke.members[0].check()?,
                     _ => {
                         let token = invoke.target.brand().unwrap_or(Token::new(
                             TokenKind::Identifier(Str::from("return")),
@@ -86,7 +86,7 @@ fn returns<'symbol>(
 }
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
-    fn infer(&self) -> Result<Type<'symbol>, CheckError<'symbol>> {
+    fn check(&self) -> Result<Type<'symbol>, CheckError<'symbol>> {
         match &self.kind {
             SymbolKind::Binding(binding) => {
                 let declared = binding
@@ -97,7 +97,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let inferred = binding
                     .value
                     .as_ref()
-                    .map(|value| value.infer())
+                    .map(|value| value.check())
                     .transpose()?;
 
                 match (declared, inferred) {
@@ -120,7 +120,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Box<Type<'symbol>>>, CheckError<'symbol>> = structure
                     .members
                     .iter()
-                    .map(|field| field.clone().infer().map(Box::new))
+                    .map(|field| field.clone().check().map(Box::new))
                     .collect();
 
                 let structure = Structure::new(
@@ -134,7 +134,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Box<Type<'symbol>>>, CheckError<'symbol>> = enumeration
                     .members
                     .iter()
-                    .map(|field| field.clone().infer().map(Box::new))
+                    .map(|field| field.clone().check().map(Box::new))
                     .collect();
 
                 let enumeration = Structure::new(
@@ -148,10 +148,10 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let members: Result<Vec<Box<Type<'symbol>>>, CheckError<'symbol>> = method
                     .members
                     .iter()
-                    .map(|field| field.clone().infer().map(Box::new))
+                    .map(|field| field.clone().check().map(Box::new))
                     .collect();
 
-                let body = method.body.infer()?;
+                let body = method.body.check()?;
 
                 let declared_output = method.output.as_ref().and_then(|value| annotation(value));
 
@@ -170,7 +170,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     Box::new(body.clone())
                 };
 
-                let method = Method::new(
+                let method = Function::new(
                     Str::from(method.target.brand().unwrap().format(0)),
                     members?,
                     Box::new(body),
@@ -179,7 +179,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     method.entry,
                 );
 
-                Ok(Type::new(TypeKind::Method(method), self.span))
+                Ok(Type::new(TypeKind::Function(method), self.span))
             }
             SymbolKind::Module(_) => Ok(Type::unit(self.span)),
             SymbolKind::Preference(_) => Ok(Type::unit(self.span)),

@@ -4,7 +4,7 @@ use {
         scope::Scope,
     },
     crate::{
-        data::{Str, Delimited, Interface, Method, Module},
+        data::{Str, Delimited, Interface, Function, Module},
         parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::Span,
@@ -86,7 +86,7 @@ impl<'resolver> Resolver<'resolver> {
 
         Symbol::new(
             0,
-            SymbolKind::Method(Method::new(
+            SymbolKind::Method(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Box::new(body),
@@ -171,7 +171,7 @@ impl<'resolver> Resolver<'resolver> {
 
         Symbol::new(
             0,
-            SymbolKind::Method(Method::new(
+            SymbolKind::Method(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Box::new(body),

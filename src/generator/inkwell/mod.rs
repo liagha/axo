@@ -57,7 +57,7 @@ pub struct Inkwell<'backend> {
 impl<'backend> Inkwell<'backend> {
     pub fn llvm_type(&self, kind: &TypeKind<'backend>) -> BasicTypeEnum<'backend> {
         match kind {
-            TypeKind::Integer { bits, .. } => {
+            TypeKind::Integer { size: bits, .. } => {
                 match bits {
                     8 => self.context.i8_type().into(),
                     16 => self.context.i16_type().into(),
@@ -66,7 +66,7 @@ impl<'backend> Inkwell<'backend> {
                     size => self.context.custom_width_int_type(*size as u32).into(),
                 }
             },
-            TypeKind::Float { bits } => {
+            TypeKind::Float { size: bits } => {
                 match bits {
                     32 => self.context.f32_type().into(),
                     64 => self.context.f64_type().into(),

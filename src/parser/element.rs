@@ -1,13 +1,19 @@
 use {
     super::Symbol,
-    crate::{data::Identity, scanner::Token, tracker::Span},
+    crate::{
+        data::*,
+        scanner::Token, 
+        tracker::Span,
+        checker::Type,
+    },
 };
-use crate::data::*;
+use crate::checker::TypeKind;
 
 pub struct Element<'element> {
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
+    pub ty: Type<'element>,
 }
 
 pub enum ElementKind<'element> {
@@ -30,7 +36,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { kind, span, reference: None }
+        Element { kind, span, reference: None, ty: Type::new(TypeKind::Void, Span::void()) }
     }
 }
 

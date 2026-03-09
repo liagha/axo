@@ -3,9 +3,8 @@ use crate::{
     analyzer::{
         Analysis, AnalyzeError, ErrorKind,
     },
-    checker::{Checkable, Type, TypeKind},
     format::Show,
-    parser::{Element, ElementKind, Symbol, SymbolKind},
+    parser::{Element, Symbol, SymbolKind},
     resolver::{
         Resolver,
     },
@@ -106,35 +105,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|value| value.analyze(resolver))
                     .transpose()?;
 
-                let annotation = binding
-                    .annotation
-                    .as_deref()
-                    .and_then(|value|
-                        match &value.kind {
-                            ElementKind::Literal(Token {
-                                                     kind: TokenKind::Identifier(identifier),
-                                                     span,
-                                                 }) => identifier
-                                .as_str()
-                                .and_then(|name| {
-                                    TypeKind::from_name(name).or_else(|| {
-                                        if name == "Type" {
-                                            Some(TypeKind::Type(Box::new(Type::new(TypeKind::Unknown, *span))))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                })
-                                .or_else(|| {
-                                    resolver.scope.lookup(value)
-                                        .ok()
-                                        .and_then(|symbol| symbol.infer().ok())
-                                        .map(|item| item.kind)
-                                }),
-                            _ => None,
-                        }
-                    );
-
                 let target_token = binding
                     .target
                     .brand()
@@ -143,7 +113,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let analyzed = Binding::new(
                     Str::from(target_token.format(0)),
                     value.map(Box::new),
-                    annotation,
+                    None,
                     binding.kind,
                 );
 
@@ -192,7 +162,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|output| output.analyze(resolver).map(Box::new))
                     .transpose()?;
 
-                let analyzed = Method::new(
+                let analyzed = Function::new(
                     Str::from(method.target.brand().unwrap().format(0)),
                     members?,
                     Box::new(body),

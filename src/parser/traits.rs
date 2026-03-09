@@ -241,6 +241,7 @@ impl<'element> Clone for Element<'element> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             reference: self.reference,
+            ty: self.ty.clone(),
         }
     }
 }

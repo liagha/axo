@@ -1,20 +1,20 @@
-use crate::checker::{types::Type, CheckError};
-use crate::resolver::{
-    Resolver,
-};
+use crate::analyzer::{AnalyzeError};
+use crate::checker::{CheckError};
+use crate::parser::Element;
 
-pub trait Checkable<'checkable> {
-    fn infer(&self) -> Result<Type<'checkable>, CheckError<'checkable>>;
+pub struct Checker<'analyzer> {
+    pub input: &'analyzer mut Vec<Element<'analyzer>>,
+    pub errors: Vec<AnalyzeError<'analyzer>>,
 }
 
-impl<'resolver> Resolver<'resolver> {
-    pub fn check(&mut self, target: Type<'resolver>, source: Type<'resolver>) {
-        if target != source {
-            let _error =
-                CheckError::new(
-                        crate::checker::ErrorKind::Mismatch(target, source.clone()),
-                        source.span
-                );
+pub trait Checkable<'checkable> {
+    fn check(&mut self) -> Vec<CheckError<'checkable>>;
+}
+
+impl<'resolver> Checker<'resolver> {
+    fn check(&mut self) {
+        for element in self.input.iter_mut() {
+            element.check();
         }
     }
 }
