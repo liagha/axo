@@ -1,34 +1,49 @@
 use crate::{
     parser::{Symbol, SymbolKind},
     checker::{
-        annotation, unify, CheckError, Checkable, ErrorKind,
+        CheckError, Checkable, ErrorKind,
     },
 };
+use crate::checker::Type;
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self) -> Vec<CheckError<'symbol>> {
-        match &self.kind {
+        match &mut self.kind {
             SymbolKind::Binding(binding) => {
-                let declared = binding
+                let mut errors = Vec::new();
+
+                let annotation = binding
                     .annotation
                     .as_ref()
-                    .and_then(|value| annotation(value));
+                    .map(
+                        |value| {
+                            match Type::annotation(&*value) {
+                                Ok(ty) => Some(ty),
+                                Err(error) => {
+                                    errors.push(error);
 
-                let inferred = match binding.value.as_ref() {
+                                    None
+                                }
+                            }
+                        }
+                    ).flatten();
+
+                let inferred = match &mut binding.value {
                     Some(value) => {
-                        let mut v = value.clone();
-                        let errors = v.check();
+                        let errors = value.check();
+
                         if !errors.is_empty() {
                             return errors;
                         }
-                        Some(v.ty.clone())
+
+                        Some(value.ty.clone())
                     }
                     None => None,
                 };
 
-                match (declared, inferred) {
+                match (annotation, inferred) {
                     (Some(declared), Some(inferred)) => {
-                        if unify(&declared, &inferred).is_none() {
+                        if Type::unify(&declared, &inferred).is_none() {
                             return vec![CheckError::new(
                                 ErrorKind::Mismatch(declared, inferred.clone()),
                                 inferred.span,
@@ -44,52 +59,46 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             SymbolKind::Structure(structure) => {
                 let mut errors = vec![];
 
-                for field in structure.members.iter() {
-                    let mut f = field.clone();
-                    errors.extend(f.check());
+                for member in structure.members.iter_mut() {
+                    errors.extend(member.check());
                 }
 
                 errors
             }
 
-            SymbolKind::Enumeration(enumeration) => {
+            SymbolKind::Function(function) => {
                 let mut errors = vec![];
 
-                for field in enumeration.members.iter() {
-                    let mut f = field.clone();
-                    errors.extend(f.check());
+                for member in function.members.iter_mut() {
+                    errors.extend(member.check());
                 }
 
-                errors
-            }
-
-            SymbolKind::Method(method) => {
-                let mut errors = vec![];
-
-                for field in method.members.iter() {
-                    let mut f = field.clone();
-                    errors.extend(f.check());
-                }
+                errors.extend(function.body.check());
 
                 if !errors.is_empty() {
                     return errors;
                 }
 
-                let mut body_element = method.body.clone();
-                let body_errors = body_element.check();
+                let output = function
+                    .output
+                    .as_ref()
+                    .map(
+                        |value| {
+                            match Type::annotation(&*value) {
+                                Ok(ty) => Some(ty),
+                                Err(error) => {
+                                    errors.push(error);
 
-                if !body_errors.is_empty() {
-                    return body_errors;
-                }
+                                    None
+                                }
+                            }
+                        }
+                    ).flatten();
 
-                let body = body_element.ty.clone();
-
-                let declared_output = method.output.as_ref().and_then(|value| annotation(value));
-
-                if let Some(expected) = declared_output {
-                    if unify(&expected, &body).is_none() {
+                if let Some(expected) = output {
+                    if Type::unify(&expected, &function.body.ty).is_none() {
                         return vec![CheckError::new(
-                            ErrorKind::Mismatch(expected, body),
+                            ErrorKind::Mismatch(expected, function.body.ty.clone()),
                             self.span,
                         )];
                     }

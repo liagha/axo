@@ -12,6 +12,7 @@ use {
         FloatPredicate, IntPredicate,
     },
 };
+use crate::checker::Type;
 
 impl<'backend> super::Inkwell<'backend> {
     fn has_terminator(&self) -> bool {
@@ -235,13 +236,13 @@ impl<'backend> super::Inkwell<'backend> {
         BasicValueEnum::from(self.context.i64_type().const_zero())
     }
 
-    pub fn method(
+    pub fn function(
         &mut self,
         method: Function<
             Str<'backend>,
             Analysis<'backend>,
             Box<Analysis<'backend>>,
-            Option<Box<Analysis<'backend>>>,
+            Option<Type<'backend>>,
         >,
     ) -> BasicValueEnum<'backend> {
         let mut parameters = vec![];
@@ -254,9 +255,9 @@ impl<'backend> super::Inkwell<'backend> {
                         let llvm_kind = self.llvm_type(annotation);
 
                         if matches!(method.interface, Interface::C) {
-                            if let TypeKind::String = annotation {
+                            if let TypeKind::String = annotation.kind {
                                 self.context.ptr_type(inkwell::AddressSpace::default()).into()
-                            } else if let TypeKind::Character = annotation {
+                            } else if let TypeKind::Character = annotation.kind {
                                 self.context.i8_type().into()
                             } else {
                                 llvm_kind
@@ -273,23 +274,7 @@ impl<'backend> super::Inkwell<'backend> {
             parameters.iter().map(|kind| (*kind).into()).collect();
 
         let return_type: Option<inkwell::types::BasicTypeEnum<'backend>> = method.output.as_ref().map(
-            |output| match &**output {
-                Analysis::Usage(name) => {
-                    if let Some(kind) = name.as_str().and_then(TypeKind::from_name) {
-                        if matches!(kind, TypeKind::Tuple { ref members } if members.len() == 0) {
-                            return None;
-                        } else {
-                            Some(self.llvm_type(&kind))
-                        }
-                    } else {
-                        self.annotation_type(output)
-                            .or_else(|| Some(self.context.i64_type().into()))
-                    }
-                }
-                _ => self
-                    .annotation_type(output)
-                    .or_else(|| Some(self.context.i64_type().into())),
-            },
+            |output| self.llvm_type(output).into(),
         ).flatten();
 
         let function_type = match return_type {

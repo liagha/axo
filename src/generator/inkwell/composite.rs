@@ -11,7 +11,6 @@ use {
     },
 };
 use crate::analyzer::Analysis;
-use crate::checker::TypeKind;
 use crate::data::{Index, Structure};
 
 impl<'backend> super::Inkwell<'backend> {
@@ -49,60 +48,6 @@ impl<'backend> super::Inkwell<'backend> {
                     .ok()?
                     .into(),
             ),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn annotation_type(
-        &mut self,
-        analysis: &Analysis<'backend>,
-    ) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis {
-            Analysis::Usage(name) => name
-                .as_str()
-                .and_then(TypeKind::from_name)
-                .map(|kind| self.llvm_type(&kind))
-                .or_else(||
-                    {
-                        self
-                            .entities
-                            .get(name)
-                            .and_then(
-                                |kind| {
-                                    if let Entity::Struct { struct_type, .. } = kind {
-                                        Some((*struct_type).into())
-                                    } else {
-                                        None
-                                    }
-                                }
-                            )
-                    }
-                ),
-            Analysis::Array(items) => {
-                if items.len() != 2 {
-                    return None;
-                }
-                let member = self.annotation_type(&items[0])?;
-                let size = match &items[1] {
-                    Analysis::Integer { value, .. } => *value as u32,
-                    _ => return None,
-                };
-                Some(member.array_type(size).into())
-            }
-            Analysis::Tuple(items) => {
-                let mut members = Vec::with_capacity(items.len());
-                for item in items {
-                    members.push(self.annotation_type(item)?);
-                }
-                let types: Vec<BasicTypeEnum> = members;
-                let struct_type = self.context.struct_type(&types, false);
-                Some(struct_type.into())
-            }
-            Analysis::Dereference(item) => self.annotation_type(item).map(|_| {
-                self.context
-                    .ptr_type(inkwell::AddressSpace::default())
-                    .into()
-            }),
             _ => None,
         }
     }

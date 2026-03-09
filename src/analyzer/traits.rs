@@ -271,11 +271,8 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                     Analysis::Structure(structure) => {
                         structure.format(verbosity)
                     }
-                    Analysis::Enumeration(enumeration) => {
-                        enumeration.format(verbosity)
-                    }
-                    Analysis::Method(method) => {
-                        method.format(verbosity)
+                    Analysis::Function(function) => {
+                        function.format(verbosity)
                     }
                     Analysis::Module(name, members) => {
                         format!(

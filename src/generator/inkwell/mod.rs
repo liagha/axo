@@ -8,7 +8,7 @@ mod primitives;
 mod variables;
 
 use crate::analyzer::Analysis;
-use crate::checker::TypeKind;
+use crate::checker::{Type, TypeKind};
 use {
     super::Backend,
     crate::{data::Str, generator::GenerateError, internal::hash::Map},
@@ -55,8 +55,8 @@ pub struct Inkwell<'backend> {
 }
 
 impl<'backend> Inkwell<'backend> {
-    pub fn llvm_type(&self, kind: &TypeKind<'backend>) -> BasicTypeEnum<'backend> {
-        match kind {
+    pub fn llvm_type(&self, ty: &Type<'backend>) -> BasicTypeEnum<'backend> {
+        match &ty.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
                     8 => self.context.i8_type().into(),
@@ -183,9 +183,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         let mut entry = None;
 
         for analysis in &analyses {
-            if let Analysis::Method(method) = analysis {
-                if method.entry {
-                    entry = Some(method);
+            if let Analysis::Function(function) = analysis {
+                if function.entry {
+                    entry = Some(function);
                 } else {
                     self.analysis(analysis.clone());
                 }
@@ -193,7 +193,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         }
 
         if let Some(entry) = entry {
-            self.method(entry.clone());
+            self.function(entry.clone());
         }
 
         if self
@@ -254,14 +254,11 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             Analysis::While(condition, body) => self.r#while(condition, body),
             Analysis::Structure(structure) => self.define_structure(structure),
             Analysis::Module(name, analyses) => self.module(name, analyses),
-            Analysis::Method(method) => self.method(method),
+            Analysis::Function(function) => self.function(function),
             Analysis::Invoke(invoke) => self.invoke(invoke),
             Analysis::Return(value) => self.r#return(value),
             Analysis::Break(value) => self.r#break(value),
             Analysis::Continue(value) => self.r#continue(value),
-            Analysis::Enumeration(_) => {
-                unimplemented!("")
-            }
         }
     }
 }

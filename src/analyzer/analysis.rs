@@ -1,9 +1,9 @@
 use {
     crate::{
         data::*,
-        checker::TypeKind,
     }
 };
+use crate::checker::Type;
 
 #[derive(Clone, Debug)]
 pub enum Analysis<'analysis> {
@@ -72,15 +72,14 @@ pub enum Analysis<'analysis> {
     Constructor(Structure<Str<'analysis>, Analysis<'analysis>>),
     Assign(Str<'analysis>, Box<Analysis<'analysis>>),
     Store(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, TypeKind<'analysis>>),
+    Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, Type<'analysis>>),
     Structure(Structure<Str<'analysis>, Analysis<'analysis>>),
-    Enumeration(Structure<Str<'analysis>, Analysis<'analysis>>),
-    Method(
+    Function(
         Function<
             Str<'analysis>,
             Analysis<'analysis>,
             Box<Analysis<'analysis>>,
-            Option<Box<Analysis<'analysis>>>,
+            Option<Type<'analysis>>,
         >,
     ),
     Module(Str<'analysis>, Vec<Analysis<'analysis>>),

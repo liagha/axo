@@ -227,15 +227,15 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 score += self.binding;
             }
 
-            (ElementKind::Invoke(invoke), SymbolKind::Method(method)) => {
+            (ElementKind::Invoke(invoke), SymbolKind::Function(function)) => {
                 score += self.shaping;
 
                 let mut errors = Vec::new();
                 
-                if invoke.members.len() > method.members.len() {
-                    score += (1 - (invoke.members.len() - method.members.len())/invoke.members.len()) as f64;
+                if invoke.members.len() > function.members.len() {
+                    score += (1 - (invoke.members.len() - function.members.len())/invoke.members.len()) as f64;
                     
-                    for member in invoke.members[method.members.len()..].iter() {
+                    for member in invoke.members[function.members.len()..].iter() {
                         errors.push(
                             ResolveError::new(
                                 ErrorKind::MissingMember {
@@ -246,14 +246,14 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                             )
                         );
                     }
-                } else if invoke.members.len() < method.members.len() {
-                    score += (1 - (method.members.len() - invoke.members.len())/method.members.len()) as f64;
+                } else if invoke.members.len() < function.members.len() {
+                    score += (1 - (function.members.len() - invoke.members.len())/function.members.len()) as f64;
 
-                    for member in method.members[invoke.members.len()..].iter() {
+                    for member in function.members[invoke.members.len()..].iter() {
                         errors.push(
                             ResolveError::new(
                                 ErrorKind::UndefinedMember {
-                                    target: method.target.brand().unwrap(),
+                                    target: function.target.brand().unwrap(),
                                     member: member.brand().unwrap(),
                                 },
                                 member.span.clone(),

@@ -1,6 +1,6 @@
 use crate::{
     data::*,
-    checker::{unify, CheckError, Checkable, ErrorKind, Type, TypeKind},
+    checker::{CheckError, Checkable, ErrorKind, Type, TypeKind},
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
@@ -19,7 +19,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     TokenKind::Character(_) => Type::character(literal.span),
                     _ => Type::new(TypeKind::Void, literal.span),
                 };
-                
+
                 Ok(ty)
             },
 
@@ -93,7 +93,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                                 }
                             }
                         }
-                        
+
                         Ok(ty)
                     }
 
@@ -155,7 +155,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Unary(unary) => {
                 let mut errors = unary.operand.check();
-                
+
                 if !errors.is_empty() {
                     return errors;
                 }
@@ -171,7 +171,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                                 unary.operator.span,
                             )
                         );
-                        
+
                         return errors;
                     },
                 };
@@ -290,7 +290,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     },
                 }
             }
-            
+
             ElementKind::Binary(binary) => {
                 let mut errors = binary.left.check();
                 errors.extend(binary.right.check());
@@ -317,7 +317,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 match operator.as_slice() {
                     [OperatorKind::Equal] => {
-                        if unify(&binary.left.ty, &binary.right.ty).is_some() {
+                        if Type::unify(&binary.left.ty, &binary.right.ty).is_some() {
                             Ok(binary.left.ty.clone())
                         } else {
                             Err(
@@ -561,7 +561,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     | [OperatorKind::LeftAngle, OperatorKind::Equal]
                     | [OperatorKind::RightAngle]
                     | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        if unify(&binary.left.ty, &binary.right.ty).is_some() {
+                        if Type::unify(&binary.left.ty, &binary.right.ty).is_some() {
                             Ok(Type::boolean(binary.operator.span))
                         } else {
                             Err(
@@ -689,7 +689,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             )
                         }
 
-                        if let Some(unified) = unify(&invoke.members[1].ty, &invoke.members[2].ty) {
+                        if let Some(unified) = Type::unify(&invoke.members[1].ty, &invoke.members[2].ty) {
                             Ok(unified)
                         } else {
                             errors.push(
@@ -763,13 +763,13 @@ impl<'element> Checkable<'element> for Element<'element> {
                 }
             }
 
-            ElementKind::Symbolize(_) => Ok(Type::unit(self.span)),
+            ElementKind::Symbolize(symbol) => return symbol.check(),
         };
-        
-        match result { 
+
+        match result {
             Ok(ty) => {
                 self.ty = ty;
-                
+
                 Vec::new()
             },
             Err(errors) => errors,

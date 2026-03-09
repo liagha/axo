@@ -125,11 +125,8 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                     SymbolKind::Structure(structure) => {
                         structure.format(verbosity)
                     }
-                    SymbolKind::Enumeration(enumeration) => {
-                        enumeration.format(verbosity)
-                    }
-                    SymbolKind::Method(method) => {
-                        method.format(verbosity)
+                    SymbolKind::Function(function) => {
+                        function.format(verbosity)
                     }
                     SymbolKind::Module(module) => {
                         module.format(verbosity)

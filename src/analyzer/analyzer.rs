@@ -133,45 +133,30 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 Ok(Analysis::Structure(analyzed))
             }
-            SymbolKind::Enumeration(enumeration) => {
-                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = enumeration
+            SymbolKind::Function(function) => {
+                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = function
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let analyzed = Structure::new(
-                    Str::from(enumeration.target.brand().unwrap().format(0)),
-                    members?,
-                );
+                let body = function.body.analyze(resolver)?;
 
-                Ok(Analysis::Enumeration(analyzed))
-            }
-            SymbolKind::Method(method) => {
-                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = method
-                    .members
-                    .iter()
-                    .map(|member| member.analyze(resolver))
-                    .collect();
-
-                let body = method.body.analyze(resolver)?;
-
-                let output = method
+                let output = function
                     .output
                     .clone()
-                    .map(|output| output.analyze(resolver).map(Box::new))
-                    .transpose()?;
+                    .map(|output| output.ty);
 
                 let analyzed = Function::new(
-                    Str::from(method.target.brand().unwrap().format(0)),
+                    Str::from(function.target.brand().unwrap().format(0)),
                     members?,
                     Box::new(body),
                     output,
-                    method.interface,
-                    method.entry,
+                    function.interface,
+                    function.entry,
                 );
 
-                Ok(Analysis::Method(analyzed))
+                Ok(Analysis::Function(analyzed))
             }
             SymbolKind::Module(module) => {
                 let target = module

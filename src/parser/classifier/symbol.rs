@@ -13,8 +13,7 @@ impl<'parser> Parser<'parser> {
         Classifier::alternative([
             Self::binding(),
             Self::structure(),
-            Self::enumeration(),
-            Self::method(),
+            Self::function(),
             Self::module(),
         ])
     }
@@ -235,76 +234,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        token.kind == TokenKind::Identifier(Str::from("enum"))
-                    }),
-                    Self::literal(),
-                ]),
-                Classifier::deferred(Self::element),
-            ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let sequence = form.as_forms();
-                let head = sequence[0].as_forms();
-
-                let keyword = head[0].unwrap_input();
-                let name = head[1].unwrap_output().clone();
-
-                let body = sequence[1].unwrap_output().clone();
-
-                let mut visibility = Visibility::Public;
-
-                let members: Vec<_> = Self::get_body(body.clone())
-                    .into_iter()
-                    .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(symbol),
-                        ElementKind::Literal(
-                            Token {
-                                kind: TokenKind::Identifier(identifier),
-                                ..
-                            }
-                        ) => {
-                            match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                "public" => {
-                                    visibility = Visibility::Public;
-                                }
-
-                                "private" => {
-                                    visibility = Visibility::Private;
-                                }
-
-                                _ => {}
-                            }
-
-                            None
-                        },
-                        _ => {
-                            None
-                        }
-                    })
-                    .collect();
-
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-
-                Ok(Form::output(Element::new(
-                    ElementKind::Symbolize(
-                        Symbol::new(
-                            0,
-                            SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
-                            span,
-                            visibility,
-                        ),
-                    ),
-                    span,
-                )))
-            },
-        )
-    }
-
-    pub fn method() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn function() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -427,7 +357,7 @@ impl<'parser> Parser<'parser> {
                         ElementKind::Symbolize(
                             Symbol::new(
                                 0,
-                                SymbolKind::Method(Function::new(
+                                SymbolKind::Function(Function::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),
@@ -452,7 +382,7 @@ impl<'parser> Parser<'parser> {
                         ElementKind::Symbolize(
                             Symbol::new(
                                 0,
-                                SymbolKind::Method(Function::new(
+                                SymbolKind::Function(Function::new(
                                     Box::new(name),
                                     members,
                                     Box::new(body),

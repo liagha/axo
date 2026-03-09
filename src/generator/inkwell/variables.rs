@@ -11,7 +11,7 @@ use {
     },
 };
 use crate::analyzer::Analysis;
-use crate::checker::TypeKind;
+use crate::checker::{Type, TypeKind};
 use crate::data::*;
 
 impl<'backend> super::Inkwell<'backend> {
@@ -157,7 +157,7 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn binding(
         &mut self,
-        binding: Binding<Str<'backend>, Box<Analysis<'backend>>, TypeKind<'backend>>,
+        binding: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
     ) -> BasicValueEnum<'backend> {
         let value = match binding.value {
             Some(v) => v,
@@ -200,8 +200,8 @@ impl<'backend> super::Inkwell<'backend> {
             value
         };
 
-        let signed = binding.annotation.as_ref().and_then(|annotation| match annotation {
-            TypeKind::Integer { signed, .. } => Some(*signed),
+        let signed = binding.annotation.as_ref().and_then(|annotation| match annotation.kind {
+            TypeKind::Integer { signed, .. } => Some(signed),
             _ => signed,
         });
 

@@ -307,7 +307,12 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::expression(), Self::symbolization()])
+        Classifier::alternative(
+            [
+                Self::symbolization(),
+                Self::expression(),
+            ]
+        )
     }
 
     pub fn fallback() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
@@ -328,17 +333,6 @@ impl<'parser> Parser<'parser> {
     pub fn parser() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::repetition(
             Classifier::alternative([
-                Classifier::predicate(|token: &Token| {
-                    matches!(
-                        token.kind,
-                        TokenKind::Punctuation(PunctuationKind::Newline)
-                            | TokenKind::Punctuation(PunctuationKind::Semicolon)
-                    )
-                })
-                    .with_ignore(),
-                Self::structure(),
-                Self::enumeration(),
-                Self::symbolization(),
                 Self::element(),
                 Self::fallback(),
             ]),

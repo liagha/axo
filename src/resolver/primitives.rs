@@ -23,15 +23,15 @@ impl<'resolver> Resolver<'resolver> {
 
         match name.as_str() {
             "compiler" => Some(Resolver::compiler(scope)),
-            "Int32" => Some(Resolver::method("Int32", "Integer")),
-            "Int64" => Some(Resolver::method("Int64", "Integer")),
-            "Float" => Some(Resolver::method("Float", "Float")),
-            "Boolean" => Some(Resolver::method("Boolean", "Boolean")),
-            "String" => Some(Resolver::method("String", "String")),
-            "Character" => Some(Resolver::method("Character", "Character")),
-            "Char" => Some(Resolver::method("Char", "Character")),
-            "Unit" => Some(Resolver::method("Unit", "Unit")),
-            "Integer" => Some(Resolver::method("Integer", "Integer")),
+            "Int32" => Some(Resolver::function("Int32", "Integer")),
+            "Int64" => Some(Resolver::function("Int64", "Integer")),
+            "Float" => Some(Resolver::function("Float", "Float")),
+            "Boolean" => Some(Resolver::function("Boolean", "Boolean")),
+            "String" => Some(Resolver::function("String", "String")),
+            "Character" => Some(Resolver::function("Character", "Character")),
+            "Char" => Some(Resolver::function("Char", "Character")),
+            "Unit" => Some(Resolver::function("Unit", "Unit")),
+            "Integer" => Some(Resolver::function("Integer", "Integer")),
             "if" => Some(Resolver::statement("if")),
             "while" => Some(Resolver::statement("while")),
             "break" => Some(Resolver::statement("break")),
@@ -86,7 +86,7 @@ impl<'resolver> Resolver<'resolver> {
 
         Symbol::new(
             0,
-            SymbolKind::Method(Function::new(
+            SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Box::new(body),
@@ -99,7 +99,7 @@ impl<'resolver> Resolver<'resolver> {
         )
     }
 
-    fn method(name: &'static str, output: &'static str) -> Symbol<'resolver> {
+    fn function(name: &'static str, output: &'static str) -> Symbol<'resolver> {
         let target = Element::new(
             ElementKind::Literal(Token::new(
                 TokenKind::Identifier(Str::from(name)),
@@ -171,7 +171,7 @@ impl<'resolver> Resolver<'resolver> {
 
         Symbol::new(
             0,
-            SymbolKind::Method(Function::new(
+            SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Box::new(body),

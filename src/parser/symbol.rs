@@ -74,8 +74,7 @@ impl<'symbol> Symbol<'symbol> {
 pub enum SymbolKind<'symbol> {
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Method(
+    Function(
         Function<
             Box<Element<'symbol>>,
             Symbol<'symbol>,
@@ -92,8 +91,7 @@ impl<'symbol> SymbolKind<'symbol> {
         match self {
             SymbolKind::Binding(binding) => binding.target.clone().brand(),
             SymbolKind::Structure(structure) => structure.target.clone().brand(),
-            SymbolKind::Enumeration(enumeration) => enumeration.target.clone().brand(),
-            SymbolKind::Method(method) => method.target.clone().brand(),
+            SymbolKind::Function(function) => function.target.clone().brand(),
             SymbolKind::Module(module) => module.target.brand().clone(),
             SymbolKind::Preference(preference) => Some(preference.target.clone()),
         }

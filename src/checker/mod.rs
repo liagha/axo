@@ -1,14 +1,13 @@
 mod checker;
 mod element;
 mod error;
-mod semantics;
 mod symbol;
 mod types;
 mod traits;
 
 pub use {checker::*, types::*};
 
-pub(crate) use {error::*, semantics::*};
+pub(crate) use {error::*}; 
 
 use crate::reporter::Error;
 
