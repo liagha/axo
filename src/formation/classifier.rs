@@ -76,6 +76,23 @@ impl<
     }
 
     #[inline]
+    fn create_child(
+        &self,
+        order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+    ) -> Self {
+        Self {
+            order,
+            marker: self.marker,
+            position: self.position,
+            consumed: self.consumed.clone(),
+            record: Record::Blank,
+            form: Form::Blank,
+            stack: self.stack.clone(),
+            depth: self.depth + 1,
+        }
+    }
+
+    #[inline]
     pub const fn is_panicked(&self) -> bool {
         matches!(self.record, Record::Panicked)
     }
@@ -128,23 +145,6 @@ impl<
     #[inline]
     pub fn set_ignore(&mut self) {
         self.record = Record::Ignored;
-    }
-
-    #[inline]
-    fn create_child(
-        &self,
-        order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
-    ) -> Self {
-        Self {
-            order,
-            marker: self.marker,
-            position: self.position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: Form::Blank,
-            stack: Vec::new(),
-            depth: self.depth + 1,
-        }
     }
 
     #[inline]
@@ -363,7 +363,7 @@ impl<
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(Classifier<Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Self::panic(emitter))
     }
@@ -707,6 +707,7 @@ impl<
         resolved.marker = classifier.marker;
         resolved.position = classifier.position;
         resolved.depth = classifier.depth + 1;
+        resolved.stack = classifier.stack.clone();
         composer.build(&mut resolved);
 
         classifier.marker = resolved.marker;
@@ -859,21 +860,22 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
     ) {
         let mut index = classifier.marker;
         let mut position = classifier.position;
-        let mut consumed = Vec::new();
+        let mut consumed = classifier.consumed.clone();
         let mut forms = Vec::with_capacity(SIZE);
-        let mut stack = Vec::new();
+        let mut stack = classifier.stack.clone();
 
         for pattern in &self.patterns {
             let mut child = Classifier {
                 order: pattern.order.clone(),
                 marker: index,
                 position,
-                consumed: Vec::new(),
+                consumed: consumed.clone(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: Vec::new(),
+                stack: stack.clone(),
                 depth: classifier.depth + 1,
             };
+
             composer.build(&mut child);
 
             match child.record {
@@ -883,7 +885,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
-                    stack.extend(child.stack);
+                    stack = child.stack;
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
@@ -891,7 +893,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
-                    stack.extend(child.stack);
+                    stack = child.stack;
                     break;
                 }
                 Record::Ignored => {
@@ -944,7 +946,7 @@ for Repetition<'repetition, Input, Output, Failure>
         let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
-        let mut stack = Vec::new();
+        let mut stack = classifier.stack.clone();
 
         while composer.source.peek_ahead(index).is_some() {
             let mut child = Classifier {
@@ -954,9 +956,10 @@ for Repetition<'repetition, Input, Output, Failure>
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: Vec::new(),
+                stack: stack.clone(),
                 depth: classifier.depth + 1,
             };
+
             composer.build(&mut child);
 
             if child.marker == index {
@@ -970,7 +973,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
-                        stack.extend(child.stack);
+                        stack = child.stack;
                     }
 
                     Record::Aligned => {
@@ -978,7 +981,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
-                        stack.extend(child.stack);
+                        stack = child.stack;
                     }
 
                     Record::Failed => {
@@ -986,7 +989,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
-                        stack.extend(child.stack);
+                        stack = child.stack;
                     }
 
                     Record::Ignored => {

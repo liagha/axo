@@ -6,7 +6,7 @@ mod traits;
 
 pub mod helper {
     use {
-        super::{classifier::Classifier, form::Form, order::Order},
+        super::{classifier::Classifier, order::Order},
         crate::{
             data::thread::{Arc, Mutex},
             internal::hash::Hash,

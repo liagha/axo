@@ -79,10 +79,12 @@ Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
         _composer: &mut Former<'_, 'fail, Input, Output, Failure>,
         classifier: &mut Classifier<'fail, Input, Output, Failure>,
     ) {
-        let failure = (self.emitter)(classifier.clone());
+        if !classifier.is_aligned() {
+            let failure = (self.emitter)(classifier.clone());
 
-        classifier.set_fail();
-        classifier.form = Form::Failure(failure);
+            classifier.set_fail();
+            classifier.form = Form::Failure(failure);
+        }
     }
 }
 
@@ -177,11 +179,13 @@ Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
         _composer: &mut Former<'_, 'panic, Input, Output, Failure>,
         classifier: &mut Classifier<'panic, Input, Output, Failure>,
     ) {
-        let failure = (self.emitter)(classifier.clone());
+        if !classifier.is_aligned() {
+            let failure = (self.emitter)(classifier.clone());
 
-        let form = Form::Failure(failure);
-        classifier.set_panic();
-        classifier.form = form;
+            let form = Form::Failure(failure);
+            classifier.set_panic();
+            classifier.form = form;
+        }
     }
 }
 

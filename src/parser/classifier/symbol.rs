@@ -4,6 +4,7 @@ use {
         data::*,
         formation::{classifier::Classifier, form::Form},
         scanner::{OperatorKind, Token, TokenKind},
+        parser::error::ErrorKind,
         tracker::{Span, Spanned},
     },
 };
@@ -25,7 +26,13 @@ impl<'parser> Parser<'parser> {
                     || token.kind == TokenKind::Identifier(Str::from("const"))
                     || token.kind == TokenKind::Identifier(Str::from("meta"))
             }),
-            Classifier::deferred(Self::element),
+            Self::expression().with_panic(
+                |classifier| {
+                    let span = classifier.consumed.span();
+
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                }
+            ),
         ])
             .with_transform(|classifier| {
                 let sequence = classifier.form.as_forms();
@@ -144,7 +151,7 @@ impl<'parser> Parser<'parser> {
                 }),
                 Self::literal(),
             ]),
-            Classifier::deferred(Self::element),
+            Self::expression(),
         ])
             .with_transform(|classifier| {
                 let sequence = classifier.form.as_forms();
@@ -406,7 +413,7 @@ impl<'parser> Parser<'parser> {
                 token.kind == TokenKind::Identifier(Str::from("module"))
             }),
             Self::literal(),
-            Classifier::deferred(Self::element),
+            Self::expression(),
         ])
             .with_transform(|classifier| {
                 let sequence = classifier.form.as_forms();
