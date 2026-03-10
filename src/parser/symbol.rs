@@ -3,7 +3,6 @@ use {
     crate::{
         data::*,
         format::Debug,
-        initializer::Preference,
         internal::hash::{Hash, Set},
         resolver::scope::Scope,
         scanner::{OperatorKind, Token, TokenKind},
@@ -11,8 +10,16 @@ use {
     },
 };
 
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub fn next_identity() -> Identity {
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
 pub struct Symbol<'symbol> {
-    pub id: Identity,
+    pub identity: Identity,
     pub usages: Set<Identity>,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
@@ -27,9 +34,9 @@ pub enum Visibility {
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(id: Identity, kind: SymbolKind<'symbol>, span: Span<'symbol>, visibility: Visibility) -> Self {
+    pub fn new(kind: SymbolKind<'symbol>, span: Span<'symbol>, visibility: Visibility) -> Self {
         Self {
-            id,
+            identity: next_identity(),
             usages: Default::default(),
             kind,
             span,
@@ -44,7 +51,7 @@ impl<'symbol> Symbol<'symbol> {
                 symbols: Set::from_iter(members),
                 parent: None,
             },
-            id: self.id,
+            identity: self.identity,
             ..self
         }
     }
@@ -56,7 +63,7 @@ impl<'symbol> Symbol<'symbol> {
     pub fn with_scope(self, scope: Scope<'symbol>) -> Self {
         Self {
             scope,
-            id: self.id,
+            identity: self.identity,
             ..self
         }
     }
@@ -83,7 +90,6 @@ pub enum SymbolKind<'symbol> {
         >,
     ),
     Module(Module<Box<Element<'symbol>>>),
-    Preference(Preference<'symbol>),
 }
 
 impl<'symbol> SymbolKind<'symbol> {
@@ -93,7 +99,6 @@ impl<'symbol> SymbolKind<'symbol> {
             SymbolKind::Structure(structure) => structure.target.clone().brand(),
             SymbolKind::Function(function) => function.target.clone().brand(),
             SymbolKind::Module(module) => module.target.brand().clone(),
-            SymbolKind::Preference(preference) => Some(preference.target.clone()),
         }
     }
 }

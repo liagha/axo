@@ -116,7 +116,7 @@ impl<'scope> Scope<'scope> {
     }
 
     pub fn get_identity(&self, target: Identity) -> Option<&Symbol<'scope>> {
-        if let Some(symbol) = self.symbols.iter().find(|s| s.id == target) {
+        if let Some(symbol) = self.symbols.iter().find(|s| s.identity == target) {
             return Some(symbol);
         }
 

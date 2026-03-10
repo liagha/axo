@@ -1,3 +1,4 @@
+use broccli::{Color, TextStyle};
 use crate::format::Show;
 use {
     super::{Element, ElementKind, Symbol, SymbolKind},
@@ -82,7 +83,8 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
         match verbosity {
             0 => {
                 format!(
-                    "{}{}",
+                    "{}. {}{}",
+                    self.identity.colorize(Color::Blue),
                     self.kind.format(verbosity),
                     if self.scope.is_empty() {
                         "".into()
@@ -94,7 +96,8 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
 
             1 => {
                 format!(
-                    "{}: {:?}{}",
+                    "{}. {}: {:?}{}",
+                    self.identity.colorize(Color::Blue),
                     self.kind.format(verbosity),
                     self.visibility,
                     if self.scope.is_empty() {
@@ -130,12 +133,6 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                     }
                     SymbolKind::Module(module) => {
                         module.format(verbosity)
-                    }
-                    SymbolKind::Preference(preference) => {
-                        format!(
-                            "Preference({}, {})",
-                            preference.target.format(verbosity), preference.value.format(verbosity)
-                        ).into()
                     }
                 }
             }
@@ -270,7 +267,7 @@ impl<'element> Eq for ElementKind<'element> {}
 impl<'symbol> Clone for Symbol<'symbol> {
     fn clone(&self) -> Self {
         Self {
-            id: self.id,
+            identity: self.identity,
             usages: self.usages.clone(),
             kind: self.kind.clone(),
             span: self.span.clone(),
@@ -302,6 +299,6 @@ impl<'symbol> PartialOrd for Symbol<'symbol> {
 
 impl<'symbol> Ord for Symbol<'symbol> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        self.identity.cmp(&other.identity)
     }
 }

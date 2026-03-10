@@ -51,7 +51,6 @@ impl<'resolver> Resolver<'resolver> {
         );
 
         Symbol::new(
-            0,
             SymbolKind::Module(Module::new(Box::new(identifier))),
             Span::void(),
             Visibility::Public,
@@ -85,7 +84,6 @@ impl<'resolver> Resolver<'resolver> {
         );
 
         Symbol::new(
-            0,
             SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),
@@ -170,7 +168,6 @@ impl<'resolver> Resolver<'resolver> {
         };
 
         Symbol::new(
-            0,
             SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),

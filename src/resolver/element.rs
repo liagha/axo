@@ -22,7 +22,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             => {
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
-                        self.reference = Some(symbol.id);
+                        self.reference = Some(symbol.identity);
                     }
 
                     Err(errors) => {
@@ -46,7 +46,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(_construct) => {
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
-                        self.reference = Some(symbol.id);
+                        self.reference = Some(symbol.identity);
                     }
 
                     Err(errors) => {
@@ -58,7 +58,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Invoke(_invoke) => {
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
-                        self.reference = Some(symbol.id);
+                        self.reference = Some(symbol.identity);
                     }
 
                     Err(errors) => {
@@ -70,7 +70,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Index(_index) => {
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
-                        self.reference = Some(symbol.id);
+                        self.reference = Some(symbol.identity);
                     }
 
                     Err(errors) => {

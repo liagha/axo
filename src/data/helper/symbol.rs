@@ -18,7 +18,7 @@ pub struct Binding<Target, Value, Type> {
 pub enum BindingKind {
     Constant,
     Variable,
-    Generic,
+    Meta,
 }
 
 #[derive(Debug, Eq)]

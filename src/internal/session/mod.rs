@@ -35,7 +35,6 @@ use {
             self,
             Location, Span,
             TrackError,
-            Spanned,
         },
     },
     inkwell::{
@@ -66,6 +65,7 @@ pub struct Session<'session> {
     pub timer: DefaultTimer,
     pub reporter: Reporter,
     pub inputs: Map<Identity, Location<'session>>,
+    pub modules: Map<Identity, Identity>,
     pub initializer: Initializer<'session>,
     pub scanners: Map<Identity, Scanner<'session>>,
     pub parsers: Map<Identity, Parser<'session>>,
@@ -92,39 +92,40 @@ impl<'session> Session<'session> {
         let mut inputs = Map::new();
 
         initializer.initialize().iter().for_each(|target| {
-            let identity = resolver.next_identity();
-
-            inputs.insert(identity, target.clone());
+            inputs.insert(inputs.len(), target.clone());
         });
 
-        let mut errors = Vec::new();
-
-        errors.extend(
+        let errors =
             initializer
-                .errors
-                .iter()
-                .map(|error| {
-                    CompileError::Initialize(error.clone())
-                })
-        );
+            .errors
+            .iter()
+            .map(|error| {
+                CompileError::Initialize(error.clone())
+            }).collect::<Vec<_>>();
 
-        let preferences = initializer
-            .output
-            .clone()
-            .into_iter()
-            .map(|preference| {
-                let span = preference.borrow_span();
-
-                Symbol::new(
-                    resolver.next_identity(),
-                    SymbolKind::Preference(preference),
-                    span,
-                    Visibility::Public,
+        let configuration = Symbol::new(
+            SymbolKind::Module(
+                Module::new(
+                    Box::from(
+                        Element::new(
+                            ElementKind::Literal(
+                                Token::new(
+                                    TokenKind::Identifier(
+                                        Str::from("config")
+                                    ),
+                                    Span::void(),
+                                ),
+                            ),
+                            Span::void(),
+                        )
+                    )
                 )
-            })
-            .collect::<Vec<Symbol>>();
+            ),
+            Span::void(),
+            Visibility::Public,
+        ).with_members(initializer.output.clone());
 
-        resolver.scope.extend(preferences);
+        resolver.add(configuration);
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
 
@@ -147,6 +148,7 @@ impl<'session> Session<'session> {
             timer,
             reporter,
             inputs,
+            modules: Map::new(),
             initializer,
             scanners: Map::new(),
             parsers: Map::new(),
@@ -267,19 +269,18 @@ impl<'session> Session<'session> {
 
                 for element in elements.iter_mut() {
                     if let ElementKind::Symbolize(symbol) = &mut element.kind {
-                        let symbol_id = self.resolver.next_identity();
-                        symbol.id = symbol_id;
-                        element.reference = Some(symbol_id);
+                        element.reference = Some(symbol.identity);
                         scope.symbols.insert(symbol.clone());
                     }
                 }
                 
                 let symbol = Symbol::new(
-                    *identity,
                     SymbolKind::Module(Module::new(head)),
                     span,
                     Visibility::Public,
                 ).with_scope(scope);
+
+                self.modules.insert(*identity, symbol.identity);
 
                 symbol
             })
@@ -288,6 +289,8 @@ impl<'session> Session<'session> {
         for module in modules {
             self.resolver.add(module);
         }
+
+        self.reporter.symbols(&self.resolver.scope.all());
     }
     
     pub fn resolve(&mut self) {
@@ -295,6 +298,7 @@ impl<'session> Session<'session> {
 
         for (identity, _location) in &self.inputs {
             let elements = self.parsers.get(identity).unwrap().output.clone();
+            let identity = self.modules.get(identity).unwrap();
             let module = self.resolver.scope.get_identity(*identity).unwrap();
             
             self.resolver.enter_scope(module.scope.clone());
@@ -305,8 +309,6 @@ impl<'session> Session<'session> {
             
             self.resolver.exit();
         }
-
-        self.reporter.symbols(&self.resolver.scope.all());
 
         self.errors.extend(
                 self.resolver

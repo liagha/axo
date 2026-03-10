@@ -1,13 +1,12 @@
 use {
     super::{scope::Scope, ResolveError},
     crate::{
-        data::{memory::replace, Identity},
+        data::{memory::replace},
         parser::{Element, Symbol},
     },
 };
 
 pub struct Resolver<'resolver> {
-    pub counter: Identity,
     pub scope: Scope<'resolver>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
@@ -16,7 +15,6 @@ pub struct Resolver<'resolver> {
 impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
-            counter: self.counter,
             scope: self.scope.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
@@ -34,7 +32,6 @@ pub trait Resolvable<'resolvable> {
 impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
-            counter: 0,
             scope: Scope::new(),
             input: Vec::new(),
             errors: Vec::new(),
@@ -63,12 +60,6 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn add(&mut self, symbol: Symbol<'resolver>) {
         self.scope.add(symbol);
-    }
-
-    pub fn next_identity(&mut self) -> Identity {
-        let id = self.counter;
-        self.counter += 1;
-        id
     }
 
     pub fn resolve(&mut self) {

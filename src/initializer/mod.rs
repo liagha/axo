@@ -1,9 +1,9 @@
 mod error;
 mod initializer;
-mod preference;
+mod configuration;
 mod traits;
 
-pub use {initializer::Initializer, preference::Preference};
+pub use {initializer::Initializer};
 
 
 use {

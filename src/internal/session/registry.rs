@@ -1,16 +1,15 @@
 use {
     super::{Resolver},
     crate::{
-        data::Str,
+        data::{Str, Identity},
         parser::{Element, ElementKind, SymbolKind},
         scanner::{Token, TokenKind},
         tracker::Span,
     },
 };
-use crate::data::Identity;
 
 impl<'registry> Resolver<'registry> {
-    fn lookup_value(
+    fn get_configuration(
         &mut self,
         key: Str<'registry>,
     ) -> Option<Token<'registry>> {
@@ -21,8 +20,8 @@ impl<'registry> Resolver<'registry> {
 
         let result = self.scope.lookup(&identifier).ok()?;
 
-        if let SymbolKind::Preference(preference) = result.kind {
-            Some(preference.value.clone())
+        if let SymbolKind::Binding(binding) = result.kind {
+            binding.value.as_ref().map(|v| v.clone().brand().unwrap_or_else(|| unreachable!()))
         } else {
             None
         }
@@ -40,7 +39,7 @@ impl<'registry> Resolver<'registry> {
             if let Some(Token {
                 kind: TokenKind::Identifier(value),
                 ..
-            }) = self.lookup_value(candidate)
+            }) = self.get_configuration(candidate)
             {
                 return Some(value);
             }
@@ -49,15 +48,15 @@ impl<'registry> Resolver<'registry> {
         None
     }
 
-    pub fn preference(
+    pub fn configuration(
         &mut self,
         identifier: Str<'registry>,
     ) -> Option<Token<'registry>> {
-        self.lookup_value(identifier)
+        self.get_configuration(identifier)
     }
 
     pub fn verbosity(&mut self) -> u8 {
-        match self.lookup_value(Str::from("Verbosity")) {
+        match self.get_configuration(Str::from("Verbosity")) {
             Some(Token {
                 kind: TokenKind::Integer(value),
                 ..
@@ -71,7 +70,7 @@ impl<'registry> Resolver<'registry> {
             if let Some(Token {
                 kind: TokenKind::Identifier(path),
                 ..
-            }) = self.lookup_value(candidate)
+            }) = self.get_configuration(candidate)
             {
                 return path;
             }

@@ -3,30 +3,12 @@ use {
     crate::{
         data::Str,
         formation::{classifier::Classifier, form::Form},
-        internal::hash::Hash,
         scanner::{OperatorKind, Token, TokenKind},
-        tracker::{Span, Spanned},
+        tracker::{Spanned},
     },
 };
-
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct Preference<'preference> {
-    pub target: Token<'preference>,
-    pub value: Token<'preference>,
-    pub span: Span<'preference>,
-}
-
-impl<'preference> Preference<'preference> {
-    pub fn new(target: Token<'preference>, value: Token<'preference>) -> Self {
-        let span = Span::merge(&target.borrow_span(), &value.borrow_span());
-
-        Self {
-            target,
-            value,
-            span,
-        }
-    }
-}
+use crate::data::{Binding, BindingKind};
+use crate::parser::{Element, ElementKind, Symbol, SymbolKind, Visibility};
 
 impl<'initializer> Initializer<'initializer> {
     fn path_string(tokens: Vec<Token<'initializer>>) -> String {
@@ -49,7 +31,7 @@ impl<'initializer> Initializer<'initializer> {
     fn path_value() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
         Classifier::sequence([
@@ -83,13 +65,13 @@ impl<'initializer> Initializer<'initializer> {
         ])
     }
 
-    fn path_preference(
+    fn path_configuration(
         name: Str<'initializer>,
         matcher: fn(&Str<'initializer>) -> bool,
     ) -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
         Classifier::with_transform(
@@ -109,7 +91,7 @@ impl<'initializer> Initializer<'initializer> {
                     move |form: Form<
                         'initializer,
                         Token<'initializer>,
-                        Preference,
+                        Symbol,
                         InitializeError<'initializer>,
                     >| {
                         let identifier = form.collect_inputs()[0].clone();
@@ -123,21 +105,53 @@ impl<'initializer> Initializer<'initializer> {
                 ),
                 Self::path_value(),
             ]),
-            |form: Form<
+            move |form: Form<
                 'initializer,
                 Token<'initializer>,
-                Preference,
+                Symbol,
                 InitializeError<'initializer>,
             >| {
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
+                let path = Self::path_string(forms[1].collect_inputs());
                 let span = identifier.clone().span();
-                let result = Self::path_string(forms[1].collect_inputs());
 
-                Ok(Form::output(Preference::new(
-                    identifier,
-                    Token::new(TokenKind::Identifier(Str::from(result)), span),
-                )))
+                let target = Element::new(
+                    ElementKind::Literal(
+                        Token::new(
+                            TokenKind::Identifier(name),
+                            span,
+                        ),
+                    ),
+                    span,
+                );
+
+                let value = Element::new(
+                    ElementKind::Literal(
+                        Token::new(
+                            TokenKind::Identifier(
+                                Str::from(path)
+                            ),
+                            span
+                        ),
+                    ),
+                    span,
+                );
+
+                let symbol = Symbol::new(
+                    SymbolKind::Binding(
+                        Binding::new(
+                            Box::from(target),
+                            Some(Box::new(value)),
+                            None,
+                            BindingKind::Meta,
+                        )
+                    ),
+                    span,
+                    Visibility::Public,
+                );
+
+                Ok(Form::output(symbol))
             },
         )
     }
@@ -145,7 +159,7 @@ impl<'initializer> Initializer<'initializer> {
     pub fn verbosity() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
         Classifier::sequence([
@@ -164,7 +178,7 @@ impl<'initializer> Initializer<'initializer> {
                 move |form: Form<
                     'initializer,
                     Token<'initializer>,
-                    Preference,
+                    Symbol,
                     InitializeError<'initializer>,
                 >| {
                     let identifier = form.collect_inputs()[0].clone();
@@ -182,13 +196,45 @@ impl<'initializer> Initializer<'initializer> {
             move |form: Form<
                 'initializer,
                 Token<'initializer>,
-                Preference,
+                Symbol,
                 InitializeError<'initializer>,
             >| {
                 let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
                 let value: Token<'initializer> = form.collect_inputs()[1].clone();
+                let span = identifier.span.merge(&value.span.clone());
 
-                Ok(Form::output(Preference::new(identifier, value)))
+                let target = Element::new(
+                    ElementKind::Literal(
+                        identifier.clone(),
+                    ),
+                    identifier.span,
+                );
+
+                let value = Element::new(
+                    ElementKind::Literal(
+                        value.clone(),
+                    ),
+                    value.span,
+                );
+
+                let symbol = Symbol::new(
+                    SymbolKind::Binding(
+                        Binding::new(
+                            Box::from(target),
+                            Some(Box::new(value)),
+                            None,
+                            BindingKind::Meta,
+                        )
+                    ),
+                    span,
+                    Visibility::Public,
+                );
+
+                Ok(
+                    Form::output(
+                        symbol,
+                    )
+                )
             },
         )
     }
@@ -196,10 +242,10 @@ impl<'initializer> Initializer<'initializer> {
     pub fn input() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Self::path_preference(Str::from("Input"), |identifier| {
+        Self::path_configuration(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
         })
     }
@@ -207,7 +253,7 @@ impl<'initializer> Initializer<'initializer> {
     pub fn implicit_input() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
         Classifier::with_transform(
@@ -215,7 +261,7 @@ impl<'initializer> Initializer<'initializer> {
             |form: Form<
                 'initializer,
                 Token<'initializer>,
-                Preference,
+                Symbol,
                 InitializeError<'initializer>,
             >| {
                 let inputs = form.collect_inputs();
@@ -224,12 +270,43 @@ impl<'initializer> Initializer<'initializer> {
                 }
 
                 let span = inputs[0].clone().span();
-                let result = Self::path_string(inputs);
 
-                Ok(Form::output(Preference::new(
-                    Token::new(TokenKind::Identifier(Str::from("Input")), span),
-                    Token::new(TokenKind::Identifier(Str::from(result)), span),
-                )))
+                let value = Token::new(TokenKind::Identifier(Str::from(Self::path_string(inputs))), span);
+
+                let identifier = Token::new(TokenKind::Identifier(Str::from("Input")), span);
+
+                let target = Element::new(
+                    ElementKind::Literal(
+                        identifier.clone(),
+                    ),
+                    identifier.span,
+                );
+
+                let value = Element::new(
+                    ElementKind::Literal(
+                        value.clone(),
+                    ),
+                    value.span,
+                );
+
+                let symbol = Symbol::new(
+                    SymbolKind::Binding(
+                        Binding::new(
+                            Box::from(target),
+                            Some(Box::new(value)),
+                            None,
+                            BindingKind::Meta,
+                        )
+                    ),
+                    span,
+                    Visibility::Public,
+                );
+
+                Ok(
+                    Form::output(
+                        symbol,
+                    )
+                )
             },
         )
     }
@@ -237,10 +314,10 @@ impl<'initializer> Initializer<'initializer> {
     pub fn output() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Self::path_preference(Str::from("Output"), |identifier| {
+        Self::path_configuration(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"
         })
     }

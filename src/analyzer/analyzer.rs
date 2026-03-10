@@ -176,8 +176,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     members?,
                 ))
             }
-            SymbolKind::Preference(_) => Ok(Analysis::unit()),
         }
-
     }
 }

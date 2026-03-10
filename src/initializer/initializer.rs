@@ -1,5 +1,5 @@
 use {
-    super::{InitializeError, Preference},
+    super::InitializeError,
     crate::{
         data::{Offset, Scale, Str},
         formation::{classifier::Classifier, form::Form, former::Former},
@@ -8,12 +8,14 @@ use {
         tracker::{Location, Peekable, Position},
     },
 };
+use crate::data::{Binding};
+use crate::parser::{ElementKind, Symbol, SymbolKind};
 
 pub struct Initializer<'initializer> {
     pub index: Offset,
     pub position: Position<'initializer>,
     pub input: Vec<Token<'initializer>>,
-    pub output: Vec<Preference<'initializer>>,
+    pub output: Vec<Symbol<'initializer>>,
     pub errors: Vec<InitializeError<'initializer>>,
 }
 
@@ -122,10 +124,10 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn preference() -> Classifier<
+    pub fn configuration() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
         Classifier::alternative([
@@ -140,10 +142,10 @@ impl<'initializer> Initializer<'initializer> {
     pub fn classifier() -> Classifier<
         'initializer,
         Token<'initializer>,
-        Preference<'initializer>,
+        Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Classifier::repetition(Self::preference(), 0, None)
+        Classifier::repetition(Self::configuration(), 0, None)
     }
 
     pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
@@ -169,7 +171,7 @@ impl<'initializer> Initializer<'initializer> {
         self.reset();
         let mut former = Former::new(self);
 
-        let mut preferences = Vec::new();
+        let mut configurations = Vec::new();
 
         let classifier = Self::classifier();
 
@@ -177,54 +179,75 @@ impl<'initializer> Initializer<'initializer> {
 
         for form in forms {
             match form {
-                Form::Output(output) => preferences.push(output),
+                Form::Output(output) => configurations.push(output),
                 Form::Failure(failure) => self.errors.push(failure),
                 Form::Multiple(multiple) => {
                     for form in multiple {
-                        preferences.push(form.unwrap_output().clone());
+                        configurations.push(form.unwrap_output().clone());
                     }
                 }
                 _ => {}
             }
         }
 
-        let targets = preferences
+        let targets = configurations
             .iter()
-            .filter(|preference| {
-                if let TokenKind::Identifier(identifier) = preference.target.kind {
-                    identifier == Str::from("Input") || identifier.starts_with("Input(")
-                } else {
-                    false
+            .filter(|configuration| {
+                if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
+                    if let ElementKind::Literal(token) = &target.kind {
+                        if let TokenKind::Identifier(identifier) = &token.kind {
+                            return *identifier == Str::from("Input")
+                                || identifier.starts_with("Input(");
+                        }
+                    }
                 }
+                false
             })
-            .map(|preference| {
-                let path = preference.clone().value.kind.unwrap_identifier();
-
-                Location::Entry(path)
+            .filter_map(|configuration| {
+                if let SymbolKind::Binding(Binding { value, .. }) = &configuration.kind {
+                    if let Some(element) = value.as_ref() {
+                        if let ElementKind::Literal(token) = &element.kind {
+                            if let TokenKind::Identifier(value) = &token.kind {
+                                return Some(Location::Entry(*value));
+                            }
+                        }
+                    }
+                }
+                None
             })
             .collect::<Vec<_>>();
 
-        let input_indexes = preferences
+        let input_indexes = configurations
             .iter()
             .enumerate()
-            .filter(|(_, preference)| {
-                if let TokenKind::Identifier(identifier) = preference.target.kind {
-                    identifier == Str::from("Input")
-                } else {
-                    false
+            .filter(|(_, configuration)| {
+                if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
+                    if let ElementKind::Literal(token) = &target.kind {
+                        if let TokenKind::Identifier(identifier) = &token.kind {
+                            return *identifier == Str::from("Input");
+                        }
+                    }
                 }
+                false
             })
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
 
         if input_indexes.len() > 1 {
             for (ordinal, pref_index) in input_indexes.iter().enumerate() {
-                if let Some(preference) = preferences.get_mut(*pref_index) {
-                    let span = preference.target.span;
-                    preference.target = Token::new(
-                        TokenKind::Identifier(Str::from(format!("Input({})", ordinal))),
-                        span,
-                    );
+                if let Some(configuration) = configurations.get_mut(*pref_index) {
+                    if let SymbolKind::Binding(Binding { target, .. }) = &mut configuration.kind {
+                        if let ElementKind::Literal(token) = &target.kind {
+                            let span = token.span;
+                            *target = Box::new(Element::new(
+                                ElementKind::Literal(Token::new(
+                                    TokenKind::Identifier(Str::from(format!("Input({})", ordinal))),
+                                    span,
+                                )),
+                                span,
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -236,36 +259,46 @@ impl<'initializer> Initializer<'initializer> {
             "OutputIR",
             "OutputExec",
         ] {
-            let indexes = preferences
+            let indexes = configurations
                 .iter()
                 .enumerate()
-                .filter(|(_, preference)| {
-                    if let TokenKind::Identifier(identifier) = preference.target.kind {
-                        identifier == Str::from(key)
-                    } else {
-                        false
+                .filter(|(_, configuration)| {
+                    if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
+                        if let ElementKind::Literal(token) = &target.kind {
+                            if let TokenKind::Identifier(identifier) = &token.kind {
+                                return *identifier == Str::from(key);
+                            }
+                        }
                     }
+                    false
                 })
                 .map(|(index, _)| index)
                 .collect::<Vec<_>>();
 
             if indexes.len() > 1 {
                 for (ordinal, pref_index) in indexes.iter().enumerate() {
-                    if let Some(preference) = preferences.get_mut(*pref_index) {
-                        let span = preference.target.span;
-                        preference.target = Token::new(
-                            TokenKind::Identifier(Str::from(format!(
-                                "{}({})",
-                                key, ordinal
-                            ))),
-                            span,
-                        );
+                    if let Some(configuration) = configurations.get_mut(*pref_index) {
+                        if let SymbolKind::Binding(Binding { target, .. }) = &mut configuration.kind {
+                            if let ElementKind::Literal(token) = &target.kind {
+                                let span = token.span;
+                                *target = Box::new(Element::new(
+                                    ElementKind::Literal(Token::new(
+                                        TokenKind::Identifier(Str::from(format!(
+                                            "{}({})",
+                                            key, ordinal
+                                        ))),
+                                        span,
+                                    )),
+                                    span,
+                                ));
+                            }
+                        }
                     }
                 }
             }
         }
 
-        self.output = preferences;
+        self.output = configurations;
 
         targets
     }

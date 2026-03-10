@@ -86,7 +86,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 }
             }
 
-            SymbolKind::Module(_) | SymbolKind::Preference(_) => {}
+            SymbolKind::Module(_) => {}
         }
     }
 }

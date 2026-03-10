@@ -24,7 +24,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("var"))
                         || token.kind == TokenKind::Identifier(Str::from("const"))
-                        || token.kind == TokenKind::Identifier(Str::from("generic"))
+                        || token.kind == TokenKind::Identifier(Str::from("meta"))
                 }),
                 Classifier::deferred(Self::element),
             ]),
@@ -42,8 +42,8 @@ impl<'parser> Parser<'parser> {
                             BindingKind::Variable
                         }
 
-                        "generic" => {
-                            BindingKind::Generic
+                        "meta" => {
+                            BindingKind::Meta
                         }
 
                         _ => BindingKind::Constant
@@ -145,7 +145,6 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
-                            0,
                             SymbolKind::Binding(
                                 Binding::new(
                                     Box::new(body),
@@ -222,7 +221,6 @@ impl<'parser> Parser<'parser> {
                 Ok(Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
-                            0,
                             SymbolKind::Structure(Structure::new(Box::new(name), members)),
                             span,
                             visibility,
@@ -356,7 +354,6 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                0,
                                 SymbolKind::Function(Function::new(
                                     Box::new(name),
                                     members,
@@ -381,7 +378,6 @@ impl<'parser> Parser<'parser> {
                     Ok(Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
-                                0,
                                 SymbolKind::Function(Function::new(
                                     Box::new(name),
                                     members,
@@ -423,7 +419,7 @@ impl<'parser> Parser<'parser> {
                     .collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol =
-                    Symbol::new(0, SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
+                    Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
                 symbol.scope.extend(fields);
 
                 Ok(Form::output(Element::new(
