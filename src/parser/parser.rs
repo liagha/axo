@@ -120,7 +120,7 @@ impl<'parser> Parser<'parser> {
             former.form(Self::filter(length)).collect_inputs()
         };
 
-        self.set_input(strained.clone());
+        self.set_input(strained);
         self.reset();
 
         let mut former = Former::new(self);

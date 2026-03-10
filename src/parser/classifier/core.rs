@@ -67,7 +67,7 @@ impl<'parser> Parser<'parser> {
             .with_transform(|classifier| {
                 let prefixes = classifier.form.collect_inputs();
                 let operand = classifier.form.collect_outputs()[0].clone();
-                let mut unary = operand.clone();
+                let mut unary = operand;
 
                 for prefix in prefixes {
                     let span = Span::merge(&prefix.borrow_span(), &unary.borrow_span());
@@ -292,8 +292,8 @@ impl<'parser> Parser<'parser> {
                 }
             }
 
-            let start = left.borrow_span().start.clone();
-            let end = right.borrow_span().end.clone();
+            let start = left.borrow_span().start;
+            let end = right.borrow_span().end;
             let span = Span::new(start, end);
 
             left = Element::new(

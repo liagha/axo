@@ -72,7 +72,7 @@ impl<'symbol> Symbol<'symbol> {
         self.scope = scope;
     }
 
-    pub fn brand(&self) -> Option<Token<'symbol>> {
+    pub fn brand(&self) -> Option<&Token<'symbol>> {
         self.kind.brand()
     }
 }
@@ -93,35 +93,35 @@ pub enum SymbolKind<'symbol> {
 }
 
 impl<'symbol> SymbolKind<'symbol> {
-    pub fn brand(&self) -> Option<Token<'symbol>> {
+    pub fn brand(&self) -> Option<&Token<'symbol>> {
         match self {
-            SymbolKind::Binding(binding) => binding.target.clone().brand(),
-            SymbolKind::Structure(structure) => structure.target.clone().brand(),
-            SymbolKind::Function(function) => function.target.clone().brand(),
-            SymbolKind::Module(module) => module.target.brand().clone(),
+            SymbolKind::Binding(binding) => binding.target.brand(),
+            SymbolKind::Structure(structure) => structure.target.brand(),
+            SymbolKind::Function(function) => function.target.brand(),
+            SymbolKind::Module(module) => module.target.brand(),
         }
     }
 }
 
 impl<'symbol> Element<'symbol> {
-    pub fn brand(&self) -> Option<Token<'symbol>> {
+    pub fn brand(&self) -> Option<&Token<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => {
-                    Some(literal.clone())
+                    Some(literal)
             },
             ElementKind::Construct(construct) => construct.target.brand(),
             ElementKind::Index(index) => index.target.brand(),
             ElementKind::Invoke(invoke) => invoke.target.brand(),
             ElementKind::Symbolize(symbol) => symbol.brand(),
             ElementKind::Binary(binary) => match binary.operator.kind {
-                TokenKind::Operator(OperatorKind::Colon) => binary.left.brand().clone(),
+                TokenKind::Operator(OperatorKind::Colon) => binary.left.brand(),
                 TokenKind::Operator(OperatorKind::Composite(ref operators))
                 if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
                     {
-                        binary.right.brand().clone()
+                        binary.right.brand()
                     }
-                TokenKind::Operator(OperatorKind::Equal) => binary.left.brand().clone(),
-                TokenKind::Operator(OperatorKind::Dot) => binary.right.brand().clone(),
+                TokenKind::Operator(OperatorKind::Equal) => binary.left.brand(),
+                TokenKind::Operator(OperatorKind::Dot) => binary.right.brand(),
                 _ => None,
             },
             _ => None,

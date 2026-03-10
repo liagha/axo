@@ -99,7 +99,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                let name = if let Some(TokenKind::Identifier(name)) = invoke.target.brand().map(|token| token.kind) {
+                let name = if let Some(TokenKind::Identifier(name)) = invoke.target.brand().map(|token| token.kind.clone()) {
                     name
                 } else {
                     unimplemented!("expected the head to be Identifier.")

@@ -56,34 +56,34 @@ impl<'token> Analyzable<'token> for Token<'token> {
         match &self.kind {
             TokenKind::Float(float) => {
                 Ok(Analysis::Float {
-                    value: float.clone(),
+                    value: *float,
                     size: 64,
                 })
             },
             TokenKind::Integer(integer) => {
                 Ok(Analysis::Integer {
-                    value: integer.clone(),
+                    value: *integer,
                     size: 64,
                     signed: true,
                 })
             },
             TokenKind::Boolean(boolean) => {
                 Ok(Analysis::Boolean {
-                    value: boolean.clone(),
+                    value: *boolean,
                 })
             },
             TokenKind::String(string) => {
                 Ok(Analysis::String {
-                    value: string.clone(),
+                    value: *string,
                 })
             },
             TokenKind::Character(character) => {
                 Ok(Analysis::Character {
-                    value: character.clone(),
+                    value: *character,
                 })
             },
             TokenKind::Identifier(identifier) => {
-                Ok(Analysis::Usage(identifier.clone()))
+                Ok(Analysis::Usage(*identifier))
             }
             TokenKind::Operator(_) => Ok(Analysis::unit()),
             TokenKind::Punctuation(_) => Ok(Analysis::unit()),

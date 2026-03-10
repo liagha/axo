@@ -139,7 +139,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
         candidate: &Symbol<'aligner>,
     ) -> Assessment<ResolveError<'aligner>> {
         if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
-            let assessment = self.assessment(&query, &candidate);
+            let assessment = self.assessment(query, &candidate);
 
             if assessment.errors.is_empty() {
                 let score = assessment.resemblance.to_f64();
@@ -239,8 +239,8 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         errors.push(
                             ResolveError::new(
                                 ErrorKind::MissingMember {
-                                    target: invoke.target.brand().unwrap(),
-                                    member: member.brand().unwrap(),
+                                    target: invoke.target.brand().unwrap().clone(),
+                                    member: member.brand().unwrap().clone(),
                                 },
                                 member.span.clone(),
                             )
@@ -253,8 +253,8 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         errors.push(
                             ResolveError::new(
                                 ErrorKind::UndefinedMember {
-                                    target: function.target.brand().unwrap(),
-                                    member: member.brand().unwrap(),
+                                    target: function.target.brand().unwrap().clone(),
+                                    member: member.brand().unwrap().clone(),
                                 },
                                 member.span.clone(),
                             )
@@ -304,11 +304,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     let mut errors = Vec::new();
 
-                    for member in &members {
+                    for member in members.clone() {
                         if !candidates.contains(&member) {
                             errors.push(ResolveError {
                                 kind: ErrorKind::UndefinedMember {
-                                    target: structure.target.brand().unwrap(),
+                                    target: structure.target.brand().unwrap().clone(),
                                     member: member.clone(),
                                 },
                                 span: query.span.clone(),
@@ -317,11 +317,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         }
                     }
 
-                    for candidate in &candidates {
+                    for candidate in candidates {
                         if !members.contains(&candidate) {
                             errors.push(ResolveError {
                                 kind: ErrorKind::MissingMember {
-                                    target: structure.target.brand().unwrap(),
+                                    target: structure.target.brand().unwrap().clone(),
                                     member: candidate.clone(),
                                 },
                                 span: query.span.clone(),

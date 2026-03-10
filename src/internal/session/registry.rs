@@ -21,7 +21,7 @@ impl<'registry> Resolver<'registry> {
         let result = self.scope.lookup(&identifier).ok()?;
 
         if let SymbolKind::Binding(binding) = result.kind {
-            binding.value.as_ref().map(|v| v.clone().brand().unwrap_or_else(|| unreachable!()))
+            binding.value.as_ref().map(|v| v.brand().clone().unwrap_or_else(|| unreachable!())).cloned()
         } else {
             None
         }

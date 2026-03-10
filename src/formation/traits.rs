@@ -2,10 +2,10 @@ use {
     super::{classifier::Classifier, form::Form, helper::Formable},
     crate::{
         data::Str,
+        tracker::{Span, Spanned},
         format::{Display, Formatter, Result, Show},
     },
 };
-use crate::tracker::{Span, Spanned};
 
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Show<'form>
     for Form<'form, Input, Output, Failure>
