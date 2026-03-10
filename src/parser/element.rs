@@ -2,14 +2,22 @@ use {
     super::Symbol,
     crate::{
         data::*,
-        scanner::Token, 
+        scanner::Token,
         tracker::Span,
-        checker::Type,
+        checker::{Type, TypeKind},
     },
 };
-use crate::checker::TypeKind;
+
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub fn next_identity() -> Identity {
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
 
 pub struct Element<'element> {
+    pub identity: Identity,
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
@@ -36,7 +44,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { kind, span, reference: None, ty: Type::new(TypeKind::Unknown, Span::void()) }
+        Element { identity: next_identity(), kind, span, reference: None, ty: Type::new(TypeKind::Unknown, Span::void()) }
     }
 }
 

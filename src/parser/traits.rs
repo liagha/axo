@@ -235,6 +235,7 @@ impl<'element> PartialEq for ElementKind<'element> {
 impl<'element> Clone for Element<'element> {
     fn clone(&self) -> Self {
         Element {
+            identity: self.identity,
             kind: self.kind.clone(),
             span: self.span.clone(),
             reference: self.reference,
