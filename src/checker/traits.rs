@@ -33,11 +33,11 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
         match verbosity {
             0 => {
                 match self {
-                    TypeKind::Integer { .. } => {
-                        "Integer".to_string()
+                    TypeKind::Integer { size, signed } => {
+                        format!("Integer[{}{}]", if *signed { "Signed | " } else { "" }, size)
                     }
-                    TypeKind::Float { .. } => {
-                        "Float".to_string()
+                    TypeKind::Float { size } => {
+                        format!("Float[{}]", size)
                     }
                     TypeKind::Boolean => {
                         "Boolean".to_string()
@@ -57,6 +57,9 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Tuple { members } => {
                         format!("Tuple({})", members.format(verbosity))
                     }
+                    TypeKind::Unknown => {
+                        "Unknown".to_string()
+                    }
                     TypeKind::Void => {
                         "Void".to_string()
                     }
@@ -68,9 +71,6 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     }
                     TypeKind::Structure(_) => {
                         "Structure".to_string()
-                    }
-                    TypeKind::Enumeration(_) => {
-                        "Enumeration".to_string()
                     }
                     TypeKind::Function(_) => {
                         "Method".to_string()

@@ -6,8 +6,8 @@ pub struct Checker<'check, 'source> {
     pub errors: Vec<CheckError<'source>>,
 }
 
-pub trait Checkable<'checkable> {
-    fn check(&mut self) -> Result<(), Vec<CheckError<'checkable>>>;
+pub trait Checkable<'element> {
+    fn check(&mut self, errors: &mut Vec<CheckError<'element>>);
 }
 
 impl<'check, 'source> Checker<'check, 'source> {
@@ -17,9 +17,7 @@ impl<'check, 'source> Checker<'check, 'source> {
 
     pub fn check(&mut self) {
         for element in self.input.iter_mut() {
-            if let Err(errs) = element.check() {
-                self.errors.extend(errs);
-            }
+            element.check(&mut self.errors);
         }
     }
 }

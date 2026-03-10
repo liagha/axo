@@ -36,7 +36,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { kind, span, reference: None, ty: Type::new(TypeKind::Void, Span::void()) }
+        Element { kind, span, reference: None, ty: Type::new(TypeKind::Unknown, Span::void()) }
     }
 }
 

@@ -246,12 +246,12 @@ pub enum TypeKind<'ty> {
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
     Void,
+    Unknown,
 
     Type,
 
     Constructor(Structure<Str<'ty>, Type<'ty>>),
     Structure(Structure<Str<'ty>, Type<'ty>>),
-    Enumeration(Structure<Str<'ty>, Type<'ty>>),
     Function(Function<Str<'ty>, Type<'ty>, Box<Type<'ty>>, Box<Type<'ty>>>),
 }
 

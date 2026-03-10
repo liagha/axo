@@ -85,7 +85,7 @@ impl<'backend> Inkwell<'backend> {
                     .ptr_type(inkwell::AddressSpace::default())
                     .into()
             },
-            TypeKind::Structure(structure) | TypeKind::Enumeration(structure) => {
+            TypeKind::Structure(structure) => {
                 self
                     .entities
                     .get(&structure.target)
