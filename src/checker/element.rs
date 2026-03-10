@@ -8,771 +8,528 @@ use crate::{
 };
 
 impl<'element> Checkable<'element> for Element<'element> {
-    fn check(&mut self) -> Vec<CheckError<'element>> {
-        let result = match &mut self.kind.clone() {
-            ElementKind::Literal(literal) => {
-                let ty = match literal.kind {
-                    TokenKind::Integer(_) => Type::integer(64, true, literal.span),
-                    TokenKind::Float(_) => Type::float(64, literal.span),
-                    TokenKind::Boolean(_) => Type::boolean(literal.span),
-                    TokenKind::String(_) => Type::string(literal.span),
-                    TokenKind::Character(_) => Type::character(literal.span),
-                    _ => Type::new(TypeKind::Void, literal.span),
-                };
-
-                Ok(ty)
+    fn check(&mut self) -> Result<(), Vec<CheckError<'element>>> {
+        let ty = match &mut self.kind.clone() {
+            ElementKind::Literal(literal) => match literal.kind {
+                TokenKind::Integer(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
+                TokenKind::Float(_)   => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
+                TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
+                TokenKind::String(_)  => Type { kind: TypeKind::String, span: literal.span },
+                TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
+                _ => Type { kind: TypeKind::Void, span: literal.span },
             },
 
-            ElementKind::Delimited(delimited) => {
-                match (
-                    &delimited.start.kind,
-                    delimited.separator.as_ref().map(|token| &token.kind),
-                    &delimited.end.kind,
-                ) {
-                    (
-                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                        None,
-                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
-                    )
-                    | (
-                        TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                        TokenKind::Punctuation(PunctuationKind::RightParenthesis),
-                    ) => {
-                        if delimited.separator.is_none() && delimited.members.len() == 1 {
-                            return delimited.members[0].check();
-                        }
+            ElementKind::Delimited(delimited) => match (
+                &delimited.start.kind,
+                delimited.separator.as_ref().map(|t| &t.kind),
+                &delimited.end.kind,
+            ) {
+                (
+                    TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                    None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                    TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                ) => {
+                    if delimited.separator.is_none() && delimited.members.len() == 1 {
+                        return delimited.members[0].check();
+                    }
 
-                        let errors : Vec<CheckError<'element>> = delimited
-                            .members
-                            .iter_mut()
-                            .map(|member| member.check())
-                            .flatten()
-                            .collect();
-
-                        if errors.is_empty() {
-                            let members = delimited
-                                .members
-                                .iter()
-                                .map(|member| member.ty.clone())
-                                .collect::<Vec<_>>();
-
-                            Ok(
-                                Type::new(
-                                    TypeKind::Tuple { members },
-                                    Span::void(),
-                                )
-                            )
-                        } else {
-                            Err(errors)
+                    let mut errors = Vec::new();
+                    for member in delimited.members.iter_mut() {
+                        if let Err(errs) = member.check() {
+                            errors.extend(errs);
                         }
                     }
 
-                    (
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        None,
-                        TokenKind::Punctuation(PunctuationKind::RightBrace),
-                    )
-                    | (
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                        TokenKind::Punctuation(PunctuationKind::RightBrace),
-                    ) => {
-                        let mut ty = Type::unit(Span::void());
-
-                        let last = delimited.members.len() - 1;
-
-                        for (index, member) in delimited.members.iter_mut().enumerate() {
-                            let errors = member.check();
-
-                            if index == last {
-                                if errors.is_empty() {
-                                    return errors;
-                                } else {
-                                    ty = member.ty.clone();
-                                }
-                            }
-                        }
-
-                        Ok(ty)
+                    if !errors.is_empty() {
+                        return Err(errors);
                     }
 
-                    (
-                        TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                        None,
-                        TokenKind::Punctuation(PunctuationKind::RightBracket),
-                    ) |
-                    (
-                        TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                        TokenKind::Punctuation(PunctuationKind::RightBracket),
-                    ) => {
-                        if delimited.members.is_empty() {
-                            Ok(
-                                Type::new(
-                                    TypeKind::Array {
-                                        member: Box::new(Type::new(TypeKind::Void, Span::void())),
-                                        size: 0,
-                                    },
-                                    Span::void(),
-                                )
-                            )
-                        } else {
-                            let mut errors = delimited.members[0].check();
-                            let inner = delimited.members[0].ty.clone();
-
-                            for member in delimited.members.iter_mut().skip(1) {
-                                errors.extend(member.check());
-
-                                if inner != member.ty {
-                                    errors.push(
-                                        CheckError::new(
-                                            ErrorKind::Mismatch(
-                                                inner.clone(),
-                                                member.ty.clone(),
-                                            ),
-                                            member.span,
-                                        )
-                                    );
-                                }
-                            }
-
-                            Ok(
-                                Type::new(
-                                    TypeKind::Array {
-                                        member: Box::new(inner),
-                                        size: delimited.members.len() as Scale,
-                                    },
-                                    Span::void(),
-                                )
-                            )
-                        }
-                    }
-
-                    _ => Ok(Type::unit(Span::void())),
+                    let members = delimited.members.iter().map(|m| m.ty.clone()).collect();
+                    Type { kind: TypeKind::Tuple { members }, span: Span::void() }
                 }
+
+                (
+                    TokenKind::Punctuation(PunctuationKind::LeftBrace),
+                    None | Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
+                    TokenKind::Punctuation(PunctuationKind::RightBrace),
+                ) => {
+                    let last = delimited.members.len() - 1;
+                    let mut ty = Type { kind: TypeKind::Tuple { members: Vec::new() }, span: Span::void() };
+
+                    for (index, member) in delimited.members.iter_mut().enumerate() {
+                        member.check()?;
+                        if index == last {
+                            ty = member.ty.clone();
+                        }
+                    }
+
+                    ty
+                }
+
+                (
+                    TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                    None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                    TokenKind::Punctuation(PunctuationKind::RightBracket),
+                ) => {
+                    if delimited.members.is_empty() {
+                        Type {
+                            kind: TypeKind::Array {
+                                member: Box::new(Type { kind: TypeKind::Void, span: Span::void() }),
+                                size: 0,
+                            },
+                            span: Span::void(),
+                        }
+                    } else {
+                        let mut errors = Vec::new();
+
+                        if let Err(errs) = delimited.members[0].check() {
+                            errors.extend(errs);
+                        }
+                        let inner = delimited.members[0].ty.clone();
+
+                        for member in delimited.members.iter_mut().skip(1) {
+                            if let Err(errs) = member.check() {
+                                errors.extend(errs);
+                            }
+                            if inner != member.ty {
+                                errors.push(CheckError::new(
+                                    ErrorKind::Mismatch(inner.clone(), member.ty.clone()),
+                                    member.span,
+                                ));
+                            }
+                        }
+
+                        if !errors.is_empty() {
+                            return Err(errors);
+                        }
+
+                        Type {
+                            kind: TypeKind::Array {
+                                member: Box::new(inner),
+                                size: delimited.members.len() as Scale,
+                            },
+                            span: Span::void(),
+                        }
+                    }
+                }
+
+                _ => Type { kind: TypeKind::Tuple { members: Vec::new() }, span: Span::void() },
             },
 
             ElementKind::Unary(unary) => {
-                let mut errors = unary.operand.check();
+                unary.operand.check()?;
 
-                if !errors.is_empty() {
-                    return errors;
-                }
-
-                let operator = match unary.operator.kind.clone() {
-                    TokenKind::Operator(operator) => operator,
-                    _ => {
-                        errors.push(
-                            CheckError::new(
-                                ErrorKind::InvalidOperation(
-                                    unary.operator.clone()
-                                ),
-                                unary.operator.span,
-                            )
-                        );
-
-                        return errors;
-                    },
+                let TokenKind::Operator(operator) = unary.operator.kind.clone() else {
+                    return Err(vec![CheckError::new(
+                        ErrorKind::InvalidOperation(unary.operator.clone()),
+                        unary.operator.span,
+                    )]);
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Exclamation] => {
-                        if unary.operand.ty.is_boolean() {
-                            Ok(Type::boolean(self.span))
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::boolean(self.span),
-                                            unary.operand.ty.clone(),
-                                        ),
-                                        self.span
-                                    )
-                                ]
-                            )
-                        }
-                    }
-                    [OperatorKind::Tilde] => {
-                        if unary.operand.ty.is_integer() {
-                            Ok(unary.operand.ty.clone())
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::integer(64, true, self.span),
-                                            unary.operand.ty.clone(),
-                                        ),
-                                        self.span,
-                                    )
-                                ]
-                            )
-                        }
-                    }
-                    [OperatorKind::Plus] | [OperatorKind::Minus] => {
-                        if unary.operand.ty.is_numeric() {
-                            Ok(unary.operand.ty.clone())
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::integer(64, true, self.span),
-                                            unary.operand.ty.clone(),
-                                        ),
-                                        self.span,
-                                    )
-                                ]
-                            )
-                        }
-                    }
+                    [OperatorKind::Exclamation] => match unary.operand.ty.kind {
+                        TypeKind::Boolean => Type { kind: TypeKind::Boolean, span: self.span },
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(
+                                Type { kind: TypeKind::Boolean, span: self.span },
+                                unary.operand.ty.clone(),
+                            ),
+                            self.span,
+                        )]),
+                    },
+
+                    [OperatorKind::Tilde] => match unary.operand.ty.kind {
+                        TypeKind::Integer { .. } => unary.operand.ty.clone(),
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(
+                                Type { kind: TypeKind::Integer { size: 64, signed: true }, span: self.span },
+                                unary.operand.ty.clone(),
+                            ),
+                            self.span,
+                        )]),
+                    },
+
+                    [OperatorKind::Plus] | [OperatorKind::Minus] => match unary.operand.ty.kind {
+                        TypeKind::Integer { .. } | TypeKind::Float { .. } => unary.operand.ty.clone(),
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(
+                                Type { kind: TypeKind::Integer { size: 64, signed: true }, span: self.span },
+                                unary.operand.ty.clone(),
+                            ),
+                            self.span,
+                        )]),
+                    },
+
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
-                            ElementKind::Literal(Token {
-                                                     kind: TokenKind::Identifier(_),
-                                                     ..
-                                                 }) => true,
+                            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => true,
                             ElementKind::Index(_) => true,
-                            ElementKind::Binary(binary) => {
-                                matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
-                            }
-                            ElementKind::Unary(unary) => {
-                                matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star))
-                            }
+                            ElementKind::Binary(binary) => matches!(
+                                binary.operator.kind,
+                                TokenKind::Operator(OperatorKind::Dot)
+                            ),
+                            ElementKind::Unary(inner) => matches!(
+                                inner.operator.kind,
+                                TokenKind::Operator(OperatorKind::Star)
+                            ),
                             _ => false,
                         };
 
-                        if addressable {
-                            Ok(Type::pointer(unary.operand.ty.clone(), self.span))
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::InvalidOperation(
-                                            unary.operator.clone()
-                                        ),
-                                        unary.operator.span,
-                                    )
-                                ]
-                            )
+                        match addressable {
+                            true => Type {
+                                kind: TypeKind::Pointer { target: Box::new(unary.operand.ty.clone()) },
+                                span: self.span,
+                            },
+                            false => return Err(vec![CheckError::new(
+                                ErrorKind::InvalidOperation(unary.operator.clone()),
+                                unary.operator.span,
+                            )]),
                         }
                     }
+
                     [OperatorKind::Star] => match unary.operand.ty.clone().kind {
-                        TypeKind::Pointer { target: to } => Ok(*to),
-                        TypeKind::Void => Ok(Type::new(TypeKind::Void, self.span)),
-                        _ => {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::pointer(Type::new(TypeKind::Void, self.span), self.span),
-                                            unary.operand.ty.clone(),
-                                        ),
-                                        self.span
-                                    )
-                                ]
-                            )
-                        },
+                        TypeKind::Pointer { target } => *target,
+                        TypeKind::Void => Type { kind: TypeKind::Void, span: self.span },
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(
+                                Type {
+                                    kind: TypeKind::Pointer {
+                                        target: Box::new(Type { kind: TypeKind::Void, span: self.span }),
+                                    },
+                                    span: self.span,
+                                },
+                                unary.operand.ty.clone(),
+                            ),
+                            self.span,
+                        )]),
                     },
-                    _ => {
-                        Err(
-                            vec![
-                                CheckError::new(
-                                    ErrorKind::InvalidOperation(
-                                        unary.operator.clone()
-                                    ),
-                                    unary.operator.span,
-                                )
-                            ]
-                        )
-                    },
+
+                    _ => return Err(vec![CheckError::new(
+                        ErrorKind::InvalidOperation(unary.operator.clone()),
+                        unary.operator.span,
+                    )]),
                 }
             }
 
             ElementKind::Binary(binary) => {
-                let mut errors = binary.left.check();
-                errors.extend(binary.right.check());
+                let mut errors = Vec::new();
+                if let Err(errs) = binary.left.check()  { errors.extend(errs); }
+                if let Err(errs) = binary.right.check() { errors.extend(errs); }
+                if !errors.is_empty() { return Err(errors); }
 
-                if !errors.is_empty() {
-                    return errors;
-                }
-
-                let operator = match binary.operator.kind.clone() {
-                    TokenKind::Operator(operator) => operator,
-                    _ => {
-                        errors.push(
-                            CheckError::new(
-                                ErrorKind::InvalidOperation(
-                                    binary.operator.clone()
-                                ),
-                                binary.operator.span,
-                            )
-                        );
-
-                        return errors;
-                    },
+                let TokenKind::Operator(operator) = binary.operator.kind.clone() else {
+                    return Err(vec![CheckError::new(
+                        ErrorKind::InvalidOperation(binary.operator.clone()),
+                        binary.operator.span,
+                    )]);
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Equal] => {
-                        if Type::unify(&binary.left.ty, &binary.right.ty).is_some() {
-                            Ok(binary.left.ty.clone())
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            binary.left.ty.clone(),
-                                            binary.right.ty.clone()
-                                        ),
-                                        binary.operator.span
-                                    )
-                                ]
-                            )
+                    [OperatorKind::Equal] => match Type::unify(&binary.left.ty, &binary.right.ty) {
+                        Some(_) => binary.left.ty.clone(),
+                        None => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                            binary.operator.span,
+                        )]),
+                    },
+
+                    [OperatorKind::Plus] => match (&binary.left.ty.kind, &binary.right.ty.kind) {
+                        (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type {
+                            kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra },
+                            span: binary.operator.span,
+                        },
+                        (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type {
+                            kind: TypeKind::Float { size: (*ls).max(*rs) },
+                            span: binary.operator.span,
+                        },
+                        (TypeKind::Float { size }, TypeKind::Integer { .. })
+                        | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type {
+                            kind: TypeKind::Float { size: *size },
+                            span: binary.operator.span,
+                        },
+                        (TypeKind::Integer { .. } | TypeKind::Float { .. }, TypeKind::Pointer { .. }) => {
+                            binary.right.ty.span = binary.operator.span;
+                            binary.right.ty.clone()
                         }
-                    }
-                    [OperatorKind::Plus] => {
-                        if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            Ok(binary.right.ty.clone())
-                        } else if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            Ok(binary.left.ty.clone())
-                        } else if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
-                            Ok(Type::new(TypeKind::Void, binary.operator.span))
-                        } else {
-                            match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                                (
-                                    TypeKind::Integer {
-                                        size: left_bits,
-                                        signed: left_signed,
-                                    },
-                                    TypeKind::Integer {
-                                        size: right_bits,
-                                        signed: right_signed,
-                                    },
-                                ) => Ok(Type::integer(
-                                    (*left_bits).max(*right_bits),
-                                    *left_signed || *right_signed,
-                                    binary.operator.span,
-                                )),
-                                (TypeKind::Float { size: left_bits }, TypeKind::Float { size: right_bits }) => {
-                                    Ok(Type::float((*left_bits).max(*right_bits), binary.operator.span))
-                                }
-                                (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
-                                | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
-                                (TypeKind::Integer { .. } | TypeKind::Float { .. }, TypeKind::Pointer { .. }) => {
-                                    binary.right.ty.span = binary.operator.span;
-                                    Ok(binary.right.ty.clone())
-                                }
-                                _ => {
-                                    Err(
-                                        vec![
-                                            CheckError::new(
-                                                ErrorKind::Mismatch(
-                                                    binary.left.ty.clone(),
-                                                    binary.right.ty.clone()
-                                                ),
-                                                binary.operator.span
-                                            )
-                                        ]
-                                    )
-                                },
-                            }
-                        }
-                    }
-                  [OperatorKind::Minus] => {
-                      if binary.left.ty.is_pointer() && binary.right.ty.is_pointer() {
-                          if binary.left.ty == binary.right.ty {
-                                Ok(Type::integer(64, true, binary.operator.span))
-                           } else {
-                                Err(
-                                    vec![
-                                        CheckError::new(
-                                            ErrorKind::Mismatch(
-                                                binary.left.ty.clone(),
-                                                binary.right.ty.clone()
-                                            ),
-                                            binary.operator.span
-                                        )
-                                    ]
-                                )
-                           }
-                        } else if binary.left.ty.is_pointer() {
-                            if binary.right.ty.is_integer() {
-                                binary.left.ty.span = binary.operator.span;
-                                Ok(binary.left.ty.clone())
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                            binary.operator.span,
+                        )]),
+                    },
+
+                    [OperatorKind::Minus] => match (&binary.left.ty.kind, &binary.right.ty.kind) {
+                        (TypeKind::Pointer { .. }, TypeKind::Pointer { .. }) => {
+                            if binary.left.ty == binary.right.ty {
+                                Type { kind: TypeKind::Integer { size: 64, signed: true }, span: binary.operator.span }
                             } else {
-                                Err(
-                                    vec![
-                                        CheckError::new(
-                                            ErrorKind::InvalidOperation(
-                                                binary.operator.clone()
-                                            ),
-                                            binary.operator.span,
-                                        )
-                                    ]
-                                )
+                                return Err(vec![CheckError::new(
+                                    ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                                    binary.operator.span,
+                                )]);
                             }
-                        } else if binary.right.ty.is_pointer() {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::InvalidOperation(
-                                            binary.operator.clone()
-                                        ),
-                                        binary.operator.span,
-                                    )
-                                ]
-                            )
-                        } else if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            Ok(binary.right.ty.clone())
-                        } else if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            Ok(binary.left.ty.clone())
-                        } else if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
-                            Ok(Type::new(TypeKind::Void, binary.operator.span))
-                        } else {
-                            match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                            (
-                                TypeKind::Integer {
-                                    size: left_bits,
-                                    signed: left_signed,
-                                },
-                                TypeKind::Integer {
-                                    size: right_bits,
-                                    signed: right_signed,
-                                },
-                            ) => Ok(Type::integer(
-                                (*left_bits).max(*right_bits),
-                                *left_signed || *right_signed,
-                                binary.operator.span,
-                            )),
-                            (TypeKind::Float { size: left_bits }, TypeKind::Float { size: right_bits }) => {
-                                Ok(Type::float((*left_bits).max(*right_bits), binary.operator.span))
-                            }
-                            (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
-                            | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
-                            _ => {
-                                Err(
-                                    vec![
-                                        CheckError::new(
-                                            ErrorKind::Mismatch(
-                                                binary.left.ty.clone(),
-                                                binary.right.ty.clone()
-                                            ),
-                                            binary.operator.span
-                                        )
-                                    ]
-                                )
-                            },
                         }
-                    }
-                    }
+                        (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) => {
+                            binary.left.ty.span = binary.operator.span;
+                            binary.left.ty.clone()
+                        }
+                        (TypeKind::Pointer { .. }, _) => return Err(vec![CheckError::new(
+                            ErrorKind::InvalidOperation(binary.operator.clone()),
+                            binary.operator.span,
+                        )]),
+                        (_, TypeKind::Pointer { .. }) => return Err(vec![CheckError::new(
+                            ErrorKind::InvalidOperation(binary.operator.clone()),
+                            binary.operator.span,
+                        )]),
+                        (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type {
+                            kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra },
+                            span: binary.operator.span,
+                        },
+                        (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type {
+                            kind: TypeKind::Float { size: (*ls).max(*rs) },
+                            span: binary.operator.span,
+                        },
+                        (TypeKind::Float { size }, TypeKind::Integer { .. })
+                        | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type {
+                            kind: TypeKind::Float { size: *size },
+                            span: binary.operator.span,
+                        },
+                        _ => return Err(vec![CheckError::new(
+                            ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                            binary.operator.span,
+                        )]),
+                    },
+
                     [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                        if binary.left.ty.is_infer() && binary.right.ty.is_numeric() {
-                            self.ty = binary.right.ty.clone();
-                            return Vec::new();
-                        }
-                        if binary.right.ty.is_infer() && binary.left.ty.is_numeric() {
-                            self.ty = binary.left.ty.clone();
-                            return Vec::new();
-                        }
-                        if binary.left.ty.is_infer() && binary.right.ty.is_infer() {
-                            self.ty = Type::new(TypeKind::Void, binary.operator.span);
-                            return Vec::new();
-                        }
                         match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                            (
-                                TypeKind::Integer {
-                                    size: left_bits,
-                                    signed: left_signed,
-                                },
-                                TypeKind::Integer {
-                                    size: right_bits,
-                                    signed: right_signed,
-                                },
-                            ) => Ok(Type::integer(
-                                (*left_bits).max(*right_bits),
-                                *left_signed || *right_signed,
-                                binary.operator.span,
-                            )),
-                            (TypeKind::Float { size: left_bits }, TypeKind::Float { size: right_bits }) => {
-                                Ok(Type::float((*left_bits).max(*right_bits), binary.operator.span))
-                            }
-                            (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
-                            | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Ok(Type::float(*bits, binary.operator.span)),
-                            _ => {
-                                Err(
-                                    vec![
-                                        CheckError::new(
-                                            ErrorKind::Mismatch(
-                                                binary.left.ty.clone(),
-                                                binary.right.ty.clone()
-                                            ),
-                                            binary.operator.span
-                                        )
-                                    ]
-                                )
+                            (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type {
+                                kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra },
+                                span: binary.operator.span,
                             },
+                            (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type {
+                                kind: TypeKind::Float { size: (*ls).max(*rs) },
+                                span: binary.operator.span,
+                            },
+                            (TypeKind::Float { size }, TypeKind::Integer { .. })
+                            | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type {
+                                kind: TypeKind::Float { size: *size },
+                                span: binary.operator.span,
+                            },
+                            _ => return Err(vec![CheckError::new(
+                                ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                                binary.operator.span,
+                            )]),
                         }
                     }
+
                     [OperatorKind::Ampersand]
                     | [OperatorKind::Pipe]
                     | [OperatorKind::Caret]
                     | [OperatorKind::LeftAngle, OperatorKind::LeftAngle]
                     | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                        if binary.left.ty.is_integer() && binary.right.ty.is_integer() {
-                            Ok(binary.left.ty.clone())
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::integer(64, true, self.span),
-                                            binary.right.ty.clone()
-                                        ),
-                                        self.span,
-                                    )
-                                ]
-                            )
+                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
+                            (TypeKind::Integer { .. }, TypeKind::Integer { .. }) => binary.left.ty.clone(),
+                            _ => return Err(vec![CheckError::new(
+                                ErrorKind::Mismatch(
+                                    Type { kind: TypeKind::Integer { size: 64, signed: true }, span: self.span },
+                                    binary.right.ty.clone(),
+                                ),
+                                self.span,
+                            )]),
                         }
                     }
+
                     [OperatorKind::Ampersand, OperatorKind::Ampersand]
                     | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                        if binary.left.ty.is_boolean() && binary.right.ty.is_boolean() {
-                            Ok(Type::boolean(binary.operator.span))
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            Type::boolean(self.span),
-                                            binary.right.ty.clone()
-                                        ),
-                                        self.span
-                                    )
-                                ]
-                            )
+                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
+                            (TypeKind::Boolean, TypeKind::Boolean) => Type { kind: TypeKind::Boolean, span: binary.operator.span },
+                            _ => return Err(vec![CheckError::new(
+                                ErrorKind::Mismatch(
+                                    Type { kind: TypeKind::Boolean, span: self.span },
+                                    binary.right.ty.clone(),
+                                ),
+                                self.span,
+                            )]),
                         }
                     }
+
                     [OperatorKind::Equal, OperatorKind::Equal]
                     | [OperatorKind::Exclamation, OperatorKind::Equal]
                     | [OperatorKind::LeftAngle]
                     | [OperatorKind::LeftAngle, OperatorKind::Equal]
                     | [OperatorKind::RightAngle]
                     | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        if Type::unify(&binary.left.ty, &binary.right.ty).is_some() {
-                            Ok(Type::boolean(binary.operator.span))
-                        } else {
-                            Err(
-                                vec![
-                                    CheckError::new(
-                                        ErrorKind::Mismatch(
-                                            binary.left.ty.clone(),
-                                            binary.right.ty.clone()
-                                        ),
-                                        binary.operator.span
-                                    )
-                                ]
-                            )
+                        match Type::unify(&binary.left.ty, &binary.right.ty) {
+                            Some(_) => Type { kind: TypeKind::Boolean, span: binary.operator.span },
+                            None => return Err(vec![CheckError::new(
+                                ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()),
+                                binary.operator.span,
+                            )]),
                         }
                     }
-                    [OperatorKind::Dot] => Ok(binary.right.ty.clone()),
-                    _ => Err(
-                        vec![
-                            CheckError::new(
-                                ErrorKind::InvalidOperation(
-                                    binary.operator.clone()
-                                ),
-                                binary.operator.span,
-                            )
-                        ]
-                    ),
+
+                    [OperatorKind::Dot] => binary.right.ty.clone(),
+
+                    _ => return Err(vec![CheckError::new(
+                        ErrorKind::InvalidOperation(binary.operator.clone()),
+                        binary.operator.span,
+                    )]),
                 }
             }
-           ElementKind::Index(index) => {
-               if index.members.is_empty() {
-                    self.ty = Type::unit(self.span);
-                    return Vec::new();
-               }
 
-                let mut errors = index.target.check();
-                errors.extend(index.members[0].check());
-
-                if !errors.is_empty() {
-                    return errors;
+            ElementKind::Index(index) => {
+                if index.members.is_empty() {
+                    self.ty = Type { kind: TypeKind::Tuple { members: Vec::new() }, span: self.span };
+                    return Ok(());
                 }
 
-                let target_ty = index.target.ty.clone();
-                let index_ty = index.members[0].ty.clone();
+                index.target.check()?;
+                index.members[0].check()?;
 
-                if !index_ty.is_integer() {
-                    return vec![
-                        CheckError::new(
-                            ErrorKind::Mismatch(
-                                Type::integer(64, true, self.span),
-                                index_ty,
-                            ),
-                            self.span,
-                        )
-                    ];
+                let target_ty = index.target.ty.clone();
+                let index_ty  = index.members[0].ty.clone();
+
+                match index_ty.kind {
+                    TypeKind::Integer { .. } => {}
+                    _ => return Err(vec![CheckError::new(
+                        ErrorKind::Mismatch(
+                            Type { kind: TypeKind::Integer { size: 64, signed: true }, span: self.span },
+                            index_ty,
+                        ),
+                        self.span,
+                    )]),
                 }
 
                 match target_ty.kind {
-                    TypeKind::Array { member, .. } => Ok(*member),
+                    TypeKind::Array { member, .. } => *member,
                     TypeKind::Tuple { members } => {
-                        if let ElementKind::Literal(Token {
-                            kind: TokenKind::Integer(value),
-                            ..
-                        }) = &index.members[0].kind
-                        {
-                            if let Ok(idx) = usize::try_from(*value) {
-                                if idx < members.len() {
-                                    self.ty = members[idx].clone();
-                                    return Vec::new();
+                        return match &index.members[0].kind {
+                            ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => {
+                                match usize::try_from(*value).ok().filter(|&i| i < members.len()) {
+                                    Some(idx) => {
+                                        self.ty = members[idx].clone();
+                                        Ok(())
+                                    }
+                                    None => Err(vec![CheckError::new(
+                                        ErrorKind::InvalidOperation(Token::new(
+                                            TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                            self.span,
+                                        )),
+                                        self.span,
+                                    )]),
                                 }
                             }
+                            _ => Err(vec![CheckError::new(
+                                ErrorKind::InvalidOperation(Token::new(
+                                    TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                                    self.span,
+                                )),
+                                self.span,
+                            )]),
                         }
-
-                        let token = Token::new(
+                    }
+                    _ => return Err(vec![CheckError::new(
+                        ErrorKind::InvalidOperation(Token::new(
                             TokenKind::Punctuation(PunctuationKind::LeftBracket),
                             self.span,
-                        );
-                        Err(
-                            vec![
-                                CheckError::new(
-                                    ErrorKind::InvalidOperation(token),
-                                    self.span,
-                                )
-                            ]
-                        )
-                    }
-                    _ => {
-                        let token = Token::new(
-                            TokenKind::Punctuation(PunctuationKind::LeftBracket),
-                            self.span,
-                        );
-                        Err(
-                            vec![
-                                CheckError::new(
-                                    ErrorKind::InvalidOperation(token),
-                                    self.span,
-                                )
-                            ]
-                        )
-                    }
+                        )),
+                        self.span,
+                    )]),
                 }
             }
+
             ElementKind::Invoke(invoke) => {
-                let primitive = invoke.target.brand().and_then(|token| match token.kind {
-                    TokenKind::Identifier(name) => Some(name),
-                    _ => None,
-                })
+                let primitive = invoke.target.brand()
+                    .and_then(|token| match token.kind {
+                        TokenKind::Identifier(name) => Some(name),
+                        _ => None,
+                    })
                     .and_then(|name| name.as_str());
 
                 match primitive {
                     Some("if") => {
-                        let mut errors = invoke.members[0].check();
-
-                        errors.extend(invoke.members[1].check());
-                        errors.extend(invoke.members[2].check());
-
-                        if !invoke.members[0].ty.is_boolean() {
-                            errors.push(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        Type::boolean(self.span),
-                                        invoke.members[0].ty.clone(),
-                                    ),
-                                    invoke.members[0].span,
-                                )
-                            )
+                        let mut errors = Vec::new();
+                        for member in invoke.members.iter_mut() {
+                            if let Err(errs) = member.check() { errors.extend(errs); }
                         }
 
-                        if let Some(unified) = Type::unify(&invoke.members[1].ty, &invoke.members[2].ty) {
-                            Ok(unified)
-                        } else {
-                            errors.push(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        invoke.members[1].ty.clone(),
-                                        invoke.members[2].ty.clone(),
-                                    ),
-                                    self.span
-                                )
-                            );
+                        match invoke.members[0].ty.kind {
+                            TypeKind::Boolean => {}
+                            _ => errors.push(CheckError::new(
+                                ErrorKind::Mismatch(
+                                    Type { kind: TypeKind::Boolean, span: self.span },
+                                    invoke.members[0].ty.clone(),
+                                ),
+                                invoke.members[0].span,
+                            )),
+                        }
 
-                            if errors.is_empty() {
-                                Ok(Type::unit(self.span))
-                            } else {
-                                Err(errors)
-                            }
+                        if !errors.is_empty() {
+                            return Err(errors);
+                        }
+
+                        match Type::unify(&invoke.members[1].ty, &invoke.members[2].ty) {
+                            Some(ty) => ty,
+                            None => return Err(vec![CheckError::new(
+                                ErrorKind::Mismatch(
+                                    invoke.members[1].ty.clone(),
+                                    invoke.members[2].ty.clone(),
+                                ),
+                                self.span,
+                            )]),
                         }
                     }
+
                     Some("while") => {
-                        let mut errors = invoke.members[0].check();
-
-                        errors.extend(invoke.members[1].check());
-
-                        if !invoke.members[0].ty.is_boolean() {
-                            errors.push(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(
-                                        Type::boolean(self.span),
-                                        invoke.members[0].ty.clone(),
-                                    ),
-                                    invoke.members[0].span,
-                                )
-                            )
+                        let mut errors = Vec::new();
+                        for member in invoke.members.iter_mut() {
+                            if let Err(errs) = member.check() { errors.extend(errs); }
                         }
 
-                        Ok(Type::unit(self.span))
+                        match invoke.members[0].ty.kind {
+                            TypeKind::Boolean => {}
+                            _ => errors.push(CheckError::new(
+                                ErrorKind::Mismatch(
+                                    Type { kind: TypeKind::Boolean, span: self.span },
+                                    invoke.members[0].ty.clone(),
+                                ),
+                                invoke.members[0].span,
+                            )),
+                        }
+
+                        if !errors.is_empty() {
+                            return Err(errors);
+                        }
+
+                        Type { kind: TypeKind::Tuple { members: Vec::new() }, span: self.span }
                     }
-                    _ => Ok(Type::new(TypeKind::Void, self.span)),
+
+                    _ => Type { kind: TypeKind::Void, span: self.span },
                 }
             }
+
             ElementKind::Construct(construct) => {
-                let members: Result<Vec<Type<'element>>, Vec<CheckError<'element>>> =
-                    construct
-                        .members
-                        .iter_mut()
-                        .map(|field| {
-                            let errors = field.check();
-
-                            if errors.is_empty() {
-                                Ok(field.ty.clone())
-                            } else {
-                                Err(errors)
-                            }
-                        })
-                        .collect();
-
-                match members {
-                    Ok(members) => {
-                        let structure = Structure::new(
-                            Str::from(construct.target.brand().unwrap().format(0)),
-                            members,
-                        );
-
-                        Ok(Type::new(TypeKind::Structure(structure), self.span))
-                    }
-
-                    Err(errors) => {
-                        Err(errors)
-                    }
+                let mut errors = Vec::new();
+                for field in construct.members.iter_mut() {
+                    if let Err(errs) = field.check() { errors.extend(errs); }
                 }
+
+                if !errors.is_empty() {
+                    return Err(errors);
+                }
+
+                let members = construct.members.iter().map(|f| f.ty.clone()).collect();
+                let structure = Structure::new(
+                    Str::from(construct.target.brand().unwrap().format(0)),
+                    members,
+                );
+
+                Type { kind: TypeKind::Structure(structure), span: self.span }
             }
 
             ElementKind::Symbolize(symbol) => return symbol.check(),
         };
 
-        match result {
-            Ok(ty) => {
-                self.ty = ty;
-
-                Vec::new()
-            },
-            Err(errors) => errors,
-        }
+        self.ty = ty;
+        Ok(())
     }
 }

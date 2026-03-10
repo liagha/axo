@@ -1,4 +1,4 @@
-use crate::checker::{CheckError};
+use crate::checker::CheckError;
 use crate::parser::Element;
 
 pub struct Checker<'check, 'source> {
@@ -7,17 +7,19 @@ pub struct Checker<'check, 'source> {
 }
 
 pub trait Checkable<'checkable> {
-    fn check(&mut self) -> Vec<CheckError<'checkable>>;
+    fn check(&mut self) -> Result<(), Vec<CheckError<'checkable>>>;
 }
 
 impl<'check, 'source> Checker<'check, 'source> {
     pub fn new(input: &'check mut Vec<Element<'source>>) -> Self {
         Self { input, errors: vec![] }
     }
-    
+
     pub fn check(&mut self) {
         for element in self.input.iter_mut() {
-            element.check();
+            if let Err(errs) = element.check() {
+                self.errors.extend(errs);
+            }
         }
     }
 }

@@ -163,6 +163,7 @@ impl<'session> Session<'session> {
         self.parse();
         self.register();
         self.resolve();
+        self.check();
         self.analyze();
         self.generate();
 

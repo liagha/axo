@@ -22,49 +22,6 @@ impl<'ty> Type<'ty> {
         Self::new(TypeKind::Tuple { members: Vec::new() }, span)
     }
 
-    pub fn integer(bits: Scale, signed: Boolean, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Integer { size: bits, signed }, span)
-    }
-
-    pub fn float(bits: Scale, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Float { size: bits }, span)
-    }
-
-    pub fn boolean(span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Boolean, span)
-    }
-
-    pub fn string(span: Span<'ty>) -> Self {
-        Self::new(TypeKind::String, span)
-    }
-
-    pub fn character(span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Character, span)
-    }
-
-    pub fn pointer(to: Type<'ty>, span: Span<'ty>) -> Self {
-        Self::new(TypeKind::Pointer { target: Box::new(to) }, span)
-    }
-
-    pub fn is_numeric(&self) -> bool {
-        matches!(self.kind, TypeKind::Integer { .. } | TypeKind::Float { .. })
-    }
-
-    pub fn is_integer(&self) -> bool {
-        matches!(self.kind, TypeKind::Integer { .. })
-    }
-
-    pub fn is_boolean(&self) -> bool {
-        matches!(self.kind, TypeKind::Boolean)
-    }
-
-    pub fn is_infer(&self) -> bool {
-        matches!(self.kind, TypeKind::Void)
-    }
-
-    pub fn is_pointer(&self) -> bool {
-        matches!(self.kind, TypeKind::Pointer { .. })
-    }
 
     pub fn unify(expected: &Type<'ty>, actual: &Type<'ty>) -> Option<Type<'ty>> {
         match (&expected.kind, &actual.kind) {
@@ -75,7 +32,14 @@ impl<'ty> Type<'ty> {
                 TypeKind::Pointer { target: actual_to },
             ) => {
                 let unified = Self::unify(expected_to, actual_to)?;
-                Some(Type::pointer(unified, expected.span))
+                Some(
+                    Type::new(
+                        TypeKind::Pointer {
+                            target: Box::from(unified),
+                        },
+                        expected.span
+                    )
+                )
             }
             (
                 TypeKind::Array {
@@ -114,16 +78,34 @@ impl<'ty> Type<'ty> {
                     size: actual_bits,
                     signed: actual_signed,
                 },
-            ) => Some(Type::integer(
-                (*expected_bits).max(*actual_bits),
-                *expected_signed || *actual_signed,
+            ) => Some(Type::new(
+                TypeKind::Integer {
+                    size: (*expected_bits).max(*actual_bits),
+                    signed: *expected_signed || *actual_signed,
+                },
                 expected.span,
             )),
             (TypeKind::Float { size: expected_bits }, TypeKind::Float { size: actual_bits }) => {
-                Some(Type::float((*expected_bits).max(*actual_bits), expected.span))
+                Some(
+                    Type::new(
+                        TypeKind::Float {
+                            size: (*expected_bits).max(*actual_bits),
+                        },
+                        expected.span
+                    )
+                )
             }
             (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
-            | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => Some(Type::float(*bits, expected.span)),
+            | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => {
+                Some(
+                    Type::new(
+                        TypeKind::Float {
+                            size: *bits,
+                        },
+                        expected.span
+                    )
+                )
+            },
             _ if expected == actual => Some(expected.clone()),
             _ => None,
         }
@@ -228,7 +210,15 @@ impl<'ty> Type<'ty> {
             ElementKind::Unary(unary) => {
                 if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
                     let item = Type::annotation(&unary.operand)?;
-                    Ok(Type::pointer(item, element.span))
+
+                    Ok(
+                        Type::new(
+                            TypeKind::Pointer {
+                                target: Box::from(item),
+                            },
+                            element.span
+                        )
+                    )
                 } else {
                     Err(CheckError::new(
                         ErrorKind::InvalidAnnotation(element.clone()),
