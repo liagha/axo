@@ -99,7 +99,7 @@ impl<'backend> Inkwell<'backend> {
 
         let shift_amt = right.into_int_value();
         let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); // Assuming shift amount is i32
+        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); 
 
         let is_shift_invalid = self.builder.build_int_compare(
             IntPredicate::UGE,
@@ -149,10 +149,10 @@ impl<'backend> Inkwell<'backend> {
 
         let shift_amt = right.into_int_value();
         let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); // Assuming shift amount is i32
+        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); 
 
         let is_shift_invalid = self.builder.build_int_compare(
-            IntPredicate::UGE, // Unsigned Greater or Equal
+            IntPredicate::UGE, 
             shift_amt,
             max_shift_amt,
             "shift_right_bound_check"

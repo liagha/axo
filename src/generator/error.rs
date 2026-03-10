@@ -6,6 +6,10 @@ pub enum ErrorKind {
     InvalidModule { reason: String },
 }
 
+pub enum ArithmeticError {
+
+}
+
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {

@@ -10,18 +10,18 @@ use {
         values::{BasicValueEnum, PointerValue},
     },
 };
-use crate::analyzer::Analysis;
+use crate::analyzer::{Analysis, AnalysisKind};
 use crate::checker::{Type, TypeKind};
 use crate::data::*;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis {
-            Analysis::Usage(name) => match self.entities.get(name) {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { kind, .. }) => Some(*kind),
                 _ => None,
             },
-            Analysis::Dereference(operand) => self.pointer_pointee_type(operand),
+            AnalysisKind::Dereference(operand) => self.pointer_pointee_type(operand),
             _ => None,
         }
     }
@@ -30,13 +30,13 @@ impl<'backend> super::Inkwell<'backend> {
         &self,
         analysis: &Analysis<'backend>,
     ) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis {
-            Analysis::Usage(name) => match self.entities.get(name) {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { pointee, .. }) => *pointee,
                 _ => None,
             },
-            Analysis::AddressOf(operand) => self.lvalue_type(operand),
-            Analysis::Dereference(operand) => {
+            AnalysisKind::AddressOf(operand) => self.lvalue_type(operand),
+            AnalysisKind::Dereference(operand) => {
                 self.pointer_pointee_type(operand).and_then(|kind| {
                     if kind.is_pointer_type() {
                         None
@@ -53,12 +53,12 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         analysis: &Analysis<'backend>,
     ) -> Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)> {
-        match &analysis {
-            Analysis::Usage(name) => match self.entities.get(name) {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => match self.entities.get(name) {
                 Some(Entity::Variable { pointer, kind, .. }) => Some((*pointer, *kind)),
                 _ => None,
             },
-            Analysis::Dereference(operand) => {
+            AnalysisKind::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand)?;
                 let value = self.analysis(*operand.clone());
                 match value {

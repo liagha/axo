@@ -1,7 +1,7 @@
 use crate::{
     data::*,
     analyzer::{
-        Analysis, CheckError, ErrorKind,
+        Analysis, AnalyzeError, ErrorKind,
     },
     format::Show,
     parser::{Element, Symbol, SymbolKind},
@@ -10,11 +10,12 @@ use crate::{
     },
     scanner::{Token, TokenKind},
 };
+use crate::analyzer::AnalysisKind;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
     pub output: Vec<Analysis<'analyzer>>,
-    pub errors: Vec<CheckError<'analyzer>>,
+    pub errors: Vec<AnalyzeError<'analyzer>>,
 }
 
 impl<'analyzer> Analyzer<'analyzer> {
@@ -45,50 +46,58 @@ pub trait Analyzable<'analyzable> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'analyzable>,
-    ) -> Result<Analysis<'analyzable>, CheckError<'analyzable>>;
+    ) -> Result<Analysis<'analyzable>, AnalyzeError<'analyzable>>;
 }
+
 
 impl<'token> Analyzable<'token> for Token<'token> {
     fn analyze(
         &self,
         _resolver: &mut Resolver<'token>,
-    ) -> Result<Analysis<'token>, CheckError<'token>> {
-        match &self.kind {
+    ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
+        let kind = match &self.kind {
             TokenKind::Float(float) => {
-                Ok(Analysis::Float {
+                AnalysisKind::Float {
                     value: *float,
                     size: 64,
-                })
+                }
             },
+
             TokenKind::Integer(integer) => {
-                Ok(Analysis::Integer {
+                AnalysisKind::Integer {
                     value: *integer,
                     size: 64,
                     signed: true,
-                })
+                }
             },
+
             TokenKind::Boolean(boolean) => {
-                Ok(Analysis::Boolean {
+                AnalysisKind::Boolean {
                     value: *boolean,
-                })
+                }
             },
+
             TokenKind::String(string) => {
-                Ok(Analysis::String {
+                AnalysisKind::String {
                     value: *string,
-                })
+                }
             },
+
             TokenKind::Character(character) => {
-                Ok(Analysis::Character {
+                AnalysisKind::Character {
                     value: *character,
-                })
+                }
             },
+
             TokenKind::Identifier(identifier) => {
-                Ok(Analysis::Usage(*identifier))
+                AnalysisKind::Usage(*identifier)
             }
-            TokenKind::Operator(_) => Ok(Analysis::unit()),
-            TokenKind::Punctuation(_) => Ok(Analysis::unit()),
-            TokenKind::Comment(_) => Ok(Analysis::unit()),
-        }
+
+            TokenKind::Operator(_) | TokenKind::Punctuation(_) | TokenKind::Comment(_) => {
+                AnalysisKind::Tuple(Vec::new())
+            }
+        };
+        Ok(Analysis::new(kind, self.span))
     }
 }
 
@@ -96,8 +105,8 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'symbol>,
-    ) -> Result<Analysis<'symbol>, CheckError<'symbol>> {
-        match &self.kind {
+    ) -> Result<Analysis<'symbol>, AnalyzeError<'symbol>> {
+        let kind = match &self.kind {
             SymbolKind::Binding(binding) => {
                 let value = binding
                     .value
@@ -108,7 +117,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let target_token = binding
                     .target
                     .brand()
-                    .ok_or_else(|| CheckError::new(ErrorKind::Unimplemented, binding.target.span))?;
+                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
                 let analyzed = Binding::new(
                     Str::from(target_token.format(0)),
@@ -117,10 +126,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     binding.kind,
                 );
 
-                Ok(Analysis::Binding(analyzed))
+                AnalysisKind::Binding(analyzed)
             }
             SymbolKind::Structure(structure) => {
-                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = structure
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = structure
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -131,10 +140,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     members?,
                 );
 
-                Ok(Analysis::Structure(analyzed))
+                AnalysisKind::Structure(analyzed)
             }
             SymbolKind::Function(function) => {
-                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = function
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
@@ -143,7 +152,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = function.body.as_ref() {
                     body.analyze(resolver)?
                 } else {
-                    Analysis::unit()
+                    Analysis::unit(self.span)
                 };
 
                 let output = function
@@ -160,26 +169,27 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     function.entry,
                 );
 
-                Ok(Analysis::Function(analyzed))
+                AnalysisKind::Function(analyzed)
             }
             SymbolKind::Module(module) => {
                 let target = module
                     .target
                     .brand()
-                    .ok_or_else(|| CheckError::new(ErrorKind::Unimplemented, module.target.span))?;
+                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, module.target.span))?;
 
-                let members: Result<Vec<Analysis<'symbol>>, CheckError<'symbol>> = self
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self
                     .scope
                     .all()
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                Ok(Analysis::Module(
+                AnalysisKind::Module(
                     Str::from(target.format(0)),
                     members?,
-                ))
+                )
             }
-        }
+        };
+        Ok(Analysis::new(kind, self.span))
     }
 }

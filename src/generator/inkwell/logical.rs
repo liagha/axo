@@ -31,10 +31,9 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn logical_or(
         &mut self,
-        left_expr: Box<Analysis<'backend>>, // Renamed
-        right_expr: Box<Analysis<'backend>>, // Renamed
+        left_expr: Box<Analysis<'backend>>, 
+        right_expr: Box<Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
-        // FIX E0502
         let left_analyzed = self.analysis(*left_expr);
         let right_analyzed = self.analysis(*right_expr);
 
@@ -49,9 +48,8 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn logical_not(
         &mut self,
-        operand_expr: Box<Analysis<'backend>>, // Renamed
+        operand_expr: Box<Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
-        // FIX E0502
         let operand_analyzed = self.analysis(*operand_expr);
         let operand_value = self.check_is_1bit_int(operand_analyzed, "NOT");
         BasicValueEnum::from(

@@ -4,18 +4,19 @@ use {
         Inkwell,
     },
     crate::{
+        data::Boolean,
         analyzer::Analysis,
     },
     inkwell::values::{BasicValueEnum},
 };
 
 impl<'backend> Inkwell<'backend> {
-    pub(super) fn coerce_numeric_pair(
+    pub fn normalize_pair(
         &self,
         left: BasicValueEnum<'backend>,
         right: BasicValueEnum<'backend>,
         name: &str,
-    ) -> (BasicValueEnum<'backend>, BasicValueEnum<'backend>, bool) {
+    ) -> (BasicValueEnum<'backend>, BasicValueEnum<'backend>, Boolean) {
         if left.is_int_value() && right.is_int_value() {
             return (left, right, false);
         }
@@ -71,7 +72,7 @@ impl<'backend> Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "add");
+        let (left, right, floating) = self.normalize_pair(left, right, "add");
 
         if !floating {
             BasicValueEnum::from(
@@ -96,7 +97,7 @@ impl<'backend> Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "subtract");
+        let (left, right, floating) = self.normalize_pair(left, right, "subtract");
 
         if !floating {
             BasicValueEnum::from(
@@ -125,7 +126,7 @@ impl<'backend> Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "multiply");
+        let (left, right, floating) = self.normalize_pair(left, right, "multiply");
 
         if !floating {
             BasicValueEnum::from(
@@ -160,7 +161,7 @@ impl<'backend> Inkwell<'backend> {
         let left = self.analysis(*left_expr);
         let right = self.analysis(*right_expr);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "divide");
+        let (left, right, floating) = self.normalize_pair(left, right, "divide");
 
         if !floating {
             let divisor = right.into_int_value();
@@ -191,7 +192,7 @@ impl<'backend> Inkwell<'backend> {
                     self.builder
                         .build_int_signed_div(
                             left.into_int_value(),
-                            divisor, // Use divisor for the actual division
+                            divisor,
                             "divide",
                         )
                         .unwrap(),
@@ -201,7 +202,7 @@ impl<'backend> Inkwell<'backend> {
                     self.builder
                         .build_int_unsigned_div(
                             left.into_int_value(),
-                            divisor, // Use divisor for the actual division
+                            divisor,
                             "divide",
                         )
                         .unwrap(),
@@ -230,7 +231,7 @@ impl<'backend> Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "modulus");
+        let (left, right, floating) = self.normalize_pair(left, right, "modulus");
 
         if floating {
             BasicValueEnum::from(

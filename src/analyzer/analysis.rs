@@ -4,9 +4,26 @@ use {
     }
 };
 use crate::checker::Type;
+use crate::tracker::Span;
 
 #[derive(Clone, Debug)]
-pub enum Analysis<'analysis> {
+pub struct Analysis<'analysis> {
+    pub kind: AnalysisKind<'analysis>,
+    pub span: Span<'analysis>,
+}
+
+impl<'analysis> Analysis<'analysis> {
+    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>) -> Self {
+        Self { kind, span }
+    }
+    
+    pub fn unit(span: Span<'analysis>) -> Self {
+        Analysis::new(AnalysisKind::Tuple(Vec::new()), span)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AnalysisKind<'analysis> {
     Integer {
         value: Integer,
         size: Scale,
@@ -54,7 +71,7 @@ pub enum Analysis<'analysis> {
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
     Index(Index<Box<Analysis<'analysis>>, Analysis<'analysis>>),
-    Invoke(Invoke<Box<Analysis<'analysis>>, Analysis<'analysis>>),
+    Invoke(Invoke<Str<'analysis>, Analysis<'analysis>>),
 
     Block(Vec<Analysis<'analysis>>),
     Conditional(
@@ -83,10 +100,4 @@ pub enum Analysis<'analysis> {
         >,
     ),
     Module(Str<'analysis>, Vec<Analysis<'analysis>>),
-}
-
-impl<'analysis> Analysis<'analysis> {
-    pub fn unit() -> Self {
-        Analysis::Tuple(Vec::new())
-    }
 }

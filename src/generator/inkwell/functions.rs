@@ -12,6 +12,7 @@ use {
         FloatPredicate, IntPredicate,
     },
 };
+use crate::analyzer::AnalysisKind;
 use crate::checker::Type;
 
 impl<'backend> super::Inkwell<'backend> {
@@ -88,14 +89,6 @@ impl<'backend> super::Inkwell<'backend> {
                 .unwrap()
         } else {
             self.context.bool_type().const_zero()
-        }
-    }
-
-    fn invoke_target_name(instruction: &Analysis<'backend>) -> Option<Str<'backend>> {
-        match instruction {
-            Analysis::Usage(name) => Some(*name),
-            Analysis::Access(_, member) => Self::invoke_target_name(&member),
-            _ => None,
         }
     }
 
@@ -247,7 +240,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> BasicValueEnum<'backend> {
         let mut parameters = vec![];
         for member in &method.members {
-            if let Analysis::Binding(bind) = &member {
+            if let AnalysisKind::Binding(bind) = &member.kind {
                 let kind = bind
                     .annotation
                     .as_ref()
@@ -321,7 +314,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         if !matches!(method.interface, Interface::C) {
             for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
-                if let Analysis::Binding(bind) = &member {
+                if let AnalysisKind::Binding(bind) = &member.kind {
                     let allocate = self.build_entry(function, param_val.get_type(), bind.target);
                     let _ = self.builder.build_store(allocate, param_val);
                     let signed = if param_val.get_type().is_int_type() {
@@ -480,36 +473,30 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn invoke(
         &mut self,
-        invoke: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
+        invoke: Invoke<Str<'backend>, Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
-        let name = Self::invoke_target_name(&invoke.target)
-            .and_then(|value| value.as_str())
-            .unwrap_or("");
-
-        if let Some(value) = self.primitive_cast(name, &invoke.members) {
+        if let Some(value) = self.primitive_cast(&*invoke.target, &invoke.members) {
             return value;
         }
 
-        if let Analysis::Usage(target_name) = &*invoke.target {
-            let option = self.entities.get(target_name).and_then(|entity| {
-                if let Entity::Function(func) = entity {
-                    Some(*func)
-                } else {
-                    None
-                }
-            });
-
-            if let Some(value) = option {
-                let mut arguments = vec![];
-                for argument in &invoke.members {
-                    let value = self.analysis(argument.clone());
-                    arguments.push(value.into());
-                }
-                let result = self.builder.build_call(value, &arguments, "call").unwrap();
-                return result
-                    .try_as_basic_value().basic()
-                    .unwrap_or(self.context.i64_type().const_zero().into());
+        let option = self.entities.get(&invoke.target).and_then(|entity| {
+            if let Entity::Function(func) = entity {
+                Some(*func)
+            } else {
+                None
             }
+        });
+
+        if let Some(value) = option {
+            let mut arguments = vec![];
+            for argument in &invoke.members {
+                let value = self.analysis(argument.clone());
+                arguments.push(value.into());
+            }
+            let result = self.builder.build_call(value, &arguments, "call").unwrap();
+            return result
+                .try_as_basic_value().basic()
+                .unwrap_or(self.context.i64_type().const_zero().into());
         }
 
         self.context.i64_type().const_zero().into()

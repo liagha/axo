@@ -7,7 +7,7 @@ mod logical;
 mod primitives;
 mod variables;
 
-use crate::analyzer::Analysis;
+use crate::analyzer::{Analysis, AnalysisKind};
 use crate::checker::{Type, TypeKind};
 use {
     super::Backend,
@@ -33,7 +33,7 @@ pub enum Entity<'backend> {
     Array {
         pointer: PointerValue<'backend>,
         element_type: BasicTypeEnum<'backend>,
-        element_count: usize, // FIX: Added element_count for array bounds checking
+        element_count: usize, 
     },
     Struct {
         struct_type: StructType<'backend>,
@@ -123,14 +123,14 @@ impl<'backend> Inkwell<'backend> {
     }
 
     pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
-        match &analysis {
-            Analysis::Integer { signed, .. } => Some(*signed),
-            Analysis::Usage(identifier) => match self.entities.get(identifier) {
+        match &analysis.kind {
+            AnalysisKind::Integer { signed, .. } => Some(*signed),
+            AnalysisKind::Usage(identifier) => match self.entities.get(identifier) {
                 Some(Entity::Variable { signed, .. }) => *signed,
                 _ => None,
             },
-            Analysis::Assign(_, value) => self.infer_signedness(value),
-            Analysis::Binding(binding) => binding
+            AnalysisKind::Assign(_, value) => self.infer_signedness(value),
+            AnalysisKind::Binding(binding) => binding
                 .value
                 .as_ref()
                 .and_then(|value| self.infer_signedness(value)),
@@ -176,7 +176,7 @@ impl<'backend> Inkwell<'backend> {
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
-            if let Analysis::Structure(structure) = &analysis {
+            if let AnalysisKind::Structure(structure) = &analysis.kind {
                 self.structure(structure.clone());
             }
         }
@@ -184,7 +184,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         let mut entry = None;
 
         for analysis in &analyses {
-            if let Analysis::Function(function) = analysis {
+            if let AnalysisKind::Function(function) = &analysis.kind {
                 if function.entry {
                     entry = Some(function);
                 } else {
@@ -212,54 +212,54 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
     }
 
     fn analysis(&mut self, instruction: Analysis<'backend>) -> BasicValueEnum<'backend> {
-        match instruction {
-            Analysis::Integer { value, size, signed, } => self.integer(value, size, signed),
-            Analysis::Float { value, size } => self.float(value, size),
-            Analysis::Boolean { value } => self.boolean(value),
-            Analysis::Character { value } => self.character(value),
-            Analysis::String { value } => self.string(value),
-            Analysis::Array(values) => self.array(values).0.into(),
-            Analysis::Tuple(values) => self.tuple(values),
-            Analysis::Add(left, right) => self.add(left, right),
-            Analysis::Subtract(left, right) => self.subtract(left, right),
-            Analysis::Multiply(left, right) => self.multiply(left, right),
-            Analysis::Divide(left, right) => self.divide(left, right),
-            Analysis::Modulus(left, right) => self.modulus(left, right),
-            Analysis::LogicalAnd(left, right) => self.logical_and(left, right),
-            Analysis::LogicalOr(left, right) => self.logical_or(left, right),
-            Analysis::LogicalNot(operand) => self.logical_not(operand),
-            Analysis::LogicalXOr(left, right) => self.logical_xor(left, right),
-            Analysis::BitwiseAnd(left, right) => self.bitwise_and(left, right),
-            Analysis::BitwiseOr(left, right) => self.bitwise_or(left, right),
-            Analysis::BitwiseNot(operand) => self.bitwise_not(operand),
-            Analysis::BitwiseXOr(left, right) => self.bitwise_xor(left, right),
-            Analysis::ShiftLeft(left, right) => self.shift_left(left, right),
-            Analysis::ShiftRight(left, right) => self.shift_right(left, right),
-            Analysis::AddressOf(operand) => self.address_of(operand),
-            Analysis::Dereference(operand) => self.dereference(operand),
-            Analysis::Equal(left, right) => self.equal(left, right),
-            Analysis::NotEqual(left, right) => self.not_equal(left, right),
-            Analysis::Less(left, right) => self.less(left, right),
-            Analysis::LessOrEqual(left, right) => self.less_or_equal(left, right),
-            Analysis::Greater(left, right) => self.greater(left, right),
-            Analysis::GreaterOrEqual(left, right) => self.greater_or_equal(left, right),
-            Analysis::Index(index) => self.index(index),
-            Analysis::Usage(identifier) => self.usage(identifier),
-            Analysis::Access(target, member) => self.access(target, member),
-            Analysis::Constructor(structure) => self.constructor(structure),
-            Analysis::Assign(target, value) => self.assign(target, value),
-            Analysis::Store(target, value) => self.store(target, value),
-            Analysis::Binding(binding) => self.binding(binding),
-            Analysis::Block(analyses) => self.block(analyses),
-            Analysis::Conditional(condition, then, otherwise) => self.conditional(condition, then, otherwise),
-            Analysis::While(condition, body) => self.r#while(condition, body),
-            Analysis::Structure(structure) => self.structure(structure),
-            Analysis::Module(name, analyses) => self.module(name, analyses),
-            Analysis::Function(function) => self.function(function),
-            Analysis::Invoke(invoke) => self.invoke(invoke),
-            Analysis::Return(value) => self.r#return(value),
-            Analysis::Break(value) => self.r#break(value),
-            Analysis::Continue(value) => self.r#continue(value),
+        match instruction.kind {
+            AnalysisKind::Integer { value, size, signed, } => self.integer(value, size, signed),
+            AnalysisKind::Float { value, size } => self.float(value, size),
+            AnalysisKind::Boolean { value } => self.boolean(value),
+            AnalysisKind::Character { value } => self.character(value),
+            AnalysisKind::String { value } => self.string(value),
+            AnalysisKind::Array(values) => self.array(values).0.into(),
+            AnalysisKind::Tuple(values) => self.tuple(values),
+            AnalysisKind::Add(left, right) => self.add(left, right),
+            AnalysisKind::Subtract(left, right) => self.subtract(left, right),
+            AnalysisKind::Multiply(left, right) => self.multiply(left, right),
+            AnalysisKind::Divide(left, right) => self.divide(left, right),
+            AnalysisKind::Modulus(left, right) => self.modulus(left, right),
+            AnalysisKind::LogicalAnd(left, right) => self.logical_and(left, right),
+            AnalysisKind::LogicalOr(left, right) => self.logical_or(left, right),
+            AnalysisKind::LogicalNot(operand) => self.logical_not(operand),
+            AnalysisKind::LogicalXOr(left, right) => self.logical_xor(left, right),
+            AnalysisKind::BitwiseAnd(left, right) => self.bitwise_and(left, right),
+            AnalysisKind::BitwiseOr(left, right) => self.bitwise_or(left, right),
+            AnalysisKind::BitwiseNot(operand) => self.bitwise_not(operand),
+            AnalysisKind::BitwiseXOr(left, right) => self.bitwise_xor(left, right),
+            AnalysisKind::ShiftLeft(left, right) => self.shift_left(left, right),
+            AnalysisKind::ShiftRight(left, right) => self.shift_right(left, right),
+            AnalysisKind::AddressOf(operand) => self.address_of(operand),
+            AnalysisKind::Dereference(operand) => self.dereference(operand),
+            AnalysisKind::Equal(left, right) => self.equal(left, right),
+            AnalysisKind::NotEqual(left, right) => self.not_equal(left, right),
+            AnalysisKind::Less(left, right) => self.less(left, right),
+            AnalysisKind::LessOrEqual(left, right) => self.less_or_equal(left, right),
+            AnalysisKind::Greater(left, right) => self.greater(left, right),
+            AnalysisKind::GreaterOrEqual(left, right) => self.greater_or_equal(left, right),
+            AnalysisKind::Index(index) => self.index(index),
+            AnalysisKind::Usage(identifier) => self.usage(identifier),
+            AnalysisKind::Access(target, member) => self.access(target, member),
+            AnalysisKind::Constructor(structure) => self.constructor(structure),
+            AnalysisKind::Assign(target, value) => self.assign(target, value),
+            AnalysisKind::Store(target, value) => self.store(target, value),
+            AnalysisKind::Binding(binding) => self.binding(binding),
+            AnalysisKind::Block(analyses) => self.block(analyses),
+            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(condition, then, otherwise),
+            AnalysisKind::While(condition, body) => self.r#while(condition, body),
+            AnalysisKind::Structure(structure) => self.structure(structure),
+            AnalysisKind::Module(name, analyses) => self.module(name, analyses),
+            AnalysisKind::Function(function) => self.function(function),
+            AnalysisKind::Invoke(invoke) => self.invoke(invoke),
+            AnalysisKind::Return(value) => self.r#return(value),
+            AnalysisKind::Break(value) => self.r#break(value),
+            AnalysisKind::Continue(value) => self.r#continue(value),
         }
     }
 }

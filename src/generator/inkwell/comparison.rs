@@ -16,7 +16,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "equal");
+        let (left, right, floating) = self.normalize_pair(left, right, "equal");
 
         if !floating {
             BasicValueEnum::from(
@@ -51,7 +51,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "not_equal");
+        let (left, right, floating) = self.normalize_pair(left, right, "not_equal");
 
         if !floating {
             BasicValueEnum::from(
@@ -91,7 +91,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "less");
+        let (left, right, floating) = self.normalize_pair(left, right, "less");
 
         if !floating {
             BasicValueEnum::from(
@@ -135,7 +135,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "less_or_equal");
+        let (left, right, floating) = self.normalize_pair(left, right, "less_or_equal");
 
         if !floating {
             BasicValueEnum::from(
@@ -179,7 +179,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "greater");
+        let (left, right, floating) = self.normalize_pair(left, right, "greater");
 
         if !floating {
             BasicValueEnum::from(
@@ -223,7 +223,7 @@ impl<'backend> super::Inkwell<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
 
-        let (left, right, floating) = self.coerce_numeric_pair(left, right, "greater_or_equal");
+        let (left, right, floating) = self.normalize_pair(left, right, "greater_or_equal");
 
         if !floating {
             BasicValueEnum::from(

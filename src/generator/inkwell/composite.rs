@@ -11,7 +11,7 @@ use {
         values::{BasicValueEnum},
     },
 };
-use crate::analyzer::Analysis;
+use crate::analyzer::{Analysis, AnalysisKind};
 use crate::data::{Index, Structure};
 
 impl<'backend> super::Inkwell<'backend> {
@@ -65,7 +65,7 @@ impl<'backend> super::Inkwell<'backend> {
         let mut fields = Vec::new();
 
         for member in &structure.members {
-            if let Analysis::Binding(binding) = &member {
+            if let AnalysisKind::Binding(binding) = &member.kind {
                 let field_name = binding.target.clone();
                 fields.push(field_name.clone());
                 let field_type = binding
@@ -117,8 +117,8 @@ impl<'backend> super::Inkwell<'backend> {
         let mut value = struct_type.get_undef();
         let mut positional_index = 0usize;
         for member in structure.members {
-            match member {
-                Analysis::Assign(field, assigned) => {
+            match member.kind {
+                AnalysisKind::Assign(field, assigned) => {
                     if let Some(index) = fields.iter().position(|name| name == &field) {
                         let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
                         let field_value = self.analysis(*assigned.clone());
@@ -134,14 +134,14 @@ impl<'backend> super::Inkwell<'backend> {
                         panic!("Struct '{}' has no field named '{}'.", name, field);
                     }
                 }
-                other => {
+                _ => {
                     if positional_index >= fields.len() {
                         panic!("Too many positional initializers for struct '{}'.", name);
                     }
                     let index = positional_index;
                     positional_index += 1;
                     let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                    let field_value = self.analysis(other);
+                    let field_value = self.analysis(member);
                     let casted = self.cast_value(field_value, field_type).unwrap_or_else(|| {
                         panic!("Type mismatch for positional argument {} in constructor for '{}'.", index, name);
                     });
@@ -162,23 +162,23 @@ impl<'backend> super::Inkwell<'backend> {
         target: Box<Analysis<'backend>>,
         member: Box<Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
-        if let Analysis::Usage(name) = &*target {
+        if let AnalysisKind::Usage(name) = &target.kind {
             if self.modules.contains_key(name) {
-                match &*member {
-                    Analysis::Usage(name) => return self.usage(name.clone()),
-                    Analysis::Invoke(invoke) => return self.invoke(invoke.clone()),
+                match &member.kind {
+                    AnalysisKind::Usage(name) => return self.usage(name.clone()),
+                    AnalysisKind::Invoke(invoke) => return self.invoke(invoke.clone()),
                     _ => {}
                 }
             }
         }
 
-        let field_name = if let Analysis::Usage(name) = &*member {
+        let field_name = if let AnalysisKind::Usage(name) = &member.kind {
             name.clone()
         } else {
             panic!("Struct member access must use a simple name.");
         };
 
-        if let Analysis::Usage(target_name) = &*target {
+        if let AnalysisKind::Usage(target_name) = &target.kind {
             if let Some(Entity::Variable { pointer, kind, .. }) = self.entities.get(target_name) {
                 if kind.is_struct_type() {
                     let struct_type = kind.into_struct_type();
@@ -307,14 +307,13 @@ impl<'backend> super::Inkwell<'backend> {
         let target = self.analysis(*target_instruction);
         let idx_value = self.analysis(index.members[0].clone());
 
-        if let Analysis::Usage(name) = &*index.target {
-            if let Some(Entity::Array { pointer, element_type, element_count }) = self.entities.get(name) {
+        if let AnalysisKind::Usage(name) = &index.target.kind {
+            if let Some(Entity::Array { element_type, element_count, .. }) = self.entities.get(name) {
                 if let BasicValueEnum::PointerValue(pointer) = target {
                     if let BasicValueEnum::IntValue(idx) = idx_value {
-                        // Array Bounds Check
                         let length_val = self.context.i32_type().const_int(*element_count as u64, false);
                         let is_idx_out_of_bounds = self.builder.build_int_compare(
-                            IntPredicate::UGE, // Unsigned Greater or Equal
+                            IntPredicate::UGE, 
                             idx,
                             length_val,
                             "array_bounds_check"
@@ -333,7 +332,6 @@ impl<'backend> super::Inkwell<'backend> {
                         self.builder.build_unreachable();
 
                         self.builder.position_at_end(continue_block);
-                        // Continue with array access in the continue_block
                         let slot = unsafe {
                             self.builder
                                 .build_in_bounds_gep(*element_type, pointer, &[idx], "array_index")

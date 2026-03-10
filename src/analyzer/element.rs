@@ -1,11 +1,11 @@
 use {
     crate::{
         data::*,
-        analyzer::{Analyzable, Analysis, CheckError, ErrorKind},
+        analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
         format::Show,
         parser::{Element, ElementKind},
         resolver::Resolver,
-        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        scanner::{OperatorKind, PunctuationKind, TokenKind},
     },
 };
 
@@ -13,12 +13,12 @@ impl<'element> Analyzable<'element> for Element<'element> {
     fn analyze(
         &self,
         resolver: &mut Resolver<'element>,
-    ) -> Result<Analysis<'element>, CheckError<'element>> {
+    ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
         match &self.kind {
             ElementKind::Literal(literal) => literal.analyze(resolver),
 
             ElementKind::Delimited(delimited) => {
-                match (
+                let kind = match (
                     &delimited.start.kind,
                     delimited.separator.as_ref().map(|token| &token.kind),
                     &delimited.end.kind,
@@ -33,13 +33,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                     ) => {
-                        let items: Result<Vec<Analysis<'element>>, CheckError<'element>> = delimited
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
                             .members
                             .iter()
                             .map(|item| item.analyze(resolver))
                             .collect();
 
-                        Ok(Analysis::Block(items?))
+                        AnalysisKind::Block(items?)
                     }
 
                     (
@@ -47,14 +47,14 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightBracket),
                     ) => {
-                        let items: Result<Vec<Analysis<'element>>, CheckError<'element>> =
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                             delimited
                                 .members
                                 .iter()
                                 .map(|item| item.analyze(resolver))
                                 .collect();
 
-                        Ok(Analysis::Array(items?))
+                        AnalysisKind::Array(items?)
                     }
 
                     (
@@ -62,112 +62,236 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                     ) => {
+                        // A single item in parentheses is just a grouped expression, not a tuple.
                         if delimited.members.len() == 1 {
-                            delimited.members[0].analyze(resolver)
+                            return delimited.members[0].analyze(resolver);
                         } else {
-                            let items: Result<Vec<Analysis<'element>>, CheckError<'element>> =
+                            let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                                 delimited
                                     .members
                                     .iter()
                                     .map(|item| item.analyze(resolver))
                                     .collect();
-                            
-                            Ok(Analysis::Tuple(items?))
+
+                            AnalysisKind::Tuple(items?)
                         }
                     }
 
-                    _ => Err(CheckError::new(ErrorKind::Unimplemented, self.span)),
-                }
+                    _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
+                };
+                Ok(Analysis::new(kind, self.span))
             }
 
-            ElementKind::Unary(unary) => unary.analyze(resolver),
+            ElementKind::Unary(unary) => {
+                if let TokenKind::Operator(operator) = &unary.operator.kind {
+                    let operand = unary.operand.analyze(resolver)?;
 
-            ElementKind::Binary(item) => item.analyze(resolver),
+                    let kind = match operator.as_slice() {
+                        [OperatorKind::Exclamation] => AnalysisKind::LogicalNot(Box::new(operand)),
+                        [OperatorKind::Tilde] => AnalysisKind::BitwiseNot(Box::new(operand)),
+                        [OperatorKind::Plus] => return Ok(operand), // '+' is a no-op, return operand as is.
+                        [OperatorKind::Minus] => {
+                            // Create a zero literal with the span of the '-' operator.
+                            let zero = Analysis::new(
+                                AnalysisKind::Integer {
+                                    value: 0,
+                                    size: 64,
+                                    signed: true,
+                                },
+                                unary.operator.span,
+                            );
+                            AnalysisKind::Subtract(Box::new(zero), Box::new(operand))
+                        }
+                        [OperatorKind::Ampersand] => AnalysisKind::AddressOf(Box::new(operand)),
+                        [OperatorKind::Star] => AnalysisKind::Dereference(Box::new(operand)),
+                        _ => {
+                            return Err(AnalyzeError::new(
+                                ErrorKind::InvalidOperation(unary.operator.clone()),
+                                unary.operator.span,
+                            ))
+                        }
+                    };
+                    
+                    return Ok(Analysis::new(kind, self.span));
+                }
+
+                Err(AnalyzeError::new(
+                    ErrorKind::InvalidOperation(unary.operator.clone()),
+                    unary.operator.span,
+                ))
+            },
+
+            ElementKind::Binary(binary) => {
+                let op_kind = if let TokenKind::Operator(operator) = &binary.operator.kind {
+                    operator
+                } else {
+                    return Err(AnalyzeError::new(
+                        ErrorKind::InvalidOperation(binary.operator.clone()),
+                        binary.operator.span,
+                    ));
+                };
+
+                let kind = match op_kind.as_slice() {
+                    [OperatorKind::Dot] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let member = binary.right.analyze(resolver)?;
+                        AnalysisKind::Access(Box::new(target), Box::new(member))
+                    }
+
+                    [OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let value = binary.right.analyze(resolver)?;
+
+                        // After the refactor, we must match on `target.kind`.
+                        match &target.kind {
+                            AnalysisKind::Usage(target_name) => {
+                                AnalysisKind::Assign(target_name.clone(), Box::new(value))
+                            }
+                            AnalysisKind::Dereference(_) => {
+                                AnalysisKind::Store(Box::new(target), Box::new(value))
+                            }
+                            _ => {
+                                return Err(AnalyzeError::new(
+                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    binary.operator.span,
+                                ))
+                            }
+                        }
+                    }
+
+                    // A helper macro could reduce this repetition, but for clarity:
+                    _ => {
+                        let left = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        match op_kind.as_slice() {
+                            [OperatorKind::Plus] => AnalysisKind::Add(Box::new(left), Box::new(right)),
+                            [OperatorKind::Minus] => AnalysisKind::Subtract(Box::new(left), Box::new(right)),
+                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(left), Box::new(right)),
+                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(left), Box::new(right)),
+                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(left), Box::new(right)),
+                            [OperatorKind::Ampersand, OperatorKind::Ampersand] => AnalysisKind::LogicalAnd(Box::new(left), Box::new(right)),
+                            [OperatorKind::Pipe, OperatorKind::Pipe] => AnalysisKind::LogicalOr(Box::new(left), Box::new(right)),
+                            [OperatorKind::Caret] => AnalysisKind::LogicalXOr(Box::new(left), Box::new(right)),
+                            [OperatorKind::Ampersand] => AnalysisKind::BitwiseAnd(Box::new(left), Box::new(right)),
+                            [OperatorKind::Pipe] => AnalysisKind::BitwiseOr(Box::new(left), Box::new(right)),
+                            [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => AnalysisKind::ShiftLeft(Box::new(left), Box::new(right)),
+                            [OperatorKind::RightAngle, OperatorKind::RightAngle] => AnalysisKind::ShiftRight(Box::new(left), Box::new(right)),
+                            [OperatorKind::Equal, OperatorKind::Equal] => AnalysisKind::Equal(Box::new(left), Box::new(right)),
+                            [OperatorKind::Exclamation, OperatorKind::Equal] => AnalysisKind::NotEqual(Box::new(left), Box::new(right)),
+                            [OperatorKind::LeftAngle] => AnalysisKind::Less(Box::new(left), Box::new(right)),
+                            [OperatorKind::LeftAngle, OperatorKind::Equal] => AnalysisKind::LessOrEqual(Box::new(left), Box::new(right)),
+                            [OperatorKind::RightAngle] => AnalysisKind::Greater(Box::new(left), Box::new(right)),
+                            [OperatorKind::RightAngle, OperatorKind::Equal] => AnalysisKind::GreaterOrEqual(Box::new(left), Box::new(right)),
+                            _ => {
+                                return Err(AnalyzeError::new(
+                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    binary.operator.span,
+                                ))
+                            }
+                        }
+                    }
+                };
+
+                Ok(Analysis::new(kind, self.span))
+            },
 
             ElementKind::Index(index) => {
                 let target = index.target.analyze(resolver)?;
-                let indexes: Result<Vec<Analysis<'element>>, CheckError<'element>> = index
+                let indexes: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = index
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();
-                
-                Ok(Analysis::Index(Index::new(
+
+                let kind = AnalysisKind::Index(Index::new(
                     Box::new(target),
                     indexes?,
-                )))
+                ));
+                Ok(Analysis::new(kind, self.span))
             }
 
             ElementKind::Invoke(invoke) => {
-                let name = if let Some(TokenKind::Identifier(name)) = invoke.target.brand().map(|token| token.kind.clone()) {
-                    name
-                } else {
-                    unimplemented!("expected the head to be Identifier.")
-                };
+                let name = invoke.target.brand().and_then(|token| {
+                    if let TokenKind::Identifier(name) = token.kind {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                });
 
-                match name.as_str() {
+                let kind = match name.as_ref().and_then(|s| s.as_str()) {
                     Some("if") => {
                         let condition = invoke.members[0].analyze(resolver)?;
                         let then = invoke.members[1].analyze(resolver)?;
                         let otherwise = invoke.members[2].analyze(resolver)?;
 
-                        Ok(Analysis::Conditional(
+                        AnalysisKind::Conditional(
                             Box::new(condition),
                             Box::new(then),
                             Box::new(otherwise),
-                        ))
+                        )
                     }
                     Some("while") => {
                         let condition = invoke.members[0].analyze(resolver)?;
                         let body = invoke.members[1].analyze(resolver)?;
 
-                        Ok(Analysis::While(
+                        AnalysisKind::While(
                             Box::new(condition),
                             Box::new(body),
-                        ))
+                        )
                     }
                     Some("break") => {
-                        let value = if invoke.members.len() == 1 {
+                        let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
                         } else {
                             None
                         };
 
-                        Ok(Analysis::Break(value))
+                        AnalysisKind::Break(value)
                     }
                     Some("continue") => {
-                        let value = if invoke.members.len() == 1 {
+                        let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
                         } else {
                             None
                         };
 
-                        Ok(Analysis::Continue(value))
+                        AnalysisKind::Continue(value)
                     }
                     Some("return") => {
-                        let value = if invoke.members.len() == 1 {
+                        let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
                         } else {
                             None
                         };
 
-                        Ok(Analysis::Return(value))
+                        AnalysisKind::Return(value)
                     }
                     _ => {
-                        let target = invoke.target.analyze(resolver)?;
-                        
-                        let arguments: Result<Vec<Analysis<'element>>, CheckError<'element>> = invoke
+                        let target = if let ElementKind::Literal(literal) = &invoke.target.kind {
+                            if let TokenKind::Identifier(name) = literal.kind {
+                                name
+                            } else { 
+                                return Err(AnalyzeError::new(ErrorKind::InvalidTarget, literal.span));
+                            }
+                        } else {
+                            return Err(AnalyzeError::new(ErrorKind::InvalidTarget, invoke.target.span));
+                        };
+
+                        let arguments: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = invoke
                             .members
                             .iter()
                             .map(|member| member.analyze(resolver))
                             .collect();
-                        
-                        Ok(Analysis::Invoke(Invoke::new(
-                            Box::new(target),
+
+                        AnalysisKind::Invoke(Invoke::new(
+                            target,
                             arguments?,
-                        )))
+                        ))
                     }
-                }
+                };
+                
+                Ok(Analysis::new(kind, self.span))
             },
 
             ElementKind::Construct(constructor) => {
@@ -181,274 +305,14 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .members
                     .iter()
                     .map(|member| member.analyze(resolver))
-                    .collect::<Result<Vec<Analysis<'element>>, CheckError<'element>>>()?;
+                    .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
 
                 let analyzed = Structure::new(Str::from(target), members);
-                
-                Ok(Analysis::Constructor(analyzed))
+
+                Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span))
             }
 
             ElementKind::Symbolize(symbol) => symbol.analyze(resolver),
         }
-
-    }
-}
-
-impl<'binary> Analyzable<'binary> for Binary<Box<Element<'binary>>, Token<'binary>, Box<Element<'binary>>> {
-    fn analyze(&self, resolver: &mut Resolver<'binary>) -> Result<Analysis<'binary>, CheckError<'binary>> {
-        if let TokenKind::Operator(operator) = &self.operator.kind {
-            match operator.as_slice() {
-                [OperatorKind::Dot] => {
-                    let target = self.left.analyze(resolver)?;
-                    let member = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Access(
-                        Box::new(target),
-                        Box::new(member),
-                    ))
-                }
-
-                [OperatorKind::Equal] => {
-                    let target = self.left.analyze(resolver)?;
-                    let value = self.right.analyze(resolver)?;
-
-                    match &target {
-                        Analysis::Usage(target_name) => Ok(Analysis::Assign(
-                            target_name.clone(),
-                            Box::new(value),
-                        )),
-                        Analysis::Dereference(_) => Ok(Analysis::Store(
-                            Box::new(target),
-                            Box::new(value),
-                        )),
-                        _ => Err(CheckError::new(
-                            ErrorKind::InvalidOperation(self.operator.clone()),
-                            self.operator.span,
-                        )),
-                    }
-                }
-
-                [OperatorKind::Plus] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Add(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Minus] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Subtract(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Star] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Multiply(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Slash] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Divide(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Percent] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::Modulus(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Ampersand, OperatorKind::Ampersand] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::LogicalAnd(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::LogicalOr(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Caret] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::LogicalXOr(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Ampersand] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::BitwiseAnd(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Pipe] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::BitwiseOr(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-
-                    Ok(Analysis::ShiftLeft(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::ShiftRight(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Equal, OperatorKind::Equal] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::Equal(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::Exclamation, OperatorKind::Equal] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::NotEqual(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::LeftAngle] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::Less(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::LeftAngle, OperatorKind::Equal] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::LessOrEqual(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::RightAngle] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::Greater(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                    let left = self.left.analyze(resolver)?;
-                    let right = self.right.analyze(resolver)?;
-                    Ok(Analysis::GreaterOrEqual(
-                        Box::new(left),
-                        Box::new(right),
-                    ))
-                }
-
-                _ => Err(CheckError::new(
-                    ErrorKind::InvalidOperation(self.operator.clone()),
-                    self.operator.span,
-                )),
-            }
-        } else {
-            Err(CheckError::new(
-                ErrorKind::InvalidOperation(self.operator.clone()),
-                self.operator.span,
-            ))
-        }
-
-    }
-}
-
-impl<'unary> Analyzable<'unary> for Unary<Token<'unary>, Box<Element<'unary>>> {
-    fn analyze(&self, resolver: &mut Resolver<'unary>) -> Result<Analysis<'unary>, CheckError<'unary>> {
-        if let TokenKind::Operator(operator) = &self.operator.kind {
-            let operand = self.operand.analyze(resolver)?;
-
-            return match operator.as_slice() {
-                [OperatorKind::Exclamation] => {
-                    Ok(Analysis::LogicalNot(Box::new(operand)))
-                }
-                [OperatorKind::Tilde] => Ok(Analysis::BitwiseNot(Box::new(operand))),
-                [OperatorKind::Plus] => Ok(operand),
-                [OperatorKind::Minus] => Ok(Analysis::Subtract(
-                    Box::new(Analysis::Integer {
-                        value: 0,
-                        size: 64,
-                        signed: true,
-                    }),
-                    Box::new(operand),
-                )),
-                [OperatorKind::Ampersand] => {
-                    Ok(Analysis::AddressOf(Box::new(operand)))
-                }
-                [OperatorKind::Star] => Ok(Analysis::Dereference(Box::new(operand))),
-                _ => Err(CheckError::new(
-                    ErrorKind::InvalidOperation(self.operator.clone()),
-                    self.operator.span,
-                )),
-            };
-        }
-
-        Err(CheckError::new(
-            ErrorKind::InvalidOperation(self.operator.clone()),
-            self.operator.span,
-        ))
     }
 }

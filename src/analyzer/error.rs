@@ -15,6 +15,7 @@ use {
 pub enum ErrorKind<'error> {
     InvalidOperation(Token<'error>),
     InvalidType,
+    InvalidTarget,
     InvalidPrimitiveArity {
         name: String,
         expected: String,
@@ -39,6 +40,9 @@ impl<'error> Show<'error> for ErrorKind<'error> {
                     }
                     ErrorKind::InvalidType => {
                         "invalid type.".to_string()
+                    }
+                    ErrorKind::InvalidTarget => {
+                        "invalid target.".to_string()
                     }
                     ErrorKind::InvalidPrimitiveArity {
                         name,
