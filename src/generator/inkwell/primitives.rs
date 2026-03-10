@@ -5,6 +5,8 @@ use {
     crate::data::{Boolean, Char, Float, Integer, Scale, Str},
     inkwell::values::BasicValueEnum,
 };
+use crate::generator::{ErrorKind, GenerateError};
+use crate::tracker::Span;
 
 impl<'backend> Inkwell<'backend> {
     pub fn integer(
@@ -26,14 +28,21 @@ impl<'backend> Inkwell<'backend> {
         BasicValueEnum::from(kind.const_int(bits, signed))
     }
 
-    pub fn float(&self, number: Float, scale: Scale) -> BasicValueEnum<'backend> {
+    pub fn float(&self, number: Float, scale: Scale, span: Span<'backend>) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let kind = match scale {
             32 => self.context.f32_type(),
             64 => self.context.f64_type(),
-            _ => self.context.f64_type(),
+            width => {
+                return Err(
+                    GenerateError::new(
+                        ErrorKind::UnsupportedFloatWidth { width },
+                        span
+                    )
+                )
+            },
         };
 
-        BasicValueEnum::from(kind.const_float(number.0))
+        Ok(BasicValueEnum::from(kind.const_float(number.0)))
     }
 
     pub fn boolean(&self, value: bool) -> BasicValueEnum<'backend> {
@@ -44,15 +53,17 @@ impl<'backend> Inkwell<'backend> {
         BasicValueEnum::from(self.context.i32_type().const_int(value as u64, false))
     }
 
-    pub fn string(&self, value: Str<'backend>) -> BasicValueEnum<'backend> {
+    pub fn string(&self, value: Str<'backend>, span: Span<'backend>) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let raw = value.as_str().unwrap_or("");
 
         let pointer = self
             .builder
             .build_global_string_ptr(raw, "string_literal")
-            .unwrap()
-            .as_pointer_value();
+            .map(|value| value.as_pointer_value())
+            .map_err(|error| {
+                GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)
+            })?;
 
-        BasicValueEnum::from(pointer)
+        Ok(BasicValueEnum::from(pointer))
     }
 }

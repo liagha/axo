@@ -52,64 +52,84 @@ impl<'backend> super::Inkwell<'backend> {
     fn lvalue_pointer(
         &mut self,
         analysis: &Analysis<'backend>,
-    ) -> Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)> {
+    ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.entities.get(name) {
-                Some(Entity::Variable { pointer, kind, .. }) => Some((*pointer, *kind)),
-                _ => None,
+                Some(Entity::Variable { pointer, kind, .. }) => Ok(Some((*pointer, *kind))),
+                _ => Ok(None),
             },
             AnalysisKind::Dereference(operand) => {
-                let pointee = self.pointer_pointee_type(operand)?;
-                let value = self.analysis(*operand.clone());
+                let pointee = self.pointer_pointee_type(operand);
+                let value = self.analysis(*operand.clone())?;
                 match value {
-                    BasicValueEnum::PointerValue(pointer) => Some((pointer, pointee)),
-                    _ => None,
+                    BasicValueEnum::PointerValue(pointer) => Ok(Some((pointer, pointee.unwrap()))),
+                    _ => Ok(None),
                 }
             }
-            _ => None,
+            _ => Ok(None),
         }
     }
 
     pub fn address_of(
         &mut self,
         operand: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        if let Some((pointer, _)) = self.lvalue_pointer(&operand) {
-            pointer.into()
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        if let Some((pointer, _)) = self.lvalue_pointer(&operand)? {
+            Ok(pointer.into())
         } else {
-            self.context.i64_type().const_zero().into()
+            Err(GenerateError::new(
+                ErrorKind::SemanticError { message: "Cannot take the address of an rvalue or non-existent entity.".to_string() },
+                span,
+            ))
         }
     }
 
     pub fn dereference(
         &mut self,
         operand: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let pointee = self.pointer_pointee_type(&operand);
-        let value = self.analysis(*operand.clone());
+        let value = self.analysis(*operand.clone())?;
+
         match (value, pointee) {
-            (BasicValueEnum::PointerValue(pointer), Some(kind)) => self
-                .builder
-                .build_load(kind, pointer, "deref_value")
-                .unwrap_or_else(|_| self.context.i64_type().const_zero().into()),
-            _ => self.context.i64_type().const_zero().into(),
+            (BasicValueEnum::PointerValue(pointer), Some(kind)) => {
+                self.builder
+                    .build_load(kind, pointer, "deref_value")
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
+            }
+            _ => Err(GenerateError::new(
+                ErrorKind::SemanticError { message: "Cannot dereference a non-pointer value.".to_string() },
+                span,
+            ))
         }
     }
 
-    pub fn usage(&self, identifier: Str<'backend>) -> BasicValueEnum<'backend> {
+    pub fn usage(
+        &self,
+        identifier: Str<'backend>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(entity) = self.entities.get(&identifier) {
             match entity {
                 Entity::Function(function) => {
-                    BasicValueEnum::from(function.as_global_value().as_pointer_value())
+                    Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
                 Entity::Variable { pointer, kind, .. } => self
                     .builder
                     .build_load(*kind, *pointer, &identifier)
-                    .unwrap(),
-                _ => self.context.i64_type().const_zero().into(),
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
+                _ => Err(GenerateError::new(
+                    ErrorKind::SemanticError { message: format!("Identifier '{}' is not a usable value.", identifier) },
+                    span,
+                )),
             }
         } else {
-            self.context.i64_type().const_zero().into()
+            Err(GenerateError::new(
+                ErrorKind::SemanticError { message: format!("Undefined identifier '{}'.", identifier) },
+                span,
+            ))
         }
     }
 
@@ -117,10 +137,11 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         target: Str<'backend>,
         value: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let pointee = self.pointer_pointee_type(&value);
         let signed = self.infer_signedness(&value);
-        let result = self.analysis(*value);
+        let result = self.analysis(*value)?;
 
         let existing_pointer = match self.entities.get(&target) {
             Some(Entity::Variable { pointer, .. }) => Some(*pointer),
@@ -128,7 +149,9 @@ impl<'backend> super::Inkwell<'backend> {
         };
 
         if let Some(slot) = existing_pointer {
-            let _ = self.builder.build_store(slot, result);
+            self.builder.build_store(slot, result)
+                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+
             self.entities.insert(
                 target.clone(),
                 Entity::Variable {
@@ -139,9 +162,12 @@ impl<'backend> super::Inkwell<'backend> {
                 },
             );
         } else {
-            let func = self.current_function();
+            let func = self.current_function(span)?;
             let pointer = self.build_entry(func, result.get_type(), target.clone());
-            let _ = self.builder.build_store(pointer, result);
+
+            self.builder.build_store(pointer, result)
+                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+
             self.entities.insert(
                 target.clone(),
                 Entity::Variable {
@@ -152,35 +178,34 @@ impl<'backend> super::Inkwell<'backend> {
                 },
             );
         }
-        result
+        Ok(result)
     }
 
     pub fn binding(
         &mut self,
         binding: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
-    ) -> BasicValueEnum<'backend> {
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let value = match binding.value {
             Some(v) => v,
             None => {
-                self.errors.push(GenerateError::new(
+                return Err(GenerateError::new(
                     ErrorKind::InvalidModule {
-                        reason: format!("binding `{}` has no initializer", binding.target),
+                        reason: format!("Binding `{}` has no initializer.", binding.target),
                     },
-                    Span::void(),
+                    span,
                 ));
-                return self.context.i64_type().const_zero().into();
             }
         };
 
-        let signed = self.infer_signedness(&value);
         let pointee = self.pointer_pointee_type(&value);
-        let value = self.analysis(*value);
+        let value = self.analysis(*value)?;
 
-        let declared_kind = binding
-            .annotation
-            .as_ref()
-            .map(|annotation| self.llvm_type(annotation))
-            .unwrap_or_else(|| value.get_type());
+        let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
+            self.llvm_type(annotation)?
+        } else { 
+            value.get_type()
+        };
 
         let casted = if value.get_type() == declared_kind {
             value
@@ -197,33 +222,42 @@ impl<'backend> super::Inkwell<'backend> {
                 .map(Into::into)
                 .unwrap_or(value)
         } else {
-            value
+            return Err(GenerateError::new(
+                ErrorKind::SemanticError { message: format!("Type mismatch in binding for `{}`.", binding.target) },
+                span,
+            ));
         };
 
         let signed = binding.annotation.as_ref().and_then(|annotation| match annotation.kind {
             TypeKind::Integer { signed, .. } => Some(signed),
-            _ => signed,
+            _ => None, // Fallback if type isn't integer
         });
 
-        let func = self.current_function();
+        let func = self.current_function(span)?;
         let pointer = self.build_entry(func, declared_kind, binding.target.clone());
-        let _ = self.builder.build_store(pointer, casted);
+
+        self.builder.build_store(pointer, casted)
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+
         self.entities.insert(
             binding.target.clone(),
             Entity::Variable { pointer, kind: declared_kind, pointee, signed },
         );
-        casted
+        Ok(casted)
     }
 
     pub fn store(
         &mut self,
         target: Box<Analysis<'backend>>,
         value: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let result = self.analysis(*value.clone());
-        if let Some((pointer, kind)) = self.lvalue_pointer(&target) {
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let result = self.analysis(*value.clone())?;
+
+        if let Some((pointer, kind)) = self.lvalue_pointer(&target)? {
             if result.get_type() == kind {
-                let _ = self.builder.build_store(pointer, result);
+                self.builder.build_store(pointer, result)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
             } else if result.is_int_value() && kind.is_int_type() {
                 let casted = self
                     .builder
@@ -231,23 +265,32 @@ impl<'backend> super::Inkwell<'backend> {
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
-                let _ = self.builder.build_store(pointer, casted);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
             } else if result.is_float_value() && kind.is_float_type() {
                 let casted = self
                     .builder
-                    .build_float_cast(
-                        result.into_float_value(),
-                        kind.into_float_type(),
-                        "store_cast",
-                    )
+                    .build_float_cast(result.into_float_value(), kind.into_float_type(), "store_cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
-                let _ = self.builder.build_store(pointer, casted);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
             } else {
-                let _ = self.builder.build_store(pointer, result);
+                return Err(GenerateError::new(
+                    ErrorKind::SemanticError { message: "Type mismatch in variable assignment.".to_string() },
+                    span,
+                ));
             }
+        } else {
+            return Err(GenerateError::new(
+                ErrorKind::SemanticError { message: "Invalid assignment target.".to_string() },
+                span,
+            ));
         }
-        result
+
+        Ok(result)
     }
 }

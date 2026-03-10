@@ -3,6 +3,7 @@ use {
     crate::analyzer::Analysis,
     inkwell::values::{BasicValueEnum, IntValue},
 };
+use crate::generator::GenerateError;
 
 impl<'backend> super::Inkwell<'backend> {
     fn check_is_1bit_int(&self, value: BasicValueEnum<'backend>, operation: &str) -> IntValue<'backend> {
@@ -14,65 +15,67 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn logical_and(
         &mut self,
-        left_expr: Box<Analysis<'backend>>,
-        right_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left_analyzed = self.analysis(*left_expr);
-        let right_analyzed = self.analysis(*right_expr);
+        left: Box<Analysis<'backend>>,
+        right: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left_analyzed = self.analysis(*left)?;
+        let right_analyzed = self.analysis(*right)?;
 
         let left_value = self.check_is_1bit_int(left_analyzed, "AND");
         let right_value = self.check_is_1bit_int(right_analyzed, "AND");
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_and(left_value, right_value, "and")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn logical_or(
         &mut self,
-        left_expr: Box<Analysis<'backend>>, 
-        right_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left_analyzed = self.analysis(*left_expr);
-        let right_analyzed = self.analysis(*right_expr);
+        left: Box<Analysis<'backend>>, 
+        right: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left_analyzed = self.analysis(*left)?;
+        let right_analyzed = self.analysis(*right)?;
 
         let left_value = self.check_is_1bit_int(left_analyzed, "OR");
         let right_value = self.check_is_1bit_int(right_analyzed, "OR");
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_or(left_value, right_value, "or")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn logical_not(
         &mut self,
-        operand_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let operand_analyzed = self.analysis(*operand_expr);
+        operand: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let operand_analyzed = self.analysis(*operand)?;
+        
         let operand_value = self.check_is_1bit_int(operand_analyzed, "NOT");
-        BasicValueEnum::from(
+        
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_not(operand_value, "not")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn logical_xor(
         &mut self,
-        left_expr: Box<Analysis<'backend>>,
-        right_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left_analyzed = self.analysis(*left_expr);
-        let right_analyzed = self.analysis(*right_expr);
+        left: Box<Analysis<'backend>>,
+        right: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left_analyzed = self.analysis(*left)?;
+        let right_analyzed = self.analysis(*right)?;
 
         let left_value = self.check_is_1bit_int(left_analyzed, "XOR");
         let right_value = self.check_is_1bit_int(right_analyzed, "XOR");
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_xor(left_value, right_value, "xor")
                 .unwrap(),
-        )
+        ))
     }
 }

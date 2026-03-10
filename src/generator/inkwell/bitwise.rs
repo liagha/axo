@@ -9,89 +9,90 @@ use {
     },
     inkwell::values::{BasicValueEnum},
 };
+use crate::generator::GenerateError;
 
 impl<'backend> Inkwell<'backend> {
     pub fn bitwise_and(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left);
-        let right = self.analysis(*right);
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left = self.analysis(*left)?;
+        let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
             panic!("Bitwise AND requires integer operands.");
         }
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_and(left.into_int_value(), right.into_int_value(), "bitwise_and")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn bitwise_or(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left);
-        let right = self.analysis(*right);
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left = self.analysis(*left)?;
+        let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
             panic!("Bitwise OR requires integer operands.");
         }
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_or(left.into_int_value(), right.into_int_value(), "bitwise_or")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn bitwise_not(
         &mut self,
         operand: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let operand_value = self.analysis(*operand);
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let operand_value = self.analysis(*operand)?;
 
         if !operand_value.is_int_value() {
             panic!("Bitwise NOT requires an integer operand.");
         }
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_not(operand_value.into_int_value(), "bitwise_not")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn bitwise_xor(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left);
-        let right = self.analysis(*right);
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left = self.analysis(*left)?;
+        let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
             panic!("Bitwise XOR requires integer operands.");
         }
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_xor(left.into_int_value(), right.into_int_value(), "bitwise_xor")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn shift_left(
         &mut self,
-        left_expr: Box<Analysis<'backend>>,
-        right_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
-        let left = self.analysis(*left_expr);
-        let right = self.analysis(*right_expr);
+        left: Box<Analysis<'backend>>,
+        right: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let left = self.analysis(*left)?;
+        let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
             panic!("Left shift requires integer operands.");
@@ -99,7 +100,7 @@ impl<'backend> Inkwell<'backend> {
 
         let shift_amt = right.into_int_value();
         let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); 
+        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false);
 
         let is_shift_invalid = self.builder.build_int_compare(
             IntPredicate::UGE,
@@ -122,26 +123,26 @@ impl<'backend> Inkwell<'backend> {
 
         self.builder.position_at_end(continue_block);
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_left_shift(left.into_int_value(), shift_amt, "shift_left")
                 .unwrap(),
-        )
+        ))
     }
 
     pub fn shift_right(
         &mut self,
-        left_expr: Box<Analysis<'backend>>,
-        right_expr: Box<Analysis<'backend>>,
-    ) -> BasicValueEnum<'backend> {
+        left: Box<Analysis<'backend>>,
+        right: Box<Analysis<'backend>>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let signed = self
-            .infer_signedness(&left_expr)
-            .zip(self.infer_signedness(&right_expr))
+            .infer_signedness(&left)
+            .zip(self.infer_signedness(&right))
             .map(|(lhs, rhs)| lhs && rhs)
             .unwrap_or(true);
 
-        let left = self.analysis(*left_expr);
-        let right = self.analysis(*right_expr);
+        let left = self.analysis(*left)?;
+        let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
             panic!("Right shift requires integer operands.");
@@ -149,10 +150,10 @@ impl<'backend> Inkwell<'backend> {
 
         let shift_amt = right.into_int_value();
         let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false); 
+        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false);
 
         let is_shift_invalid = self.builder.build_int_compare(
-            IntPredicate::UGE, 
+            IntPredicate::UGE,
             shift_amt,
             max_shift_amt,
             "shift_right_bound_check"
@@ -172,7 +173,7 @@ impl<'backend> Inkwell<'backend> {
 
         self.builder.position_at_end(continue_block);
 
-        BasicValueEnum::from(
+        Ok(BasicValueEnum::from(
             self.builder
                 .build_right_shift(
                     left.into_int_value(),
@@ -181,6 +182,6 @@ impl<'backend> Inkwell<'backend> {
                     "shift_right",
                 )
                 .unwrap(),
-        )
+        ))
     }
 }

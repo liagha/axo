@@ -4,6 +4,7 @@ use {
     },
     crate::{
         analyzer::{Analysis},
+        generator::GenerateError,
     }
 };
 
@@ -13,5 +14,5 @@ pub trait Backend<'backend> {
     fn analysis(
         &mut self,
         instruction: Analysis<'backend>,
-    ) -> BasicValueEnum<'backend>;
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>>;
 }
