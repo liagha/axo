@@ -67,7 +67,7 @@ pub mod memory {
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace},
+        mem::{discriminant, replace, take},
     };
 }
 

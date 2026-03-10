@@ -7,6 +7,7 @@ use {
     },
     crate::{
         data::{
+            memory::{take},
             thread::{Arc, Mutex},
             Boolean, Offset, Scale,
         },
@@ -14,7 +15,6 @@ use {
     },
 };
 
-#[derive(Clone)]
 pub struct Classifier<
     'classifier,
     Input: Formable<'classifier>,
@@ -77,7 +77,7 @@ impl<
 
     #[inline]
     fn create_child(
-        &self,
+        &mut self,
         order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     ) -> Self {
         Self {
@@ -87,7 +87,7 @@ impl<
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
-            stack: self.stack.clone(),
+            stack: take(&mut self.stack),
             depth: self.depth + 1,
         }
     }
@@ -406,13 +406,13 @@ impl<
     }
 
     #[inline]
-    pub fn as_optional(&self) -> Self {
-        Self::optional(self.clone())
+    pub fn into_optional(self) -> Self {
+        Self::optional(self)
     }
 
     #[inline]
-    pub fn as_persistence(&self, min: Scale, max: Option<Scale>) -> Self {
-        Self::persistence(self.clone(), min, max)
+    pub fn into_persistence(self, min: Scale, max: Option<Scale>) -> Self {
+        Self::persistence(self, min, max)
     }
 
     #[inline]
@@ -631,14 +631,12 @@ pub struct Alternative<
     pub blacklist: Vec<Record>,
 }
 
-impl<
-    'alternative,
+impl<'alternative, Input, Output, Failure, const SIZE: Scale> Order<'alternative, Input, Output, Failure>
+for Alternative<'alternative, Input, Output, Failure, SIZE>
+where
     Input: Formable<'alternative>,
     Output: Formable<'alternative>,
     Failure: Formable<'alternative>,
-    const SIZE: Scale,
-> Order<'alternative, Input, Output, Failure>
-for Alternative<'alternative, Input, Output, Failure, SIZE>
 {
     #[inline]
     fn order(
@@ -647,21 +645,47 @@ for Alternative<'alternative, Input, Output, Failure, SIZE>
         classifier: &mut Classifier<'alternative, Input, Output, Failure>,
     ) {
         let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
+        // Record the stack state before trying alternatives
+        let initial_stack_len = classifier.stack.len();
+        // Move stack out to work with it
+        let mut current_stack = take(&mut classifier.stack);
 
         for pattern in &self.patterns {
-            let mut child = classifier.create_child(pattern.order.clone());
+            // Create a temporary child with the current stack state
+            let mut child = Classifier {
+                order: pattern.order.clone(),
+                marker: classifier.marker,
+                position: classifier.position,
+                consumed: Vec::new(),
+                record: Record::Blank,
+                form: Form::Blank,
+                stack: current_stack, // Pass the stack in
+                depth: classifier.depth + 1,
+            };
+
             composer.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
+                // FAILURE: Rollback the stack to the initial state
+                current_stack = take(&mut child.stack);
+                current_stack.truncate(initial_stack_len);
                 continue;
             }
 
             if let Some(ref mut champion) = best {
                 if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
+                    // This is a better match: Swap child and champion
+                    // We must preserve the stack from the NEW champion
                     *champion = child;
+                    current_stack = take(&mut champion.stack);
+                } else {
+                    // Not a better match: Rollback stack
+                    current_stack = take(&mut child.stack);
+                    current_stack.truncate(initial_stack_len);
                 }
             } else {
                 best = Some(child);
+                current_stack = take(&mut best.as_mut().unwrap().stack);
             }
 
             if let Some(ref champion) = best {
@@ -676,11 +700,14 @@ for Alternative<'alternative, Input, Output, Failure, SIZE>
                 classifier.record = champion.record;
                 classifier.marker = champion.marker;
                 classifier.position = champion.position;
-                classifier.consumed = std::mem::take(&mut champion.consumed);
-                classifier.form = std::mem::take(&mut champion.form);
-                classifier.stack = std::mem::take(&mut champion.stack);
+                classifier.consumed = take(&mut champion.consumed);
+                classifier.form = take(&mut champion.form);
+                classifier.stack = current_stack; // Return the modified stack
             }
-            None => classifier.set_empty(),
+            None => {
+                classifier.set_empty();
+                classifier.stack = current_stack;
+            }
         }
     }
 }
@@ -712,15 +739,15 @@ impl<
         resolved.marker = classifier.marker;
         resolved.position = classifier.position;
         resolved.depth = classifier.depth + 1;
-        resolved.stack = std::mem::take(&mut classifier.stack);
+        resolved.stack = take(&mut classifier.stack);
         composer.build(&mut resolved);
 
         classifier.marker = resolved.marker;
         classifier.position = resolved.position;
-        classifier.consumed = std::mem::take(&mut resolved.consumed);
+        classifier.consumed = take(&mut resolved.consumed);
         classifier.record = resolved.record;
-        classifier.form = std::mem::take(&mut resolved.form);
-        classifier.stack = std::mem::take(&mut resolved.stack);
+        classifier.form = take(&mut resolved.form);
+        classifier.stack = take(&mut resolved.stack);
     }
 }
 
@@ -753,9 +780,9 @@ impl<
         if child.is_effected() {
             classifier.marker = child.marker;
             classifier.position = child.position;
-            classifier.consumed = std::mem::take(&mut child.consumed);
-            classifier.form = std::mem::take(&mut child.form);
-            classifier.stack = std::mem::take(&mut child.stack);
+            classifier.consumed = take(&mut child.consumed);
+            classifier.form = take(&mut child.form);
+            classifier.stack = take(&mut child.stack);
             classifier.set_align();
         } else {
             classifier.set_ignore();
@@ -791,10 +818,10 @@ impl<
 
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = std::mem::take(&mut child.consumed);
+        classifier.consumed = take(&mut child.consumed);
         classifier.record = child.record;
-        classifier.form = std::mem::take(&mut child.form);
-        classifier.stack = std::mem::take(&mut child.stack);
+        classifier.form = take(&mut child.form);
+        classifier.stack = take(&mut child.stack);
     }
 }
 
@@ -823,9 +850,9 @@ Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failur
 
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = std::mem::take(&mut child.consumed);
-        classifier.form = std::mem::take(&mut child.form);
-        classifier.stack = std::mem::take(&mut child.stack);
+        classifier.consumed = take(&mut child.consumed);
+        classifier.form = take(&mut child.form);
+        classifier.stack = take(&mut child.stack);
 
         if child.is_aligned() {
             classifier.record = self.precedence.max(Record::Aligned.into()).into();
@@ -865,18 +892,12 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
     ) {
         let mut index = classifier.marker;
         let mut position = classifier.position;
-        let mut consumed = std::mem::take(&mut classifier.consumed);
+        let mut consumed = take(&mut classifier.consumed);
         let mut forms = Vec::with_capacity(SIZE);
 
-        let mut stack = std::mem::take(&mut classifier.stack);
+        let mut stack = take(&mut classifier.stack);
 
         for pattern in &self.patterns {
-            let mut child_stack = Vec::new();
-
-            if !stack.is_empty() {
-                child_stack.push(Form::multiple(stack));
-            }
-
             let mut child = Classifier {
                 order: pattern.order.clone(),
                 marker: index,
@@ -884,7 +905,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: child_stack,
+                stack,
                 depth: classifier.depth + 1,
             };
 
@@ -895,27 +916,27 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(std::mem::take(&mut child.consumed));
-                    forms.push(std::mem::take(&mut child.form));
-                    stack = std::mem::take(&mut child.stack);
+                    consumed.extend(take(&mut child.consumed));
+                    forms.push(take(&mut child.form));
+                    stack = take(&mut child.stack);
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(std::mem::take(&mut child.consumed));
-                    forms.push(std::mem::take(&mut child.form));
-                    stack = std::mem::take(&mut child.stack);
+                    consumed.extend(take(&mut child.consumed));
+                    forms.push(take(&mut child.form));
+                    stack = take(&mut child.stack);
                     break;
                 }
                 Record::Ignored => {
                     index = child.marker;
                     position = child.position;
-                    stack = std::mem::take(&mut child.stack);
+                    stack = take(&mut child.stack);
                 }
                 _ => {
                     classifier.record = child.record;
-                    stack = std::mem::take(&mut child.stack);
+                    stack = take(&mut child.stack);
                     break;
                 }
             }
@@ -961,15 +982,9 @@ for Repetition<'repetition, Input, Output, Failure>
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
 
-        let mut stack = std::mem::take(&mut classifier.stack);
+        let mut stack = take(&mut classifier.stack);
 
         while composer.source.peek_ahead(index).is_some() {
-            let mut child_stack = Vec::new();
-
-            if !stack.is_empty() {
-                child_stack.push(Form::multiple(stack));
-            }
-
             let mut child = Classifier {
                 order: self.classifier.order.clone(),
                 marker: index,
@@ -977,14 +992,14 @@ for Repetition<'repetition, Input, Output, Failure>
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: child_stack,
+                stack,
                 depth: classifier.depth + 1,
             };
 
             composer.build(&mut child);
 
             if child.marker == index {
-                stack = std::mem::take(&mut child.stack);
+                stack = take(&mut child.stack);
                 break;
             }
 
@@ -993,17 +1008,17 @@ for Repetition<'repetition, Input, Output, Failure>
                     Record::Panicked | Record::Aligned | Record::Failed => {
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(std::mem::take(&mut child.consumed));
-                        forms.push(std::mem::take(&mut child.form));
-                        stack = std::mem::take(&mut child.stack);
+                        consumed.extend(take(&mut child.consumed));
+                        forms.push(take(&mut child.form));
+                        stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
                         index = child.marker;
                         position = child.position;
-                        stack = std::mem::take(&mut child.stack);
+                        stack = take(&mut child.stack);
                     }
                     _ => {
-                        stack = std::mem::take(&mut child.stack);
+                        stack = take(&mut child.stack);
                     }
                 }
             } else {
@@ -1012,26 +1027,26 @@ for Repetition<'repetition, Input, Output, Failure>
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(std::mem::take(&mut child.consumed));
-                        forms.push(std::mem::take(&mut child.form));
-                        stack = std::mem::take(&mut child.stack);
+                        consumed.extend(take(&mut child.consumed));
+                        forms.push(take(&mut child.form));
+                        stack = take(&mut child.stack);
                         break;
                     }
                     Record::Aligned => {
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(std::mem::take(&mut child.consumed));
-                        forms.push(std::mem::take(&mut child.form));
-                        stack = std::mem::take(&mut child.stack);
+                        consumed.extend(take(&mut child.consumed));
+                        forms.push(take(&mut child.form));
+                        stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
                         index = child.marker;
                         position = child.position;
-                        stack = std::mem::take(&mut child.stack);
+                        stack = take(&mut child.stack);
                     }
                     _ => {
-                        stack = std::mem::take(&mut child.stack);
+                        stack = take(&mut child.stack);
                     }
                 }
             }

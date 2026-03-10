@@ -129,7 +129,7 @@ impl<'scanner> Scanner<'scanner> {
     {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|c: &Character| c.value == '-').as_optional(),
+                Classifier::predicate(|c: &Character| c.value == '-').into_optional(),
                 Classifier::persistence(
                     Classifier::alternative([
                         Classifier::predicate(|c: &Character| c.is_numeric()),
@@ -138,7 +138,7 @@ impl<'scanner> Scanner<'scanner> {
                     ]),
                     0,
                     None,
-                ).as_optional(),
+                ).into_optional(),
                 Classifier::optional(
                     Classifier::sequence([
                         Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),

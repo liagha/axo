@@ -22,14 +22,14 @@ impl<'parser> Parser<'parser> {
                     | TokenKind::Punctuation(PunctuationKind::Semicolon)
             )
         })
-            .as_optional();
+            .into_optional();
 
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(open)),
-                item.as_optional(),
+                item.clone().into_optional(),
                 Classifier::persistence(
-                    Classifier::sequence([separator, item.as_optional()]),
+                    Classifier::sequence([separator, item.into_optional()]),
                     0,
                     None,
                 ),

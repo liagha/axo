@@ -1,4 +1,4 @@
-use crate::format::Display;
+use crate::format::{Display, Formatter, Result};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind {
@@ -7,7 +7,7 @@ pub enum ErrorKind {
 }
 
 impl Display for ErrorKind {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             ErrorKind::UnsupportedAnalysis { instruction } => {
                 write!(

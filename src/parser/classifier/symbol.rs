@@ -272,7 +272,7 @@ impl<'parser> Parser<'parser> {
                         classifier.form = output[0].clone();
                         Ok(())
                     }),
-                Self::expression().as_optional(),
+                Self::expression().into_optional(),
             ])
                 .with_transform(|classifier| {
                     let sequence = classifier.form.as_forms();
@@ -362,7 +362,7 @@ impl<'parser> Parser<'parser> {
                             Ok(())
                         }),
                 ])),
-                Self::expression().as_optional(),
+                Self::expression().into_optional(),
             ])
                 .with_transform(|classifier| {
                     let sequence = classifier.form.as_forms();
