@@ -149,9 +149,21 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("struct"))
                 }),
-                Self::literal(),
+                Self::literal().with_panic(
+                    |classifier| {
+                        let span = classifier.consumed.span();
+                        
+                        ParseError::new(ErrorKind::ExpectedHead, span)
+                    }
+                ),
             ]),
-            Self::expression(),
+            Self::expression().with_panic(
+                |classifier| {
+                    let span = classifier.consumed.span();
+                    
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                }
+            ),
         ])
             .with_transform(|classifier| {
                 let sequence = classifier.form.as_forms();

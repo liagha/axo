@@ -84,10 +84,10 @@ impl<
             order,
             marker: self.marker,
             position: self.position,
-            consumed: self.consumed.clone(),
+            consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
-            stack: self.stack.clone(),
+            stack: Vec::new(),
             depth: self.depth + 1,
         }
     }
@@ -595,9 +595,9 @@ impl<
         composer: &mut Former<'_, 'predicate, Input, Output, Failure>,
         classifier: &mut Classifier<'predicate, Input, Output, Failure>,
     ) {
-        if let Some(peek) = composer.source.peek_ahead(classifier.marker) {
+        if let Some(peek) = composer.source.get(classifier.marker) {
             if (self.function)(peek) {
-                let value = composer.source.get(classifier.marker).cloned().unwrap();
+                let value = peek.clone();
                 classifier.set_align();
                 composer
                     .source
@@ -786,10 +786,10 @@ impl<
 
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = child.consumed;
+        classifier.consumed = std::mem::take(&mut child.consumed);
         classifier.record = child.record;
-        classifier.form = child.form;
-        classifier.stack = child.stack;
+        classifier.form = std::mem::take(&mut child.form);
+        classifier.stack = std::mem::take(&mut child.stack);
     }
 }
 
@@ -869,10 +869,10 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 order: pattern.order.clone(),
                 marker: index,
                 position,
-                consumed: consumed.clone(),
+                consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: stack.clone(),
+                stack: Vec::new(),
                 depth: classifier.depth + 1,
             };
 
@@ -885,7 +885,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
-                    stack = child.stack;
+                    stack.extend(child.stack);
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
@@ -893,7 +893,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
-                    stack = child.stack;
+                    stack.extend(child.stack);
                     break;
                 }
                 Record::Ignored => {

@@ -14,6 +14,14 @@ pub enum Form<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: F
 }
 
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>>
+Default for Form<'form, Input, Output, Failure>
+{
+    fn default() -> Self {
+        Self::Blank
+    }
+}
+
+impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>>
     Form<'form, Input, Output, Failure>
 {
     #[inline(always)]
@@ -23,12 +31,12 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
 
     #[inline(always)]
     pub fn input(input: Input) -> Self {
-        Form::Input(input.clone())
+        Form::Input(input)
     }
 
     #[inline(always)]
     pub fn output(output: Output) -> Self {
-        Form::Output(output.clone())
+        Form::Output(output)
     }
 
     #[inline(always)]
@@ -36,7 +44,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
         if forms.is_empty() {
             Form::Blank
         } else {
-            Form::Multiple(forms.clone())
+            Form::Multiple(forms)
         }
     }
 
@@ -47,7 +55,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
 
     #[inline(always)]
     pub fn get_input(&self) -> Option<Input> {
-        match self.clone() {
+        match self {
             Form::Input(input) => Some(input.clone()),
             _ => None,
         }
@@ -55,7 +63,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
 
     #[inline(always)]
     pub fn get_output(&self) -> Option<Output> {
-        match self.clone() {
+        match self {
             Form::Output(output) => Some(output.clone()),
             _ => None,
         }

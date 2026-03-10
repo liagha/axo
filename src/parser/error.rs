@@ -7,7 +7,7 @@ use crate::format::Show;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
-    ExpectedCondition,
+    ExpectedHead,
     ExpectedBody,
     MissingSeparator(TokenKind<'error>),
     UnclosedDelimiter(TokenKind<'error>),
@@ -20,7 +20,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match self {
-            ErrorKind::ExpectedCondition => "expected condition.".to_string(),
+            ErrorKind::ExpectedHead => "expected head.".to_string(),
             ErrorKind::UnexpectedPunctuation => "unexpected punctuation.".to_string(),
             ErrorKind::ExpectedBody => "expected body.".to_string(),
             ErrorKind::MissingSeparator(kind) => {
