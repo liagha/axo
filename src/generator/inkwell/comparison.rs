@@ -12,11 +12,13 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "equal");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(
@@ -31,7 +33,7 @@ impl<'backend> super::Inkwell<'backend> {
             BasicValueEnum::from(
                 self.builder
                     .build_float_compare(
-                        FloatPredicate::OEQ,
+                        FloatPredicate::OEQ, 
                         left.into_float_value(),
                         right.into_float_value(),
                         "equal",
@@ -45,11 +47,13 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "not_equal");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(
@@ -64,7 +68,7 @@ impl<'backend> super::Inkwell<'backend> {
             BasicValueEnum::from(
                 self.builder
                     .build_float_compare(
-                        FloatPredicate::ONE,
+                        FloatPredicate::ONE, 
                         left.into_float_value(),
                         right.into_float_value(),
                         "not_equal",
@@ -78,7 +82,6 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
@@ -87,7 +90,10 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap_or(true);
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "less");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(
@@ -120,7 +126,6 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
@@ -129,7 +134,10 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap_or(true);
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "less_or_equal");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(
@@ -162,7 +170,6 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
@@ -171,7 +178,10 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap_or(true);
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "greater");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(
@@ -204,7 +214,6 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        
     ) -> BasicValueEnum<'backend> {
         let signed = self
             .infer_signedness(&left)
@@ -213,7 +222,10 @@ impl<'backend> super::Inkwell<'backend> {
             .unwrap_or(true);
         let left = self.analysis(*left);
         let right = self.analysis(*right);
-        if left.is_int_value() && right.is_int_value() {
+
+        let (left, right, floating) = self.coerce_numeric_pair(left, right, "greater_or_equal");
+
+        if !floating {
             BasicValueEnum::from(
                 self.builder
                     .build_int_compare(

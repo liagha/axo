@@ -33,6 +33,7 @@ pub enum Entity<'backend> {
     Array {
         pointer: PointerValue<'backend>,
         element_type: BasicTypeEnum<'backend>,
+        element_count: usize, // FIX: Added element_count for array bounds checking
     },
     Struct {
         struct_type: StructType<'backend>,
@@ -176,7 +177,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
             if let Analysis::Structure(structure) = &analysis {
-                self.define_structure(structure.clone());
+                self.structure(structure.clone());
             }
         }
 
@@ -252,7 +253,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             Analysis::Block(analyses) => self.block(analyses),
             Analysis::Conditional(condition, then, otherwise) => self.conditional(condition, then, otherwise),
             Analysis::While(condition, body) => self.r#while(condition, body),
-            Analysis::Structure(structure) => self.define_structure(structure),
+            Analysis::Structure(structure) => self.structure(structure),
             Analysis::Module(name, analyses) => self.module(name, analyses),
             Analysis::Function(function) => self.function(function),
             Analysis::Invoke(invoke) => self.invoke(invoke),

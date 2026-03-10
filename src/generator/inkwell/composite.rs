@@ -1,3 +1,4 @@
+use inkwell::IntPredicate;
 use inkwell::values::PointerValue;
 use {
     super::Entity,
@@ -52,7 +53,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
     }
 
-    pub fn define_structure(
+    pub fn structure(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
@@ -71,7 +72,12 @@ impl<'backend> super::Inkwell<'backend> {
                     .annotation
                     .as_ref()
                     .map(|annotation| self.llvm_type(annotation))
-                    .unwrap_or_else(|| self.context.i64_type().into());
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Struct field '{}' in '{}' is missing a type annotation.",
+                            field_name, name
+                        )
+                    });
                 field_types.push(field_type);
             }
         }
@@ -89,6 +95,8 @@ impl<'backend> super::Inkwell<'backend> {
         self.context.i64_type().const_zero().into()
     }
 
+
+
     pub fn constructor(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
@@ -100,10 +108,10 @@ impl<'backend> super::Inkwell<'backend> {
                 if let Entity::Struct { struct_type, fields } = entity {
                     (*struct_type, fields.clone())
                 } else {
-                    return self.context.i64_type().const_zero().into();
+                    panic!("'{}' is not a struct type.", name);
                 }
             } else {
-                return self.context.i64_type().const_zero().into();
+                panic!("Unknown struct type '{}'.", name);
             };
 
         let mut value = struct_type.get_undef();
@@ -114,30 +122,34 @@ impl<'backend> super::Inkwell<'backend> {
                     if let Some(index) = fields.iter().position(|name| name == &field) {
                         let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
                         let field_value = self.analysis(*assigned.clone());
-                        if let Some(casted) = self.cast_value(field_value, field_type) {
-                            value = self
-                                .builder
-                                .build_insert_value(value, casted, index as u32, "struct_insert")
-                                .unwrap()
-                                .into_struct_value();
-                        }
-                    }
-                }
-                other => {
-                    if positional_index >= fields.len() {
-                        continue;
-                    }
-                    let index = positional_index;
-                    positional_index += 1;
-                    let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
-                    let field_value = self.analysis(other);
-                    if let Some(casted) = self.cast_value(field_value, field_type) {
+                        let casted = self.cast_value(field_value, field_type).unwrap_or_else(|| {
+                            panic!("Type mismatch for field '{}' in constructor for '{}'.", field, name);
+                        });
                         value = self
                             .builder
                             .build_insert_value(value, casted, index as u32, "struct_insert")
                             .unwrap()
                             .into_struct_value();
+                    } else {
+                        panic!("Struct '{}' has no field named '{}'.", name, field);
                     }
+                }
+                other => {
+                    if positional_index >= fields.len() {
+                        panic!("Too many positional initializers for struct '{}'.", name);
+                    }
+                    let index = positional_index;
+                    positional_index += 1;
+                    let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
+                    let field_value = self.analysis(other);
+                    let casted = self.cast_value(field_value, field_type).unwrap_or_else(|| {
+                        panic!("Type mismatch for positional argument {} in constructor for '{}'.", index, name);
+                    });
+                    value = self
+                        .builder
+                        .build_insert_value(value, casted, index as u32, "struct_insert")
+                        .unwrap()
+                        .into_struct_value();
                 }
             }
         }
@@ -160,9 +172,10 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        let field_name = match &*member {
-            Analysis::Usage(name) => name.clone(),
-            _ => return self.context.i64_type().const_zero().into(),
+        let field_name = if let Analysis::Usage(name) = &*member {
+            name.clone()
+        } else {
+            panic!("Struct member access must use a simple name.");
         };
 
         if let Analysis::Usage(target_name) = &*target {
@@ -179,21 +192,15 @@ impl<'backend> super::Inkwell<'backend> {
 
                     if let Some(struct_name) = struct_name {
                         if let Some(Entity::Struct { fields, .. }) = self.entities.get(&struct_name) {
-                            if let Some(index) = fields.iter().position(|name| name == &field_name)
-                            {
-                                if let Ok(slot) = self.builder.build_struct_gep(
+                            if let Some(index) = fields.iter().position(|name| name == &field_name) {
+                                let slot = self.builder.build_struct_gep(
                                     struct_type,
                                     *pointer,
                                     index as u32,
                                     "field_ptr",
-                                ) {
-                                    let field_type =
-                                        struct_type.get_field_type_at_index(index as u32).unwrap();
-                                    return self
-                                        .builder
-                                        .build_load(field_type, slot, "field_value")
-                                        .unwrap();
-                                }
+                                ).unwrap();
+                                let field_type = struct_type.get_field_type_at_index(index as u32).unwrap();
+                                return self.builder.build_load(field_type, slot, "field_value").unwrap();
                             }
                         }
                     }
@@ -207,28 +214,18 @@ impl<'backend> super::Inkwell<'backend> {
                 if let Entity::Struct { struct_type, .. } = entity {
                     if struct_type.as_basic_type_enum() == struct_value.get_type().as_basic_type_enum() {
                         Some(name.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                    } else { None }
+                } else { None }
             }) {
                 if let Some(Entity::Struct { fields, .. }) = self.entities.get(&struct_name) {
                     if let Some(index) = fields.iter().position(|name| name == &field_name) {
-                        if let Ok(value) = self.builder.build_extract_value(
-                            struct_value,
-                            index as u32,
-                            "field_extract",
-                        ) {
-                            return value;
-                        }
+                        return self.builder.build_extract_value(struct_value, index as u32, "field_extract").unwrap();
                     }
                 }
             }
         }
 
-        self.context.i64_type().const_zero().into()
+        panic!("Attempted to access field '{}' on a non-struct type or value.", field_name);
     }
 
     pub fn array(
@@ -236,15 +233,7 @@ impl<'backend> super::Inkwell<'backend> {
         elements: Vec<Analysis<'backend>>,
     ) -> (PointerValue<'backend>, BasicTypeEnum<'backend>) {
         if elements.is_empty() {
-            let element_type = self.context.i8_type();
-            let array_type = element_type.array_type(0);
-
-            let ptr = self
-                .builder
-                .build_alloca(array_type, "array_empty")
-                .unwrap();
-
-            return (ptr.into(), element_type.into());
+            panic!("Cannot create an empty array without a type annotation.");
         }
 
         let mut values = Vec::with_capacity(elements.len());
@@ -269,9 +258,13 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap()
             };
 
-            if let Some(casted) = self.cast_value(value, element_type) {
-                let _ = self.builder.build_store(slot, casted);
-            }
+            let casted = self.cast_value(value, element_type).unwrap_or_else(|| {
+                panic!(
+                    "Type mismatch in array literal. Element {} has an incompatible type.",
+                    index
+                );
+            });
+            let _ = self.builder.build_store(slot, casted);
         }
 
         (ptr, element_type)
@@ -307,7 +300,7 @@ impl<'backend> super::Inkwell<'backend> {
         index: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
     ) -> BasicValueEnum<'backend> {
         if index.members.is_empty() {
-            return self.context.i64_type().const_zero().into();
+            panic!("Index operation requires at least one index argument.");
         }
 
         let target_instruction = index.target.clone();
@@ -315,9 +308,32 @@ impl<'backend> super::Inkwell<'backend> {
         let idx_value = self.analysis(index.members[0].clone());
 
         if let Analysis::Usage(name) = &*index.target {
-            if let Some(Entity::Array { element_type, .. }) = self.entities.get(name) {
+            if let Some(Entity::Array { pointer, element_type, element_count }) = self.entities.get(name) {
                 if let BasicValueEnum::PointerValue(pointer) = target {
                     if let BasicValueEnum::IntValue(idx) = idx_value {
+                        // Array Bounds Check
+                        let length_val = self.context.i32_type().const_int(*element_count as u64, false);
+                        let is_idx_out_of_bounds = self.builder.build_int_compare(
+                            IntPredicate::UGE, // Unsigned Greater or Equal
+                            idx,
+                            length_val,
+                            "array_bounds_check"
+                        ).unwrap();
+
+                        let current_block = self.builder.get_insert_block().unwrap();
+                        let function = current_block.get_parent().unwrap();
+
+                        let trap_block = self.context.append_basic_block(function, "trap_oob");
+                        let continue_block = self.context.append_basic_block(function, "continue_oob");
+
+                        self.builder.build_conditional_branch(is_idx_out_of_bounds, trap_block, continue_block);
+
+                        self.builder.position_at_end(trap_block);
+                        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call");
+                        self.builder.build_unreachable();
+
+                        self.builder.position_at_end(continue_block);
+                        // Continue with array access in the continue_block
                         let slot = unsafe {
                             self.builder
                                 .build_in_bounds_gep(*element_type, pointer, &[idx], "array_index")
@@ -334,23 +350,22 @@ impl<'backend> super::Inkwell<'backend> {
                     if let BasicValueEnum::IntValue(idx) = idx_value {
                         if let Some(constant) = idx.get_zero_extended_constant() {
                             let struct_type = kind.into_struct_type();
-                            if let Ok(slot) = self.builder.build_struct_gep(
+                            let slot = self.builder.build_struct_gep(
                                 struct_type,
                                 *pointer,
                                 constant as u32,
                                 "tuple_index",
-                            ) {
-                                return self
-                                    .builder
-                                    .build_load(
-                                        struct_type
-                                            .get_field_type_at_index(constant as u32)
-                                            .unwrap(),
-                                        slot,
-                                        "tuple_value",
-                                    )
-                                    .unwrap();
-                            }
+                            ).unwrap();
+                            return self
+                                .builder
+                                .build_load(
+                                    struct_type
+                                        .get_field_type_at_index(constant as u32)
+                                        .unwrap(),
+                                    slot,
+                                    "tuple_value",
+                                )
+                                .unwrap();
                         }
                     }
                 }
@@ -359,29 +374,25 @@ impl<'backend> super::Inkwell<'backend> {
         if let BasicValueEnum::StructValue(struct_value) = target {
             if let BasicValueEnum::IntValue(idx) = idx_value {
                 if let Some(constant) = idx.get_zero_extended_constant() {
-                    if let Ok(value) = self.builder.build_extract_value(
+                    return self.builder.build_extract_value(
                         struct_value,
                         constant as u32,
                         "tuple_extract",
-                    ) {
-                        return value;
-                    }
+                    ).unwrap();
                 }
             }
         } else if let BasicValueEnum::ArrayValue(array_value) = target {
             if let BasicValueEnum::IntValue(idx) = idx_value {
                 if let Some(constant) = idx.get_zero_extended_constant() {
-                    if let Ok(value) = self.builder.build_extract_value(
+                    return self.builder.build_extract_value(
                         array_value,
                         constant as u32,
                         "array_extract",
-                    ) {
-                        return value;
-                    }
+                    ).unwrap();
                 }
             }
         }
 
-        self.context.i64_type().const_zero().into()
+        panic!("Type cannot be indexed.");
     }
 }

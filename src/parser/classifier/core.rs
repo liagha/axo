@@ -1,10 +1,10 @@
 use crate::{
+    data::*,
     formation::{classifier::Classifier, form::Form},
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Span, Spanned},
 };
-use crate::data::*;
 
 impl<'parser> Parser<'parser> {
     pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
