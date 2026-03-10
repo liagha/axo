@@ -158,6 +158,18 @@ impl<'element> Spanned<'element> for Element<'element> {
     }
 }
 
+impl<'symbol> Spanned<'symbol> for Symbol<'symbol> {
+    #[track_caller]
+    fn borrow_span(&self) -> Span<'symbol> {
+        self.span
+    }
+
+    #[track_caller]
+    fn span(self) -> Span<'symbol> {
+        self.span
+    }
+}
+
 impl<'element> Hash for ElementKind<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {

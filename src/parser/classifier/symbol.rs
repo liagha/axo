@@ -152,7 +152,7 @@ impl<'parser> Parser<'parser> {
                 Self::literal().with_panic(
                     |classifier| {
                         let span = classifier.consumed.span();
-                        
+
                         ParseError::new(ErrorKind::ExpectedHead, span)
                     }
                 ),
@@ -160,7 +160,7 @@ impl<'parser> Parser<'parser> {
             Self::expression().with_panic(
                 |classifier| {
                     let span = classifier.consumed.span();
-                    
+
                     ParseError::new(ErrorKind::ExpectedBody, span)
                 }
             ),
@@ -223,18 +223,30 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
-                Self::literal(),
-                Self::group(Classifier::alternative([
-                    Classifier::deferred(Self::symbolization),
-                    Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Identifier(_))
-                    })
-                        .with_transform(|classifier| {
+                Self::literal().with_panic(
+                    |classifier| {
+                        let span = classifier.consumed.span();
+
+                        ParseError::new(ErrorKind::ExpectedName, span)
+                    }
+                ),
+                Self::group(
+                    Classifier::alternative([
+                        Classifier::deferred(Self::symbolization),
+                        Classifier::predicate(|token: &Token| {
+                            matches!(token.kind, TokenKind::Identifier(_))
+                        }).with_transform(|classifier| {
                             let input = classifier.form.unwrap_input();
                             classifier.form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
                             Ok(())
                         }),
-                ])),
+                ])).with_panic(
+                    |classifier| {
+                        let span = classifier.stack.span();
+
+                        ParseError::new(ErrorKind::ExpectedHead, span)
+                    }
+                ),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
                         if let TokenKind::Operator(operator) = &token.kind {
@@ -247,7 +259,13 @@ impl<'parser> Parser<'parser> {
                     Classifier::alternative([
                         Self::prefixed(),
                         Self::literal(),
-                    ]),
+                    ]).with_panic(
+                        |classifier| {
+                            let span = classifier.stack.span();
+
+                            ParseError::new(ErrorKind::ExpectedAnnotation, span)
+                        }
+                    ),
                 ])
                     .with_transform(|classifier| {
                         let output = classifier.form.as_forms();
@@ -424,8 +442,20 @@ impl<'parser> Parser<'parser> {
             Classifier::predicate(|token: &Token| {
                 token.kind == TokenKind::Identifier(Str::from("module"))
             }),
-            Self::literal(),
-            Self::expression(),
+            Self::literal().with_panic(
+                |classifier| {
+                    let span = classifier.stack.span();
+
+                    ParseError::new(ErrorKind::ExpectedName, span)
+                }
+            ),
+            Self::expression().with_panic(
+                |classifier| {
+                    let span = classifier.stack.span();
+
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                }
+            ),
         ])
             .with_transform(|classifier| {
                 let sequence = classifier.form.as_forms();

@@ -87,7 +87,7 @@ impl<
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
-            stack: Vec::new(),
+            stack: self.stack.clone(),
             depth: self.depth + 1,
         }
     }
@@ -397,7 +397,6 @@ impl<
         self.with_order(Self::transform(transform))
     }
 
-
     #[inline]
     pub fn with_fallback(
         self,
@@ -534,7 +533,10 @@ impl<
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
                 classifier.consumed.push(peek.clone());
-                classifier.form = Form::input(peek);
+
+                let form = Form::input(peek);
+                classifier.form = form.clone();
+                classifier.stack.push(form);
             } else {
                 classifier.set_empty();
             }
@@ -603,7 +605,10 @@ impl<
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
                 classifier.consumed.push(value.clone());
-                classifier.form = Form::input(value);
+
+                let form = Form::input(value);
+                classifier.form = form.clone();
+                classifier.stack.push(form);
             } else {
                 classifier.set_empty();
             }
@@ -667,13 +672,13 @@ for Alternative<'alternative, Input, Output, Failure, SIZE>
         }
 
         match best {
-            Some(champion) => {
+            Some(mut champion) => {
                 classifier.record = champion.record;
                 classifier.marker = champion.marker;
                 classifier.position = champion.position;
-                classifier.consumed = champion.consumed;
-                classifier.form = champion.form;
-                classifier.stack = champion.stack;
+                classifier.consumed = std::mem::take(&mut champion.consumed);
+                classifier.form = std::mem::take(&mut champion.form);
+                classifier.stack = std::mem::take(&mut champion.stack);
             }
             None => classifier.set_empty(),
         }
@@ -707,15 +712,15 @@ impl<
         resolved.marker = classifier.marker;
         resolved.position = classifier.position;
         resolved.depth = classifier.depth + 1;
-        resolved.stack = classifier.stack.clone();
+        resolved.stack = std::mem::take(&mut classifier.stack);
         composer.build(&mut resolved);
 
         classifier.marker = resolved.marker;
         classifier.position = resolved.position;
-        classifier.consumed = resolved.consumed;
+        classifier.consumed = std::mem::take(&mut resolved.consumed);
         classifier.record = resolved.record;
-        classifier.form = resolved.form;
-        classifier.stack = resolved.stack;
+        classifier.form = std::mem::take(&mut resolved.form);
+        classifier.stack = std::mem::take(&mut resolved.stack);
     }
 }
 
@@ -748,9 +753,9 @@ impl<
         if child.is_effected() {
             classifier.marker = child.marker;
             classifier.position = child.position;
-            classifier.consumed = child.consumed;
-            classifier.form = child.form;
-            classifier.stack = child.stack;
+            classifier.consumed = std::mem::take(&mut child.consumed);
+            classifier.form = std::mem::take(&mut child.form);
+            classifier.stack = std::mem::take(&mut child.stack);
             classifier.set_align();
         } else {
             classifier.set_ignore();
@@ -818,9 +823,9 @@ Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failur
 
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = child.consumed.clone();
-        classifier.form = child.form.clone();
-        classifier.stack = child.stack.clone();
+        classifier.consumed = std::mem::take(&mut child.consumed);
+        classifier.form = std::mem::take(&mut child.form);
+        classifier.stack = std::mem::take(&mut child.stack);
 
         if child.is_aligned() {
             classifier.record = self.precedence.max(Record::Aligned.into()).into();
@@ -860,11 +865,18 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
     ) {
         let mut index = classifier.marker;
         let mut position = classifier.position;
-        let mut consumed = classifier.consumed.clone();
+        let mut consumed = std::mem::take(&mut classifier.consumed);
         let mut forms = Vec::with_capacity(SIZE);
-        let mut stack = classifier.stack.clone();
+
+        let mut stack = std::mem::take(&mut classifier.stack);
 
         for pattern in &self.patterns {
+            let mut child_stack = Vec::new();
+
+            if !stack.is_empty() {
+                child_stack.push(Form::multiple(stack));
+            }
+
             let mut child = Classifier {
                 order: pattern.order.clone(),
                 marker: index,
@@ -872,7 +884,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: Vec::new(),
+                stack: child_stack,
                 depth: classifier.depth + 1,
             };
 
@@ -883,25 +895,27 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(child.consumed);
-                    forms.push(child.form);
-                    stack.extend(child.stack);
+                    consumed.extend(std::mem::take(&mut child.consumed));
+                    forms.push(std::mem::take(&mut child.form));
+                    stack = std::mem::take(&mut child.stack);
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(child.consumed);
-                    forms.push(child.form);
-                    stack.extend(child.stack);
+                    consumed.extend(std::mem::take(&mut child.consumed));
+                    forms.push(std::mem::take(&mut child.form));
+                    stack = std::mem::take(&mut child.stack);
                     break;
                 }
                 Record::Ignored => {
                     index = child.marker;
                     position = child.position;
+                    stack = std::mem::take(&mut child.stack);
                 }
                 _ => {
                     classifier.record = child.record;
+                    stack = std::mem::take(&mut child.stack);
                     break;
                 }
             }
@@ -946,9 +960,16 @@ for Repetition<'repetition, Input, Output, Failure>
         let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
-        let mut stack = classifier.stack.clone();
+
+        let mut stack = std::mem::take(&mut classifier.stack);
 
         while composer.source.peek_ahead(index).is_some() {
+            let mut child_stack = Vec::new();
+
+            if !stack.is_empty() {
+                child_stack.push(Form::multiple(stack));
+            }
+
             let mut child = Classifier {
                 order: self.classifier.order.clone(),
                 marker: index,
@@ -956,97 +977,73 @@ for Repetition<'repetition, Input, Output, Failure>
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: stack.clone(),
+                stack: child_stack,
                 depth: classifier.depth + 1,
             };
 
             composer.build(&mut child);
 
             if child.marker == index {
+                stack = std::mem::take(&mut child.stack);
                 break;
             }
 
             if self.persist {
                 match child.record {
-                    Record::Panicked => {
+                    Record::Panicked | Record::Aligned | Record::Failed => {
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack = child.stack;
+                        consumed.extend(std::mem::take(&mut child.consumed));
+                        forms.push(std::mem::take(&mut child.form));
+                        stack = std::mem::take(&mut child.stack);
                     }
-
-                    Record::Aligned => {
-                        index = child.marker;
-                        position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack = child.stack;
-                    }
-
-                    Record::Failed => {
-                        index = child.marker;
-                        position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack = child.stack;
-                    }
-
                     Record::Ignored => {
                         index = child.marker;
                         position = child.position;
+                        stack = std::mem::take(&mut child.stack);
                     }
-
-                    _ => {}
+                    _ => {
+                        stack = std::mem::take(&mut child.stack);
+                    }
                 }
             } else {
                 match child.record {
-                    Record::Panicked => {
+                    Record::Panicked | Record::Failed => {
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack.extend(child.stack);
+                        consumed.extend(std::mem::take(&mut child.consumed));
+                        forms.push(std::mem::take(&mut child.form));
+                        stack = std::mem::take(&mut child.stack);
                         break;
                     }
-
                     Record::Aligned => {
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack.extend(child.stack);
+                        consumed.extend(std::mem::take(&mut child.consumed));
+                        forms.push(std::mem::take(&mut child.form));
+                        stack = std::mem::take(&mut child.stack);
                     }
-
-                    Record::Failed => {
-                        classifier.record = child.record;
-                        index = child.marker;
-                        position = child.position;
-                        consumed.extend(child.consumed);
-                        forms.push(child.form);
-                        stack.extend(child.stack);
-                        break;
-                    }
-
                     Record::Ignored => {
                         index = child.marker;
                         position = child.position;
+                        stack = std::mem::take(&mut child.stack);
                     }
-
-                    _ => {}
+                    _ => {
+                        stack = std::mem::take(&mut child.stack);
+                    }
                 }
             }
 
             if let Some(max) = self.maximum {
-                if forms.len() >= max {
+                if forms.len() >= max as usize {
                     break;
                 }
             }
         }
 
-        if forms.len() >= self.minimum {
+        if forms.len() >= self.minimum as usize {
             if self.persist {
                 classifier.set_align();
             }
@@ -1059,6 +1056,7 @@ for Repetition<'repetition, Input, Output, Failure>
             if self.persist {
                 classifier.set_empty();
             }
+            classifier.stack = stack;
         }
     }
 }

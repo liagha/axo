@@ -14,11 +14,12 @@ pub mod helper {
             format::Show,
         },
     };
+    use crate::tracker::Spanned;
 
-    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + 'formable {}
+    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + Spanned<'formable> + 'formable {}
 
     impl<'formable, T> Formable<'formable> for T where
-        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + 'formable
+        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + Spanned<'formable> + 'formable
     {
     }
 

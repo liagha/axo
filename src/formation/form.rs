@@ -157,6 +157,25 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
         inputs
     }
 
+    pub fn collect_inputs_iter(&self) -> Vec<Input> {
+        let mut inputs = Vec::new();
+        let mut stack = vec![self];
+
+        while let Some(form) = stack.pop() {
+            match form {
+                Form::Input(input) => inputs.push(input.clone()),
+                Form::Multiple(forms) => {
+                    for f in forms {
+                        stack.push(f);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        inputs
+    }
+
     fn collect_inputs_into(&self, inputs: &mut Vec<Input>) {
         match self {
             Form::Input(input) => inputs.push(input.clone()),
@@ -175,6 +194,25 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
         outputs
     }
 
+    pub fn collect_outputs_iter(&self) -> Vec<Output> {
+        let mut outputs = Vec::new();
+        let mut stack = vec![self];
+
+        while let Some(form) = stack.pop() {
+            match form {
+                Form::Output(output) => outputs.push(output.clone()),
+                Form::Multiple(forms) => {
+                    for f in forms {
+                        stack.push(f);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        outputs
+    }
+
     fn collect_outputs_into(&self, outputs: &mut Vec<Output>) {
         match self {
             Form::Output(output) => outputs.push(output.clone()),
@@ -190,6 +228,25 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     pub fn collect_failures(&self) -> Vec<Failure> {
         let mut failures = Vec::new();
         self.collect_failures_into(&mut failures);
+        failures
+    }
+
+    pub fn collect_failures_iter(&self) -> Vec<Failure> {
+        let mut failures = Vec::new();
+        let mut stack = vec![self];
+
+        while let Some(form) = stack.pop() {
+            match form {
+                Form::Failure(failure) => failures.push(failure.clone()),
+                Form::Multiple(forms) => {
+                    for f in forms {
+                        stack.push(f);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         failures
     }
 

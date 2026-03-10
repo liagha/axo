@@ -7,6 +7,7 @@ use {
     },
 };
 use crate::data::*;
+use crate::tracker::Spanned;
 
 impl<'parser> Parser<'parser> {
     fn delimited_form(
@@ -32,14 +33,12 @@ impl<'parser> Parser<'parser> {
                     0,
                     None,
                 ),
-                Classifier::with_fallback(
-                    Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)),
-                    Classifier::fail(move |_classifier| {
-                        ParseError::new(
-                            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)),
-                            Span::void(),
-                        )
-                    }),
+                Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)).with_panic(
+                    move |classifier| {
+                        let span = Form::multiple(classifier.stack).collect_inputs_iter().span();
+
+                        ParseError::new(ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)), span)
+                    }
                 ),
             ]),
             move |classifier| {
