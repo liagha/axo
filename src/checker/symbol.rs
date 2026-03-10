@@ -5,7 +5,7 @@ use crate::{
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self, errors: &mut Vec<CheckError<'symbol>>) {
-        match &mut self.kind {
+        let ty = match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 let mut failed = false;
 
@@ -33,7 +33,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     None => None,
                 };
 
-                if let (Some(declared), Some(inferred)) = (annotation, inferred) {
+                if let (Some(declared), Some(inferred)) = (annotation.clone(), inferred) {
                     if Type::unify(&declared, &inferred).is_none() {
                         errors.push(CheckError::new(
                             ErrorKind::Mismatch(declared, inferred.clone()),
@@ -44,12 +44,21 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 }
 
                 if failed { return; }
+                
+                annotation.unwrap_or(Type::new(TypeKind::Void, self.span))
             }
 
             SymbolKind::Structure(structure) => {
-                for member in structure.members.iter_mut() {
-                    member.check(errors);
-                }
+                let _members = structure
+                    .members
+                    .iter_mut()
+                    .map(|member| {
+                        member.check(errors);
+                        
+                        member.ty.clone()
+                    });
+                
+                Type::new(TypeKind::Void, self.span)
             }
 
             SymbolKind::Function(function) => {
@@ -59,8 +68,8 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     member.check(errors);
                 }
 
-                let output = function.output.as_ref().and_then(|value| {
-                    match Type::annotation(&*value) {
+                let output = function.output.as_ref().and_then(|output| {
+                    match Type::annotation(&*output) {
                         Ok(ty) => Some(ty),
                         Err(error) => {
                             errors.push(error);
@@ -78,18 +87,26 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                     if failed { return; }
 
-                    if let Some(expected) = output {
+                    if let Some(expected) = output.clone() {
                         if Type::unify(&expected, &body.ty).is_none() {
-                            errors.push(CheckError::new(
-                                ErrorKind::Mismatch(expected, body.ty.clone()),
-                                self.span,
-                            ));
+                            errors.push(
+                                CheckError::new(
+                                    ErrorKind::Mismatch(expected, body.ty.clone()),
+                                    self.span,
+                                )
+                            );
                         }
                     }
                 }
+
+                output.unwrap_or(Type::new(TypeKind::Void, self.span))
             }
 
-            SymbolKind::Module(_) => {}
-        }
+            SymbolKind::Module(_) => {
+                Type::new(TypeKind::Void, self.span)
+            }
+        };
+        
+        self.ty = ty
     }
 }

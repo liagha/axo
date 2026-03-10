@@ -155,10 +155,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Analysis::unit(self.span)
                 };
 
-                let output = function
-                    .output
-                    .clone()
-                    .map(|output| output.ty);
+                let output = Some(self.ty.clone());
 
                 let analyzed = Function::new(
                     Str::from(function.target.brand().unwrap().format(0)),

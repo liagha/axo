@@ -62,7 +62,7 @@ impl<'backend> super::Inkwell<'backend> {
                 fields.push(field_name.clone());
 
                 let field_type = if let Some(annotation) = binding.annotation.as_ref() {
-                    self.llvm_type(annotation)?
+                    self.llvm_type(annotation, member.span)?
                 } else {
                     return Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {

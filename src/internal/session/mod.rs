@@ -164,8 +164,8 @@ impl<'session> Session<'session> {
         self.scan();
         self.parse();
         self.register();
-        self.resolve();
-        self.check();
+        //self.resolve();
+        //self.check();
         self.analyze();
         self.generate();
 

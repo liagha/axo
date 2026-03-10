@@ -58,7 +58,7 @@ pub struct Inkwell<'backend> {
 }
 
 impl<'backend> Inkwell<'backend> {
-    pub fn llvm_type(&self, ty: &Type<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+    pub fn llvm_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let ty = match &ty.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
@@ -105,8 +105,8 @@ impl<'backend> Inkwell<'backend> {
                 } else {
                     return Err(
                         GenerateError::new(
-                            ErrorKind::InvalidType,
-                            ty.span
+                            ErrorKind::InvalidType { ty: ty.clone() },
+                            span
                         )
                     )
                 }
@@ -114,8 +114,8 @@ impl<'backend> Inkwell<'backend> {
             _ => {
                 return Err(
                     GenerateError::new(
-                        ErrorKind::InvalidType,
-                        ty.span
+                        ErrorKind::InvalidType { ty: ty.clone() },
+                        span
                     )
                 );
             },

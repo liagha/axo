@@ -10,4 +10,4 @@ use {
 };
 
 
-pub type GenerateError<'error> = Error<'error, ErrorKind>;
+pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;

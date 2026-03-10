@@ -11,6 +11,7 @@ use {
 };
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::checker::{Type, TypeKind};
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -25,6 +26,7 @@ pub struct Symbol<'symbol> {
     pub span: Span<'symbol>,
     pub scope: Scope<'symbol>,
     pub visibility: Visibility,
+    pub ty: Type<'symbol>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -42,6 +44,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(),
             visibility,
+            ty: Type::new(TypeKind::Unknown, Span::void())
         }
     }
 

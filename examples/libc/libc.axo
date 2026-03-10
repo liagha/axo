@@ -83,3 +83,7 @@ const MAP_HUGETLB   = 262144  // Use huge pages
 // ─── Sentinel Values ─────────────────────────────────────────────────
 const MAP_FAILED = -1  // Returned by mmap on failure
 const INVALID_FD = -1  // Returned by open on failure
+
+func main(): Integer {
+    write(STDOUT, "test", 4)
+}

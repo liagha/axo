@@ -1,11 +1,12 @@
+use crate::checker::Type;
 use crate::data::Scale;
-use crate::format::{Display, Formatter, Result};
+use crate::format::{Display, Formatter, Result, Show};
 
 #[derive(Clone, Debug)]
-pub enum ErrorKind {
+pub enum ErrorKind<'error> {
     InvalidModule { reason: String },
     BuilderError { reason: String },
-    InvalidType,
+    InvalidType { ty: Type<'error> },
     UnsupportedFloatWidth { width: Scale },
     SemanticError { message: String },
     Arithmetic(ArithmeticError),
@@ -74,7 +75,7 @@ pub enum DataStructureError {
     NotIndexable,
 }
 
-impl Display for ErrorKind {
+impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             ErrorKind::InvalidModule { reason } => {
@@ -83,8 +84,8 @@ impl Display for ErrorKind {
             ErrorKind::BuilderError { reason } => {
                 write!(f, "builder error: {}", reason)
             }
-            ErrorKind::InvalidType => {
-                write!(f, "invalid LLVM type")
+            ErrorKind::InvalidType { ty } => {
+                write!(f, "invalid LLVM type {}", ty.format(2))
             }
             ErrorKind::UnsupportedFloatWidth { width } => {
                 write!(f, "invalid LLVM float width: {}", width)

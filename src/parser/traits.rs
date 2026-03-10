@@ -285,6 +285,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
             span: self.span.clone(),
             scope: self.scope.clone(),
             visibility: self.visibility.clone(),
+            ty: self.ty.clone(),
         }
     }
 }

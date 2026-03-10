@@ -207,7 +207,7 @@ impl<'backend> super::Inkwell<'backend> {
         let value = self.analysis(*value)?;
 
         let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
-            self.llvm_type(annotation)?
+            self.llvm_type(annotation, span)?
         } else {
             value.get_type()
         };

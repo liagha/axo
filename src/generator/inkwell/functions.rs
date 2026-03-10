@@ -1,3 +1,4 @@
+use inkwell::types::BasicMetadataTypeEnum;
 use {
     super::{Backend, Entity},
     crate::{
@@ -257,11 +258,11 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut parameters = vec![];
+        
         for member in &method.members {
             if let AnalysisKind::Binding(bind) = &member.kind {
-
                 let kind = if let Some(annotation) = bind.annotation.as_ref() {
-                    let llvm_kind = self.llvm_type(annotation)?;
+                    let llvm_kind = self.llvm_type(annotation, member.span)?;
 
                     if matches!(method.interface, Interface::C) {
                         if let TypeKind::String = annotation.kind {
@@ -278,22 +279,19 @@ impl<'backend> super::Inkwell<'backend> {
                     self.context.i64_type().into()
                 };
 
-                parameters.push(kind);
+                parameters.push(kind.into());
             }
         }
 
-        let parameter_types: Vec<inkwell::types::BasicMetadataTypeEnum<'backend>> =
-            parameters.iter().map(|kind| (*kind).into()).collect();
-
         let return_type = if let Some(return_type) = method.output {
-            Some(self.llvm_type(&return_type)?)
+            Some(self.llvm_type(&return_type, span)?)
         } else {
             None
         };
 
         let function_type = match return_type {
-            Some(kind) => kind.fn_type(&parameter_types, false),
-            None => self.context.void_type().fn_type(&parameter_types, false),
+            Some(kind) => kind.fn_type(&parameters, false),
+            None => self.context.void_type().fn_type(&parameters, false),
         };
 
         let name = method.target.as_str().unwrap_or("anonymous_function");
