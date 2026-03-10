@@ -25,7 +25,7 @@ pub trait Order<
 pub struct Align;
 
 impl<'align, Input: Formable<'align>, Output: Formable<'align>, Failure: Formable<'align>>
-    Order<'align, Input, Output, Failure> for Align
+Order<'align, Input, Output, Failure> for Align
 {
     #[inline]
     fn order(
@@ -48,7 +48,7 @@ pub struct Branch<
 }
 
 impl<'branch, Input: Formable<'branch>, Output: Formable<'branch>, Failure: Formable<'branch>>
-    Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failure>
+Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -71,7 +71,7 @@ pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure:
 }
 
 impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>>
-    Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
+Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -79,7 +79,7 @@ impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'
         _composer: &mut Former<'_, 'fail, Input, Output, Failure>,
         classifier: &mut Classifier<'fail, Input, Output, Failure>,
     ) {
-        let failure = (self.emitter)(classifier.form.clone());
+        let failure = (self.emitter)(classifier.clone());
 
         classifier.set_fail();
         classifier.form = Form::Failure(failure);
@@ -89,7 +89,7 @@ impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'
 pub struct Ignore;
 
 impl<'ignore, Input: Formable<'ignore>, Output: Formable<'ignore>, Failure: Formable<'ignore>>
-    Order<'ignore, Input, Output, Failure> for Ignore
+Order<'ignore, Input, Output, Failure> for Ignore
 {
     #[inline]
     fn order(
@@ -114,11 +114,11 @@ pub struct Inspect<
 }
 
 impl<
-        'inspector,
-        Input: Formable<'inspector>,
-        Output: Formable<'inspector>,
-        Failure: Formable<'inspector>,
-    > Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure>
+    'inspector,
+    Input: Formable<'inspector>,
+    Output: Formable<'inspector>,
+    Failure: Formable<'inspector>,
+> Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -141,11 +141,11 @@ pub struct Multiple<
 }
 
 impl<
-        'multiple,
-        Input: Formable<'multiple>,
-        Output: Formable<'multiple>,
-        Failure: Formable<'multiple>,
-    > Order<'multiple, Input, Output, Failure> for Multiple<'multiple, Input, Output, Failure>
+    'multiple,
+    Input: Formable<'multiple>,
+    Output: Formable<'multiple>,
+    Failure: Formable<'multiple>,
+> Order<'multiple, Input, Output, Failure> for Multiple<'multiple, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -169,7 +169,7 @@ pub struct Panic<
 }
 
 impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>>
-    Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
+Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -177,7 +177,7 @@ impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formabl
         _composer: &mut Former<'_, 'panic, Input, Output, Failure>,
         classifier: &mut Classifier<'panic, Input, Output, Failure>,
     ) {
-        let failure = (self.emitter)(classifier.form.clone());
+        let failure = (self.emitter)(classifier.clone());
 
         let form = Form::Failure(failure);
         classifier.set_panic();
@@ -188,7 +188,7 @@ impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formabl
 pub struct Pardon;
 
 impl<'pardon, Input: Formable<'pardon>, Output: Formable<'pardon>, Failure: Formable<'pardon>>
-    Order<'pardon, Input, Output, Failure> for Pardon
+Order<'pardon, Input, Output, Failure> for Pardon
 {
     #[inline]
     fn order(
@@ -205,11 +205,11 @@ pub struct Perform<'perform> {
 }
 
 impl<
-        'perform,
-        Input: Formable<'perform>,
-        Output: Formable<'perform>,
-        Failure: Formable<'perform>,
-    > Order<'perform, Input, Output, Failure> for Perform<'perform>
+    'perform,
+    Input: Formable<'perform>,
+    Output: Formable<'perform>,
+    Failure: Formable<'perform>,
+> Order<'perform, Input, Output, Failure> for Perform<'perform>
 {
     #[inline]
     fn order(
@@ -229,7 +229,7 @@ impl<
 pub struct Skip;
 
 impl<'skip, Input: Formable<'skip>, Output: Formable<'skip>, Failure: Formable<'skip>>
-    Order<'skip, Input, Output, Failure> for Skip
+Order<'skip, Input, Output, Failure> for Skip
 {
     #[inline]
     fn order(
@@ -254,11 +254,11 @@ pub struct Transform<
 }
 
 impl<
-        'transform,
-        Input: Formable<'transform>,
-        Output: Formable<'transform>,
-        Failure: Formable<'transform>,
-    > Order<'transform, Input, Output, Failure> for Transform<'transform, Input, Output, Failure>
+    'transform,
+    Input: Formable<'transform>,
+    Output: Formable<'transform>,
+    Failure: Formable<'transform>,
+> Order<'transform, Input, Output, Failure> for Transform<'transform, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -268,7 +268,7 @@ impl<
     ) {
         if classifier.is_aligned() {
             let result = if let Ok(mut guard) = self.transformer.lock() {
-                let result = guard(classifier.form.clone());
+                let result = guard(classifier);
                 drop(guard);
                 result
             } else {
@@ -276,8 +276,7 @@ impl<
             };
 
             match result {
-                Ok(mapped) => {
-                    classifier.form = mapped;
+                Ok(_) => {
                 }
                 Err(error) => {
                     classifier.set_fail();

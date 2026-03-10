@@ -88,30 +88,32 @@ impl<'initializer> Initializer<'initializer> {
                     }
                 })
                 .with_transform(
-                    move |form: Form<
+                    move |classifier: &mut Classifier<
                         'initializer,
                         Token<'initializer>,
                         Symbol,
                         InitializeError<'initializer>,
                     >| {
-                        let identifier = form.collect_inputs()[0].clone();
+                        let identifier = classifier.form.collect_inputs()[0].clone();
                         let span = identifier.span();
 
-                        Ok(Form::Input(Token::new(
+                        classifier.form = Form::Input(Token::new(
                             TokenKind::Identifier(name.clone()),
                             span,
-                        )))
+                        ));
+
+                        Ok(())
                     },
                 ),
                 Self::path_value(),
             ]),
-            move |form: Form<
+            move |classifier: &mut Classifier<
                 'initializer,
                 Token<'initializer>,
                 Symbol,
                 InitializeError<'initializer>,
             >| {
-                let forms = form.as_forms();
+                let forms = classifier.form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
                 let path = Self::path_string(forms[1].collect_inputs());
                 let span = identifier.clone().span();
@@ -151,7 +153,9 @@ impl<'initializer> Initializer<'initializer> {
                     Visibility::Public,
                 );
 
-                Ok(Form::output(symbol))
+                classifier.form = Form::output(symbol);
+
+                Ok(())
             },
         )
     }
@@ -175,32 +179,34 @@ impl<'initializer> Initializer<'initializer> {
                 }
             })
             .with_transform(
-                move |form: Form<
+                move |classifier: &mut Classifier<
                     'initializer,
                     Token<'initializer>,
                     Symbol,
                     InitializeError<'initializer>,
                 >| {
-                    let identifier = form.collect_inputs()[0].clone();
+                    let identifier = classifier.form.collect_inputs()[0].clone();
                     let span = identifier.span();
 
-                    Ok(Form::Input(Token::new(
+                    classifier.form = Form::Input(Token::new(
                         TokenKind::Identifier(Str::from("Verbosity")),
                         span,
-                    )))
+                    ));
+
+                    Ok(())
                 },
             ),
             Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
         ])
         .with_transform(
-            move |form: Form<
+            move |classifier: &mut Classifier<
                 'initializer,
                 Token<'initializer>,
                 Symbol,
                 InitializeError<'initializer>,
             >| {
-                let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
-                let value: Token<'initializer> = form.collect_inputs()[1].clone();
+                let identifier: Token<'initializer> = classifier.form.collect_inputs()[0].clone();
+                let value: Token<'initializer> = classifier.form.collect_inputs()[1].clone();
                 let span = identifier.span.merge(&value.span.clone());
 
                 let target = Element::new(
@@ -230,11 +236,9 @@ impl<'initializer> Initializer<'initializer> {
                     Visibility::Public,
                 );
 
-                Ok(
-                    Form::output(
-                        symbol,
-                    )
-                )
+                classifier.form = Form::output(symbol);
+
+                Ok(())
             },
         )
     }
@@ -258,15 +262,15 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::with_transform(
             Self::path_value(),
-            |form: Form<
+            |classifier: &mut Classifier<
                 'initializer,
                 Token<'initializer>,
                 Symbol,
                 InitializeError<'initializer>,
             >| {
-                let inputs = form.collect_inputs();
+                let inputs = classifier.form.collect_inputs();
                 if inputs.is_empty() {
-                    return Ok(Form::blank());
+                    classifier.form = Form::blank();
                 }
 
                 let span = inputs[0].clone().span();
@@ -302,11 +306,9 @@ impl<'initializer> Initializer<'initializer> {
                     Visibility::Public,
                 );
 
-                Ok(
-                    Form::output(
-                        symbol,
-                    )
-                )
+                classifier.form = Form::output(symbol);
+
+                Ok(())
             },
         )
     }

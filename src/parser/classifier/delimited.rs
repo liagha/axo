@@ -34,7 +34,7 @@ impl<'parser> Parser<'parser> {
                 ),
                 Classifier::with_fallback(
                     Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)),
-                    Classifier::fail(move |_form: Form<Token, Element, ParseError>| {
+                    Classifier::fail(move |_classifier| {
                         ParseError::new(
                             ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)),
                             Span::void(),
@@ -42,9 +42,9 @@ impl<'parser> Parser<'parser> {
                     }),
                 ),
             ]),
-            move |form| {
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
+            move |classifier| {
+                let delimiters = classifier.form.collect_inputs();
+                let elements = classifier.form.collect_outputs();
 
                 let Some(start) = delimiters.first() else {
                     return Err(ParseError::new(
@@ -106,7 +106,9 @@ impl<'parser> Parser<'parser> {
                     _ => unreachable!("unexpected bracket/separator combination"),
                 };
 
-                Ok(Form::output(Element::new(kind, span)))
+                classifier.form = Form::output(Element::new(kind, span));
+
+                Ok(())
             },
         )
     }

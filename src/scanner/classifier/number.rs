@@ -34,16 +34,23 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            move |form| {
-                let inputs = form.collect_inputs();
+            move |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
-                parser
-                    .parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
-                    .map_err(move |err| ScanError::new(ErrorKind::NumberParse(err), span))
+                match parser.parse(&number) { 
+                    Ok(number) => {
+                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        
+                        Ok(())
+                    }
+                    
+                    Err(error) => {
+                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
+                    }
+                }
             },
         )
     }
@@ -62,16 +69,23 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |form| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
-                parser
-                    .parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
-                    .map_err(|err| ScanError::new(ErrorKind::NumberParse(err), span))
+                match parser.parse(&number) {
+                    Ok(number) => {
+                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+
+                        Ok(())
+                    }
+
+                    Err(error) => {
+                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
+                    }
+                }
             },
         )
     }
@@ -90,16 +104,23 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |form| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
 
-                parser
-                    .parse(&number)
-                    .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
-                    .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
+                match parser.parse(&number) {
+                    Ok(number) => {
+                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+
+                        Ok(())
+                    }
+
+                    Err(error) => {
+                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
+                    }
+                }
             },
         )
     }
@@ -134,25 +155,39 @@ impl<'scanner> Scanner<'scanner> {
                     ])
                 ),
             ]),
-            |form| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let number: Str = inputs.clone().into_iter().collect();
                 let span = inputs.borrow_span().clone();
 
                 if number.contains(".") || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
-                    parser
-                        .parse(&number)
-                        .map(|num| {
-                            Form::output(Token::new(TokenKind::Float(Float::from(num)), span))
-                        })
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
+                    
+                    match parser.parse(&number) {
+                        Ok(number) => {
+                            classifier.form = Form::output(Token::new(TokenKind::Float(Float::from(number)), span));
+
+                            Ok(())
+                        }
+
+                        Err(error) => {
+                            Err(ScanError::new(ErrorKind::NumberParse(error), span))
+                        }
+                    }
                 } else {
                     let parser = parser::<i128>();
-                    parser
-                        .parse(&number)
-                        .map(|num| Form::output(Token::new(TokenKind::Integer(num), span)))
-                        .map_err(|e| ScanError::new(ErrorKind::NumberParse(e), span))
+                    
+                    match parser.parse(&number) {
+                        Ok(number) => {
+                            classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+
+                            Ok(())
+                        }
+
+                        Err(error) => {
+                            Err(ScanError::new(ErrorKind::NumberParse(error), span))
+                        }
+                    }
                 }
             },
         )

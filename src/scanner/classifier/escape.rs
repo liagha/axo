@@ -22,8 +22,8 @@ impl<'scanner> Scanner<'scanner> {
             }),
         ])
         .with_transform(
-            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let escape = inputs[1];
 
@@ -48,7 +48,9 @@ impl<'scanner> Scanner<'scanner> {
                     }
                 };
 
-                Ok(Form::Input(Character::new(escaped, span)))
+                classifier.form = Form::Input(Character::new(escaped, span));
+
+                Ok(())
             },
         )
     }
@@ -64,8 +66,8 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
                 let span = inputs.borrow_span().clone();
 
@@ -79,7 +81,11 @@ impl<'scanner> Scanner<'scanner> {
                         }
 
                         match from_u32(code_point) {
-                            Some(ch) => Ok(Form::Input(Character::new(ch, span))),
+                            Some(ch) => {
+                                classifier.form = Form::Input(Character::new(ch, span));
+
+                                Ok(())
+                            },
                             None => Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
                                 span,
@@ -107,8 +113,8 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
                 let span = inputs.borrow_span().clone();
 
@@ -122,7 +128,11 @@ impl<'scanner> Scanner<'scanner> {
                         }
 
                         match from_u32(code_point) {
-                            Some(ch) => Ok(Form::Input(Character::new(ch, span))),
+                            Some(ch) => {
+                                classifier.form = Form::Input(Character::new(ch, span));
+
+                                Ok(())
+                            },
                             None => Err(ScanError::new(
                                 ErrorKind::InvalidEscape(EscapeError::Invalid),
                                 span,
@@ -152,8 +162,8 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::literal('}'),
         ])
         .with_transform(
-            |form: Form<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>| {
-                let inputs = form.collect_inputs();
+            |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let digits: Str = inputs
                     .iter()
                     .skip(3)
@@ -171,7 +181,11 @@ impl<'scanner> Scanner<'scanner> {
 
                 match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                     Some(code_point) => match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
+                        Some(ch) => {
+                            classifier.form = Form::Input(Character::new(ch, span));
+
+                            Ok(())
+                        },
                         None => {
                             let err = if code_point > 0x10FFFF {
                                 ErrorKind::InvalidCharacter(CharacterError::OutOfRange)
@@ -204,19 +218,18 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            move |form: Form<
-                'scanner,
-                Character<'scanner>,
-                Token<'scanner>,
-                ScanError<'scanner>,
-            >| {
-                let inputs = form.collect_inputs();
+            move |classifier| {
+                let inputs = classifier.form.collect_inputs();
                 let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
                 let span = inputs.span().clone();
 
                 match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                     Some(code_point) => match from_u32(code_point) {
-                        Some(ch) => Ok(Form::Input(Character::new(ch, span))),
+                        Some(ch) => {
+                            classifier.form = Form::Input(Character::new(ch, span));
+
+                            Ok(())
+                        },
                         None => {
                             let err = if (0xD800..=0xDFFF).contains(&code_point) {
                                 ErrorKind::InvalidCharacter(CharacterError::Surrogate)

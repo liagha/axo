@@ -28,8 +28,8 @@ impl<'parser> Parser<'parser> {
                 }),
                 Classifier::deferred(Self::element),
             ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let sequence = form.as_forms();
+            |classifier| {
+                let sequence = classifier.form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
                 let kind = if let TokenKind::Identifier(identifier) = keyword.kind {
@@ -142,7 +142,7 @@ impl<'parser> Parser<'parser> {
                     }
                 }
 
-                Ok(Form::output(Element::new(
+                classifier.form = Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
                             SymbolKind::Binding(
@@ -158,7 +158,9 @@ impl<'parser> Parser<'parser> {
                         )
                     ),
                     span,
-                )))
+                ));
+
+                Ok(())
             },
         )
     }
@@ -175,8 +177,8 @@ impl<'parser> Parser<'parser> {
                 ]),
                 Classifier::deferred(Self::element),
             ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let sequence = form.as_forms();
+            |classifier| {
+                let sequence = classifier.form.as_forms();
                 let head = sequence[0].as_forms();
 
                 let keyword = head[0].unwrap_input();
@@ -218,7 +220,7 @@ impl<'parser> Parser<'parser> {
 
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                Ok(Form::output(Element::new(
+                classifier.form = Form::output(Element::new(
                     ElementKind::Symbolize(
                         Symbol::new(
                             SymbolKind::Structure(Structure::new(Box::new(name), members)),
@@ -227,7 +229,9 @@ impl<'parser> Parser<'parser> {
                         ),
                     ),
                     span,
-                )))
+                ));
+
+                Ok(())
             },
         )
     }
@@ -250,18 +254,15 @@ impl<'parser> Parser<'parser> {
                                     false
                                 }
                             }).with_transform(
-                                |form: Form<
-                                    'parser,
-                                    Token<'parser>,
-                                    Element<'parser>,
-                                    ParseError<'parser>,
-                                >| {
-                                    let input = form.unwrap_input();
+                                |classifier| {
+                                    let input = classifier.form.unwrap_input();
 
-                                    Ok(Form::output(Element::new(
+                                    classifier.form = Form::output(Element::new(
                                         ElementKind::literal(input.clone()),
                                         input.span,
-                                    )))
+                                    ));
+                                    
+                                    Ok(())
                                 },
                             ),
                         ]
@@ -282,15 +283,17 @@ impl<'parser> Parser<'parser> {
                             Self::literal(),
                         ]),
                     ]
-                ).with_transform(|form| {
-                    let output = form.as_forms();
+                ).with_transform(|classifier| {
+                    let output = classifier.form.as_forms();
 
-                    Ok(output[0].clone())
+                    classifier.form = output[0].clone();
+                    
+                    Ok(())
                 }).as_optional(),
                 Classifier::deferred(Self::element),
             ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let sequence = form.as_forms();
+            |classifier| {
+                let sequence = classifier.form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
@@ -351,7 +354,7 @@ impl<'parser> Parser<'parser> {
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(Element::new(
+                    classifier.form = Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
                                 SymbolKind::Function(Function::new(
@@ -367,7 +370,9 @@ impl<'parser> Parser<'parser> {
                             ),
                         ),
                         span,
-                    )))
+                    ));
+                    
+                    Ok(())
                 } else {
                     let output = sequence[3].unwrap_output().clone();
 
@@ -375,7 +380,7 @@ impl<'parser> Parser<'parser> {
 
                     let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                    Ok(Form::output(Element::new(
+                    classifier.form = Form::output(Element::new(
                         ElementKind::Symbolize(
                             Symbol::new(
                                 SymbolKind::Function(Function::new(
@@ -391,7 +396,9 @@ impl<'parser> Parser<'parser> {
                             ),
                         ),
                         span,
-                    )))
+                    ));
+                    
+                    Ok(())
                 }
             },
         )
@@ -406,8 +413,8 @@ impl<'parser> Parser<'parser> {
                 Self::literal(),
                 Classifier::deferred(Self::element),
             ]),
-            |form: Form<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>| {
-                let sequence = form.as_forms();
+            |classifier| {
+                let sequence = classifier.form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
@@ -422,10 +429,12 @@ impl<'parser> Parser<'parser> {
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
                 symbol.scope.extend(fields);
 
-                Ok(Form::output(Element::new(
+                classifier.form = Form::output(Element::new(
                     ElementKind::Symbolize(symbol),
                     span,
-                )))
+                ));
+                
+                Ok(())
             },
         )
     }

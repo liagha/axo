@@ -27,15 +27,16 @@ pub struct Classifier<
     pub consumed: Vec<Input>,
     pub record: Record,
     pub form: Form<'classifier, Input, Output, Failure>,
+    pub stack: Vec<Form<'classifier, Input, Output, Failure>>,
     pub depth: Scale,
 }
 
 impl<
-        'classifier,
-        Input: Formable<'classifier>,
-        Output: Formable<'classifier>,
-        Failure: Formable<'classifier>,
-    > Classifier<'classifier, Input, Output, Failure>
+    'classifier,
+    Input: Formable<'classifier>,
+    Output: Formable<'classifier>,
+    Failure: Formable<'classifier>,
+> Classifier<'classifier, Input, Output, Failure>
 {
     #[inline]
     pub fn new(
@@ -50,6 +51,7 @@ impl<
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
+            stack: Vec::new(),
             depth: 0,
         }
     }
@@ -68,6 +70,7 @@ impl<
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
+            stack: Vec::new(),
             depth,
         }
     }
@@ -139,6 +142,7 @@ impl<
             consumed: Vec::new(),
             record: Record::Blank,
             form: Form::Blank,
+            stack: Vec::new(),
             depth: self.depth + 1,
         }
     }
@@ -320,7 +324,7 @@ impl<
     #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Arc::new(Fail {
             emitter: Arc::new(emitter),
@@ -336,9 +340,9 @@ impl<
     pub fn with_inspect<I>(self, inspector: I) -> Self
     where
         I: Fn(
-                Classifier<'classifier, Input, Output, Failure>,
-            ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
-            + 'classifier,
+            Classifier<'classifier, Input, Output, Failure>,
+        ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+        + 'classifier,
     {
         self.with_order(Arc::new(Inspect {
             inspector: Arc::new(inspector),
@@ -359,7 +363,7 @@ impl<
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(Form<Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(Classifier<Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Self::panic(emitter))
     }
@@ -386,12 +390,13 @@ impl<
     pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: FnMut(
-                Form<'classifier, Input, Output, Failure>,
-            ) -> Result<Form<'classifier, Input, Output, Failure>, Failure>
-            + 'classifier,
+            &mut Classifier<'classifier, Input, Output, Failure>,
+        ) -> Result<(), Failure>
+        + 'classifier,
     {
         self.with_order(Self::transform(transform))
     }
+
 
     #[inline]
     pub fn with_fallback(
@@ -417,9 +422,9 @@ impl<
     ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: FnMut(
-                Form<'classifier, Input, Output, Failure>,
-            ) -> Result<Form<'classifier, Input, Output, Failure>, Failure>
-            + 'classifier,
+            &mut Classifier<'classifier, Input, Output, Failure>,
+        ) -> Result<(), Failure>
+        + 'classifier,
     {
         Arc::new(Transform {
             transformer: Arc::new(Mutex::new(transformer)),
@@ -429,7 +434,7 @@ impl<
     #[inline]
     pub fn fail<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Fail {
             emitter: Arc::new(emitter),
@@ -439,7 +444,7 @@ impl<
     #[inline]
     pub fn panic<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Form<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Arc::new(Panic {
             emitter: Arc::new(emitter),
@@ -457,9 +462,9 @@ impl<
     ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: Fn(
-                Classifier<'classifier, Input, Output, Failure>,
-            ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
-            + 'classifier,
+            Classifier<'classifier, Input, Output, Failure>,
+        ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+        + 'classifier,
     {
         Arc::new(Inspect {
             inspector: Arc::new(inspector),
@@ -510,11 +515,11 @@ pub struct Literal<'literal, Input> {
 }
 
 impl<
-        'literal,
-        Input: Formable<'literal>,
-        Output: Formable<'literal>,
-        Failure: Formable<'literal>,
-    > Order<'literal, Input, Output, Failure> for Literal<'literal, Input>
+    'literal,
+    Input: Formable<'literal>,
+    Output: Formable<'literal>,
+    Failure: Formable<'literal>,
+> Order<'literal, Input, Output, Failure> for Literal<'literal, Input>
 {
     #[inline]
     fn order(
@@ -550,7 +555,7 @@ pub struct Negate<
 }
 
 impl<'negate, Input: Formable<'negate>, Output: Formable<'negate>, Failure: Formable<'negate>>
-    Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failure>
+Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -578,11 +583,11 @@ pub struct Predicate<'predicate, Input: Formable<'predicate>> {
 }
 
 impl<
-        'predicate,
-        Input: Formable<'predicate>,
-        Output: Formable<'predicate>,
-        Failure: Formable<'predicate>,
-    > Order<'predicate, Input, Output, Failure> for Predicate<'predicate, Input>
+    'predicate,
+    Input: Formable<'predicate>,
+    Output: Formable<'predicate>,
+    Failure: Formable<'predicate>,
+> Order<'predicate, Input, Output, Failure> for Predicate<'predicate, Input>
 {
     #[inline]
     fn order(
@@ -622,13 +627,13 @@ pub struct Alternative<
 }
 
 impl<
-        'alternative,
-        Input: Formable<'alternative>,
-        Output: Formable<'alternative>,
-        Failure: Formable<'alternative>,
-        const SIZE: Scale,
-    > Order<'alternative, Input, Output, Failure>
-    for Alternative<'alternative, Input, Output, Failure, SIZE>
+    'alternative,
+    Input: Formable<'alternative>,
+    Output: Formable<'alternative>,
+    Failure: Formable<'alternative>,
+    const SIZE: Scale,
+> Order<'alternative, Input, Output, Failure>
+for Alternative<'alternative, Input, Output, Failure, SIZE>
 {
     #[inline]
     fn order(
@@ -668,6 +673,7 @@ impl<
                 classifier.position = champion.position;
                 classifier.consumed = champion.consumed;
                 classifier.form = champion.form;
+                classifier.stack = champion.stack;
             }
             None => classifier.set_empty(),
         }
@@ -685,11 +691,11 @@ pub struct Deferred<
 }
 
 impl<
-        'deferred,
-        Input: Formable<'deferred>,
-        Output: Formable<'deferred>,
-        Failure: Formable<'deferred>,
-    > Order<'deferred, Input, Output, Failure> for Deferred<'deferred, Input, Output, Failure>
+    'deferred,
+    Input: Formable<'deferred>,
+    Output: Formable<'deferred>,
+    Failure: Formable<'deferred>,
+> Order<'deferred, Input, Output, Failure> for Deferred<'deferred, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -708,6 +714,7 @@ impl<
         classifier.consumed = resolved.consumed;
         classifier.record = resolved.record;
         classifier.form = resolved.form;
+        classifier.stack = resolved.stack;
     }
 }
 
@@ -722,11 +729,11 @@ pub struct Optional<
 }
 
 impl<
-        'optional,
-        Input: Formable<'optional>,
-        Output: Formable<'optional>,
-        Failure: Formable<'optional>,
-    > Order<'optional, Input, Output, Failure> for Optional<'optional, Input, Output, Failure>
+    'optional,
+    Input: Formable<'optional>,
+    Output: Formable<'optional>,
+    Failure: Formable<'optional>,
+> Order<'optional, Input, Output, Failure> for Optional<'optional, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -742,6 +749,7 @@ impl<
             classifier.position = child.position;
             classifier.consumed = child.consumed;
             classifier.form = child.form;
+            classifier.stack = child.stack;
             classifier.set_align();
         } else {
             classifier.set_ignore();
@@ -760,11 +768,11 @@ pub struct Wrapper<
 }
 
 impl<
-        'wrapper,
-        Input: Formable<'wrapper>,
-        Output: Formable<'wrapper>,
-        Failure: Formable<'wrapper>,
-    > Order<'wrapper, Input, Output, Failure> for Wrapper<'wrapper, Input, Output, Failure>
+    'wrapper,
+    Input: Formable<'wrapper>,
+    Output: Formable<'wrapper>,
+    Failure: Formable<'wrapper>,
+> Order<'wrapper, Input, Output, Failure> for Wrapper<'wrapper, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -780,6 +788,7 @@ impl<
         classifier.consumed = child.consumed;
         classifier.record = child.record;
         classifier.form = child.form;
+        classifier.stack = child.stack;
     }
 }
 
@@ -795,7 +804,7 @@ pub struct Ranked<
 }
 
 impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Formable<'ranked>>
-    Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure>
+Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -810,6 +819,7 @@ impl<'ranked, Input: Formable<'ranked>, Output: Formable<'ranked>, Failure: Form
         classifier.position = child.position;
         classifier.consumed = child.consumed.clone();
         classifier.form = child.form.clone();
+        classifier.stack = child.stack.clone();
 
         if child.is_aligned() {
             classifier.record = self.precedence.max(Record::Aligned.into()).into();
@@ -833,13 +843,13 @@ pub struct Sequence<
 }
 
 impl<
-        'sequence,
-        Input: Formable<'sequence>,
-        Output: Formable<'sequence>,
-        Failure: Formable<'sequence>,
-        const SIZE: Scale,
-    > Order<'sequence, Input, Output, Failure>
-    for Sequence<'sequence, Input, Output, Failure, SIZE>
+    'sequence,
+    Input: Formable<'sequence>,
+    Output: Formable<'sequence>,
+    Failure: Formable<'sequence>,
+    const SIZE: Scale,
+> Order<'sequence, Input, Output, Failure>
+for Sequence<'sequence, Input, Output, Failure, SIZE>
 {
     #[inline]
     fn order(
@@ -851,6 +861,7 @@ impl<
         let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::with_capacity(SIZE);
+        let mut stack = Vec::new();
 
         for pattern in &self.patterns {
             let mut child = Classifier {
@@ -860,6 +871,7 @@ impl<
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
+                stack: Vec::new(),
                 depth: classifier.depth + 1,
             };
             composer.build(&mut child);
@@ -871,6 +883,7 @@ impl<
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
+                    stack.extend(child.stack);
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
@@ -878,6 +891,7 @@ impl<
                     position = child.position;
                     consumed.extend(child.consumed);
                     forms.push(child.form);
+                    stack.extend(child.stack);
                     break;
                 }
                 Record::Ignored => {
@@ -895,6 +909,7 @@ impl<
         classifier.position = position;
         classifier.consumed = consumed;
         classifier.form = Form::multiple(forms);
+        classifier.stack = stack;
     }
 }
 
@@ -912,12 +927,12 @@ pub struct Repetition<
 }
 
 impl<
-        'repetition,
-        Input: Formable<'repetition>,
-        Output: Formable<'repetition>,
-        Failure: Formable<'repetition>,
-    > Order<'repetition, Input, Output, Failure>
-    for Repetition<'repetition, Input, Output, Failure>
+    'repetition,
+    Input: Formable<'repetition>,
+    Output: Formable<'repetition>,
+    Failure: Formable<'repetition>,
+> Order<'repetition, Input, Output, Failure>
+for Repetition<'repetition, Input, Output, Failure>
 {
     #[inline]
     fn order(
@@ -929,6 +944,7 @@ impl<
         let mut position = classifier.position;
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
+        let mut stack = Vec::new();
 
         while composer.source.peek_ahead(index).is_some() {
             let mut child = Classifier {
@@ -938,6 +954,7 @@ impl<
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
+                stack: Vec::new(),
                 depth: classifier.depth + 1,
             };
             composer.build(&mut child);
@@ -953,6 +970,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                     }
 
                     Record::Aligned => {
@@ -960,6 +978,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                     }
 
                     Record::Failed => {
@@ -967,6 +986,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                     }
 
                     Record::Ignored => {
@@ -984,6 +1004,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                         break;
                     }
 
@@ -993,6 +1014,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                     }
 
                     Record::Failed => {
@@ -1001,6 +1023,7 @@ impl<
                         position = child.position;
                         consumed.extend(child.consumed);
                         forms.push(child.form);
+                        stack.extend(child.stack);
                         break;
                     }
 
@@ -1028,6 +1051,7 @@ impl<
             classifier.position = position;
             classifier.consumed = consumed;
             classifier.form = Form::multiple(forms);
+            classifier.stack = stack;
         } else {
             if self.persist {
                 classifier.set_empty();

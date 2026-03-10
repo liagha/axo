@@ -36,24 +36,24 @@ pub mod helper {
     }
 
     pub type Emitter<'emitter, Input, Output, Failure> =
-        Arc<dyn Fn(Form<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
+    Arc<dyn Fn(Classifier<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
     pub type Evaluator<'evaluator, Input, Output, Failure> =
-        Arc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
+    Arc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
     pub type Inspector<'inspector, Input, Output, Failure> = Arc<
         dyn Fn(
-                Classifier<'inspector, Input, Output, Failure>,
-            ) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector>
-            + 'inspector,
+            Classifier<'inspector, Input, Output, Failure>,
+        ) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector>
+        + 'inspector,
     >;
     pub type Performer<'performer> = Arc<Mutex<dyn FnMut() -> () + 'performer>>;
     pub type Predicate<'predicate, Input> = Arc<dyn Fn(&Input) -> bool + 'predicate>;
+
     pub type Transformer<'transformer, Input, Output, Failure> = Arc<
         Mutex<
             dyn FnMut(
-                    Form<'transformer, Input, Output, Failure>,
-                )
-                    -> Result<Form<'transformer, Input, Output, Failure>, Failure>
-                + 'transformer,
+                &mut Classifier<'transformer, Input, Output, Failure>,
+            ) -> Result<(), Failure>
+            + 'transformer,
         >,
     >;
 }

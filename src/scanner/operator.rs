@@ -33,8 +33,6 @@ pub enum OperatorKind {
     Tilde,
     Backtick,
 
-    In,
-
     Composite(Vec<OperatorKind>),
 }
 
@@ -64,7 +62,7 @@ impl OperatorKind {
             [LeftAngle] | [RightAngle] => Some(3),
             [LeftAngle, LeftAngle] | [RightAngle, RightAngle] => Some(4),
             [Ampersand] | [Caret] | [Pipe] => Some(1),
-            [In] | [Equal] => Some(0),
+            [Equal] => Some(0),
 
             [Colon, Colon] => Some(10),
             [Star, Star] | [Caret, Caret] => Some(7),
@@ -159,7 +157,6 @@ impl OperatorKind {
 impl Display for OperatorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            In => write!(f, "in"),
             Tilde => write!(f, "~"),
             Equal => write!(f, "="),
             Colon => write!(f, ":"),
@@ -375,8 +372,6 @@ impl Operator for str {
             "*" => Star,
             "~" => Tilde,
             "`" => Backtick,
-
-            "in" => In,
 
             _ => {
                 let mut ops = Vec::new();
