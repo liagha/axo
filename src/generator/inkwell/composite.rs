@@ -1,7 +1,6 @@
 use inkwell::IntPredicate;
-use inkwell::values::PointerValue;
 use {
-    super::{Entity, Backend, GenerateError, super::ErrorKind},
+    super::{Entity, Backend, GenerateError, super::{ErrorKind, DataStructureError}},
     crate::{
         data::{Str, Index, Structure},
         analyzer::{Analysis, AnalysisKind},
@@ -66,11 +65,12 @@ impl<'backend> super::Inkwell<'backend> {
                     self.llvm_type(annotation)?
                 } else {
                     return Err(GenerateError::new(
-                        ErrorKind::SemanticError {
-                            message: format!("Struct field '{}' in '{}' is missing a type annotation.", field_name, name)
-                        },
-                        span
-                    ))
+                        ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
+                            struct_name: name.to_string(),
+                            field_name: field_name.to_string(),
+                        }),
+                        span,
+                    ));
                 };
 
                 field_types.push(field_type);
@@ -87,8 +87,6 @@ impl<'backend> super::Inkwell<'backend> {
             }
         );
 
-        // Note: Defining a struct is a compile-time concept. Returning a dummy i64 zero
-        // to maintain compatibility with your current expression-oriented loop.
         Ok(self.context.i64_type().const_zero().into())
     }
 
@@ -103,10 +101,10 @@ impl<'backend> super::Inkwell<'backend> {
             if let Entity::Struct { struct_type, fields } = entity {
                 (*struct_type, fields.clone())
             } else {
-                return Err(GenerateError::new(ErrorKind::SemanticError { message: format!("'{}' is not a struct type.", name) }, span));
+                return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name.to_string() }), span));
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::SemanticError { message: format!("Unknown struct type '{}'.", name) }, span));
+            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: name.to_string() }), span));
         };
 
         let mut value = struct_type.get_undef();
@@ -120,7 +118,7 @@ impl<'backend> super::Inkwell<'backend> {
                         let field_value = self.analysis(*assigned.clone())?;
 
                         let casted = self.cast_value(field_value, field_type).ok_or_else(|| {
-                            GenerateError::new(ErrorKind::SemanticError { message: format!("Type mismatch for field '{}' in constructor for '{}'.", field, name) }, span)
+                            GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch { struct_name: name.to_string(), field_name: field.to_string() }), span)
                         })?;
 
                         value = self.builder
@@ -128,12 +126,12 @@ impl<'backend> super::Inkwell<'backend> {
                             .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
                             .into_struct_value();
                     } else {
-                        return Err(GenerateError::new(ErrorKind::SemanticError { message: format!("Struct '{}' has no field named '{}'.", name, field) }, span));
+                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownField { struct_name: name.to_string(), field_name: field.to_string() }), span));
                     }
                 }
                 _ => {
                     if positional_index >= fields.len() {
-                        return Err(GenerateError::new(ErrorKind::SemanticError { message: format!("Too many positional initializers for struct '{}'.", name) }, span));
+                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TooManyInitializers { struct_name: name.to_string() }), span));
                     }
 
                     let index = positional_index;
@@ -143,7 +141,7 @@ impl<'backend> super::Inkwell<'backend> {
                     let field_value = self.analysis(member)?;
 
                     let casted = self.cast_value(field_value, field_type).ok_or_else(|| {
-                        GenerateError::new(ErrorKind::SemanticError { message: format!("Type mismatch for positional argument {} in constructor for '{}'.", index, name) }, span)
+                        GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorPositionalArgTypeMismatch { struct_name: name.to_string(), index }), span)
                     })?;
 
                     value = self.builder
@@ -163,13 +161,12 @@ impl<'backend> super::Inkwell<'backend> {
         member: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        // Module access
         if let AnalysisKind::Usage(name) = &target.kind {
             if self.modules.contains_key(name) {
                 match &member.kind {
                     AnalysisKind::Usage(name) => return self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => return self.invoke(invoke.clone(), span),
-                    _ => return Err(GenerateError::new(ErrorKind::SemanticError { message: "Invalid module access.".to_string() }, span)),
+                    _ => return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess), span)),
                 }
             }
         }
@@ -177,16 +174,14 @@ impl<'backend> super::Inkwell<'backend> {
         let field_name = if let AnalysisKind::Usage(name) = &member.kind {
             name.clone()
         } else {
-            return Err(GenerateError::new(ErrorKind::SemanticError { message: "Struct member access must use a simple name.".to_string() }, span));
+            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidMemberAccessExpression), span));
         };
 
-        // Pointer / Variable Field Access
         if let AnalysisKind::Usage(target_name) = &target.kind {
             if let Some(Entity::Variable { pointer, kind, .. }) = self.entities.get(target_name) {
                 if kind.is_struct_type() {
                     let struct_type = kind.into_struct_type();
 
-                    // Optimized Struct Field Lookup
                     let mut found_fields = None;
                     for entity in self.entities.values() {
                         if let Entity::Struct { struct_type: ent_struct, fields } = entity {
@@ -215,7 +210,6 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        // Direct Value Extract Access
         let target_value = self.analysis(*target)?;
         if let BasicValueEnum::StructValue(struct_value) = target_value {
             let mut found_fields = None;
@@ -237,16 +231,16 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        Err(GenerateError::new(ErrorKind::SemanticError { message: format!("Attempted to access field '{}' on a non-struct type or value.", field_name) }, span))
+        Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::AccessOnNonStructType { field_name: field_name.to_string() }), span))
     }
 
     pub fn array(
         &mut self,
         elements: Vec<Analysis<'backend>>,
         span: Span<'backend>,
-    ) -> Result<(PointerValue<'backend>, BasicTypeEnum<'backend>), GenerateError<'backend>> {
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if elements.is_empty() {
-            return Err(GenerateError::new(ErrorKind::SemanticError { message: "Cannot create an empty array without a type annotation.".to_string() }, span));
+            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::EmptyArray), span));
         }
 
         let mut values = Vec::with_capacity(elements.len());
@@ -259,7 +253,7 @@ impl<'backend> super::Inkwell<'backend> {
         let element_type = values[0].get_type();
         let array_type = element_type.array_type(values.len() as u32);
 
-        let ptr = self.builder.build_alloca(array_type, "array")
+        let ptr = self.builder.build_alloca(array_type, "array_literal")
             .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
 
         let zero = self.context.i32_type().const_zero();
@@ -274,14 +268,14 @@ impl<'backend> super::Inkwell<'backend> {
             };
 
             let casted = self.cast_value(value, element_type).ok_or_else(|| {
-                GenerateError::new(ErrorKind::SemanticError { message: format!("Type mismatch in array literal. Element {} has an incompatible type.", index) }, span)
+                GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayLiteralTypeMismatch { index }), span)
             })?;
 
             self.builder.build_store(slot, casted)
                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
         }
 
-        Ok((ptr, element_type))
+        Ok(ptr.into())
     }
 
     pub fn tuple(
@@ -317,7 +311,7 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if index.members.is_empty() {
-            return Err(GenerateError::new(ErrorKind::SemanticError { message: "Index operation requires at least one index argument.".to_string() }, span));
+            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::IndexMissingArgument), span));
         }
 
         let target_instruction = index.target.clone();
@@ -325,7 +319,6 @@ impl<'backend> super::Inkwell<'backend> {
         let idx_value = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(name) = &index.target.kind {
-            // Pointer Indexing (Arrays)
             if let Some(Entity::Array { element_type, element_count, .. }) = self.entities.get(name) {
                 if let BasicValueEnum::PointerValue(pointer) = target {
                     if let BasicValueEnum::IntValue(idx) = idx_value {
@@ -368,9 +361,7 @@ impl<'backend> super::Inkwell<'backend> {
                             .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span));
                     }
                 }
-            }
-            // Pointer Indexing (Struct/Tuples)
-            else if let Some(Entity::Variable { kind, pointer, .. }) = self.entities.get(name) {
+            } else if let Some(Entity::Variable { kind, pointer, .. }) = self.entities.get(name) {
                 if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(idx) = idx_value {
                         if let Some(constant) = idx.get_zero_extended_constant() {
@@ -386,14 +377,13 @@ impl<'backend> super::Inkwell<'backend> {
                             return self.builder.build_load(field_type, slot, "tuple_value")
                                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span));
                         } else {
-                            return Err(GenerateError::new(ErrorKind::SemanticError { message: "Tuple index must be a compile-time constant.".to_string() }, span));
+                            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span));
                         }
                     }
                 }
             }
         }
 
-        // Direct Value Extraction (Structs/Tuples)
         if let BasicValueEnum::StructValue(struct_value) = target {
             if let BasicValueEnum::IntValue(idx) = idx_value {
                 if let Some(constant) = idx.get_zero_extended_constant() {
@@ -404,11 +394,10 @@ impl<'backend> super::Inkwell<'backend> {
                     ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
                         .map(Into::into);
                 } else {
-                    return Err(GenerateError::new(ErrorKind::SemanticError { message: "Tuple index must be a compile-time constant.".to_string() }, span));
+                    return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span));
                 }
             }
         }
-        // Direct Value Extraction (Arrays)
         else if let BasicValueEnum::ArrayValue(array_value) = target {
             if let BasicValueEnum::IntValue(idx) = idx_value {
                 if let Some(constant) = idx.get_zero_extended_constant() {
@@ -419,11 +408,11 @@ impl<'backend> super::Inkwell<'backend> {
                     ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
                         .map(Into::into);
                 } else {
-                    return Err(GenerateError::new(ErrorKind::SemanticError { message: "Array value index must be a compile-time constant.".to_string() }, span));
+                    return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayIndexNotConstant), span));
                 }
             }
         }
 
-        Err(GenerateError::new(ErrorKind::SemanticError { message: "Type cannot be indexed or invalid index provided.".to_string() }, span))
+        Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotIndexable), span))
     }
 }

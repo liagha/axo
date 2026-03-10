@@ -13,6 +13,7 @@ use {
 use crate::analyzer::{Analysis, AnalysisKind};
 use crate::checker::{Type, TypeKind};
 use crate::data::*;
+use crate::generator::error::VariableError;
 
 impl<'backend> super::Inkwell<'backend> {
     fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
@@ -79,7 +80,7 @@ impl<'backend> super::Inkwell<'backend> {
             Ok(pointer.into())
         } else {
             Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Cannot take the address of an rvalue or non-existent entity.".to_string() },
+                ErrorKind::Variable(VariableError::AddressOfRValue),
                 span,
             ))
         }
@@ -100,7 +101,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
             }
             _ => Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Cannot dereference a non-pointer value.".to_string() },
+                ErrorKind::Variable(VariableError::DereferenceNonPointer),
                 span,
             ))
         }
@@ -121,13 +122,17 @@ impl<'backend> super::Inkwell<'backend> {
                     .build_load(*kind, *pointer, &identifier)
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
                 _ => Err(GenerateError::new(
-                    ErrorKind::SemanticError { message: format!("Identifier '{}' is not a usable value.", identifier) },
+                    ErrorKind::Variable(VariableError::NotAValue {
+                        name: identifier.to_string(),
+                    }),
                     span,
                 )),
             }
         } else {
             Err(GenerateError::new(
-                ErrorKind::SemanticError { message: format!("Undefined identifier '{}'.", identifier) },
+                ErrorKind::Variable(VariableError::Undefined {
+                    name: identifier.to_string(),
+                }),
                 span,
             ))
         }
@@ -190,9 +195,9 @@ impl<'backend> super::Inkwell<'backend> {
             Some(v) => v,
             None => {
                 return Err(GenerateError::new(
-                    ErrorKind::InvalidModule {
-                        reason: format!("Binding `{}` has no initializer.", binding.target),
-                    },
+                    ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                        name: binding.target.to_string(),
+                    }),
                     span,
                 ));
             }
@@ -203,7 +208,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
             self.llvm_type(annotation)?
-        } else { 
+        } else {
             value.get_type()
         };
 
@@ -223,7 +228,9 @@ impl<'backend> super::Inkwell<'backend> {
                 .unwrap_or(value)
         } else {
             return Err(GenerateError::new(
-                ErrorKind::SemanticError { message: format!("Type mismatch in binding for `{}`.", binding.target) },
+                ErrorKind::Variable(VariableError::BindingTypeMismatch {
+                    name: binding.target.to_string(),
+                }),
                 span,
             ));
         };
@@ -280,13 +287,13 @@ impl<'backend> super::Inkwell<'backend> {
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
             } else {
                 return Err(GenerateError::new(
-                    ErrorKind::SemanticError { message: "Type mismatch in variable assignment.".to_string() },
+                    ErrorKind::Variable(VariableError::AssignmentTypeMismatch),
                     span,
                 ));
             }
         } else {
             return Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Invalid assignment target.".to_string() },
+                ErrorKind::Variable(VariableError::InvalidAssignmentTarget),
                 span,
             ));
         }

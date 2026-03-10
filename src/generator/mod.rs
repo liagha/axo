@@ -3,7 +3,7 @@ mod error;
 mod generator;
 mod inkwell;
 
-pub use {backend::Backend, error::ErrorKind, generator::Generator, inkwell::Inkwell};
+pub use {backend::Backend, error::*, generator::Generator, inkwell::Inkwell};
 
 use {
     crate::reporter::Error,

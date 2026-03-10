@@ -6,22 +6,31 @@ use {
     },
     crate::{
         analyzer::Analysis,
+        generator::{ErrorKind},
     },
     inkwell::values::{BasicValueEnum},
 };
+use crate::generator::error::BitwiseError;
 use crate::generator::GenerateError;
+use crate::tracker::Span;
 
 impl<'backend> Inkwell<'backend> {
     pub fn bitwise_and(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left = self.analysis(*left)?;
         let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
-            panic!("Bitwise AND requires integer operands.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "AND".to_string(),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
@@ -35,12 +44,18 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left = self.analysis(*left)?;
         let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
-            panic!("Bitwise OR requires integer operands.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "OR".to_string(),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
@@ -53,11 +68,17 @@ impl<'backend> Inkwell<'backend> {
     pub fn bitwise_not(
         &mut self,
         operand: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let operand_value = self.analysis(*operand)?;
 
         if !operand_value.is_int_value() {
-            panic!("Bitwise NOT requires an integer operand.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "NOT".to_string(),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
@@ -71,12 +92,18 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left = self.analysis(*left)?;
         let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
-            panic!("Bitwise XOR requires integer operands.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "XOR".to_string(),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
@@ -90,12 +117,18 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left = self.analysis(*left)?;
         let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
-            panic!("Left shift requires integer operands.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "shift left".to_string(),
+                }),
+                span,
+            ));
         }
 
         let shift_amt = right.into_int_value();
@@ -115,11 +148,14 @@ impl<'backend> Inkwell<'backend> {
         let trap_block = self.context.append_basic_block(function, "trap_shift_invalid");
         let continue_block = self.context.append_basic_block(function, "continue_shift_left");
 
-        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block);
+        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block)
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
 
         self.builder.position_at_end(trap_block);
-        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call");
-        self.builder.build_unreachable();
+        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call")
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        self.builder.build_unreachable()
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
 
         self.builder.position_at_end(continue_block);
 
@@ -134,6 +170,7 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
+        span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let signed = self
             .infer_signedness(&left)
@@ -145,7 +182,12 @@ impl<'backend> Inkwell<'backend> {
         let right = self.analysis(*right)?;
 
         if !left.is_int_value() || !right.is_int_value() {
-            panic!("Right shift requires integer operands.");
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: "shift right".to_string(),
+                }),
+                span,
+            ));
         }
 
         let shift_amt = right.into_int_value();
@@ -165,11 +207,14 @@ impl<'backend> Inkwell<'backend> {
         let trap_block = self.context.append_basic_block(function, "trap_shift_invalid");
         let continue_block = self.context.append_basic_block(function, "continue_shift_right");
 
-        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block);
+        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block)
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
 
         self.builder.position_at_end(trap_block);
-        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call");
-        self.builder.build_unreachable();
+        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call")
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        self.builder.build_unreachable()
+            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
 
         self.builder.position_at_end(continue_block);
 

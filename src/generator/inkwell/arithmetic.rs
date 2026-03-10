@@ -3,7 +3,7 @@ use {
     crate::{
         data::{Str, Boolean},
         analyzer::Analysis,
-        generator::{ErrorKind, GenerateError},
+        generator::{ErrorKind, ArithmeticError, GenerateError},
     },
     inkwell::{
         values::{
@@ -128,7 +128,7 @@ impl<'backend> Inkwell<'backend> {
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::InvalidOperandType { side: "LHS", instruction: name.to_string() }, span));
+            return Err(GenerateError::new(ErrorKind::Arithmetic(ArithmeticError::InvalidOperandType { side: "LHS".to_string(), instruction: name.to_string() }), span));
         };
 
         let right_normalized = if right.is_float_value() {
@@ -148,7 +148,7 @@ impl<'backend> Inkwell<'backend> {
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::InvalidOperandType { side: "RHS", instruction: name.to_string() }, span));
+            return Err(GenerateError::new(ErrorKind::Arithmetic(ArithmeticError::InvalidOperandType { side: "RHS".to_string(), instruction: name.to_string() }), span));
         };
 
         Ok((left_normalized, right_normalized, true))

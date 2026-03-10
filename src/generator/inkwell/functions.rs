@@ -16,6 +16,7 @@ use {
 };
 use crate::analyzer::AnalysisKind;
 use crate::checker::Type;
+use crate::generator::error::{ControlFlowError, FunctionError};
 
 impl<'backend> super::Inkwell<'backend> {
     fn has_terminator(&self) -> bool {
@@ -62,7 +63,7 @@ impl<'backend> super::Inkwell<'backend> {
                 .map(Into::into)
                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
             _ => Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Incompatible return type provided.".to_string() },
+                ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
             )),
         }
@@ -222,7 +223,7 @@ impl<'backend> super::Inkwell<'backend> {
         &mut self,
         name: Str<'backend>,
         analyses: Vec<Analysis<'backend>>,
-        span: Span<'backend>,
+        _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let name_str = name.as_str().unwrap_or("module");
         self.modules.insert(name, self.context.create_module(name_str));
@@ -377,7 +378,7 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn block(
         &mut self,
         analyses: Vec<Analysis<'backend>>,
-        span: Span<'backend>,
+        _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut last = self.context.i64_type().const_zero().into();
         for analysis in analyses {
@@ -532,7 +533,9 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         Err(GenerateError::new(
-            ErrorKind::SemanticError { message: format!("Undefined function or primitive cast '{}'.", invoke.target) },
+            ErrorKind::Function(FunctionError::Undefined {
+                name: invoke.target.to_string(),
+            }),
             span,
         ))
     }
@@ -588,7 +591,7 @@ impl<'backend> super::Inkwell<'backend> {
                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
         } else {
             return Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Break statement outside of a loop.".to_string() },
+                ErrorKind::ControlFlow(ControlFlowError::BreakOutsideLoop),
                 span,
             ));
         }
@@ -614,7 +617,7 @@ impl<'backend> super::Inkwell<'backend> {
                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
         } else {
             return Err(GenerateError::new(
-                ErrorKind::SemanticError { message: "Continue statement outside of a loop.".to_string() },
+                ErrorKind::ControlFlow(ControlFlowError::ContinueOutsideLoop),
                 span,
             ));
         }
@@ -630,7 +633,7 @@ impl<'backend> super::Inkwell<'backend> {
             .get_insert_block()
             .and_then(|block| block.get_parent())
             .ok_or_else(|| GenerateError::new(
-                ErrorKind::SemanticError { message: "Attempted to perform an operation outside of a function context.".to_string() },
+                ErrorKind::Function(FunctionError::NotInFunctionContext),
                 span
             ))
     }
