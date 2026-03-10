@@ -87,7 +87,7 @@ impl<'resolver> Resolver<'resolver> {
             SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),
-                Box::new(body),
+                Some(Box::new(body)),
                 None,
                 Interface::Compiler,
                 false,
@@ -171,7 +171,7 @@ impl<'resolver> Resolver<'resolver> {
             SymbolKind::Function(Function::new(
                 Box::new(target),
                 Vec::new(),
-                Box::new(body),
+                Some(Box::new(body)),
                 Some(Box::new(output_annotation)),
                 Interface::Compiler,
                 false,

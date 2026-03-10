@@ -140,7 +140,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let body = function.body.analyze(resolver)?;
+                let body = if let Some(body) = function.body.as_ref() {
+                    body.analyze(resolver)?
+                } else {
+                    Analysis::unit()
+                };
 
                 let output = function
                     .output

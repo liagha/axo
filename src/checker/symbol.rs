@@ -59,13 +59,6 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     member.check(errors);
                 }
 
-                function.body.check(errors);
-                if function.body.ty.kind == TypeKind::Unknown {
-                    failed = true;
-                }
-
-                if failed { return; }
-
                 let output = function.output.as_ref().and_then(|value| {
                     match Type::annotation(&*value) {
                         Ok(ty) => Some(ty),
@@ -76,12 +69,22 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     }
                 });
 
-                if let Some(expected) = output {
-                    if Type::unify(&expected, &function.body.ty).is_none() {
-                        errors.push(CheckError::new(
-                            ErrorKind::Mismatch(expected, function.body.ty.clone()),
-                            self.span,
-                        ));
+                if let Some(body) = &mut function.body {
+                    body.check(errors);
+                    
+                    if body.ty.kind == TypeKind::Unknown {
+                        failed = true;
+                    }
+
+                    if failed { return; }
+
+                    if let Some(expected) = output {
+                        if Type::unify(&expected, &body.ty).is_none() {
+                            errors.push(CheckError::new(
+                                ErrorKind::Mismatch(expected, body.ty.clone()),
+                                self.span,
+                            ));
+                        }
                     }
                 }
             }

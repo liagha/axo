@@ -85,7 +85,7 @@ pub enum SymbolKind<'symbol> {
         Function<
             Box<Element<'symbol>>,
             Symbol<'symbol>,
-            Box<Element<'symbol>>,
+            Option<Box<Element<'symbol>>>,
             Option<Box<Element<'symbol>>>,
         >,
     ),
