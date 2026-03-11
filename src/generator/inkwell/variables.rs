@@ -130,7 +130,6 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         if let Some(module) = self.modules.get(&self.current_module) {
-            // 1. Check for global variables
             if let Some(global) = module.get_global(&identifier) {
                 let basic_type: BasicTypeEnum = match global.get_value_type() {
                     inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
@@ -154,7 +153,6 @@ impl<'backend> super::Inkwell<'backend> {
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
             }
 
-            // 2. Add missing lookup for LLVM Functions!
             if let Some(function) = module.get_function(&identifier) {
                 return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
             }

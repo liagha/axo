@@ -101,6 +101,10 @@ impl<'backend> super::Inkwell<'backend> {
         arguments: &[Analysis<'backend>],
         span: Span<'backend>,
     ) -> Result<Option<BasicValueEnum<'backend>>, GenerateError<'backend>> {
+        if !matches!(name, "Int64" | "Int32" | "Float" | "Boolean" | "Character" | "Char") {
+            return Ok(None);
+        }
+
         let argument = if let Some(passed) = arguments.first() {
             Some(self.analysis(passed.clone())?)
         } else {
@@ -305,9 +309,9 @@ impl<'backend> super::Inkwell<'backend> {
 
             let callable = self.current_module().add_function(identifier, signature, linkage);
 
-            let mut func_scope = Map::default();
-            func_scope.insert(method.target.clone(), Entity::Function(callable));
-            self.entities.push(func_scope);
+            self.insert_entity(method.target.clone(), Entity::Function(callable));
+
+            self.entities.push(Map::default());
 
             let entry = self.context.append_basic_block(callable, "entry");
             self.builder.position_at_end(entry);

@@ -247,7 +247,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
 
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
-                // Prevent cascading "MissingReturn" errors if a previous error aborted generation
                 if self.errors.is_empty() {
                     self.errors.push(
                         GenerateError::new(
@@ -260,7 +259,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             }
         }
 
-        // Only run LLVM verify if no preceding errors occurred to avoid noisy verification panics
         if self.errors.is_empty() {
             if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {
                 self.errors.push(
