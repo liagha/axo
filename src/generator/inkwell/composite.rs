@@ -387,7 +387,6 @@ impl<'backend> Inkwell<'backend> {
                         )
                     })?;
 
-                    // Write correctly to the memory block
                     self.builder.build_store(pointer, casted).map_err(|error| {
                         GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                     })?;
@@ -461,7 +460,6 @@ impl<'backend> Inkwell<'backend> {
                         }
                     } else if let Some(fields) = self.union_fields(*kind) {
                         if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == &field) {
-                            // Extract straight from union base pointer
                             return self.builder.build_load(*field_type, *pointer, "value").map_err(
                                 |error| {
                                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
@@ -488,7 +486,6 @@ impl<'backend> Inkwell<'backend> {
                 }
             } else if let Some(fields) = self.union_fields(structure.get_type().as_basic_type_enum()) {
                 if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == &field) {
-                    // Temporaries need to be spilled to stack for dynamic extraction
                     let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
                     let pointer = self.build_entry(function, structure.get_type().into(), Str::from("union_spill"));
 
@@ -702,7 +699,6 @@ impl<'backend> Inkwell<'backend> {
                         .map(Into::into);
                 }
 
-                // Spill to stack for dynamic index on temporary array value
                 let shape = array.get_type();
                 let function = self
                     .builder
@@ -716,7 +712,6 @@ impl<'backend> Inkwell<'backend> {
                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                 })?;
 
-                // Bounds checking logic for stack-spilled array
                 let length = self.context.i32_type().const_int(shape.len() as u64, false);
                 let exceeds = self
                     .builder

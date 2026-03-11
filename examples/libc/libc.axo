@@ -135,6 +135,8 @@ func main(): Integer {
 
     test_array()
 
+    test_user_input()
+
     return(EXIT_SUCCESS)
 }
 
@@ -167,5 +169,40 @@ func test_array() {
     var array = [2, 3, 4, 5]
 
     println_str("Array Element:")
-    print_i64(array[2])
+    println_i64(array[2])
+}
+
+func test_user_input() {
+    println_str("Please enter your name: ")
+
+    // 1. Allocate a 256-byte memory buffer using mmap.
+    // Address: 0 (Let the OS choose the memory location)
+    // Length: 256 bytes
+    // Prot: PROT_READ | PROT_WRITE (read and write permissions)
+    // Flags: MAP_PRIVATE | MAP_ANONYMOUS (memory not backed by a file)
+    // FD: INVALID_FD (-1)
+    // Offset: 0
+    var buffer = mmap(0, 256, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, INVALID_FD, 0)
+
+    // Check if memory allocation succeeded
+    if (buffer != MAP_FAILED, {
+
+        // 2. Read input from Standard Input (0)
+        // We read up to 256 bytes from STDIN into our allocated buffer.
+        // It returns the actual number of bytes the user typed.
+        var bytes_read = read(STDIN, buffer, 256)
+
+        println_str("Hello, ")
+
+        // 3. Write the exact bytes we just read back to Standard Output (1)
+        // We use `write` instead of `print_str` because `buffer` is a raw
+        // byte sequence with a known length, not necessarily a null-terminated string.
+        write(STDOUT, buffer, bytes_read)
+
+        // 4. Free the allocated memory back to the OS
+        munmap(buffer, 256)
+
+    }, {
+        println_str("Failed to allocate memory for input buffer.")
+    })
 }

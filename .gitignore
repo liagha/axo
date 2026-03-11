@@ -5,6 +5,7 @@
 /lab
 */.DS_Store
 *.ll
+*.o
 *.exe
 *.out
 *.bin
