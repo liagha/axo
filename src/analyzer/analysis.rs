@@ -10,15 +10,12 @@ use crate::tracker::Span;
 pub struct Analysis<'analysis> {
     pub kind: AnalysisKind<'analysis>,
     pub span: Span<'analysis>,
+    pub ty: Type<'analysis>,
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>) -> Self {
-        Self { kind, span }
-    }
-    
-    pub fn unit(span: Span<'analysis>) -> Self {
-        Analysis::new(AnalysisKind::Tuple(Vec::new()), span)
+    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, ty: Type<'analysis>) -> Self {
+        Self { kind, span, ty }
     }
 }
 
@@ -44,6 +41,10 @@ pub enum AnalysisKind<'analysis> {
     },
     Array(Vec<Analysis<'analysis>>),
     Tuple(Vec<Analysis<'analysis>>),
+
+    Cast(Box<Analysis<'analysis>>, Type<'analysis>),
+    Negate(Box<Analysis<'analysis>>),
+    SizeOf(Type<'analysis>),
 
     Add(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Subtract(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),

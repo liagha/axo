@@ -188,7 +188,6 @@ impl<'backend> Inkwell<'backend> {
 
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
-        // Pass 1: Structures
         for analysis in &analyses {
             if let AnalysisKind::Structure(structure) = &analysis.kind {
                 if let Err(error) = self.structure(structure.clone(), analysis.span) {
@@ -208,7 +207,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
 
         let mut entry = None;
 
-        // Pass 3: Functions (except entry point)
         for analysis in &analyses {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if function.entry {
@@ -222,7 +220,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             }
         }
 
-        // Pass 4: Entry point (main)
         if let Some((entry_func, span)) = entry {
             self.builder.clear_insertion_position();
             if let Err(error) = self.function(entry_func.clone(), span) {
@@ -230,7 +227,6 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             }
         }
 
-        // Terminate any dangling basic blocks automatically using the correct return type
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
                 if let Some(func) = block.get_parent() {
@@ -268,6 +264,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::String { value } => self.string(value, instruction.span),
             AnalysisKind::Array(values) => self.array(values, instruction.span),
             AnalysisKind::Tuple(values) => self.tuple(values, instruction.span),
+            AnalysisKind::Cast(value, ty) => self.explicit_cast(value, ty, instruction.span),
+            AnalysisKind::Negate(value) => self.negate(value, instruction.span),
+            AnalysisKind::SizeOf(ty) => self.size_of(ty, instruction.span),
             AnalysisKind::Add(left, right) => self.add(left, right, instruction.span),
             AnalysisKind::Subtract(left, right) => self.subtract(left, right, instruction.span),
             AnalysisKind::Multiply(left, right) => self.multiply(left, right, instruction.span),

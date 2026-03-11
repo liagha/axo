@@ -1,17 +1,12 @@
 use crate::{
     data::*,
-    analyzer::{
-        Analysis, AnalyzeError, ErrorKind,
-    },
+    analyzer::{Analysis, AnalyzeError, ErrorKind},
     format::Show,
     parser::{Element, Symbol, SymbolKind},
-    resolver::{
-        Resolver,
-    },
-    scanner::{Token, TokenKind},
+    resolver::Resolver,
 };
 use crate::analyzer::AnalysisKind;
-use crate::checker::{Type};
+use crate::checker::{Type, TypeKind};
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -25,16 +20,20 @@ impl<'analyzer> Analyzer<'analyzer> {
             input,
             output: Vec::new(),
             errors: Vec::new(),
-        }    
+        }
     }
-    
+
     pub fn analyze(&mut self, resolver: &mut Resolver<'analyzer>) {
         for element in self.input.iter_mut() {
+            if element.ty.kind == TypeKind::Unknown {
+                self.errors.push(AnalyzeError::new(ErrorKind::Unimplemented, element.span));
+                continue;
+            }
+
             match element.analyze(resolver) {
                 Ok(analysis) => {
                     self.output.push(analysis);
                 }
-                
                 Err(error) => {
                     self.errors.push(error);
                 }
@@ -50,57 +49,6 @@ pub trait Analyzable<'analyzable> {
     ) -> Result<Analysis<'analyzable>, AnalyzeError<'analyzable>>;
 }
 
-
-impl<'token> Analyzable<'token> for Token<'token> {
-    fn analyze(
-        &self,
-        _resolver: &mut Resolver<'token>,
-    ) -> Result<Analysis<'token>, AnalyzeError<'token>> {
-        let kind = match &self.kind {
-            TokenKind::Float(float) => {
-                AnalysisKind::Float {
-                    value: *float,
-                    size: 64,
-                }
-            },
-
-            TokenKind::Integer(integer) => {
-                AnalysisKind::Integer {
-                    value: *integer,
-                    size: 64,
-                    signed: true,
-                }
-            },
-
-            TokenKind::Boolean(boolean) => {
-                AnalysisKind::Boolean {
-                    value: *boolean,
-                }
-            },
-
-            TokenKind::String(string) => {
-                AnalysisKind::String {
-                    value: *string,
-                }
-            },
-
-            TokenKind::Character(character) => {
-                AnalysisKind::Character {
-                    value: *character,
-                }
-            },
-
-            TokenKind::Identifier(identifier) => {
-                AnalysisKind::Usage(*identifier)
-            }
-
-            TokenKind::Operator(_) | TokenKind::Punctuation(_) | TokenKind::Comment(_) => {
-                AnalysisKind::Tuple(Vec::new())
-            }
-        };
-        Ok(Analysis::new(kind, self.span))
-    }
-}
 
 impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
     fn analyze(
@@ -153,7 +101,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = function.body.as_ref() {
                     body.analyze(resolver)?
                 } else {
-                    Analysis::unit(self.span)
+                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::unit(self.span))
                 };
 
                 let output = if let Some(output) = &function.output {
@@ -192,6 +140,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 )
             }
         };
-        Ok(Analysis::new(kind, self.span))
+
+        Ok(Analysis::new(kind, self.span, self.ty.clone()))
     }
 }

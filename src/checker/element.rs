@@ -18,7 +18,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                 TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
                 TokenKind::String(_)  => Type { kind: TypeKind::String, span: literal.span },
                 TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
-                _ => Type::new(TypeKind::Tuple { members: Vec::new() }, literal.span),
+                _ => Type::unit(literal.span),
             },
 
             ElementKind::Delimited(delimited) => match (
@@ -36,8 +36,10 @@ impl<'element> Checkable<'element> for Element<'element> {
                         delimited.members[0].ty.clone()
                     } else {
                         let mut failed = false;
+
                         for member in delimited.members.iter_mut() {
                             member.check(errors);
+
                             if member.ty.kind == TypeKind::Unknown { failed = true; }
                         }
 

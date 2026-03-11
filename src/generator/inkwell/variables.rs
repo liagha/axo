@@ -51,7 +51,7 @@ impl<'backend> super::Inkwell<'backend> {
                 match (value, pointee) {
                     (BasicValueEnum::PointerValue(_), None) => {
                         Err(GenerateError::new(
-                            ErrorKind::Variable(VariableError::DereferenceNonPointer), // Or a "Missing Type" error
+                            ErrorKind::Variable(VariableError::DereferenceNonPointer),
                             analysis.span,
                         ))
                     }
@@ -63,7 +63,7 @@ impl<'backend> super::Inkwell<'backend> {
                             .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, analysis.span))?;
                         Ok(Some((ptr, kind)))
                     }
-                    _ => Ok(None), // Or return a specific DereferenceNonPointer error
+                    _ => Ok(None),
                 }
             }
             _ => Ok(None),
@@ -111,7 +111,6 @@ impl<'backend> super::Inkwell<'backend> {
         identifier: Str<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        // 1. Check local/known entities first
         if let Some(entity) = self.entities.get(&identifier) {
             return match entity {
                 Entity::Function(function) => {
@@ -130,11 +129,8 @@ impl<'backend> super::Inkwell<'backend> {
             };
         }
 
-        // 2. Fallback: Check if it's an LLVM global variable registered in the current module
         if let Some(module) = self.modules.get(&self.current_module) {
             if let Some(global) = module.get_global(&identifier) {
-                // Safely convert AnyTypeEnum into BasicTypeEnum using a match statement.
-                // This gets the literal type stored IN the global (e.g., i64), NOT the pointer to it!
                 let basic_type: BasicTypeEnum = match global.get_value_type() {
                     inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
                     inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
@@ -158,7 +154,6 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        // 3. Completely undefined
         Err(GenerateError::new(
             ErrorKind::Variable(VariableError::Undefined {
                 name: identifier.to_string(),
@@ -232,17 +227,14 @@ impl<'backend> super::Inkwell<'backend> {
             }
         };
 
-        // Determine pointee from the declared type annotation if it exists
         let pointee = if let Some(annotation) = binding.annotation.as_ref() {
             match &annotation.kind {
                 TypeKind::Pointer { target } => {
-                    // Convert your internal TypeKind to Inkwell BasicTypeEnum
                     Some(self.llvm_type(target, span)?)
                 }
                 _ => None,
             }
         } else {
-            // Fallback to inference from the RHS
             self.pointer_pointee_type(&value)
         };
 
@@ -275,7 +267,6 @@ impl<'backend> super::Inkwell<'backend> {
                 .map(Into::into)
                 .unwrap_or(value)
         } else if value.is_pointer_value() && declared_kind.is_int_type() {
-            // NEW: Automatically cast Pointer (like string literal) to Int (like i64)
             self.builder
                 .build_ptr_to_int(value.into_pointer_value(), declared_kind.into_int_type(), "bind_ptr_cast")
                 .ok()
@@ -355,7 +346,6 @@ impl<'backend> super::Inkwell<'backend> {
                 self.builder.build_store(pointer, casted)
                     .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
             } else if result.is_pointer_value() && kind.is_int_type() {
-                // NEW: Cast Pointer to Int on re-assignment
                 let casted = self
                     .builder
                     .build_ptr_to_int(result.into_pointer_value(), kind.into_int_type(), "store_ptr_cast")

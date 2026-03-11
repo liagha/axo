@@ -1,12 +1,11 @@
-use {
-    crate::{
-        data::*,
-        analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
-        format::Show,
-        parser::{Element, ElementKind},
-        resolver::Resolver,
-        scanner::{OperatorKind, PunctuationKind, TokenKind},
-    },
+use crate::{
+    data::*,
+    analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
+    format::Show,
+    parser::{Element, ElementKind},
+    resolver::Resolver,
+    scanner::{OperatorKind, PunctuationKind, TokenKind},
+    checker::{Type, TypeKind},
 };
 
 impl<'element> Analyzable<'element> for Element<'element> {
@@ -14,8 +13,47 @@ impl<'element> Analyzable<'element> for Element<'element> {
         &self,
         resolver: &mut Resolver<'element>,
     ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
+        fn cast<'cast>(expression: Analysis<'cast>, ty: Type<'cast>) -> Analysis<'cast> {
+            if expression.ty == ty {
+                expression
+            } else {
+                let span = expression.span;
+
+                Analysis::new(AnalysisKind::Cast(Box::new(expression), ty.clone()), span, ty)
+            }
+        }
+
+        let ty = self.ty.clone();
+
+        if ty.kind == TypeKind::Unknown {
+            return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span));
+        }
+
         match &self.kind {
-            ElementKind::Literal(literal) => literal.analyze(resolver),
+            ElementKind::Literal(literal) => {
+                let kind = match &literal.kind {
+                    TokenKind::Integer(value) => {
+                        let (size, signed) = match &ty.kind {
+                            TypeKind::Integer { size, signed } => (*size, *signed),
+                            _ => (64, true),
+                        };
+                        AnalysisKind::Integer { value: *value, size, signed }
+                    }
+                    TokenKind::Float(value) => {
+                        let size = match &ty.kind {
+                            TypeKind::Float { size } => *size,
+                            _ => 64,
+                        };
+                        AnalysisKind::Float { value: *value, size }
+                    }
+                    TokenKind::Boolean(value) => AnalysisKind::Boolean { value: *value },
+                    TokenKind::String(value) => AnalysisKind::String { value: *value },
+                    TokenKind::Character(value) => AnalysisKind::Character { value: *value },
+                    _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
+                };
+
+                Ok(Analysis::new(kind, self.span, ty))
+            }
 
             ElementKind::Delimited(delimited) => {
                 let kind = match (
@@ -25,12 +63,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 ) {
                     (
                         TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        None,
-                        TokenKind::Punctuation(PunctuationKind::RightBrace),
-                    )
-                    | (
-                        TokenKind::Punctuation(PunctuationKind::LeftBrace),
-                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
+                        None | Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                     ) => {
                         let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
@@ -47,12 +80,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightBracket),
                     ) => {
-                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
-                            delimited
-                                .members
-                                .iter()
-                                .map(|item| item.analyze(resolver))
-                                .collect();
+                        let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
+                            .members
+                            .iter()
+                            .map(|item| item.analyze(resolver))
+                            .collect();
 
                         AnalysisKind::Array(items?)
                     }
@@ -62,16 +94,14 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                     ) => {
-                        // A single item in parentheses is just a grouped expression, not a tuple.
-                        if delimited.members.len() == 1 {
+                        if delimited.separator.is_none() && delimited.members.len() == 1 {
                             return delimited.members[0].analyze(resolver);
                         } else {
-                            let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
-                                delimited
-                                    .members
-                                    .iter()
-                                    .map(|item| item.analyze(resolver))
-                                    .collect();
+                            let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
+                                .members
+                                .iter()
+                                .map(|item| item.analyze(resolver))
+                                .collect();
 
                             AnalysisKind::Tuple(items?)
                         }
@@ -79,7 +109,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                     _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
                 };
-                Ok(Analysis::new(kind, self.span))
+                Ok(Analysis::new(kind, self.span, ty))
             }
 
             ElementKind::Unary(unary) => {
@@ -89,46 +119,24 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     let kind = match operator.as_slice() {
                         [OperatorKind::Exclamation] => AnalysisKind::LogicalNot(Box::new(operand)),
                         [OperatorKind::Tilde] => AnalysisKind::BitwiseNot(Box::new(operand)),
-                        [OperatorKind::Plus] => return Ok(operand), // '+' is a no-op, return operand as is.
-                        [OperatorKind::Minus] => {
-                            // Create a zero literal with the span of the '-' operator.
-                            let zero = Analysis::new(
-                                AnalysisKind::Integer {
-                                    value: 0,
-                                    size: 64,
-                                    signed: true,
-                                },
-                                unary.operator.span,
-                            );
-                            AnalysisKind::Subtract(Box::new(zero), Box::new(operand))
-                        }
+                        [OperatorKind::Plus] => return Ok(operand),
+                        [OperatorKind::Minus] => AnalysisKind::Negate(Box::new(operand)),
                         [OperatorKind::Ampersand] => AnalysisKind::AddressOf(Box::new(operand)),
                         [OperatorKind::Star] => AnalysisKind::Dereference(Box::new(operand)),
-                        _ => {
-                            return Err(AnalyzeError::new(
-                                ErrorKind::InvalidOperation(unary.operator.clone()),
-                                unary.operator.span,
-                            ))
-                        }
+                        _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span))
                     };
-                    
-                    return Ok(Analysis::new(kind, self.span));
+
+                    return Ok(Analysis::new(kind, self.span, ty));
                 }
 
-                Err(AnalyzeError::new(
-                    ErrorKind::InvalidOperation(unary.operator.clone()),
-                    unary.operator.span,
-                ))
+                Err(AnalyzeError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span))
             },
 
             ElementKind::Binary(binary) => {
                 let op_kind = if let TokenKind::Operator(operator) = &binary.operator.kind {
                     operator
                 } else {
-                    return Err(AnalyzeError::new(
-                        ErrorKind::InvalidOperation(binary.operator.clone()),
-                        binary.operator.span,
-                    ));
+                    return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
                 };
 
                 let kind = match op_kind.as_slice() {
@@ -142,33 +150,62 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let target = binary.left.analyze(resolver)?;
                         let value = binary.right.analyze(resolver)?;
 
+                        let safely_cast_value = cast(value, target.ty.clone());
+
                         match &target.kind {
-                            AnalysisKind::Usage(target_name) => {
-                                AnalysisKind::Assign(target_name.clone(), Box::new(value))
-                            }
-                            AnalysisKind::Dereference(_) => {
-                                AnalysisKind::Store(Box::new(target), Box::new(value))
-                            }
-                            t => {
-                                println!("---- {:?}", t);
-                                return Err(AnalyzeError::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
-                                    binary.operator.span,
-                                ))
-                            }
+                            AnalysisKind::Usage(target_name) => AnalysisKind::Assign(target_name.clone(), Box::new(safely_cast_value)),
+                            AnalysisKind::Dereference(_) | AnalysisKind::Access(_, _) | AnalysisKind::Index(_) => AnalysisKind::Store(Box::new(target), Box::new(safely_cast_value)),
+                            _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span))
                         }
                     }
 
-                    // A helper macro could reduce this repetition, but for clarity:
                     _ => {
                         let left = binary.left.analyze(resolver)?;
                         let right = binary.right.analyze(resolver)?;
+
                         match op_kind.as_slice() {
-                            [OperatorKind::Plus] => AnalysisKind::Add(Box::new(left), Box::new(right)),
-                            [OperatorKind::Minus] => AnalysisKind::Subtract(Box::new(left), Box::new(right)),
-                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(left), Box::new(right)),
-                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(left), Box::new(right)),
-                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(left), Box::new(right)),
+                            [OperatorKind::Plus] => {
+                                match (&left.ty.kind, &right.ty.kind) {
+                                    (TypeKind::Pointer { target }, _) => {
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.ty.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.ty.clone());
+                                        AnalysisKind::Add(Box::new(left), Box::new(scaled))
+                                    }
+                                    (_, TypeKind::Pointer { target }) => {
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), left.span, left.ty.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size_of)), left.span, left.ty.clone());
+                                        AnalysisKind::Add(Box::new(scaled), Box::new(right))
+                                    }
+                                    _ => {
+                                        let l = cast(left, ty.clone());
+                                        let r = cast(right, ty.clone());
+                                        AnalysisKind::Add(Box::new(l), Box::new(r))
+                                    }
+                                }
+                            },
+                            [OperatorKind::Minus] => {
+                                match (&left.ty.kind, &right.ty.kind) {
+                                    (TypeKind::Pointer { target: target_left }, TypeKind::Pointer { .. }) => {
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), self.span, ty.clone());
+                                        let raw_sub = Analysis::new(AnalysisKind::Subtract(Box::new(left), Box::new(right)), self.span, ty.clone());
+                                        AnalysisKind::Divide(Box::new(raw_sub), Box::new(size_of))
+                                    }
+                                    (TypeKind::Pointer { target: target_left }, _) => {
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), right.span, right.ty.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.ty.clone());
+                                        AnalysisKind::Subtract(Box::new(left), Box::new(scaled))
+                                    }
+                                    _ => {
+                                        let l = cast(left, ty.clone());
+                                        let r = cast(right, ty.clone());
+                                        AnalysisKind::Subtract(Box::new(l), Box::new(r))
+                                    }
+                                }
+                            },
+                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(cast(left, ty.clone())), Box::new(cast(right, ty.clone()))),
+                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(cast(left, ty.clone())), Box::new(cast(right, ty.clone()))),
+                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(cast(left, ty.clone())), Box::new(cast(right, ty.clone()))),
+
                             [OperatorKind::Ampersand, OperatorKind::Ampersand] => AnalysisKind::LogicalAnd(Box::new(left), Box::new(right)),
                             [OperatorKind::Pipe, OperatorKind::Pipe] => AnalysisKind::LogicalOr(Box::new(left), Box::new(right)),
                             [OperatorKind::Caret] => AnalysisKind::LogicalXOr(Box::new(left), Box::new(right)),
@@ -176,23 +213,19 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             [OperatorKind::Pipe] => AnalysisKind::BitwiseOr(Box::new(left), Box::new(right)),
                             [OperatorKind::LeftAngle, OperatorKind::LeftAngle] => AnalysisKind::ShiftLeft(Box::new(left), Box::new(right)),
                             [OperatorKind::RightAngle, OperatorKind::RightAngle] => AnalysisKind::ShiftRight(Box::new(left), Box::new(right)),
+
                             [OperatorKind::Equal, OperatorKind::Equal] => AnalysisKind::Equal(Box::new(left), Box::new(right)),
                             [OperatorKind::Exclamation, OperatorKind::Equal] => AnalysisKind::NotEqual(Box::new(left), Box::new(right)),
                             [OperatorKind::LeftAngle] => AnalysisKind::Less(Box::new(left), Box::new(right)),
                             [OperatorKind::LeftAngle, OperatorKind::Equal] => AnalysisKind::LessOrEqual(Box::new(left), Box::new(right)),
                             [OperatorKind::RightAngle] => AnalysisKind::Greater(Box::new(left), Box::new(right)),
                             [OperatorKind::RightAngle, OperatorKind::Equal] => AnalysisKind::GreaterOrEqual(Box::new(left), Box::new(right)),
-                            _ => {
-                                return Err(AnalyzeError::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
-                                    binary.operator.span,
-                                ))
-                            }
+                            _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span))
                         }
                     }
                 };
 
-                Ok(Analysis::new(kind, self.span))
+                Ok(Analysis::new(kind, self.span, ty))
             },
 
             ElementKind::Index(index) => {
@@ -207,16 +240,12 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     Box::new(target),
                     indexes?,
                 ));
-                Ok(Analysis::new(kind, self.span))
+                Ok(Analysis::new(kind, self.span, ty))
             }
 
             ElementKind::Invoke(invoke) => {
                 let name = invoke.target.brand().and_then(|token| {
-                    if let TokenKind::Identifier(name) = token.kind {
-                        Some(name)
-                    } else {
-                        None
-                    }
+                    if let TokenKind::Identifier(name) = token.kind { Some(name) } else { None }
                 });
 
                 let kind = match name.as_ref().and_then(|s| s.as_str()) {
@@ -235,43 +264,32 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let condition = invoke.members[0].analyze(resolver)?;
                         let body = invoke.members[1].analyze(resolver)?;
 
-                        AnalysisKind::While(
-                            Box::new(condition),
-                            Box::new(body),
-                        )
+                        AnalysisKind::While(Box::new(condition), Box::new(body))
                     }
                     Some("break") => {
                         let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
-                        } else {
-                            None
-                        };
+                        } else { None };
 
                         AnalysisKind::Break(value)
                     }
                     Some("continue") => {
                         let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
-                        } else {
-                            None
-                        };
+                        } else { None };
 
                         AnalysisKind::Continue(value)
                     }
                     Some("return") => {
                         let value = if !invoke.members.is_empty() {
                             Some(Box::new(invoke.members[0].analyze(resolver)?))
-                        } else {
-                            None
-                        };
+                        } else { None };
 
                         AnalysisKind::Return(value)
                     }
                     _ => {
                         let target = if let ElementKind::Literal(literal) = &invoke.target.kind {
-                            if let TokenKind::Identifier(name) = literal.kind {
-                                name
-                            } else { 
+                            if let TokenKind::Identifier(name) = literal.kind { name } else {
                                 return Err(AnalyzeError::new(ErrorKind::InvalidTarget, literal.span));
                             }
                         } else {
@@ -284,14 +302,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             .map(|member| member.analyze(resolver))
                             .collect();
 
-                        AnalysisKind::Invoke(Invoke::new(
-                            target,
-                            arguments?,
-                        ))
+                        AnalysisKind::Invoke(Invoke::new(target, arguments?))
                     }
                 };
-                
-                Ok(Analysis::new(kind, self.span))
+
+                Ok(Analysis::new(kind, self.span, ty))
             },
 
             ElementKind::Construct(constructor) => {
@@ -308,8 +323,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
 
                 let analyzed = Structure::new(Str::from(target), members);
-
-                Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span))
+                Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span, ty))
             }
 
             ElementKind::Symbolize(symbol) => symbol.analyze(resolver),

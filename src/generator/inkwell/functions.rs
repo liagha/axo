@@ -1,3 +1,4 @@
+use inkwell::types::BasicTypeEnum;
 use inkwell::values::IntValue;
 use {
     super::{Backend, Entity},
@@ -675,4 +676,107 @@ impl<'backend> super::Inkwell<'backend> {
                 span
             ))
     }
+    pub fn explicit_cast(
+        &mut self,
+        value: Box<Analysis<'backend>>,
+        target_type: Type<'backend>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let evaluated = self.analysis(*value)?;
+        let llvm_target = self.llvm_type(&target_type, span)?;
+
+        if evaluated.get_type() == llvm_target {
+            return Ok(evaluated);
+        }
+
+        match (evaluated, llvm_target) {
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => self
+                .builder
+                .build_int_cast(integer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
+                .builder
+                .build_float_cast(float, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => self
+                .builder
+                .build_signed_int_to_float(integer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => self
+                .builder
+                .build_float_to_signed_int(float, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
+                .builder
+                .build_ptr_to_int(pointer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(target)) => self
+                .builder
+                .build_int_to_ptr(integer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            _ => Err(GenerateError::new(
+                ErrorKind::BuilderError { reason: "Unsupported or incompatible cast operation".to_string() },
+                span,
+            )),
+        }
+    }
+
+    pub fn negate(
+        &mut self,
+        value: Box<Analysis<'backend>>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let evaluated = self.analysis(*value)?;
+
+        match evaluated {
+            BasicValueEnum::IntValue(integer) => self
+                .builder
+                .build_int_neg(integer, "neg")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            BasicValueEnum::FloatValue(float) => self
+                .builder
+                .build_float_neg(float, "fneg")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+
+            _ => Err(GenerateError::new(
+                ErrorKind::BuilderError { reason: "Operand cannot be negated (must be an Integer or Float)".to_string() },
+                span,
+            )),
+        }
+    }
+
+    pub fn size_of(
+        &mut self,
+        ty: Type<'backend>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let llvm_target = self.llvm_type(&ty, span)?;
+
+        let size = llvm_target.size_of().ok_or_else(|| {
+            GenerateError::new(
+                ErrorKind::BuilderError {
+                    reason: "Cannot compute the byte size of the provided type".to_string()
+                },
+                span,
+            )
+        })?;
+
+        Ok(size.into())
+    }
+
 }

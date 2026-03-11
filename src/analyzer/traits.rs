@@ -39,6 +39,17 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                     AnalysisKind::Tuple(tuple) => {
                         format!("Tuple({})", tuple.format(verbosity)).into()
                     }
+
+                    AnalysisKind::Cast(analysis, ty) => {
+                        format!("Cast({}, {})", analysis.format(verbosity), ty.format(verbosity)).into()
+                    }
+                    AnalysisKind::Negate(analysis) => {
+                        format!("Negate({})", analysis.format(verbosity)).into()
+                    }
+                    AnalysisKind::SizeOf(analysis) => {
+                        format!("SizeOf({})", analysis.format(verbosity)).into()
+                    }
+                    
                     AnalysisKind::Add(left, right) => {
                         format!(
                             "Add({}, {})",

@@ -645,13 +645,10 @@ where
         classifier: &mut Classifier<'alternative, Input, Output, Failure>,
     ) {
         let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
-        // Record the stack state before trying alternatives
         let initial_stack_len = classifier.stack.len();
-        // Move stack out to work with it
         let mut current_stack = take(&mut classifier.stack);
 
         for pattern in &self.patterns {
-            // Create a temporary child with the current stack state
             let mut child = Classifier {
                 order: pattern.order.clone(),
                 marker: classifier.marker,
@@ -659,14 +656,13 @@ where
                 consumed: Vec::new(),
                 record: Record::Blank,
                 form: Form::Blank,
-                stack: current_stack, // Pass the stack in
+                stack: current_stack, 
                 depth: classifier.depth + 1,
             };
 
             composer.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
-                // FAILURE: Rollback the stack to the initial state
                 current_stack = take(&mut child.stack);
                 current_stack.truncate(initial_stack_len);
                 continue;
@@ -674,12 +670,9 @@ where
 
             if let Some(ref mut champion) = best {
                 if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
-                    // This is a better match: Swap child and champion
-                    // We must preserve the stack from the NEW champion
                     *champion = child;
                     current_stack = take(&mut champion.stack);
                 } else {
-                    // Not a better match: Rollback stack
                     current_stack = take(&mut child.stack);
                     current_stack.truncate(initial_stack_len);
                 }
@@ -702,7 +695,7 @@ where
                 classifier.position = champion.position;
                 classifier.consumed = take(&mut champion.consumed);
                 classifier.form = take(&mut champion.form);
-                classifier.stack = current_stack; // Return the modified stack
+                classifier.stack = current_stack;
             }
             None => {
                 classifier.set_empty();

@@ -68,7 +68,7 @@ impl<'backend> Inkwell<'backend> {
         name: &str,
         span: Span<'backend>
     ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, Boolean), GenerateError<'backend>> {
-        let ptr_int_type = self.context.i64_type(); // Assuming 64-bit architecture
+        let ptr_int_type = self.context.i64_type();
 
         if left.is_pointer_value() {
             left = self.builder.build_ptr_to_int(
