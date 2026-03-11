@@ -37,6 +37,10 @@ pub enum Entity<'backend> {
         structure: StructType<'backend>,
         fields: Vec<Str<'backend>>,
     },
+    Union {
+        structure: StructType<'backend>,
+        fields: Vec<(Str<'backend>, BasicTypeEnum<'backend>)>,
+    },
     Function(FunctionValue<'backend>),
 }
 
@@ -322,6 +326,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(condition, then, otherwise, instruction.span),
             AnalysisKind::While(condition, body) => self.r#while(condition, body, instruction.span),
             AnalysisKind::Structure(structure) => self.structure(structure, instruction.span),
+            AnalysisKind::Union(structure) => self.union(structure, instruction.span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, instruction.span),
             AnalysisKind::Function(function) => self.function(function, instruction.span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, instruction.span),

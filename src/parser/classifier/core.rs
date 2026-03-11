@@ -27,7 +27,7 @@ impl<'parser> Parser<'parser> {
                         | TokenKind::Float(_)
                         | TokenKind::Integer(_)
                 ) || if let TokenKind::Identifier(identifier) = &token.kind {
-                    !["var", "const", "struct", "enum", "func", "module"]
+                    !["var", "const", "struct", "union", "enum", "func", "module"]
                         .contains(&identifier.unwrap_str())
                 } else {
                     false

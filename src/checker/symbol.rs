@@ -2,6 +2,8 @@ use crate::{
     parser::{Symbol, SymbolKind},
     checker::{CheckError, Checkable, ErrorKind, Type, TypeKind},
 };
+use crate::data::{Structure};
+use crate::format::Show;
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self, errors: &mut Vec<CheckError<'symbol>>) {
@@ -49,28 +51,62 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Structure(structure) => {
-                let _members = structure
+                let head = structure
+                    .target
+                    .brand()
+                    .format(0);
+                
+                let members = structure
                     .members
                     .iter_mut()
                     .map(|member| {
                         member.check(errors);
                         
                         member.ty.clone()
-                    });
+                    }).collect();
+                
+                let structure = Structure::new(head, members);
 
-                Type::new(TypeKind::Tuple { members: Vec::new() }, self.span)
+                Type::new(TypeKind::Structure(structure), self.span)
+            }
+
+            SymbolKind::Union(union) => {
+                let head = union
+                    .target
+                    .brand()
+                    .format(0);
+
+                let members = union
+                    .members
+                    .iter_mut()
+                    .map(|member| {
+                        member.check(errors);
+
+                        member.ty.clone()
+                    }).collect();
+
+                let union = Structure::new(head, members);
+
+                Type::new(TypeKind::Union(union), self.span)
             }
 
             SymbolKind::Function(function) => {
+                let head = function
+                    .target
+                    .brand()
+                    .format(0);
+
                 let mut failed = false;
 
-                for member in function.members.iter_mut() {
+                let members = function.members.iter_mut().map(|member| {
                     member.check(errors);
-                }
+                    
+                    member.ty.clone()
+                }).collect();
 
                 let output = function.output.as_ref().and_then(|output| {
                     match Type::annotation(&*output) {
-                        Ok(ty) => Some(ty),
+                        Ok(ty) => Some(Box::new(ty)),
                         Err(error) => {
                             errors.push(error);
                             None
@@ -91,15 +127,15 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                         if Type::unify(&expected, &body.ty).is_none() {
                             errors.push(
                                 CheckError::new(
-                                    ErrorKind::Mismatch(expected, body.ty.clone()),
+                                    ErrorKind::Mismatch(*expected, body.ty.clone()),
                                     self.span,
                                 )
                             );
                         }
                     }
                 }
-
-                output.unwrap_or(Type::new(TypeKind::Tuple { members: Vec::new() }, self.span))
+                
+                Type::new(TypeKind::Function(head, members, output), self.span)
             }
 
             SymbolKind::Module(_) => {

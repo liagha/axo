@@ -249,7 +249,8 @@ pub enum TypeKind<'ty> {
 
     Constructor(Structure<Str<'ty>, Type<'ty>>),
     Structure(Structure<Str<'ty>, Type<'ty>>),
-    Function(Function<Str<'ty>, Type<'ty>, Box<Type<'ty>>, Box<Type<'ty>>>),
+    Union(Structure<Str<'ty>, Type<'ty>>),
+    Function(Str<'ty>, Vec<Type<'ty>>, Option<Box<Type<'ty>>>),
 }
 
 impl<'ty> PartialEq for Type<'ty> {

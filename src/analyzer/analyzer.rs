@@ -91,6 +91,20 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 AnalysisKind::Structure(analyzed)
             }
+            SymbolKind::Union(union) => {
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = union
+                    .members
+                    .iter()
+                    .map(|member| member.analyze(resolver))
+                    .collect();
+
+                let analyzed = Structure::new(
+                    Str::from(union.target.brand().unwrap().format(0)),
+                    members?,
+                );
+
+                AnalysisKind::Union(analyzed)
+            }
             SymbolKind::Function(function) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
                     .members

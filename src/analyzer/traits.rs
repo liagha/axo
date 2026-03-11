@@ -282,6 +282,9 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                     AnalysisKind::Structure(structure) => {
                         structure.format(verbosity)
                     }
+                    AnalysisKind::Union(union) => {
+                        union.format(verbosity)
+                    }
                     AnalysisKind::Function(function) => {
                         function.format(verbosity)
                     }

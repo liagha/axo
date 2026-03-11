@@ -128,6 +128,9 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                     SymbolKind::Structure(structure) => {
                         structure.format(verbosity)
                     }
+                    SymbolKind::Union(union) => {
+                        union.format(verbosity)
+                    }
                     SymbolKind::Function(function) => {
                         function.format(verbosity)
                     }

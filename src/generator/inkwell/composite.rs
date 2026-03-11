@@ -36,6 +36,48 @@ impl<'backend> Inkwell<'backend> {
         None
     }
 
+    fn union_fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<(Str<'backend>, BasicTypeEnum<'backend>)>> {
+        for scope in self.entities.iter().rev() {
+            for entity in scope.values() {
+                if let Entity::Union {
+                    structure,
+                    fields,
+                } = entity
+                {
+                    if structure.as_basic_type_enum() == target {
+                        return Some(fields.clone());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn size(&self, ty: BasicTypeEnum<'backend>) -> u64 {
+        match ty {
+            BasicTypeEnum::IntType(integer) => (integer.get_bit_width() as u64 + 7) / 8,
+            BasicTypeEnum::FloatType(float) => (float.get_bit_width() as u64 + 7) / 8,
+            BasicTypeEnum::PointerType(_) => 8,
+            BasicTypeEnum::ArrayType(array) => array.len() as u64 * self.size(array.get_element_type()),
+            BasicTypeEnum::StructType(structure) => {
+                let mut size = 0;
+
+                for index in 0..structure.count_fields() {
+                    if let Some(field_ty) = structure.get_field_type_at_index(index) {
+                        size += self.size(field_ty);
+                    }
+                }
+
+                size
+            }
+            BasicTypeEnum::VectorType(vector) => vector.get_size() as u64 * self.size(vector.get_element_type()),
+            BasicTypeEnum::ScalableVectorType(_) => {
+                unimplemented!("Statically sizing scalable vectors for unions is not supported")
+            }
+        }
+    }
+
     pub fn trap(
         &self,
         condition: Option<IntValue<'backend>>,
@@ -164,6 +206,61 @@ impl<'backend> Inkwell<'backend> {
         Ok(self.context.i64_type().const_zero().into())
     }
 
+    pub fn union(
+        &mut self,
+        structure: Structure<Str<'backend>, Analysis<'backend>>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let identifier = structure.target.clone();
+        let string = identifier.as_str().unwrap_or("union");
+        let shape = self.context.opaque_struct_type(string);
+
+        let mut fields = Vec::with_capacity(structure.members.len());
+        let mut largest_type: Option<BasicTypeEnum> = None;
+        let mut max_size = 0;
+
+        for member in &structure.members {
+            if let AnalysisKind::Binding(binding) = &member.kind {
+                let field = binding.target.clone();
+
+                let annotation = binding.annotation.as_ref().ok_or_else(|| {
+                    GenerateError::new(
+                        ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
+                            struct_name: string.to_string(),
+                            field_name: field.as_str().unwrap_or("").to_string(),
+                        }),
+                        span,
+                    )
+                })?;
+
+                let ty = self.to_basic_type(annotation, member.span)?;
+                fields.push((field.clone(), ty));
+
+                let size = self.size(ty);
+                if size >= max_size || largest_type.is_none() {
+                    max_size = size;
+                    largest_type = Some(ty);
+                }
+            }
+        }
+
+        if let Some(largest) = largest_type {
+            shape.set_body(&[largest], false);
+        } else {
+            shape.set_body(&[], false);
+        }
+
+        self.insert_entity(
+            identifier,
+            Entity::Union {
+                structure: shape,
+                fields,
+            },
+        );
+
+        Ok(self.context.i64_type().const_zero().into())
+    }
+
     pub fn constructor(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
@@ -172,87 +269,144 @@ impl<'backend> Inkwell<'backend> {
         let identifier = structure.target.clone();
         let name_str = identifier.as_str().unwrap_or("").to_string();
 
-        let (shape, fields) = match self.get_entity(&identifier) {
-            Some(Entity::Struct {
-                structure: defined,
-                fields,
-            }) => (*defined, fields.clone()),
-            Some(_) => {
-                return Err(GenerateError::new(
-                    ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }),
-                    span,
-                ))
-            }
-            None => {
-                return Err(GenerateError::new(
-                    ErrorKind::DataStructure(DataStructureError::UnknownStructType {
-                        name: name_str,
-                    }),
-                    span,
-                ))
-            }
-        };
+        let entity = self.get_entity(&identifier).cloned();
 
-        let mut value = shape.get_undef();
-        let mut position = 0usize;
+        match entity {
+            Some(Entity::Struct { structure: shape, fields }) => {
+                let mut value = shape.get_undef();
+                let mut position = 0usize;
 
-        for member in structure.members {
-            let (index, field_name, assigned) = match &member.kind {
-                AnalysisKind::Assign(field, assigned) => {
-                    let idx = fields
+                for member in structure.members {
+                    let (index, field_name, assigned) = match &member.kind {
+                        AnalysisKind::Assign(field, assigned) => {
+                            let idx = fields
+                                .iter()
+                                .position(|item| item == field)
+                                .ok_or_else(|| {
+                                    GenerateError::new(
+                                        ErrorKind::DataStructure(DataStructureError::UnknownField {
+                                            struct_name: name_str.clone(),
+                                            field_name: field.as_str().unwrap_or("").to_string(),
+                                        }),
+                                        span,
+                                    )
+                                })?;
+                            (
+                                idx,
+                                field.as_str().unwrap_or("").to_string(),
+                                *assigned.clone(),
+                            )
+                        }
+                        _ => {
+                            if position >= fields.len() {
+                                return Err(GenerateError::new(
+                                    ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
+                                        struct_name: name_str,
+                                    }),
+                                    span,
+                                ));
+                            }
+                            let idx = position;
+                            position += 1;
+                            (idx, format!("positional arg {}", idx), member)
+                        }
+                    };
+
+                    let kind = shape.get_field_type_at_index(index as u32).unwrap();
+                    let evaluated = self.analysis(assigned)?;
+
+                    let casted = self.convert(evaluated, kind).ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
+                                struct_name: name_str.clone(),
+                                field_name,
+                            }),
+                            span,
+                        )
+                    })?;
+
+                    value = self
+                        .builder
+                        .build_insert_value(value, casted, index as u32, "insert")
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                        .into_struct_value();
+                }
+
+                Ok(value.into())
+            }
+
+            Some(Entity::Union { structure: shape, fields }) => {
+                if structure.members.len() > 1 {
+                    return Err(GenerateError::new(
+                        ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
+                            struct_name: name_str,
+                        }),
+                        span,
+                    ));
+                }
+
+                let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
+                let pointer = self.build_entry(function, shape.into(), Str::from("union_init"));
+
+                if let Some(member) = structure.members.into_iter().next() {
+                    let (field_name, assigned) = match &member.kind {
+                        AnalysisKind::Assign(field, assigned) => {
+                            (field.as_str().unwrap_or("").to_string(), *assigned.clone())
+                        }
+                        _ => {
+                            return Err(GenerateError::new(
+                                ErrorKind::DataStructure(DataStructureError::InvalidMemberAccessExpression),
+                                span,
+                            ))
+                        }
+                    };
+
+                    let field_type = fields
                         .iter()
-                        .position(|item| item == field)
+                        .find(|(name, _)| name.as_str().unwrap_or("") == field_name)
+                        .map(|(_, ty)| *ty)
                         .ok_or_else(|| {
                             GenerateError::new(
                                 ErrorKind::DataStructure(DataStructureError::UnknownField {
                                     struct_name: name_str.clone(),
-                                    field_name: field.as_str().unwrap_or("").to_string(),
+                                    field_name: field_name.clone(),
                                 }),
                                 span,
                             )
                         })?;
-                    (
-                        idx,
-                        field.as_str().unwrap_or("").to_string(),
-                        *assigned.clone(),
-                    )
-                }
-                _ => {
-                    if position >= fields.len() {
-                        return Err(GenerateError::new(
-                            ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
-                                struct_name: name_str,
+
+                    let evaluated = self.analysis(assigned)?;
+
+                    let casted = self.convert(evaluated, field_type).ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
+                                struct_name: name_str.clone(),
+                                field_name,
                             }),
                             span,
-                        ));
-                    }
-                    let idx = position;
-                    position += 1;
-                    (idx, format!("positional arg {}", idx), member)
+                        )
+                    })?;
+
+                    // Write correctly to the memory block
+                    self.builder.build_store(pointer, casted).map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
                 }
-            };
 
-            let kind = shape.get_field_type_at_index(index as u32).unwrap();
-            let evaluated = self.analysis(assigned)?;
+                self.builder.build_load(shape, pointer, "union_val")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+            }
 
-            let casted = self.convert(evaluated, kind).ok_or_else(|| {
-                GenerateError::new(
-                    ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
-                        struct_name: name_str.clone(),
-                        field_name,
-                    }),
-                    span,
-                )
-            })?;
+            Some(_) => Err(GenerateError::new(
+                ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }),
+                span,
+            )),
 
-            value = self
-                .builder
-                .build_insert_value(value, casted, index as u32, "insert")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                .into_struct_value();
+            None => Err(GenerateError::new(
+                ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: name_str }),
+                span,
+            )),
         }
-
-        Ok(value.into())
     }
 
     pub fn access(
@@ -288,6 +442,7 @@ impl<'backend> Inkwell<'backend> {
             if let Some(Entity::Variable { pointer, kind, .. }) = self.get_entity(identifier) {
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
+
                     if let Some(fields) = self.fields(*kind) {
                         if let Some(index) = fields.iter().position(|item| item == &field) {
                             let slot = self
@@ -299,6 +454,15 @@ impl<'backend> Inkwell<'backend> {
                             let resolved = shape.get_field_type_at_index(index as u32).unwrap();
 
                             return self.builder.build_load(resolved, slot, "value").map_err(
+                                |error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                },
+                            );
+                        }
+                    } else if let Some(fields) = self.union_fields(*kind) {
+                        if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == &field) {
+                            // Extract straight from union base pointer
+                            return self.builder.build_load(*field_type, *pointer, "value").map_err(
                                 |error| {
                                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                                 },
@@ -321,6 +485,22 @@ impl<'backend> Inkwell<'backend> {
                             GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                         })
                         .map(Into::into);
+                }
+            } else if let Some(fields) = self.union_fields(structure.get_type().as_basic_type_enum()) {
+                if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == &field) {
+                    // Temporaries need to be spilled to stack for dynamic extraction
+                    let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
+                    let pointer = self.build_entry(function, structure.get_type().into(), Str::from("union_spill"));
+
+                    self.builder.build_store(pointer, structure).map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
+
+                    return self.builder.build_load(*field_type, pointer, "value").map_err(
+                        |error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        },
+                    );
                 }
             }
         }

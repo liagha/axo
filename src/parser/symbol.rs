@@ -84,6 +84,7 @@ impl<'symbol> Symbol<'symbol> {
 pub enum SymbolKind<'symbol> {
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Union(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Function(
         Function<
             Box<Element<'symbol>>,
@@ -100,6 +101,7 @@ impl<'symbol> SymbolKind<'symbol> {
         match self {
             SymbolKind::Binding(binding) => binding.target.brand(),
             SymbolKind::Structure(structure) => structure.target.brand(),
+            SymbolKind::Union(union) => union.target.brand(),
             SymbolKind::Function(function) => function.target.brand(),
             SymbolKind::Module(module) => module.target.brand(),
         }

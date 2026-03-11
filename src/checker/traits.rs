@@ -69,8 +69,11 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Structure(_) => {
                         "Structure".to_string()
                     }
-                    TypeKind::Function(_) => {
-                        "Method".to_string()
+                    TypeKind::Union(_) => {
+                        "Union".to_string()
+                    }
+                    TypeKind::Function(_, _, _) => {
+                        "Function".to_string()
                     }
                 }
             }
