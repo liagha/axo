@@ -14,7 +14,7 @@ use {
 impl<'resolver> Resolver<'resolver> {
     pub fn builtin(
         target: &Element<'resolver>,
-        scope: &Scope<'resolver>,
+        scope: &Scope<Symbol<'resolver>>,
     ) -> Option<Symbol<'resolver>> {
         let name = target.brand().and_then(|token| match token.kind {
             TokenKind::Identifier(identifier) => identifier.as_str().map(|name| name.to_string()),
@@ -41,7 +41,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    fn compiler(scope: &Scope<'resolver>) -> Symbol<'resolver> {
+    fn compiler(scope: &Scope<Symbol<'resolver>>) -> Symbol<'resolver> {
         let identifier = Element::new(
             ElementKind::Literal(Token::new(
                 TokenKind::Identifier(Str::from("compiler")),

@@ -64,6 +64,7 @@ pub enum FunctionError {
     IncompatibleReturnType,
     Undefined { name: String },
     NotInFunctionContext,
+    MissingReturn,
 }
 
 #[derive(Clone, Debug)]
@@ -246,6 +247,9 @@ impl Display for FunctionError {
             }
             FunctionError::NotInFunctionContext => {
                 write!(f, "operation cannot be performed outside of a function context")
+            }
+            FunctionError::MissingReturn => {
+                write!(f, "missing return value")
             }
         }
     }

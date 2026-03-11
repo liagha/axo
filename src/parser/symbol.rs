@@ -24,7 +24,7 @@ pub struct Symbol<'symbol> {
     pub usages: Set<Identity>,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
-    pub scope: Scope<'symbol>,
+    pub scope: Scope<Symbol<'symbol>>,
     pub visibility: Visibility,
     pub ty: Type<'symbol>,
 }
@@ -63,7 +63,7 @@ impl<'symbol> Symbol<'symbol> {
         self.scope.symbols.extend(members);
     }
 
-    pub fn with_scope(self, scope: Scope<'symbol>) -> Self {
+    pub fn with_scope(self, scope: Scope<Symbol<'symbol>>) -> Self {
         Self {
             scope,
             identity: self.identity,
@@ -71,7 +71,7 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn set_scope(&mut self, scope: Scope<'symbol>) {
+    pub fn set_scope(&mut self, scope: Scope<Symbol<'symbol>>) {
         self.scope = scope;
     }
 
@@ -110,7 +110,7 @@ impl<'symbol> Element<'symbol> {
     pub fn brand(&self) -> Option<&Token<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => {
-                    Some(literal)
+                Some(literal)
             },
             ElementKind::Construct(construct) => construct.target.brand(),
             ElementKind::Index(index) => index.target.brand(),

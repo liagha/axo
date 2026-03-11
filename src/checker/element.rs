@@ -11,7 +11,7 @@ impl<'element> Checkable<'element> for Element<'element> {
     fn check(&mut self, errors: &mut Vec<CheckError<'element>>) {
         let span = self.span;
 
-        let resolved_ty = match &mut self.kind {
+        let ty = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
                 TokenKind::Integer(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
                 TokenKind::Float(_)   => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
@@ -601,10 +601,11 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Symbolize(symbol) => {
                 symbol.check(errors);
-                Type::new(TypeKind::Tuple { members: Vec::new() }, span)
+
+                symbol.ty.clone()
             }
         };
 
-        self.ty = resolved_ty;
+        self.ty = ty;
     }
 }

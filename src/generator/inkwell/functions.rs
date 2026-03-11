@@ -54,26 +54,6 @@ impl<'backend> super::Inkwell<'backend> {
                 .build_float_cast(float, target.into_float_type(), "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-            (BasicValueEnum::IntValue(integer), target) if target.is_float_type() => self
-                .builder
-                .build_signed_int_to_float(integer, target.into_float_type(), "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-            (BasicValueEnum::FloatValue(float), target) if target.is_int_type() => self
-                .builder
-                .build_float_to_signed_int(float, target.into_int_type(), "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-            (BasicValueEnum::PointerValue(pointer), target) if target.is_int_type() => self
-                .builder
-                .build_ptr_to_int(pointer, target.into_int_type(), "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-            (BasicValueEnum::IntValue(integer), target) if target.is_pointer_type() => self
-                .builder
-                .build_int_to_ptr(integer, target.into_pointer_type(), "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             _ => Err(GenerateError::new(
                 ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
@@ -314,7 +294,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(inkwell::module::Linkage::External),
             );
             callable.set_section(Some("text"));
-            self.entities.insert(method.target.clone(), Entity::Function(callable));
+            self.insert_entity(method.target.clone(), Entity::Function(callable));
             callable
         } else {
             let linkage = if method.entry {
@@ -325,15 +305,9 @@ impl<'backend> super::Inkwell<'backend> {
 
             let callable = self.current_module().add_function(identifier, signature, linkage);
 
-            let previous = self.entities.clone();
-            let mut scoped = Map::default();
-            for (key, item) in previous.iter() {
-                if let Entity::Function(existing) = item {
-                    scoped.insert((*key).clone(), Entity::Function(existing.clone()));
-                }
-            }
-            self.entities = scoped;
-            self.entities.insert(method.target.clone(), Entity::Function(callable));
+            let mut func_scope = Map::default();
+            func_scope.insert(method.target.clone(), Entity::Function(callable));
+            self.entities.push(func_scope);
 
             let entry = self.context.append_basic_block(callable, "entry");
             self.builder.position_at_end(entry);
@@ -353,7 +327,7 @@ impl<'backend> super::Inkwell<'backend> {
                     } else {
                         None
                     };
-                    self.entities.insert(
+                    self.insert_entity(
                         bind.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
@@ -367,6 +341,8 @@ impl<'backend> super::Inkwell<'backend> {
 
             self.loop_headers.clear();
             self.loop_exits.clear();
+            self.loop_results.clear();
+
             let result = self.analysis(*method.body.clone())?;
 
             if !self.terminated() {
@@ -379,6 +355,8 @@ impl<'backend> super::Inkwell<'backend> {
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
+
+            self.entities.pop();
         }
 
         Ok(self.context.i64_type().const_zero().into())
@@ -424,7 +402,6 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(consequence);
         let leftwards = self.analysis(*positive)?;
-        let left = self.builder.get_insert_block();
         let persists = !self.terminated();
 
         if persists {
@@ -435,7 +412,6 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(alternative);
         let rightwards = self.analysis(*negative)?;
-        let right = self.builder.get_insert_block();
         let continues = !self.terminated();
 
         if continues {
@@ -447,15 +423,25 @@ impl<'backend> super::Inkwell<'backend> {
         self.builder.position_at_end(merge);
 
         if persists && continues && leftwards.get_type() == rightwards.get_type() {
-            let phi = self
-                .builder
-                .build_phi(leftwards.get_type(), "result")
+            let result_alloca = self.build_entry(function, leftwards.get_type(), "cond_res".into());
+
+            if let Some(left_block) = consequence.get_terminator().and_then(|t| t.get_parent()) {
+                self.builder.position_before(&left_block.get_terminator().unwrap());
+                self.builder.build_store(result_alloca, leftwards)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            }
+
+            if let Some(right_block) = alternative.get_terminator().and_then(|t| t.get_parent()) {
+                self.builder.position_before(&right_block.get_terminator().unwrap());
+                self.builder.build_store(result_alloca, rightwards)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            }
+
+            self.builder.position_at_end(merge);
+            let value = self.builder.build_load(leftwards.get_type(), result_alloca, "cond_val")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            if let (Some(alpha), Some(beta)) = (left, right) {
-                phi.add_incoming(&[(&leftwards, alpha), (&rightwards, beta)]);
-            }
-            Ok(phi.as_basic_value())
+            Ok(value)
         } else if persists {
             Ok(leftwards)
         } else if continues {
@@ -480,6 +466,10 @@ impl<'backend> super::Inkwell<'backend> {
         let core = self.context.append_basic_block(function, "core");
         let end = self.context.append_basic_block(function, "end");
 
+        let result_alloc = self.build_entry(function, self.context.i64_type().into(), "loop_res".into());
+        self.builder.build_store(result_alloc, self.context.i64_type().const_zero())
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
         self.builder
             .build_unconditional_branch(heading)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
@@ -493,11 +483,14 @@ impl<'backend> super::Inkwell<'backend> {
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(core);
+
         self.loop_headers.push(heading);
         self.loop_exits.push(end);
+        self.loop_results.push(Some(result_alloc));
 
         self.analysis(*body)?;
 
+        self.loop_results.pop();
         self.loop_exits.pop();
         self.loop_headers.pop();
 
@@ -508,7 +501,11 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         self.builder.position_at_end(end);
-        Ok(self.context.i64_type().const_zero().into())
+
+        let final_value = self.builder.build_load(self.context.i64_type(), result_alloc, "loop_val")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+        Ok(final_value)
     }
 
     pub fn invoke(
@@ -520,7 +517,7 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(value);
         }
 
-        let entity = self.entities.get(&invoke.target).and_then(|item| {
+        let entity = self.get_entity(&invoke.target).and_then(|item| {
             if let Entity::Function(callable) = item {
                 Some(*callable)
             } else {
@@ -618,7 +615,11 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
-            self.analysis(*item)?;
+            let evaluated = self.analysis(*item)?;
+            if let Some(Some(alloc)) = self.loop_results.last() {
+                self.builder.build_store(*alloc, evaluated)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            }
         }
 
         if self.terminated() {
@@ -644,7 +645,11 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
-            self.analysis(*item)?;
+            let evaluated = self.analysis(*item)?;
+            if let Some(Some(alloc)) = self.loop_results.last() {
+                self.builder.build_store(*alloc, evaluated)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            }
         }
 
         if self.terminated() {
@@ -676,6 +681,7 @@ impl<'backend> super::Inkwell<'backend> {
                 span
             ))
     }
+
     pub fn explicit_cast(
         &mut self,
         value: Box<Analysis<'backend>>,
@@ -776,5 +782,4 @@ impl<'backend> super::Inkwell<'backend> {
 
         Ok(size.into())
     }
-
 }

@@ -6,7 +6,7 @@ use crate::{
     resolver::Resolver,
 };
 use crate::analyzer::AnalysisKind;
-use crate::checker::{Type, TypeKind};
+use crate::checker::{Type};
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -25,11 +25,6 @@ impl<'analyzer> Analyzer<'analyzer> {
 
     pub fn analyze(&mut self, resolver: &mut Resolver<'analyzer>) {
         for element in self.input.iter_mut() {
-            if element.ty.kind == TypeKind::Unknown {
-                self.errors.push(AnalyzeError::new(ErrorKind::Unimplemented, element.span));
-                continue;
-            }
-
             match element.analyze(resolver) {
                 Ok(analysis) => {
                     self.output.push(analysis);

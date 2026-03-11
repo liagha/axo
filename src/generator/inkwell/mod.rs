@@ -46,14 +46,30 @@ pub struct Inkwell<'backend> {
     pub modules: Map<Str<'backend>, Module<'backend>>,
     pub current_module: Str<'backend>,
 
-    entities: Map<Str<'backend>, Entity<'backend>>,
+    entities: Vec<Map<Str<'backend>, Entity<'backend>>>,
     pub errors: Vec<GenerateError<'backend>>,
 
     loop_headers: Vec<BasicBlock<'backend>>,
     loop_exits: Vec<BasicBlock<'backend>>,
+    loop_results: Vec<Option<PointerValue<'backend>>>,
 }
 
 impl<'backend> Inkwell<'backend> {
+    pub fn get_entity(&self, name: &Str<'backend>) -> Option<&Entity<'backend>> {
+        for scope in self.entities.iter().rev() {
+            if let Some(entity) = scope.get(name) {
+                return Some(entity);
+            }
+        }
+        None
+    }
+
+    pub fn insert_entity(&mut self, name: Str<'backend>, entity: Entity<'backend>) {
+        if let Some(scope) = self.entities.last_mut() {
+            scope.insert(name, entity);
+        }
+    }
+
     pub fn llvm_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let ty = match &ty.kind {
             TypeKind::Integer { size: bits, .. } => {
@@ -86,8 +102,7 @@ impl<'backend> Inkwell<'backend> {
             },
             TypeKind::Structure(structure) => {
                 if let Some(ty) = self
-                    .entities
-                    .get(&structure.target)
+                    .get_entity(&structure.target)
                     .and_then(
                         |entity| {
                             if let Entity::Struct { struct_type, .. } = entity {
@@ -123,22 +138,25 @@ impl<'backend> Inkwell<'backend> {
     pub fn new(context: ContextRef<'backend>) -> Self {
         let builder = context.create_builder();
 
+        inkwell::targets::Target::initialize_all(&inkwell::targets::InitializationConfig::default());
+
         Self {
             context,
             builder,
             current_module: Default::default(),
-            entities: Default::default(),
+            entities: vec![Default::default()],
             modules: Default::default(),
             errors: Vec::new(),
             loop_headers: Vec::new(),
             loop_exits: Vec::new(),
+            loop_results: Vec::new(),
         }
     }
 
     pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
         match &analysis.kind {
             AnalysisKind::Integer { signed, .. } => Some(*signed),
-            AnalysisKind::Usage(identifier) => match self.entities.get(identifier) {
+            AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
                 Some(Entity::Variable { signed, .. }) => *signed,
                 _ => None,
             },
@@ -229,29 +247,29 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
 
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
-                if let Some(func) = block.get_parent() {
-                    if let Some(ret_type) = func.get_type().get_return_type() {
-                        if ret_type.is_int_type() {
-                            let _ = self.builder.build_return(Some(&ret_type.into_int_type().const_zero()));
-                        } else if ret_type.is_float_type() {
-                            let _ = self.builder.build_return(Some(&ret_type.into_float_type().const_zero()));
-                        } else {
-                            let _ = self.builder.build_return(None);
-                        }
-                    } else {
-                        let _ = self.builder.build_return(None);
-                    }
+                // Prevent cascading "MissingReturn" errors if a previous error aborted generation
+                if self.errors.is_empty() {
+                    self.errors.push(
+                        GenerateError::new(
+                            ErrorKind::Function(error::FunctionError::MissingReturn),
+                            Span::void()
+                        )
+                    );
                 }
+                let _ = self.builder.build_unreachable();
             }
         }
 
-        if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {
-            self.errors.push(
-                GenerateError::new(
-                    ErrorKind::Verification(error.to_string()),
-                    Span::void()
+        // Only run LLVM verify if no preceding errors occurred to avoid noisy verification panics
+        if self.errors.is_empty() {
+            if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {
+                self.errors.push(
+                    GenerateError::new(
+                        ErrorKind::Verification(error.to_string()),
+                        Span::void()
+                    )
                 )
-            )
+            }
         }
     }
 

@@ -15,12 +15,12 @@ use {
 };
 
 #[derive(Clone)]
-pub struct Scope<'scope> {
-    pub symbols: Set<Symbol<'scope>>,
-    pub parent: Option<Box<Scope<'scope>>>,
+pub struct Scope<Value> {
+    pub symbols: Set<Value>,
+    pub parent: Option<Box<Scope<Value>>>,
 }
 
-impl<'scope> Scope<'scope> {
+impl<'scope> Scope<Symbol<'scope>> {
     pub fn new() -> Self {
         Self {
             symbols: Set::new(),
@@ -32,18 +32,18 @@ impl<'scope> Scope<'scope> {
         self.symbols.is_empty()
     }
 
-    pub fn with_parent(parent: Scope<'scope>) -> Self {
+    pub fn with_parent(parent: Scope<Symbol<'scope>>) -> Self {
         Self {
             symbols: Set::new(),
             parent: Some(Box::new(parent)),
         }
     }
 
-    pub fn attach(&mut self, parent: Scope<'scope>) {
+    pub fn attach(&mut self, parent: Scope<Symbol<'scope>>) {
         self.parent = Some(Box::new(parent));
     }
 
-    pub fn detach(&mut self) -> Option<Scope<'scope>> {
+    pub fn detach(&mut self) -> Option<Scope<Symbol<'scope>>> {
         self.parent.take().map(|boxed| *boxed)
     }
 
@@ -82,7 +82,7 @@ impl<'scope> Scope<'scope> {
         depth
     }
 
-    pub fn root(&self) -> &Scope<'scope> {
+    pub fn root(&self) -> &Scope<Symbol<'scope>> {
         let mut current = self;
         while let Some(parent) = current.parent.as_deref() {
             current = parent;
@@ -96,7 +96,7 @@ impl<'scope> Scope<'scope> {
         }
     }
 
-    pub fn merge(&mut self, other: &Scope<'scope>) {
+    pub fn merge(&mut self, other: &Scope<Symbol<'scope>>) {
         for symbol in &other.symbols {
             self.add(symbol.clone());
         }

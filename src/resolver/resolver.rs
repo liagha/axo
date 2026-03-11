@@ -7,7 +7,7 @@ use {
 };
 
 pub struct Resolver<'resolver> {
-    pub scope: Scope<'resolver>,
+    pub scope: Scope<Symbol<'resolver>>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
 }
@@ -47,7 +47,7 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.attach(parent);
     }
 
-    pub fn enter_scope(&mut self, scope: Scope<'resolver>) {
+    pub fn enter_scope(&mut self, scope: Scope<Symbol<'resolver>>) {
         let parent = replace(&mut self.scope, scope);
         self.scope.attach(parent);
     }

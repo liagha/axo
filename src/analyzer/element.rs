@@ -25,10 +25,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
         let ty = self.ty.clone();
 
-        if ty.kind == TypeKind::Unknown {
-            return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span));
-        }
-
         match &self.kind {
             ElementKind::Literal(literal) => {
                 let kind = match &literal.kind {
@@ -49,6 +45,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     TokenKind::Boolean(value) => AnalysisKind::Boolean { value: *value },
                     TokenKind::String(value) => AnalysisKind::String { value: *value },
                     TokenKind::Character(value) => AnalysisKind::Character { value: *value },
+                    TokenKind::Identifier(identifier) => AnalysisKind::Usage(identifier.clone()),
                     _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
                 };
 
@@ -326,7 +323,9 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span, ty))
             }
 
-            ElementKind::Symbolize(symbol) => symbol.analyze(resolver),
+            ElementKind::Symbolize(symbol) => {
+                symbol.analyze(resolver)
+            },
         }
     }
 }

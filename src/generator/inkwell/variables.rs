@@ -18,7 +18,7 @@ use {
 impl<'backend> super::Inkwell<'backend> {
     fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
-            AnalysisKind::Usage(name) => match self.entities.get(name) {
+            AnalysisKind::Usage(name) => match self.get_entity(name) {
                 Some(Entity::Variable { pointee, .. }) if pointee.is_some() => *pointee,
 
                 Some(Entity::Variable { kind, .. }) if kind.is_pointer_type() => {
@@ -111,7 +111,7 @@ impl<'backend> super::Inkwell<'backend> {
         identifier: Str<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if let Some(entity) = self.entities.get(&identifier) {
+        if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
                 Entity::Function(function) => {
                     Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
@@ -130,6 +130,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         if let Some(module) = self.modules.get(&self.current_module) {
+            // 1. Check for global variables
             if let Some(global) = module.get_global(&identifier) {
                 let basic_type: BasicTypeEnum = match global.get_value_type() {
                     inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
@@ -152,6 +153,11 @@ impl<'backend> super::Inkwell<'backend> {
                     .build_load(basic_type, global.as_pointer_value(), &identifier)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
             }
+
+            // 2. Add missing lookup for LLVM Functions!
+            if let Some(function) = module.get_function(&identifier) {
+                return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
+            }
         }
 
         Err(GenerateError::new(
@@ -172,7 +178,7 @@ impl<'backend> super::Inkwell<'backend> {
         let signed = self.infer_signedness(&value);
         let result = self.analysis(*value)?;
 
-        let existing_pointer = match self.entities.get(&target) {
+        let existing_pointer = match self.get_entity(&target) {
             Some(Entity::Variable { pointer, .. }) => Some(*pointer),
             _ => None,
         };
@@ -181,15 +187,25 @@ impl<'backend> super::Inkwell<'backend> {
             self.builder.build_store(slot, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            self.entities.insert(
-                target.clone(),
-                Entity::Variable {
-                    pointer: slot,
-                    kind: result.get_type(),
-                    pointee,
-                    signed,
-                },
-            );
+            let mut updated = false;
+            for scope in self.entities.iter_mut().rev() {
+                if scope.contains_key(&target) {
+                    scope.insert(
+                        target.clone(),
+                        Entity::Variable {
+                            pointer: slot,
+                            kind: result.get_type(),
+                            pointee,
+                            signed,
+                        },
+                    );
+                    updated = true;
+                    break;
+                }
+            }
+            if !updated {
+                self.insert_entity(target.clone(), Entity::Variable { pointer: slot, kind: result.get_type(), pointee, signed });
+            }
         } else {
             let func = self.parent(span)?;
             let pointer = self.build_entry(func, result.get_type(), target.clone());
@@ -197,7 +213,7 @@ impl<'backend> super::Inkwell<'backend> {
             self.builder.build_store(pointer, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            self.entities.insert(
+            self.insert_entity(
                 target.clone(),
                 Entity::Variable {
                     pointer,
@@ -266,12 +282,6 @@ impl<'backend> super::Inkwell<'backend> {
                 .ok()
                 .map(Into::into)
                 .unwrap_or(value)
-        } else if value.is_pointer_value() && declared_kind.is_int_type() {
-            self.builder
-                .build_ptr_to_int(value.into_pointer_value(), declared_kind.into_int_type(), "bind_ptr_cast")
-                .ok()
-                .map(Into::into)
-                .unwrap_or(value)
         } else {
             return Err(GenerateError::new(
                 ErrorKind::Variable(VariableError::BindingTypeMismatch {
@@ -305,7 +315,7 @@ impl<'backend> super::Inkwell<'backend> {
             global.as_pointer_value()
         };
 
-        self.entities.insert(
+        self.insert_entity(
             binding.target.clone(),
             Entity::Variable { pointer, kind: declared_kind, pointee, signed },
         );
@@ -339,16 +349,6 @@ impl<'backend> super::Inkwell<'backend> {
                 let casted = self
                     .builder
                     .build_float_cast(result.into_float_value(), kind.into_float_type(), "store_cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result);
-
-                self.builder.build_store(pointer, casted)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-            } else if result.is_pointer_value() && kind.is_int_type() {
-                let casted = self
-                    .builder
-                    .build_ptr_to_int(result.into_pointer_value(), kind.into_int_type(), "store_ptr_cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
