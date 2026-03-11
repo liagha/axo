@@ -10,7 +10,7 @@ use {
     },
     inkwell::values::{BasicValueEnum},
 };
-use crate::generator::error::BitwiseError;
+use crate::generator::inkwell::error::BitwiseError;
 use crate::generator::GenerateError;
 use crate::tracker::Span;
 

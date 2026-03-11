@@ -163,10 +163,10 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let AnalysisKind::Usage(identifier) = &target.kind {
             if self.modules.contains_key(identifier) {
-                match &member.kind {
-                    AnalysisKind::Usage(name) => return self.usage(name.clone(), span),
-                    AnalysisKind::Invoke(invoke) => return self.invoke(invoke.clone(), span),
-                    _ => return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess), span)),
+                return match &member.kind {
+                    AnalysisKind::Usage(name) => self.usage(name.clone(), span),
+                    AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
+                    _ => Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess), span)),
                 }
             }
         }
@@ -253,29 +253,20 @@ impl<'backend> super::Inkwell<'backend> {
         let kind = values[0].get_type();
         let shape = kind.array_type(values.len() as u32);
 
-        let pointer = self.builder.build_alloca(shape, "array")
-            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
-
-        let zero = self.context.i32_type().const_zero();
+        let mut current = shape.get_undef();
 
         for (index, value) in values.into_iter().enumerate() {
-            let offset = self.context.i32_type().const_int(index as u64, false);
-
-            let slot = unsafe {
-                self.builder
-                    .build_in_bounds_gep(shape, pointer, &[zero, offset], "index")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
-            };
-
             let casted = self.convert(value, kind).ok_or_else(|| {
                 GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayLiteralTypeMismatch { index }), span)
             })?;
 
-            self.builder.build_store(slot, casted)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+            current = self.builder
+                .build_insert_value(current, casted, index as u32, "insert")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                .into_array_value();
         }
 
-        Ok(pointer.into())
+        Ok(current.into())
     }
 
     pub fn tuple(
@@ -319,10 +310,30 @@ impl<'backend> super::Inkwell<'backend> {
         let offset = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
-            if let Some(Entity::Array { element_type: element, element_count: count, .. }) = self.entities.get(identifier) {
-                if let BasicValueEnum::PointerValue(pointer) = target {
+            if let Some(Entity::Variable { kind, pointer, .. }) = self.entities.get(identifier) {
+                if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {
-                        let length = self.context.i32_type().const_int(*count as u64, false);
+                        return if let Some(constant) = integer.get_zero_extended_constant() {
+                            let shape = kind.into_struct_type();
+                            let slot = self.builder.build_struct_gep(
+                                shape,
+                                *pointer,
+                                constant as u32,
+                                "index",
+                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+
+                            let field = shape.get_field_type_at_index(constant as u32).unwrap();
+                            self.builder.build_load(field, slot, "value")
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                        } else {
+                            Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
+                        }
+                    }
+                } else if kind.is_array_type() {
+                    if let BasicValueEnum::IntValue(integer) = offset {
+                        let shape = kind.into_array_type();
+                        let element_type = shape.get_element_type();
+                        let length = self.context.i32_type().const_int(shape.len() as u64, false);
 
                         let exceeds = self.builder.build_int_compare(
                             IntPredicate::UGE,
@@ -351,34 +362,15 @@ impl<'backend> super::Inkwell<'backend> {
 
                         self.builder.position_at_end(resume);
 
+                        let zero = self.context.i32_type().const_zero();
                         let slot = unsafe {
                             self.builder
-                                .build_in_bounds_gep(*element, pointer, &[integer], "index")
+                                .build_in_bounds_gep(shape, *pointer, &[zero, integer], "index")
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                         };
 
-                        return self.builder.build_load(*element, slot, "value")
+                        return self.builder.build_load(element_type, slot, "value")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span));
-                    }
-                }
-            } else if let Some(Entity::Variable { kind, pointer, .. }) = self.entities.get(identifier) {
-                if kind.is_struct_type() {
-                    if let BasicValueEnum::IntValue(integer) = offset {
-                        if let Some(constant) = integer.get_zero_extended_constant() {
-                            let shape = kind.into_struct_type();
-                            let slot = self.builder.build_struct_gep(
-                                shape,
-                                *pointer,
-                                constant as u32,
-                                "index",
-                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
-
-                            let field = shape.get_field_type_at_index(constant as u32).unwrap();
-                            return self.builder.build_load(field, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span));
-                        } else {
-                            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span));
-                        }
                     }
                 }
             }
@@ -386,28 +378,28 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let BasicValueEnum::StructValue(structure) = target {
             if let BasicValueEnum::IntValue(integer) = offset {
-                if let Some(constant) = integer.get_zero_extended_constant() {
-                    return self.builder.build_extract_value(
+                return if let Some(constant) = integer.get_zero_extended_constant() {
+                    self.builder.build_extract_value(
                         structure,
                         constant as u32,
                         "extract",
                     ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
-                        .map(Into::into);
+                        .map(Into::into)
                 } else {
-                    return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span));
+                    Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
                 }
             }
         } else if let BasicValueEnum::ArrayValue(array) = target {
             if let BasicValueEnum::IntValue(integer) = offset {
-                if let Some(constant) = integer.get_zero_extended_constant() {
-                    return self.builder.build_extract_value(
+                return if let Some(constant) = integer.get_zero_extended_constant() {
+                    self.builder.build_extract_value(
                         array,
                         constant as u32,
                         "extract",
                     ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
-                        .map(Into::into);
+                        .map(Into::into)
                 } else {
-                    return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayIndexNotConstant), span));
+                    Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayIndexNotConstant), span))
                 }
             }
         }

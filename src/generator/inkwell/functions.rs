@@ -17,7 +17,7 @@ use {
 };
 use crate::analyzer::AnalysisKind;
 use crate::checker::Type;
-use crate::generator::error::{ControlFlowError, FunctionError};
+use crate::generator::inkwell::error::{ControlFlowError, FunctionError};
 
 impl<'backend> super::Inkwell<'backend> {
     fn terminated(&self) -> bool {

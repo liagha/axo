@@ -1,13 +1,10 @@
 mod backend;
-mod error;
 mod generator;
 mod inkwell;
 
-pub use {backend::Backend, error::*, generator::Generator, inkwell::Inkwell};
+pub use {backend::Backend, generator::Generator, inkwell::Inkwell};
 
-use {
-    crate::reporter::Error,
-};
-
+use crate::reporter::Error;
+pub use self::inkwell::error::*;
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;

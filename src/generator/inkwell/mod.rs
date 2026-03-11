@@ -6,6 +6,7 @@ mod functions;
 mod logical;
 mod primitives;
 mod variables;
+pub mod error;
 
 use crate::analyzer::{Analysis, AnalysisKind};
 use crate::checker::{Type, TypeKind};
@@ -31,11 +32,6 @@ pub enum Entity<'backend> {
         kind: BasicTypeEnum<'backend>,
         pointee: Option<BasicTypeEnum<'backend>>,
         signed: Option<bool>,
-    },
-    Array {
-        pointer: PointerValue<'backend>,
-        element_type: BasicTypeEnum<'backend>,
-        element_count: usize,
     },
     Struct {
         struct_type: StructType<'backend>,

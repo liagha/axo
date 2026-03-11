@@ -1,54 +1,34 @@
-use inkwell::types::BasicType;
-use inkwell::values::BasicValue;
 use {
     super::{Backend, Entity},
     crate::{
+        data::*,
+        analyzer::{Analysis, AnalysisKind},
+        checker::{Type, TypeKind},
+        generator::inkwell::error::VariableError,
         data::Str,
         generator::{ErrorKind, GenerateError},
         tracker::Span,
     },
     inkwell::{
-        types::BasicTypeEnum,
+        types::{BasicTypeEnum},
         values::{BasicValueEnum, PointerValue},
     },
 };
-use crate::analyzer::{Analysis, AnalysisKind};
-use crate::checker::{Type, TypeKind};
-use crate::data::*;
-use crate::generator::error::VariableError;
 
 impl<'backend> super::Inkwell<'backend> {
-    fn lvalue_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
-        match &analysis.kind {
-            AnalysisKind::Usage(name) => match self.entities.get(name) {
-                Some(Entity::Variable { kind, .. }) => Some(*kind),
-                _ => None,
-            },
-            AnalysisKind::Dereference(operand) => self.pointer_pointee_type(operand),
-            _ => None,
-        }
-    }
-
     fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.entities.get(name) {
-                // Priority 1: Use the explicitly tracked pointee type
                 Some(Entity::Variable { pointee, .. }) if pointee.is_some() => *pointee,
 
-                // Priority 2: If it's a pointer but metadata is missing, and not opaque:
                 Some(Entity::Variable { kind, .. }) if kind.is_pointer_type() => {
-                    // This only works on older LLVM versions.
-                    // For Opaque Pointers, this will return None or error.
                     None
                 }
                 _ => None,
             },
             AnalysisKind::Dereference(operand) => {
-                // For **ptr, we need the pointee of the pointer returned by *ptr
                 self.pointer_pointee_type(operand).and_then(|t| {
                     if t.is_pointer_type() {
-                        // Logic to find what a pointer-to-pointer points to.
-                        // This usually requires looking up the type in your IR/Checker.
                         None
                     } else {
                         Some(t)
@@ -59,22 +39,17 @@ impl<'backend> super::Inkwell<'backend> {
         }
     }
 
-    // src/generator/inkwell/variables.rs
-
     fn lvalue_pointer(
         &mut self,
         analysis: &Analysis<'backend>,
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
         match &analysis.kind {
-            // ... (Usage case)
             AnalysisKind::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand);
                 let value = self.analysis(*operand.clone())?;
 
-                // Ensure we have a pointer and we know what it points to
                 match (value, pointee) {
                     (BasicValueEnum::PointerValue(_), None) => {
-                        // The value is a pointer, but the compiler doesn't know the element type.
                         Err(GenerateError::new(
                             ErrorKind::Variable(VariableError::DereferenceNonPointer), // Or a "Missing Type" error
                             analysis.span,
@@ -84,8 +59,7 @@ impl<'backend> super::Inkwell<'backend> {
                         Ok(Some((pointer, kind)))
                     }
                     (BasicValueEnum::IntValue(addr), Some(kind)) => {
-                        // Handle pointer arithmetic results (Int -> Ptr cast)
-                        let ptr = self.builder.build_int_to_ptr(addr, kind.ptr_type(inkwell::AddressSpace::default()), "ptr_arith_cast")
+                        let ptr = self.builder.build_int_to_ptr(addr, self.context.ptr_type(inkwell::AddressSpace::default()), "ptr_arith_cast")
                             .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, analysis.span))?;
                         Ok(Some((ptr, kind)))
                     }
