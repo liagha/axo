@@ -116,7 +116,7 @@ impl<'backend> Inkwell<'backend> {
                 } else {
                     return Err(
                         GenerateError::new(
-                            ErrorKind::InvalidType { ty: ty.clone() },
+                            ErrorKind::InvalidType(ty.clone()),
                             span
                         )
                     )
@@ -130,7 +130,7 @@ impl<'backend> Inkwell<'backend> {
             _ => {
                 return Err(
                     GenerateError::new(
-                        ErrorKind::InvalidType { ty: ty.clone() },
+                        ErrorKind::InvalidType(ty.clone()),
                         span
                     )
                 );

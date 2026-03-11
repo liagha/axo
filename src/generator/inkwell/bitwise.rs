@@ -1,20 +1,18 @@
 use {
-    super::{
-        Backend,
-        Inkwell,
-    },
     crate::{
         analyzer::{
             Analysis,
         },
         generator::{
+            Inkwell,
+            Backend,
+            ErrorKind,
+            GenerateError,
             inkwell::{
                 error::{
                     BitwiseError,
                 },
             },
-            ErrorKind,
-            GenerateError,
         },
         tracker::{
             Span,
@@ -140,7 +138,7 @@ impl<'backend> Inkwell<'backend> {
         let condition = self.builder.build_int_compare(IntPredicate::UGE, secondary, limit, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        self.trap(condition, span)?;
+        self.trap(Some(condition), span)?;
 
         Ok(BasicValueEnum::from(
             self.builder.build_left_shift(primary, secondary, "shift")
@@ -174,7 +172,7 @@ impl<'backend> Inkwell<'backend> {
         let condition = self.builder.build_int_compare(IntPredicate::UGE, secondary, limit, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        self.trap(condition, span)?;
+        self.trap(Some(condition), span)?;
 
         Ok(BasicValueEnum::from(
             self.builder.build_right_shift(primary, secondary, signed, "shift")

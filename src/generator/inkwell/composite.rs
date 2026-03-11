@@ -1,18 +1,91 @@
-use inkwell::IntPredicate;
+use inkwell::values::IntValue;
 use {
-    super::{Entity, Backend, GenerateError, super::{ErrorKind, DataStructureError}},
     crate::{
-        data::{Str, Index, Structure},
         analyzer::{Analysis, AnalysisKind},
+        data::{Index, Str, Structure},
+        generator::{
+            inkwell::{Backend, Entity, GenerateError, Inkwell},
+            DataStructureError, ErrorKind,
+        },
         tracker::Span,
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
         values::BasicValueEnum,
+        IntPredicate,
     },
 };
+use crate::generator::BuilderError;
 
-impl<'backend> super::Inkwell<'backend> {
+impl<'backend> Inkwell<'backend> {
+    fn fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<Str<'backend>>> {
+        for scope in self.entities.iter().rev() {
+            for entity in scope.values() {
+                if let Entity::Struct {
+                    structure,
+                    fields,
+                } = entity
+                {
+                    if structure.as_basic_type_enum() == target {
+                        return Some(fields.clone());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn trap(
+        &self,
+        condition: Option<IntValue<'backend>>,
+        span: Span<'backend>,
+    ) -> Result<(), GenerateError<'backend>> {
+
+        let trap_fn = self.current_module()
+            .get_function("llvm.trap")
+            .unwrap_or_else(|| {
+                let trap_type = self.context.void_type().fn_type(&[], false);
+                self.current_module().add_function("llvm.trap", trap_type, None)
+            });
+
+        match condition {
+            None => {
+                self.builder.build_call(trap_fn, &[], "trap")
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError(e.into()), span))?;
+
+                self.builder.build_unreachable()
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError(e.into()), span))?;
+            }
+
+            Some(condition) => {
+                let block = self.builder.get_insert_block()
+                    .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
+
+                let parent = block.get_parent()
+                    .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
+
+                let failure = self.context.append_basic_block(parent, "trap");
+                let success = self.context.append_basic_block(parent, "cont");
+
+                self.builder.build_conditional_branch(condition, failure, success)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError(e.into()), span))?;
+
+                self.builder.position_at_end(failure);
+
+                self.builder.build_call(trap_fn, &[], "")
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError(e.into()), span))?;
+
+                self.builder.build_unreachable()
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError(e.into()), span))?;
+
+                self.builder.position_at_end(success);
+            }
+        }
+
+        Ok(())
+    }
+
     fn convert(
         &self,
         value: BasicValueEnum<'backend>,
@@ -23,19 +96,23 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         match (value, target) {
-            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => self.builder
+            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => self
+                .builder
                 .build_int_cast(integer, target.into_int_type(), "cast")
                 .ok()
                 .map(Into::into),
-            (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self.builder
+            (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self
+                .builder
                 .build_float_cast(float, target.into_float_type(), "cast")
                 .ok()
                 .map(Into::into),
-            (BasicValueEnum::IntValue(integer), target) if target.is_float_type() => self.builder
+            (BasicValueEnum::IntValue(integer), target) if target.is_float_type() => self
+                .builder
                 .build_signed_int_to_float(integer, target.into_float_type(), "cast")
                 .ok()
                 .map(Into::into),
-            (BasicValueEnum::FloatValue(float), target) if target.is_int_type() => self.builder
+            (BasicValueEnum::FloatValue(float), target) if target.is_int_type() => self
+                .builder
                 .build_float_to_signed_int(float, target.into_int_type(), "cast")
                 .ok()
                 .map(Into::into),
@@ -50,31 +127,27 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("structure");
-        let name_str = string.to_string();
-
         let shape = self.context.opaque_struct_type(string);
 
-        let mut types = Vec::new();
-        let mut fields = Vec::new();
+        let mut types = Vec::with_capacity(structure.members.len());
+        let mut fields = Vec::with_capacity(structure.members.len());
 
         for member in &structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 fields.push(field.clone());
 
-                let kind = if let Some(annotation) = binding.annotation.as_ref() {
-                    self.to_basic_type(annotation, member.span)?
-                } else {
-                    return Err(GenerateError::new(
+                let annotation = binding.annotation.as_ref().ok_or_else(|| {
+                    GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
-                            struct_name: name_str,
+                            struct_name: string.to_string(),
                             field_name: field.as_str().unwrap_or("").to_string(),
                         }),
                         span,
-                    ));
-                };
+                    )
+                })?;
 
-                types.push(kind);
+                types.push(self.to_basic_type(annotation, member.span)?);
             }
         }
 
@@ -85,7 +158,7 @@ impl<'backend> super::Inkwell<'backend> {
             Entity::Struct {
                 structure: shape,
                 fields,
-            }
+            },
         );
 
         Ok(self.context.i64_type().const_zero().into())
@@ -99,68 +172,84 @@ impl<'backend> super::Inkwell<'backend> {
         let identifier = structure.target.clone();
         let name_str = identifier.as_str().unwrap_or("").to_string();
 
-        let (shape, fields) = if let Some(entity) = self.get_entity(&identifier) {
-            if let Entity::Struct { structure: defined, fields } = entity {
-                (*defined, fields.clone())
-            } else {
-                return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }), span));
+        let (shape, fields) = match self.get_entity(&identifier) {
+            Some(Entity::Struct {
+                structure: defined,
+                fields,
+            }) => (*defined, fields.clone()),
+            Some(_) => {
+                return Err(GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }),
+                    span,
+                ))
             }
-        } else {
-            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: name_str }), span));
+            None => {
+                return Err(GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::UnknownStructType {
+                        name: name_str,
+                    }),
+                    span,
+                ))
+            }
         };
 
         let mut value = shape.get_undef();
         let mut position = 0usize;
 
         for member in structure.members {
-            match member.kind {
+            let (index, field_name, assigned) = match &member.kind {
                 AnalysisKind::Assign(field, assigned) => {
-                    if let Some(index) = fields.iter().position(|item| item == &field) {
-                        let kind = shape.get_field_type_at_index(index as u32).unwrap();
-                        let evaluated = self.analysis(*assigned.clone())?;
-
-                        let casted = self.convert(evaluated, kind).ok_or_else(|| {
-                            GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
-                                struct_name: name_str.clone(),
-                                field_name: field.as_str().unwrap_or("").to_string()
-                            }), span)
+                    let idx = fields
+                        .iter()
+                        .position(|item| item == field)
+                        .ok_or_else(|| {
+                            GenerateError::new(
+                                ErrorKind::DataStructure(DataStructureError::UnknownField {
+                                    struct_name: name_str.clone(),
+                                    field_name: field.as_str().unwrap_or("").to_string(),
+                                }),
+                                span,
+                            )
                         })?;
-
-                        value = self.builder
-                            .build_insert_value(value, casted, index as u32, "insert")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                            .into_struct_value();
-                    } else {
-                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownField {
-                            struct_name: name_str.clone(),
-                            field_name: field.as_str().unwrap_or("").to_string()
-                        }), span));
-                    }
+                    (
+                        idx,
+                        field.as_str().unwrap_or("").to_string(),
+                        *assigned.clone(),
+                    )
                 }
                 _ => {
                     if position >= fields.len() {
-                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TooManyInitializers { struct_name: name_str }), span));
+                        return Err(GenerateError::new(
+                            ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
+                                struct_name: name_str,
+                            }),
+                            span,
+                        ));
                     }
-
-                    let index = position;
+                    let idx = position;
                     position += 1;
-
-                    let kind = shape.get_field_type_at_index(index as u32).unwrap();
-                    let evaluated = self.analysis(member)?;
-
-                    let casted = self.convert(evaluated, kind).ok_or_else(|| {
-                        GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorPositionalArgTypeMismatch {
-                            struct_name: name_str.clone(),
-                            index
-                        }), span)
-                    })?;
-
-                    value = self.builder
-                        .build_insert_value(value, casted, index as u32, "insert")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                        .into_struct_value();
+                    (idx, format!("positional arg {}", idx), member)
                 }
-            }
+            };
+
+            let kind = shape.get_field_type_at_index(index as u32).unwrap();
+            let evaluated = self.analysis(assigned)?;
+
+            let casted = self.convert(evaluated, kind).ok_or_else(|| {
+                GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
+                        struct_name: name_str.clone(),
+                        field_name,
+                    }),
+                    span,
+                )
+            })?;
+
+            value = self
+                .builder
+                .build_insert_value(value, casted, index as u32, "insert")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                .into_struct_value();
         }
 
         Ok(value.into())
@@ -177,48 +266,43 @@ impl<'backend> super::Inkwell<'backend> {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
-                    _ => Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess), span)),
-                }
+                    _ => Err(GenerateError::new(
+                        ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess),
+                        span,
+                    )),
+                };
             }
         }
 
-        let field = if let AnalysisKind::Usage(identifier) = &member.kind {
-            identifier.clone()
-        } else {
-            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::InvalidMemberAccessExpression), span));
+        let field = match &member.kind {
+            AnalysisKind::Usage(identifier) => identifier.clone(),
+            _ => {
+                return Err(GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::InvalidMemberAccessExpression),
+                    span,
+                ))
+            }
         };
 
         if let AnalysisKind::Usage(identifier) = &target.kind {
             if let Some(Entity::Variable { pointer, kind, .. }) = self.get_entity(identifier) {
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
-
-                    let mut found = None;
-
-                    for scope in self.entities.iter().rev() {
-                        for entity in scope.values() {
-                            if let Entity::Struct { structure: defined, fields } = entity {
-                                if defined.as_basic_type_enum() == shape.as_basic_type_enum() {
-                                    found = Some(fields.clone());
-                                    break;
-                                }
-                            }
-                        }
-                        if found.is_some() { break; }
-                    }
-
-                    if let Some(fields) = found {
+                    if let Some(fields) = self.fields(*kind) {
                         if let Some(index) = fields.iter().position(|item| item == &field) {
-                            let slot = self.builder.build_struct_gep(
-                                shape,
-                                *pointer,
-                                index as u32,
-                                "pointer",
-                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
+                            let slot = self
+                                .builder
+                                .build_struct_gep(shape, *pointer, index as u32, "pointer")
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
                             let resolved = shape.get_field_type_at_index(index as u32).unwrap();
-                            return self.builder.build_load(resolved, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
+
+                            return self.builder.build_load(resolved, slot, "value").map_err(
+                                |error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                },
+                            );
                         }
                     }
                 }
@@ -226,30 +310,27 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         let evaluated = self.analysis(*target)?;
-        if let BasicValueEnum::StructValue(structure) = evaluated {
-            let mut found = None;
-            for scope in self.entities.iter().rev() {
-                for entity in scope.values() {
-                    if let Entity::Struct { structure: defined, fields } = entity {
-                        if defined.as_basic_type_enum() == structure.get_type().as_basic_type_enum() {
-                            found = Some(fields.clone());
-                            break;
-                        }
-                    }
-                }
-                if found.is_some() { break; }
-            }
 
-            if let Some(fields) = found {
+        if let BasicValueEnum::StructValue(structure) = evaluated {
+            if let Some(fields) = self.fields(structure.get_type().as_basic_type_enum()) {
                 if let Some(index) = fields.iter().position(|item| item == &field) {
-                    return self.builder.build_extract_value(structure, index as u32, "extract")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                        .map(|value| value.into());
+                    return self
+                        .builder
+                        .build_extract_value(structure, index as u32, "extract")
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })
+                        .map(Into::into);
                 }
             }
         }
 
-        Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::AccessOnNonStructType { field_name: field.to_string() }), span))
+        Err(GenerateError::new(
+            ErrorKind::DataStructure(DataStructureError::AccessOnNonStructType {
+                field_name: field.to_string(),
+            }),
+            span,
+        ))
     }
 
     pub fn array(
@@ -258,27 +339,34 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if elements.is_empty() {
-            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::EmptyArray), span));
+            return Err(GenerateError::new(
+                ErrorKind::DataStructure(DataStructureError::EmptyArray),
+                span,
+            ));
         }
 
         let mut values = Vec::with_capacity(elements.len());
 
         for element in elements {
-            let value = self.analysis(element)?;
-            values.push(value);
+            values.push(self.analysis(element)?);
         }
 
         let kind = values[0].get_type();
         let shape = kind.array_type(values.len() as u32);
-
         let mut current = shape.get_undef();
 
         for (index, value) in values.into_iter().enumerate() {
             let casted = self.convert(value, kind).ok_or_else(|| {
-                GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayLiteralTypeMismatch { index }), span)
+                GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::ArrayLiteralTypeMismatch {
+                        index,
+                    }),
+                    span,
+                )
             })?;
 
-            current = self.builder
+            current = self
+                .builder
                 .build_insert_value(current, casted, index as u32, "insert")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 .into_array_value();
@@ -292,20 +380,18 @@ impl<'backend> super::Inkwell<'backend> {
         elements: Vec<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let mut values = Vec::new();
-
+        let mut values = Vec::with_capacity(elements.len());
         for element in elements {
-            let value = self.analysis(element)?;
-            values.push(value);
+            values.push(self.analysis(element)?);
         }
 
         let types: Vec<BasicTypeEnum> = values.iter().map(|item| item.get_type()).collect();
-
         let shape = self.context.struct_type(&types, false);
         let mut current = shape.get_undef();
 
         for (index, value) in values.into_iter().enumerate() {
-            current = self.builder
+            current = self
+                .builder
                 .build_insert_value(current, value, index as u32, "insert")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 .into_struct_value();
@@ -320,7 +406,10 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if index.members.is_empty() {
-            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::IndexMissingArgument), span));
+            return Err(GenerateError::new(
+                ErrorKind::DataStructure(DataStructureError::IndexMissingArgument),
+                span,
+            ));
         }
 
         let base = index.target.clone();
@@ -331,140 +420,166 @@ impl<'backend> super::Inkwell<'backend> {
             if let Some(Entity::Variable { kind, pointer, .. }) = self.get_entity(&identifier) {
                 if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {
-                        return if let Some(constant) = integer.get_zero_extended_constant() {
-                            let shape = kind.into_struct_type();
-                            let slot = self.builder.build_struct_gep(
-                                shape,
-                                *pointer,
-                                constant as u32,
-                                "index",
-                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        let constant = integer.get_zero_extended_constant().ok_or_else(|| {
+                            GenerateError::new(
+                                ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant),
+                                span,
+                            )
+                        })?;
 
-                            let field = shape.get_field_type_at_index(constant as u32).unwrap();
-                            self.builder.build_load(field, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                        } else {
-                            Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
-                        }
+                        let shape = kind.into_struct_type();
+                        let slot = self
+                            .builder
+                            .build_struct_gep(shape, *pointer, constant as u32, "index")
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            })?;
+
+                        let field = shape.get_field_type_at_index(constant as u32).unwrap();
+                        return self
+                            .builder
+                            .build_load(field, slot, "value")
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            });
                     }
                 } else if kind.is_array_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {
                         let shape = kind.into_array_type();
-                        let element_type = shape.get_element_type();
+
                         let length = self.context.i32_type().const_int(shape.len() as u64, false);
+                        let exceeds = self
+                            .builder
+                            .build_int_compare(IntPredicate::UGE, integer, length, "check")
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            })?;
 
-                        let exceeds = self.builder.build_int_compare(
-                            IntPredicate::UGE,
-                            integer,
-                            length,
-                            "check"
-                        ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        let function = self
+                            .builder
+                            .get_insert_block()
+                            .unwrap()
+                            .get_parent()
+                            .unwrap();
+                        let trap_block = self.context.append_basic_block(function, "trap");
+                        let resume_block = self.context.append_basic_block(function, "resume");
 
-                        let block = self.builder.get_insert_block().unwrap();
-                        let function = block.get_parent().unwrap();
+                        self.builder
+                            .build_conditional_branch(exceeds, trap_block, resume_block)
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            })?;
 
-                        let trap = self.context.append_basic_block(function, "trap");
-                        let resume = self.context.append_basic_block(function, "resume");
+                        self.builder.position_at_end(trap_block);
+                        self.trap(None, span)?;
 
-                        self.builder.build_conditional_branch(exceeds, trap, resume)
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                        self.builder.position_at_end(trap);
-
-                        let trap_fn = self.current_module().get_function("llvm.trap").unwrap_or_else(|| {
-                            let trap_type = self.context.void_type().fn_type(&[], false);
-                            self.current_module().add_function("llvm.trap", trap_type, None)
-                        });
-
-                        self.builder.build_call(trap_fn, &[], "trap")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                        self.builder.build_unreachable()
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                        self.builder.position_at_end(resume);
-
+                        self.builder.position_at_end(resume_block);
                         let zero = self.context.i32_type().const_zero();
                         let slot = unsafe {
                             self.builder
                                 .build_in_bounds_gep(shape, *pointer, &[zero, integer], "index")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?
                         };
 
-                        return self.builder.build_load(element_type, slot, "value")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
+                        return self
+                            .builder
+                            .build_load(shape.get_element_type(), slot, "value")
+                            .map_err(|error| {
+                                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                            });
                     }
                 }
             }
         }
 
-        if let BasicValueEnum::StructValue(structure) = target {
-            if let BasicValueEnum::IntValue(integer) = offset {
-                return if let Some(constant) = integer.get_zero_extended_constant() {
-                    self.builder.build_extract_value(
-                        structure,
-                        constant as u32,
-                        "extract",
-                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                        .map(Into::into)
-                } else {
-                    Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
-                }
+        match (target, offset) {
+            (BasicValueEnum::StructValue(structure), BasicValueEnum::IntValue(integer)) => {
+                let constant = integer.get_zero_extended_constant().ok_or_else(|| {
+                    GenerateError::new(
+                        ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant),
+                        span,
+                    )
+                })?;
+
+                return self
+                    .builder
+                    .build_extract_value(structure, constant as u32, "extract")
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })
+                    .map(Into::into);
             }
-        } else if let BasicValueEnum::ArrayValue(array) = target {
-            if let BasicValueEnum::IntValue(integer) = offset {
-                return if let Some(constant) = integer.get_zero_extended_constant() {
-                    self.builder.build_extract_value(
-                        array,
-                        constant as u32,
-                        "extract",
-                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                        .map(Into::into)
-                } else {
-                    let shape = array.get_type();
-                    let element_type = shape.get_element_type();
-                    let block = self.builder.get_insert_block().unwrap();
-                    let function = block.get_parent().unwrap();
+            (BasicValueEnum::ArrayValue(array), BasicValueEnum::IntValue(integer)) => {
+                if let Some(constant) = integer.get_zero_extended_constant() {
+                    return self
+                        .builder
+                        .build_extract_value(array, constant as u32, "extract")
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })
+                        .map(Into::into);
+                }
 
-                    let pointer = self.build_entry(function, shape.into(), Str::from("array_spill"));
-                    self.builder.build_store(pointer, array)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                // Spill to stack for dynamic index on temporary array value
+                let shape = array.get_type();
+                let function = self
+                    .builder
+                    .get_insert_block()
+                    .unwrap()
+                    .get_parent()
+                    .unwrap();
+                let pointer = self.build_entry(function, shape.into(), Str::from("array_spill"));
 
-                    let length = self.context.i32_type().const_int(shape.len() as u64, false);
-                    let exceeds = self.builder.build_int_compare(IntPredicate::UGE, integer, length, "check")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                self.builder.build_store(pointer, array).map_err(|error| {
+                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                })?;
 
-                    let trap = self.context.append_basic_block(function, "trap");
-                    let resume = self.context.append_basic_block(function, "resume");
+                // Bounds checking logic for stack-spilled array
+                let length = self.context.i32_type().const_int(shape.len() as u64, false);
+                let exceeds = self
+                    .builder
+                    .build_int_compare(IntPredicate::UGE, integer, length, "check")
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
 
-                    self.builder.build_conditional_branch(exceeds, trap, resume)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                let trap_block = self.context.append_basic_block(function, "trap");
+                let resume_block = self.context.append_basic_block(function, "resume");
 
-                    self.builder.position_at_end(trap);
-                    let trap_fn = self.current_module().get_function("llvm.trap").unwrap_or_else(|| {
-                        let trap_type = self.context.void_type().fn_type(&[], false);
-                        self.current_module().add_function("llvm.trap", trap_type, None)
+                self.builder
+                    .build_conditional_branch(exceeds, trap_block, resume_block)
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
+
+                self.builder.position_at_end(trap_block);
+                self.trap(None, span)?;
+
+                self.builder.position_at_end(resume_block);
+                let zero = self.context.i32_type().const_zero();
+                let slot = unsafe {
+                    self.builder
+                        .build_in_bounds_gep(shape, pointer, &[zero, integer], "index")
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?
+                };
+
+                return self
+                    .builder
+                    .build_load(shape.get_element_type(), slot, "value")
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                     });
-                    self.builder.build_call(trap_fn, &[], "trap")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                    self.builder.build_unreachable()
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                    self.builder.position_at_end(resume);
-
-                    let zero = self.context.i32_type().const_zero();
-                    let slot = unsafe {
-                        self.builder
-                            .build_in_bounds_gep(shape, pointer, &[zero, integer], "index")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    };
-
-                    self.builder.build_load(element_type, slot, "value")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                }
             }
+            _ => {}
         }
 
-        Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotIndexable), span))
+        Err(GenerateError::new(
+            ErrorKind::DataStructure(DataStructureError::NotIndexable),
+            span,
+        ))
     }
 }

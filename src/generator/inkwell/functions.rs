@@ -1,24 +1,23 @@
-use inkwell::types::BasicTypeEnum;
-use inkwell::values::IntValue;
 use {
-    super::{Backend, Entity},
     crate::{
         data::*,
-        analyzer::Analysis,
-        checker::TypeKind,
+        analyzer::{Analysis, AnalysisKind},
+        checker::{Type, TypeKind},
         internal::hash::Map,
-        generator::{ErrorKind, GenerateError},
+        generator::{Backend, ErrorKind, GenerateError, inkwell::Entity},
         tracker::Span,
+        generator::{
+            inkwell::{
+                error::{ControlFlowError, FunctionError}
+            }
+        },
     },
     inkwell::{
-        types::BasicType,
-        values::{BasicValueEnum, FunctionValue},
+        types::{BasicType, BasicTypeEnum},
+        values::{IntValue, BasicValueEnum, FunctionValue},
         FloatPredicate, IntPredicate,
     },
 };
-use crate::analyzer::AnalysisKind;
-use crate::checker::Type;
-use crate::generator::inkwell::error::{ControlFlowError, FunctionError};
 
 impl<'backend> super::Inkwell<'backend> {
     fn terminated(&self) -> bool {

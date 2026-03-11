@@ -4,8 +4,8 @@ use crate::format::{Display, Formatter, Result, Show};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
-    InvalidType { ty: Type<'error> },
-    UnsupportedFloatWidth { width: Scale },
+    InvalidType(Type<'error>),
+    UnsupportedFloatWidth(Scale),
     Cast,
     Bitwise(BitwiseError),
     Function(FunctionError),
@@ -108,10 +108,10 @@ pub enum DataStructureError {
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            ErrorKind::InvalidType { ty } => {
+            ErrorKind::InvalidType(ty) => {
                 write!(f, "invalid LLVM type {}", ty.format(2))
             }
-            ErrorKind::UnsupportedFloatWidth { width } => {
+            ErrorKind::UnsupportedFloatWidth(width) => {
                 write!(f, "invalid LLVM float width: {}", width)
             }
             ErrorKind::Bitwise(error) => write!(f, "{}", error),

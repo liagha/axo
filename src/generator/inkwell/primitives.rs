@@ -35,7 +35,7 @@ impl<'backend> Inkwell<'backend> {
             width => {
                 return Err(
                     GenerateError::new(
-                        ErrorKind::UnsupportedFloatWidth { width },
+                        ErrorKind::UnsupportedFloatWidth(width),
                         span
                     )
                 )
