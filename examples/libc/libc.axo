@@ -9,6 +9,22 @@ func munmap(c, const addr: *UInt8, const length: UInt64): Integer
 func unlink(c, const path: String): Integer
 func lseek(c, const fd: Integer, const offset: Int64, const whence: Integer): Int64
 
+// ─── Formatting & Print Functions ────────────────────────────────────
+func print_i64(c, const v: Int64)
+func print_f64(c, const v: Float)
+func print_bool(c, const v: Bool)
+func print_str(c, const s: String)
+func print_char(c, const v: UInt8)
+func println(c)
+func print_hex(c, const v: Int64)
+func print_ptr(c, const v: *UInt8)
+
+// ─── Newline Variants ────────────────────────────────────────────────
+func println_i64(c, const v: Int64)
+func println_f64(c, const v: Float)
+func println_bool(c, const v: Bool)
+func println_str(c, const s: String)
+
 // ─── Standard File Descriptors ───────────────────────────────────────
 const STDIN  = 0
 const STDOUT = 1
@@ -24,66 +40,107 @@ const O_WRONLY    = 1
 const O_RDWR      = 2
 
 // ─── Open: Creation Flags ────────────────────────────────────────────
-const O_CREAT     = 64       // 0100
-const O_EXCL      = 128      // 0200
-const O_NOCTTY    = 256      // 0400
-const O_TRUNC     = 512      // 01000
+const O_CREAT     = 64
+const O_EXCL      = 128
+const O_NOCTTY    = 256
+const O_TRUNC     = 512
 
 // ─── Open: File Status Flags ─────────────────────────────────────────
-const O_APPEND    = 1024     // 02000
-const O_NONBLOCK  = 2048     // 04000
-const O_DSYNC     = 4096     // 010000
-const O_ASYNC     = 8192     // 020000
-const O_DIRECT    = 16384    // 040000
-const O_LARGEFILE = 32768    // 0100000
-const O_DIRECTORY = 65536    // 0200000
-const O_NOFOLLOW  = 131072   // 0400000
-const O_NOATIME   = 262144   // 01000000
-const O_CLOEXEC   = 524288   // 02000000
-const O_SYNC      = 1052672  // 04010000
-const O_PATH      = 2097152  // 010000000
-const O_TMPFILE   = 4259840  // 020200000
+const O_APPEND    = 1024
+const O_NONBLOCK  = 2048
+const O_DSYNC     = 4096
+const O_ASYNC     = 8192
+const O_DIRECT    = 16384
+const O_LARGEFILE = 32768
+const O_DIRECTORY = 65536
+const O_NOFOLLOW  = 131072
+const O_NOATIME   = 262144
+const O_CLOEXEC   = 524288
+const O_SYNC      = 1052672
+const O_PATH      = 2097152
+const O_TMPFILE   = 4259840
 
 // ─── File Permission Bits ────────────────────────────────────────────
-const S_IRWXU = 448  // 0700 - owner:  rwx
-const S_IRUSR = 256  // 0400 - owner:  read
-const S_IWUSR = 128  // 0200 - owner:  write
-const S_IXUSR = 64   // 0100 - owner:  exec
-const S_IRWXG = 56   // 0070 - group:  rwx
-const S_IRGRP = 32   // 0040 - group:  read
-const S_IWGRP = 16   // 0020 - group:  write
-const S_IXGRP = 8    // 0010 - group:  exec
-const S_IRWXO = 7    // 0007 - others: rwx
-const S_IROTH = 4    // 0004 - others: read
-const S_IWOTH = 2    // 0002 - others: write
-const S_IXOTH = 1    // 0001 - others: exec
+const S_IRWXU = 448
+const S_IRUSR = 256
+const S_IWUSR = 128
+const S_IXUSR = 64
+const S_IRWXG = 56
+const S_IRGRP = 32
+const S_IWGRP = 16
+const S_IXGRP = 8
+const S_IRWXO = 7
+const S_IROTH = 4
+const S_IWOTH = 2
+const S_IXOTH = 1
 
 // ─── lseek: Whence ───────────────────────────────────────────────────
-const SEEK_SET = 0   // Absolute offset
-const SEEK_CUR = 1   // Relative to current position
-const SEEK_END = 2   // Relative to end of file
+const SEEK_SET = 0
+const SEEK_CUR = 1
+const SEEK_END = 2
 
 // ─── mmap: Protection Flags ──────────────────────────────────────────
-const PROT_NONE  = 0  // No access
-const PROT_READ  = 1  // Readable
-const PROT_WRITE = 2  // Writable
-const PROT_EXEC  = 4  // Executable
+const PROT_NONE  = 0
+const PROT_READ  = 1
+const PROT_WRITE = 2
+const PROT_EXEC  = 4
 
 // ─── mmap: Map Flags ─────────────────────────────────────────────────
-const MAP_SHARED    = 1       // Share changes with other processes
-const MAP_PRIVATE   = 2       // Copy-on-write, changes are private
-const MAP_FIXED     = 16      // Use exact address given
-const MAP_ANONYMOUS = 32      // Not backed by any file
-const MAP_GROWSDOWN = 256     // Stack-like, grows downward
-const MAP_LOCKED    = 8192    // Lock pages in RAM
-const MAP_NORESERVE = 16384   // Don't reserve swap space
-const MAP_POPULATE  = 32768   // Prefault pages into memory
-const MAP_HUGETLB   = 262144  // Use huge pages
+const MAP_SHARED    = 1
+const MAP_PRIVATE   = 2
+const MAP_FIXED     = 16
+const MAP_ANONYMOUS = 32
+const MAP_GROWSDOWN = 256
+const MAP_LOCKED    = 8192
+const MAP_NORESERVE = 16384
+const MAP_POPULATE  = 32768
+const MAP_HUGETLB   = 262144
 
 // ─── Sentinel Values ─────────────────────────────────────────────────
-const MAP_FAILED = -1  // Returned by mmap on failure
-const INVALID_FD = -1  // Returned by open on failure
+const MAP_FAILED = -1
+const INVALID_FD = -1
 
 func main(): Integer {
-    write(STDOUT, "test", 4)
+    var i = 0
+
+    while(
+        i < 10,
+        {
+            println_i64(i)
+
+            print_str("Fac: ")
+            println_i64(factorial(i))
+
+            i = i + 1
+        }
+    )
+
+    test_logic(2)
+
+    return(EXIT_SUCCESS)
+}
+
+func test_logic(const x: Integer): Integer {
+    if (x > 5, {
+        println_str("Greater than 5")
+    }, {
+        println_str("5 or less")
+    })
+    return(0)
+}
+
+func factorial(const n: Integer): Integer {
+    if (n == 0, {
+        return(1)
+    }, {
+        return(n * factorial(n - 1))
+    })
+}
+
+func test_file_io() {
+    var fd = open("/home/ali/Downloads/test.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR)
+    if (fd != INVALID_FD, {
+        write(fd, "Hello Ali", 9)
+        close(fd)
+    }, 0)
 }

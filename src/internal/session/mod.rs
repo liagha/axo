@@ -49,6 +49,7 @@ use {
         tracker::Peekable,
     }
 };
+use crate::analyzer::AnalyzeError;
 use crate::checker::{CheckError, Checker};
 
 pub enum CompileError<'error> {
@@ -57,6 +58,7 @@ pub enum CompileError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Check(CheckError<'error>),
+    Analyze(AnalyzeError<'error>),
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
 }
@@ -164,7 +166,7 @@ impl<'session> Session<'session> {
         self.scan();
         self.parse();
         self.register();
-        //self.resolve();
+        self.resolve();
         //self.check();
         self.analyze();
         self.generate();
@@ -178,6 +180,7 @@ impl<'session> Session<'session> {
                 CompileError::Parse(error) => self.reporter.error(&error),
                 CompileError::Resolve(error) => self.reporter.error(&error),
                 CompileError::Check(error) => self.reporter.error(&error),
+                CompileError::Analyze(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
             }
@@ -359,6 +362,15 @@ impl<'session> Session<'session> {
             analyzer.analyze(&mut self.resolver);
 
             self.reporter.analysis(&*analyzer.output);
+
+            self.errors.extend(
+                analyzer
+                    .errors
+                    .iter()
+                    .map(|error| {
+                        CompileError::Analyze(error.clone())
+                    })
+            );
 
             self.analyzers.insert(identity, analyzer);
 

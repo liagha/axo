@@ -61,13 +61,31 @@ impl<'backend> Inkwell<'backend> {
 
     pub fn normalize_pair(
         &self,
-        left: BasicValueEnum<'backend>,
-        right: BasicValueEnum<'backend>,
+        mut left: BasicValueEnum<'backend>,
+        mut right: BasicValueEnum<'backend>,
         left_signed: bool,
         right_signed: bool,
-        name: &str, 
+        name: &str,
         span: Span<'backend>
     ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, Boolean), GenerateError<'backend>> {
+        let ptr_int_type = self.context.i64_type(); // Assuming 64-bit architecture
+
+        if left.is_pointer_value() {
+            left = self.builder.build_ptr_to_int(
+                left.into_pointer_value(),
+                ptr_int_type,
+                &format!("{}_lhs_ptr_to_int", name)
+            ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into();
+        }
+
+        if right.is_pointer_value() {
+            right = self.builder.build_ptr_to_int(
+                right.into_pointer_value(),
+                ptr_int_type,
+                &format!("{}_rhs_ptr_to_int", name)
+            ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into();
+        }
+
         if left.is_int_value() && right.is_int_value() {
             let left_int = left.into_int_value();
             let right_int = right.into_int_value();

@@ -142,7 +142,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let target = binary.left.analyze(resolver)?;
                         let value = binary.right.analyze(resolver)?;
 
-                        // After the refactor, we must match on `target.kind`.
                         match &target.kind {
                             AnalysisKind::Usage(target_name) => {
                                 AnalysisKind::Assign(target_name.clone(), Box::new(value))
@@ -150,7 +149,8 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             AnalysisKind::Dereference(_) => {
                                 AnalysisKind::Store(Box::new(target), Box::new(value))
                             }
-                            _ => {
+                            t => {
+                                println!("---- {:?}", t);
                                 return Err(AnalyzeError::new(
                                     ErrorKind::InvalidOperation(binary.operator.clone()),
                                     binary.operator.span,

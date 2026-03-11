@@ -1,3 +1,4 @@
+use inkwell::values::IntValue;
 use {
     super::{Backend, Entity},
     crate::{
@@ -19,7 +20,7 @@ use crate::checker::Type;
 use crate::generator::error::{ControlFlowError, FunctionError};
 
 impl<'backend> super::Inkwell<'backend> {
-    fn has_terminator(&self) -> bool {
+    fn terminated(&self) -> bool {
         self.builder
             .get_insert_block()
             .and_then(|block| block.get_terminator())
@@ -32,51 +33,46 @@ impl<'backend> super::Inkwell<'backend> {
         value: BasicValueEnum<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let expected = match function.get_type().get_return_type() {
+        let target = match function.get_type().get_return_type() {
             Some(kind) => kind,
             None => return Ok(value),
         };
 
-        if value.get_type() == expected {
+        if value.get_type() == target {
             return Ok(value);
         }
 
-        match (value, expected) {
-            (BasicValueEnum::IntValue(int), expected) if expected.is_int_type() => self
+        match (value, target) {
+            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => self
                 .builder
-                .build_int_cast(int, expected.into_int_type(), "ret_cast_int")
+                .build_int_cast(integer, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-            (BasicValueEnum::FloatValue(float), expected) if expected.is_float_type() => self
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+            (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self
                 .builder
-                .build_float_cast(float, expected.into_float_type(), "ret_cast_float")
+                .build_float_cast(float, target.into_float_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-            (BasicValueEnum::IntValue(int), expected) if expected.is_float_type() => self
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+            (BasicValueEnum::IntValue(integer), target) if target.is_float_type() => self
                 .builder
-                .build_signed_int_to_float(int, expected.into_float_type(), "ret_int_to_float")
+                .build_signed_int_to_float(integer, target.into_float_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-            (BasicValueEnum::FloatValue(float), expected) if expected.is_int_type() => self
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+            (BasicValueEnum::FloatValue(float), target) if target.is_int_type() => self
                 .builder
-                .build_float_to_signed_int(float, expected.into_int_type(), "ret_float_to_int")
+                .build_float_to_signed_int(float, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-
-            // NEW: Handle returning a Pointer from an Int function (e.g. returning a string literal as i64)
-            (BasicValueEnum::PointerValue(ptr), expected) if expected.is_int_type() => self
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+            (BasicValueEnum::PointerValue(pointer), target) if target.is_int_type() => self
                 .builder
-                .build_ptr_to_int(ptr, expected.into_int_type(), "ret_ptr_to_int")
+                .build_ptr_to_int(pointer, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-
-            // NEW: Handle returning an Int from a Pointer function
-            (BasicValueEnum::IntValue(int), expected) if expected.is_pointer_type() => self
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+            (BasicValueEnum::IntValue(integer), target) if target.is_pointer_type() => self
                 .builder
-                .build_int_to_ptr(int, expected.into_pointer_type(), "ret_int_to_ptr")
+                .build_int_to_ptr(integer, target.into_pointer_type(), "cast")
                 .map(Into::into)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
-
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
             _ => Err(GenerateError::new(
                 ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
@@ -84,24 +80,24 @@ impl<'backend> super::Inkwell<'backend> {
         }
     }
 
-    fn truthy(
+    fn truth(
         &mut self,
         value: BasicValueEnum<'backend>,
         span: Span<'backend>,
-    ) -> Result<inkwell::values::IntValue<'backend>, GenerateError<'backend>> {
+    ) -> Result<IntValue<'backend>, GenerateError<'backend>> {
         if value.is_int_value() {
-            let int = value.into_int_value();
-            if int.get_type().get_bit_width() == 1 {
-                Ok(int)
+            let integer = value.into_int_value();
+            if integer.get_type().get_bit_width() == 1 {
+                Ok(integer)
             } else {
                 self.builder
                     .build_int_compare(
                         IntPredicate::NE,
-                        int,
-                        int.get_type().const_zero(),
-                        "if_cond",
+                        integer,
+                        integer.get_type().const_zero(),
+                        "condition",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
             }
         } else if value.is_float_value() {
             let float = value.into_float_value();
@@ -110,93 +106,93 @@ impl<'backend> super::Inkwell<'backend> {
                     FloatPredicate::ONE,
                     float,
                     float.get_type().const_zero(),
-                    "if_cond",
+                    "condition",
                 )
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
         } else {
             Ok(self.context.bool_type().const_zero())
         }
     }
 
-    fn primitive_cast(
+    fn cast(
         &mut self,
         name: &str,
         arguments: &[Analysis<'backend>],
         span: Span<'backend>,
     ) -> Result<Option<BasicValueEnum<'backend>>, GenerateError<'backend>> {
-        let arg = if let Some(argument) = arguments.first() {
-            Some(self.analysis(argument.clone())?)
+        let argument = if let Some(passed) = arguments.first() {
+            Some(self.analysis(passed.clone())?)
         } else {
             None
         };
 
         match name {
-            "Int64" => Ok(Some(match arg {
+            "Int64" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i64_type(), "cast_int")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .build_int_cast(value.into_int_value(), self.context.i64_type(), "cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
                     .build_float_to_signed_int(
                         value.into_float_value(),
                         self.context.i64_type(),
-                        "cast_float_to_int",
+                        "cast",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 _ => self.context.i64_type().const_zero().into(),
             })),
-            "Int32" => Ok(Some(match arg {
+            "Int32" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast_i32")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
                     .build_float_to_signed_int(
                         value.into_float_value(),
                         self.context.i32_type(),
-                        "cast_float_to_i32",
+                        "cast",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 _ => self.context.i32_type().const_zero().into(),
             })),
-            "Float" => Ok(Some(match arg {
+            "Float" => Ok(Some(match argument {
                 Some(value) if value.is_float_value() => self
                     .builder
                     .build_float_cast(
                         value.into_float_value(),
                         self.context.f64_type(),
-                        "cast_float",
+                        "cast",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 Some(value) if value.is_int_value() => self
                     .builder
                     .build_signed_int_to_float(
                         value.into_int_value(),
                         self.context.f64_type(),
-                        "cast_int_to_float",
+                        "cast",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 _ => self.context.f64_type().const_zero().into(),
             })),
-            "Boolean" => Ok(Some(match arg {
+            "Boolean" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => {
-                    let int = value.into_int_value();
+                    let integer = value.into_int_value();
                     self.builder
                         .build_int_compare(
                             IntPredicate::NE,
-                            int,
-                            int.get_type().const_zero(),
-                            "cast_bool_int",
+                            integer,
+                            integer.get_type().const_zero(),
+                            "cast",
                         )
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                         .into()
                 }
                 Some(value) if value.is_float_value() => {
@@ -206,27 +202,27 @@ impl<'backend> super::Inkwell<'backend> {
                             FloatPredicate::ONE,
                             float,
                             float.get_type().const_zero(),
-                            "cast_bool_float",
+                            "cast",
                         )
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                         .into()
                 }
                 _ => self.context.bool_type().const_zero().into(),
             })),
-            "Character" | "Char" => Ok(Some(match arg {
+            "Character" | "Char" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast_char")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
                     .build_float_to_signed_int(
                         value.into_float_value(),
                         self.context.i32_type(),
-                        "cast_float_to_char",
+                        "cast",
                     )
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                     .into(),
                 _ => self.context.i32_type().const_zero().into(),
             })),
@@ -240,21 +236,21 @@ impl<'backend> super::Inkwell<'backend> {
         analyses: Vec<Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let name_str = name.as_str().unwrap_or("module");
-        self.modules.insert(name, self.context.create_module(name_str));
+        let string = name.as_str().unwrap_or("module");
+        self.modules.insert(name, self.context.create_module(string));
 
-        let caller_block = self.builder.get_insert_block();
+        let caller = self.builder.get_insert_block();
         for analysis in analyses {
-            if self.has_terminator() {
+            if self.terminated() {
                 break;
             }
-            let current_block = self.builder.get_insert_block();
+            let current = self.builder.get_insert_block();
             self.analysis(analysis)?;
-            if let Some(block) = current_block {
+            if let Some(block) = current {
                 self.builder.position_at_end(block);
             }
         }
-        if let Some(block) = caller_block {
+        if let Some(block) = caller {
             self.builder.position_at_end(block);
         }
 
@@ -276,7 +272,7 @@ impl<'backend> super::Inkwell<'backend> {
         for member in &method.members {
             if let AnalysisKind::Binding(bind) = &member.kind {
                 let kind = if let Some(annotation) = bind.annotation.as_ref() {
-                    let llvm_kind = self.llvm_type(annotation, member.span)?;
+                    let resolved = self.llvm_type(annotation, member.span)?;
 
                     if matches!(method.interface, Interface::C) {
                         if let TypeKind::String = annotation.kind {
@@ -284,10 +280,10 @@ impl<'backend> super::Inkwell<'backend> {
                         } else if let TypeKind::Character = annotation.kind {
                             self.context.i8_type().into()
                         } else {
-                            llvm_kind
+                            resolved
                         }
                     } else {
-                        llvm_kind
+                        resolved
                     }
                 } else {
                     self.context.i64_type().into()
@@ -297,28 +293,28 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        let return_type = if let Some(return_type) = method.output {
-            Some(self.llvm_type(&return_type, span)?)
+        let output = if let Some(annotation) = method.output {
+            Some(self.llvm_type(&annotation, span)?)
         } else {
             None
         };
 
-        let function_type = match return_type {
+        let signature = match output {
             Some(kind) => kind.fn_type(&parameters, false),
             None => self.context.void_type().fn_type(&parameters, false),
         };
 
-        let name = method.target.as_str().unwrap_or("anonymous_function");
+        let identifier = method.target.as_str().unwrap_or("function");
 
         let function = if matches!(method.interface, Interface::C) {
-            let function = self.current_module().add_function(
-                name,
-                function_type,
+            let callable = self.current_module().add_function(
+                identifier,
+                signature,
                 Some(inkwell::module::Linkage::External),
             );
-            function.set_section(Some(".text"));
-            self.entities.insert(method.target.clone(), Entity::Function(function));
-            function
+            callable.set_section(Some("text"));
+            self.entities.insert(method.target.clone(), Entity::Function(callable));
+            callable
         } else {
             let linkage = if method.entry {
                 Some(inkwell::module::Linkage::External)
@@ -326,32 +322,32 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(inkwell::module::Linkage::Internal)
             };
 
-            let function = self.current_module().add_function(name, function_type, linkage);
+            let callable = self.current_module().add_function(identifier, signature, linkage);
 
-            let previous_entities = self.entities.clone();
-            let mut scoped_entities = Map::default();
-            for (name, entity) in previous_entities.iter() {
-                if let Entity::Function(function) = entity {
-                    scoped_entities.insert((*name).clone(), Entity::Function(function.clone()));
+            let previous = self.entities.clone();
+            let mut scoped = Map::default();
+            for (key, item) in previous.iter() {
+                if let Entity::Function(existing) = item {
+                    scoped.insert((*key).clone(), Entity::Function(existing.clone()));
                 }
             }
-            self.entities = scoped_entities;
-            self.entities.insert(method.target.clone(), Entity::Function(function));
+            self.entities = scoped;
+            self.entities.insert(method.target.clone(), Entity::Function(callable));
 
-            let entry_block = self.context.append_basic_block(function, "entry");
-            self.builder.position_at_end(entry_block);
-            function
+            let entry = self.context.append_basic_block(callable, "entry");
+            self.builder.position_at_end(entry);
+            callable
         };
 
         if !matches!(method.interface, Interface::C) {
-            for (param_val, member) in function.get_param_iter().zip(method.members.iter()) {
+            for (parameter, member) in function.get_param_iter().zip(method.members.iter()) {
                 if let AnalysisKind::Binding(bind) = &member.kind {
-                    let allocate = self.build_entry(function, param_val.get_type(), bind.target.clone());
+                    let allocate = self.build_entry(function, parameter.get_type(), bind.target.clone());
 
-                    self.builder.build_store(allocate, param_val)
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    self.builder.build_store(allocate, parameter)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-                    let signed = if param_val.get_type().is_int_type() {
+                    let signed = if parameter.get_type().is_int_type() {
                         Some(true)
                     } else {
                         None
@@ -360,7 +356,7 @@ impl<'backend> super::Inkwell<'backend> {
                         bind.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
-                            kind: param_val.get_type(),
+                            kind: parameter.get_type(),
                             pointee: None,
                             signed,
                         },
@@ -370,16 +366,16 @@ impl<'backend> super::Inkwell<'backend> {
 
             self.loop_headers.clear();
             self.loop_exits.clear();
-            let body_result = self.analysis(*method.body.clone())?;
+            let result = self.analysis(*method.body.clone())?;
 
-            if !self.has_terminator() {
-                if return_type.is_none() {
+            if !self.terminated() {
+                if output.is_none() {
                     self.builder.build_return(None)
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
                 } else {
-                    let value = self.coerce(function, body_result, span)?;
+                    let value = self.coerce(function, result, span)?;
                     self.builder.build_return(Some(&value))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
                 }
             }
         }
@@ -394,7 +390,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut last = self.context.i64_type().const_zero().into();
         for analysis in analyses {
-            if self.has_terminator() {
+            if self.terminated() {
                 break;
             }
             last = self.analysis(analysis)?;
@@ -405,64 +401,64 @@ impl<'backend> super::Inkwell<'backend> {
     pub fn conditional(
         &mut self,
         condition: Box<Analysis<'backend>>,
-        then: Box<Analysis<'backend>>,
-        otherwise: Box<Analysis<'backend>>,
+        positive: Box<Analysis<'backend>>,
+        negative: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if self.has_terminator() {
+        if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let condition_val = self.analysis(*condition)?;
-        let condition_truthy = self.truthy(condition_val, span)?;
+        let evaluated = self.analysis(*condition)?;
+        let truth = self.truth(evaluated, span)?;
 
-        let current_func = self.current_function(span)?;
-        let then_block = self.context.append_basic_block(current_func, "if_then");
-        let else_block = self.context.append_basic_block(current_func, "if_else");
-        let merge_block = self.context.append_basic_block(current_func, "if_merge");
+        let function = self.parent(span)?;
+        let consequence = self.context.append_basic_block(function, "consequence");
+        let alternative = self.context.append_basic_block(function, "alternative");
+        let merge = self.context.append_basic_block(function, "merge");
 
         self.builder
-            .build_conditional_branch(condition_truthy, then_block, else_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            .build_conditional_branch(truth, consequence, alternative)
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-        self.builder.position_at_end(then_block);
-        let then_value = self.analysis(*then)?;
-        let then_end = self.builder.get_insert_block();
-        let then_reaches_merge = !self.has_terminator();
+        self.builder.position_at_end(consequence);
+        let leftwards = self.analysis(*positive)?;
+        let left = self.builder.get_insert_block();
+        let persists = !self.terminated();
 
-        if then_reaches_merge {
+        if persists {
             self.builder
-                .build_unconditional_branch(merge_block)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .build_unconditional_branch(merge)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
         }
 
-        self.builder.position_at_end(else_block);
-        let else_value = self.analysis(*otherwise)?;
-        let else_end = self.builder.get_insert_block();
-        let else_reaches_merge = !self.has_terminator();
+        self.builder.position_at_end(alternative);
+        let rightwards = self.analysis(*negative)?;
+        let right = self.builder.get_insert_block();
+        let continues = !self.terminated();
 
-        if else_reaches_merge {
+        if continues {
             self.builder
-                .build_unconditional_branch(merge_block)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .build_unconditional_branch(merge)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
         }
 
-        self.builder.position_at_end(merge_block);
+        self.builder.position_at_end(merge);
 
-        if then_reaches_merge && else_reaches_merge && then_value.get_type() == else_value.get_type() {
+        if persists && continues && leftwards.get_type() == rightwards.get_type() {
             let phi = self
                 .builder
-                .build_phi(then_value.get_type(), "if_result")
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .build_phi(leftwards.get_type(), "result")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-            if let (Some(t_end), Some(e_end)) = (then_end, else_end) {
-                phi.add_incoming(&[(&then_value, t_end), (&else_value, e_end)]);
+            if let (Some(alpha), Some(beta)) = (left, right) {
+                phi.add_incoming(&[(&leftwards, alpha), (&rightwards, beta)]);
             }
             Ok(phi.as_basic_value())
-        } else if then_reaches_merge {
-            Ok(then_value)
-        } else if else_reaches_merge {
-            Ok(else_value)
+        } else if persists {
+            Ok(leftwards)
+        } else if continues {
+            Ok(rightwards)
         } else {
             Ok(self.context.i64_type().const_zero().into())
         }
@@ -474,43 +470,43 @@ impl<'backend> super::Inkwell<'backend> {
         body: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if self.has_terminator() {
+        if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let current_func = self.current_function(span)?;
-        let condition_block = self.context.append_basic_block(current_func, "while_condition");
-        let body_block = self.context.append_basic_block(current_func, "while_body");
-        let end_block = self.context.append_basic_block(current_func, "while_end");
+        let function = self.parent(span)?;
+        let heading = self.context.append_basic_block(function, "heading");
+        let core = self.context.append_basic_block(function, "core");
+        let end = self.context.append_basic_block(function, "end");
 
         self.builder
-            .build_unconditional_branch(condition_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            .build_unconditional_branch(heading)
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-        self.builder.position_at_end(condition_block);
-        let condition_val = self.analysis(*condition)?;
-        let condition_truthy = self.truthy(condition_val, span)?;
+        self.builder.position_at_end(heading);
+        let evaluated = self.analysis(*condition)?;
+        let truth = self.truth(evaluated, span)?;
 
         self.builder
-            .build_conditional_branch(condition_truthy, body_block, end_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            .build_conditional_branch(truth, core, end)
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-        self.builder.position_at_end(body_block);
-        self.loop_headers.push(condition_block);
-        self.loop_exits.push(end_block);
+        self.builder.position_at_end(core);
+        self.loop_headers.push(heading);
+        self.loop_exits.push(end);
 
         self.analysis(*body)?;
 
         self.loop_exits.pop();
         self.loop_headers.pop();
 
-        if !self.has_terminator() {
+        if !self.terminated() {
             self.builder
-                .build_unconditional_branch(condition_block)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .build_unconditional_branch(heading)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
         }
 
-        self.builder.position_at_end(end_block);
+        self.builder.position_at_end(end);
         Ok(self.context.i64_type().const_zero().into())
     }
 
@@ -519,57 +515,59 @@ impl<'backend> super::Inkwell<'backend> {
         invoke: Invoke<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if let Some(value) = self.primitive_cast(&*invoke.target, &invoke.members, span)? {
+        if let Some(value) = self.cast(&*invoke.target, &invoke.members, span)? {
             return Ok(value);
         }
 
-        let function_entity = self.entities.get(&invoke.target).and_then(|entity| {
-            if let Entity::Function(func) = entity {
-                Some(*func)
+        let entity = self.entities.get(&invoke.target).and_then(|item| {
+            if let Entity::Function(callable) = item {
+                Some(*callable)
             } else {
                 None
             }
         });
 
-        if let Some(func_value) = function_entity {
+        if let Some(callable) = entity {
             let mut arguments = vec![];
 
-            // Get the expected types from the LLVM function signature
-            let expected_types = func_value.get_type().get_param_types();
+            let expected = callable.get_type().get_param_types();
 
-            for (i, argument) in invoke.members.iter().enumerate() {
-                let mut value = self.analysis(argument.clone())?;
+            for (position, argument) in invoke.members.iter().enumerate() {
+                let mut evaluated = self.analysis(argument.clone())?;
 
-                // Automatically cast arguments to match expected function signature
-                if let Some(expected_type) = expected_types.get(i) {
-                    if value.is_pointer_value() && expected_type.is_int_type() {
-                        value = self.builder
+                if let Some(kind) = expected.get(position) {
+                    if evaluated.is_pointer_value() && kind.is_int_type() {
+                        evaluated = self.builder
                             .build_ptr_to_int(
-                                value.into_pointer_value(),
-                                expected_type.into_int_type(),
-                                "call_ptr_to_int"
+                                evaluated.into_pointer_value(),
+                                kind.into_int_type(),
+                                "cast"
                             )
-                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                             .into();
-                    } else if value.is_int_value() && expected_type.is_pointer_type() {
-                        value = self.builder
+                    } else if evaluated.is_int_value() && kind.is_pointer_type() {
+                        evaluated = self.builder
                             .build_int_to_ptr(
-                                value.into_int_value(),
-                                expected_type.into_pointer_type(),
-                                "call_int_to_ptr"
+                                evaluated.into_int_value(),
+                                kind.into_pointer_type(),
+                                "cast"
                             )
-                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
                             .into();
                     }
                 }
 
-                arguments.push(value.into());
+                arguments.push(evaluated.into());
             }
 
-            let result = self.builder.build_call(func_value, &arguments, "call")
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            let result = self.builder.build_call(callable, &arguments, "call")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
 
-            return Ok(result.try_as_basic_value().basic().unwrap());
+            return if let Some(value) = result.try_as_basic_value().basic() {
+                Ok(value)
+            } else {
+                Ok(self.context.i64_type().const_zero().into())
+            }
         }
 
         Err(GenerateError::new(
@@ -585,29 +583,29 @@ impl<'backend> super::Inkwell<'backend> {
         value: Option<Box<Analysis<'backend>>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if self.has_terminator() {
+        if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let current_func = self.current_function(span)?;
+        let function = self.parent(span)?;
 
         match value {
             Some(item) => {
                 let result = self.analysis(*item)?;
-                if current_func.get_type().get_return_type().is_none() {
+                if function.get_type().get_return_type().is_none() {
                     self.builder.build_return(None)
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
                     Ok(self.context.i64_type().const_zero().into())
                 } else {
-                    let value = self.coerce(current_func, result, span)?;
-                    self.builder.build_return(Some(&value))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-                    Ok(value)
+                    let coerced = self.coerce(function, result, span)?;
+                    self.builder.build_return(Some(&coerced))
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                    Ok(coerced)
                 }
             }
             None => {
                 self.builder.build_return(None)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
                 Ok(self.context.i64_type().const_zero().into())
             }
         }
@@ -622,13 +620,13 @@ impl<'backend> super::Inkwell<'backend> {
             self.analysis(*item)?;
         }
 
-        if self.has_terminator() {
+        if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
         if let Some(exit) = self.loop_exits.last().copied() {
             self.builder.build_unconditional_branch(exit)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
         } else {
             return Err(GenerateError::new(
                 ErrorKind::ControlFlow(ControlFlowError::BreakOutsideLoop),
@@ -648,13 +646,13 @@ impl<'backend> super::Inkwell<'backend> {
             self.analysis(*item)?;
         }
 
-        if self.has_terminator() {
+        if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
         if let Some(header) = self.loop_headers.last().copied() {
             self.builder.build_unconditional_branch(header)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
         } else {
             return Err(GenerateError::new(
                 ErrorKind::ControlFlow(ControlFlowError::ContinueOutsideLoop),
@@ -665,7 +663,7 @@ impl<'backend> super::Inkwell<'backend> {
         Ok(self.context.i64_type().const_zero().into())
     }
 
-    pub fn current_function(
+    pub fn parent(
         &self,
         span: Span<'backend>,
     ) -> Result<FunctionValue<'backend>, GenerateError<'backend>> {

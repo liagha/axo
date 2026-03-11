@@ -98,7 +98,15 @@ impl<'error> Display for ErrorKind<'error> {
             ErrorKind::Variable(e) => write!(f, "{}", e),
             ErrorKind::ControlFlow(e) => write!(f, "{}", e),
             ErrorKind::DataStructure(e) => write!(f, "{}", e),
-            ErrorKind::Arithmetic(_) => write!(f, "arithmetic error"),
+            ErrorKind::Arithmetic(e) => write!(f, "arithmetic error: {}", e),
+        }
+    }
+}
+
+impl Display for ArithmeticError {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
+            ArithmeticError::InvalidOperandType { side, instruction } => write!(f, "invalid LLVM operand type: {} - {}", side, instruction),
         }
     }
 }

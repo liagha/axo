@@ -1,3 +1,4 @@
+use inkwell::types::BasicType;
 use inkwell::values::BasicValue;
 use {
     super::{Backend, Entity},
@@ -28,44 +29,67 @@ impl<'backend> super::Inkwell<'backend> {
         }
     }
 
-    fn pointer_pointee_type(
-        &self,
-        analysis: &Analysis<'backend>,
-    ) -> Option<BasicTypeEnum<'backend>> {
+    fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.entities.get(name) {
-                Some(Entity::Variable { pointee, .. }) => *pointee,
+                // Priority 1: Use the explicitly tracked pointee type
+                Some(Entity::Variable { pointee, .. }) if pointee.is_some() => *pointee,
+
+                // Priority 2: If it's a pointer but metadata is missing, and not opaque:
+                Some(Entity::Variable { kind, .. }) if kind.is_pointer_type() => {
+                    // This only works on older LLVM versions.
+                    // For Opaque Pointers, this will return None or error.
+                    None
+                }
                 _ => None,
             },
-            AnalysisKind::AddressOf(operand) => self.lvalue_type(operand),
             AnalysisKind::Dereference(operand) => {
-                self.pointer_pointee_type(operand).and_then(|kind| {
-                    if kind.is_pointer_type() {
+                // For **ptr, we need the pointee of the pointer returned by *ptr
+                self.pointer_pointee_type(operand).and_then(|t| {
+                    if t.is_pointer_type() {
+                        // Logic to find what a pointer-to-pointer points to.
+                        // This usually requires looking up the type in your IR/Checker.
                         None
                     } else {
-                        Some(kind)
+                        Some(t)
                     }
                 })
-            }
+            },
             _ => None,
         }
     }
+
+    // src/generator/inkwell/variables.rs
 
     fn lvalue_pointer(
         &mut self,
         analysis: &Analysis<'backend>,
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
         match &analysis.kind {
-            AnalysisKind::Usage(name) => match self.entities.get(name) {
-                Some(Entity::Variable { pointer, kind, .. }) => Ok(Some((*pointer, *kind))),
-                _ => Ok(None),
-            },
+            // ... (Usage case)
             AnalysisKind::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand);
                 let value = self.analysis(*operand.clone())?;
-                match value {
-                    BasicValueEnum::PointerValue(pointer) => Ok(Some((pointer, pointee.unwrap()))),
-                    _ => Ok(None),
+
+                // Ensure we have a pointer and we know what it points to
+                match (value, pointee) {
+                    (BasicValueEnum::PointerValue(_), None) => {
+                        // The value is a pointer, but the compiler doesn't know the element type.
+                        Err(GenerateError::new(
+                            ErrorKind::Variable(VariableError::DereferenceNonPointer), // Or a "Missing Type" error
+                            analysis.span,
+                        ))
+                    }
+                    (BasicValueEnum::PointerValue(pointer), Some(kind)) => {
+                        Ok(Some((pointer, kind)))
+                    }
+                    (BasicValueEnum::IntValue(addr), Some(kind)) => {
+                        // Handle pointer arithmetic results (Int -> Ptr cast)
+                        let ptr = self.builder.build_int_to_ptr(addr, kind.ptr_type(inkwell::AddressSpace::default()), "ptr_arith_cast")
+                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, analysis.span))?;
+                        Ok(Some((ptr, kind)))
+                    }
+                    _ => Ok(None), // Or return a specific DereferenceNonPointer error
                 }
             }
             _ => Ok(None),
@@ -198,7 +222,7 @@ impl<'backend> super::Inkwell<'backend> {
                 },
             );
         } else {
-            let func = self.current_function(span)?;
+            let func = self.parent(span)?;
             let pointer = self.build_entry(func, result.get_type(), target.clone());
 
             self.builder.build_store(pointer, result)
@@ -234,7 +258,20 @@ impl<'backend> super::Inkwell<'backend> {
             }
         };
 
-        let pointee = self.pointer_pointee_type(&value);
+        // Determine pointee from the declared type annotation if it exists
+        let pointee = if let Some(annotation) = binding.annotation.as_ref() {
+            match &annotation.kind {
+                TypeKind::Pointer { target } => {
+                    // Convert your internal TypeKind to Inkwell BasicTypeEnum
+                    Some(self.llvm_type(target, span)?)
+                }
+                _ => None,
+            }
+        } else {
+            // Fallback to inference from the RHS
+            self.pointer_pointee_type(&value)
+        };
+
         let value = self.analysis(*value)?;
 
         let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
