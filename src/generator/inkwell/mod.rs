@@ -34,7 +34,7 @@ pub enum Entity<'backend> {
         signed: Option<bool>,
     },
     Struct {
-        struct_type: StructType<'backend>,
+        structure: StructType<'backend>,
         fields: Vec<Str<'backend>>,
     },
     Function(FunctionValue<'backend>),
@@ -70,7 +70,7 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    pub fn llvm_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+    pub fn to_basic_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let ty = match &ty.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
@@ -105,7 +105,7 @@ impl<'backend> Inkwell<'backend> {
                     .get_entity(&structure.target)
                     .and_then(
                         |entity| {
-                            if let Entity::Struct { struct_type, .. } = entity {
+                            if let Entity::Struct { structure: struct_type, .. } = entity {
                                 Some((*struct_type).into())
                             } else {
                                 None

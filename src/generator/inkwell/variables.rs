@@ -87,7 +87,7 @@ impl<'backend> super::Inkwell<'backend> {
                         let mut found = None;
                         for scope in self.entities.iter().rev() {
                             for entity in scope.values() {
-                                if let Entity::Struct { struct_type: defined, fields } = entity {
+                                if let Entity::Struct { structure: defined, fields } = entity {
                                     if defined.as_basic_type_enum() == shape.as_basic_type_enum() {
                                         found = Some(fields.clone());
                                         break;
@@ -332,7 +332,7 @@ impl<'backend> super::Inkwell<'backend> {
         let pointee = if let Some(annotation) = binding.annotation.as_ref() {
             match &annotation.kind {
                 TypeKind::Pointer { target } => {
-                    Some(self.llvm_type(target, span)?)
+                    Some(self.to_basic_type(target, span)?)
                 }
                 _ => None,
             }
@@ -361,7 +361,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
-            self.llvm_type(annotation, span)?
+            self.to_basic_type(annotation, span)?
         } else {
             value.get_type()
         };

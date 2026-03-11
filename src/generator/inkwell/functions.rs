@@ -54,7 +54,6 @@ impl<'backend> super::Inkwell<'backend> {
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
 
                 } else {
-                    // Defaulting to sext for unknown signedness in implicit return coercion
                     self.builder.build_int_s_extend(integer, target.into_int_type(), "sext")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
@@ -268,7 +267,7 @@ impl<'backend> super::Inkwell<'backend> {
         for member in &method.members {
             if let AnalysisKind::Binding(bind) = &member.kind {
                 let kind = if let Some(annotation) = bind.annotation.as_ref() {
-                    let resolved = self.llvm_type(annotation, member.span)?;
+                    let resolved = self.to_basic_type(annotation, member.span)?;
 
                     if matches!(method.interface, Interface::C) {
                         if let TypeKind::String = annotation.kind {
@@ -290,7 +289,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         let output = if let Some(annotation) = method.output {
-            Some(self.llvm_type(&annotation, span)?)
+            Some(self.to_basic_type(&annotation, span)?)
         } else {
             None
         };
@@ -735,7 +734,7 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let evaluated = self.analysis(*value.clone())?;
-        let llvm_target = self.llvm_type(&target_type, span)?;
+        let llvm_target = self.to_basic_type(&target_type, span)?;
 
         if evaluated.get_type() == llvm_target {
             return Ok(evaluated);
@@ -756,7 +755,6 @@ impl<'backend> super::Inkwell<'backend> {
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else if source_width < target_width {
-                    // It uses the source's signedness rule for accurate expansion
                     let source_signed = self.infer_signedness(&value).unwrap_or(true);
                     if source_signed {
                         self.builder.build_int_s_extend(integer, target, "sext")
@@ -854,7 +852,7 @@ impl<'backend> super::Inkwell<'backend> {
         ty: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let llvm_target = self.llvm_type(&ty, span)?;
+        let llvm_target = self.to_basic_type(&ty, span)?;
 
         let size = llvm_target.size_of().ok_or_else(|| {
             GenerateError::new(

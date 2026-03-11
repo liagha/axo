@@ -63,7 +63,7 @@ impl<'backend> super::Inkwell<'backend> {
                 fields.push(field.clone());
 
                 let kind = if let Some(annotation) = binding.annotation.as_ref() {
-                    self.llvm_type(annotation, member.span)?
+                    self.to_basic_type(annotation, member.span)?
                 } else {
                     return Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
@@ -83,7 +83,7 @@ impl<'backend> super::Inkwell<'backend> {
         self.insert_entity(
             identifier,
             Entity::Struct {
-                struct_type: shape,
+                structure: shape,
                 fields,
             }
         );
@@ -100,7 +100,7 @@ impl<'backend> super::Inkwell<'backend> {
         let name_str = identifier.as_str().unwrap_or("").to_string();
 
         let (shape, fields) = if let Some(entity) = self.get_entity(&identifier) {
-            if let Entity::Struct { struct_type: defined, fields } = entity {
+            if let Entity::Struct { structure: defined, fields } = entity {
                 (*defined, fields.clone())
             } else {
                 return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }), span));
@@ -197,7 +197,7 @@ impl<'backend> super::Inkwell<'backend> {
 
                     for scope in self.entities.iter().rev() {
                         for entity in scope.values() {
-                            if let Entity::Struct { struct_type: defined, fields } = entity {
+                            if let Entity::Struct { structure: defined, fields } = entity {
                                 if defined.as_basic_type_enum() == shape.as_basic_type_enum() {
                                     found = Some(fields.clone());
                                     break;
@@ -230,7 +230,7 @@ impl<'backend> super::Inkwell<'backend> {
             let mut found = None;
             for scope in self.entities.iter().rev() {
                 for entity in scope.values() {
-                    if let Entity::Struct { struct_type: defined, fields } = entity {
+                    if let Entity::Struct { structure: defined, fields } = entity {
                         if defined.as_basic_type_enum() == structure.get_type().as_basic_type_enum() {
                             found = Some(fields.clone());
                             break;
