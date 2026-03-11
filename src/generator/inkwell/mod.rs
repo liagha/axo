@@ -248,7 +248,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {
             self.errors.push(
                 GenerateError::new(
-                    ErrorKind::BuilderError { reason: error.to_string() },
+                    ErrorKind::Verification(error.to_string()),
                     Span::void()
                 )
             )
@@ -272,10 +272,10 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::Multiply(left, right) => self.multiply(left, right, instruction.span),
             AnalysisKind::Divide(left, right) => self.divide(left, right, instruction.span),
             AnalysisKind::Modulus(left, right) => self.modulus(left, right, instruction.span),
-            AnalysisKind::LogicalAnd(left, right) => self.logical_and(left, right),
-            AnalysisKind::LogicalOr(left, right) => self.logical_or(left, right),
-            AnalysisKind::LogicalNot(operand) => self.logical_not(operand),
-            AnalysisKind::LogicalXOr(left, right) => self.logical_xor(left, right),
+            AnalysisKind::LogicalAnd(left, right) => self.logical_and(left, right, instruction.span),
+            AnalysisKind::LogicalOr(left, right) => self.logical_or(left, right, instruction.span),
+            AnalysisKind::LogicalNot(operand) => self.logical_not(operand, instruction.span),
+            AnalysisKind::LogicalXOr(left, right) => self.logical_xor(left, right, instruction.span),
             AnalysisKind::BitwiseAnd(left, right) => self.bitwise_and(left, right, instruction.span),
             AnalysisKind::BitwiseOr(left, right) => self.bitwise_or(left, right, instruction.span),
             AnalysisKind::BitwiseNot(operand) => self.bitwise_not(operand, instruction.span),

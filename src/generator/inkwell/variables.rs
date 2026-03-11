@@ -60,7 +60,7 @@ impl<'backend> super::Inkwell<'backend> {
                     }
                     (BasicValueEnum::IntValue(addr), Some(kind)) => {
                         let ptr = self.builder.build_int_to_ptr(addr, self.context.ptr_type(inkwell::AddressSpace::default()), "ptr_arith_cast")
-                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, analysis.span))?;
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?;
                         Ok(Some((ptr, kind)))
                     }
                     _ => Ok(None),
@@ -97,7 +97,7 @@ impl<'backend> super::Inkwell<'backend> {
             (BasicValueEnum::PointerValue(pointer), Some(kind)) => {
                 self.builder
                     .build_load(kind, pointer, "deref_value")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
             }
             _ => Err(GenerateError::new(
                 ErrorKind::Variable(VariableError::DereferenceNonPointer),
@@ -119,7 +119,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Entity::Variable { pointer, kind, .. } => self
                     .builder
                     .build_load(*kind, *pointer, &identifier)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
                 _ => Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::NotAValue {
                         name: identifier.to_string(),
@@ -150,7 +150,7 @@ impl<'backend> super::Inkwell<'backend> {
 
                 return self.builder
                     .build_load(basic_type, global.as_pointer_value(), &identifier)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span));
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
             }
         }
 
@@ -179,7 +179,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(slot) = existing_pointer {
             self.builder.build_store(slot, result)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             self.entities.insert(
                 target.clone(),
@@ -195,7 +195,7 @@ impl<'backend> super::Inkwell<'backend> {
             let pointer = self.build_entry(func, result.get_type(), target.clone());
 
             self.builder.build_store(pointer, result)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             self.entities.insert(
                 target.clone(),
@@ -292,7 +292,7 @@ impl<'backend> super::Inkwell<'backend> {
             let pointer = self.build_entry(func, declared_kind, binding.target.clone());
 
             self.builder.build_store(pointer, casted)
-                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             pointer
         } else {
@@ -324,7 +324,7 @@ impl<'backend> super::Inkwell<'backend> {
         if let Some((pointer, kind)) = self.lvalue_pointer(&target)? {
             if result.get_type() == kind {
                 self.builder.build_store(pointer, result)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else if result.is_int_value() && kind.is_int_type() {
                 let casted = self
                     .builder
@@ -334,7 +334,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap_or(result);
 
                 self.builder.build_store(pointer, casted)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else if result.is_float_value() && kind.is_float_type() {
                 let casted = self
                     .builder
@@ -344,7 +344,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap_or(result);
 
                 self.builder.build_store(pointer, casted)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else if result.is_pointer_value() && kind.is_int_type() {
                 let casted = self
                     .builder
@@ -354,7 +354,7 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap_or(result);
 
                 self.builder.build_store(pointer, casted)
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else {
                 return Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::AssignmentTypeMismatch),

@@ -48,32 +48,32 @@ impl<'backend> super::Inkwell<'backend> {
                 .builder
                 .build_int_cast(integer, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self
                 .builder
                 .build_float_cast(float, target.into_float_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             (BasicValueEnum::IntValue(integer), target) if target.is_float_type() => self
                 .builder
                 .build_signed_int_to_float(integer, target.into_float_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             (BasicValueEnum::FloatValue(float), target) if target.is_int_type() => self
                 .builder
                 .build_float_to_signed_int(float, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             (BasicValueEnum::PointerValue(pointer), target) if target.is_int_type() => self
                 .builder
                 .build_ptr_to_int(pointer, target.into_int_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             (BasicValueEnum::IntValue(integer), target) if target.is_pointer_type() => self
                 .builder
                 .build_int_to_ptr(integer, target.into_pointer_type(), "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             _ => Err(GenerateError::new(
                 ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
@@ -98,7 +98,7 @@ impl<'backend> super::Inkwell<'backend> {
                         integer.get_type().const_zero(),
                         "condition",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
             }
         } else if value.is_float_value() {
             let float = value.into_float_value();
@@ -109,7 +109,7 @@ impl<'backend> super::Inkwell<'backend> {
                     float.get_type().const_zero(),
                     "condition",
                 )
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
         } else {
             Ok(self.context.bool_type().const_zero())
         }
@@ -132,7 +132,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(value) if value.is_int_value() => self
                     .builder
                     .build_int_cast(value.into_int_value(), self.context.i64_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
@@ -141,7 +141,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i64_type(),
                         "cast",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.i64_type().const_zero().into(),
             })),
@@ -149,7 +149,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(value) if value.is_int_value() => self
                     .builder
                     .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
@@ -158,7 +158,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i32_type(),
                         "cast",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.i32_type().const_zero().into(),
             })),
@@ -170,7 +170,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.f64_type(),
                         "cast",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_int_value() => self
                     .builder
@@ -179,7 +179,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.f64_type(),
                         "cast",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.f64_type().const_zero().into(),
             })),
@@ -193,7 +193,7 @@ impl<'backend> super::Inkwell<'backend> {
                             integer.get_type().const_zero(),
                             "cast",
                         )
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                         .into()
                 }
                 Some(value) if value.is_float_value() => {
@@ -205,7 +205,7 @@ impl<'backend> super::Inkwell<'backend> {
                             float.get_type().const_zero(),
                             "cast",
                         )
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                         .into()
                 }
                 _ => self.context.bool_type().const_zero().into(),
@@ -214,7 +214,7 @@ impl<'backend> super::Inkwell<'backend> {
                 Some(value) if value.is_int_value() => self
                     .builder
                     .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
                     .builder
@@ -223,7 +223,7 @@ impl<'backend> super::Inkwell<'backend> {
                         self.context.i32_type(),
                         "cast",
                     )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.i32_type().const_zero().into(),
             })),
@@ -346,7 +346,7 @@ impl<'backend> super::Inkwell<'backend> {
                     let allocate = self.build_entry(function, parameter.get_type(), bind.target.clone());
 
                     self.builder.build_store(allocate, parameter)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                     let signed = if parameter.get_type().is_int_type() {
                         Some(true)
@@ -372,11 +372,11 @@ impl<'backend> super::Inkwell<'backend> {
             if !self.terminated() {
                 if output.is_none() {
                     self.builder.build_return(None)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 } else {
                     let value = self.coerce(function, result, span)?;
                     self.builder.build_return(Some(&value))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
         }
@@ -420,7 +420,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder
             .build_conditional_branch(truth, consequence, alternative)
-            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(consequence);
         let leftwards = self.analysis(*positive)?;
@@ -430,7 +430,7 @@ impl<'backend> super::Inkwell<'backend> {
         if persists {
             self.builder
                 .build_unconditional_branch(merge)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         }
 
         self.builder.position_at_end(alternative);
@@ -441,7 +441,7 @@ impl<'backend> super::Inkwell<'backend> {
         if continues {
             self.builder
                 .build_unconditional_branch(merge)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         }
 
         self.builder.position_at_end(merge);
@@ -450,7 +450,7 @@ impl<'backend> super::Inkwell<'backend> {
             let phi = self
                 .builder
                 .build_phi(leftwards.get_type(), "result")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             if let (Some(alpha), Some(beta)) = (left, right) {
                 phi.add_incoming(&[(&leftwards, alpha), (&rightwards, beta)]);
@@ -482,7 +482,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder
             .build_unconditional_branch(heading)
-            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(heading);
         let evaluated = self.analysis(*condition)?;
@@ -490,7 +490,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder
             .build_conditional_branch(truth, core, end)
-            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(core);
         self.loop_headers.push(heading);
@@ -504,7 +504,7 @@ impl<'backend> super::Inkwell<'backend> {
         if !self.terminated() {
             self.builder
                 .build_unconditional_branch(heading)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         }
 
         self.builder.position_at_end(end);
@@ -544,7 +544,7 @@ impl<'backend> super::Inkwell<'backend> {
                                 kind.into_int_type(),
                                 "cast"
                             )
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     } else if evaluated.is_int_value() && kind.is_pointer_type() {
                         evaluated = self.builder
@@ -553,7 +553,7 @@ impl<'backend> super::Inkwell<'backend> {
                                 kind.into_pointer_type(),
                                 "cast"
                             )
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     }
                 }
@@ -562,7 +562,7 @@ impl<'backend> super::Inkwell<'backend> {
             }
 
             let result = self.builder.build_call(callable, &arguments, "call")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return if let Some(value) = result.try_as_basic_value().basic() {
                 Ok(value)
@@ -595,18 +595,18 @@ impl<'backend> super::Inkwell<'backend> {
                 let result = self.analysis(*item)?;
                 if function.get_type().get_return_type().is_none() {
                     self.builder.build_return(None)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(self.context.i64_type().const_zero().into())
                 } else {
                     let coerced = self.coerce(function, result, span)?;
                     self.builder.build_return(Some(&coerced))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(coerced)
                 }
             }
             None => {
                 self.builder.build_return(None)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 Ok(self.context.i64_type().const_zero().into())
             }
         }
@@ -627,7 +627,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(exit) = self.loop_exits.last().copied() {
             self.builder.build_unconditional_branch(exit)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
             return Err(GenerateError::new(
                 ErrorKind::ControlFlow(ControlFlowError::BreakOutsideLoop),
@@ -653,7 +653,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(header) = self.loop_headers.last().copied() {
             self.builder.build_unconditional_branch(header)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
             return Err(GenerateError::new(
                 ErrorKind::ControlFlow(ControlFlowError::ContinueOutsideLoop),
@@ -694,40 +694,40 @@ impl<'backend> super::Inkwell<'backend> {
                 .builder
                 .build_int_cast(integer, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
                 .builder
                 .build_float_cast(float, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => self
                 .builder
                 .build_signed_int_to_float(integer, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => self
                 .builder
                 .build_float_to_signed_int(float, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
                 .builder
                 .build_ptr_to_int(pointer, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(target)) => self
                 .builder
                 .build_int_to_ptr(integer, target, "cast")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             _ => Err(GenerateError::new(
-                ErrorKind::BuilderError { reason: "Unsupported or incompatible cast operation".to_string() },
+                ErrorKind::Cast,
                 span,
             )),
         }
@@ -745,16 +745,16 @@ impl<'backend> super::Inkwell<'backend> {
                 .builder
                 .build_int_neg(integer, "neg")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             BasicValueEnum::FloatValue(float) => self
                 .builder
                 .build_float_neg(float, "fneg")
                 .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)),
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             _ => Err(GenerateError::new(
-                ErrorKind::BuilderError { reason: "Operand cannot be negated (must be an Integer or Float)".to_string() },
+                ErrorKind::Negate,
                 span,
             )),
         }
@@ -769,9 +769,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         let size = llvm_target.size_of().ok_or_else(|| {
             GenerateError::new(
-                ErrorKind::BuilderError {
-                    reason: "Cannot compute the byte size of the provided type".to_string()
-                },
+                ErrorKind::SizeOf,
                 span,
             )
         })?;

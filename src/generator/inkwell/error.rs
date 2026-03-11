@@ -4,26 +4,55 @@ use crate::format::{Display, Formatter, Result, Show};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
-    InvalidModule { reason: String },
-    BuilderError { reason: String },
     InvalidType { ty: Type<'error> },
     UnsupportedFloatWidth { width: Scale },
-    SemanticError { message: String },
-    Arithmetic(ArithmeticError),
+    Cast,
     Bitwise(BitwiseError),
     Function(FunctionError),
     Variable(VariableError),
     ControlFlow(ControlFlowError),
     DataStructure(DataStructureError),
+    BuilderError(BuilderError),
+    Verification(String),
+    Normalize,
+    SizeOf,
+    Negate,
+    Boolean,
 }
 
-#[derive(Clone, Debug)]
-pub enum ArithmeticError {
-    InvalidOperandType {
-        side: String,
-        instruction: String,
-    }
+#[derive(Clone, Eq, Debug, PartialEq)]
+pub enum AlignmentError {
+    NonPowerOfTwo(u32),
+    SrcNonPowerOfTwo(u32),
+    DestNonPowerOfTwo(u32),
+    Unsized,
+    UnalignedInstruction,
 }
+
+#[derive(Clone, Eq, Debug, PartialEq)]
+pub enum OrderingError {
+    WeakerThanMonotic,
+    WeakerSuccessOrdering,
+    ReleaseOrAcqRel,
+}
+
+#[derive(Clone, Eq, Debug, PartialEq)]
+pub enum BuilderError {
+    Function,
+    Parent,
+    BlockInsertion,
+    UnsetPosition,
+    AlignmentError(AlignmentError),
+    ExtractOutOfRange,
+    BitwidthError,
+    PointeeTypeMismatch,
+    NotSameType,
+    NotPointerOrInteger,
+    OrderingError(OrderingError),
+    GEPPointee,
+    GEPIndex,
+}
+
 
 #[derive(Clone, Debug)]
 pub enum BitwiseError {
@@ -78,35 +107,120 @@ pub enum DataStructureError {
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            ErrorKind::InvalidModule { reason } => {
-                write!(f, "invalid LLVM module: {}.", reason)
-            }
-            ErrorKind::BuilderError { reason } => {
-                write!(f, "builder error: {}", reason)
-            }
             ErrorKind::InvalidType { ty } => {
                 write!(f, "invalid LLVM type {}", ty.format(2))
             }
             ErrorKind::UnsupportedFloatWidth { width } => {
                 write!(f, "invalid LLVM float width: {}", width)
             }
-            ErrorKind::SemanticError { message } => {
-                write!(f, "semantic error: {}", message)
-            }
-            ErrorKind::Bitwise(e) => write!(f, "{}", e),
-            ErrorKind::Function(e) => write!(f, "{}", e),
-            ErrorKind::Variable(e) => write!(f, "{}", e),
-            ErrorKind::ControlFlow(e) => write!(f, "{}", e),
-            ErrorKind::DataStructure(e) => write!(f, "{}", e),
-            ErrorKind::Arithmetic(e) => write!(f, "arithmetic error: {}", e),
+            ErrorKind::Bitwise(error) => write!(f, "{}", error),
+            ErrorKind::Function(error) => write!(f, "{}", error),
+            ErrorKind::Variable(error) => write!(f, "{}", error),
+            ErrorKind::ControlFlow(error) => write!(f, "{}", error),
+            ErrorKind::DataStructure(error) => write!(f, "{}", error),
+            ErrorKind::Verification(error) => write!(f, "verification error: {}", error),
+            ErrorKind::Normalize => write!(f, "normalization error"),
+            ErrorKind::BuilderError(error) => write!(f, "builder error: {}", error),
+            ErrorKind::Cast => write!(f, "Unsupported or incompatible cast operation"),
+            ErrorKind::SizeOf => write!(f, "Cannot compute the byte size of the provided type"),
+            ErrorKind::Negate => write!(f, "Operand cannot be negated (must be an Integer or Float)"),
+            ErrorKind::Boolean => write!(f, "not a Boolean"),
         }
     }
 }
 
-impl Display for ArithmeticError {
+impl Display for AlignmentError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            ArithmeticError::InvalidOperandType { side, instruction } => write!(f, "invalid LLVM operand type: {} - {}", side, instruction),
+            AlignmentError::NonPowerOfTwo(v) => {
+                write!(f, "{} is not a power of two and cannot be used for alignment", v)
+            }
+            AlignmentError::SrcNonPowerOfTwo(_v) => {
+                write!(f, "The src_align_bytes argument was not a power of two.")
+            }
+            AlignmentError::DestNonPowerOfTwo(_v) => {
+                write!(f, "The dest_align_bytes argument was not a power of two.")
+            }
+            AlignmentError::Unsized => {
+                write!(
+                    f,
+                    "type is unsized and cannot be aligned. Suggestion: Align memory manually."
+                )
+            }
+            AlignmentError::UnalignedInstruction => {
+                write!(f, "value is not an alloca, load, or store instruction.")
+            }
+        }
+    }
+}
+
+impl Display for OrderingError {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
+            OrderingError::WeakerThanMonotic => {
+                write!(f, "Both success and failure orderings must be monotonic or stronger.")
+            }
+            OrderingError::WeakerSuccessOrdering => {
+                write!(
+                    f,
+                    "The failure ordering may not be stronger than the success ordering."
+                )
+            }
+            OrderingError::ReleaseOrAcqRel => {
+                write!(
+                    f,
+                    "The failure ordering may not be release or acquire release."
+                )
+            }
+        }
+    }
+}
+
+impl Display for BuilderError {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
+            BuilderError::Parent => {
+                write!(f, "parent error")
+            }
+            BuilderError::Function => {
+                write!(f, "function error")
+            }
+            BuilderError::BlockInsertion => {
+                write!(f, "Builder block cannot be inserted.")
+            }
+            BuilderError::UnsetPosition => {
+                write!(f, "Builder position is not set")
+            }
+            BuilderError::AlignmentError(error) => {
+                write!(f, "Alignment error: {}", error)
+            }
+            BuilderError::ExtractOutOfRange => {
+                write!(f, "Aggregate extract index out of range")
+            }
+            BuilderError::BitwidthError => {
+                write!(
+                    f,
+                    "The bitwidth of value must be a power of 2 and greater than or equal to 8."
+                )
+            }
+            BuilderError::PointeeTypeMismatch => {
+                write!(f, "Pointee type does not match the value's type")
+            }
+            BuilderError::NotSameType => {
+                write!(f, "Values must have the same type")
+            }
+            BuilderError::NotPointerOrInteger => {
+                write!(f, "Values must have pointer or integer type")
+            }
+            BuilderError::OrderingError(_) => {
+                write!(f, "Ordering error or mismatch")
+            }
+            BuilderError::GEPPointee => {
+                write!(f, "GEP pointee is not a struct")
+            }
+            BuilderError::GEPIndex => {
+                write!(f, "GEP index out of range")
+            }
         }
     }
 }
@@ -218,6 +332,45 @@ impl Display for DataStructureError {
             DataStructureError::TupleIndexNotConstant => write!(f, "tuple index must be a compile-time constant"),
             DataStructureError::ArrayIndexNotConstant => write!(f, "array value index must be a compile-time constant"),
             DataStructureError::NotIndexable => write!(f, "type cannot be indexed or invalid index provided"),
+        }
+    }
+}
+
+impl From<inkwell::builder::BuilderError> for BuilderError {
+    fn from(error: inkwell::builder::BuilderError) -> Self {
+        match error {
+            inkwell::builder::BuilderError::UnsetPosition => BuilderError::UnsetPosition,
+            inkwell::builder::BuilderError::AlignmentError(error) => BuilderError::AlignmentError(error.into()),
+            inkwell::builder::BuilderError::ExtractOutOfRange => BuilderError::ExtractOutOfRange,
+            inkwell::builder::BuilderError::BitwidthError => BuilderError::BitwidthError,
+            inkwell::builder::BuilderError::PointeeTypeMismatch => BuilderError::PointeeTypeMismatch,
+            inkwell::builder::BuilderError::NotSameType => BuilderError::NotSameType,
+            inkwell::builder::BuilderError::NotPointerOrInteger => BuilderError::NotPointerOrInteger,
+            inkwell::builder::BuilderError::OrderingError(error) => BuilderError::OrderingError(error.into()),
+            inkwell::builder::BuilderError::GEPPointee => BuilderError::GEPPointee,
+            inkwell::builder::BuilderError::GEPIndex => BuilderError::GEPIndex,
+        }
+    }
+}
+
+impl From<inkwell::error::AlignmentError> for AlignmentError {
+    fn from(error: inkwell::error::AlignmentError) -> Self {
+        match error {
+            inkwell::error::AlignmentError::NonPowerOfTwo(value) => AlignmentError::NonPowerOfTwo(value.into()),
+            inkwell::error::AlignmentError::SrcNonPowerOfTwo(value) => AlignmentError::SrcNonPowerOfTwo(value.into()),
+            inkwell::error::AlignmentError::DestNonPowerOfTwo(value) => AlignmentError::DestNonPowerOfTwo(value.into()),
+            inkwell::error::AlignmentError::Unsized => AlignmentError::Unsized,
+            inkwell::error::AlignmentError::UnalignedInstruction => AlignmentError::UnalignedInstruction,
+        }
+    }
+}
+
+impl From<inkwell::builder::OrderingError> for OrderingError {
+    fn from(error: inkwell::builder::OrderingError) -> Self {
+        match error {
+            inkwell::builder::OrderingError::WeakerThanMonotic => OrderingError::WeakerThanMonotic,
+            inkwell::builder::OrderingError::WeakerSuccessOrdering => OrderingError::WeakerSuccessOrdering,
+            inkwell::builder::OrderingError::ReleaseOrAcqRel => OrderingError::ReleaseOrAcqRel,
         }
     }
 }

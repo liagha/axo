@@ -1,200 +1,187 @@
 use {
-    super::{Backend, Inkwell},
+    super::{
+        Backend,
+        Inkwell,
+    },
     crate::{
-        data::{Str, Boolean},
-        analyzer::Analysis,
-        generator::{ErrorKind, ArithmeticError, GenerateError},
+        analyzer::{
+            Analysis,
+        },
+        generator::{
+            ErrorKind,
+            GenerateError,
+        },
+        tracker::{
+            Span,
+        },
     },
     inkwell::{
         values::{
-            IntValue,
-            BasicValueEnum,
+            BasicValueEnum as Value,
+            IntValue as Integer,
         },
-        IntPredicate
+        IntPredicate as Decision,
     },
 };
-use crate::tracker::Span;
+use crate::generator::BuilderError;
 
 impl<'backend> Inkwell<'backend> {
-    fn zero_trap(
+    pub fn trap(
         &self,
-        divisor: IntValue<'backend>,
-        name: Str<'backend>, 
-        span: Span<'backend>
+        condition: Integer<'backend>,
+        span: Span<'backend>,
     ) -> Result<(), GenerateError<'backend>> {
-        let zero_value = divisor.get_type().const_zero();
-        let is_zero = self.builder.build_int_compare(
-            IntPredicate::EQ,
-            divisor,
-            zero_value,
-            &format!("is_{}_zero", name),
-        ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        let block = self.builder.get_insert_block().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
 
-        let current_block = self.builder.get_insert_block()
-            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError { reason: "No current basic block".to_string() }, span))?;
+        let parent = block.get_parent().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
-        let function = current_block.get_parent()
-            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError { reason: "No parent function for block".to_string()}, span))?;
+        let failure = self.context.append_basic_block(parent, "failure");
+        let success = self.context.append_basic_block(parent, "success");
 
-        let trap_block = self.context.append_basic_block(function, &format!("trap_{}_zero", name));
+        self.builder.build_conditional_branch(condition, failure, success)
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        let continue_block = self.context.append_basic_block(function, &format!("continue_{}", name));
+        self.builder.position_at_end(failure);
 
-        self.builder.build_conditional_branch(is_zero, trap_block, continue_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        let intrinsic = self.current_module().get_function("llvm.trap")
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Function), span))?;
 
-        self.builder.position_at_end(trap_block);
-
-        let trap_function = self.current_module().get_function("llvm.trap")
-            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError { reason: "llvm.trap intrinsic not found".to_string() }, span))?;
-
-        self.builder.build_call(trap_function, &[], "trap_call")
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        self.builder.build_call(intrinsic, &[], "call")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.build_unreachable()
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        self.builder.position_at_end(continue_block);
+        self.builder.position_at_end(success);
 
         Ok(())
     }
 
-    pub fn normalize_pair(
+    pub fn normalize(
         &self,
-        mut left: BasicValueEnum<'backend>,
-        mut right: BasicValueEnum<'backend>,
-        left_signed: bool,
-        right_signed: bool,
-        name: &str,
-        span: Span<'backend>
-    ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, Boolean), GenerateError<'backend>> {
-        let ptr_int_type = self.context.i64_type();
+        mut primary: Value<'backend>,
+        mut secondary: Value<'backend>,
+        signs: [bool; 2],
+        span: Span<'backend>,
+    ) -> Result<(Value<'backend>, Value<'backend>, bool), GenerateError<'backend>> {
+        let pointer = self.context.i64_type();
 
-        if left.is_pointer_value() {
-            left = self.builder.build_ptr_to_int(
-                left.into_pointer_value(),
-                ptr_int_type,
-                &format!("{}_lhs_ptr_to_int", name)
-            ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into();
+        if primary.is_pointer_value() {
+            primary = self.builder.build_ptr_to_int(primary.into_pointer_value(), pointer, "cast")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into();
         }
 
-        if right.is_pointer_value() {
-            right = self.builder.build_ptr_to_int(
-                right.into_pointer_value(),
-                ptr_int_type,
-                &format!("{}_rhs_ptr_to_int", name)
-            ).map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into();
+        if secondary.is_pointer_value() {
+            secondary = self.builder.build_ptr_to_int(secondary.into_pointer_value(), pointer, "cast")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into();
         }
 
-        if left.is_int_value() && right.is_int_value() {
-            let left_int = left.into_int_value();
-            let right_int = right.into_int_value();
+        if primary.is_int_value() && secondary.is_int_value() {
+            let alpha = primary.into_int_value();
+            let beta = secondary.into_int_value();
 
-            let left_width = left_int.get_type().get_bit_width();
-            let right_width = right_int.get_type().get_bit_width();
+            let sizes = [alpha.get_type().get_bit_width(), beta.get_type().get_bit_width()];
 
-            if left_width < right_width {
-                let new_left = if left_signed {
-                    self.builder.build_int_s_extend(left_int, right_int.get_type(), &format!("{}_ext_lhs", name))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            if sizes[0] < sizes[1] {
+                let extended = if signs[0] {
+                    self.builder.build_int_s_extend(alpha, beta.get_type(), "extend")
                 } else {
-                    self.builder.build_int_z_extend(left_int, right_int.get_type(), &format!("{}_ext_lhs", name))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
-                };
-                return Ok((new_left.into(), right, false));
-            } else if right_width < left_width {
-                let new_right = if right_signed {
-                    self.builder.build_int_s_extend(right_int, left_int.get_type(), &format!("{}_ext_rhs", name))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                    self.builder.build_int_z_extend(alpha, beta.get_type(), "extend")
+                }.map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                return Ok((extended.into(), secondary, false));
+            } else if sizes[1] < sizes[0] {
+                let extended = if signs[1] {
+                    self.builder.build_int_s_extend(beta, alpha.get_type(), "extend")
                 } else {
-                    self.builder.build_int_z_extend(right_int, left_int.get_type(), &format!("{}_ext_rhs", name))
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
-                };
-                return Ok((left, new_right.into(), false));
+                    self.builder.build_int_z_extend(beta, alpha.get_type(), "extend")
+                }.map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                return Ok((primary, extended.into(), false));
             }
 
-            return Ok((left, right, false));
+            return Ok((primary, secondary, false));
         }
 
-        let mut float_type = self.context.f64_type();
+        let mut kind = self.context.f64_type();
 
-        if left.is_float_value() {
-            float_type = left.into_float_value().get_type();
-        }
-
-        if right.is_float_value() {
-            let right_float_type = right.into_float_value().get_type();
-            if right_float_type != float_type && right_float_type == self.context.f64_type() {
-                float_type = self.context.f64_type();
-            }
-        }
-
-        let left_normalized = if left.is_float_value() {
-            let float_val = left.into_float_value();
-            if float_val.get_type() != float_type {
-                self.builder.build_float_ext(float_val, float_type, &format!("{}_ext_lhs", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+        if primary.is_float_value() && secondary.is_float_value() {
+            let types = [primary.into_float_value().get_type(), secondary.into_float_value().get_type()];
+            if types[0] != types[1] {
+                kind = self.context.f64_type();
             } else {
-                left
+                kind = types[0];
             }
-        } else if left.is_int_value() {
-            if left_signed {
-                self.builder.build_signed_int_to_float(left.into_int_value(), float_type, &format!("{}_lhs_to_float", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+        } else if primary.is_float_value() {
+            kind = primary.into_float_value().get_type();
+        } else if secondary.is_float_value() {
+            kind = secondary.into_float_value().get_type();
+        }
+
+        let first = if primary.is_float_value() {
+            let float = primary.into_float_value();
+            if float.get_type() != kind {
+                self.builder.build_float_ext(float, kind, "extend")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
             } else {
-                self.builder.build_unsigned_int_to_float(left.into_int_value(), float_type, &format!("{}_lhs_to_float", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+                primary
+            }
+        } else if primary.is_int_value() {
+            if signs[0] {
+                self.builder.build_signed_int_to_float(primary.into_int_value(), kind, "convert")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
+            } else {
+                self.builder.build_unsigned_int_to_float(primary.into_int_value(), kind, "convert")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::Arithmetic(ArithmeticError::InvalidOperandType { side: "LHS".to_string(), instruction: name.to_string() }), span));
+            return Err(GenerateError::new(ErrorKind::Normalize, span));
         };
 
-        let right_normalized = if right.is_float_value() {
-            let float_val = right.into_float_value();
-            if float_val.get_type() != float_type {
-                self.builder.build_float_ext(float_val, float_type, &format!("{}_ext_rhs", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+        let second = if secondary.is_float_value() {
+            let float = secondary.into_float_value();
+            if float.get_type() != kind {
+                self.builder.build_float_ext(float, kind, "extend")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
             } else {
-                right
+                secondary
             }
-        } else if right.is_int_value() {
-            if right_signed {
-                self.builder.build_signed_int_to_float(right.into_int_value(), float_type, &format!("{}_rhs_to_float", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+        } else if secondary.is_int_value() {
+            if signs[1] {
+                self.builder.build_signed_int_to_float(secondary.into_int_value(), kind, "convert")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
             } else {
-                self.builder.build_unsigned_int_to_float(right.into_int_value(), float_type, &format!("{}_rhs_to_float", name))
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?.into()
+                self.builder.build_unsigned_int_to_float(secondary.into_int_value(), kind, "convert")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?.into()
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::Arithmetic(ArithmeticError::InvalidOperandType { side: "RHS".to_string(), instruction: name.to_string() }), span));
+            return Err(GenerateError::new(ErrorKind::Normalize, span));
         };
 
-        Ok((left_normalized, right_normalized, true))
+        Ok((first, second, true))
     }
 
     pub fn add(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
+        span: Span<'backend>,
+    ) -> Result<Value<'backend>, GenerateError<'backend>> {
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "add", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_int_add(left.into_int_value(), right.into_int_value(), "add")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_int_add(primary.into_int_value(), secondary.into_int_value(), "add")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_add(left.into_float_value(), right.into_float_value(), "add")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_float_add(primary.into_float_value(), secondary.into_float_value(), "add")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -203,25 +190,25 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
+        span: Span<'backend>,
+    ) -> Result<Value<'backend>, GenerateError<'backend>> {
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "subtract", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_int_sub(left.into_int_value(), right.into_int_value(), "subtract")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_int_sub(primary.into_int_value(), secondary.into_int_value(), "subtract")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_sub(left.into_float_value(), right.into_float_value(), "subtract")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_float_sub(primary.into_float_value(), secondary.into_float_value(), "subtract")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -230,25 +217,25 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
+        span: Span<'backend>,
+    ) -> Result<Value<'backend>, GenerateError<'backend>> {
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "multiply", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_int_mul(left.into_int_value(), right.into_int_value(), "multiply")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_int_mul(primary.into_int_value(), secondary.into_int_value(), "multiply")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_mul(left.into_float_value(), right.into_float_value(), "multiply")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_float_mul(primary.into_float_value(), secondary.into_float_value(), "multiply")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -257,36 +244,39 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let combined_signed = left_signed && right_signed;
+        span: Span<'backend>,
+    ) -> Result<Value<'backend>, GenerateError<'backend>> {
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "divide", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            let divisor = right.into_int_value();
-            self.zero_trap(divisor, Str::from("div"), span)?;
+            let divisor = secondary.into_int_value();
+            let zero = divisor.get_type().const_zero();
+            let condition = self.builder.build_int_compare(Decision::EQ, divisor, zero, "check")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            if combined_signed {
-                Ok(BasicValueEnum::from(
-                    self.builder.build_int_signed_div(left.into_int_value(), divisor, "divide")
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            self.trap(condition, span)?;
+
+            if first && second {
+                Ok(Value::from(
+                    self.builder.build_int_signed_div(primary.into_int_value(), divisor, "divide")
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 ))
             } else {
-                Ok(BasicValueEnum::from(
-                    self.builder.build_int_unsigned_div(left.into_int_value(), divisor, "divide")
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                Ok(Value::from(
+                    self.builder.build_int_unsigned_div(primary.into_int_value(), divisor, "divide")
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 ))
             }
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_div(left.into_float_value(), right.into_float_value(), "divide")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_float_div(primary.into_float_value(), secondary.into_float_value(), "divide")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -295,35 +285,38 @@ impl<'backend> Inkwell<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let combined_signed = left_signed && right_signed;
+        span: Span<'backend>,
+    ) -> Result<Value<'backend>, GenerateError<'backend>> {
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "modulus", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_rem(left.into_float_value(), right.into_float_value(), "modulus")
-                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            Ok(Value::from(
+                self.builder.build_float_rem(primary.into_float_value(), secondary.into_float_value(), "modulus")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
-            let divisor = right.into_int_value();
-            self.zero_trap(divisor, Str::from("mod"), span)?;
+            let divisor = secondary.into_int_value();
+            let zero = divisor.get_type().const_zero();
+            let condition = self.builder.build_int_compare(Decision::EQ, divisor, zero, "check")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            if combined_signed {
-                Ok(BasicValueEnum::from(
-                    self.builder.build_int_signed_rem(left.into_int_value(), divisor, "modulus")
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+            self.trap(condition, span)?;
+
+            if first && second {
+                Ok(Value::from(
+                    self.builder.build_int_signed_rem(primary.into_int_value(), divisor, "modulus")
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 ))
             } else {
-                Ok(BasicValueEnum::from(
-                    self.builder.build_int_unsigned_rem(left.into_int_value(), divisor, "modulus")
-                        .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                Ok(Value::from(
+                    self.builder.build_int_unsigned_rem(primary.into_int_value(), divisor, "modulus")
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 ))
             }
         }

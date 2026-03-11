@@ -1,18 +1,32 @@
-use inkwell::IntPredicate;
 use {
     super::{
         Backend,
         Inkwell,
     },
     crate::{
-        analyzer::Analysis,
-        generator::{ErrorKind},
+        analyzer::{
+            Analysis,
+        },
+        generator::{
+            inkwell::{
+                error::{
+                    BitwiseError,
+                },
+            },
+            ErrorKind,
+            GenerateError,
+        },
+        tracker::{
+            Span,
+        },
     },
-    inkwell::values::{BasicValueEnum},
+    inkwell::{
+        values::{
+            BasicValueEnum,
+        },
+        IntPredicate,
+    },
 };
-use crate::generator::inkwell::error::BitwiseError;
-use crate::generator::GenerateError;
-use crate::tracker::Span;
 
 impl<'backend> Inkwell<'backend> {
     pub fn bitwise_and(
@@ -21,22 +35,21 @@ impl<'backend> Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        if !left.is_int_value() || !right.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "AND".to_string(),
-                }),
-                span,
-            ));
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
+
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+
+        if floating {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "and".to_string() }), span));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_and(left.into_int_value(), right.into_int_value(), "bitwise_and")
-                .unwrap(),
+            self.builder.build_and(primary.into_int_value(), secondary.into_int_value(), "and")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 
@@ -46,22 +59,21 @@ impl<'backend> Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        if !left.is_int_value() || !right.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "OR".to_string(),
-                }),
-                span,
-            ));
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
+
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+
+        if floating {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "or".to_string() }), span));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_or(left.into_int_value(), right.into_int_value(), "bitwise_or")
-                .unwrap(),
+            self.builder.build_or(primary.into_int_value(), secondary.into_int_value(), "or")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 
@@ -70,21 +82,15 @@ impl<'backend> Inkwell<'backend> {
         operand: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let operand_value = self.analysis(*operand)?;
+        let alpha = self.analysis(*operand)?;
 
-        if !operand_value.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "NOT".to_string(),
-                }),
-                span,
-            ));
+        if !alpha.is_int_value() {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "not".to_string() }), span));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_not(operand_value.into_int_value(), "bitwise_not")
-                .unwrap(),
+            self.builder.build_not(alpha.into_int_value(), "not")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 
@@ -94,22 +100,21 @@ impl<'backend> Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        if !left.is_int_value() || !right.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "XOR".to_string(),
-                }),
-                span,
-            ));
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
+
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+
+        if floating {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "xor".to_string() }), span));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_xor(left.into_int_value(), right.into_int_value(), "bitwise_xor")
-                .unwrap(),
+            self.builder.build_xor(primary.into_int_value(), secondary.into_int_value(), "xor")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 
@@ -119,50 +124,27 @@ impl<'backend> Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        if !left.is_int_value() || !right.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "shift left".to_string(),
-                }),
-                span,
-            ));
+        if !alpha.is_int_value() || !beta.is_int_value() {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "shift".to_string() }), span));
         }
 
-        let shift_amt = right.into_int_value();
-        let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false);
+        let primary = alpha.into_int_value();
+        let secondary = beta.into_int_value();
 
-        let is_shift_invalid = self.builder.build_int_compare(
-            IntPredicate::UGE,
-            shift_amt,
-            max_shift_amt,
-            "shift_left_bound_check"
-        ).unwrap();
+        let width = primary.get_type().get_bit_width() as u64;
+        let limit = secondary.get_type().const_int(width, false);
 
-        let current_block = self.builder.get_insert_block().unwrap();
-        let function = current_block.get_parent().unwrap();
+        let condition = self.builder.build_int_compare(IntPredicate::UGE, secondary, limit, "check")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        let trap_block = self.context.append_basic_block(function, "trap_shift_invalid");
-        let continue_block = self.context.append_basic_block(function, "continue_shift_left");
-
-        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-
-        self.builder.position_at_end(trap_block);
-        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call")
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-        self.builder.build_unreachable()
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-
-        self.builder.position_at_end(continue_block);
+        self.trap(condition, span)?;
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_left_shift(left.into_int_value(), shift_amt, "shift_left")
-                .unwrap(),
+            self.builder.build_left_shift(primary, secondary, "shift")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 
@@ -172,61 +154,31 @@ impl<'backend> Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let signed = self
-            .infer_signedness(&left)
-            .zip(self.infer_signedness(&right))
-            .map(|(lhs, rhs)| lhs && rhs)
-            .unwrap_or(true);
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
+        let signed = first && second;
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        if !left.is_int_value() || !right.is_int_value() {
-            return Err(GenerateError::new(
-                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
-                    instruction: "shift right".to_string(),
-                }),
-                span,
-            ));
+        if !alpha.is_int_value() || !beta.is_int_value() {
+            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: "shift".to_string() }), span));
         }
 
-        let shift_amt = right.into_int_value();
-        let operand_bit_width = left.into_int_value().get_type().get_bit_width() as u64;
-        let max_shift_amt = self.context.i32_type().const_int(operand_bit_width, false);
+        let primary = alpha.into_int_value();
+        let secondary = beta.into_int_value();
 
-        let is_shift_invalid = self.builder.build_int_compare(
-            IntPredicate::UGE,
-            shift_amt,
-            max_shift_amt,
-            "shift_right_bound_check"
-        ).unwrap();
+        let width = primary.get_type().get_bit_width() as u64;
+        let limit = secondary.get_type().const_int(width, false);
 
-        let current_block = self.builder.get_insert_block().unwrap();
-        let function = current_block.get_parent().unwrap();
+        let condition = self.builder.build_int_compare(IntPredicate::UGE, secondary, limit, "check")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        let trap_block = self.context.append_basic_block(function, "trap_shift_invalid");
-        let continue_block = self.context.append_basic_block(function, "continue_shift_right");
-
-        self.builder.build_conditional_branch(is_shift_invalid, trap_block, continue_block)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-
-        self.builder.position_at_end(trap_block);
-        self.builder.build_call(self.current_module().get_function("llvm.trap").unwrap(), &[], "trap_call")
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-        self.builder.build_unreachable()
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
-
-        self.builder.position_at_end(continue_block);
+        self.trap(condition, span)?;
 
         Ok(BasicValueEnum::from(
-            self.builder
-                .build_right_shift(
-                    left.into_int_value(),
-                    shift_amt,
-                    signed,
-                    "shift_right",
-                )
-                .unwrap(),
+            self.builder.build_right_shift(primary, secondary, signed, "shift")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
         ))
     }
 }

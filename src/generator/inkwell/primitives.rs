@@ -61,7 +61,7 @@ impl<'backend> Inkwell<'backend> {
             .build_global_string_ptr(raw, "string_literal")
             .map(|value| value.as_pointer_value())
             .map_err(|error| {
-                GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span)
+                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
             })?;
 
         Ok(BasicValueEnum::from(pointer))

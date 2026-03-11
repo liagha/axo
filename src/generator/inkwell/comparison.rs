@@ -1,46 +1,53 @@
 use {
     super::{
         Backend,
-        GenerateError,
-        super::ErrorKind,
+        Inkwell,
     },
     crate::{
-        analyzer::Analysis,
+        analyzer::{
+            Analysis,
+        },
+        generator::{
+            ErrorKind,
+            GenerateError,
+        },
+        tracker::{
+            Span,
+        },
     },
     inkwell::{
-        values::BasicValueEnum,
-        FloatPredicate, IntPredicate,
+        values::{
+            BasicValueEnum,
+        },
+        FloatPredicate,
+        IntPredicate,
     },
 };
-use crate::tracker::Span;
 
-impl<'backend> super::Inkwell<'backend> {
+impl<'backend> Inkwell<'backend> {
     pub fn equal(
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "equal", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    IntPredicate::EQ, left.into_int_value(), right.into_int_value(), "equal",
-                ).map_err(
-                    |error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(IntPredicate::EQ, primary.into_int_value(), secondary.into_int_value(), "equal")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::OEQ, left.into_float_value(), right.into_float_value(), "equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::OEQ, primary.into_float_value(), secondary.into_float_value(), "equal")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -51,25 +58,23 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "not_equal", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    IntPredicate::NE, left.into_int_value(), right.into_int_value(), "not_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(IntPredicate::NE, primary.into_int_value(), secondary.into_int_value(), "unequal")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::ONE, left.into_float_value(), right.into_float_value(), "not_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::ONE, primary.into_float_value(), secondary.into_float_value(), "unequal")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -80,27 +85,25 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let signed = left_signed && right_signed;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
+        let signed = first && second;
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "less", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            let predicate = if signed { IntPredicate::SLT } else { IntPredicate::ULT };
+            let limit = if signed { IntPredicate::SLT } else { IntPredicate::ULT };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    predicate, left.into_int_value(), right.into_int_value(), "less",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "less")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::OLT, left.into_float_value(), right.into_float_value(), "less",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::OLT, primary.into_float_value(), secondary.into_float_value(), "less")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -111,27 +114,25 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let signed = left_signed && right_signed;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
+        let signed = first && second;
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "less_or_equal", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            let predicate = if signed { IntPredicate::SLE } else { IntPredicate::ULE };
+            let limit = if signed { IntPredicate::SLE } else { IntPredicate::ULE };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    predicate, left.into_int_value(), right.into_int_value(), "less_or_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "maximum")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::OLE, left.into_float_value(), right.into_float_value(), "less_or_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::OLE, primary.into_float_value(), secondary.into_float_value(), "maximum")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -142,27 +143,25 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let signed = left_signed && right_signed;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
+        let signed = first && second;
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "greater", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            let predicate = if signed { IntPredicate::SGT } else { IntPredicate::UGT };
+            let limit = if signed { IntPredicate::SGT } else { IntPredicate::UGT };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    predicate, left.into_int_value(), right.into_int_value(), "greater",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "greater")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::OGT, left.into_float_value(), right.into_float_value(), "greater",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::OGT, primary.into_float_value(), secondary.into_float_value(), "greater")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }
@@ -173,27 +172,25 @@ impl<'backend> super::Inkwell<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_signed = self.infer_signedness(&left).unwrap_or(true);
-        let right_signed = self.infer_signedness(&right).unwrap_or(true);
-        let signed = left_signed && right_signed;
+        let first = self.infer_signedness(&left).unwrap_or(true);
+        let second = self.infer_signedness(&right).unwrap_or(true);
+        let signed = first && second;
 
-        let left = self.analysis(*left)?;
-        let right = self.analysis(*right)?;
+        let alpha = self.analysis(*left)?;
+        let beta = self.analysis(*right)?;
 
-        let (left, right, floating) = self.normalize_pair(left, right, left_signed, right_signed, "greater_or_equal", span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
 
         if !floating {
-            let predicate = if signed { IntPredicate::SGE } else { IntPredicate::UGE };
+            let limit = if signed { IntPredicate::SGE } else { IntPredicate::UGE };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(
-                    predicate, left.into_int_value(), right.into_int_value(), "greater_or_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "minimum")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(
-                    FloatPredicate::OGE, left.into_float_value(), right.into_float_value(), "greater_or_equal",
-                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                self.builder.build_float_compare(FloatPredicate::OGE, primary.into_float_value(), secondary.into_float_value(), "minimum")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
     }

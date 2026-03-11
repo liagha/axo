@@ -123,7 +123,7 @@ impl<'backend> super::Inkwell<'backend> {
 
                         value = self.builder
                             .build_insert_value(value, casted, index as u32, "insert")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into_struct_value();
                     } else {
                         return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownField { struct_name: identifier.to_string(), field_name: field.to_string() }), span));
@@ -146,7 +146,7 @@ impl<'backend> super::Inkwell<'backend> {
 
                     value = self.builder
                         .build_insert_value(value, casted, index as u32, "insert")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                         .into_struct_value();
                 }
             }
@@ -199,11 +199,11 @@ impl<'backend> super::Inkwell<'backend> {
                                 *pointer,
                                 index as u32,
                                 "pointer",
-                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                             let resolved = shape.get_field_type_at_index(index as u32).unwrap();
                             return self.builder.build_load(resolved, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span));
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
                         }
                     }
                 }
@@ -225,7 +225,7 @@ impl<'backend> super::Inkwell<'backend> {
             if let Some(fields) = found {
                 if let Some(index) = fields.iter().position(|item| item == &field) {
                     return self.builder.build_extract_value(structure, index as u32, "extract")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                         .map(|value| value.into());
                 }
             }
@@ -262,7 +262,7 @@ impl<'backend> super::Inkwell<'backend> {
 
             current = self.builder
                 .build_insert_value(current, casted, index as u32, "insert")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 .into_array_value();
         }
 
@@ -289,7 +289,7 @@ impl<'backend> super::Inkwell<'backend> {
         for (index, value) in values.into_iter().enumerate() {
             current = self.builder
                 .build_insert_value(current, value, index as u32, "insert")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 .into_struct_value();
         }
 
@@ -320,11 +320,11 @@ impl<'backend> super::Inkwell<'backend> {
                                 *pointer,
                                 constant as u32,
                                 "index",
-                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                             let field = shape.get_field_type_at_index(constant as u32).unwrap();
                             self.builder.build_load(field, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                         } else {
                             Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
                         }
@@ -340,7 +340,7 @@ impl<'backend> super::Inkwell<'backend> {
                             integer,
                             length,
                             "check"
-                        ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                        ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                         let block = self.builder.get_insert_block().unwrap();
                         let function = block.get_parent().unwrap();
@@ -349,16 +349,16 @@ impl<'backend> super::Inkwell<'backend> {
                         let resume = self.context.append_basic_block(function, "resume");
 
                         self.builder.build_conditional_branch(exceeds, trap, resume)
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                         self.builder.position_at_end(trap);
                         if let Some(callable) = self.current_module().get_function("llvm.trap") {
                             self.builder.build_call(callable, &[], "trap")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                         }
 
                         self.builder.build_unreachable()
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?;
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                         self.builder.position_at_end(resume);
 
@@ -366,11 +366,11 @@ impl<'backend> super::Inkwell<'backend> {
                         let slot = unsafe {
                             self.builder
                                 .build_in_bounds_gep(shape, *pointer, &[zero, integer], "index")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))?
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                         };
 
                         return self.builder.build_load(element_type, slot, "value")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span));
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
                     }
                 }
             }
@@ -383,7 +383,7 @@ impl<'backend> super::Inkwell<'backend> {
                         structure,
                         constant as u32,
                         "extract",
-                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                         .map(Into::into)
                 } else {
                     Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant), span))
@@ -396,7 +396,7 @@ impl<'backend> super::Inkwell<'backend> {
                         array,
                         constant as u32,
                         "extract",
-                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError { reason: error.to_string() }, span))
+                    ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                         .map(Into::into)
                 } else {
                     Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::ArrayIndexNotConstant), span))
