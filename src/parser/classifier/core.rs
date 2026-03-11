@@ -34,7 +34,7 @@ impl<'parser> Parser<'parser> {
                 }
             }),
             |classifier| {
-                let input = classifier.form.collect_inputs()[0].clone();
+                let input = &classifier.form.collect_inputs()[0];
 
                 classifier.form = Form::output(
                     Element::new(

@@ -84,11 +84,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let head = structure
-                    .target
-                    .brand()
-                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, structure.target.span))?;
-
                 let analyzed = Structure::new(
                     Str::from(structure.target.brand().unwrap().format(0)),
                     members?,

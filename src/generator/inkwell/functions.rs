@@ -12,7 +12,7 @@ use {
     },
     inkwell::{
         types::BasicType,
-        values::{BasicValueEnum, FunctionValue, PointerValue},
+        values::{BasicValueEnum, FunctionValue},
         FloatPredicate, IntPredicate,
     },
 };

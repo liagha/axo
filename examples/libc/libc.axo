@@ -131,7 +131,6 @@ func main(): Integer {
 
     println_i64(point.x)
 
-
     test_logic(2)
 
     test_array()
