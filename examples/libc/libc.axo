@@ -100,6 +100,45 @@ const MAP_HUGETLB   = 262144
 const MAP_FAILED = -1
 const INVALID_FD = -1
 
+struct Point {
+    const x: Integer,
+    const y: Integer,
+}
+
+func main(): Integer {
+    var i = 0
+
+    while(
+        i < 10,
+        {
+            println_i64(i)
+
+            print_str("Fac: ")
+            println_i64(factorial(i))
+
+            i = i + 1
+        }
+    )
+
+    const point = Point { x = 3, y = 5 }
+
+    println_str("Old:")
+    println_i64(point.x)
+
+    point.x = 6
+
+    println_str("New:")
+
+    println_i64(point.x)
+
+
+    test_logic(2)
+
+    test_array()
+
+    return(EXIT_SUCCESS)
+}
+
 func test_logic(const x: Integer): Integer {
     if (x > 5, {
         println_str("Greater than 5")
@@ -130,26 +169,4 @@ func test_array() {
 
     println_str("Array Element:")
     print_i64(array[2])
-}
-
-func main(): Integer {
-    var i = 0
-
-    while(
-        i < 10,
-        {
-            println_i64(i)
-
-            print_str("Fac: ")
-            println_i64(factorial(i))
-
-            i = i + 1
-        }
-    )
-
-    test_logic(2)
-
-    test_array()
-
-    return(EXIT_SUCCESS)
 }

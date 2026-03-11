@@ -50,6 +50,7 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("structure");
+        let name_str = string.to_string();
 
         let shape = self.context.opaque_struct_type(string);
 
@@ -66,8 +67,8 @@ impl<'backend> super::Inkwell<'backend> {
                 } else {
                     return Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
-                            struct_name: identifier.to_string(),
-                            field_name: field.to_string(),
+                            struct_name: name_str,
+                            field_name: field.as_str().unwrap_or("").to_string(),
                         }),
                         span,
                     ));
@@ -96,15 +97,16 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
+        let name_str = identifier.as_str().unwrap_or("").to_string();
 
         let (shape, fields) = if let Some(entity) = self.get_entity(&identifier) {
             if let Entity::Struct { struct_type: defined, fields } = entity {
                 (*defined, fields.clone())
             } else {
-                return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotAStructType { name: identifier.to_string() }), span));
+                return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }), span));
             }
         } else {
-            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: identifier.to_string() }), span));
+            return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: name_str }), span));
         };
 
         let mut value = shape.get_undef();
@@ -118,7 +120,10 @@ impl<'backend> super::Inkwell<'backend> {
                         let evaluated = self.analysis(*assigned.clone())?;
 
                         let casted = self.convert(evaluated, kind).ok_or_else(|| {
-                            GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch { struct_name: identifier.to_string(), field_name: field.to_string() }), span)
+                            GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorFieldTypeMismatch {
+                                struct_name: name_str.clone(),
+                                field_name: field.as_str().unwrap_or("").to_string()
+                            }), span)
                         })?;
 
                         value = self.builder
@@ -126,12 +131,15 @@ impl<'backend> super::Inkwell<'backend> {
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into_struct_value();
                     } else {
-                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownField { struct_name: identifier.to_string(), field_name: field.to_string() }), span));
+                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::UnknownField {
+                            struct_name: name_str.clone(),
+                            field_name: field.as_str().unwrap_or("").to_string()
+                        }), span));
                     }
                 }
                 _ => {
                     if position >= fields.len() {
-                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TooManyInitializers { struct_name: identifier.to_string() }), span));
+                        return Err(GenerateError::new(ErrorKind::DataStructure(DataStructureError::TooManyInitializers { struct_name: name_str }), span));
                     }
 
                     let index = position;
@@ -141,7 +149,10 @@ impl<'backend> super::Inkwell<'backend> {
                     let evaluated = self.analysis(member)?;
 
                     let casted = self.convert(evaluated, kind).ok_or_else(|| {
-                        GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorPositionalArgTypeMismatch { struct_name: identifier.to_string(), index }), span)
+                        GenerateError::new(ErrorKind::DataStructure(DataStructureError::ConstructorPositionalArgTypeMismatch {
+                            struct_name: name_str.clone(),
+                            index
+                        }), span)
                     })?;
 
                     value = self.builder
@@ -183,7 +194,7 @@ impl<'backend> super::Inkwell<'backend> {
                     let shape = kind.into_struct_type();
 
                     let mut found = None;
-                    
+
                     for scope in self.entities.iter().rev() {
                         for entity in scope.values() {
                             if let Entity::Struct { struct_type: defined, fields } = entity {

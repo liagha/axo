@@ -36,14 +36,6 @@ impl<'token> Show<'token> for Token<'token> {
                 format!("{}", self.kind.format(verbosity))
             }
 
-            1 => {
-                format!("{}", self.kind.format(verbosity))
-            }
-
-            2 => {
-                format!("{:?} | {:?}", self.kind.format(verbosity), self.span)
-            }
-
             _ => {
                 self.format(verbosity - 1).to_string()
             }

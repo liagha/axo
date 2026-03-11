@@ -1,3 +1,4 @@
+use inkwell::types::BasicType;
 use {
     super::{Backend, Entity},
     crate::{
@@ -10,7 +11,7 @@ use {
         tracker::Span,
     },
     inkwell::{
-        types::{BasicTypeEnum},
+        types::BasicTypeEnum,
         values::{BasicValueEnum, PointerValue},
     },
 };
@@ -20,20 +21,10 @@ impl<'backend> super::Inkwell<'backend> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.get_entity(name) {
                 Some(Entity::Variable { pointee, .. }) if pointee.is_some() => *pointee,
-
-                Some(Entity::Variable { kind, .. }) if kind.is_pointer_type() => {
-                    None
-                }
                 _ => None,
             },
             AnalysisKind::Dereference(operand) => {
-                self.pointer_pointee_type(operand).and_then(|t| {
-                    if t.is_pointer_type() {
-                        None
-                    } else {
-                        Some(t)
-                    }
-                })
+                self.pointer_pointee_type(operand)
             },
             _ => None,
         }
@@ -44,6 +35,22 @@ impl<'backend> super::Inkwell<'backend> {
         analysis: &Analysis<'backend>,
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
         match &analysis.kind {
+            AnalysisKind::Usage(name) => {
+                if let Some(entity) = self.get_entity(name) {
+                    match entity {
+                        Entity::Variable { pointer, kind, .. } => {
+                            Ok(Some((*pointer, *kind)))
+                        }
+                        Entity::Function(func) => {
+                            let ptr = func.as_global_value().as_pointer_value();
+                            Ok(Some((ptr, ptr.get_type().into())))
+                        }
+                        _ => Ok(None)
+                    }
+                } else {
+                    Ok(None)
+                }
+            }
             AnalysisKind::Dereference(operand) => {
                 let pointee = self.pointer_pointee_type(operand);
                 let value = self.analysis(*operand.clone())?;
@@ -65,6 +72,89 @@ impl<'backend> super::Inkwell<'backend> {
                     }
                     _ => Ok(None),
                 }
+            }
+            AnalysisKind::Access(target, member) => {
+                let field_name = if let AnalysisKind::Usage(identifier) = &member.kind {
+                    identifier.clone()
+                } else {
+                    return Ok(None);
+                };
+
+                if let Some((base_ptr, base_kind)) = self.lvalue_pointer(target)? {
+                    if base_kind.is_struct_type() {
+                        let shape = base_kind.into_struct_type();
+
+                        let mut found = None;
+                        for scope in self.entities.iter().rev() {
+                            for entity in scope.values() {
+                                if let Entity::Struct { struct_type: defined, fields } = entity {
+                                    if defined.as_basic_type_enum() == shape.as_basic_type_enum() {
+                                        found = Some(fields.clone());
+                                        break;
+                                    }
+                                }
+                            }
+                            if found.is_some() { break; }
+                        }
+
+                        if let Some(fields) = found {
+                            if let Some(index) = fields.iter().position(|item| item == &field_name) {
+                                let slot = self.builder.build_struct_gep(
+                                    shape,
+                                    base_ptr,
+                                    index as u32,
+                                    "pointer",
+                                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?;
+
+                                let resolved = shape.get_field_type_at_index(index as u32).unwrap();
+                                return Ok(Some((slot, resolved)));
+                            }
+                        }
+                    }
+                }
+
+                Ok(None)
+            }
+            AnalysisKind::Index(index) => {
+                if let Some((base_ptr, base_kind)) = self.lvalue_pointer(&index.target)? {
+                    if index.members.is_empty() {
+                        return Ok(None);
+                    }
+
+                    let offset = self.analysis(index.members[0].clone())?;
+
+                    if base_kind.is_struct_type() {
+                        if let BasicValueEnum::IntValue(integer) = offset {
+                            if let Some(constant) = integer.get_zero_extended_constant() {
+                                let shape = base_kind.into_struct_type();
+                                let slot = self.builder.build_struct_gep(
+                                    shape,
+                                    base_ptr,
+                                    constant as u32,
+                                    "index_ptr",
+                                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?;
+
+                                let resolved = shape.get_field_type_at_index(constant as u32).unwrap();
+                                return Ok(Some((slot, resolved)));
+                            }
+                        }
+                    } else if base_kind.is_array_type() {
+                        if let BasicValueEnum::IntValue(integer) = offset {
+                            let shape = base_kind.into_array_type();
+                            let element_type = shape.get_element_type();
+                            let zero = self.context.i32_type().const_zero();
+                            let slot = unsafe {
+                                self.builder
+                                    .build_in_bounds_gep(shape, base_ptr, &[zero, integer], "index_ptr")
+                                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?
+                            };
+
+                            return Ok(Some((slot, element_type)));
+                        }
+                    }
+                }
+
+                Ok(None)
             }
             _ => Ok(None),
         }
@@ -116,10 +206,15 @@ impl<'backend> super::Inkwell<'backend> {
                 Entity::Function(function) => {
                     Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
-                Entity::Variable { pointer, kind, .. } => self
-                    .builder
-                    .build_load(*kind, *pointer, &identifier)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+                Entity::Variable { pointer, kind, .. } => {
+                    if kind.is_array_type() || kind.is_struct_type() {
+                        Ok(BasicValueEnum::from(*pointer))
+                    } else {
+                        self.builder
+                            .build_load(*kind, *pointer, &identifier)
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                    }
+                },
                 _ => Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::NotAValue {
                         name: identifier.to_string(),
@@ -132,11 +227,12 @@ impl<'backend> super::Inkwell<'backend> {
         if let Some(module) = self.modules.get(&self.current_module) {
             if let Some(global) = module.get_global(&identifier) {
                 let basic_type: BasicTypeEnum = match global.get_value_type() {
-                    inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::ArrayType(_) | inkwell::types::AnyTypeEnum::StructType(_) => {
+                        return Ok(BasicValueEnum::from(global.as_pointer_value()));
+                    }
                     inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
                     inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
                     inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
-                    inkwell::types::AnyTypeEnum::StructType(t) => t.into(),
                     inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
                     _ => {
                         return Err(GenerateError::new(
@@ -205,22 +301,14 @@ impl<'backend> super::Inkwell<'backend> {
                 self.insert_entity(target.clone(), Entity::Variable { pointer: slot, kind: result.get_type(), pointee, signed });
             }
         } else {
-            let func = self.parent(span)?;
-            let pointer = self.build_entry(func, result.get_type(), target.clone());
-
-            self.builder.build_store(pointer, result)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-            self.insert_entity(
-                target.clone(),
-                Entity::Variable {
-                    pointer,
-                    kind: result.get_type(),
-                    pointee,
-                    signed,
-                },
-            );
+            return Err(GenerateError::new(
+                ErrorKind::Variable(VariableError::Undefined {
+                    name: target.to_string(),
+                }),
+                span,
+            ));
         }
+
         Ok(result)
     }
 
@@ -252,15 +340,31 @@ impl<'backend> super::Inkwell<'backend> {
             self.pointer_pointee_type(&value)
         };
 
+        let is_global_scope = self.builder.get_insert_block().is_none();
+
+        let dummy_func = if is_global_scope {
+            let void_type = self.context.void_type();
+            let fn_type = void_type.fn_type(&[], false);
+            let func = self.modules.get(&self.current_module).unwrap().add_function("__init_temp", fn_type, None);
+            let block = self.context.append_basic_block(func, "entry");
+            self.builder.position_at_end(block);
+            Some(func)
+        } else {
+            None
+        };
+
         let value = self.analysis(*value)?;
+
+        if let Some(func) = dummy_func {
+            self.builder.clear_insertion_position();
+            unsafe { func.delete(); }
+        }
 
         let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
             self.llvm_type(annotation, span)?
         } else {
             value.get_type()
         };
-
-        let is_global_scope = self.builder.get_insert_block().is_none();
 
         let casted = if value.get_type() == declared_kind {
             value
@@ -275,11 +379,15 @@ impl<'backend> super::Inkwell<'backend> {
                     .unwrap_or(value)
             }
         } else if value.is_float_value() && declared_kind.is_float_type() {
-            self.builder
-                .build_float_cast(value.into_float_value(), declared_kind.into_float_type(), "bind_cast")
-                .ok()
-                .map(Into::into)
-                .unwrap_or(value)
+            if is_global_scope {
+                value
+            } else {
+                self.builder
+                    .build_float_cast(value.into_float_value(), declared_kind.into_float_type(), "bind_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(value)
+            }
         } else {
             return Err(GenerateError::new(
                 ErrorKind::Variable(VariableError::BindingTypeMismatch {
@@ -294,9 +402,8 @@ impl<'backend> super::Inkwell<'backend> {
             _ => None,
         });
 
-        let parent_func = self.builder.get_insert_block().and_then(|b| b.get_parent());
-
-        let pointer = if let Some(func) = parent_func {
+        let pointer = if !is_global_scope {
+            let func = self.builder.get_insert_block().unwrap().get_parent().unwrap();
             let pointer = self.build_entry(func, declared_kind, binding.target.clone());
 
             self.builder.build_store(pointer, casted)
@@ -308,7 +415,7 @@ impl<'backend> super::Inkwell<'backend> {
             let global = module.add_global(declared_kind, None, &binding.target);
 
             global.set_initializer(&casted);
-            global.set_constant(true);
+            global.set_constant(false);
 
             global.as_pointer_value()
         };

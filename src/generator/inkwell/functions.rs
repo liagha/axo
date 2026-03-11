@@ -12,7 +12,7 @@ use {
     },
     inkwell::{
         types::BasicType,
-        values::{BasicValueEnum, FunctionValue},
+        values::{BasicValueEnum, FunctionValue, PointerValue},
         FloatPredicate, IntPredicate,
     },
 };
@@ -44,11 +44,22 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         match (value, target) {
-            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => self
-                .builder
-                .build_int_cast(integer, target.into_int_type(), "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => {
+                let source_width = integer.get_type().get_bit_width();
+                let target_width = target.into_int_type().get_bit_width();
+
+                if source_width > target_width {
+                    self.builder.build_int_truncate(integer, target.into_int_type(), "trunc")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+
+                } else {
+                    // Defaulting to sext for unknown signedness in implicit return coercion
+                    self.builder.build_int_s_extend(integer, target.into_int_type(), "sext")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                }
+            },
             (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self
                 .builder
                 .build_float_cast(float, target.into_float_type(), "cast")
@@ -115,7 +126,7 @@ impl<'backend> super::Inkwell<'backend> {
             "Int64" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i64_type(), "cast")
+                    .build_int_s_extend(value.into_int_value(), self.context.i64_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
@@ -132,7 +143,7 @@ impl<'backend> super::Inkwell<'backend> {
             "Int32" => Ok(Some(match argument {
                 Some(value) if value.is_int_value() => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
+                    .build_int_truncate(value.into_int_value(), self.context.i32_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 Some(value) if value.is_float_value() => self
@@ -538,6 +549,37 @@ impl<'backend> super::Inkwell<'backend> {
                 let mut evaluated = self.analysis(argument.clone())?;
 
                 if let Some(kind) = expected.get(position) {
+                    if kind.is_pointer_type() {
+                        if evaluated.is_array_value() {
+                            let array_val = evaluated.into_array_value();
+                            let parent_func = self.parent(span)?;
+                            let alloca = self.build_entry(parent_func, array_val.get_type().into(), "array_decay".into());
+
+                            self.builder.build_store(alloca, array_val)
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                            let zero = self.context.i32_type().const_zero();
+                            evaluated = unsafe {
+                                self.builder.build_in_bounds_gep(
+                                    array_val.get_type(),
+                                    alloca,
+                                    &[zero, zero],
+                                    "decay_ptr"
+                                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                            }.into();
+
+                        } else if evaluated.is_struct_value() {
+                            let struct_val = evaluated.into_struct_value();
+                            let parent_func = self.parent(span)?;
+                            let alloca = self.build_entry(parent_func, struct_val.get_type().into(), "struct_decay".into());
+
+                            self.builder.build_store(alloca, struct_val)
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                            evaluated = alloca.into();
+                        }
+                    }
+
                     if evaluated.is_pointer_value() && kind.is_int_type() {
                         evaluated = self.builder
                             .build_ptr_to_int(
@@ -692,19 +734,43 @@ impl<'backend> super::Inkwell<'backend> {
         target_type: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let evaluated = self.analysis(*value)?;
+        let evaluated = self.analysis(*value.clone())?;
         let llvm_target = self.llvm_type(&target_type, span)?;
 
         if evaluated.get_type() == llvm_target {
             return Ok(evaluated);
         }
 
+        let target_signed = match &target_type.kind {
+            TypeKind::Integer { signed, .. } => *signed,
+            _ => true,
+        };
+
         match (evaluated, llvm_target) {
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => self
-                .builder
-                .build_int_cast(integer, target, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => {
+                let source_width = integer.get_type().get_bit_width();
+                let target_width = target.get_bit_width();
+
+                if source_width > target_width {
+                    self.builder.build_int_truncate(integer, target, "trunc")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                } else if source_width < target_width {
+                    // It uses the source's signedness rule for accurate expansion
+                    let source_signed = self.infer_signedness(&value).unwrap_or(true);
+                    if source_signed {
+                        self.builder.build_int_s_extend(integer, target, "sext")
+                            .map(Into::into)
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                    } else {
+                        self.builder.build_int_z_extend(integer, target, "zext")
+                            .map(Into::into)
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                    }
+                } else {
+                    Ok(integer.into())
+                }
+            },
 
             (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
                 .builder
@@ -712,17 +778,30 @@ impl<'backend> super::Inkwell<'backend> {
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => self
-                .builder
-                .build_signed_int_to_float(integer, target, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => {
+                let source_signed = self.infer_signedness(&value).unwrap_or(true);
+                if source_signed {
+                    self.builder.build_signed_int_to_float(integer, target, "cast")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                } else {
+                    self.builder.build_unsigned_int_to_float(integer, target, "cast")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                }
+            },
 
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => self
-                .builder
-                .build_float_to_signed_int(float, target, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => {
+                if target_signed {
+                    self.builder.build_float_to_signed_int(float, target, "cast")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                } else {
+                    self.builder.build_float_to_unsigned_int(float, target, "cast")
+                        .map(Into::into)
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                }
+            },
 
             (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
                 .builder

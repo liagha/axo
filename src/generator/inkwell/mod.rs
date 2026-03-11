@@ -122,6 +122,11 @@ impl<'backend> Inkwell<'backend> {
                     )
                 }
             },
+
+            TypeKind::String => {
+                self.context.ptr_type(inkwell::AddressSpace::default()).into()
+            }
+
             _ => {
                 return Err(
                     GenerateError::new(

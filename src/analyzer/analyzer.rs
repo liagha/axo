@@ -58,15 +58,20 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|value| value.analyze(resolver))
                     .transpose()?;
 
-                let target_token = binding
+                let head = binding
                     .target
                     .brand()
                     .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
+                let annotation = binding
+                    .annotation
+                    .as_ref()
+                    .map(|annotation| Type::annotation(&*annotation).unwrap());
+
                 let analyzed = Binding::new(
-                    Str::from(target_token.format(0)),
+                    Str::from(head.format(0)),
                     value.map(Box::new),
-                    None,
+                    annotation,
                     binding.kind,
                 );
 
@@ -78,6 +83,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();
+
+                let head = structure
+                    .target
+                    .brand()
+                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, structure.target.span))?;
 
                 let analyzed = Structure::new(
                     Str::from(structure.target.brand().unwrap().format(0)),
