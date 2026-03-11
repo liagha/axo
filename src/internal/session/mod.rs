@@ -76,6 +76,7 @@ pub struct Session<'session> {
     pub generator: Generator<'session, Inkwell<'session>>,
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
+    pub outputs: Map<Identity, Location<'session>>,
 }
 
 impl<'session> Session<'session> {
@@ -159,6 +160,7 @@ impl<'session> Session<'session> {
             generator,
             context,
             errors,
+            outputs: Map::new(),
         }
     }
 
@@ -170,6 +172,7 @@ impl<'session> Session<'session> {
         //self.check();
         self.analyze();
         self.generate();
+        self.emit();
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -389,7 +392,7 @@ impl<'session> Session<'session> {
             self.generator.backend.current_module = stem.clone();
 
             let schema =
-                Self::output(
+                Self::schema(
                     *location,
                     Resolver::schema(&mut self.resolver, *identity),
                 );
@@ -400,22 +403,30 @@ impl<'session> Session<'session> {
 
             self.generator.errors.extend(self.generator.backend.errors.clone());
 
-            match File::create(&schema) {
-                Ok(mut file) => {
-                    if let Err(error) = file.write_all(self.generator.backend.current_module().print_to_string().to_string().as_bytes()) {
-                        let location = Location::Entry(Str::from(schema.clone()));
+            match schema.to_path() {
+                Ok(path) => {
+                    match File::create(&path) {
+                        Ok(mut file) => {
+                            if let Err(error) = file.write_all(self.generator.backend.current_module().print_to_string().to_string().as_bytes()) {
+                                self.errors.push(
+                                    CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
+                                )
+                            }
 
-                        self.errors.push(
-                            CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, location), Span::void()))
-                        )
+                            self.outputs.insert(*identity, schema);
+                        }
+
+                        Err(error) => {
+                            self.errors.push(
+                                CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
+                            )
+                        }
                     }
                 }
 
                 Err(error) => {
-                    let location = Location::Entry(Str::from(schema.clone()));
-
                     self.errors.push(
-                        CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, location), Span::void()))
+                        CompileError::Track(error)
                     )
                 }
             }
@@ -436,8 +447,51 @@ impl<'session> Session<'session> {
         }
     }
 
-    fn output(location: Location<'session>, schema: Option<Str<'session>>) -> PathBuf {
-        let schema = if let Some(schema) = schema {
+    pub fn emit(&mut self) {
+        let mut objects = Map::new();
+
+        for (identity, location) in &self.outputs.clone() {
+            let object = Self::object(*location, None);
+
+            let mut command = std::process::Command::new("clang");
+            command
+                .arg("-c")
+                .arg(location.to_string())
+                .arg("-o")
+                .arg(object.to_string());
+
+            let status = command.status().expect("failed to run clang");
+
+            if status.success() {
+                objects.insert(*identity, object);
+            } else {
+                panic!("clang failed compiling {}", location);
+            }
+        }
+
+        let mut link = std::process::Command::new("clang");
+
+        for object in objects.values() {
+            link.arg(object.to_string());
+        }
+
+        link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
+
+        let executable = Self::executable(*objects.get(&0).unwrap(), None);
+
+        link.arg("-o").arg(executable.to_string());
+
+        let status = link.status().expect("failed to link");
+
+        if !status.success() {
+            panic!("linking failed");
+        }
+
+        std::process::Command::new(executable.to_string()).status().expect("failed to execute");
+    }
+
+    fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+        let schema = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
             let path = location.to_path().unwrap();
@@ -446,6 +500,32 @@ impl<'session> Session<'session> {
             parent.join(location.stem().unwrap()).with_extension("ll")
         };
 
-        schema
+        Location::Entry(Str::from(schema))
+    }
+
+    fn object(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+        let schema = if let Some(schema) = configuration {
+            PathBuf::from(schema.to_string())
+        } else {
+            let path = location.to_path().unwrap();
+            let parent = path.parent().unwrap();
+
+            parent.join(location.stem().unwrap()).with_extension("o")
+        };
+
+        Location::Entry(Str::from(schema))
+    }
+
+    fn executable(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+        let schema = if let Some(schema) = configuration {
+            PathBuf::from(schema.to_string())
+        } else {
+            let path = location.to_path().unwrap();
+            let parent = path.parent().unwrap();
+
+            parent.join(location.stem().unwrap()).with_extension("")
+        };
+
+        Location::Entry(Str::from(schema))
     }
 }
