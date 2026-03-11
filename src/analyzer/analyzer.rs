@@ -11,6 +11,7 @@ use crate::{
     scanner::{Token, TokenKind},
 };
 use crate::analyzer::AnalysisKind;
+use crate::checker::{Type};
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -155,7 +156,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Analysis::unit(self.span)
                 };
 
-                let output = Some(self.ty.clone());
+                let output = if let Some(output) = &function.output {
+                    Type::annotation(&*output).ok()
+                } else {
+                    None
+                };
 
                 let analyzed = Function::new(
                     Str::from(function.target.brand().unwrap().format(0)),

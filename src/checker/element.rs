@@ -18,7 +18,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                 TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
                 TokenKind::String(_)  => Type { kind: TypeKind::String, span: literal.span },
                 TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
-                _ => Type { kind: TypeKind::Void, span: literal.span },
+                _ => Type::new(TypeKind::Tuple { members: Vec::new() }, literal.span),
             },
 
             ElementKind::Delimited(delimited) => match (
@@ -78,7 +78,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     if delimited.members.is_empty() {
                         Type {
                             kind: TypeKind::Array {
-                                member: Box::new(Type { kind: TypeKind::Void, span: Span::void() }),
+                                member: Box::new(Type::new(TypeKind::Tuple { members: Vec::new() }, self.span)),
                                 size: 0,
                             },
                             span: Span::void(),
@@ -206,13 +206,12 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                     [OperatorKind::Star] => match unary.operand.ty.clone().kind {
                         TypeKind::Pointer { target } => *target,
-                        TypeKind::Void => Type { kind: TypeKind::Void, span },
                         _ => {
                             errors.push(CheckError::new(
                                 ErrorKind::Mismatch(
                                     Type {
                                         kind: TypeKind::Pointer {
-                                            target: Box::new(Type { kind: TypeKind::Void, span }),
+                                            target: Box::new(Type::new(TypeKind::Tuple { members: Vec::new() }, span)),
                                         },
                                         span,
                                     },
@@ -576,7 +575,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         Type { kind: TypeKind::Tuple { members: Vec::new() }, span }
                     }
 
-                    _ => Type { kind: TypeKind::Void, span },
+                    _ => Type::new(TypeKind::Tuple { members: Vec::new() }, span),
                 }
             }
 
@@ -600,7 +599,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Symbolize(symbol) => {
                 symbol.check(errors);
-                Type { kind: TypeKind::Void, span }
+                Type::new(TypeKind::Tuple { members: Vec::new() }, span)
             }
         };
 

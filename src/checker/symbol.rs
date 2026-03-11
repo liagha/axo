@@ -45,7 +45,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 if failed { return; }
                 
-                annotation.unwrap_or(Type::new(TypeKind::Void, self.span))
+                annotation.unwrap_or(Type::new(TypeKind::Tuple { members: Vec::new() }, self.span))
             }
 
             SymbolKind::Structure(structure) => {
@@ -57,8 +57,8 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                         
                         member.ty.clone()
                     });
-                
-                Type::new(TypeKind::Void, self.span)
+
+                Type::new(TypeKind::Tuple { members: Vec::new() }, self.span)
             }
 
             SymbolKind::Function(function) => {
@@ -99,11 +99,11 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     }
                 }
 
-                output.unwrap_or(Type::new(TypeKind::Void, self.span))
+                output.unwrap_or(Type::new(TypeKind::Tuple { members: Vec::new() }, self.span))
             }
 
             SymbolKind::Module(_) => {
-                Type::new(TypeKind::Void, self.span)
+                Type::new(TypeKind::Tuple { members: Vec::new() }, self.span)
             }
         };
         

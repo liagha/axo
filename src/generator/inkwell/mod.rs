@@ -192,6 +192,7 @@ impl<'backend> Inkwell<'backend> {
 
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
+        // Pass 1: Structures
         for analysis in &analyses {
             if let AnalysisKind::Structure(structure) = &analysis.kind {
                 if let Err(error) = self.structure(structure.clone(), analysis.span) {
@@ -200,38 +201,56 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             }
         }
 
+        for analysis in &analyses {
+            if let AnalysisKind::Binding(_) = &analysis.kind {
+                self.builder.clear_insertion_position();
+                if let Err(error) = self.analysis(analysis.clone()) {
+                    self.errors.push(error);
+                }
+            }
+        }
+
         let mut entry = None;
 
+        // Pass 3: Functions (except entry point)
         for analysis in &analyses {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if function.entry {
                     entry = Some((function, analysis.span));
                 } else {
-                    match self.analysis(analysis.clone()) {
-                        Ok(_) => {}
-                        Err(error) => {
-                            self.errors.push(error);
-                        }
+                    self.builder.clear_insertion_position();
+                    if let Err(error) = self.analysis(analysis.clone()) {
+                        self.errors.push(error);
                     }
                 }
             }
         }
 
-        if let Some((entry, span)) = entry {
-            if let Err(error) = self.function(entry.clone(), span) {
+        // Pass 4: Entry point (main)
+        if let Some((entry_func, span)) = entry {
+            self.builder.clear_insertion_position();
+            if let Err(error) = self.function(entry_func.clone(), span) {
                 self.errors.push(error);
             }
         }
 
-        if self
-            .builder
-            .get_insert_block()
-            .and_then(|block| block.get_terminator())
-            .is_none()
-        {
-            let _ = self
-                .builder
-                .build_return(Some(&self.context.i32_type().const_zero()));
+        // Terminate any dangling basic blocks automatically using the correct return type
+        if let Some(block) = self.builder.get_insert_block() {
+            if block.get_terminator().is_none() {
+                if let Some(func) = block.get_parent() {
+                    if let Some(ret_type) = func.get_type().get_return_type() {
+                        if ret_type.is_int_type() {
+                            let _ = self.builder.build_return(Some(&ret_type.into_int_type().const_zero()));
+                        } else if ret_type.is_float_type() {
+                            let _ = self.builder.build_return(Some(&ret_type.into_float_type().const_zero()));
+                        } else {
+                            let _ = self.builder.build_return(None);
+                        }
+                    } else {
+                        let _ = self.builder.build_return(None);
+                    }
+                }
+            }
         }
 
         if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {

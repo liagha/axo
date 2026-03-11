@@ -60,9 +60,6 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Unknown => {
                         "Unknown".to_string()
                     }
-                    TypeKind::Void => {
-                        "Void".to_string()
-                    }
                     TypeKind::Type => {
                         "Type".to_string()
                     }

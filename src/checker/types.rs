@@ -25,8 +25,6 @@ impl<'ty> Type<'ty> {
 
     pub fn unify(expected: &Type<'ty>, actual: &Type<'ty>) -> Option<Type<'ty>> {
         match (&expected.kind, &actual.kind) {
-            (TypeKind::Void, _) => Some(actual.clone()),
-            (_, TypeKind::Void) => Some(expected.clone()),
             (
                 TypeKind::Pointer { target: expected_to },
                 TypeKind::Pointer { target: actual_to },
@@ -245,7 +243,6 @@ pub enum TypeKind<'ty> {
     Pointer { target: Box<Type<'ty>> },
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
-    Void,
     Unknown,
 
     Type,

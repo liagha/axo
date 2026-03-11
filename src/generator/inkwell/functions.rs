@@ -1,4 +1,3 @@
-use inkwell::types::BasicMetadataTypeEnum;
 use {
     super::{Backend, Entity},
     crate::{
@@ -63,6 +62,21 @@ impl<'backend> super::Inkwell<'backend> {
                 .build_float_to_signed_int(float, expected.into_int_type(), "ret_float_to_int")
                 .map(Into::into)
                 .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
+
+            // NEW: Handle returning a Pointer from an Int function (e.g. returning a string literal as i64)
+            (BasicValueEnum::PointerValue(ptr), expected) if expected.is_int_type() => self
+                .builder
+                .build_ptr_to_int(ptr, expected.into_int_type(), "ret_ptr_to_int")
+                .map(Into::into)
+                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
+
+            // NEW: Handle returning an Int from a Pointer function
+            (BasicValueEnum::IntValue(int), expected) if expected.is_pointer_type() => self
+                .builder
+                .build_int_to_ptr(int, expected.into_pointer_type(), "ret_int_to_ptr")
+                .map(Into::into)
+                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span)),
+
             _ => Err(GenerateError::new(
                 ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
@@ -258,7 +272,7 @@ impl<'backend> super::Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut parameters = vec![];
-        
+
         for member in &method.members {
             if let AnalysisKind::Binding(bind) = &member.kind {
                 let kind = if let Some(annotation) = bind.annotation.as_ref() {
@@ -519,8 +533,36 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(func_value) = function_entity {
             let mut arguments = vec![];
-            for argument in &invoke.members {
-                let value = self.analysis(argument.clone())?;
+
+            // Get the expected types from the LLVM function signature
+            let expected_types = func_value.get_type().get_param_types();
+
+            for (i, argument) in invoke.members.iter().enumerate() {
+                let mut value = self.analysis(argument.clone())?;
+
+                // Automatically cast arguments to match expected function signature
+                if let Some(expected_type) = expected_types.get(i) {
+                    if value.is_pointer_value() && expected_type.is_int_type() {
+                        value = self.builder
+                            .build_ptr_to_int(
+                                value.into_pointer_value(),
+                                expected_type.into_int_type(),
+                                "call_ptr_to_int"
+                            )
+                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                            .into();
+                    } else if value.is_int_value() && expected_type.is_pointer_type() {
+                        value = self.builder
+                            .build_int_to_ptr(
+                                value.into_int_value(),
+                                expected_type.into_pointer_type(),
+                                "call_int_to_ptr"
+                            )
+                            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?
+                            .into();
+                    }
+                }
+
                 arguments.push(value.into());
             }
 

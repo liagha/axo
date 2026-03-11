@@ -1,3 +1,4 @@
+use inkwell::values::BasicValue;
 use {
     super::{Backend, Entity},
     crate::{
@@ -112,8 +113,9 @@ impl<'backend> super::Inkwell<'backend> {
         identifier: Str<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        // 1. Check local/known entities first
         if let Some(entity) = self.entities.get(&identifier) {
-            match entity {
+            return match entity {
                 Entity::Function(function) => {
                     Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
@@ -127,15 +129,44 @@ impl<'backend> super::Inkwell<'backend> {
                     }),
                     span,
                 )),
-            }
-        } else {
-            Err(GenerateError::new(
-                ErrorKind::Variable(VariableError::Undefined {
-                    name: identifier.to_string(),
-                }),
-                span,
-            ))
+            };
         }
+
+        // 2. Fallback: Check if it's an LLVM global variable registered in the current module
+        if let Some(module) = self.modules.get(&self.current_module) {
+            if let Some(global) = module.get_global(&identifier) {
+                // Safely convert AnyTypeEnum into BasicTypeEnum using a match statement.
+                // This gets the literal type stored IN the global (e.g., i64), NOT the pointer to it!
+                let basic_type: BasicTypeEnum = match global.get_value_type() {
+                    inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::StructType(t) => t.into(),
+                    inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
+                    _ => {
+                        return Err(GenerateError::new(
+                            ErrorKind::Variable(VariableError::NotAValue {
+                                name: identifier.to_string(),
+                            }),
+                            span,
+                        ));
+                    }
+                };
+
+                return self.builder
+                    .build_load(basic_type, global.as_pointer_value(), &identifier)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span));
+            }
+        }
+
+        // 3. Completely undefined
+        Err(GenerateError::new(
+            ErrorKind::Variable(VariableError::Undefined {
+                name: identifier.to_string(),
+            }),
+            span,
+        ))
     }
 
     pub fn assign(
@@ -212,17 +243,30 @@ impl<'backend> super::Inkwell<'backend> {
             value.get_type()
         };
 
+        let is_global_scope = self.builder.get_insert_block().is_none();
+
         let casted = if value.get_type() == declared_kind {
             value
         } else if value.is_int_value() && declared_kind.is_int_type() {
-            self.builder
-                .build_int_cast(value.into_int_value(), declared_kind.into_int_type(), "bind_cast")
-                .ok()
-                .map(Into::into)
-                .unwrap_or(value)
+            if is_global_scope {
+                value
+            } else {
+                self.builder
+                    .build_int_cast(value.into_int_value(), declared_kind.into_int_type(), "bind_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(value)
+            }
         } else if value.is_float_value() && declared_kind.is_float_type() {
             self.builder
                 .build_float_cast(value.into_float_value(), declared_kind.into_float_type(), "bind_cast")
+                .ok()
+                .map(Into::into)
+                .unwrap_or(value)
+        } else if value.is_pointer_value() && declared_kind.is_int_type() {
+            // NEW: Automatically cast Pointer (like string literal) to Int (like i64)
+            self.builder
+                .build_ptr_to_int(value.into_pointer_value(), declared_kind.into_int_type(), "bind_ptr_cast")
                 .ok()
                 .map(Into::into)
                 .unwrap_or(value)
@@ -237,19 +281,33 @@ impl<'backend> super::Inkwell<'backend> {
 
         let signed = binding.annotation.as_ref().and_then(|annotation| match annotation.kind {
             TypeKind::Integer { signed, .. } => Some(signed),
-            _ => None, // Fallback if type isn't integer
+            _ => None,
         });
 
-        let func = self.current_function(span)?;
-        let pointer = self.build_entry(func, declared_kind, binding.target.clone());
+        let parent_func = self.builder.get_insert_block().and_then(|b| b.get_parent());
 
-        self.builder.build_store(pointer, casted)
-            .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+        let pointer = if let Some(func) = parent_func {
+            let pointer = self.build_entry(func, declared_kind, binding.target.clone());
+
+            self.builder.build_store(pointer, casted)
+                .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+
+            pointer
+        } else {
+            let module = self.modules.get(&self.current_module).unwrap();
+            let global = module.add_global(declared_kind, None, &binding.target);
+
+            global.set_initializer(&casted);
+            global.set_constant(true);
+
+            global.as_pointer_value()
+        };
 
         self.entities.insert(
             binding.target.clone(),
             Entity::Variable { pointer, kind: declared_kind, pointee, signed },
         );
+
         Ok(casted)
     }
 
@@ -279,6 +337,17 @@ impl<'backend> super::Inkwell<'backend> {
                 let casted = self
                     .builder
                     .build_float_cast(result.into_float_value(), kind.into_float_type(), "store_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|e| GenerateError::new(ErrorKind::BuilderError { reason: e.to_string() }, span))?;
+            } else if result.is_pointer_value() && kind.is_int_type() {
+                // NEW: Cast Pointer to Int on re-assignment
+                let casted = self
+                    .builder
+                    .build_ptr_to_int(result.into_pointer_value(), kind.into_int_type(), "store_ptr_cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);
