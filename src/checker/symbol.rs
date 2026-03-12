@@ -18,6 +18,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let inferred = binding.value.as_mut().map(|value| {
                     value.check(checker);
+
                     value.ty.clone()
                 });
 
@@ -74,7 +75,13 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     }
                 }
 
-                Type::new(TypeKind::Function(head.into(), members, output.map(Box::new)), self.span)
+                let inferred_output = match (&output, &function.body) {
+                    (Some(output), _) => Some(Box::new(checker.concretize(output))),
+                    (None, Some(body)) => Some(Box::new(checker.concretize(&body.ty))),
+                    (None, None) => None,
+                };
+
+                Type::new(TypeKind::Function(head.into(), members, inferred_output), self.span)
             }
 
             SymbolKind::Module(_) => {

@@ -12,7 +12,7 @@ func lseek(c, const fd: Integer, const offset: Int64, const whence: Integer): In
 // ─── Formatting & Print Functions ────────────────────────────────────
 func print_i64(c, const v: Int64)
 func print_f64(c, const v: Float)
-func print_bool(c, const v: Bool)
+func print_bool(c, const v: Boolean)
 func print_str(c, const s: String)
 func print_char(c, const v: UInt8)
 func println(c)
@@ -22,7 +22,7 @@ func print_ptr(c, const v: *UInt8)
 // ─── Newline Variants ────────────────────────────────────────────────
 func println_i64(c, const v: Int64)
 func println_f64(c, const v: Float)
-func println_bool(c, const v: Bool)
+func println_bool(c, const v: Boolean)
 func println_str(c, const s: String)
 
 // ─── Standard File Descriptors ───────────────────────────────────────
@@ -124,7 +124,7 @@ func factorial(const n: Integer): Integer {
 }
 
 func test_file_io() {
-    var fd: Integer = open("/home/ali/Downloads/test.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR)
+    var fd = open("/home/ali/Downloads/test.txt", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR)
     if (fd != INVALID_FD, {
         write(fd, "Hello Ali", 9)
         close(fd)
@@ -148,7 +148,7 @@ func test_user_input() {
     // Flags: MAP_PRIVATE | MAP_ANONYMOUS (memory not backed by a file)
     // FD: INVALID_FD (-1)
     // Offset: 0
-    var buffer: Integer = mmap(0, 256, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, INVALID_FD, 0)
+    var buffer = mmap(0, 256, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, INVALID_FD, 0)
 
     // Check if memory allocation succeeded
     if (buffer != MAP_FAILED, {
@@ -156,7 +156,7 @@ func test_user_input() {
         // 2. Read input from Standard Input (0)
         // We read up to 256 bytes from STDIN into our allocated buffer.
         // It returns the actual number of bytes the user typed.
-        var bytes_read: Integer = read(STDIN, buffer, 256)
+        var bytes_read = read(STDIN, buffer, 256)
 
         println_str("Hello, ")
 

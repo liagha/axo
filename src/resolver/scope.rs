@@ -127,7 +127,7 @@ impl<'scope> Scope<Symbol<'scope>> {
         &mut self,
         target: &Element<'scope>,
     ) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
-        if let Some(symbol) = Resolver::builtin(target, self) {
+        if let Some(symbol) = Resolver::builtin(target) {
             return Ok(symbol);
         }
 

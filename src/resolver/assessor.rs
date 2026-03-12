@@ -131,7 +131,7 @@ impl<'aligner> Resembler<Token<'aligner>, Token<'aligner>, ()> for Aligner<'alig
 }
 
 impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'aligner>>
-    for Aligner<'aligner>
+for Aligner<'aligner>
 {
     fn assessment(
         &mut self,
@@ -218,9 +218,9 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
         match (query.kind.clone(), candidate.kind.clone()) {
             (
                 ElementKind::Literal(Token {
-                    kind: TokenKind::Identifier(_),
-                    ..
-                }),
+                                         kind: TokenKind::Identifier(_),
+                                         ..
+                                     }),
                 _,
             ) => {
                 score += self.shaping;
@@ -231,39 +231,49 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 score += self.shaping;
 
                 let mut errors = Vec::new();
-                
+
                 if invoke.members.len() > function.members.len() {
-                    score += (1 - (invoke.members.len() - function.members.len())/invoke.members.len()) as f64;
-                    
+                    // BUG FIX: Ensure floating point division to prevent int division from truncating to 0
+                    let diff = (invoke.members.len() - function.members.len()) as f64;
+                    score += 1.0 - (diff / invoke.members.len() as f64);
+
                     for member in invoke.members[function.members.len()..].iter() {
-                        errors.push(
-                            ResolveError::new(
-                                ErrorKind::MissingMember {
-                                    target: invoke.target.brand().unwrap().clone(),
-                                    member: member.brand().unwrap().clone(),
-                                },
-                                member.span.clone(),
-                            )
-                        );
+                        // BUG FIX: Prevent unwrapping `None` by matching `Some`
+                        if let (Some(target_brand), Some(member_brand)) = (invoke.target.brand(), member.brand()) {
+                            errors.push(
+                                ResolveError::new(
+                                    ErrorKind::MissingMember {
+                                        target: target_brand.clone(),
+                                        member: member_brand.clone(),
+                                    },
+                                    member.span.clone(),
+                                )
+                            );
+                        }
                     }
                 } else if invoke.members.len() < function.members.len() {
-                    score += (1 - (function.members.len() - invoke.members.len())/function.members.len()) as f64;
+                    // BUG FIX: Ensure floating point division to prevent int division from truncating to 0
+                    let diff = (function.members.len() - invoke.members.len()) as f64;
+                    score += 1.0 - (diff / function.members.len() as f64);
 
                     for member in function.members[invoke.members.len()..].iter() {
-                        errors.push(
-                            ResolveError::new(
-                                ErrorKind::UndefinedMember {
-                                    target: function.target.brand().unwrap().clone(),
-                                    member: member.brand().unwrap().clone(),
-                                },
-                                member.span.clone(),
-                            )
-                        );
+                        // BUG FIX: Prevent unwrapping `None` by matching `Some`
+                        if let (Some(target_brand), Some(member_brand)) = (function.target.brand(), member.brand()) {
+                            errors.push(
+                                ResolveError::new(
+                                    ErrorKind::UndefinedMember {
+                                        target: target_brand.clone(),
+                                        member: member_brand.clone(),
+                                    },
+                                    member.span.clone(),
+                                )
+                            );
+                        }
                     }
-                } else { 
-                    score += 1f64;
+                } else {
+                    score += 1.0;
                 }
-                
+
                 return Assessment {
                     resemblance: Resemblance::Partial(score),
                     errors,
@@ -273,16 +283,17 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
                 score += self.shaping;
 
+                // BUG FIX: Do not unwrap fields in struct construction. Map filter them gracefully.
                 let candidates = structure
                     .members
                     .iter()
-                    .map(|member| member.brand().unwrap())
+                    .filter_map(|member| member.brand())
                     .collect::<Vec<_>>();
 
                 let members = construct
                     .members
                     .iter()
-                    .map(|member| member.brand().unwrap())
+                    .filter_map(|member| member.brand())
                     .collect::<Vec<_>>();
 
                 if candidates == members {
@@ -306,27 +317,31 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     for member in members.clone() {
                         if !candidates.contains(&member) {
-                            errors.push(ResolveError {
-                                kind: ErrorKind::UndefinedMember {
-                                    target: structure.target.brand().unwrap().clone(),
-                                    member: member.clone(),
-                                },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            })
+                            if let Some(target_brand) = structure.target.brand() {
+                                errors.push(ResolveError {
+                                    kind: ErrorKind::UndefinedMember {
+                                        target: target_brand.clone(),
+                                        member: member.clone(),
+                                    },
+                                    span: query.span.clone(),
+                                    hints: Vec::new(),
+                                })
+                            }
                         }
                     }
 
                     for candidate in candidates {
                         if !members.contains(&candidate) {
-                            errors.push(ResolveError {
-                                kind: ErrorKind::MissingMember {
-                                    target: structure.target.brand().unwrap().clone(),
-                                    member: candidate.clone(),
-                                },
-                                span: query.span.clone(),
-                                hints: Vec::new(),
-                            })
+                            if let Some(target_brand) = structure.target.brand() {
+                                errors.push(ResolveError {
+                                    kind: ErrorKind::MissingMember {
+                                        target: target_brand.clone(),
+                                        member: candidate.clone(),
+                                    },
+                                    span: query.span.clone(),
+                                    hints: Vec::new(),
+                                })
+                            }
                         }
                     }
 

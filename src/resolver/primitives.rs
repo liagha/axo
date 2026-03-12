@@ -1,10 +1,9 @@
 use {
     super::{
         Resolver,
-        scope::Scope,
     },
     crate::{
-        data::{Str, Delimited, Interface, Function, Module},
+        data::{Str, Delimited, Interface, Function},
         parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::Span,
@@ -14,7 +13,6 @@ use {
 impl<'resolver> Resolver<'resolver> {
     pub fn builtin(
         target: &Element<'resolver>,
-        scope: &Scope<Symbol<'resolver>>,
     ) -> Option<Symbol<'resolver>> {
         let name = target.brand().and_then(|token| match token.kind {
             TokenKind::Identifier(identifier) => identifier.as_str().map(|name| name.to_string()),
@@ -22,40 +20,35 @@ impl<'resolver> Resolver<'resolver> {
         })?;
 
         match name.as_str() {
-            "compiler" => Some(Resolver::compiler(scope)),
+            "Int8" => Some(Resolver::function("Int8", "Integer")),
+            "Int16" => Some(Resolver::function("Int16", "Integer")),
             "Int32" => Some(Resolver::function("Int32", "Integer")),
             "Int64" => Some(Resolver::function("Int64", "Integer")),
-            "Float" => Some(Resolver::function("Float", "Float")),
-            "Boolean" => Some(Resolver::function("Boolean", "Boolean")),
-            "String" => Some(Resolver::function("String", "String")),
-            "Character" => Some(Resolver::function("Character", "Character")),
-            "Char" => Some(Resolver::function("Char", "Character")),
-            "Unit" => Some(Resolver::function("Unit", "Unit")),
             "Integer" => Some(Resolver::function("Integer", "Integer")),
+
+            "UInt8" => Some(Resolver::function("UInt8", "Integer")),
+            "UInt16" => Some(Resolver::function("UInt16", "Integer")),
+            "UInt32" => Some(Resolver::function("UInt32", "Integer")),
+            "UInt64" => Some(Resolver::function("UInt64", "Integer")),
+
+            "Float32" => Some(Resolver::function("Float32", "Float")),
+            "Float64" => Some(Resolver::function("Float64", "Float")),
+            "Float" => Some(Resolver::function("Float", "Float")),
+
+            "Boolean" => Some(Resolver::function("Boolean", "Boolean")),
+            "Character" => Some(Resolver::function("Character", "Character")),
+            "String" => Some(Resolver::function("String", "String")),
+
+            "Void" => Some(Resolver::function("Void", "Void")),
+
             "if" => Some(Resolver::statement("if")),
             "while" => Some(Resolver::statement("while")),
             "break" => Some(Resolver::statement("break")),
             "continue" => Some(Resolver::statement("continue")),
             "return" => Some(Resolver::statement("return")),
+
             _ => None,
         }
-    }
-
-    fn compiler(scope: &Scope<Symbol<'resolver>>) -> Symbol<'resolver> {
-        let identifier = Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from("compiler")),
-                Span::void(),
-            )),
-            Span::void(),
-        );
-
-        Symbol::new(
-            SymbolKind::Module(Module::new(Box::new(identifier))),
-            Span::void(),
-            Visibility::Public,
-        )
-            .with_scope(scope.root().clone())
     }
 
     fn statement(name: &'static str) -> Symbol<'resolver> {

@@ -235,6 +235,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     Some("if") => {
                         let boolean_type = Type::new(TypeKind::Boolean, span);
                         checker.unify(invoke.members[0].span, &invoke.members[0].ty, &boolean_type);
+
                         checker.unify(span, &invoke.members[1].ty, &invoke.members[2].ty)
                     }
                     Some("while") => {
@@ -248,8 +249,15 @@ impl<'element> Checkable<'element> for Element<'element> {
                         let arguments = invoke.members.iter().map(|member| member.ty.clone()).collect();
                         let function_type = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(return_type.clone()))), span);
 
-                        checker.unify(span, &invoke.target.ty, &function_type);
-                        return_type
+                        println!("--- {:?}", invoke.target.ty);
+
+                        let unified = checker.unify(span, &invoke.target.ty, &function_type);
+
+                        match unified.kind {
+                            TypeKind::Function(_, _, Some(output)) => *output,
+                            TypeKind::Function(_, _, None) => Type::new(TypeKind::Void, span),
+                            _ => return_type,
+                        }
                     }
                 }
             }

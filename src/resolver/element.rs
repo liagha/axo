@@ -43,7 +43,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 resolver.exit();
             }
 
-            ElementKind::Construct(_construct) => {
+            ElementKind::Construct(construct) => {
+                for member in construct.members.iter_mut() {
+                    member.resolve(resolver);
+                }
+
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
                         self.reference = Some(symbol.identity);
@@ -55,7 +59,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 }
             }
 
-            ElementKind::Invoke(_invoke) => {
+            ElementKind::Invoke(invoke) => {
+                for member in invoke.members.iter_mut() {
+                    member.resolve(resolver);
+                }
+
                 match resolver.scope.lookup(&self) {
                     Ok(symbol) => {
                         self.reference = Some(symbol.identity);
@@ -67,16 +75,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 }
             },
 
-            ElementKind::Index(_index) => {
-                match resolver.scope.lookup(&self) {
-                    Ok(symbol) => {
-                        self.reference = Some(symbol.identity);
-                    }
+            ElementKind::Index(index) => {
+                index.target.resolve(resolver);
 
-                    Err(errors) => {
-                        resolver.errors.extend(errors);
-                    }
-                }
+                index.members.iter_mut().for_each(|member| member.resolve(resolver));
             }
 
             ElementKind::Binary(binary) => {
@@ -97,13 +99,23 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         self.reference = binary.right.reference;
                     }
 
-                    _ => {}
+                    _ => {
+                        binary.right.resolve(resolver);
+                    }
                 }
             },
 
-            ElementKind::Unary(_unary) => {},
+            ElementKind::Unary(unary) => {
+                unary.operand.resolve(resolver);
+            },
 
-            ElementKind::Symbolize(_symbol) => {},
+            ElementKind::Symbolize(symbol) => {
+                self.reference = Some(symbol.identity);
+
+                resolver.add(symbol.clone());
+
+                symbol.resolve(resolver);
+            },
         }
     }
 }

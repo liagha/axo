@@ -120,8 +120,8 @@ impl<'check, 'source> Checker<'check, 'source> {
     }
 
     pub fn lookup(&mut self, identity: Identity, span: Span<'source>) -> Type<'source> {
-        if let Some(type_value) = self.environment.get(&identity) {
-            return type_value.clone();
+        if let Some(ty) = self.environment.get(&identity) {
+            return ty.clone();
         }
 
         if let Some(symbol) = self.resolver.scope.get_identity(identity) {
@@ -231,7 +231,9 @@ impl<'check, 'source> Checker<'check, 'source> {
                     self.errors.push(CheckError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                     return left;
                 }
+
                 self.variables[identity] = Some(right.clone());
+
                 right
             }
             (_, TypeKind::Variable(identity)) => {
@@ -284,7 +286,6 @@ impl<'check, 'source> Checker<'check, 'source> {
                     }
                     (None, None) => None,
                 };
-
                 Type::new(TypeKind::Function(name, unified_parameters, unified_output), left.span)
             }
             _ => {

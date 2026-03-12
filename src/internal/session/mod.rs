@@ -45,7 +45,6 @@ use {
 use {
     crate::{
         generator::{Generator, GenerateError, Backend, Inkwell},
-        resolver::scope::Scope,
         tracker::Peekable,
     }
 };
@@ -284,22 +283,11 @@ impl<'session> Session<'session> {
                     span,
                 ).into();
 
-                let elements = &mut self.parsers.get_mut(identity).unwrap().output;
-
-                let mut scope = Scope::new();
-
-                for element in elements.iter_mut() {
-                    if let ElementKind::Symbolize(symbol) = &mut element.kind {
-                        element.reference = Some(symbol.identity);
-                        scope.symbols.insert(symbol.clone());
-                    }
-                }
-                
                 let symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
                     span,
                     Visibility::Public,
-                ).with_scope(scope);
+                );
 
                 self.modules.insert(*identity, symbol.identity);
 
@@ -319,16 +307,25 @@ impl<'session> Session<'session> {
 
         for (identity, _location) in &self.inputs {
             let elements = self.parsers.get(identity).unwrap().output.clone();
-            let identity = self.modules.get(identity).unwrap();
-            let module = self.resolver.scope.get_identity(*identity).unwrap();
-            
+            let module_identity = self.modules.get(identity).unwrap();
+
+            let mut module = self.resolver.scope.get_identity(*module_identity).unwrap().clone();
+
             self.resolver.enter_scope(module.scope.clone());
 
             self.resolver.set_input(elements);
-            
+
             self.resolver.resolve();
-            
+
+            let mut scope = self.resolver.scope.clone();
+
+            scope.parent = None;
+            module.scope = scope;
+
             self.resolver.exit();
+
+            let old_module = self.resolver.scope.get_identity(*module_identity).unwrap().clone();
+            self.resolver.scope.replace(&old_module, module);
         }
 
         self.errors.extend(
