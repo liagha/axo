@@ -22,124 +22,26 @@ impl<'ty> Type<'ty> {
         Self::new(TypeKind::Tuple { members: Vec::new() }, span)
     }
 
-
-    pub fn unify(expected: &Type<'ty>, actual: &Type<'ty>) -> Option<Type<'ty>> {
-        match (&expected.kind, &actual.kind) {
-            (
-                TypeKind::Pointer { target: expected_to },
-                TypeKind::Pointer { target: actual_to },
-            ) => {
-                let unified = Self::unify(expected_to, actual_to)?;
-                Some(
-                    Type::new(
-                        TypeKind::Pointer {
-                            target: Box::from(unified),
-                        },
-                        expected.span
-                    )
-                )
-            }
-            (
-                TypeKind::Array {
-                    member: expected_member,
-                    size: expected_size,
-                },
-                TypeKind::Array {
-                    member: actual_member,
-                    size: actual_size,
-                },
-            ) if expected_size == actual_size => {
-                let unified = Self::unify(expected_member, actual_member)?;
-                Some(Type::new(
-                    TypeKind::Array {
-                        member: Box::new(unified),
-                        size: *expected_size,
-                    },
-                    expected.span,
-                ))
-            }
-            (TypeKind::Tuple { members: expected_members }, TypeKind::Tuple { members: actual_members })
-            if expected_members.len() == actual_members.len() =>
-                {
-                    let mut unified = Vec::with_capacity(expected_members.len());
-                    for (expected_member, actual_member) in expected_members.iter().zip(actual_members.iter()) {
-                        unified.push(Self::unify(expected_member, actual_member)?);
-                    }
-                    Some(Type::new(TypeKind::Tuple { members: unified }, expected.span))
-                }
-            (
-                TypeKind::Integer {
-                    size: expected_bits,
-                    signed: expected_signed,
-                },
-                TypeKind::Integer {
-                    size: actual_bits,
-                    signed: actual_signed,
-                },
-            ) => Some(Type::new(
-                TypeKind::Integer {
-                    size: (*expected_bits).max(*actual_bits),
-                    signed: *expected_signed || *actual_signed,
-                },
-                expected.span,
-            )),
-            (TypeKind::Float { size: expected_bits }, TypeKind::Float { size: actual_bits }) => {
-                Some(
-                    Type::new(
-                        TypeKind::Float {
-                            size: (*expected_bits).max(*actual_bits),
-                        },
-                        expected.span
-                    )
-                )
-            }
-            (TypeKind::Float { size: bits }, TypeKind::Integer { .. })
-            | (TypeKind::Integer { .. }, TypeKind::Float { size: bits }) => {
-                Some(
-                    Type::new(
-                        TypeKind::Float {
-                            size: *bits,
-                        },
-                        expected.span
-                    )
-                )
-            },
-            _ if expected == actual => Some(expected.clone()),
-            _ => None,
-        }
-    }
-
     pub fn annotation(element: &Element<'ty>) -> Result<Type<'ty>, CheckError<'ty>> {
         match &element.kind {
-            ElementKind::Literal(Token {
-                                     kind: TokenKind::Identifier(name),
-                                     span,
-                                 }) => {
+            ElementKind::Literal(Token { kind: TokenKind::Identifier(name), span }) => {
                 let name = name.as_str().unwrap();
 
                 let kind = match name {
                     "Int8" => TypeKind::Integer { size: 8, signed: true },
                     "Int16" => TypeKind::Integer { size: 16, signed: true },
                     "Int32" => TypeKind::Integer { size: 32, signed: true },
-                    "Int64" => TypeKind::Integer { size: 64, signed: true },
+                    "Int64" | "Integer" => TypeKind::Integer { size: 64, signed: true },
                     "UInt8" => TypeKind::Integer { size: 8, signed: false },
                     "UInt16" => TypeKind::Integer { size: 16, signed: false },
                     "UInt32" => TypeKind::Integer { size: 32, signed: false },
                     "UInt64" => TypeKind::Integer { size: 64, signed: false },
                     "Float32" => TypeKind::Float { size: 32 },
-                    "Float64" => TypeKind::Float { size: 64 },
-                    "Bool" => TypeKind::Boolean,
+                    "Float64" | "Float" => TypeKind::Float { size: 64 },
+                    "Bool" | "Boolean" => TypeKind::Boolean,
                     "Char" | "Character" => TypeKind::Character,
                     "String" => TypeKind::String,
-                    "Integer" => TypeKind::Integer { size: 64, signed: true },
-                    "Float" => TypeKind::Float { size: 64 },
-                    "Boolean" => TypeKind::Boolean,
-                    _ => {
-                        return Err(CheckError::new(
-                            ErrorKind::InvalidAnnotation(element.clone()),
-                            element.span,
-                        ))
-                    }
+                    _ => return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                 };
 
                 Ok(Self::new(kind, *span))
@@ -156,33 +58,16 @@ impl<'ty> Type<'ty> {
                     TokenKind::Punctuation(PunctuationKind::RightBracket),
                 ) => {
                     if delimited.members.len() != 2 {
-                        return Err(CheckError::new(
-                            ErrorKind::InvalidAnnotation(element.clone()),
-                            element.span,
-                        ));
+                        return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
                     }
 
                     let member = Type::annotation(&delimited.members[0])?;
                     let size = match delimited.members[1].kind {
-                        ElementKind::Literal(Token {
-                                                 kind: TokenKind::Integer(value),
-                                                 ..
-                                             }) => value as Scale,
-                        _ => {
-                            return Err(CheckError::new(
-                                ErrorKind::InvalidAnnotation(element.clone()),
-                                element.span,
-                            ))
-                        }
+                        ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => value as Scale,
+                        _ => return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                     };
 
-                    Ok(Type::new(
-                        TypeKind::Array {
-                            member: Box::new(member),
-                            size,
-                        },
-                        element.span,
-                    ))
+                    Ok(Type::new(TypeKind::Array { member: Box::new(member), size }, element.span))
                 }
 
                 (
@@ -190,45 +75,23 @@ impl<'ty> Type<'ty> {
                     Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
-                    let members: Result<Vec<Type<'ty>>, CheckError<'ty>> =
-                        delimited.members.iter().map(Type::annotation).collect();
-
-                    Ok(Type::new(
-                        TypeKind::Tuple { members: members? },
-                        element.span,
-                    ))
+                    let members: Result<Vec<Type<'ty>>, CheckError<'ty>> = delimited.members.iter().map(Type::annotation).collect();
+                    Ok(Type::new(TypeKind::Tuple { members: members? }, element.span))
                 }
 
-                _ => Err(CheckError::new(
-                    ErrorKind::InvalidAnnotation(element.clone()),
-                    element.span,
-                )),
+                _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
             },
 
             ElementKind::Unary(unary) => {
                 if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
                     let item = Type::annotation(&unary.operand)?;
-
-                    Ok(
-                        Type::new(
-                            TypeKind::Pointer {
-                                target: Box::from(item),
-                            },
-                            element.span
-                        )
-                    )
+                    Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }, element.span))
                 } else {
-                    Err(CheckError::new(
-                        ErrorKind::InvalidAnnotation(element.clone()),
-                        element.span,
-                    ))
+                    Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
                 }
             }
 
-            _ => Err(CheckError::new(
-                ErrorKind::InvalidAnnotation(element.clone()),
-                element.span,
-            )),
+            _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
         }
     }
 }
@@ -244,9 +107,8 @@ pub enum TypeKind<'ty> {
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
     Void,
+    Variable(Identity),
     Unknown,
-
-    Type,
 
     Constructor(Structure<Str<'ty>, Type<'ty>>),
     Structure(Structure<Str<'ty>, Type<'ty>>),

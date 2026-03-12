@@ -1,69 +1,41 @@
 use crate::{
     parser::{Symbol, SymbolKind},
-    checker::{CheckError, Checkable, ErrorKind, Type, TypeKind},
+    checker::{Checkable, Checker, Type, TypeKind},
 };
-use crate::data::{Structure};
+use crate::data::Structure;
 use crate::format::Show;
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
-    fn check(&mut self, errors: &mut Vec<CheckError<'symbol>>) {
+    fn check(&mut self, checker: &mut Checker<'_, 'symbol>) {
         let ty = match &mut self.kind {
             SymbolKind::Binding(binding) => {
-                let mut failed = false;
-
-                let annotation = binding.annotation.as_ref().and_then(|value| {
-                    match Type::annotation(&*value) {
-                        Ok(ty) => Some(ty),
-                        Err(error) => {
-                            errors.push(error);
-                            failed = true;
-                            None
-                        }
-                    }
+                let declared = binding.annotation.as_ref().map(|a| {
+                    Type::annotation(a).unwrap_or_else(|e| {
+                        checker.errors.push(e);
+                        checker.fresh(self.span)
+                    })
                 });
 
-                let inferred = match &mut binding.value {
-                    Some(value) => {
-                        value.check(errors);
-                        if value.ty.kind == TypeKind::Unknown {
-                            failed = true;
-                            None
-                        } else {
-                            Some(value.ty.clone())
-                        }
-                    }
-                    None => None,
-                };
+                let inferred = binding.value.as_mut().map(|v| {
+                    v.check(checker);
+                    v.ty.clone()
+                });
 
-                if let (Some(declared), Some(inferred)) = (annotation.clone(), inferred.clone()) {
-                    if Type::unify(&declared, &inferred).is_none() {
-                        errors.push(CheckError::new(
-                            ErrorKind::Mismatch(declared, inferred.clone()),
-                            inferred.span,
-                        ));
-                        failed = true;
-                    }
+                match (declared, inferred) {
+                    (Some(d), Some(i)) => checker.unify(self.span, &d, &i),
+                    (Some(d), None) => d,
+                    (None, Some(i)) => i,
+                    (None, None) => checker.fresh(self.span),
                 }
-
-                if failed { return; }
-
-                annotation.unwrap_or(inferred.unwrap_or(Type::unit(self.span)))
             }
 
             SymbolKind::Structure(structure) => {
-                let head = structure
-                    .target
-                    .brand()
-                    .format(0);
+                let head = structure.target.brand().format(0);
 
-                let members = structure
-                    .members
-                    .iter_mut()
-                    .map(|member| {
-                        member.check(errors);
-
-                        member.ty.clone()
-                    }).collect();
+                let members = structure.members.iter_mut().map(|member| {
+                    member.check(checker);
+                    member.ty.clone()
+                }).collect();
 
                 let structure = Structure::new(head, members);
 
@@ -71,19 +43,12 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Union(union) => {
-                let head = union
-                    .target
-                    .brand()
-                    .format(0);
+                let head = union.target.brand().format(0);
 
-                let members = union
-                    .members
-                    .iter_mut()
-                    .map(|member| {
-                        member.check(errors);
-
-                        member.ty.clone()
-                    }).collect();
+                let members = union.members.iter_mut().map(|member| {
+                    member.check(checker);
+                    member.ty.clone()
+                }).collect();
 
                 let union = Structure::new(head, members);
 
@@ -91,51 +56,29 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Function(function) => {
-                let head = function
-                    .target
-                    .brand()
-                    .format(0);
+                let head = function.target.brand().format(0);
 
-                let mut failed = false;
-
-                let members = function.members.iter_mut().map(|member| {
-                    member.check(errors);
-
+                let members: Vec<_> = function.members.iter_mut().map(|member| {
+                    member.check(checker);
                     member.ty.clone()
                 }).collect();
 
-                let output = function.output.as_ref().and_then(|output| {
-                    match Type::annotation(&*output) {
-                        Ok(ty) => Some(Box::new(ty)),
-                        Err(error) => {
-                            errors.push(error);
-                            None
-                        }
-                    }
+                let output = function.output.as_ref().map(|output| {
+                    Type::annotation(output).unwrap_or_else(|e| {
+                        checker.errors.push(e);
+                        checker.fresh(self.span)
+                    })
                 });
 
                 if let Some(body) = &mut function.body {
-                    body.check(errors);
+                    body.check(checker);
 
-                    if body.ty.kind == TypeKind::Unknown {
-                        failed = true;
-                    }
-
-                    if failed { return; }
-
-                    if let Some(expected) = output.clone() {
-                        if Type::unify(&expected, &body.ty).is_none() {
-                            errors.push(
-                                CheckError::new(
-                                    ErrorKind::Mismatch(*expected, body.ty.clone()),
-                                    self.span,
-                                )
-                            );
-                        }
+                    if let Some(expected) = &output {
+                        checker.unify(self.span, expected, &body.ty);
                     }
                 }
 
-                Type::new(TypeKind::Function(head, members, output), self.span)
+                Type::new(TypeKind::Function(head, members, output.map(Box::new)), self.span)
             }
 
             SymbolKind::Module(_) => {

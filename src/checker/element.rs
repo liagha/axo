@@ -1,6 +1,6 @@
 use crate::{
     data::*,
-    checker::{CheckError, Checkable, ErrorKind, Type, TypeKind},
+    checker::{CheckError, Checkable, ErrorKind, Type, TypeKind, Checker},
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl<'element> Checkable<'element> for Element<'element> {
-    fn check(&mut self, errors: &mut Vec<CheckError<'element>>) {
+    fn check(&mut self, checker: &mut Checker<'_, 'element>) {
         let span = self.span;
 
         let ty = match &mut self.kind {
@@ -18,7 +18,6 @@ impl<'element> Checkable<'element> for Element<'element> {
                 TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
                 TokenKind::String(_)  => Type { kind: TypeKind::String, span: literal.span },
                 TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
-                // HACK: Treat identifiers as integers to satisfy C-style constants (O_CREAT) without an environment
                 TokenKind::Identifier(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
                 _ => Type::unit(literal.span),
             },
@@ -34,22 +33,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
                     if delimited.separator.is_none() && delimited.members.len() == 1 {
-                        delimited.members[0].check(errors);
+                        delimited.members[0].check(checker);
                         delimited.members[0].ty.clone()
                     } else {
-                        let mut failed = false;
-
-                        for member in delimited.members.iter_mut() {
-                            member.check(errors);
-                            if member.ty.kind == TypeKind::Unknown { failed = true; }
+                        let mut members = Vec::with_capacity(delimited.members.len());
+                        for member in &mut delimited.members {
+                            member.check(checker);
+                            members.push(member.ty.clone());
                         }
-
-                        if failed {
-                            self.ty = Type::unit(span);
-                            return;
-                        }
-
-                        let members = delimited.members.iter().map(|m| m.ty.clone()).collect();
                         Type { kind: TypeKind::Tuple { members }, span: Span::void() }
                     }
                 }
@@ -59,22 +50,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                     None | Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                     TokenKind::Punctuation(PunctuationKind::RightBrace),
                 ) => {
-                    let last = delimited.members.len().saturating_sub(1);
                     let mut ty = Type::new(TypeKind::Void, Span::void());
-                    let mut failed = false;
+                    let last = delimited.members.len().saturating_sub(1);
 
                     for (index, member) in delimited.members.iter_mut().enumerate() {
-                        member.check(errors);
-                        if member.ty.kind == TypeKind::Unknown { failed = true; }
-
+                        member.check(checker);
                         if index == last {
                             ty = member.ty.clone();
                         }
-                    }
-
-                    if failed {
-                        self.ty = Type::unit(span);
-                        return;
                     }
                     ty
                 }
@@ -84,56 +67,17 @@ impl<'element> Checkable<'element> for Element<'element> {
                     None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                     TokenKind::Punctuation(PunctuationKind::RightBracket),
                 ) => {
-                    if delimited.members.is_empty() {
-                        Type {
-                            kind: TypeKind::Array {
-                                member: Box::new(Type::new(TypeKind::Void, self.span)),
-                                size: 0,
-                            },
-                            span: Span::void(),
-                        }
-                    } else {
-                        let mut failed = false;
-
-                        for member in delimited.members.iter_mut() {
-                            member.check(errors);
-                            if member.ty.kind == TypeKind::Unknown { failed = true; }
-                        }
-
-                        if failed {
-                            self.ty = Type::unit(span);
-                            return;
-                        }
-
-                        let inner = delimited.members[0].ty.clone();
-                        for member in delimited.members.iter().skip(1) {
-                            if inner != member.ty {
-                                errors.push(CheckError::new(
-                                    ErrorKind::Mismatch(inner.clone(), member.ty.clone()),
-                                    member.span,
-                                ));
-                                failed = true;
-                            }
-                        }
-
-                        if failed {
-                            self.ty = Type {
-                                kind: TypeKind::Array {
-                                    member: Box::new(inner),
-                                    size: delimited.members.len() as Scale,
-                                },
-                                span: Span::void(),
-                            };
-                            return;
-                        }
-
-                        Type {
-                            kind: TypeKind::Array {
-                                member: Box::new(inner),
-                                size: delimited.members.len() as Scale,
-                            },
-                            span: Span::void(),
-                        }
+                    let mut inner = checker.fresh(span);
+                    for member in &mut delimited.members {
+                        member.check(checker);
+                        inner = checker.unify(member.span, &inner, &member.ty);
+                    }
+                    Type {
+                        kind: TypeKind::Array {
+                            member: Box::new(inner),
+                            size: delimited.members.len() as Scale,
+                        },
+                        span: Span::void(),
                     }
                 }
 
@@ -141,316 +85,175 @@ impl<'element> Checkable<'element> for Element<'element> {
             },
 
             ElementKind::Unary(unary) => {
-                unary.operand.check(errors);
-                if unary.operand.ty.kind == TypeKind::Unknown {
-                    self.ty = Type::unit(span);
-                    return;
-                }
+                unary.operand.check(checker);
 
                 let TokenKind::Operator(operator) = unary.operator.kind.clone() else {
-                    errors.push(CheckError::new(
-                        ErrorKind::InvalidOperation(unary.operator.clone()),
-                        unary.operator.span,
-                    ));
-                    self.ty = Type::unit(span);
+                    checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                     return;
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Exclamation] => match unary.operand.ty.kind {
-                        TypeKind::Boolean => Type { kind: TypeKind::Boolean, span },
-                        _ => {
-                            errors.push(CheckError::new(
-                                ErrorKind::Mismatch(Type { kind: TypeKind::Boolean, span }, unary.operand.ty.clone()),
-                                span,
-                            ));
-                            Type { kind: TypeKind::Boolean, span }
-                        }
-                    },
-
-                    [OperatorKind::Tilde] => match unary.operand.ty.kind {
-                        TypeKind::Integer { .. } => unary.operand.ty.clone(),
-                        _ => {
-                            errors.push(CheckError::new(
-                                ErrorKind::Mismatch(Type { kind: TypeKind::Integer { size: 64, signed: true }, span }, unary.operand.ty.clone()),
-                                span,
-                            ));
-                            Type { kind: TypeKind::Integer { size: 64, signed: true }, span }
-                        }
-                    },
-
-                    [OperatorKind::Plus] | [OperatorKind::Minus] => match unary.operand.ty.kind {
-                        TypeKind::Integer { .. } | TypeKind::Float { .. } => unary.operand.ty.clone(),
-                        _ => {
-                            errors.push(CheckError::new(
-                                ErrorKind::Mismatch(Type { kind: TypeKind::Integer { size: 64, signed: true }, span }, unary.operand.ty.clone()),
-                                span,
-                            ));
-                            Type { kind: TypeKind::Integer { size: 64, signed: true }, span }
-                        }
-                    },
-
+                    [OperatorKind::Exclamation] => checker.unify(span, &unary.operand.ty, &Type { kind: TypeKind::Boolean, span }),
+                    [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.ty.clone(),
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
-                            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) => true,
-                            ElementKind::Index(_) => true,
-                            ElementKind::Binary(binary) => matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot)),
-                            ElementKind::Unary(inner) => matches!(inner.operator.kind, TokenKind::Operator(OperatorKind::Star)),
+                            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) | ElementKind::Index(_) => {
+                                true
+                            }
+
+                            ElementKind::Binary(binary) => {
+                                matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
+                            }
+
+                            ElementKind::Unary(inner) => {
+                                matches!(inner.operator.kind, TokenKind::Operator(OperatorKind::Star))
+                            }
+
                             _ => false,
                         };
 
-                        match addressable {
-                            true => Type { kind: TypeKind::Pointer { target: Box::new(unary.operand.ty.clone()) }, span },
-                            false => {
-                                errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
-                                Type::unit(span)
-                            }
+                        if addressable {
+                            Type { kind: TypeKind::Pointer { target: Box::new(unary.operand.ty.clone()) }, span }
+                        } else {
+                            checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
+                            checker.fresh(span)
                         }
                     }
-
-                    [OperatorKind::Star] => match unary.operand.ty.clone().kind {
-                        TypeKind::Pointer { target } => *target,
-                        _ => {
-                            errors.push(CheckError::new(
-                                ErrorKind::Mismatch(Type { kind: TypeKind::Pointer { target: Box::new(Type::unit(span)) }, span }, unary.operand.ty.clone()),
-                                span,
-                            ));
-                            Type::unit(span)
-                        }
-                    },
-
+                    [OperatorKind::Star] => {
+                        let target = checker.fresh(span);
+                        let ptr = Type::new(TypeKind::Pointer { target: Box::new(target.clone()) }, span);
+                        checker.unify(span, &unary.operand.ty, &ptr);
+                        target
+                    }
                     _ => {
-                        errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
-                        Type::unit(span)
+                        checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
+                        checker.fresh(span)
                     }
                 }
             }
 
             ElementKind::Binary(binary) => {
-                binary.left.check(errors);
-                binary.right.check(errors);
-
-                if binary.left.ty.kind == TypeKind::Unknown || binary.right.ty.kind == TypeKind::Unknown {
-                    self.ty = Type::unit(span);
-                    return;
-                }
+                binary.left.check(checker);
+                binary.right.check(checker);
 
                 let TokenKind::Operator(operator) = binary.operator.kind.clone() else {
-                    errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
-                    self.ty = Type::unit(span);
+                    checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
                     return;
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Equal] => match Type::unify(&binary.left.ty, &binary.right.ty) {
-                        Some(_) => binary.left.ty.clone(),
-                        None => {
-                            errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                            binary.left.ty.clone()
-                        }
-                    },
+                    [OperatorKind::Equal] => checker.unify(span, &binary.left.ty, &binary.right.ty),
+                    [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
+                        let left = checker.resolve(&binary.left.ty);
+                        let right = checker.resolve(&binary.right.ty);
 
-                    [OperatorKind::Plus] => match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                        (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type { kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra }, span: binary.operator.span },
-                        (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type { kind: TypeKind::Float { size: (*ls).max(*rs) }, span: binary.operator.span },
-                        (TypeKind::Float { size }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type { kind: TypeKind::Float { size: *size }, span: binary.operator.span },
-                        (TypeKind::Integer { .. } | TypeKind::Float { .. }, TypeKind::Pointer { .. }) => {
-                            binary.right.ty.span = binary.operator.span;
-                            binary.right.ty.clone()
-                        }
-                        _ => {
-                            errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                            binary.left.ty.clone()
-                        }
-                    },
-
-                    [OperatorKind::Minus] => match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                        (TypeKind::Pointer { .. }, TypeKind::Pointer { .. }) => {
-                            if binary.left.ty == binary.right.ty { Type { kind: TypeKind::Integer { size: 64, signed: true }, span: binary.operator.span } }
-                            else {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                                binary.left.ty.clone()
-                            }
-                        }
-                        (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) => {
-                            binary.left.ty.span = binary.operator.span;
-                            binary.left.ty.clone()
-                        }
-                        (TypeKind::Pointer { .. }, _) | (_, TypeKind::Pointer { .. }) => {
-                            errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
-                            binary.left.ty.clone()
-                        }
-                        (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type { kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra }, span: binary.operator.span },
-                        (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type { kind: TypeKind::Float { size: (*ls).max(*rs) }, span: binary.operator.span },
-                        (TypeKind::Float { size }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type { kind: TypeKind::Float { size: *size }, span: binary.operator.span },
-                        _ => {
-                            errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                            binary.left.ty.clone()
-                        }
-                    },
-
-                    [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                            (TypeKind::Integer { size: ls, signed: la }, TypeKind::Integer { size: rs, signed: ra }) => Type { kind: TypeKind::Integer { size: (*ls).max(*rs), signed: *la || *ra }, span: binary.operator.span },
-                            (TypeKind::Float { size: ls }, TypeKind::Float { size: rs }) => Type { kind: TypeKind::Float { size: (*ls).max(*rs) }, span: binary.operator.span },
-                            (TypeKind::Float { size }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Float { size }) => Type { kind: TypeKind::Float { size: *size }, span: binary.operator.span },
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                                binary.left.ty.clone()
-                            }
+                        if matches!(left.kind, TypeKind::Pointer { .. }) {
+                            left
+                        } else if matches!(right.kind, TypeKind::Pointer { .. }) {
+                            right
+                        } else {
+                            checker.unify(span, &left, &right)
                         }
                     }
-
                     [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                            (TypeKind::Integer { .. }, TypeKind::Integer { .. }) => binary.left.ty.clone(),
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(Type { kind: TypeKind::Integer { size: 64, signed: true }, span }, binary.right.ty.clone()), span));
-                                Type { kind: TypeKind::Integer { size: 64, signed: true }, span }
-                            }
-                        }
+                        checker.unify(span, &binary.left.ty, &binary.right.ty)
                     }
-
                     [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                        match (&binary.left.ty.kind, &binary.right.ty.kind) {
-                            (TypeKind::Boolean, TypeKind::Boolean) => Type { kind: TypeKind::Boolean, span: binary.operator.span },
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(Type { kind: TypeKind::Boolean, span }, binary.right.ty.clone()), span));
-                                Type { kind: TypeKind::Boolean, span }
-                            }
-                        }
+                        checker.unify(span, &binary.left.ty, &Type { kind: TypeKind::Boolean, span });
+                        checker.unify(span, &binary.right.ty, &Type { kind: TypeKind::Boolean, span });
+                        Type { kind: TypeKind::Boolean, span }
                     }
-
                     [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        match Type::unify(&binary.left.ty, &binary.right.ty) {
-                            Some(_) => Type { kind: TypeKind::Boolean, span: binary.operator.span },
-                            None => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(binary.left.ty.clone(), binary.right.ty.clone()), binary.operator.span));
-                                Type { kind: TypeKind::Boolean, span }
-                            }
-                        }
+                        checker.unify(span, &binary.left.ty, &binary.right.ty);
+                        Type { kind: TypeKind::Boolean, span }
                     }
-
                     [OperatorKind::Dot] => binary.right.ty.clone(),
-
                     _ => {
-                        errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
-                        Type::unit(span)
+                        checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
+                        checker.fresh(span)
                     }
                 }
             }
 
             ElementKind::Index(index) => {
                 if index.members.is_empty() {
+                    self.ty = checker.fresh(span);
                     return;
                 }
 
-                index.target.check(errors);
-                index.members[0].check(errors);
+                index.target.check(checker);
+                index.members[0].check(checker);
 
-                if index.target.ty.kind == TypeKind::Unknown || index.members[0].ty.kind == TypeKind::Unknown {
-                    self.ty = Type::unit(span);
-                    return;
-                }
+                let idx_ty = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
+                checker.unify(span, &index.members[0].ty, &idx_ty);
 
-                let target_ty = index.target.ty.clone();
-                let index_ty  = index.members[0].ty.clone();
+                let target = checker.resolve(&index.target.ty);
 
-                match index_ty.kind {
-                    TypeKind::Integer { .. } => {}
-                    _ => {
-                        errors.push(CheckError::new(ErrorKind::Mismatch(Type { kind: TypeKind::Integer { size: 64, signed: true }, span }, index_ty), span));
-                    }
-                }
-
-                match target_ty.kind {
+                match target.kind {
                     TypeKind::Pointer { target } => *target,
                     TypeKind::Array { member, .. } => *member,
                     TypeKind::Tuple { members } => {
-                        match &index.members[0].kind {
-                            ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => {
-                                match usize::try_from(*value).ok().filter(|&i| i < members.len()) {
-                                    Some(idx) => members[idx].clone(),
-                                    None => {
-                                        errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
-                                        Type::unit(span)
-                                    }
-                                }
+                        if let ElementKind::Literal(Token { kind: TokenKind::Integer(val), .. }) = index.members[0].kind {
+                            if let Some(idx) = usize::try_from(val).ok().filter(|&i| i < members.len()) {
+                                members[idx].clone()
+                            } else {
+                                checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
+                                checker.fresh(span)
                             }
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
-                                Type::unit(span)
-                            }
+                        } else {
+                            checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
+                            checker.fresh(span)
                         }
                     }
-                    TypeKind::Integer { .. } => Type { kind: TypeKind::Integer { size: 64, signed: true }, span },
+                    TypeKind::Variable(_) => {
+                        let element = checker.fresh(span);
+                        let ptr = Type::new(TypeKind::Pointer { target: Box::new(element.clone()) }, span);
+                        checker.unify(span, &target, &ptr);
+                        element
+                    }
                     _ => {
-                        errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
-                        Type { kind: TypeKind::Integer { size: 64, signed: true }, span }
+                        checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
+                        checker.fresh(span)
                     }
                 }
             }
 
             ElementKind::Invoke(invoke) => {
-                let mut failed = false;
                 for member in invoke.members.iter_mut() {
-                    member.check(errors);
-                    if member.ty.kind == TypeKind::Unknown { failed = true; }
+                    member.check(checker);
                 }
 
-                if failed {
-                    self.ty = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
-                    return;
-                }
-
-                let primitive = invoke.target.brand()
-                    .and_then(|token| match token.kind {
-                        TokenKind::Identifier(name) => Some(name),
-                        _ => None,
-                    })
-                    .and_then(|name| name.as_str());
+                let primitive = invoke.target.brand().and_then(|t| match t.kind {
+                    TokenKind::Identifier(name) => Some(name),
+                    _ => None,
+                }).and_then(|name| name.as_str());
 
                 match primitive {
                     Some("if") => {
-                        match invoke.members[0].ty.kind {
-                            TypeKind::Boolean => {}
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(Type { kind: TypeKind::Boolean, span }, invoke.members[0].ty.clone()), invoke.members[0].span));
-                            }
-                        }
-
-                        match Type::unify(&invoke.members[1].ty, &invoke.members[2].ty) {
-                            Some(ty) => ty,
-                            None => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(invoke.members[1].ty.clone(), invoke.members[2].ty.clone()), span));
-                                invoke.members[1].ty.clone()
-                            }
-                        }
+                        let bool_ty = Type::new(TypeKind::Boolean, span);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].ty, &bool_ty);
+                        checker.unify(span, &invoke.members[1].ty, &invoke.members[2].ty)
                     }
-
                     Some("while") => {
-                        match invoke.members[0].ty.kind {
-                            TypeKind::Boolean => {}
-                            _ => {
-                                errors.push(CheckError::new(ErrorKind::Mismatch(Type { kind: TypeKind::Boolean, span }, invoke.members[0].ty.clone()), invoke.members[0].span));
-                            }
-                        }
+                        let bool_ty = Type::new(TypeKind::Boolean, span);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].ty, &bool_ty);
                         Type::unit(span)
                     }
-                    _ => Type::new(TypeKind::Integer { size: 64, signed: true }, span),
+                    _ => {
+                        invoke.target.check(checker);
+                        let ret = checker.fresh(span);
+                        let args = invoke.members.iter().map(|m| m.ty.clone()).collect();
+                        let fn_ty = Type::new(TypeKind::Function(Str::default(), args, Some(Box::new(ret.clone()))), span);
+
+                        checker.unify(span, &invoke.target.ty, &fn_ty);
+                        ret
+                    }
                 }
             }
 
             ElementKind::Construct(construct) => {
-                let mut failed = false;
                 for field in construct.members.iter_mut() {
-                    field.check(errors);
-                    if field.ty.kind == TypeKind::Unknown { failed = true; }
-                }
-
-                if failed {
-                    self.ty = Type::unit(span);
-                    return;
+                    field.check(checker);
                 }
 
                 let members = construct.members.iter().map(|f| f.ty.clone()).collect();
@@ -460,7 +263,7 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
 
             ElementKind::Symbolize(symbol) => {
-                symbol.check(errors);
+                symbol.check(checker);
                 symbol.ty.clone()
             }
         };

@@ -58,12 +58,6 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                         format!("Tuple({})", members.format(verbosity))
                     }
                     TypeKind::Void => "Void".to_string(),
-                    TypeKind::Unknown => {
-                        "Unknown".to_string()
-                    }
-                    TypeKind::Type => {
-                        "Type".to_string()
-                    }
                     TypeKind::Constructor(_) => {
                         "Constructor".to_string()
                     }
@@ -76,6 +70,8 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Function(_, _, _) => {
                         "Function".to_string()
                     }
+                    TypeKind::Variable(_) => "Variable".to_string(),
+                    TypeKind::Unknown => "Unknown".to_string(),
                 }
             }
 
