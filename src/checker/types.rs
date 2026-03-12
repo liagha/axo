@@ -1,28 +1,27 @@
 use crate::{
-    data::{Boolean, Scale, Str},
+    checker::{CheckError, ErrorKind},
+    data::{Boolean, Identity, Scale, Str, Structure},
+    parser::{Element, ElementKind},
+    scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
 };
-use crate::checker::{CheckError, ErrorKind};
-use crate::data::*;
-use crate::parser::{Element, ElementKind};
-use crate::scanner::{OperatorKind, PunctuationKind, Token, TokenKind};
 
 #[derive(Clone, Debug)]
-pub struct Type<'ty> {
-    pub kind: TypeKind<'ty>,
-    pub span: Span<'ty>,
+pub struct Type<'source> {
+    pub kind: TypeKind<'source>,
+    pub span: Span<'source>,
 }
 
-impl<'ty> Type<'ty> {
-    pub fn new(kind: TypeKind<'ty>, span: Span<'ty>) -> Self {
+impl<'source> Type<'source> {
+    pub fn new(kind: TypeKind<'source>, span: Span<'source>) -> Self {
         Self { kind, span }
     }
 
-    pub fn unit(span: Span<'ty>) -> Self {
+    pub fn unit(span: Span<'source>) -> Self {
         Self::new(TypeKind::Tuple { members: Vec::new() }, span)
     }
 
-    pub fn annotation(element: &Element<'ty>) -> Result<Type<'ty>, CheckError<'ty>> {
+    pub fn annotation(element: &Element<'source>) -> Result<Type<'source>, CheckError<'source>> {
         match &element.kind {
             ElementKind::Literal(Token { kind: TokenKind::Identifier(name), span }) => {
                 let name = name.as_str().unwrap();
@@ -75,7 +74,7 @@ impl<'ty> Type<'ty> {
                     Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
-                    let members: Result<Vec<Type<'ty>>, CheckError<'ty>> = delimited.members.iter().map(Type::annotation).collect();
+                    let members: Result<Vec<Type<'source>>, CheckError<'source>> = delimited.members.iter().map(Type::annotation).collect();
                     Ok(Type::new(TypeKind::Tuple { members: members? }, element.span))
                 }
 
@@ -97,26 +96,26 @@ impl<'ty> Type<'ty> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TypeKind<'ty> {
+pub enum TypeKind<'source> {
     Integer { size: Scale, signed: Boolean },
     Float { size: Scale },
     Boolean,
     String,
     Character,
-    Pointer { target: Box<Type<'ty>> },
-    Array { member: Box<Type<'ty>>, size: Scale },
-    Tuple { members: Vec<Type<'ty>> },
+    Pointer { target: Box<Type<'source>> },
+    Array { member: Box<Type<'source>>, size: Scale },
+    Tuple { members: Vec<Type<'source>> },
     Void,
     Variable(Identity),
     Unknown,
 
-    Constructor(Structure<Str<'ty>, Type<'ty>>),
-    Structure(Structure<Str<'ty>, Type<'ty>>),
-    Union(Structure<Str<'ty>, Type<'ty>>),
-    Function(Str<'ty>, Vec<Type<'ty>>, Option<Box<Type<'ty>>>),
+    Constructor(Structure<Str<'source>, Type<'source>>),
+    Structure(Structure<Str<'source>, Type<'source>>),
+    Union(Structure<Str<'source>, Type<'source>>),
+    Function(Str<'source>, Vec<Type<'source>>, Option<Box<Type<'source>>>),
 }
 
-impl<'ty> PartialEq for Type<'ty> {
+impl<'source> PartialEq for Type<'source> {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
     }

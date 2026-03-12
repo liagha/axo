@@ -353,7 +353,7 @@ impl<'session> Session<'session> {
         for identity in identities {
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
-            let mut checker = Checker::new(elements);
+            let mut checker = Checker::new(elements, &self.resolver);
 
             checker.check();
 

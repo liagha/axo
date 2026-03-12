@@ -1,39 +1,38 @@
 use crate::{
-    format::{self, Display},
+    checker::types::Type,
+    data::Str,
+    format::{self, Display, Show},
+    parser::Element,
     scanner::Token,
 };
-use crate::checker::types::Type;
-use crate::data::Str;
-use crate::format::Show;
-use crate::parser::Element;
 
 #[derive(Clone)]
-pub enum ErrorKind<'error> {
-    Mismatch(Type<'error>, Type<'error>),
-    InvalidOperation(Token<'error>),
-    InvalidAnnotation(Element<'error>),
+pub enum ErrorKind<'source> {
+    Mismatch(Type<'source>, Type<'source>),
+    InvalidOperation(Token<'source>),
+    InvalidAnnotation(Element<'source>),
 }
 
-impl<'error> Show<'error> for ErrorKind<'error> {
+impl<'source> Show<'source> for ErrorKind<'source> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'source> {
         match self {
-            ErrorKind::Mismatch(this, other) => {
-                format!("expected `{}` but got `{}`.", this.format(verbosity), other.format(verbosity))
+            ErrorKind::Mismatch(left, right) => {
+                format!("expected `{}` but got `{}`.", left.format(verbosity), right.format(verbosity)).into()
             }
             ErrorKind::InvalidOperation(token) => {
-                format!("invalid operation for operand types: `{}`.", token.format(verbosity))
+                format!("invalid operation for operand types: `{}`.", token.format(verbosity)).into()
             }
             ErrorKind::InvalidAnnotation(element) => {
-                format!("invalid type annotation: `{}`.", element.format(verbosity))
+                format!("invalid type annotation: `{}`.", element.format(verbosity)).into()
             }
-        }.into()
+        }
     }
 }
 
 impl Display for ErrorKind<'_> {
-    fn fmt(&self, f: &mut format::Formatter<'_>) -> format::Result {
-        write!(f, "{}", self.format(0))
+    fn fmt(&self, formatter: &mut format::Formatter<'_>) -> format::Result {
+        write!(formatter, "{}", self.format(0))
     }
 }

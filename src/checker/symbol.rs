@@ -1,84 +1,80 @@
 use crate::{
-    parser::{Symbol, SymbolKind},
     checker::{Checkable, Checker, Type, TypeKind},
+    data::Structure,
+    format::Show,
+    parser::{Symbol, SymbolKind},
 };
-use crate::data::Structure;
-use crate::format::Show;
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self, checker: &mut Checker<'_, 'symbol>) {
-        let ty = match &mut self.kind {
+        let type_value = match &mut self.kind {
             SymbolKind::Binding(binding) => {
-                let declared = binding.annotation.as_ref().map(|a| {
-                    Type::annotation(a).unwrap_or_else(|e| {
-                        checker.errors.push(e);
+                let declared = binding.annotation.as_ref().map(|annotation| {
+                    Type::annotation(annotation).unwrap_or_else(|error| {
+                        checker.errors.push(error);
                         checker.fresh(self.span)
                     })
                 });
 
-                let inferred = binding.value.as_mut().map(|v| {
-                    v.check(checker);
-                    v.ty.clone()
+                let inferred = binding.value.as_mut().map(|value| {
+                    value.check(checker);
+                    value.ty.clone()
                 });
 
                 match (declared, inferred) {
-                    (Some(d), Some(i)) => checker.unify(self.span, &d, &i),
-                    (Some(d), None) => d,
-                    (None, Some(i)) => i,
+                    (Some(declared_type), Some(inferred_type)) => checker.unify(self.span, &declared_type, &inferred_type),
+                    (Some(declared_type), None) => declared_type,
+                    (None, Some(inferred_type)) => inferred_type,
                     (None, None) => checker.fresh(self.span),
                 }
             }
 
             SymbolKind::Structure(structure) => {
-                let head = structure.target.brand().format(0);
+                let head = structure.target.brand().unwrap().format(0);
 
                 let members = structure.members.iter_mut().map(|member| {
                     member.check(checker);
                     member.ty.clone()
                 }).collect();
 
-                let structure = Structure::new(head, members);
-
-                Type::new(TypeKind::Structure(structure), self.span)
+                Type::new(TypeKind::Structure(Structure::new(head.into(), members)), self.span)
             }
 
             SymbolKind::Union(union) => {
-                let head = union.target.brand().format(0);
+                let head = union.target.brand().unwrap().format(0);
 
                 let members = union.members.iter_mut().map(|member| {
                     member.check(checker);
                     member.ty.clone()
                 }).collect();
 
-                let union = Structure::new(head, members);
-
-                Type::new(TypeKind::Union(union), self.span)
+                Type::new(TypeKind::Union(Structure::new(head.into(), members)), self.span)
             }
 
             SymbolKind::Function(function) => {
-                let head = function.target.brand().format(0);
+                let head = function.target.brand().unwrap().format(0);
 
                 let members: Vec<_> = function.members.iter_mut().map(|member| {
                     member.check(checker);
+                    checker.environment.insert(member.identity, member.ty.clone());
                     member.ty.clone()
                 }).collect();
 
-                let output = function.output.as_ref().map(|output| {
-                    Type::annotation(output).unwrap_or_else(|e| {
-                        checker.errors.push(e);
+                let output = function.output.as_ref().map(|annotation| {
+                    Type::annotation(annotation).unwrap_or_else(|error| {
+                        checker.errors.push(error);
                         checker.fresh(self.span)
                     })
                 });
 
                 if let Some(body) = &mut function.body {
                     body.check(checker);
-
                     if let Some(expected) = &output {
                         checker.unify(self.span, expected, &body.ty);
                     }
                 }
 
-                Type::new(TypeKind::Function(head, members, output.map(Box::new)), self.span)
+                Type::new(TypeKind::Function(head.into(), members, output.map(Box::new)), self.span)
             }
 
             SymbolKind::Module(_) => {
@@ -86,6 +82,6 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        self.ty = ty
+        self.ty = type_value;
     }
 }
