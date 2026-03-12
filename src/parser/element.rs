@@ -7,21 +7,14 @@ use {
         checker::{Type, TypeKind},
     },
 };
-
-use core::sync::atomic::{AtomicUsize, Ordering};
-
-pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-pub fn next_identity() -> Identity {
-    COUNTER.fetch_add(1, Ordering::Relaxed)
-}
+use crate::resolver::next_identity;
 
 pub struct Element<'element> {
     pub identity: Identity,
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
-    pub ty: Type<'element>,
+    pub typ: Type<'element>,
 }
 
 pub enum ElementKind<'element> {
@@ -44,7 +37,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { identity: next_identity(), kind, span, reference: None, ty: Type::new(TypeKind::Unknown, span) }
+        Element { identity: next_identity(), kind, span, reference: None, typ: Type::new(TypeKind::Unknown, span) }
     }
 }
 

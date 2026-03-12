@@ -386,9 +386,9 @@ impl<'parser> Parser<'parser> {
                                 match identifier.as_str().unwrap().to_lowercase().as_str() {
                                     "public" => visibility = Visibility::Public,
                                     "private" => visibility = Visibility::Private,
-                                    "c" => interface = Interface::C,
-                                    "axo" => interface = Interface::Axo,
-                                    "compiler" => interface = Interface::Compiler,
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
                                     _ => {}
                                 }
                                 None
@@ -475,9 +475,9 @@ impl<'parser> Parser<'parser> {
                                 match identifier.as_str().unwrap().to_lowercase().as_str() {
                                     "public" => visibility = Visibility::Public,
                                     "private" => visibility = Visibility::Private,
-                                    "c" => interface = Interface::C,
-                                    "axo" => interface = Interface::Axo,
-                                    "compiler" => interface = Interface::Compiler,
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
                                     _ => {}
                                 }
                                 None

@@ -1,29 +1,29 @@
 // ─── Syscall Functions ───────────────────────────────────────────────
-func write(c, const fd: Integer, const buf: *UInt8, const len: UInt64): Integer
-func read(c, const fd: Integer, const buf: *UInt8, const count: UInt64): UInt64
-func _exit(c, const status: Integer)
-func open(c, const path: String, const flags: Integer, const mode: Integer): Integer
-func close(c, const fd: Integer): Integer
-func mmap(c, const addr: *UInt8, const length: UInt64, const prot: Integer, const flags: Integer, const fd: Integer, const offset: Int64): *UInt8
-func munmap(c, const addr: *UInt8, const length: UInt64): Integer
-func unlink(c, const path: String): Integer
-func lseek(c, const fd: Integer, const offset: Int64, const whence: Integer): Int64
+func write(C, const fd: Integer, const buf: *UInt8, const len: UInt64): Integer
+func read(C, const fd: Integer, const buf: *UInt8, const count: UInt64): UInt64
+func _exit(C, const status: Integer)
+func open(C, const path: String, const flags: Integer, const mode: Integer): Integer
+func close(C, const fd: Integer): Integer
+func mmap(C, const addr: *UInt8, const length: UInt64, const prot: Integer, const flags: Integer, const fd: Integer, const offset: Int64): *UInt8
+func munmap(C, const addr: *UInt8, const length: UInt64): Integer
+func unlink(C, const path: String): Integer
+func lseek(C, const fd: Integer, const offset: Int64, const whence: Integer): Int64
 
 // ─── Formatting & Print Functions ────────────────────────────────────
-func print_i64(c, const v: Int64)
-func print_f64(c, const v: Float)
-func print_bool(c, const v: Boolean)
-func print_str(c, const s: String)
-func print_char(c, const v: UInt8)
+func print_i64(C, const v: Int64)
+func print_f64(C, const v: Float)
+func print_bool(C, const v: Boolean)
+func print_str(C, const s: String)
+func print_char(C, const v: UInt8)
 func println(c)
-func print_hex(c, const v: Int64)
-func print_ptr(c, const v: *UInt8)
+func print_hex(C, const v: Int64)
+func print_ptr(C, const v: *UInt8)
 
 // ─── Newline Variants ────────────────────────────────────────────────
-func println_i64(c, const v: Int64)
-func println_f64(c, const v: Float)
-func println_bool(c, const v: Boolean)
-func println_str(c, const s: String)
+func println_i64(C, const v: Int64)
+func println_f64(C, const v: Float)
+func println_bool(C, const v: Boolean)
+func println_str(C, const s: String)
 
 // ─── Standard File Descriptors ───────────────────────────────────────
 const STDIN  = 0

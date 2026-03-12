@@ -6,10 +6,10 @@ use {
 use crate::checker::{Type, TypeKind};
 use crate::data::Str;
 
-impl<'ty> Show<'ty> for Type<'ty> {
+impl<'typ> Show<'typ> for Type<'typ> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'ty> {
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'typ> {
         match verbosity {
             0 => {
                 format!("{}", self.kind.format(verbosity))
@@ -26,10 +26,10 @@ impl<'ty> Show<'ty> for Type<'ty> {
     }
 }
 
-impl<'ty> Show<'ty> for TypeKind<'ty> {
+impl<'typ> Show<'typ> for TypeKind<'typ> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'ty> {
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'typ> {
         match verbosity {
             0 => {
                 match self {

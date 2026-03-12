@@ -10,12 +10,12 @@ use crate::tracker::Span;
 pub struct Analysis<'analysis> {
     pub kind: AnalysisKind<'analysis>,
     pub span: Span<'analysis>,
-    pub ty: Type<'analysis>,
+    pub typ: Type<'analysis>,
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, ty: Type<'analysis>) -> Self {
-        Self { kind, span, ty }
+    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, typ: Type<'analysis>) -> Self {
+        Self { kind, span, typ }
     }
 }
 

@@ -251,7 +251,7 @@ impl<'element> Clone for Element<'element> {
             kind: self.kind.clone(),
             span: self.span.clone(),
             reference: self.reference,
-            ty: self.ty.clone(),
+            typ: self.typ.clone(),
         }
     }
 }
@@ -288,7 +288,7 @@ impl<'symbol> Clone for Symbol<'symbol> {
             span: self.span.clone(),
             scope: self.scope.clone(),
             visibility: self.visibility.clone(),
-            ty: self.ty.clone(),
+            typ: self.typ.clone(),
         }
     }
 }

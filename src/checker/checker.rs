@@ -54,7 +54,7 @@ impl<'check, 'source> Checker<'check, 'source> {
     }
 
     pub fn concretize_element(&mut self, element: &mut Element<'source>) {
-        element.ty = self.concretize(&element.ty);
+        element.typ = self.concretize(&element.typ);
 
         match &mut element.kind {
             ElementKind::Literal(_) => {}
@@ -94,7 +94,7 @@ impl<'check, 'source> Checker<'check, 'source> {
     }
 
     pub fn concretize_symbol(&mut self, symbol: &mut Symbol<'source>) {
-        symbol.ty = self.concretize(&symbol.ty);
+        symbol.typ = self.concretize(&symbol.typ);
 
         match &mut symbol.kind {
             SymbolKind::Binding(binding) => {
@@ -120,8 +120,8 @@ impl<'check, 'source> Checker<'check, 'source> {
     }
 
     pub fn lookup(&mut self, identity: Identity, span: Span<'source>) -> Type<'source> {
-        if let Some(ty) = self.environment.get(&identity) {
-            return ty.clone();
+        if let Some(typ) = self.environment.get(&identity) {
+            return typ.clone();
         }
 
         if let Some(symbol) = self.resolver.scope.get_identity(identity) {
@@ -132,7 +132,7 @@ impl<'check, 'source> Checker<'check, 'source> {
 
             cloned.check(self);
 
-            let unified = self.unify(span, &variable, &cloned.ty);
+            let unified = self.unify(span, &variable, &cloned.typ);
             self.environment.insert(identity, unified.clone());
 
             return unified;

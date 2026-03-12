@@ -19,7 +19,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let inferred = binding.value.as_mut().map(|value| {
                     value.check(checker);
 
-                    value.ty.clone()
+                    value.typ.clone()
                 });
 
                 match (declared, inferred) {
@@ -35,7 +35,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let members = structure.members.iter_mut().map(|member| {
                     member.check(checker);
-                    member.ty.clone()
+                    member.typ.clone()
                 }).collect();
 
                 Type::new(TypeKind::Structure(Structure::new(head.into(), members)), self.span)
@@ -46,7 +46,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let members = union.members.iter_mut().map(|member| {
                     member.check(checker);
-                    member.ty.clone()
+                    member.typ.clone()
                 }).collect();
 
                 Type::new(TypeKind::Union(Structure::new(head.into(), members)), self.span)
@@ -57,8 +57,8 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let members: Vec<_> = function.members.iter_mut().map(|member| {
                     member.check(checker);
-                    checker.environment.insert(member.identity, member.ty.clone());
-                    member.ty.clone()
+                    checker.environment.insert(member.identity, member.typ.clone());
+                    member.typ.clone()
                 }).collect();
 
                 let output = function.output.as_ref().map(|annotation| {
@@ -71,13 +71,13 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 if let Some(body) = &mut function.body {
                     body.check(checker);
                     if let Some(expected) = &output {
-                        checker.unify(self.span, expected, &body.ty);
+                        checker.unify(self.span, expected, &body.typ);
                     }
                 }
 
                 let inferred_output = match (&output, &function.body) {
                     (Some(output), _) => Some(Box::new(checker.concretize(output))),
-                    (None, Some(body)) => Some(Box::new(checker.concretize(&body.ty))),
+                    (None, Some(body)) => Some(Box::new(checker.concretize(&body.typ))),
                     (None, None) => None,
                 };
 
@@ -89,6 +89,6 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        self.ty = type_value;
+        self.typ = type_value;
     }
 }

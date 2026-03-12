@@ -1,3 +1,5 @@
+// src/checker/element.rs
+
 use crate::{
     checker::{CheckError, Checkable, Checker, ErrorKind, Type, TypeKind},
     data::{Scale, Str, Structure},
@@ -11,7 +13,7 @@ impl<'element> Checkable<'element> for Element<'element> {
     fn check(&mut self, checker: &mut Checker<'_, 'element>) {
         let span = self.span;
 
-        let type_value = match &mut self.kind {
+        let typ = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
                 TokenKind::Integer(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
                 TokenKind::Float(_)   => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
@@ -40,12 +42,12 @@ impl<'element> Checkable<'element> for Element<'element> {
                 ) => {
                     if delimited.separator.is_none() && delimited.members.len() == 1 {
                         delimited.members[0].check(checker);
-                        delimited.members[0].ty.clone()
+                        delimited.members[0].typ.clone()
                     } else {
                         let mut members = Vec::with_capacity(delimited.members.len());
                         for member in &mut delimited.members {
                             member.check(checker);
-                            members.push(member.ty.clone());
+                            members.push(member.typ.clone());
                         }
                         Type { kind: TypeKind::Tuple { members }, span: Span::void() }
                     }
@@ -62,7 +64,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     for (index, member) in delimited.members.iter_mut().enumerate() {
                         member.check(checker);
                         if index == last {
-                            block_type = member.ty.clone();
+                            block_type = member.typ.clone();
                         }
                     }
                     block_type
@@ -76,7 +78,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     let mut inner = checker.fresh(span);
                     for member in &mut delimited.members {
                         member.check(checker);
-                        inner = checker.unify(member.span, &inner, &member.ty);
+                        inner = checker.unify(member.span, &inner, &member.typ);
                     }
                     Type {
                         kind: TypeKind::Array {
@@ -99,8 +101,8 @@ impl<'element> Checkable<'element> for Element<'element> {
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Exclamation] => checker.unify(span, &unary.operand.ty, &Type { kind: TypeKind::Boolean, span }),
-                    [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.ty.clone(),
+                    [OperatorKind::Exclamation] => checker.unify(span, &unary.operand.typ, &Type { kind: TypeKind::Boolean, span }),
+                    [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typ.clone(),
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
                             ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) | ElementKind::Index(_) => {
@@ -116,7 +118,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         };
 
                         if addressable {
-                            Type { kind: TypeKind::Pointer { target: Box::new(unary.operand.ty.clone()) }, span }
+                            Type { kind: TypeKind::Pointer { target: Box::new(unary.operand.typ.clone()) }, span }
                         } else {
                             checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                             checker.fresh(span)
@@ -125,7 +127,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     [OperatorKind::Star] => {
                         let target = checker.fresh(span);
                         let pointer = Type::new(TypeKind::Pointer { target: Box::new(target.clone()) }, span);
-                        checker.unify(span, &unary.operand.ty, &pointer);
+                        checker.unify(span, &unary.operand.typ, &pointer);
                         target
                     }
                     _ => {
@@ -145,10 +147,10 @@ impl<'element> Checkable<'element> for Element<'element> {
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Equal] => checker.unify(span, &binary.left.ty, &binary.right.ty),
+                    [OperatorKind::Equal] => checker.unify(span, &binary.left.typ, &binary.right.typ),
                     [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                        let left = checker.concretize(&binary.left.ty);
-                        let right = checker.concretize(&binary.right.ty);
+                        let left = checker.concretize(&binary.left.typ);
+                        let right = checker.concretize(&binary.right.typ);
 
                         if matches!(left.kind, TypeKind::Pointer { .. }) {
                             left
@@ -159,18 +161,18 @@ impl<'element> Checkable<'element> for Element<'element> {
                         }
                     }
                     [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                        checker.unify(span, &binary.left.ty, &binary.right.ty)
+                        checker.unify(span, &binary.left.typ, &binary.right.typ)
                     }
                     [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                        checker.unify(span, &binary.left.ty, &Type { kind: TypeKind::Boolean, span });
-                        checker.unify(span, &binary.right.ty, &Type { kind: TypeKind::Boolean, span });
+                        checker.unify(span, &binary.left.typ, &Type { kind: TypeKind::Boolean, span });
+                        checker.unify(span, &binary.right.typ, &Type { kind: TypeKind::Boolean, span });
                         Type { kind: TypeKind::Boolean, span }
                     }
                     [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        checker.unify(span, &binary.left.ty, &binary.right.ty);
+                        checker.unify(span, &binary.left.typ, &binary.right.typ);
                         Type { kind: TypeKind::Boolean, span }
                     }
-                    [OperatorKind::Dot] => binary.right.ty.clone(),
+                    [OperatorKind::Dot] => binary.right.typ.clone(),
                     _ => {
                         checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
                         checker.fresh(span)
@@ -180,7 +182,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Index(index_element) => {
                 if index_element.members.is_empty() {
-                    self.ty = checker.fresh(span);
+                    self.typ = checker.fresh(span);
                     return;
                 }
 
@@ -188,9 +190,9 @@ impl<'element> Checkable<'element> for Element<'element> {
                 index_element.members[0].check(checker);
 
                 let index_type = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
-                checker.unify(span, &index_element.members[0].ty, &index_type);
+                checker.unify(span, &index_element.members[0].typ, &index_type);
 
-                let target = checker.concretize(&index_element.target.ty);
+                let target = checker.concretize(&index_element.target.typ);
 
                 match target.kind {
                     TypeKind::Pointer { target } => *target,
@@ -234,22 +236,22 @@ impl<'element> Checkable<'element> for Element<'element> {
                 match primitive {
                     Some("if") => {
                         let boolean_type = Type::new(TypeKind::Boolean, span);
-                        checker.unify(invoke.members[0].span, &invoke.members[0].ty, &boolean_type);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean_type);
 
-                        checker.unify(span, &invoke.members[1].ty, &invoke.members[2].ty)
+                        checker.unify(span, &invoke.members[1].typ, &invoke.members[2].typ)
                     }
                     Some("while") => {
                         let boolean_type = Type::new(TypeKind::Boolean, span);
-                        checker.unify(invoke.members[0].span, &invoke.members[0].ty, &boolean_type);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean_type);
                         Type::unit(span)
                     }
                     _ => {
                         invoke.target.check(checker);
                         let return_type = checker.fresh(span);
-                        let arguments = invoke.members.iter().map(|member| member.ty.clone()).collect();
+                        let arguments = invoke.members.iter().map(|member| member.typ.clone()).collect();
                         let function_type = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(return_type.clone()))), span);
 
-                        let unified = checker.unify(span, &invoke.target.ty, &function_type);
+                        let unified = checker.unify(span, &invoke.target.typ, &function_type);
 
                         match unified.kind {
                             TypeKind::Function(_, _, Some(output)) => *output,
@@ -267,7 +269,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     field.check(checker);
                 }
 
-                let members = construct.members.iter().map(|field| field.ty.clone()).collect();
+                let members = construct.members.iter().map(|field| field.typ.clone()).collect();
                 let structure = Structure::new(Str::from(construct.target.brand().unwrap().format(0)), members);
 
                 Type { kind: TypeKind::Structure(structure), span }
@@ -276,15 +278,19 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Symbolize(symbol) => {
                 symbol.check(checker);
 
-                if let Some(existing) = checker.environment.get(&symbol.identity).cloned() {
-                    checker.unify(span, &existing, &symbol.ty);
-                }
+                let final_type = if let Some(existing) = checker.environment.get(&symbol.identity).cloned() {
+                    checker.unify(span, &existing, &symbol.typ)
+                } else {
+                    symbol.typ.clone()
+                };
 
-                checker.environment.insert(symbol.identity, symbol.ty.clone());
-                symbol.ty.clone()
+                // Update the symbol in the AST, the environment, and the element's type
+                symbol.typ = final_type.clone();
+                checker.environment.insert(symbol.identity, final_type.clone());
+                final_type
             }
         };
 
-        self.ty = type_value;
+        self.typ = typ;
     }
 }

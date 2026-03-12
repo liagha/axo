@@ -66,7 +66,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let analyzed = Binding::new(
                     Str::from(head.format(0)),
                     value.map(Box::new),
-                    self.ty.clone(),
+                    self.typ.clone(),
                     binding.kind,
                 );
 
@@ -150,6 +150,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        Ok(Analysis::new(kind, self.span, self.ty.clone()))
+        Ok(Analysis::new(kind, self.span, self.typ.clone()))
     }
 }

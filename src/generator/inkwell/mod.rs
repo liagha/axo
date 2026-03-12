@@ -31,7 +31,7 @@ use crate::tracker::Span;
 pub enum Entity<'backend> {
     Variable {
         pointer: PointerValue<'backend>,
-        ty: Type<'backend>,
+        typ: Type<'backend>,
     },
     Struct {
         structure: StructType<'backend>,
@@ -144,8 +144,8 @@ impl<'backend> Inkwell<'backend> {
         self.modules.contains_key(name)
     }
 
-    pub fn to_basic_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
-        let ty = match &ty.kind {
+    pub fn to_basic_type(&self, typ: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+        let typ = match &typ.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
                     8 => self.context.i8_type().into(),
@@ -175,12 +175,12 @@ impl<'backend> Inkwell<'backend> {
                     .into()
             },
             TypeKind::Array { member, size } => {
-                let ty = self.to_basic_type(member, span.clone())?;
+                let typ = self.to_basic_type(member, span.clone())?;
 
-                ty.array_type(*size as u32).into()
+                typ.array_type(*size as u32).into()
             }
             TypeKind::Structure(structure) => {
-                if let Some(ty) = self
+                if let Some(typ) = self
                     .get_entity(&structure.target)
                     .and_then(
                         |entity| {
@@ -191,11 +191,11 @@ impl<'backend> Inkwell<'backend> {
                             }
                         }
                     ) {
-                    ty
+                    typ
                 } else {
                     return Err(
                         GenerateError::new(
-                            ErrorKind::InvalidType(ty.clone()),
+                            ErrorKind::InvalidType(typ.clone()),
                             span
                         )
                     )
@@ -209,22 +209,22 @@ impl<'backend> Inkwell<'backend> {
             _ => {
                 return Err(
                     GenerateError::new(
-                        ErrorKind::InvalidType(ty.clone()),
+                        ErrorKind::InvalidType(typ.clone()),
                         span
                     )
                 );
             },
         };
 
-        Ok(ty)
+        Ok(typ)
     }
 
     pub fn from_basic_type(
         &self,
-        ty: BasicTypeEnum<'backend>,
+        typ: BasicTypeEnum<'backend>,
         span: Span<'backend>,
     ) -> Type<'backend> {
-        let kind = match ty {
+        let kind = match typ {
             BasicTypeEnum::IntType(integer) => {
                 let bits = integer.get_bit_width();
 
@@ -243,9 +243,9 @@ impl<'backend> Inkwell<'backend> {
                 }
             }
 
-            BasicTypeEnum::PointerType(ty) => {
+            BasicTypeEnum::PointerType(typ) => {
                 TypeKind::Pointer {
-                    target: Box::new(self.from_basic_type(ty.as_basic_type_enum(), span))
+                    target: Box::new(self.from_basic_type(typ.as_basic_type_enum(), span))
                 }
             }
 
@@ -305,8 +305,8 @@ impl<'backend> Inkwell<'backend> {
         match &analysis.kind {
             AnalysisKind::Integer { signed, .. } => Some(*signed),
             AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
-                Some(Entity::Variable { ty, .. }) => {
-                    if let TypeKind::Integer { signed, .. } = &ty.kind {
+                Some(Entity::Variable { typ, .. }) => {
+                    if let TypeKind::Integer { signed, .. } = &typ.kind {
                         Some(*signed)
                     } else {
                         None
@@ -434,9 +434,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::String { value } => self.string(value, instruction.span),
             AnalysisKind::Array(values) => self.array(values, instruction.span),
             AnalysisKind::Tuple(values) => self.tuple(values, instruction.span),
-            AnalysisKind::Cast(value, ty) => self.explicit_cast(value, ty, instruction.span),
+            AnalysisKind::Cast(value, typ) => self.explicit_cast(value, typ, instruction.span),
             AnalysisKind::Negate(value) => self.negate(value, instruction.span),
-            AnalysisKind::SizeOf(ty) => self.size_of(ty, instruction.span),
+            AnalysisKind::SizeOf(typ) => self.size_of(typ, instruction.span),
             AnalysisKind::Add(left, right) => self.add(left, right, instruction.span),
             AnalysisKind::Subtract(left, right) => self.subtract(left, right, instruction.span),
             AnalysisKind::Multiply(left, right) => self.multiply(left, right, instruction.span),

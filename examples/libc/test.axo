@@ -1,4 +1,4 @@
-func println_i64(c, const v: Int64)
+func println_i64(C, const v: Int64)
 
 func add(const a: Integer, const b: Integer): Integer {
     a + b
