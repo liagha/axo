@@ -165,14 +165,29 @@ impl<'session> Session<'session> {
     }
 
     pub fn compile(&mut self) {
-        self.scan();
-        self.parse();
-        self.register();
-        self.resolve();
-        //self.check();
-        self.analyze();
-        self.generate();
-        self.emit();
+        'pipeline : {
+            self.scan();
+
+            self.parse();
+            if !self.errors.is_empty() { break 'pipeline; }
+
+            self.register();
+            if !self.errors.is_empty() { break 'pipeline; }
+
+            self.resolve();
+            if !self.errors.is_empty() { break 'pipeline; }
+
+            //self.check();
+            //if !self.errors.is_empty() { break 'pipeline; }
+
+            self.analyze();
+            if !self.errors.is_empty() { break 'pipeline; }
+
+            self.generate();
+            if !self.errors.is_empty() { break 'pipeline; }
+
+            self.emit();
+        }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
@@ -384,10 +399,16 @@ impl<'session> Session<'session> {
     }
     
     pub fn generate(&mut self) {
+        let target_triple = inkwell::targets::TargetMachine::get_default_triple();
+
+
         for (identity, location) in &self.inputs.clone() {
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(identity).unwrap().output.clone();
             let module = self.generator.backend.context.create_module(stem.as_str().unwrap());
+
+            module.set_triple(&target_triple);
+
             self.generator.backend.modules.insert(stem, module);
             self.generator.backend.current_module = stem.clone();
 
@@ -403,14 +424,16 @@ impl<'session> Session<'session> {
 
             self.generator.errors.extend(self.generator.backend.errors.clone());
 
-            match schema.to_path() {
+            match schema.as_path() {
                 Ok(path) => {
                     match File::create(&path) {
                         Ok(mut file) => {
                             if let Err(error) = file.write_all(self.generator.backend.current_module().print_to_string().to_string().as_bytes()) {
                                 self.errors.push(
                                     CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
-                                )
+                                );
+
+                                return;
                             }
 
                             self.outputs.insert(*identity, schema);

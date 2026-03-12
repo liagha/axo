@@ -105,40 +105,6 @@ struct Point {
     const y: Integer,
 }
 
-func main(): Integer {
-    var i = 0
-
-    while(
-        i < 10,
-        {
-            println_i64(i)
-
-            print_str("Fac: ")
-            println_i64(factorial(i))
-
-            i = i + 1
-        }
-    )
-
-    const point = Point { x = 3, y = 5 }
-
-    println_str("Old:")
-    println_i64(point.x)
-
-    point.x = 6
-
-    println_str("New:")
-
-    println_i64(point.x)
-
-    test_logic(2)
-
-    test_array()
-
-    test_user_input()
-
-    return(EXIT_SUCCESS)
-}
 
 func test_logic(const x: Integer): Integer {
     if (x > 5, {

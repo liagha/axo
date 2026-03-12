@@ -22,6 +22,26 @@ pub enum Location<'location> {
 }
 
 impl<'location> Location<'location> {
+    pub fn as_path(&self) -> Result<PathBuf, TrackError<'location>> {
+        match self {
+            Location::Entry(path) => {
+                let path = PathBuf::from(path);
+
+                Ok(path.clone())
+            }
+            _ => {
+                let kind = ErrorKind::NotAnEntry(*self);
+
+                Err(
+                    TrackError::new(
+                        kind,
+                        Span::void(),
+                    )
+                )
+            }
+        }
+    }
+
     pub fn to_path(&self) -> Result<PathBuf, TrackError<'location>> {
         match self {
             Location::Entry(path) => {

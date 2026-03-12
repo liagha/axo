@@ -313,7 +313,7 @@ impl<'backend> super::Inkwell<'backend> {
             let linkage = if method.entry {
                 Some(inkwell::module::Linkage::External)
             } else {
-                Some(inkwell::module::Linkage::Internal)
+                Some(inkwell::module::Linkage::External)
             };
 
             let callable = self.current_module().add_function(identifier, signature, linkage);
@@ -532,7 +532,20 @@ impl<'backend> super::Inkwell<'backend> {
 
         let entity = self.get_entity(&invoke.target).and_then(|item| {
             if let Entity::Function(callable) = item {
-                Some(*callable)
+                let current_module = self.current_module();
+                let identifier = invoke.target.as_str().unwrap_or("");
+
+                if let Some(existing_func) = current_module.get_function(identifier) {
+                    Some(existing_func)
+                } else {
+                    let fn_type = callable.get_type();
+                    let external_func = current_module.add_function(
+                        identifier,
+                        fn_type,
+                        Some(inkwell::module::Linkage::External),
+                    );
+                    Some(external_func)
+                }
             } else {
                 None
             }
