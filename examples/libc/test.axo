@@ -1,11 +1,34 @@
-func println_i64(C, const v: Int64)
+func main(): Integer {
+    var i = 0
 
-func add(const a: Integer, const b: Integer): Integer {
-    a + b
-}
+    while(
+        i < 10,
+        {
+            libc.println_i64(i)
 
-func main() {
-    var number = add(2, 3)
+            libc.print_str("Fac: ")
+            libc.println_i64(libc.factorial(i))
 
-    println_i64(number)
+            i = i + 1
+        }
+    )
+
+    const point = Point { x = 3, y = 5 }
+
+    libc.println_str("Old:")
+    libc.println_i64(point.x)
+
+    point.x = 6
+
+    libc.println_str("New:")
+
+    libc.println_i64(point.x)
+
+    libc.test_logic(2)
+
+    libc.test_array()
+
+    libc.test_user_input()
+
+    return(libc.EXIT_SUCCESS)
 }

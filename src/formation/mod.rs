@@ -8,7 +8,7 @@ pub mod helper {
     use {
         super::{classifier::Classifier, order::Order},
         crate::{
-            data::thread::{Arc, Mutex},
+            data::sync::{Arc, Mutex},
             internal::hash::Hash,
             tracker::Peekable,
             format::Show,

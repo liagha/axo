@@ -27,12 +27,18 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Construct(construct) => {
+                // Ensure the target is also resolved
+                construct.target.resolve(resolver);
+
                 for member in construct.members.iter_mut() {
                     member.resolve(resolver);
                 }
             }
 
             ElementKind::Invoke(invoke) => {
+                // Ensure the target is also resolved
+                invoke.target.resolve(resolver);
+
                 for member in invoke.members.iter_mut() {
                     member.resolve(resolver);
                 }

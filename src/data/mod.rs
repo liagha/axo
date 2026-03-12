@@ -75,8 +75,9 @@ pub mod slice {
     pub use core::slice::{from_raw_parts, from_ref, Iter, SliceIndex};
 }
 
-pub mod thread {
+pub mod sync {
     pub use std::sync::{Arc, Mutex};
+    pub use core::sync::atomic::{AtomicUsize, Ordering};
 }
 
 use crate::internal::operation::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};

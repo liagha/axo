@@ -8,7 +8,12 @@ use {
             InitializeError,
         },
         internal::{
-            platform::{PathBuf, File, Write},
+            platform::{
+                PathBuf, 
+                File,
+                Command,
+                Write,
+            },
             hash::{
                 Map,
             },
@@ -23,6 +28,7 @@ use {
         reporter::Reporter,
         resolver::{
             Resolver,
+            Resolvable,
             ResolveError,
         },
         analyzer::Analyzer,
@@ -99,11 +105,11 @@ impl<'session> Session<'session> {
 
         let errors =
             initializer
-            .errors
-            .iter()
-            .map(|error| {
-                CompileError::Initialize(error.clone())
-            }).collect::<Vec<_>>();
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Initialize(error.clone())
+                }).collect::<Vec<_>>();
 
         let configuration = Symbol::new(
             SymbolKind::Module(
@@ -225,7 +231,7 @@ impl<'session> Session<'session> {
                         CompileError::Scan(error.clone())
                     })
             );
-            
+
             self.scanners.insert(*identity, scanner);
         }
 
@@ -243,7 +249,7 @@ impl<'session> Session<'session> {
             let mut parser = Parser::new(*location);
 
             let tokens = self.scanners.get(identity).unwrap().output.clone();
-            
+
             parser.set_input(tokens);
             parser.parse();
 
@@ -301,21 +307,33 @@ impl<'session> Session<'session> {
 
         self.reporter.symbols(&self.resolver.scope.all());
     }
-    
+
     pub fn resolve(&mut self) {
         self.reporter.start("resolving");
 
-        for (identity, _location) in &self.inputs {
-            let elements = self.parsers.get(identity).unwrap().output.clone();
-            let module_identity = self.modules.get(identity).unwrap();
+        let identities: Vec<_> = self.inputs.keys().copied().collect();
 
-            let mut module = self.resolver.scope.get_identity(*module_identity).unwrap().clone();
+        for identity in identities {
+            let module_identity = *self.modules.get(&identity).unwrap();
+
+            let mut module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
-            self.resolver.set_input(elements);
+            // Get a mutable reference directly to the parser output!
+            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
-            self.resolver.resolve();
+            // Two-pass scoping to allow forward declaration (order independence)
+            for element in elements.iter_mut() {
+                if let ElementKind::Symbolize(symbol) = &element.kind {
+                    self.resolver.add(symbol.clone());
+                }
+            }
+
+            // Resolve each AST element directly, persisting modifications
+            for element in elements.iter_mut() {
+                element.resolve(&mut self.resolver);
+            }
 
             let mut scope = self.resolver.scope.clone();
 
@@ -324,12 +342,12 @@ impl<'session> Session<'session> {
 
             self.resolver.exit();
 
-            let old_module = self.resolver.scope.get_identity(*module_identity).unwrap().clone();
+            let old_module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
             self.resolver.scope.replace(&old_module, module);
         }
 
         self.errors.extend(
-                self.resolver
+            self.resolver
                 .errors
                 .iter()
                 .map(|error| {
@@ -368,10 +386,10 @@ impl<'session> Session<'session> {
 
         self.reporter.finish("checking", duration);
     }
-    
+
     pub fn analyze(&mut self) {
         let identities: Vec<_> = self.inputs.keys().copied().collect();
-        
+
         for identity in identities {
             self.reporter.start("analyzing");
 
@@ -397,7 +415,7 @@ impl<'session> Session<'session> {
             self.reporter.finish("analyzing", duration);
         }
     }
-    
+
     pub fn generate(&mut self) {
         let target_triple = inkwell::targets::TargetMachine::get_default_triple();
 
@@ -476,7 +494,7 @@ impl<'session> Session<'session> {
         for (identity, location) in &self.outputs.clone() {
             let object = Self::object(*location, None);
 
-            let mut command = std::process::Command::new("clang");
+            let mut command = Command::new("clang");
             command
                 .arg("-c")
                 .arg(location.to_string())
@@ -492,7 +510,7 @@ impl<'session> Session<'session> {
             }
         }
 
-        let mut link = std::process::Command::new("clang");
+        let mut link = Command::new("clang");
 
         for object in objects.values() {
             link.arg(object.to_string());
@@ -510,7 +528,7 @@ impl<'session> Session<'session> {
             panic!("linking failed");
         }
 
-        std::process::Command::new(executable.to_string()).status().expect("failed to execute");
+        Command::new(executable.to_string()).status().expect("failed to execute");
     }
 
     fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
@@ -519,7 +537,7 @@ impl<'session> Session<'session> {
         } else {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
-            
+
             parent.join(location.stem().unwrap()).with_extension("ll")
         };
 

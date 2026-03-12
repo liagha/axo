@@ -383,7 +383,7 @@ impl<'parser> Parser<'parser> {
                                                      kind: TokenKind::Identifier(identifier),
                                                      ..
                                                  }) => {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                match identifier.as_str().unwrap() {
                                     "public" => visibility = Visibility::Public,
                                     "private" => visibility = Visibility::Private,
                                     "C" => interface = Interface::C,
@@ -472,7 +472,7 @@ impl<'parser> Parser<'parser> {
                                                      kind: TokenKind::Identifier(identifier),
                                                      ..
                                                  }) => {
-                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                match identifier.as_str().unwrap() {
                                     "public" => visibility = Visibility::Public,
                                     "private" => visibility = Visibility::Private,
                                     "C" => interface = Interface::C,

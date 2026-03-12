@@ -8,12 +8,19 @@ mod symbol;
 mod traits;
 mod primitives;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 pub use resolver::*;
 
 pub(super) use {error::*, hint::*};
-use crate::data::Identity;
-use crate::reporter::{Error, Hint};
+
+use {
+    crate::{
+        data::{
+            Identity,
+            sync::{AtomicUsize, Ordering},
+        },
+        reporter::{Error, Hint},
+    }
+};
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 

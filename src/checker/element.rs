@@ -1,5 +1,3 @@
-// src/checker/element.rs
-
 use crate::{
     checker::{CheckError, Checkable, Checker, ErrorKind, Type, TypeKind},
     data::{Scale, Str, Structure},
@@ -16,9 +14,9 @@ impl<'element> Checkable<'element> for Element<'element> {
         let typ = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
                 TokenKind::Integer(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
-                TokenKind::Float(_)   => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
+                TokenKind::Float(_) => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
                 TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
-                TokenKind::String(_)  => Type { kind: TypeKind::String, span: literal.span },
+                TokenKind::String(_) => Type { kind: TypeKind::String, span: literal.span },
                 TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
                 TokenKind::Identifier(_) => {
                     if let Some(identity) = self.reference {
@@ -58,16 +56,19 @@ impl<'element> Checkable<'element> for Element<'element> {
                     None | Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                     TokenKind::Punctuation(PunctuationKind::RightBrace),
                 ) => {
-                    let mut block_type = Type::new(TypeKind::Void, Span::void());
+                    let scope = checker.environment.clone();
+                    let mut block = Type::new(TypeKind::Void, Span::void());
                     let last = delimited.members.len().saturating_sub(1);
 
                     for (index, member) in delimited.members.iter_mut().enumerate() {
                         member.check(checker);
                         if index == last {
-                            block_type = member.typ.clone();
+                            block = member.typ.clone();
                         }
                     }
-                    block_type
+
+                    checker.environment = scope;
+                    block
                 }
 
                 (
@@ -105,15 +106,9 @@ impl<'element> Checkable<'element> for Element<'element> {
                     [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typ.clone(),
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
-                            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) | ElementKind::Index(_) => {
-                                true
-                            }
-                            ElementKind::Binary(binary) => {
-                                matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot))
-                            }
-                            ElementKind::Unary(inner) => {
-                                matches!(inner.operator.kind, TokenKind::Operator(OperatorKind::Star))
-                            }
+                            ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) | ElementKind::Index(_) => true,
+                            ElementKind::Binary(binary) => matches!(binary.operator.kind, TokenKind::Operator(OperatorKind::Dot)),
+                            ElementKind::Unary(inner) => matches!(inner.operator.kind, TokenKind::Operator(OperatorKind::Star)),
                             _ => false,
                         };
 
@@ -164,9 +159,10 @@ impl<'element> Checkable<'element> for Element<'element> {
                         checker.unify(span, &binary.left.typ, &binary.right.typ)
                     }
                     [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                        checker.unify(span, &binary.left.typ, &Type { kind: TypeKind::Boolean, span });
-                        checker.unify(span, &binary.right.typ, &Type { kind: TypeKind::Boolean, span });
-                        Type { kind: TypeKind::Boolean, span }
+                        let boolean = Type { kind: TypeKind::Boolean, span };
+                        checker.unify(span, &binary.left.typ, &boolean);
+                        checker.unify(span, &binary.right.typ, &boolean);
+                        boolean
                     }
                     [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
                         checker.unify(span, &binary.left.typ, &binary.right.typ);
@@ -180,27 +176,27 @@ impl<'element> Checkable<'element> for Element<'element> {
                 }
             }
 
-            ElementKind::Index(index_element) => {
-                if index_element.members.is_empty() {
+            ElementKind::Index(index) => {
+                if index.members.is_empty() {
                     self.typ = checker.fresh(span);
                     return;
                 }
 
-                index_element.target.check(checker);
-                index_element.members[0].check(checker);
+                index.target.check(checker);
+                index.members[0].check(checker);
 
-                let index_type = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
-                checker.unify(span, &index_element.members[0].typ, &index_type);
+                let expected = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
+                checker.unify(span, &index.members[0].typ, &expected);
 
-                let target = checker.concretize(&index_element.target.typ);
+                let target = checker.concretize(&index.target.typ);
 
                 match target.kind {
                     TypeKind::Pointer { target } => *target,
                     TypeKind::Array { member, .. } => *member,
                     TypeKind::Tuple { members } => {
-                        if let ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) = index_element.members[0].kind {
-                            if let Some(index) = usize::try_from(value).ok().filter(|&i| i < members.len()) {
-                                members[index].clone()
+                        if let ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) = index.members[0].kind {
+                            if let Some(position) = usize::try_from(value).ok().filter(|&position| position < members.len()) {
+                                members[position].clone()
                             } else {
                                 checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
                                 checker.fresh(span)
@@ -235,30 +231,28 @@ impl<'element> Checkable<'element> for Element<'element> {
 
                 match primitive {
                     Some("if") => {
-                        let boolean_type = Type::new(TypeKind::Boolean, span);
-                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean_type);
-
+                        let boolean = Type::new(TypeKind::Boolean, span);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean);
                         checker.unify(span, &invoke.members[1].typ, &invoke.members[2].typ)
                     }
                     Some("while") => {
-                        let boolean_type = Type::new(TypeKind::Boolean, span);
-                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean_type);
+                        let boolean = Type::new(TypeKind::Boolean, span);
+                        checker.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean);
                         Type::unit(span)
                     }
                     _ => {
                         invoke.target.check(checker);
-                        let return_type = checker.fresh(span);
-                        let arguments = invoke.members.iter().map(|member| member.typ.clone()).collect();
-                        let function_type = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(return_type.clone()))), span);
 
-                        let unified = checker.unify(span, &invoke.target.typ, &function_type);
+                        let output = checker.fresh(span);
+                        let arguments = invoke.members.iter().map(|member| member.typ.clone()).collect();
+                        let function = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(output.clone()))), span);
+
+                        let unified = checker.unify(span, &invoke.target.typ, &function);
 
                         match unified.kind {
-                            TypeKind::Function(_, _, Some(output)) => *output,
+                            TypeKind::Function(_, _, Some(kind)) => *kind,
                             TypeKind::Function(_, _, None) => Type::new(TypeKind::Void, span),
-                            _ => {
-                                return_type
-                            }
+                            _ => output,
                         }
                     }
                 }
@@ -278,16 +272,15 @@ impl<'element> Checkable<'element> for Element<'element> {
             ElementKind::Symbolize(symbol) => {
                 symbol.check(checker);
 
-                let final_type = if let Some(existing) = checker.environment.get(&symbol.identity).cloned() {
+                let unified = if let Some(existing) = checker.environment.get(&symbol.identity).cloned() {
                     checker.unify(span, &existing, &symbol.typ)
                 } else {
                     symbol.typ.clone()
                 };
 
-                // Update the symbol in the AST, the environment, and the element's type
-                symbol.typ = final_type.clone();
-                checker.environment.insert(symbol.identity, final_type.clone());
-                final_type
+                symbol.typ = unified.clone();
+                checker.environment.insert(symbol.identity, unified.clone());
+                unified
             }
         };
 

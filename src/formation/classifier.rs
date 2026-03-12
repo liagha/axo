@@ -8,7 +8,7 @@ use {
     crate::{
         data::{
             memory::{take},
-            thread::{Arc, Mutex},
+            sync::{Arc, Mutex},
             Boolean, Offset, Scale,
         },
         tracker::{Location, Position},

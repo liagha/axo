@@ -233,12 +233,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 let mut errors = Vec::new();
 
                 if invoke.members.len() > function.members.len() {
-                    // BUG FIX: Ensure floating point division to prevent int division from truncating to 0
                     let diff = (invoke.members.len() - function.members.len()) as f64;
-                    score += 1.0 - (diff / invoke.members.len() as f64);
+                    // Fix mathematical scale to remain within maximum 1.0 boundary
+                    score += self.binding * (1.0 - (diff / invoke.members.len() as f64));
 
                     for member in invoke.members[function.members.len()..].iter() {
-                        // BUG FIX: Prevent unwrapping `None` by matching `Some`
                         if let (Some(target_brand), Some(member_brand)) = (invoke.target.brand(), member.brand()) {
                             errors.push(
                                 ResolveError::new(
@@ -252,12 +251,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         }
                     }
                 } else if invoke.members.len() < function.members.len() {
-                    // BUG FIX: Ensure floating point division to prevent int division from truncating to 0
                     let diff = (function.members.len() - invoke.members.len()) as f64;
-                    score += 1.0 - (diff / function.members.len() as f64);
+                    // Fix mathematical scale to remain within maximum 1.0 boundary
+                    score += self.binding * (1.0 - (diff / function.members.len() as f64));
 
                     for member in function.members[invoke.members.len()..].iter() {
-                        // BUG FIX: Prevent unwrapping `None` by matching `Some`
                         if let (Some(target_brand), Some(member_brand)) = (function.target.brand(), member.brand()) {
                             errors.push(
                                 ResolveError::new(
@@ -271,11 +269,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         }
                     }
                 } else {
-                    score += 1.0;
+                    score += self.binding;
                 }
 
                 return Assessment {
-                    resemblance: Resemblance::Partial(score),
+                    resemblance: Resemblance::from(score),
                     errors,
                 }
             }
@@ -283,7 +281,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
             (ElementKind::Construct(construct), SymbolKind::Structure(structure)) => {
                 score += self.shaping;
 
-                // BUG FIX: Do not unwrap fields in struct construction. Map filter them gracefully.
                 let candidates = structure
                     .members
                     .iter()

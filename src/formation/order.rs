@@ -5,7 +5,7 @@ use {
         former::Former,
         helper::{Emitter, Formable, Inspector, Performer, Transformer},
     },
-    crate::data::thread::Arc,
+    crate::data::sync::Arc,
 };
 
 pub trait Order<

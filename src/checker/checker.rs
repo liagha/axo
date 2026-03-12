@@ -1,17 +1,22 @@
 use crate::{
-    checker::{CheckError, Type, TypeKind},
-    data::{Identity, Structure},
+    checker::{Type, TypeKind, ErrorKind, CheckError},
+    data::{
+        Identity,
+        Structure,
+        memory::take,
+    },
+    internal::{
+        hash::Map,
+    },
     parser::{Element, ElementKind, Symbol, SymbolKind},
     resolver::Resolver,
     tracker::Span,
 };
-use std::collections::HashMap;
-use crate::checker::ErrorKind;
 
 pub struct Checker<'check, 'source> {
     pub input: &'check mut Vec<Element<'source>>,
     pub resolver: &'check Resolver<'source>,
-    pub environment: HashMap<Identity, Type<'source>>,
+    pub environment: Map<Identity, Type<'source>>,
     pub errors: Vec<CheckError<'source>>,
     pub variables: Vec<Option<Type<'source>>>,
 }
@@ -25,14 +30,14 @@ impl<'check, 'source> Checker<'check, 'source> {
         Self {
             input,
             resolver,
-            environment: HashMap::new(),
+            environment: Map::new(),
             errors: Vec::new(),
             variables: Vec::new(),
         }
     }
 
     pub fn check(&mut self) {
-        let mut elements = std::mem::take(self.input);
+        let mut elements = take(self.input);
 
         for element in &mut elements {
             element.check(self);
@@ -42,14 +47,14 @@ impl<'check, 'source> Checker<'check, 'source> {
             self.concretize_element(element);
         }
 
-        let environment = std::mem::take(&mut self.environment);
-        let mut concretized_environment = HashMap::with_capacity(environment.len());
+        let environment = take(&mut self.environment);
+        let mut resolved = Map::with_capacity(environment.len());
 
-        for (identity, type_value) in environment {
-            concretized_environment.insert(identity, self.concretize(&type_value));
+        for (identity, typ) in environment {
+            resolved.insert(identity, self.concretize(&typ));
         }
 
-        self.environment = concretized_environment;
+        self.environment = resolved;
         *self.input = elements;
     }
 
@@ -115,7 +120,7 @@ impl<'check, 'source> Checker<'check, 'source> {
                     self.concretize_element(body);
                 }
             }
-            _ => {}
+            SymbolKind::Module(_) => {}
         }
     }
 
@@ -130,7 +135,9 @@ impl<'check, 'source> Checker<'check, 'source> {
             let variable = self.fresh(span);
             self.environment.insert(identity, variable.clone());
 
+            let scope = self.environment.clone();
             cloned.check(self);
+            self.environment = scope;
 
             let unified = self.unify(span, &variable, &cloned.typ);
             self.environment.insert(identity, unified.clone());
@@ -147,57 +154,53 @@ impl<'check, 'source> Checker<'check, 'source> {
         Type::new(TypeKind::Variable(identity), span)
     }
 
-    pub fn concretize(&mut self, type_value: &Type<'source>) -> Type<'source> {
-        match &type_value.kind {
+    pub fn concretize(&mut self, typ: &Type<'source>) -> Type<'source> {
+        match &typ.kind {
             TypeKind::Variable(identity) => {
                 if let Some(resolved) = self.variables[*identity].clone() {
                     let deep = self.concretize(&resolved);
                     self.variables[*identity] = Some(deep.clone());
                     deep
                 } else {
-                    type_value.clone()
+                    typ.clone()
                 }
             }
             TypeKind::Pointer { target } => {
-                Type::new(TypeKind::Pointer { target: Box::new(self.concretize(target)) }, type_value.span)
+                Type::new(TypeKind::Pointer { target: Box::new(self.concretize(target)) }, typ.span)
             }
             TypeKind::Array { member, size } => {
-                Type::new(TypeKind::Array { member: Box::new(self.concretize(member)), size: *size }, type_value.span)
+                Type::new(TypeKind::Array { member: Box::new(self.concretize(member)), size: *size }, typ.span)
             }
             TypeKind::Tuple { members } => {
-                Type::new(TypeKind::Tuple { members: members.iter().map(|member| self.concretize(member)).collect() }, type_value.span)
+                let items = members.iter().map(|item| self.concretize(item)).collect();
+                Type::new(TypeKind::Tuple { members: items }, typ.span)
             }
             TypeKind::Function(name, parameters, output) => {
-                Type::new(
-                    TypeKind::Function(
-                        name.clone(),
-                        parameters.iter().map(|parameter| self.concretize(parameter)).collect(),
-                        output.as_ref().map(|output_type| Box::new(self.concretize(output_type))),
-                    ),
-                    type_value.span,
-                )
+                let arguments = parameters.iter().map(|parameter| self.concretize(parameter)).collect();
+                let returnable = output.as_ref().map(|kind| Box::new(self.concretize(kind)));
+                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typ.span)
             }
             TypeKind::Structure(structure) => {
                 let members = structure.members.iter().map(|member| self.concretize(member)).collect();
-                Type::new(TypeKind::Structure(Structure::new(structure.target.clone(), members)), type_value.span)
+                Type::new(TypeKind::Structure(Structure::new(structure.target.clone(), members)), typ.span)
             }
             TypeKind::Union(structure) => {
                 let members = structure.members.iter().map(|member| self.concretize(member)).collect();
-                Type::new(TypeKind::Union(Structure::new(structure.target.clone(), members)), type_value.span)
+                Type::new(TypeKind::Union(Structure::new(structure.target.clone(), members)), typ.span)
             }
             TypeKind::Constructor(structure) => {
                 let members = structure.members.iter().map(|member| self.concretize(member)).collect();
-                Type::new(TypeKind::Constructor(Structure::new(structure.target.clone(), members)), type_value.span)
+                Type::new(TypeKind::Constructor(Structure::new(structure.target.clone(), members)), typ.span)
             }
-            _ => type_value.clone(),
+            _ => typ.clone(),
         }
     }
 
-    fn occurs(&mut self, identity: Identity, type_value: &Type<'source>) -> bool {
-        let concretized = self.concretize(type_value);
+    fn occurs(&mut self, identity: Identity, typ: &Type<'source>) -> bool {
+        let concretized = self.concretize(typ);
 
         match concretized.kind {
-            TypeKind::Variable(variable_identity) => identity == variable_identity,
+            TypeKind::Variable(variable) => identity == variable,
             TypeKind::Pointer { ref target } => self.occurs(identity, target),
             TypeKind::Array { ref member, .. } => self.occurs(identity, member),
             TypeKind::Tuple { ref members } => members.iter().any(|member| self.occurs(identity, member)),
@@ -205,8 +208,8 @@ impl<'check, 'source> Checker<'check, 'source> {
                 if parameters.iter().any(|parameter| self.occurs(identity, parameter)) {
                     return true;
                 }
-                if let Some(output_type) = output {
-                    return self.occurs(identity, output_type);
+                if let Some(kind) = output {
+                    return self.occurs(identity, kind);
                 }
                 false
             }
@@ -233,7 +236,6 @@ impl<'check, 'source> Checker<'check, 'source> {
                 }
 
                 self.variables[identity] = Some(right.clone());
-
                 right
             }
             (_, TypeKind::Variable(identity)) => {
@@ -241,55 +243,54 @@ impl<'check, 'source> Checker<'check, 'source> {
                     self.errors.push(CheckError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                     return left;
                 }
+
                 self.variables[identity] = Some(left.clone());
                 left
             }
-            (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
-                let unified_target = self.unify(span, &left_target, &right_target);
-                Type::new(TypeKind::Pointer { target: Box::new(unified_target) }, left.span)
+            (TypeKind::Pointer { target: source }, TypeKind::Pointer { target: destination }) => {
+                let unified = self.unify(span, &source, &destination);
+                Type::new(TypeKind::Pointer { target: Box::new(unified) }, left.span)
             }
-            (TypeKind::Array { member: left_member, size: left_size }, TypeKind::Array { member: right_member, size: right_size }) if left_size == right_size => {
-                let unified_member = self.unify(span, &left_member, &right_member);
-                Type::new(TypeKind::Array { member: Box::new(unified_member), size: left_size }, left.span)
+            (TypeKind::Array { member: source, size: capacity }, TypeKind::Array { member: destination, size: limit }) if capacity == limit => {
+                let unified = self.unify(span, &source, &destination);
+                Type::new(TypeKind::Array { member: Box::new(unified), size: capacity }, left.span)
             }
-            (TypeKind::Tuple { members: left_members }, TypeKind::Tuple { members: right_members }) if left_members.len() == right_members.len() => {
-                let mut unified_members = Vec::with_capacity(left_members.len());
-                for (left_member, right_member) in left_members.iter().zip(right_members.iter()) {
-                    unified_members.push(self.unify(span, left_member, right_member));
+            (TypeKind::Tuple { members: source }, TypeKind::Tuple { members: destination }) if source.len() == destination.len() => {
+                let mut unified = Vec::with_capacity(source.len());
+                for (source_item, destination_item) in source.iter().zip(destination.iter()) {
+                    unified.push(self.unify(span, source_item, destination_item));
                 }
-                Type::new(TypeKind::Tuple { members: unified_members }, left.span)
+                Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
-            (TypeKind::Integer { size: left_size, signed: left_signed }, TypeKind::Integer { size: right_size, signed: right_signed }) => {
-                Type::new(TypeKind::Integer { size: left_size.max(right_size), signed: left_signed || right_signed }, left.span)
+            (TypeKind::Integer { size: source, signed: source_signed }, TypeKind::Integer { size: destination, signed: destination_signed }) => {
+                Type::new(TypeKind::Integer { size: source.max(destination), signed: source_signed || destination_signed }, left.span)
             }
-            (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) => {
-                Type::new(TypeKind::Float { size: left_size.max(right_size) }, left.span)
+            (TypeKind::Float { size: source }, TypeKind::Float { size: destination }) => {
+                Type::new(TypeKind::Float { size: source.max(destination) }, left.span)
             }
-            (TypeKind::Function(name, left_parameters, left_output), TypeKind::Function(_, right_parameters, right_output)) if left_parameters.len() == right_parameters.len() => {
-                let mut unified_parameters = Vec::with_capacity(left_parameters.len());
+            (TypeKind::Function(name, source, source_output), TypeKind::Function(_, destination, destination_output)) if source.len() == destination.len() => {
+                let mut unified = Vec::with_capacity(source.len());
 
-                for (left_parameter, right_parameter) in left_parameters.iter().zip(right_parameters.iter()) {
-                    unified_parameters.push(self.unify(span, left_parameter, right_parameter));
+                for (source_item, destination_item) in source.iter().zip(destination.iter()) {
+                    unified.push(self.unify(span, source_item, destination_item));
                 }
 
-                let unified_output = match (left_output, right_output) {
-                    (Some(left_out), Some(right_out)) => {
-                        Some(Box::new(self.unify(span, &left_out, &right_out)))
+                let output = match (source_output, destination_output) {
+                    (Some(source_kind), Some(destination_kind)) => {
+                        Some(Box::new(self.unify(span, &source_kind, &destination_kind)))
                     }
-                    (Some(left_out), None) => {
-                        let void_type = Type::new(TypeKind::Void, span);
-
-                        Some(Box::new(self.unify(span, &left_out, &void_type)))
+                    (Some(source_kind), None) => {
+                        let void = Type::new(TypeKind::Void, span);
+                        Some(Box::new(self.unify(span, &source_kind, &void)))
                     }
-                    (None, Some(right_out)) => {
-                        let void_type = Type::new(TypeKind::Void, span);
-
-                        Some(Box::new(self.unify(span, &void_type, &right_out)))
+                    (None, Some(destination_kind)) => {
+                        let void = Type::new(TypeKind::Void, span);
+                        Some(Box::new(self.unify(span, &void, &destination_kind)))
                     }
                     (None, None) => None,
                 };
 
-                Type::new(TypeKind::Function(name, unified_parameters, unified_output), left.span)
+                Type::new(TypeKind::Function(name, unified, output), left.span)
             }
             _ => {
                 self.errors.push(CheckError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));

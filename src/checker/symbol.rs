@@ -7,7 +7,7 @@ use crate::{
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self, checker: &mut Checker<'_, 'symbol>) {
-        let type_value = match &mut self.kind {
+        let typ = match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 let declared = binding.annotation.as_ref().map(|annotation| {
                     Type::annotation(annotation).unwrap_or_else(|error| {
@@ -18,14 +18,13 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let inferred = binding.value.as_mut().map(|value| {
                     value.check(checker);
-
                     value.typ.clone()
                 });
 
                 match (declared, inferred) {
-                    (Some(declared_type), Some(inferred_type)) => checker.unify(self.span, &declared_type, &inferred_type),
-                    (Some(declared_type), None) => declared_type,
-                    (None, Some(inferred_type)) => inferred_type,
+                    (Some(source), Some(destination)) => checker.unify(self.span, &source, &destination),
+                    (Some(source), None) => source,
+                    (None, Some(destination)) => destination,
                     (None, None) => checker.fresh(self.span),
                 }
             }
@@ -54,6 +53,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Function(function) => {
                 let head = function.target.brand().unwrap().format(0);
+                let scope = checker.environment.clone();
 
                 let members: Vec<_> = function.members.iter_mut().map(|member| {
                     member.check(checker);
@@ -75,13 +75,15 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     }
                 }
 
-                let inferred_output = match (&output, &function.body) {
-                    (Some(output), _) => Some(Box::new(checker.concretize(output))),
+                checker.environment = scope;
+
+                let inferred = match (&output, &function.body) {
+                    (Some(expected), _) => Some(Box::new(checker.concretize(expected))),
                     (None, Some(body)) => Some(Box::new(checker.concretize(&body.typ))),
                     (None, None) => None,
                 };
 
-                Type::new(TypeKind::Function(head.into(), members, inferred_output), self.span)
+                Type::new(TypeKind::Function(head.into(), members, inferred), self.span)
             }
 
             SymbolKind::Module(_) => {
@@ -89,6 +91,6 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        self.typ = type_value;
+        self.typ = typ;
     }
 }
