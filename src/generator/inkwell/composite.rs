@@ -19,39 +19,23 @@ use crate::generator::BuilderError;
 
 impl<'backend> Inkwell<'backend> {
     fn fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<Str<'backend>>> {
-        for scope in self.entities.iter().rev() {
-            for entity in scope.values() {
-                if let Entity::Struct {
-                    structure,
-                    fields,
-                } = entity
-                {
-                    if structure.as_basic_type_enum() == target {
-                        return Some(fields.clone());
-                    }
-                }
-            }
+        if let Some(Entity::Struct { fields, .. }) = self.find_entity(|entity| {
+            matches!(entity, Entity::Struct { structure, .. } if structure.as_basic_type_enum() == target)
+        }) {
+            Some(fields.clone())
+        } else {
+            None
         }
-
-        None
     }
 
     fn union_fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<(Str<'backend>, BasicTypeEnum<'backend>)>> {
-        for scope in self.entities.iter().rev() {
-            for entity in scope.values() {
-                if let Entity::Union {
-                    structure,
-                    fields,
-                } = entity
-                {
-                    if structure.as_basic_type_enum() == target {
-                        return Some(fields.clone());
-                    }
-                }
-            }
+        if let Some(Entity::Union { fields, .. }) = self.find_entity(|entity| {
+            matches!(entity, Entity::Union { structure, .. } if structure.as_basic_type_enum() == target)
+        }) {
+            Some(fields.clone())
+        } else {
+            None
         }
-
-        None
     }
 
     fn size(&self, ty: BasicTypeEnum<'backend>) -> u64 {
@@ -195,6 +179,7 @@ impl<'backend> Inkwell<'backend> {
 
         shape.set_body(&types, false);
 
+        // USE HELPER: Already abstract
         self.insert_entity(
             identifier,
             Entity::Struct {
@@ -250,6 +235,7 @@ impl<'backend> Inkwell<'backend> {
             shape.set_body(&[], false);
         }
 
+        // USE HELPER: Already abstract
         self.insert_entity(
             identifier,
             Entity::Union {
@@ -269,6 +255,7 @@ impl<'backend> Inkwell<'backend> {
         let identifier = structure.target.clone();
         let name_str = identifier.as_str().unwrap_or("").to_string();
 
+        // USE HELPER: Already abstract
         let entity = self.get_entity(&identifier).cloned();
 
         match entity {
@@ -415,7 +402,8 @@ impl<'backend> Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            if self.modules.contains_key(identifier) {
+            // USE HELPER: Abstracting modules map
+            if self.has_module(identifier) {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
@@ -438,6 +426,7 @@ impl<'backend> Inkwell<'backend> {
         };
 
         if let AnalysisKind::Usage(identifier) = &target.kind {
+            // USE HELPER: Already abstract
             if let Some(Entity::Variable { pointer, kind, .. }) = self.get_entity(identifier) {
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
@@ -594,6 +583,7 @@ impl<'backend> Inkwell<'backend> {
         let offset = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
+            // USE HELPER: Already abstract
             if let Some(Entity::Variable { kind, pointer, .. }) = self.get_entity(&identifier) {
                 if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {

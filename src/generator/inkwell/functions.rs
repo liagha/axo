@@ -3,7 +3,6 @@ use {
         data::*,
         analyzer::{Analysis, AnalysisKind},
         checker::{Type, TypeKind},
-        internal::hash::Map,
         generator::{Backend, ErrorKind, GenerateError, inkwell::Entity},
         tracker::Span,
         generator::{
@@ -51,7 +50,6 @@ impl<'backend> super::Inkwell<'backend> {
                     self.builder.build_int_truncate(integer, target.into_int_type(), "trunc")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-
                 } else {
                     self.builder.build_int_s_extend(integer, target.into_int_type(), "sext")
                         .map(Into::into)
@@ -320,7 +318,8 @@ impl<'backend> super::Inkwell<'backend> {
 
             self.insert_entity(method.target.clone(), Entity::Function(callable));
 
-            self.entities.push(Map::default());
+            // USE HELPER: Pushing a new block scope
+            self.enter_scope();
 
             let entry = self.context.append_basic_block(callable, "entry");
             self.builder.position_at_end(entry);
@@ -352,9 +351,8 @@ impl<'backend> super::Inkwell<'backend> {
                 }
             }
 
-            self.loop_headers.clear();
-            self.loop_exits.clear();
-            self.loop_results.clear();
+            // USE HELPER: Clean any lingering loop states
+            self.clear_loops();
 
             let result = self.analysis(*method.body.clone())?;
 
@@ -369,7 +367,8 @@ impl<'backend> super::Inkwell<'backend> {
                 }
             }
 
-            self.entities.pop();
+            // USE HELPER: Popping out of the block scope
+            self.exit_scope();
         }
 
         Ok(self.context.i64_type().const_zero().into())
@@ -497,15 +496,13 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(core);
 
-        self.loop_headers.push(heading);
-        self.loop_exits.push(end);
-        self.loop_results.push(Some(result_alloc));
+        // USE HELPER: Abstracting loop push logic
+        self.enter_loop(heading, end, Some(result_alloc));
 
         self.analysis(*body)?;
 
-        self.loop_results.pop();
-        self.loop_exits.pop();
-        self.loop_headers.pop();
+        // USE HELPER: Abstracting loop pop logic
+        self.exit_loop();
 
         if !self.terminated() {
             self.builder
@@ -673,8 +670,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(Some(alloc)) = self.loop_results.last() {
-                self.builder.build_store(*alloc, evaluated)
+            // USE HELPER: Abstracting result resolution
+            if let Some(alloc) = self.current_loop_result() {
+                self.builder.build_store(alloc, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -683,7 +681,8 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        if let Some(exit) = self.loop_exits.last().copied() {
+        // USE HELPER: Access loop exit
+        if let Some(exit) = self.current_loop_exit() {
             self.builder.build_unconditional_branch(exit)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
@@ -703,8 +702,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(Some(alloc)) = self.loop_results.last() {
-                self.builder.build_store(*alloc, evaluated)
+            // USE HELPER: Abstracting result resolution
+            if let Some(alloc) = self.current_loop_result() {
+                self.builder.build_store(alloc, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -713,7 +713,8 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        if let Some(header) = self.loop_headers.last().copied() {
+        // USE HELPER: Access loop header
+        if let Some(header) = self.current_loop_header() {
             self.builder.build_unconditional_branch(header)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {

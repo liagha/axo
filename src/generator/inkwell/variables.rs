@@ -2,11 +2,11 @@ use inkwell::types::BasicType;
 use {
     super::{Backend, Entity},
     crate::{
-        data::*,
         analyzer::{Analysis, AnalysisKind},
         checker::{Type, TypeKind},
-        generator::inkwell::error::VariableError,
+        data::*,
         data::Str,
+        generator::inkwell::error::VariableError,
         generator::{ErrorKind, GenerateError},
         tracker::Span,
     },
@@ -84,20 +84,12 @@ impl<'backend> super::Inkwell<'backend> {
                     if base_kind.is_struct_type() {
                         let shape = base_kind.into_struct_type();
 
-                        let mut found = None;
-                        for scope in self.entities.iter().rev() {
-                            for entity in scope.values() {
-                                if let Entity::Struct { structure: defined, fields } = entity {
-                                    if defined.as_basic_type_enum() == shape.as_basic_type_enum() {
-                                        found = Some(fields.clone());
-                                        break;
-                                    }
-                                }
-                            }
-                            if found.is_some() { break; }
-                        }
+                        // USE HELPER: Abstracting scope traversal
+                        let found = self.find_entity(|entity| {
+                            matches!(entity, Entity::Struct { structure: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
+                        });
 
-                        if let Some(fields) = found {
+                        if let Some(Entity::Struct { fields, .. }) = found {
                             if let Some(index) = fields.iter().position(|item| item == &field_name) {
                                 let slot = self.builder.build_struct_gep(
                                     shape,
@@ -224,34 +216,35 @@ impl<'backend> super::Inkwell<'backend> {
             };
         }
 
-        if let Some(module) = self.modules.get(&self.current_module) {
-            if let Some(global) = module.get_global(&identifier) {
-                let basic_type: BasicTypeEnum = match global.get_value_type() {
-                    inkwell::types::AnyTypeEnum::ArrayType(_) | inkwell::types::AnyTypeEnum::StructType(_) => {
-                        return Ok(BasicValueEnum::from(global.as_pointer_value()));
-                    }
-                    inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
-                    inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
-                    inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
-                    inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
-                    _ => {
-                        return Err(GenerateError::new(
-                            ErrorKind::Variable(VariableError::NotAValue {
-                                name: identifier.to_string(),
-                            }),
-                            span,
-                        ));
-                    }
-                };
+        // USE HELPER: Eliminating direct modules map access
+        let module = self.current_module();
 
-                return self.builder
-                    .build_load(basic_type, global.as_pointer_value(), &identifier)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
-            }
+        if let Some(global) = module.get_global(&identifier) {
+            let basic_type: BasicTypeEnum = match global.get_value_type() {
+                inkwell::types::AnyTypeEnum::ArrayType(_) | inkwell::types::AnyTypeEnum::StructType(_) => {
+                    return Ok(BasicValueEnum::from(global.as_pointer_value()));
+                }
+                inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
+                inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
+                inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
+                inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
+                _ => {
+                    return Err(GenerateError::new(
+                        ErrorKind::Variable(VariableError::NotAValue {
+                            name: identifier.to_string(),
+                        }),
+                        span,
+                    ));
+                }
+            };
 
-            if let Some(function) = module.get_function(&identifier) {
-                return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
-            }
+            return self.builder
+                .build_load(basic_type, global.as_pointer_value(), &identifier)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
+        }
+
+        if let Some(function) = module.get_function(&identifier) {
+            return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
         }
 
         Err(GenerateError::new(
@@ -281,24 +274,16 @@ impl<'backend> super::Inkwell<'backend> {
             self.builder.build_store(slot, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let mut updated = false;
-            for scope in self.entities.iter_mut().rev() {
-                if scope.contains_key(&target) {
-                    scope.insert(
-                        target.clone(),
-                        Entity::Variable {
-                            pointer: slot,
-                            kind: result.get_type(),
-                            pointee,
-                            signed,
-                        },
-                    );
-                    updated = true;
-                    break;
-                }
-            }
-            if !updated {
-                self.insert_entity(target.clone(), Entity::Variable { pointer: slot, kind: result.get_type(), pointee, signed });
+            let new_entity = Entity::Variable {
+                pointer: slot,
+                kind: result.get_type(),
+                pointee,
+                signed,
+            };
+
+            // USE HELPER: Abstracting mutable scope traversal
+            if !self.update_entity(&target, new_entity.clone()) {
+                self.insert_entity(target.clone(), new_entity);
             }
         } else {
             return Err(GenerateError::new(
@@ -345,7 +330,10 @@ impl<'backend> super::Inkwell<'backend> {
         let dummy_func = if is_global_scope {
             let void_type = self.context.void_type();
             let fn_type = void_type.fn_type(&[], false);
-            let func = self.modules.get(&self.current_module).unwrap().add_function("__init_temp", fn_type, None);
+
+            // USE HELPER: Eliminating direct modules map access
+            let func = self.current_module().add_function("__init_temp", fn_type, None);
+
             let block = self.context.append_basic_block(func, "entry");
             self.builder.position_at_end(block);
             Some(func)
@@ -411,7 +399,8 @@ impl<'backend> super::Inkwell<'backend> {
 
             pointer
         } else {
-            let module = self.modules.get(&self.current_module).unwrap();
+            // USE HELPER: Eliminating direct modules map access
+            let module = self.current_module();
             let global = module.add_global(declared_kind, None, &binding.target);
 
             global.set_initializer(&casted);
@@ -420,6 +409,7 @@ impl<'backend> super::Inkwell<'backend> {
             global.as_pointer_value()
         };
 
+        // USE HELPER: Already abstract
         self.insert_entity(
             binding.target.clone(),
             Entity::Variable { pointer, kind: declared_kind, pointee, signed },

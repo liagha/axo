@@ -73,6 +73,76 @@ impl<'backend> Inkwell<'backend> {
             scope.insert(name, entity);
         }
     }
+    pub fn enter_scope(&mut self) {
+        self.entities.push(Map::default());
+    }
+
+    pub fn exit_scope(&mut self) {
+        self.entities.pop();
+    }
+
+    pub fn clear_loops(&mut self) {
+        self.loop_headers.clear();
+        self.loop_exits.clear();
+        self.loop_results.clear();
+    }
+
+    pub fn enter_loop(
+        &mut self,
+        header: BasicBlock<'backend>,
+        exit: BasicBlock<'backend>,
+        result: Option<PointerValue<'backend>>,
+    ) {
+        self.loop_headers.push(header);
+        self.loop_exits.push(exit);
+        self.loop_results.push(result);
+    }
+
+    pub fn exit_loop(&mut self) {
+        self.loop_results.pop();
+        self.loop_exits.pop();
+        self.loop_headers.pop();
+    }
+
+    pub fn current_loop_header(&self) -> Option<BasicBlock<'backend>> {
+        self.loop_headers.last().copied()
+    }
+
+    pub fn current_loop_exit(&self) -> Option<BasicBlock<'backend>> {
+        self.loop_exits.last().copied()
+    }
+
+    pub fn current_loop_result(&self) -> Option<PointerValue<'backend>> {
+        self.loop_results.last().copied().flatten()
+    }
+
+    pub fn update_entity(&mut self, name: &Str<'backend>, new_entity: Entity<'backend>) -> bool {
+        for scope in self.entities.iter_mut().rev() {
+            if scope.contains_key(name) {
+                scope.insert(name.clone(), new_entity);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn find_entity<F>(&self, mut predicate: F) -> Option<&Entity<'backend>>
+    where
+        F: FnMut(&Entity<'backend>) -> bool,
+    {
+        for scope in self.entities.iter().rev() {
+            for entity in scope.values() {
+                if predicate(entity) {
+                    return Some(entity);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn has_module(&self, name: &Str<'backend>) -> bool {
+        self.modules.contains_key(name)
+    }
 
     pub fn to_basic_type(&self, ty: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let ty = match &ty.kind {
