@@ -177,7 +177,7 @@ impl<'session> Session<'session> {
             if !self.errors.is_empty() { break 'pipeline; }
 
             self.check();
-            //if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() { break 'pipeline; }
 
             self.analyze();
             if !self.errors.is_empty() { break 'pipeline; }

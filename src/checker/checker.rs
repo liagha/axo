@@ -278,14 +278,17 @@ impl<'check, 'source> Checker<'check, 'source> {
                     }
                     (Some(left_out), None) => {
                         let void_type = Type::new(TypeKind::Void, span);
+
                         Some(Box::new(self.unify(span, &left_out, &void_type)))
                     }
                     (None, Some(right_out)) => {
                         let void_type = Type::new(TypeKind::Void, span);
+
                         Some(Box::new(self.unify(span, &void_type, &right_out)))
                     }
                     (None, None) => None,
                 };
+
                 Type::new(TypeKind::Function(name, unified_parameters, unified_output), left.span)
             }
             _ => {

@@ -214,7 +214,6 @@ impl<'backend> Inkwell<'backend> {
             shape.set_body(&[], false);
         }
 
-        // USE HELPER: Already abstract
         self.insert_entity(
             identifier,
             Entity::Union {
@@ -234,7 +233,6 @@ impl<'backend> Inkwell<'backend> {
         let identifier = structure.target.clone();
         let name_str = identifier.as_str().unwrap_or("").to_string();
 
-        // USE HELPER: Already abstract
         let entity = self.get_entity(&identifier).cloned();
 
         match entity {
@@ -381,7 +379,6 @@ impl<'backend> Inkwell<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            // USE HELPER: Abstracting modules map
             if self.has_module(identifier) {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
@@ -405,7 +402,6 @@ impl<'backend> Inkwell<'backend> {
         };
 
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            // USE HELPER: Already abstract
             if let Some(Entity::Variable { pointer, ty }) = self.get_entity(identifier) {
                 let kind = self.to_basic_type(ty, span)?;
 

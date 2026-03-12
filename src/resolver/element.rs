@@ -14,23 +14,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
         resolver: &mut Resolver<'element>,
     ) {
         match &mut self.kind {
-            ElementKind::Literal(
-                Token {
-                    kind: TokenKind::Identifier(_),
-                    ..
-                })
-            => {
-                match resolver.scope.lookup(&self) {
-                    Ok(symbol) => {
-                        self.reference = Some(symbol.identity);
-                    }
-
-                    Err(errors) => {
-                        resolver.errors.extend(errors);
-                    }
-                }
-            }
-
             ElementKind::Literal(_) => {}
 
             ElementKind::Delimited(delimited) => {
@@ -47,33 +30,13 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 for member in construct.members.iter_mut() {
                     member.resolve(resolver);
                 }
-
-                match resolver.scope.lookup(&self) {
-                    Ok(symbol) => {
-                        self.reference = Some(symbol.identity);
-                    }
-
-                    Err(errors) => {
-                        resolver.errors.extend(errors);
-                    }
-                }
             }
 
             ElementKind::Invoke(invoke) => {
                 for member in invoke.members.iter_mut() {
                     member.resolve(resolver);
                 }
-
-                match resolver.scope.lookup(&self) {
-                    Ok(symbol) => {
-                        self.reference = Some(symbol.identity);
-                    }
-
-                    Err(errors) => {
-                        resolver.errors.extend(errors);
-                    }
-                }
-            },
+            }
 
             ElementKind::Index(index) => {
                 index.target.resolve(resolver);
@@ -103,17 +66,53 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         binary.right.resolve(resolver);
                     }
                 }
-            },
+            }
 
             ElementKind::Unary(unary) => {
                 unary.operand.resolve(resolver);
-            },
+            }
 
             ElementKind::Symbolize(symbol) => {
                 self.reference = Some(symbol.identity);
 
                 symbol.resolve(resolver);
-            },
+            }
+        }
+
+        let mut resolved_identity = None;
+
+        match &self.kind {
+            ElementKind::Literal(Token {
+                                     kind: TokenKind::Identifier(_),
+                                     ..
+                                 })
+            | ElementKind::Construct(_)
+            | ElementKind::Invoke(_) => {
+                match resolver.scope.lookup(self) {
+                    Ok(symbol) => {
+                        resolved_identity = Some(symbol.identity);
+                    }
+
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if let Some(identity) = resolved_identity {
+            self.reference = Some(identity);
+
+            match &mut self.kind {
+                ElementKind::Construct(construct) => {
+                    construct.target.reference = Some(identity);
+                }
+                ElementKind::Invoke(invoke) => {
+                    invoke.target.reference = Some(identity);
+                }
+                _ => {}
+            }
         }
     }
 }

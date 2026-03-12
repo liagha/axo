@@ -1,3 +1,11 @@
+func println_i64(c, const v: Int64)
+
+func add(const a: Integer, const b: Integer): Integer {
+    a + b
+}
+
 func main() {
-    libc.test_logic(11)
+    var number = add(2, 3)
+
+    println_i64(number)
 }

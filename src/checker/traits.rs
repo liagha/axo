@@ -70,7 +70,9 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Function(_, _, _) => {
                         "Function".to_string()
                     }
-                    TypeKind::Variable(_) => "Variable".to_string(),
+                    TypeKind::Variable(variable) => {
+                        format!("Variable({})", variable)
+                    },
                     TypeKind::Unknown => "Unknown".to_string(),
                 }
             }

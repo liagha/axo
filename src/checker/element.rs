@@ -249,14 +249,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                         let arguments = invoke.members.iter().map(|member| member.ty.clone()).collect();
                         let function_type = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(return_type.clone()))), span);
 
-                        println!("--- {:?}", invoke.target.ty);
-
                         let unified = checker.unify(span, &invoke.target.ty, &function_type);
 
                         match unified.kind {
                             TypeKind::Function(_, _, Some(output)) => *output,
                             TypeKind::Function(_, _, None) => Type::new(TypeKind::Void, span),
-                            _ => return_type,
+                            _ => {
+                                return_type
+                            }
                         }
                     }
                 }
