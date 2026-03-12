@@ -13,6 +13,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         &mut self,
         resolver: &mut Resolver<'symbol>,
     ) {
+        // Register the symbol initially so it is accessible recursively if needed
         resolver.add(self.clone());
 
         match &mut self.kind {
@@ -32,6 +33,11 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.resolve(resolver);
                 }
 
+                // Capture the populated scope before exiting
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
+
                 resolver.exit();
             }
             SymbolKind::Union(union) => {
@@ -40,6 +46,11 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 for member in union.members.iter_mut() {
                     member.resolve(resolver);
                 }
+
+                // Capture the populated scope before exiting
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
 
                 resolver.exit();
             }
@@ -58,9 +69,18 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     body.resolve(resolver);
                 }
 
+                // Capture the populated scope before exiting
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
+
                 resolver.exit();
             }
             SymbolKind::Module(_) => {}
         }
+
+        // Re-add the finalized symbol to the resolver so that outer scopes
+        // receive the version with the fully populated `self.scope`.
+        resolver.add(self.clone());
     }
 }

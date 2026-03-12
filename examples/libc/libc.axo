@@ -167,8 +167,9 @@ func test_user_input() {
 
         // 4. Free the allocated memory back to the OS
         munmap(buffer, 256)
-
     }, {
         println_str("Failed to allocate memory for input buffer.")
+
+        0
     })
 }

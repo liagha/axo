@@ -48,11 +48,11 @@ impl<'typ> Show<'typ> for TypeKind<'typ> {
                     TypeKind::Character => {
                         "Character".to_string()
                     }
-                    TypeKind::Pointer { .. } => {
-                        "Pointer".to_string()
+                    TypeKind::Pointer { target } => {
+                        format!("Pointer({})", target.format(verbosity))
                     }
-                    TypeKind::Array { .. } => {
-                        "Array".to_string()
+                    TypeKind::Array { member, size } => {
+                        format!("Array[{}; {}]", member.format(verbosity), size)
                     }
                     TypeKind::Tuple { members } => {
                         format!("Tuple({})", members.format(verbosity))
@@ -67,8 +67,8 @@ impl<'typ> Show<'typ> for TypeKind<'typ> {
                     TypeKind::Union(_) => {
                         "Union".to_string()
                     }
-                    TypeKind::Function(_, _, _) => {
-                        "Function".to_string()
+                    TypeKind::Function(name, members, output) => {
+                        format!("Function({})[{}]:{}", name.format(verbosity), members.format(verbosity), output.format(verbosity))
                     }
                     TypeKind::Variable(variable) => {
                         format!("Variable({})", variable)

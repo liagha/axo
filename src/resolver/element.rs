@@ -3,7 +3,7 @@ use {
         Resolvable, Resolver,
     },
     crate::{
-        parser::{Element, ElementKind},
+        parser::{Element, ElementKind, SymbolKind},
         scanner::{OperatorKind, Token, TokenKind},
     },
 };
@@ -29,16 +29,51 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
+                let mut entered = false;
+
+                if let Some(reference) = construct.target.reference {
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                        if matches!(symbol.kind, SymbolKind::Structure(_) | SymbolKind::Union(_)) {
+                            let mut scope = symbol.scope.clone();
+                            scope.parent = Some(Box::new(resolver.scope.clone()));
+                            resolver.enter_scope(scope);
+                            entered = true;
+                        }
+                    }
+                }
+
                 for member in construct.members.iter_mut() {
                     member.resolve(resolver);
+                }
+
+                if entered {
+                    resolver.exit();
                 }
             }
 
             ElementKind::Invoke(invoke) => {
                 invoke.target.resolve(resolver);
 
+                let mut entered = false;
+
+                // Temporarily inject the function's scope to resolve named arguments.
+                if let Some(reference) = invoke.target.reference {
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                        if matches!(symbol.kind, SymbolKind::Function(_)) {
+                            let mut scope = symbol.scope.clone();
+                            scope.parent = Some(Box::new(resolver.scope.clone()));
+                            resolver.enter_scope(scope);
+                            entered = true;
+                        }
+                    }
+                }
+
                 for member in invoke.members.iter_mut() {
                     member.resolve(resolver);
+                }
+
+                if entered {
+                    resolver.exit();
                 }
             }
 
@@ -53,17 +88,28 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 match binary.operator.kind {
                     TokenKind::Operator(OperatorKind::Dot) => {
+                        let mut is_namespace = false;
+
                         if let Some(reference) = binary.left.reference {
                             if let Some(symbol) = resolver.scope.get_identity(reference) {
-                                resolver.enter_scope(symbol.scope.clone());
+                                match &symbol.kind {
+                                    SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_) => {
+                                        is_namespace = true;
 
-                                binary.right.resolve(resolver);
+                                        resolver.enter_scope(symbol.scope.clone());
 
-                                resolver.exit();
+                                        binary.right.resolve(resolver);
+
+                                        resolver.exit();
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
 
-                        self.reference = binary.right.reference;
+                        if is_namespace {
+                            self.reference = binary.right.reference;
+                        }
                     }
 
                     _ => {

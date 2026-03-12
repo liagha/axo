@@ -50,12 +50,12 @@ use {
 
 use {
     crate::{
+        analyzer::AnalyzeError,
+        checker::{CheckError, Checker},
         generator::{Generator, GenerateError, Backend, Inkwell},
         tracker::Peekable,
     }
 };
-use crate::analyzer::AnalyzeError;
-use crate::checker::{CheckError, Checker};
 
 pub enum CompileError<'error> {
     Initialize(InitializeError<'error>),
