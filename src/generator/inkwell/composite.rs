@@ -383,6 +383,7 @@ impl<'backend> Inkwell<'backend> {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
+                    AnalysisKind::Constructor(constructor) => self.constructor(constructor.clone(), span),
                     _ => Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess),
                         span,

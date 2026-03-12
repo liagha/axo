@@ -247,6 +247,20 @@ impl<'check, 'source> Checker<'check, 'source> {
                 self.variables[identity] = Some(left.clone());
                 left
             }
+            (TypeKind::String, TypeKind::Pointer { .. }) => right,
+            (TypeKind::Pointer { .. }, TypeKind::String) => left,
+
+            (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => right,
+            (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) => left,
+
+            (TypeKind::Array { member, .. }, TypeKind::Pointer { target }) => {
+                self.unify(span, &member, &target);
+                right
+            }
+            (TypeKind::Pointer { target }, TypeKind::Array { member, .. }) => {
+                self.unify(span, &target, &member);
+                left
+            }
             (TypeKind::Pointer { target: source }, TypeKind::Pointer { target: destination }) => {
                 let unified = self.unify(span, &source, &destination);
                 Type::new(TypeKind::Pointer { target: Box::new(unified) }, left.span)

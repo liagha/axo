@@ -30,5 +30,5 @@ func main(): Integer {
 
     libc.test_user_input()
 
-    return(libc.EXIT_SUCCESS)
+    return(0)
 }
