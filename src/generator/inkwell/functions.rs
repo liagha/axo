@@ -334,18 +334,11 @@ impl<'backend> super::Inkwell<'backend> {
                     self.builder.build_store(allocate, parameter)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                    let signed = if parameter.get_type().is_int_type() {
-                        Some(true)
-                    } else {
-                        None
-                    };
                     self.insert_entity(
                         bind.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
-                            kind: parameter.get_type(),
-                            pointee: None,
-                            signed,
+                            ty: self.from_basic_type(parameter.get_type(), member.span),
                         },
                     );
                 }

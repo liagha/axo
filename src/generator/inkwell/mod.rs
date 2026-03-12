@@ -8,6 +8,7 @@ mod primitives;
 mod variables;
 pub mod error;
 
+use inkwell::types::BasicType;
 use crate::analyzer::{Analysis, AnalysisKind};
 use crate::checker::{Type, TypeKind};
 use {
@@ -22,6 +23,7 @@ use {
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
+use crate::data::{Scale, Structure};
 use crate::generator::ErrorKind;
 use crate::tracker::Span;
 
@@ -29,9 +31,7 @@ use crate::tracker::Span;
 pub enum Entity<'backend> {
     Variable {
         pointer: PointerValue<'backend>,
-        kind: BasicTypeEnum<'backend>,
-        pointee: Option<BasicTypeEnum<'backend>>,
-        signed: Option<bool>,
+        ty: Type<'backend>,
     },
     Struct {
         structure: StructType<'backend>,
@@ -214,6 +214,70 @@ impl<'backend> Inkwell<'backend> {
         Ok(ty)
     }
 
+    pub fn from_basic_type(
+        &self,
+        ty: BasicTypeEnum<'backend>,
+        span: Span<'backend>,
+    ) -> Type<'backend> {
+        let kind = match ty {
+            BasicTypeEnum::IntType(integer) => {
+                let bits = integer.get_bit_width();
+
+                match bits {
+                    1 => TypeKind::Boolean,
+                    8 | 16 | 32 | 64 => TypeKind::Integer { size: bits as usize, signed: true },
+                    _ => TypeKind::Integer { size: bits as usize, signed: true },
+                }
+            }
+
+            BasicTypeEnum::FloatType(float) => {
+                let bits = float.get_bit_width();
+
+                TypeKind::Float {
+                    size: bits as usize,
+                }
+            }
+
+            BasicTypeEnum::PointerType(ty) => {
+                TypeKind::Pointer {
+                    target: Box::new(self.from_basic_type(ty.as_basic_type_enum(), span))
+                }
+            }
+
+            BasicTypeEnum::StructType(structure) => {
+                let name = Str::from(structure.clone().get_name().clone().unwrap().to_str().unwrap().to_string());
+                let fields = structure.clone().get_field_types().iter().map(|basic| self.from_basic_type(*basic, span)).collect();
+
+                TypeKind::Structure(
+                    Structure::new(
+                        name,
+                        fields,
+                    )
+                )
+            }
+
+            BasicTypeEnum::ArrayType(array) => {
+                let member = self.from_basic_type(array.get_element_type(), span).into();
+
+
+                TypeKind::Array {
+                    member,
+                    size: array.len() as Scale
+                }
+            }
+
+            BasicTypeEnum::VectorType(_) => {
+                unimplemented!()
+            }
+
+            BasicTypeEnum::ScalableVectorType(_) => {
+                unimplemented!()
+            }
+        };
+
+        Type::new(kind, span)
+    }
+
     pub fn new(context: ContextRef<'backend>) -> Self {
         let builder = context.create_builder();
 
@@ -232,11 +296,67 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
+    /// Safely attempts to infer the AST type of an unannotated analysis node.
+    pub fn infer_type(&self, analysis: &Analysis<'backend>) -> Option<Type<'backend>> {
+        match &analysis.kind {
+            AnalysisKind::Integer { size, signed, .. } => Some(Type {
+                kind: TypeKind::Integer { size: *size, signed: *signed },
+                span: analysis.span
+            }),
+            AnalysisKind::Float { size, .. } => Some(Type {
+                kind: TypeKind::Float { size: *size },
+                span: analysis.span
+            }),
+            AnalysisKind::Boolean { .. } => Some(Type {
+                kind: TypeKind::Boolean,
+                span: analysis.span
+            }),
+            AnalysisKind::String { .. } => Some(Type {
+                kind: TypeKind::String,
+                span: analysis.span
+            }),
+            AnalysisKind::Character { .. } => Some(Type {
+                kind: TypeKind::Character,
+                span: analysis.span
+            }),
+            AnalysisKind::Usage(name) => {
+                if let Some(Entity::Variable { ty, .. }) = self.get_entity(name) {
+                    Some(ty.clone())
+                } else {
+                    None
+                }
+            },
+            AnalysisKind::Dereference(operand) => {
+                self.infer_type(operand).and_then(|ty| {
+                    if let TypeKind::Pointer { target } = ty.kind {
+                        Some(*target)
+                    } else {
+                        None
+                    }
+                })
+            },
+            AnalysisKind::AddressOf(operand) => {
+                self.infer_type(operand).map(|ty| Type {
+                    kind: TypeKind::Pointer { target: Box::new(ty) },
+                    span: analysis.span,
+                })
+            },
+            AnalysisKind::Cast(_, ty) => Some(ty.clone()),
+            _ => None,
+        }
+    }
+
     pub fn infer_signedness(&self, analysis: &Analysis<'backend>) -> Option<bool> {
         match &analysis.kind {
             AnalysisKind::Integer { signed, .. } => Some(*signed),
             AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
-                Some(Entity::Variable { signed, .. }) => *signed,
+                Some(Entity::Variable { ty, .. }) => {
+                    if let TypeKind::Integer { signed, .. } = &ty.kind {
+                        Some(*signed)
+                    } else {
+                        None
+                    }
+                },
                 _ => None,
             },
             AnalysisKind::Assign(_, value) => self.infer_signedness(value),

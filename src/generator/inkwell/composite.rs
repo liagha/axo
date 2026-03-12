@@ -427,11 +427,13 @@ impl<'backend> Inkwell<'backend> {
 
         if let AnalysisKind::Usage(identifier) = &target.kind {
             // USE HELPER: Already abstract
-            if let Some(Entity::Variable { pointer, kind, .. }) = self.get_entity(identifier) {
+            if let Some(Entity::Variable { pointer, ty }) = self.get_entity(identifier) {
+                let kind = self.to_basic_type(ty, span)?;
+
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
 
-                    if let Some(fields) = self.fields(*kind) {
+                    if let Some(fields) = self.fields(kind) {
                         if let Some(index) = fields.iter().position(|item| item == &field) {
                             let slot = self
                                 .builder
@@ -447,7 +449,7 @@ impl<'backend> Inkwell<'backend> {
                                 },
                             );
                         }
-                    } else if let Some(fields) = self.union_fields(*kind) {
+                    } else if let Some(fields) = self.union_fields(kind) {
                         if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == &field) {
                             return self.builder.build_load(*field_type, *pointer, "value").map_err(
                                 |error| {
@@ -584,7 +586,9 @@ impl<'backend> Inkwell<'backend> {
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
             // USE HELPER: Already abstract
-            if let Some(Entity::Variable { kind, pointer, .. }) = self.get_entity(&identifier) {
+            if let Some(Entity::Variable { ty, pointer }) = self.get_entity(identifier) {
+                let kind = self.to_basic_type(ty, span)?;
+
                 if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {
                         let constant = integer.get_zero_extended_constant().ok_or_else(|| {

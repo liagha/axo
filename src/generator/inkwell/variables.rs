@@ -20,7 +20,13 @@ impl<'backend> super::Inkwell<'backend> {
     fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.get_entity(name) {
-                Some(Entity::Variable { pointee, .. }) if pointee.is_some() => *pointee,
+                Some(Entity::Variable { ty, .. }) => {
+                    if let TypeKind::Pointer { target } = &ty.kind {
+                        self.to_basic_type(target, analysis.span).ok()
+                    } else {
+                        None
+                    }
+                },
                 _ => None,
             },
             AnalysisKind::Dereference(operand) => {
@@ -38,8 +44,9 @@ impl<'backend> super::Inkwell<'backend> {
             AnalysisKind::Usage(name) => {
                 if let Some(entity) = self.get_entity(name) {
                     match entity {
-                        Entity::Variable { pointer, kind, .. } => {
-                            Ok(Some((*pointer, *kind)))
+                        Entity::Variable { pointer, ty } => {
+                            let kind = self.to_basic_type(ty, analysis.span)?;
+                            Ok(Some((*pointer, kind)))
                         }
                         Entity::Function(func) => {
                             let ptr = func.as_global_value().as_pointer_value();
@@ -198,12 +205,14 @@ impl<'backend> super::Inkwell<'backend> {
                 Entity::Function(function) => {
                     Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
-                Entity::Variable { pointer, kind, .. } => {
+                Entity::Variable { pointer, ty } => {
+                    let kind = self.to_basic_type(ty, span)?;
+
                     if kind.is_array_type() || kind.is_struct_type() {
                         Ok(BasicValueEnum::from(*pointer))
                     } else {
                         self.builder
-                            .build_load(*kind, *pointer, &identifier)
+                            .build_load(kind, *pointer, &identifier)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     }
                 },
@@ -261,24 +270,20 @@ impl<'backend> super::Inkwell<'backend> {
         value: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let pointee = self.pointer_pointee_type(&value);
-        let signed = self.infer_signedness(&value);
         let result = self.analysis(*value)?;
 
-        let existing_pointer = match self.get_entity(&target) {
-            Some(Entity::Variable { pointer, .. }) => Some(*pointer),
+        let existing_var = match self.get_entity(&target) {
+            Some(Entity::Variable { pointer, ty }) => Some((*pointer, ty.clone())),
             _ => None,
         };
 
-        if let Some(slot) = existing_pointer {
+        if let Some((slot, ty)) = existing_var {
             self.builder.build_store(slot, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             let new_entity = Entity::Variable {
                 pointer: slot,
-                kind: result.get_type(),
-                pointee,
-                signed,
+                ty,
             };
 
             // USE HELPER: Abstracting mutable scope traversal
@@ -302,7 +307,7 @@ impl<'backend> super::Inkwell<'backend> {
         binding: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let value = match binding.value {
+        let value_ast = match binding.value {
             Some(v) => v,
             None => {
                 return Err(GenerateError::new(
@@ -314,16 +319,9 @@ impl<'backend> super::Inkwell<'backend> {
             }
         };
 
-        let pointee = if let Some(annotation) = binding.annotation.as_ref() {
-            match &annotation.kind {
-                TypeKind::Pointer { target } => {
-                    Some(self.to_basic_type(target, span)?)
-                }
-                _ => None,
-            }
-        } else {
-            self.pointer_pointee_type(&value)
-        };
+        let declared_ty = binding.annotation.clone().unwrap_or_else(|| {
+            self.infer_type(&value_ast).unwrap_or(Type { kind: TypeKind::Unknown, span })
+        });
 
         let is_global_scope = self.builder.get_insert_block().is_none();
 
@@ -341,40 +339,36 @@ impl<'backend> super::Inkwell<'backend> {
             None
         };
 
-        let value = self.analysis(*value)?;
+        let result = self.analysis(*value_ast)?;
 
         if let Some(func) = dummy_func {
             self.builder.clear_insertion_position();
             unsafe { func.delete(); }
         }
 
-        let declared_kind = if let Some(annotation) = binding.annotation.as_ref() {
-            self.to_basic_type(annotation, span)?
-        } else {
-            value.get_type()
-        };
+        let declared_kind = self.to_basic_type(&declared_ty, span)?;
 
-        let casted = if value.get_type() == declared_kind {
-            value
-        } else if value.is_int_value() && declared_kind.is_int_type() {
+        let casted = if result.get_type() == declared_kind {
+            result
+        } else if result.is_int_value() && declared_kind.is_int_type() {
             if is_global_scope {
-                value
+                result
             } else {
                 self.builder
-                    .build_int_cast(value.into_int_value(), declared_kind.into_int_type(), "bind_cast")
+                    .build_int_cast(result.into_int_value(), declared_kind.into_int_type(), "bind_cast")
                     .ok()
                     .map(Into::into)
-                    .unwrap_or(value)
+                    .unwrap_or(result)
             }
-        } else if value.is_float_value() && declared_kind.is_float_type() {
+        } else if result.is_float_value() && declared_kind.is_float_type() {
             if is_global_scope {
-                value
+                result
             } else {
                 self.builder
-                    .build_float_cast(value.into_float_value(), declared_kind.into_float_type(), "bind_cast")
+                    .build_float_cast(result.into_float_value(), declared_kind.into_float_type(), "bind_cast")
                     .ok()
                     .map(Into::into)
-                    .unwrap_or(value)
+                    .unwrap_or(result)
             }
         } else {
             return Err(GenerateError::new(
@@ -384,11 +378,6 @@ impl<'backend> super::Inkwell<'backend> {
                 span,
             ));
         };
-
-        let signed = binding.annotation.as_ref().and_then(|annotation| match annotation.kind {
-            TypeKind::Integer { signed, .. } => Some(signed),
-            _ => None,
-        });
 
         let pointer = if !is_global_scope {
             let func = self.builder.get_insert_block().unwrap().get_parent().unwrap();
@@ -412,7 +401,7 @@ impl<'backend> super::Inkwell<'backend> {
         // USE HELPER: Already abstract
         self.insert_entity(
             binding.target.clone(),
-            Entity::Variable { pointer, kind: declared_kind, pointee, signed },
+            Entity::Variable { pointer, ty: declared_ty },
         );
 
         Ok(casted)
