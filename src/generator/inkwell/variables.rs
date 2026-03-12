@@ -91,7 +91,6 @@ impl<'backend> super::Inkwell<'backend> {
                     if base_kind.is_struct_type() {
                         let shape = base_kind.into_struct_type();
 
-                        // USE HELPER: Abstracting scope traversal
                         let found = self.find_entity(|entity| {
                             matches!(entity, Entity::Struct { structure: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
                         });
@@ -225,7 +224,6 @@ impl<'backend> super::Inkwell<'backend> {
             };
         }
 
-        // USE HELPER: Eliminating direct modules map access
         let module = self.current_module();
 
         if let Some(global) = module.get_global(&identifier) {
@@ -286,7 +284,6 @@ impl<'backend> super::Inkwell<'backend> {
                 ty,
             };
 
-            // USE HELPER: Abstracting mutable scope traversal
             if !self.update_entity(&target, new_entity.clone()) {
                 self.insert_entity(target.clone(), new_entity);
             }
@@ -307,8 +304,8 @@ impl<'backend> super::Inkwell<'backend> {
         binding: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let value_ast = match binding.value {
-            Some(v) => v,
+        let value = match binding.value {
+            Some(value) => value,
             None => {
                 return Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::BindingWithoutInitializer {
@@ -319,17 +316,13 @@ impl<'backend> super::Inkwell<'backend> {
             }
         };
 
-        let declared_ty = binding.annotation.clone().unwrap_or_else(|| {
-            self.infer_type(&value_ast).unwrap_or(Type { kind: TypeKind::Unknown, span })
-        });
-
+        let ty = binding.annotation.clone();
         let is_global_scope = self.builder.get_insert_block().is_none();
 
         let dummy_func = if is_global_scope {
             let void_type = self.context.void_type();
             let fn_type = void_type.fn_type(&[], false);
 
-            // USE HELPER: Eliminating direct modules map access
             let func = self.current_module().add_function("__init_temp", fn_type, None);
 
             let block = self.context.append_basic_block(func, "entry");
@@ -339,14 +332,14 @@ impl<'backend> super::Inkwell<'backend> {
             None
         };
 
-        let result = self.analysis(*value_ast)?;
+        let result = self.analysis(*value)?;
 
         if let Some(func) = dummy_func {
             self.builder.clear_insertion_position();
             unsafe { func.delete(); }
         }
 
-        let declared_kind = self.to_basic_type(&declared_ty, span)?;
+        let declared_kind = self.to_basic_type(&ty, span)?;
 
         let casted = if result.get_type() == declared_kind {
             result
@@ -370,6 +363,36 @@ impl<'backend> super::Inkwell<'backend> {
                     .map(Into::into)
                     .unwrap_or(result)
             }
+        } else if result.is_pointer_value() && declared_kind.is_pointer_type() {
+            if is_global_scope {
+                result
+            } else {
+                self.builder
+                    .build_pointer_cast(result.into_pointer_value(), declared_kind.into_pointer_type(), "bind_ptrcast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            }
+        } else if result.is_int_value() && declared_kind.is_pointer_type() {
+            if is_global_scope {
+                result
+            } else {
+                self.builder
+                    .build_int_to_ptr(result.into_int_value(), declared_kind.into_pointer_type(), "bind_int2ptr")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            }
+        } else if result.is_pointer_value() && declared_kind.is_int_type() {
+            if is_global_scope {
+                result
+            } else {
+                self.builder
+                    .build_ptr_to_int(result.into_pointer_value(), declared_kind.into_int_type(), "bind_ptr2int")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            }
         } else {
             return Err(GenerateError::new(
                 ErrorKind::Variable(VariableError::BindingTypeMismatch {
@@ -388,7 +411,6 @@ impl<'backend> super::Inkwell<'backend> {
 
             pointer
         } else {
-            // USE HELPER: Eliminating direct modules map access
             let module = self.current_module();
             let global = module.add_global(declared_kind, None, &binding.target);
 
@@ -398,10 +420,9 @@ impl<'backend> super::Inkwell<'backend> {
             global.as_pointer_value()
         };
 
-        // USE HELPER: Already abstract
         self.insert_entity(
             binding.target.clone(),
-            Entity::Variable { pointer, ty: declared_ty },
+            Entity::Variable { pointer, ty },
         );
 
         Ok(casted)
@@ -433,6 +454,36 @@ impl<'backend> super::Inkwell<'backend> {
                 let casted = self
                     .builder
                     .build_float_cast(result.into_float_value(), kind.into_float_type(), "store_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            } else if result.is_pointer_value() && kind.is_pointer_type() {
+                let casted = self
+                    .builder
+                    .build_pointer_cast(result.into_pointer_value(), kind.into_pointer_type(), "store_ptrcast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            } else if result.is_int_value() && kind.is_pointer_type() {
+                let casted = self
+                    .builder
+                    .build_int_to_ptr(result.into_int_value(), kind.into_pointer_type(), "store_int2ptr")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result);
+
+                self.builder.build_store(pointer, casted)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            } else if result.is_pointer_value() && kind.is_int_type() {
+                let casted = self
+                    .builder
+                    .build_ptr_to_int(result.into_pointer_value(), kind.into_int_type(), "store_ptr2int")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result);

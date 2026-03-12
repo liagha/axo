@@ -10,7 +10,7 @@ use {
 pub struct Binding<Target, Value, Type> {
     pub target: Target,
     pub value: Option<Value>,
-    pub annotation: Option<Type>,
+    pub annotation: Type,
     pub kind: BindingKind,
 }
 
@@ -56,7 +56,7 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
     pub fn new(
         target: Target,
         value: Option<Value>,
-        annotation: Option<Type>,
+        annotation: Type,
         kind: BindingKind,
     ) -> Self {
         Binding {
@@ -226,11 +226,7 @@ impl<
                 "Binding({:?} | {}{}{})",
                 self.kind,
                 self.target.format(verbosity),
-                if let Some(annotation) = &self.annotation {
-                    format!(" : {}", annotation.format(verbosity))
-                } else {
-                    "".to_string()
-                },
+                format!(" : {}", self.annotation.format(verbosity)),
                 if let Some(value) = &self.value {
                     format!(" = {}", value.format(verbosity))
                 } else {

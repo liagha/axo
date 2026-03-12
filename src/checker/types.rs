@@ -243,6 +243,7 @@ pub enum TypeKind<'ty> {
     Pointer { target: Box<Type<'ty>> },
     Array { member: Box<Type<'ty>>, size: Scale },
     Tuple { members: Vec<Type<'ty>> },
+    Void,
     Unknown,
 
     Type,

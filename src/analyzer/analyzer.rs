@@ -63,15 +63,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .brand()
                     .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
-                let annotation = binding
-                    .annotation
-                    .as_ref()
-                    .map(|annotation| Type::annotation(&*annotation).unwrap());
-
                 let analyzed = Binding::new(
                     Str::from(head.format(0)),
                     value.map(Box::new),
-                    annotation,
+                    self.ty.clone(),
                     binding.kind,
                 );
 

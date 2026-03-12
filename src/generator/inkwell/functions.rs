@@ -263,13 +263,13 @@ impl<'backend> super::Inkwell<'backend> {
 
         for member in &method.members {
             if let AnalysisKind::Binding(bind) = &member.kind {
-                let kind = if let Some(annotation) = bind.annotation.as_ref() {
-                    let resolved = self.to_basic_type(annotation, member.span)?;
+                let kind = {
+                    let resolved = self.to_basic_type(&bind.annotation, member.span)?;
 
                     if matches!(method.interface, Interface::C) {
-                        if let TypeKind::String = annotation.kind {
+                        if let TypeKind::String = &bind.annotation.kind {
                             self.context.ptr_type(inkwell::AddressSpace::default()).into()
-                        } else if let TypeKind::Character = annotation.kind {
+                        } else if let TypeKind::Character = &bind.annotation.kind {
                             self.context.i8_type().into()
                         } else {
                             resolved
@@ -277,8 +277,6 @@ impl<'backend> super::Inkwell<'backend> {
                     } else {
                         resolved
                     }
-                } else {
-                    self.context.i64_type().into()
                 };
 
                 parameters.push(kind.into());
@@ -344,7 +342,6 @@ impl<'backend> super::Inkwell<'backend> {
                 }
             }
 
-            // USE HELPER: Clean any lingering loop states
             self.clear_loops();
 
             let result = self.analysis(*method.body.clone())?;

@@ -177,7 +177,7 @@ impl<'session> Session<'session> {
             self.resolve();
             if !self.errors.is_empty() { break 'pipeline; }
 
-            //self.check();
+            self.check();
             //if !self.errors.is_empty() { break 'pipeline; }
 
             self.analyze();
@@ -348,16 +348,19 @@ impl<'session> Session<'session> {
     pub fn check(&mut self) {
         self.reporter.start("checking");
 
-        for identity in self.inputs.keys()  {
-            let mut elements = self.parsers.get(identity).unwrap().output.clone();
-            let mut checker = Checker::new(&mut elements);
+        let identities: Vec<_> = self.inputs.keys().copied().collect();
+
+        for identity in identities {
+            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+
+            let mut checker = Checker::new(elements);
 
             checker.check();
 
             self.errors.extend(
                 checker
                     .errors
-                    .iter()
+                    .into_iter()
                     .map(|error| {
                         CompileError::Check(error.clone())
                     })

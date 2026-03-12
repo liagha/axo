@@ -57,6 +57,7 @@ impl<'ty> Show<'ty> for TypeKind<'ty> {
                     TypeKind::Tuple { members } => {
                         format!("Tuple({})", members.format(verbosity))
                     }
+                    TypeKind::Void => "Void".to_string(),
                     TypeKind::Unknown => {
                         "Unknown".to_string()
                     }

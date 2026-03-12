@@ -174,6 +174,11 @@ impl<'backend> Inkwell<'backend> {
                     .ptr_type(inkwell::AddressSpace::default())
                     .into()
             },
+            TypeKind::Array { member, size } => {
+                let ty = self.to_basic_type(member, span.clone())?;
+
+                ty.array_type(*size as u32).into()
+            }
             TypeKind::Structure(structure) => {
                 if let Some(ty) = self
                     .get_entity(&structure.target)
@@ -293,56 +298,6 @@ impl<'backend> Inkwell<'backend> {
             loop_headers: Vec::new(),
             loop_exits: Vec::new(),
             loop_results: Vec::new(),
-        }
-    }
-
-    /// Safely attempts to infer the AST type of an unannotated analysis node.
-    pub fn infer_type(&self, analysis: &Analysis<'backend>) -> Option<Type<'backend>> {
-        match &analysis.kind {
-            AnalysisKind::Integer { size, signed, .. } => Some(Type {
-                kind: TypeKind::Integer { size: *size, signed: *signed },
-                span: analysis.span
-            }),
-            AnalysisKind::Float { size, .. } => Some(Type {
-                kind: TypeKind::Float { size: *size },
-                span: analysis.span
-            }),
-            AnalysisKind::Boolean { .. } => Some(Type {
-                kind: TypeKind::Boolean,
-                span: analysis.span
-            }),
-            AnalysisKind::String { .. } => Some(Type {
-                kind: TypeKind::String,
-                span: analysis.span
-            }),
-            AnalysisKind::Character { .. } => Some(Type {
-                kind: TypeKind::Character,
-                span: analysis.span
-            }),
-            AnalysisKind::Usage(name) => {
-                if let Some(Entity::Variable { ty, .. }) = self.get_entity(name) {
-                    Some(ty.clone())
-                } else {
-                    None
-                }
-            },
-            AnalysisKind::Dereference(operand) => {
-                self.infer_type(operand).and_then(|ty| {
-                    if let TypeKind::Pointer { target } = ty.kind {
-                        Some(*target)
-                    } else {
-                        None
-                    }
-                })
-            },
-            AnalysisKind::AddressOf(operand) => {
-                self.infer_type(operand).map(|ty| Type {
-                    kind: TypeKind::Pointer { target: Box::new(ty) },
-                    span: analysis.span,
-                })
-            },
-            AnalysisKind::Cast(_, ty) => Some(ty.clone()),
-            _ => None,
         }
     }
 

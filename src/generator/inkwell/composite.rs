@@ -149,7 +149,7 @@ impl<'backend> Inkwell<'backend> {
     pub fn structure(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
-        span: Span<'backend>,
+        _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("structure");
@@ -163,23 +163,12 @@ impl<'backend> Inkwell<'backend> {
                 let field = binding.target.clone();
                 fields.push(field.clone());
 
-                let annotation = binding.annotation.as_ref().ok_or_else(|| {
-                    GenerateError::new(
-                        ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
-                            struct_name: string.to_string(),
-                            field_name: field.as_str().unwrap_or("").to_string(),
-                        }),
-                        span,
-                    )
-                })?;
-
-                types.push(self.to_basic_type(annotation, member.span)?);
+                types.push(self.to_basic_type(&binding.annotation, member.span)?);
             }
         }
 
         shape.set_body(&types, false);
 
-        // USE HELPER: Already abstract
         self.insert_entity(
             identifier,
             Entity::Struct {
@@ -194,7 +183,7 @@ impl<'backend> Inkwell<'backend> {
     pub fn union(
         &mut self,
         structure: Structure<Str<'backend>, Analysis<'backend>>,
-        span: Span<'backend>,
+        _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("union");
@@ -208,17 +197,7 @@ impl<'backend> Inkwell<'backend> {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
 
-                let annotation = binding.annotation.as_ref().ok_or_else(|| {
-                    GenerateError::new(
-                        ErrorKind::DataStructure(DataStructureError::FieldMissingAnnotation {
-                            struct_name: string.to_string(),
-                            field_name: field.as_str().unwrap_or("").to_string(),
-                        }),
-                        span,
-                    )
-                })?;
-
-                let ty = self.to_basic_type(annotation, member.span)?;
+                let ty = self.to_basic_type(&binding.annotation, member.span)?;
                 fields.push((field.clone(), ty));
 
                 let size = self.size(ty);

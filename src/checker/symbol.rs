@@ -35,7 +35,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     None => None,
                 };
 
-                if let (Some(declared), Some(inferred)) = (annotation.clone(), inferred) {
+                if let (Some(declared), Some(inferred)) = (annotation.clone(), inferred.clone()) {
                     if Type::unify(&declared, &inferred).is_none() {
                         errors.push(CheckError::new(
                             ErrorKind::Mismatch(declared, inferred.clone()),
@@ -46,8 +46,8 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 }
 
                 if failed { return; }
-                
-                annotation.unwrap_or(Type::new(TypeKind::Tuple { members: Vec::new() }, self.span))
+
+                annotation.unwrap_or(inferred.unwrap_or(Type::unit(self.span)))
             }
 
             SymbolKind::Structure(structure) => {
@@ -55,16 +55,16 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     .target
                     .brand()
                     .format(0);
-                
+
                 let members = structure
                     .members
                     .iter_mut()
                     .map(|member| {
                         member.check(errors);
-                        
+
                         member.ty.clone()
                     }).collect();
-                
+
                 let structure = Structure::new(head, members);
 
                 Type::new(TypeKind::Structure(structure), self.span)
@@ -100,7 +100,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 let members = function.members.iter_mut().map(|member| {
                     member.check(errors);
-                    
+
                     member.ty.clone()
                 }).collect();
 
@@ -116,7 +116,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
                 if let Some(body) = &mut function.body {
                     body.check(errors);
-                    
+
                     if body.ty.kind == TypeKind::Unknown {
                         failed = true;
                     }
@@ -134,15 +134,15 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                         }
                     }
                 }
-                
+
                 Type::new(TypeKind::Function(head, members, output), self.span)
             }
 
             SymbolKind::Module(_) => {
-                Type::new(TypeKind::Tuple { members: Vec::new() }, self.span)
+                Type::new(TypeKind::Void, self.span)
             }
         };
-        
+
         self.ty = ty
     }
 }

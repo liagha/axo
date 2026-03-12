@@ -82,7 +82,7 @@ impl<'symbol> Symbol<'symbol> {
 
 #[derive(Clone, PartialEq, Hash)]
 pub enum SymbolKind<'symbol> {
-    Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Box<Element<'symbol>>>),
+    Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
     Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Union(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
     Function(
