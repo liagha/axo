@@ -30,13 +30,11 @@ impl<'scanner> Scanner<'scanner> {
             .with_transform(
                 move |classifier| {
                     let inputs = classifier.form.collect_inputs();
-                    let content = inputs.clone().into_iter().collect::<Str>();
+                    let span = inputs.borrow_span().clone();
+                    let content = inputs.into_iter().collect::<Str>();
 
-                    classifier.form = Form::output(Token::new(
-                        TokenKind::String(content),
-                        inputs.borrow_span(),
-                    ));
-                    
+                    classifier.form = Form::output(Token::new(TokenKind::String(content), span));
+
                     Ok(())
                 },
             )
@@ -59,13 +57,11 @@ impl<'scanner> Scanner<'scanner> {
             .with_transform(
                 move |classifier| {
                     let inputs = classifier.form.collect_inputs();
-                    let content = inputs.clone().into_iter().collect::<Str>();
+                    let span = inputs.borrow_span().clone();
+                    let content = inputs.into_iter().collect::<Str>();
 
-                    classifier.form = Form::output(Token::new(
-                        TokenKind::String(content),
-                        inputs.borrow_span(),
-                    ));
-                    
+                    classifier.form = Form::output(Token::new(TokenKind::String(content), span));
+
                     Ok(())
                 },
             )
@@ -109,7 +105,8 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<Str>();
+                let span = inputs.borrow_span().clone();
+                let content = inputs.into_iter().collect::<Str>();
 
                 let token = match content.unwrap_str() {
                     "true" => TokenKind::Boolean(true),
@@ -117,7 +114,7 @@ impl<'scanner> Scanner<'scanner> {
                     _ => TokenKind::Identifier(content),
                 };
                 
-                classifier.form = Form::output(Token::new(token, inputs.borrow_span())); 
+                classifier.form = Form::output(Token::new(token, span));
 
                 Ok(())
             },
@@ -134,11 +131,12 @@ impl<'scanner> Scanner<'scanner> {
             ),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<Str>();
+                let span = inputs.borrow_span().clone();
+                let content = inputs.into_iter().collect::<Str>();
 
                 classifier.form = Form::output(Token::new(
                     TokenKind::Operator(content.to_operator()),
-                    inputs.borrow_span(),
+                    span,
                 ));
                 
                 Ok(())
@@ -152,11 +150,12 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<Str>();
+                let span = inputs.borrow_span().clone();
+                let content = inputs.into_iter().collect::<Str>();
 
                 classifier.form = Form::output(Token::new(
                     TokenKind::Punctuation(content.to_punctuation()),
-                    inputs.borrow_span(),
+                    span,
                 ));
                 
                 Ok(())
@@ -174,14 +173,15 @@ impl<'scanner> Scanner<'scanner> {
             ),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<Str>();
+                let span = inputs.borrow_span().clone();
+                let content = inputs.into_iter().collect::<Str>();
 
                 let kind = match content.len() {
                     1 => TokenKind::Punctuation(PunctuationKind::Space),
                     len => TokenKind::Punctuation(PunctuationKind::Indentation(len)),
                 };
 
-                classifier.form = Form::output(Token::new(kind, inputs.borrow_span()));
+                classifier.form = Form::output(Token::new(kind, span));
                 
                 Ok(())
             },
@@ -221,11 +221,12 @@ impl<'scanner> Scanner<'scanner> {
             ])]),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let content = inputs.clone().into_iter().collect::<Str>();
+                let span = inputs.borrow_span().clone();
+                let content = inputs.into_iter().collect::<Str>();
 
                 classifier.form = Form::output(Token::new(
                     TokenKind::Comment(content),
-                    inputs.borrow_span(),
+                    span,
                 ));
                 
                 Ok(())
@@ -257,7 +258,6 @@ impl<'scanner> Scanner<'scanner> {
                 Self::identifier(),
                 Self::number(),
                 Self::string(),
-                Self::escape_sequence(),
                 Self::backtick(),
                 Self::character(),
                 Self::operator(),

@@ -36,9 +36,9 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             move |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let number: Str = inputs.clone().into_iter().collect();
-                let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
+                let parser = parser::<i128>();
+                let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) { 
                     Ok(number) => {
@@ -71,9 +71,9 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let number: Str = inputs.clone().into_iter().collect();
-                let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
+                let parser = parser::<i128>();
+                let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
                     Ok(number) => {
@@ -106,9 +106,9 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let number: Str = inputs.clone().into_iter().collect();
-                let parser = parser::<i128>();
                 let span = inputs.borrow_span().clone();
+                let parser = parser::<i128>();
+                let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
                     Ok(number) => {
@@ -157,8 +157,8 @@ impl<'scanner> Scanner<'scanner> {
             ]),
             |classifier| {
                 let inputs = classifier.form.collect_inputs();
-                let number: Str = inputs.clone().into_iter().collect();
                 let span = inputs.borrow_span().clone();
+                let number: Str = inputs.into_iter().collect();
 
                 if number.contains(".") || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();

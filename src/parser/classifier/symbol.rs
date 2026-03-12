@@ -23,9 +23,11 @@ impl<'parser> Parser<'parser> {
     pub fn binding() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
-                token.kind == TokenKind::Identifier(Str::from("var"))
-                    || token.kind == TokenKind::Identifier(Str::from("const"))
-                    || token.kind == TokenKind::Identifier(Str::from("meta"))
+                if let TokenKind::Identifier(id) = &token.kind {
+                    matches!(id.as_str().unwrap(), "var" | "const" | "meta")
+                } else {
+                    false
+                }
             }),
             Self::expression().with_panic(
                 |classifier| {
@@ -148,7 +150,11 @@ impl<'parser> Parser<'parser> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("struct"))
+                    if let TokenKind::Identifier(id) = &token.kind {
+                        id.as_str() == Some("struct")
+                    } else {
+                        false
+                    }
                 }),
                 Self::literal().with_panic(
                     |classifier| {
@@ -222,7 +228,11 @@ impl<'parser> Parser<'parser> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("union"))
+                    if let TokenKind::Identifier(id) = &token.kind {
+                        id.as_str() == Some("union")
+                    } else {
+                        false
+                    }
                 }),
                 Self::literal().with_panic(
                     |classifier| {
@@ -515,7 +525,11 @@ impl<'parser> Parser<'parser> {
     pub fn module() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
-                token.kind == TokenKind::Identifier(Str::from("module"))
+                if let TokenKind::Identifier(id) = &token.kind {
+                    id.as_str() == Some("module")
+                } else {
+                    false
+                }
             }),
             Self::literal().with_panic(
                 |classifier| {
