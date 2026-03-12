@@ -13,7 +13,7 @@ func main(): Integer {
         }
     )
 
-    const point = Point { x = 3, y = 5 }
+    const point = libc.Point { x = 3, y = 5 }
 
     libc.println_str("Old:")
     libc.println_i64(point.x)

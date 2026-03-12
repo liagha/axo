@@ -316,7 +316,6 @@ impl<'backend> super::Inkwell<'backend> {
 
             self.insert_entity(method.target.clone(), Entity::Function(callable));
 
-            // USE HELPER: Pushing a new block scope
             self.enter_scope();
 
             let entry = self.context.append_basic_block(callable, "entry");
@@ -357,7 +356,6 @@ impl<'backend> super::Inkwell<'backend> {
                 }
             }
 
-            // USE HELPER: Popping out of the block scope
             self.exit_scope();
         }
 
@@ -486,12 +484,10 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(core);
 
-        // USE HELPER: Abstracting loop push logic
         self.enter_loop(heading, end, Some(result_alloc));
 
         self.analysis(*body)?;
 
-        // USE HELPER: Abstracting loop pop logic
         self.exit_loop();
 
         if !self.terminated() {
@@ -660,7 +656,6 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            // USE HELPER: Abstracting result resolution
             if let Some(alloc) = self.current_loop_result() {
                 self.builder.build_store(alloc, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
@@ -671,7 +666,6 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        // USE HELPER: Access loop exit
         if let Some(exit) = self.current_loop_exit() {
             self.builder.build_unconditional_branch(exit)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
@@ -692,7 +686,6 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            // USE HELPER: Abstracting result resolution
             if let Some(alloc) = self.current_loop_result() {
                 self.builder.build_store(alloc, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
@@ -703,7 +696,6 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        // USE HELPER: Access loop header
         if let Some(header) = self.current_loop_header() {
             self.builder.build_unconditional_branch(header)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;

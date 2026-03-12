@@ -27,7 +27,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Construct(construct) => {
-                // Ensure the target is also resolved
                 construct.target.resolve(resolver);
 
                 for member in construct.members.iter_mut() {
@@ -36,7 +35,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                // Ensure the target is also resolved
                 invoke.target.resolve(resolver);
 
                 for member in invoke.members.iter_mut() {
@@ -85,7 +83,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
         }
 
-        let mut resolved_identity = None;
+        let mut identity = None;
 
         match &self.kind {
             ElementKind::Literal(Token {
@@ -96,7 +94,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             | ElementKind::Invoke(_) => {
                 match resolver.scope.lookup(self) {
                     Ok(symbol) => {
-                        resolved_identity = Some(symbol.identity);
+                        identity = Some(symbol.identity);
                     }
 
                     Err(errors) => {
@@ -107,7 +105,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             _ => {}
         }
 
-        if let Some(identity) = resolved_identity {
+        if let Some(identity) = identity {
             self.reference = Some(identity);
 
             match &mut self.kind {

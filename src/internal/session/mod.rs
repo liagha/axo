@@ -9,7 +9,7 @@ use {
         },
         internal::{
             platform::{
-                PathBuf, 
+                PathBuf,
                 File,
                 Command,
                 Write,
@@ -313,30 +313,43 @@ impl<'session> Session<'session> {
 
         let identities: Vec<_> = self.inputs.keys().copied().collect();
 
-        for identity in identities {
+        for &identity in &identities {
             let module_identity = *self.modules.get(&identity).unwrap();
-
             let mut module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
-            // Get a mutable reference directly to the parser output!
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
-            // Two-pass scoping to allow forward declaration (order independence)
             for element in elements.iter_mut() {
                 if let ElementKind::Symbolize(symbol) = &element.kind {
                     self.resolver.add(symbol.clone());
                 }
             }
 
-            // Resolve each AST element directly, persisting modifications
+            let mut scope = self.resolver.scope.clone();
+            scope.parent = None;
+            module.scope = scope;
+
+            self.resolver.exit();
+
+            let old_module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
+            self.resolver.scope.replace(&old_module, module);
+        }
+
+        for &identity in &identities {
+            let module_identity = *self.modules.get(&identity).unwrap();
+            let mut module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
+
+            self.resolver.enter_scope(module.scope.clone());
+
+            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
             }
 
             let mut scope = self.resolver.scope.clone();
-
             scope.parent = None;
             module.scope = scope;
 

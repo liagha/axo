@@ -560,7 +560,6 @@ impl<'backend> Inkwell<'backend> {
         let offset = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
-            // USE HELPER: Already abstract
             if let Some(Entity::Variable { typ, pointer }) = self.get_entity(identifier) {
                 let kind = self.to_basic_type(typ, span)?;
 

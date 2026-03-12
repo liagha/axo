@@ -234,7 +234,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                 if invoke.members.len() > function.members.len() {
                     let diff = (invoke.members.len() - function.members.len()) as f64;
-                    // Fix mathematical scale to remain within maximum 1.0 boundary
                     score += self.binding * (1.0 - (diff / invoke.members.len() as f64));
 
                     for member in invoke.members[function.members.len()..].iter() {
@@ -252,7 +251,6 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     }
                 } else if invoke.members.len() < function.members.len() {
                     let diff = (function.members.len() - invoke.members.len()) as f64;
-                    // Fix mathematical scale to remain within maximum 1.0 boundary
                     score += self.binding * (1.0 - (diff / function.members.len() as f64));
 
                     for member in function.members[invoke.members.len()..].iter() {
