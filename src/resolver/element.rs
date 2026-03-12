@@ -112,8 +112,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Symbolize(symbol) => {
                 self.reference = Some(symbol.identity);
 
-                resolver.add(symbol.clone());
-
                 symbol.resolve(resolver);
             },
         }

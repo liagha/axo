@@ -13,6 +13,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         &mut self,
         resolver: &mut Resolver<'symbol>,
     ) {
+        resolver.add(self.clone());
+
         match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 if let Some(annotation) = &mut binding.annotation {
