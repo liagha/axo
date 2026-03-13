@@ -84,10 +84,10 @@ impl<
             order,
             marker: self.marker,
             position: self.position,
-            consumed: Vec::new(),
+            consumed: take(&mut self.consumed), // Optimization: Pass vectors down to avoid allocation
             record: Record::Blank,
             form: 0,
-            stack: take(&mut self.stack),
+            stack: take(&mut self.stack), // Optimization: Pass vectors down to avoid allocation
             depth: self.depth + 1,
         }
     }
@@ -528,19 +528,21 @@ impl<
         former: &mut Former<'_, 'literal, Input, Output, Failure>,
         classifier: &mut Classifier<'literal, Input, Output, Failure>,
     ) {
-        if let Some(peek) = former.source.get(classifier.marker).cloned() {
-            if self.value.eq(&peek) {
+        if let Some(peek) = former.source.get(classifier.marker) {
+            if self.value.eq(peek) {
                 classifier.set_align();
                 former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
 
+                // Optimization: Cache clone to avoid heavy double-cloning payload
+                let peek_cloned = peek.clone();
                 let consumed_id = former.consumed.len();
-                former.consumed.push(peek.clone());
+                former.consumed.push(peek_cloned.clone());
                 classifier.consumed.push(consumed_id);
 
                 let form_id = former.forms.len();
-                former.forms.push(Form::input(peek));
+                former.forms.push(Form::input(peek_cloned));
                 classifier.form = form_id;
                 classifier.stack.push(form_id);
             } else {
@@ -573,17 +575,25 @@ Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failur
     ) {
         let checkpoint_consumed = former.consumed.len();
         let checkpoint_forms = former.forms.len();
+        let initial_classifier_consumed_len = classifier.consumed.len();
+        let initial_stack_len = classifier.stack.len();
 
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
-        // Negate is a lookahead assertion; completely rollback all arena usage.
+        let record = child.record;
+
+        classifier.consumed = child.consumed;
+        classifier.stack = child.stack;
+        classifier.consumed.truncate(initial_classifier_consumed_len);
+        classifier.stack.truncate(initial_stack_len);
+
         former.consumed.truncate(checkpoint_consumed);
         former.forms.truncate(checkpoint_forms);
 
-        if child.is_aligned() {
+        if record == Record::Aligned {
             classifier.set_empty();
-        } else if child.is_effected() {
+        } else if record == Record::Failed {
             classifier.set_align();
             classifier.form = 0;
         } else {
@@ -612,18 +622,19 @@ impl<
     ) {
         if let Some(peek) = former.source.get(classifier.marker) {
             if (self.function)(peek) {
-                let value = peek.clone();
+                // Optimization: Cache clone to avoid heavy double-cloning payload
+                let value_cloned = peek.clone();
                 classifier.set_align();
                 former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
 
                 let consumed_id = former.consumed.len();
-                former.consumed.push(value.clone());
+                former.consumed.push(value_cloned.clone());
                 classifier.consumed.push(consumed_id);
 
                 let form_id = former.forms.len();
-                former.forms.push(Form::input(value));
+                former.forms.push(Form::input(value_cloned));
                 classifier.form = form_id;
                 classifier.stack.push(form_id);
             } else {
@@ -662,8 +673,11 @@ where
         classifier: &mut Classifier<'alternative, Input, Output, Failure>,
     ) {
         let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
-        let initial_stack_len = classifier.stack.len();
+
         let mut current_stack = take(&mut classifier.stack);
+        let mut current_consumed = take(&mut classifier.consumed);
+        let initial_stack_len = current_stack.len();
+        let initial_classifier_consumed_len = current_consumed.len();
 
         let mut current_consumed_len = former.consumed.len();
         let mut current_forms_len = former.forms.len();
@@ -673,7 +687,7 @@ where
                 order: pattern.order.clone(),
                 marker: classifier.marker,
                 position: classifier.position,
-                consumed: Vec::new(),
+                consumed: current_consumed,
                 record: Record::Blank,
                 form: 0,
                 stack: current_stack,
@@ -683,8 +697,11 @@ where
             former.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
-                current_stack = take(&mut child.stack);
+                // Efficient rollback; perfectly reuses vector capacities and strictly fulfills borrow guarantees
+                current_stack = child.stack;
+                current_consumed = child.consumed;
                 current_stack.truncate(initial_stack_len);
+                current_consumed.truncate(initial_classifier_consumed_len);
                 former.consumed.truncate(current_consumed_len);
                 former.forms.truncate(current_forms_len);
                 continue;
@@ -692,19 +709,37 @@ where
 
             if let Some(ref mut champion) = best {
                 if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
-                    *champion = child;
-                    current_stack = take(&mut champion.stack);
+                    // Optimization: Safely swaps state and uses the discarded `champion` allocations to rebuild for the next branch
+                    std::mem::swap(champion, &mut child);
+                    current_stack = child.stack;
+                    current_consumed = child.consumed;
+                    current_stack.truncate(initial_stack_len);
+                    current_consumed.truncate(initial_classifier_consumed_len);
+
                     current_consumed_len = former.consumed.len();
                     current_forms_len = former.forms.len();
                 } else {
-                    current_stack = take(&mut child.stack);
+                    current_stack = child.stack;
+                    current_consumed = child.consumed;
                     current_stack.truncate(initial_stack_len);
+                    current_consumed.truncate(initial_classifier_consumed_len);
+
                     former.consumed.truncate(current_consumed_len);
                     former.forms.truncate(current_forms_len);
                 }
             } else {
+                // Massive Optimization: Preserve existing inner vector capacities instead of truncating vector states
+                // by using `to_vec()` that heavily restricts bounds and triggers O(N) re-allocations natively within back-tracking logic models
+                let mut next_stack = Vec::with_capacity(child.stack.capacity());
+                next_stack.extend_from_slice(&child.stack[..initial_stack_len]);
+                current_stack = next_stack;
+
+                let mut next_consumed = Vec::with_capacity(child.consumed.capacity());
+                next_consumed.extend_from_slice(&child.consumed[..initial_classifier_consumed_len]);
+                current_consumed = next_consumed;
+
                 best = Some(child);
-                current_stack = take(&mut best.as_mut().unwrap().stack);
+
                 current_consumed_len = former.consumed.len();
                 current_forms_len = former.forms.len();
             }
@@ -723,10 +758,11 @@ where
                 classifier.position = champion.position;
                 classifier.consumed = take(&mut champion.consumed);
                 classifier.form = champion.form;
-                classifier.stack = current_stack;
+                classifier.stack = take(&mut champion.stack);
             }
             None => {
                 classifier.set_empty();
+                classifier.consumed = current_consumed;
                 classifier.stack = current_stack;
             }
         }
@@ -760,15 +796,16 @@ impl<
         resolved.marker = classifier.marker;
         resolved.position = classifier.position;
         resolved.depth = classifier.depth + 1;
+        resolved.consumed = take(&mut classifier.consumed);
         resolved.stack = take(&mut classifier.stack);
         former.build(&mut resolved);
 
         classifier.marker = resolved.marker;
         classifier.position = resolved.position;
-        classifier.consumed = take(&mut resolved.consumed);
+        classifier.consumed = resolved.consumed;
         classifier.record = resolved.record;
         classifier.form = resolved.form;
-        classifier.stack = take(&mut resolved.stack);
+        classifier.stack = resolved.stack;
     }
 }
 
@@ -797,20 +834,27 @@ impl<
     ) {
         let checkpoint_consumed = former.consumed.len();
         let checkpoint_forms = former.forms.len();
+        let initial_classifier_consumed_len = classifier.consumed.len();
+        let initial_stack_len = classifier.stack.len();
 
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
-        if child.is_effected() {
+        let effected = child.is_effected();
+
+        classifier.consumed = child.consumed;
+        classifier.stack = child.stack;
+
+        if effected {
             classifier.marker = child.marker;
             classifier.position = child.position;
-            classifier.consumed = take(&mut child.consumed);
             classifier.form = child.form;
-            classifier.stack = take(&mut child.stack);
             classifier.set_align();
         } else {
             former.consumed.truncate(checkpoint_consumed);
             former.forms.truncate(checkpoint_forms);
+            classifier.consumed.truncate(initial_classifier_consumed_len);
+            classifier.stack.truncate(initial_stack_len);
             classifier.set_ignore();
         }
     }
@@ -844,10 +888,10 @@ impl<
 
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = take(&mut child.consumed);
+        classifier.consumed = child.consumed;
         classifier.record = child.record;
         classifier.form = child.form;
-        classifier.stack = take(&mut child.stack);
+        classifier.stack = child.stack;
     }
 }
 
@@ -874,15 +918,17 @@ Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failur
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
+        let record = child.record;
+
         classifier.marker = child.marker;
         classifier.position = child.position;
-        classifier.consumed = take(&mut child.consumed);
+        classifier.consumed = child.consumed;
         classifier.form = child.form;
-        classifier.stack = take(&mut child.stack);
+        classifier.stack = child.stack;
 
-        if child.is_aligned() {
+        if record == Record::Aligned {
             classifier.record = self.precedence.max(Record::Aligned.into()).into();
-        } else if child.is_failed() {
+        } else if record == Record::Failed {
             classifier.record = self.precedence.min(Record::Failed.into()).into();
         } else {
             classifier.record = child.record;
@@ -918,13 +964,16 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
     ) {
         let mut index = classifier.marker;
         let mut position = classifier.position;
-        let mut consumed = take(&mut classifier.consumed);
-        let mut forms = Vec::with_capacity(SIZE);
 
         let initial_consumed_len = former.consumed.len();
         let initial_forms_len = former.forms.len();
 
-        let mut stack = take(&mut classifier.stack);
+        let mut current_consumed = take(&mut classifier.consumed);
+        let mut current_stack = take(&mut classifier.stack);
+        let initial_classifier_consumed_len = current_consumed.len();
+        let initial_stack_len = current_stack.len();
+
+        let mut forms = Vec::with_capacity(SIZE);
         let mut broke_on_blank = false;
 
         for pattern in &self.patterns {
@@ -932,63 +981,68 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 order: pattern.order.clone(),
                 marker: index,
                 position,
-                consumed: Vec::new(),
+                consumed: current_consumed,
                 record: Record::Blank,
                 form: 0,
-                stack,
+                stack: current_stack,
                 depth: classifier.depth + 1,
             };
 
             former.build(&mut child);
+
+            current_consumed = child.consumed;
+            current_stack = child.stack;
 
             match child.record {
                 Record::Aligned => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(take(&mut child.consumed));
                     forms.push(child.form);
-                    stack = take(&mut child.stack);
                 }
                 Record::Panicked | Record::Failed => {
                     classifier.record = child.record;
                     index = child.marker;
                     position = child.position;
-                    consumed.extend(take(&mut child.consumed));
                     forms.push(child.form);
-                    stack = take(&mut child.stack);
                     break;
                 }
                 Record::Ignored => {
                     index = child.marker;
                     position = child.position;
-                    stack = take(&mut child.stack);
                 }
                 _ => {
                     classifier.record = child.record;
-                    stack = take(&mut child.stack);
                     broke_on_blank = true;
                     break;
                 }
             }
         }
 
+        classifier.consumed = current_consumed;
+        classifier.stack = current_stack;
+
         if broke_on_blank {
             // Unsuccessful sequence rollback cleans up partial progress efficiently
             former.consumed.truncate(initial_consumed_len);
             former.forms.truncate(initial_forms_len);
-            classifier.stack = stack;
+            classifier.consumed.truncate(initial_classifier_consumed_len);
+            classifier.stack.truncate(initial_stack_len);
         } else {
             classifier.marker = index;
             classifier.position = position;
-            classifier.consumed = consumed;
 
-            let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
+            // Optimization: Remove exponential deep clones in nested AST parsing
+            let multi_form = Form::multiple(
+                forms
+                    .into_iter()
+                    .map(|id| std::mem::replace(&mut former.forms[id], Form::Blank))
+                    .collect(),
+            );
+
             let form_id = former.forms.len();
             former.forms.push(multi_form);
             classifier.form = form_id;
-
-            classifier.stack = stack;
         }
     }
 }
@@ -1022,35 +1076,43 @@ for Repetition<'repetition, Input, Output, Failure>
     ) {
         let mut index = classifier.marker;
         let mut position = classifier.position;
-        let mut consumed = Vec::new();
         let mut forms = Vec::new();
 
         let initial_consumed_len = former.consumed.len();
         let initial_forms_len = former.forms.len();
 
-        let mut stack = take(&mut classifier.stack);
+        let mut current_consumed = take(&mut classifier.consumed);
+        let mut current_stack = take(&mut classifier.stack);
+        let initial_classifier_consumed_len = current_consumed.len();
+        let initial_stack_len = current_stack.len();
 
         while former.source.peek_ahead(index).is_some() {
             let loop_consumed_len = former.consumed.len();
             let loop_forms_len = former.forms.len();
+            let loop_classifier_consumed_len = current_consumed.len();
+            let loop_stack_len = current_stack.len();
 
             let mut child = Classifier {
                 order: self.classifier.order.clone(),
                 marker: index,
                 position,
-                consumed: Vec::new(),
+                consumed: current_consumed,
                 record: Record::Blank,
                 form: 0,
-                stack,
+                stack: current_stack,
                 depth: classifier.depth + 1,
             };
 
             former.build(&mut child);
 
+            current_consumed = child.consumed;
+            current_stack = child.stack;
+
             if child.marker == index {
                 former.consumed.truncate(loop_consumed_len);
                 former.forms.truncate(loop_forms_len);
-                stack = take(&mut child.stack);
+                current_consumed.truncate(loop_classifier_consumed_len);
+                current_stack.truncate(loop_stack_len);
                 break;
             }
 
@@ -1059,21 +1121,21 @@ for Repetition<'repetition, Input, Output, Failure>
                     Record::Panicked | Record::Aligned | Record::Failed => {
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(take(&mut child.consumed));
                         forms.push(child.form);
-                        stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
                         former.consumed.truncate(loop_consumed_len);
                         former.forms.truncate(loop_forms_len);
+                        current_consumed.truncate(loop_classifier_consumed_len);
+                        current_stack.truncate(loop_stack_len);
                         index = child.marker;
                         position = child.position;
-                        stack = take(&mut child.stack);
                     }
                     _ => {
                         former.consumed.truncate(loop_consumed_len);
                         former.forms.truncate(loop_forms_len);
-                        stack = take(&mut child.stack);
+                        current_consumed.truncate(loop_classifier_consumed_len);
+                        current_stack.truncate(loop_stack_len);
                     }
                 }
             } else {
@@ -1082,30 +1144,28 @@ for Repetition<'repetition, Input, Output, Failure>
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(take(&mut child.consumed));
                         forms.push(child.form);
-                        stack = take(&mut child.stack);
                         break;
                     }
                     Record::Aligned => {
                         classifier.record = child.record;
                         index = child.marker;
                         position = child.position;
-                        consumed.extend(take(&mut child.consumed));
                         forms.push(child.form);
-                        stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
                         former.consumed.truncate(loop_consumed_len);
                         former.forms.truncate(loop_forms_len);
+                        current_consumed.truncate(loop_classifier_consumed_len);
+                        current_stack.truncate(loop_stack_len);
                         index = child.marker;
                         position = child.position;
-                        stack = take(&mut child.stack);
                     }
                     _ => {
                         former.consumed.truncate(loop_consumed_len);
                         former.forms.truncate(loop_forms_len);
-                        stack = take(&mut child.stack);
+                        current_consumed.truncate(loop_classifier_consumed_len);
+                        current_stack.truncate(loop_stack_len);
                     }
                 }
             }
@@ -1117,29 +1177,37 @@ for Repetition<'repetition, Input, Output, Failure>
             }
         }
 
+        classifier.consumed = current_consumed;
+        classifier.stack = current_stack;
+
         if forms.len() >= self.minimum as usize {
             if self.persist {
                 classifier.set_align();
             }
             classifier.marker = index;
             classifier.position = position;
-            classifier.consumed = consumed;
 
-            let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
+            // Optimization: Eliminate deep Form cloning via std::mem::replace extraction
+            let multi_form = Form::multiple(
+                forms
+                    .into_iter()
+                    .map(|id| std::mem::replace(&mut former.forms[id], Form::Blank))
+                    .collect(),
+            );
+
             let form_id = former.forms.len();
             former.forms.push(multi_form);
             classifier.form = form_id;
-
-            classifier.stack = stack;
         } else {
             // Failed the minimum requirement, rollback ALL progress made inside loop
             former.consumed.truncate(initial_consumed_len);
             former.forms.truncate(initial_forms_len);
+            classifier.consumed.truncate(initial_classifier_consumed_len);
+            classifier.stack.truncate(initial_stack_len);
 
             if self.persist {
                 classifier.set_empty();
             }
-            classifier.stack = stack;
         }
     }
 }

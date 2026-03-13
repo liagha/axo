@@ -15,7 +15,7 @@ func print_f64(C, const v: Float)
 func print_bool(C, const v: Boolean)
 func print_str(C, const s: String)
 func print_char(C, const v: UInt8)
-func println(c)
+func println(C)
 func print_hex(C, const v: Int64)
 func print_ptr(C, const v: *UInt8)
 
