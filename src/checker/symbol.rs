@@ -2,8 +2,7 @@ use crate::{
     checker::{Checkable, Checker, Type, TypeKind},
     data::Structure,
     format::Show,
-    parser::{ElementKind, Symbol, SymbolKind},
-    scanner::TokenKind,
+    parser::{Symbol, SymbolKind},
 };
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
@@ -11,15 +10,9 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
         let typ = match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 let declared = binding.annotation.as_mut().map(|annotation| {
-                    match Type::annotation(annotation) {
+                    match Type::annotation(checker, annotation) {
                         Ok(typ) => typ,
                         Err(error) => {
-                            if let ElementKind::Literal(literal) = &annotation.kind {
-                                if matches!(literal.kind, TokenKind::Identifier(_)) {
-                                    annotation.check(checker);
-                                    return annotation.typ.clone();
-                                }
-                            }
                             checker.errors.push(error);
                             checker.fresh(self.span)
                         }
@@ -70,15 +63,9 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 }).collect();
 
                 let output = function.output.as_mut().map(|annotation| {
-                    match Type::annotation(annotation) {
+                    match Type::annotation(checker, annotation) {
                         Ok(typ) => typ,
                         Err(error) => {
-                            if let ElementKind::Literal(literal) = &annotation.kind {
-                                if matches!(literal.kind, TokenKind::Identifier(_)) {
-                                    annotation.check(checker);
-                                    return annotation.typ.clone();
-                                }
-                            }
                             checker.errors.push(error);
                             checker.fresh(self.span)
                         }
@@ -107,5 +94,31 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
         };
 
         self.typ = typ;
+    }
+
+    fn reify(&mut self, checker: &mut Checker<'_, 'symbol>) {
+        self.typ = checker.reify(&self.typ);
+
+        match &mut self.kind {
+            SymbolKind::Binding(binding) => {
+                if let Some(value) = &mut binding.value {
+                    value.reify(checker);
+                }
+            }
+            SymbolKind::Structure(structure) | SymbolKind::Union(structure) => {
+                for member in &mut structure.members {
+                    member.reify(checker);
+                }
+            }
+            SymbolKind::Function(function) => {
+                for member in &mut function.members {
+                    member.reify(checker);
+                }
+                if let Some(body) = &mut function.body {
+                    body.reify(checker);
+                }
+            }
+            SymbolKind::Module(_) => {}
+        }
     }
 }

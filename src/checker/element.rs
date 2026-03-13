@@ -141,9 +141,9 @@ impl<'element> Checkable<'element> for Element<'element> {
                     [OperatorKind::Dot] => {
                         binary.left.check(checker);
                         if let ElementKind::Literal(Token { kind: TokenKind::Identifier(_), span: right_span }) = &binary.right.kind {
-                            let field_type = checker.fresh(*right_span);
-                            binary.right.typ = field_type.clone();
-                            field_type
+                            let field = checker.fresh(*right_span);
+                            binary.right.typ = field.clone();
+                            field
                         } else {
                             binary.right.check(checker);
                             binary.right.typ.clone()
@@ -156,15 +156,20 @@ impl<'element> Checkable<'element> for Element<'element> {
                         match operator.as_slice() {
                             [OperatorKind::Equal] => checker.unify(span, &binary.left.typ, &binary.right.typ),
                             [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                                let left = checker.reify(&binary.left.typ);
-                                let right = checker.reify(&binary.right.typ);
+                                let lhs = checker.reify(&binary.left.typ);
+                                let rhs = checker.reify(&binary.right.typ);
 
-                                if matches!(left.kind, TypeKind::Pointer { .. }) {
-                                    left
-                                } else if matches!(right.kind, TypeKind::Pointer { .. }) {
-                                    right
+                                let is_void = |typ: &Type| matches!(&typ.kind, TypeKind::Pointer { target } if matches!(&target.kind, TypeKind::Void));
+
+                                if is_void(&lhs) || is_void(&rhs) {
+                                    checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), span));
+                                    checker.fresh(span)
+                                } else if matches!(lhs.kind, TypeKind::Pointer { .. }) {
+                                    lhs
+                                } else if matches!(rhs.kind, TypeKind::Pointer { .. }) {
+                                    rhs
                                 } else {
-                                    checker.unify(span, &left, &right)
+                                    checker.unify(span, &lhs, &rhs)
                                 }
                             }
                             [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
@@ -191,6 +196,7 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Index(index) => {
                 if index.members.is_empty() {
+                    checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
                     self.typ = checker.fresh(span);
                     return;
                 }
@@ -300,20 +306,62 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
 
             ElementKind::Symbolize(symbol) => {
+                let pre = checker.fresh(span);
+                checker.environment.insert(symbol.identity, pre.clone());
+
                 symbol.check(checker);
 
-                let unified = if let Some(existing) = checker.environment.get(&symbol.identity).cloned() {
-                    checker.unify(span, &existing, &symbol.typ)
-                } else {
-                    symbol.typ.clone()
-                };
-
+                let unified = checker.unify(span, &pre, &symbol.typ);
                 symbol.typ = unified.clone();
                 checker.environment.insert(symbol.identity, unified.clone());
+
                 unified
             }
         };
 
         self.typ = typ;
+    }
+
+
+    fn reify(&mut self, checker: &mut Checker<'_, 'element>) {
+        self.typ = checker.reify(&self.typ);
+
+        match &mut self.kind {
+            ElementKind::Literal(_) => {}
+            ElementKind::Delimited(delimited) => {
+                for member in &mut delimited.members {
+                    member.reify(checker);
+                }
+            }
+            ElementKind::Unary(unary) => {
+                unary.operand.reify(checker);
+            }
+            ElementKind::Binary(binary) => {
+                binary.left.reify(checker);
+                binary.right.reify(checker);
+            }
+            ElementKind::Index(index) => {
+                index.target.reify(checker);
+                
+                for member in &mut index.members {
+                    member.reify(checker);
+                }
+            }
+            ElementKind::Invoke(invoke) => {
+                invoke.target.reify(checker);
+                
+                for member in &mut invoke.members {
+                    member.reify(checker);
+                }
+            }
+            ElementKind::Construct(construct) => {
+                for member in &mut construct.members {
+                    member.reify(checker);
+                }
+            }
+            ElementKind::Symbolize(symbol) => {
+                symbol.reify(checker);
+            }
+        }
     }
 }

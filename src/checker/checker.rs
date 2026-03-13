@@ -1,14 +1,8 @@
 use crate::{
-    checker::{Type, TypeKind, ErrorKind, CheckError},
-    data::{
-        Identity,
-        Structure,
-        memory::take,
-    },
-    internal::{
-        hash::Map,
-    },
-    parser::{Element, ElementKind, Symbol, SymbolKind},
+    checker::{CheckError, ErrorKind, Type, TypeKind},
+    data::{memory::take, Identity, Structure},
+    internal::hash::Map,
+    parser::{Element, Symbol, SymbolKind},
     resolver::Resolver,
     tracker::Span,
 };
@@ -23,6 +17,7 @@ pub struct Checker<'check, 'source> {
 
 pub trait Checkable<'source> {
     fn check(&mut self, checker: &mut Checker<'_, 'source>);
+    fn reify(&mut self, checker: &mut Checker<'_, 'source>);
 }
 
 impl<'check, 'source> Checker<'check, 'source> {
@@ -44,7 +39,7 @@ impl<'check, 'source> Checker<'check, 'source> {
         }
 
         for element in &mut elements {
-            self.reify_element(element);
+            element.reify(self);
         }
 
         let environment = take(&mut self.environment);
@@ -58,69 +53,41 @@ impl<'check, 'source> Checker<'check, 'source> {
         *self.input = elements;
     }
 
-    pub fn reify_element(&mut self, element: &mut Element<'source>) {
-        element.typ = self.reify(&element.typ);
-
-        match &mut element.kind {
-            ElementKind::Literal(_) => {}
-            ElementKind::Delimited(delimited) => {
-                for member in &mut delimited.members {
-                    self.reify_element(member);
+    pub fn reify(&mut self, typ: &Type<'source>) -> Type<'source> {
+        match &typ.kind {
+            TypeKind::Variable(identity) => {
+                if let Some(resolved) = self.variables[*identity].clone() {
+                    let deep = self.reify(&resolved);
+                    self.variables[*identity] = Some(deep.clone());
+                    deep
+                } else {
+                    typ.clone()
                 }
             }
-            ElementKind::Unary(unary) => {
-                self.reify_element(&mut unary.operand);
+            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typ.span),
+            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typ.span),
+            TypeKind::Tuple { members } => {
+                let items = members.iter().map(|item| self.reify(item)).collect();
+                Type::new(TypeKind::Tuple { members: items }, typ.span)
             }
-            ElementKind::Binary(binary) => {
-                self.reify_element(&mut binary.left);
-                self.reify_element(&mut binary.right);
+            TypeKind::Function(name, parameters, output) => {
+                let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
+                let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
+                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typ.span)
             }
-            ElementKind::Index(index) => {
-                self.reify_element(&mut index.target);
-                for member in &mut index.members {
-                    self.reify_element(member);
-                }
+            TypeKind::Structure(structure) => {
+                let members = structure.members.iter().map(|member| self.reify(member)).collect();
+                Type::new(TypeKind::Structure(Structure::new(structure.target.clone(), members)), typ.span)
             }
-            ElementKind::Invoke(invoke) => {
-                self.reify_element(&mut invoke.target);
-                for member in &mut invoke.members {
-                    self.reify_element(member);
-                }
+            TypeKind::Union(structure) => {
+                let members = structure.members.iter().map(|member| self.reify(member)).collect();
+                Type::new(TypeKind::Union(Structure::new(structure.target.clone(), members)), typ.span)
             }
-            ElementKind::Construct(construct) => {
-                for member in &mut construct.members {
-                    self.reify_element(member);
-                }
+            TypeKind::Constructor(structure) => {
+                let members = structure.members.iter().map(|member| self.reify(member)).collect();
+                Type::new(TypeKind::Constructor(Structure::new(structure.target.clone(), members)), typ.span)
             }
-            ElementKind::Symbolize(symbol) => {
-                self.reify_symbol(symbol);
-            }
-        }
-    }
-
-    pub fn reify_symbol(&mut self, symbol: &mut Symbol<'source>) {
-        symbol.typ = self.reify(&symbol.typ);
-
-        match &mut symbol.kind {
-            SymbolKind::Binding(binding) => {
-                if let Some(value) = &mut binding.value {
-                    self.reify_element(value);
-                }
-            }
-            SymbolKind::Structure(structure) | SymbolKind::Union(structure) => {
-                for member in &mut structure.members {
-                    self.reify_symbol(member);
-                }
-            }
-            SymbolKind::Function(function) => {
-                for member in &mut function.members {
-                    self.reify_symbol(member);
-                }
-                if let Some(body) = &mut function.body {
-                    self.reify_element(body);
-                }
-            }
-            SymbolKind::Module(_) => {}
+            _ => typ.clone(),
         }
     }
 
@@ -154,48 +121,6 @@ impl<'check, 'source> Checker<'check, 'source> {
         Type::new(TypeKind::Variable(identity), span)
     }
 
-    pub fn reify(&mut self, typ: &Type<'source>) -> Type<'source> {
-        match &typ.kind {
-            TypeKind::Variable(identity) => {
-                if let Some(resolved) = self.variables[*identity].clone() {
-                    let deep = self.reify(&resolved);
-                    self.variables[*identity] = Some(deep.clone());
-                    deep
-                } else {
-                    typ.clone()
-                }
-            }
-            TypeKind::Pointer { target } => {
-                Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typ.span)
-            }
-            TypeKind::Array { member, size } => {
-                Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typ.span)
-            }
-            TypeKind::Tuple { members } => {
-                let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::new(TypeKind::Tuple { members: items }, typ.span)
-            }
-            TypeKind::Function(name, parameters, output) => {
-                let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
-                let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
-                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typ.span)
-            }
-            TypeKind::Structure(structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Structure(Structure::new(structure.target.clone(), members)), typ.span)
-            }
-            TypeKind::Union(structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Union(Structure::new(structure.target.clone(), members)), typ.span)
-            }
-            TypeKind::Constructor(structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Constructor(Structure::new(structure.target.clone(), members)), typ.span)
-            }
-            _ => typ.clone(),
-        }
-    }
-
     fn occurs(&mut self, identity: Identity, typ: &Type<'source>) -> bool {
         let flattened = self.reify(typ);
 
@@ -213,9 +138,7 @@ impl<'check, 'source> Checker<'check, 'source> {
                 }
                 false
             }
-            TypeKind::Structure(ref structure) | TypeKind::Union(ref structure) | TypeKind::Constructor(ref structure) => {
-                structure.members.iter().any(|member| self.occurs(identity, member))
-            }
+            TypeKind::Structure(ref structure) | TypeKind::Union(ref structure) | TypeKind::Constructor(ref structure) => structure.members.iter().any(|member| self.occurs(identity, member)),
             _ => false,
         }
     }
@@ -247,27 +170,14 @@ impl<'check, 'source> Checker<'check, 'source> {
                 self.variables[identity] = Some(left.clone());
                 left
             }
-            (TypeKind::String, TypeKind::Pointer { .. }) => right,
-            (TypeKind::Pointer { .. }, TypeKind::String) => left,
 
-            (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => right,
-            (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) => left,
-
-            (TypeKind::Array { member, .. }, TypeKind::Pointer { target }) => {
-                self.unify(span, &member, &target);
-                right
-            }
-            (TypeKind::Pointer { target }, TypeKind::Array { member, .. }) => {
-                self.unify(span, &target, &member);
-                left
+            (TypeKind::Array { member: src_member, size: src_size }, TypeKind::Array { member: dst_member, size: dst_size }) if src_size == dst_size => {
+                let unified = self.unify(span, &src_member, &dst_member);
+                Type::new(TypeKind::Array { member: Box::new(unified), size: src_size }, left.span)
             }
             (TypeKind::Pointer { target: src_target }, TypeKind::Pointer { target: dst_target }) => {
                 let unified = self.unify(span, &src_target, &dst_target);
                 Type::new(TypeKind::Pointer { target: Box::new(unified) }, left.span)
-            }
-            (TypeKind::Array { member: src_member, size: src_size }, TypeKind::Array { member: dst_member, size: dst_size }) if src_size == dst_size => {
-                let unified = self.unify(span, &src_member, &dst_member);
-                Type::new(TypeKind::Array { member: Box::new(unified), size: src_size }, left.span)
             }
             (TypeKind::Tuple { members: src_members }, TypeKind::Tuple { members: dst_members }) if src_members.len() == dst_members.len() => {
                 let mut unified = Vec::with_capacity(src_members.len());
@@ -276,12 +186,36 @@ impl<'check, 'source> Checker<'check, 'source> {
                 }
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
-            (TypeKind::Integer { size: src_size, signed: src_signed }, TypeKind::Integer { size: dst_size, signed: dst_signed }) => {
-                Type::new(TypeKind::Integer { size: src_size.max(dst_size), signed: src_signed || dst_signed }, left.span)
+
+            (TypeKind::Structure(src), TypeKind::Structure(dst)) if src.target == dst.target && src.members.len() == dst.members.len() => {
+                let mut unified = Vec::with_capacity(src.members.len());
+                for (src_item, dst_item) in src.members.iter().zip(dst.members.iter()) {
+                    unified.push(self.unify(span, src_item, dst_item));
+                }
+                Type::new(TypeKind::Structure(Structure::new(src.target.clone(), unified)), left.span)
             }
-            (TypeKind::Float { size: src_size }, TypeKind::Float { size: dst_size }) => {
-                Type::new(TypeKind::Float { size: src_size.max(dst_size) }, left.span)
+            (TypeKind::Union(src), TypeKind::Union(dst)) if src.target == dst.target && src.members.len() == dst.members.len() => {
+                let mut unified = Vec::with_capacity(src.members.len());
+                for (src_item, dst_item) in src.members.iter().zip(dst.members.iter()) {
+                    unified.push(self.unify(span, src_item, dst_item));
+                }
+                Type::new(TypeKind::Union(Structure::new(src.target.clone(), unified)), left.span)
             }
+            (TypeKind::Constructor(src), TypeKind::Constructor(dst)) if src.target == dst.target && src.members.len() == dst.members.len() => {
+                let mut unified = Vec::with_capacity(src.members.len());
+                for (src_item, dst_item) in src.members.iter().zip(dst.members.iter()) {
+                    unified.push(self.unify(span, src_item, dst_item));
+                }
+                Type::new(TypeKind::Constructor(Structure::new(src.target.clone(), unified)), left.span)
+            }
+
+            (TypeKind::Integer { size: src_size, signed: src_signed }, TypeKind::Integer { size: dst_size, signed: dst_signed }) if src_size == dst_size && src_signed == dst_signed => {
+                Type::new(TypeKind::Integer { size: src_size, signed: src_signed }, left.span)
+            }
+            (TypeKind::Float { size: src_size }, TypeKind::Float { size: dst_size }) if src_size == dst_size => {
+                Type::new(TypeKind::Float { size: src_size }, left.span)
+            }
+
             (TypeKind::Function(name, src_params, src_output), TypeKind::Function(_, dst_params, dst_output)) if src_params.len() == dst_params.len() => {
                 let mut unified = Vec::with_capacity(src_params.len());
 
@@ -290,9 +224,7 @@ impl<'check, 'source> Checker<'check, 'source> {
                 }
 
                 let output = match (src_output, dst_output) {
-                    (Some(src_kind), Some(dst_kind)) => {
-                        Some(Box::new(self.unify(span, &src_kind, &dst_kind)))
-                    }
+                    (Some(src_kind), Some(dst_kind)) => Some(Box::new(self.unify(span, &src_kind, &dst_kind))),
                     (Some(src_kind), None) => {
                         let void = Type::new(TypeKind::Void, span);
                         Some(Box::new(self.unify(span, &src_kind, &void)))
