@@ -30,15 +30,17 @@ impl<'parser> Parser<'parser> {
                 }
             }),
             Self::expression().with_panic(
-                |classifier| {
-                    let span = classifier.consumed.span();
+                |former, classifier| {
+                    let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = consumed.span();
 
                     ParseError::new(ErrorKind::ExpectedBody, span)
                 }
             ),
         ])
-            .with_transform(|classifier| {
-                let sequence = classifier.form.as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input();
 
                 let kind = if let TokenKind::Identifier(identifier) = keyword.kind {
@@ -133,7 +135,7 @@ impl<'parser> Parser<'parser> {
                     }
                 }
 
-                classifier.form = Form::output(Element::new(
+                *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
                         SymbolKind::Binding(Binding::new(Box::new(body), value, annotation, kind)),
                         span,
@@ -157,23 +159,26 @@ impl<'parser> Parser<'parser> {
                     }
                 }),
                 Self::literal().with_panic(
-                    |classifier| {
-                        let span = classifier.consumed.span();
+                    |former, classifier| {
+                        let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = consumed.span();
 
                         ParseError::new(ErrorKind::ExpectedHead, span)
                     }
                 ),
             ]),
             Self::expression().with_panic(
-                |classifier| {
-                    let span = classifier.consumed.span();
+                |former, classifier| {
+                    let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = consumed.span();
 
                     ParseError::new(ErrorKind::ExpectedBody, span)
                 }
             ),
         ])
-            .with_transform(|classifier| {
-                let sequence = classifier.form.as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
 
                 let keyword = head[0].unwrap_input();
@@ -211,7 +216,7 @@ impl<'parser> Parser<'parser> {
 
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                classifier.form = Form::output(Element::new(
+                *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
                         SymbolKind::Structure(Structure::new(Box::new(name), members)),
                         span,
@@ -235,23 +240,26 @@ impl<'parser> Parser<'parser> {
                     }
                 }),
                 Self::literal().with_panic(
-                    |classifier| {
-                        let span = classifier.consumed.span();
+                    |former, classifier| {
+                        let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = consumed.span();
 
                         ParseError::new(ErrorKind::ExpectedHead, span)
                     }
                 ),
             ]),
             Self::expression().with_panic(
-                |classifier| {
-                    let span = classifier.consumed.span();
+                |former, classifier| {
+                    let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = consumed.span();
 
                     ParseError::new(ErrorKind::ExpectedBody, span)
                 }
             ),
         ])
-            .with_transform(|classifier| {
-                let sequence = classifier.form.as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let head = sequence[0].as_forms();
 
                 let keyword = head[0].unwrap_input();
@@ -289,9 +297,9 @@ impl<'parser> Parser<'parser> {
 
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
-                classifier.form = Form::output(Element::new(
+                *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Structure(Structure::new(Box::new(name), members)),
+                        SymbolKind::Union(Structure::new(Box::new(name), members)),
                         span,
                         visibility,
                     )),
@@ -309,8 +317,9 @@ impl<'parser> Parser<'parser> {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
                 Self::literal().with_panic(
-                    |classifier| {
-                        let span = classifier.consumed.span();
+                    |former, classifier| {
+                        let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = consumed.span();
 
                         ParseError::new(ErrorKind::ExpectedName, span)
                     }
@@ -320,14 +329,16 @@ impl<'parser> Parser<'parser> {
                         Classifier::deferred(Self::symbolization),
                         Classifier::predicate(|token: &Token| {
                             matches!(token.kind, TokenKind::Identifier(_))
-                        }).with_transform(|classifier| {
-                            let input = classifier.form.unwrap_input();
-                            classifier.form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
+                        }).with_transform(|former, classifier| {
+                            let form = former.forms.get_mut(classifier.form).unwrap();
+                            let input = form.unwrap_input();
+                            *form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
                             Ok(())
                         }),
                 ])).with_panic(
-                    |classifier| {
-                        let span = classifier.stack.span();
+                    |former, classifier| {
+                        let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = stack.span();
 
                         ParseError::new(ErrorKind::ExpectedHead, span)
                     }
@@ -345,22 +356,26 @@ impl<'parser> Parser<'parser> {
                         Self::prefixed(),
                         Self::literal(),
                     ]).with_panic(
-                        |classifier| {
-                            let span = classifier.stack.span();
+                        |former, classifier| {
+                            let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                            let span = stack.span();
 
                             ParseError::new(ErrorKind::ExpectedAnnotation, span)
                         }
                     ),
                 ])
-                    .with_transform(|classifier| {
-                        let output = classifier.form.as_forms();
-                        classifier.form = output[0].clone();
+                    .with_transform(|former, classifier| {
+                        let form = former.forms.get_mut(classifier.form).unwrap();
+                        let output = form.as_forms();
+                        *form = output[0].clone();
+                        
                         Ok(())
                     }),
                 Self::expression().into_optional(),
             ])
-                .with_transform(|classifier| {
-                    let sequence = classifier.form.as_forms();
+                .with_transform(|former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let sequence = form.as_forms();
                     let keyword = sequence[0].unwrap_input().clone();
                     let name = sequence[1].unwrap_output().clone();
                     let invoke = sequence[2].unwrap_output().clone();
@@ -413,7 +428,7 @@ impl<'parser> Parser<'parser> {
                         Span::merge(&keyword.borrow_span(), &return_type.borrow_span())
                     };
 
-                    classifier.form = Form::output(Element::new(
+                    *form = Form::output(Element::new(
                         ElementKind::Symbolize(Symbol::new(
                             SymbolKind::Function(Function::new(
                                 Box::new(name),
@@ -441,16 +456,20 @@ impl<'parser> Parser<'parser> {
                     Classifier::predicate(|token: &Token| {
                         matches!(token.kind, TokenKind::Identifier(_))
                     })
-                        .with_transform(|classifier| {
-                            let input = classifier.form.unwrap_input();
-                            classifier.form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
+                        .with_transform(|former, classifier| {
+                            let form = former.forms.get_mut(classifier.form).unwrap();
+                            let input = form.unwrap_input();
+
+                            *form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
+                            
                             Ok(())
                         }),
                 ])),
                 Self::expression().into_optional(),
             ])
-                .with_transform(|classifier| {
-                    let sequence = classifier.form.as_forms();
+                .with_transform(|former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let sequence = form.as_forms();
                     let keyword = sequence[0].unwrap_input().clone();
                     let name = sequence[1].unwrap_output().clone();
                     let invoke = sequence[2].unwrap_output().clone();
@@ -502,7 +521,7 @@ impl<'parser> Parser<'parser> {
                         Span::merge(&keyword.borrow_span(), &invoke.borrow_span())
                     };
 
-                    classifier.form = Form::output(Element::new(
+                    *form = Form::output(Element::new(
                         ElementKind::Symbolize(Symbol::new(
                             SymbolKind::Function(Function::new(
                                 Box::new(name),
@@ -532,22 +551,25 @@ impl<'parser> Parser<'parser> {
                 }
             }),
             Self::literal().with_panic(
-                |classifier| {
-                    let span = classifier.stack.span();
+                |former, classifier| {
+                    let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = stack.span();
 
                     ParseError::new(ErrorKind::ExpectedName, span)
                 }
             ),
             Self::expression().with_panic(
-                |classifier| {
-                    let span = classifier.stack.span();
+                |former, classifier| {
+                    let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = stack.span();
 
                     ParseError::new(ErrorKind::ExpectedBody, span)
                 }
             ),
         ])
-            .with_transform(|classifier| {
-                let sequence = classifier.form.as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
@@ -562,7 +584,7 @@ impl<'parser> Parser<'parser> {
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
                 symbol.scope.extend(fields);
 
-                classifier.form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));
+                *form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));
 
                 Ok(())
             })

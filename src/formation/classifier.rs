@@ -7,8 +7,8 @@ use {
     },
     crate::{
         data::{
-            memory::{take},
-            sync::{Rc},
+            memory::take,
+            sync::Rc,
             Boolean, Offset, Scale,
         },
         tracker::{Location, Position},
@@ -24,10 +24,10 @@ pub struct Classifier<
     pub order: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     pub marker: Offset,
     pub position: Position<'classifier>,
-    pub consumed: Vec<Input>,
+    pub consumed: Vec<usize>,
     pub record: Record,
-    pub form: Form<'classifier, Input, Output, Failure>,
-    pub stack: Vec<Form<'classifier, Input, Output, Failure>>,
+    pub form: usize,
+    pub stack: Vec<usize>,
     pub depth: Scale,
 }
 
@@ -50,7 +50,7 @@ impl<
             position,
             consumed: Vec::new(),
             record: Record::Blank,
-            form: Form::Blank,
+            form: 0,
             stack: Vec::new(),
             depth: 0,
         }
@@ -69,7 +69,7 @@ impl<
             position,
             consumed: Vec::new(),
             record: Record::Blank,
-            form: Form::Blank,
+            form: 0,
             stack: Vec::new(),
             depth,
         }
@@ -86,7 +86,7 @@ impl<
             position: self.position,
             consumed: Vec::new(),
             record: Record::Blank,
-            form: Form::Blank,
+            form: 0,
             stack: take(&mut self.stack),
             depth: self.depth + 1,
         }
@@ -324,7 +324,7 @@ impl<
     #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(&mut Former<'_, 'classifier, Input, Output, Failure>, Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -363,7 +363,7 @@ impl<
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        F: Fn(&mut Former<'_, 'classifier, Input, Output, Failure>, Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         self.with_order(Self::panic(emitter))
     }
@@ -390,6 +390,7 @@ impl<
     pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: Fn(
+            &mut Former<'_, 'classifier, Input, Output, Failure>,
             &mut Classifier<'classifier, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + 'classifier,
@@ -421,6 +422,7 @@ impl<
     ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: Fn(
+            &mut Former<'_, 'classifier, Input, Output, Failure>,
             &mut Classifier<'classifier, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + 'classifier,
@@ -433,7 +435,7 @@ impl<
     #[inline]
     pub fn fail<T>(emitter: T) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(&mut Former<'_, 'classifier, Input, Output, Failure>, Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -443,7 +445,7 @@ impl<
     #[inline]
     pub fn panic<T>(emitter: T) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
+        T: Fn(&mut Former<'_, 'classifier, Input, Output, Failure>, Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
         Rc::new(Panic {
             emitter: Rc::new(emitter),
@@ -532,11 +534,15 @@ impl<
                 former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
-                classifier.consumed.push(peek.clone());
 
-                let form = Form::input(peek);
-                classifier.form = form.clone();
-                classifier.stack.push(form);
+                let consumed_id = former.consumed.len();
+                former.consumed.push(peek.clone());
+                classifier.consumed.push(consumed_id);
+
+                let form_id = former.forms.len();
+                former.forms.push(Form::input(peek));
+                classifier.form = form_id;
+                classifier.stack.push(form_id);
             } else {
                 classifier.set_empty();
             }
@@ -572,7 +578,7 @@ Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failur
             classifier.set_empty();
         } else if child.is_effected() {
             classifier.set_align();
-            classifier.form = Form::Blank;
+            classifier.form = 0;
         } else {
             classifier.set_empty();
         }
@@ -604,11 +610,15 @@ impl<
                 former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
-                classifier.consumed.push(value.clone());
 
-                let form = Form::input(value);
-                classifier.form = form.clone();
-                classifier.stack.push(form);
+                let consumed_id = former.consumed.len();
+                former.consumed.push(value.clone());
+                classifier.consumed.push(consumed_id);
+
+                let form_id = former.forms.len();
+                former.forms.push(Form::input(value));
+                classifier.form = form_id;
+                classifier.stack.push(form_id);
             } else {
                 classifier.set_empty();
             }
@@ -655,8 +665,8 @@ where
                 position: classifier.position,
                 consumed: Vec::new(),
                 record: Record::Blank,
-                form: Form::Blank,
-                stack: current_stack, 
+                form: 0,
+                stack: current_stack,
                 depth: classifier.depth + 1,
             };
 
@@ -694,7 +704,7 @@ where
                 classifier.marker = champion.marker;
                 classifier.position = champion.position;
                 classifier.consumed = take(&mut champion.consumed);
-                classifier.form = take(&mut champion.form);
+                classifier.form = champion.form;
                 classifier.stack = current_stack;
             }
             None => {
@@ -739,7 +749,7 @@ impl<
         classifier.position = resolved.position;
         classifier.consumed = take(&mut resolved.consumed);
         classifier.record = resolved.record;
-        classifier.form = take(&mut resolved.form);
+        classifier.form = resolved.form;
         classifier.stack = take(&mut resolved.stack);
     }
 }
@@ -774,7 +784,7 @@ impl<
             classifier.marker = child.marker;
             classifier.position = child.position;
             classifier.consumed = take(&mut child.consumed);
-            classifier.form = take(&mut child.form);
+            classifier.form = child.form;
             classifier.stack = take(&mut child.stack);
             classifier.set_align();
         } else {
@@ -813,7 +823,7 @@ impl<
         classifier.position = child.position;
         classifier.consumed = take(&mut child.consumed);
         classifier.record = child.record;
-        classifier.form = take(&mut child.form);
+        classifier.form = child.form;
         classifier.stack = take(&mut child.stack);
     }
 }
@@ -844,7 +854,7 @@ Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failur
         classifier.marker = child.marker;
         classifier.position = child.position;
         classifier.consumed = take(&mut child.consumed);
-        classifier.form = take(&mut child.form);
+        classifier.form = child.form;
         classifier.stack = take(&mut child.stack);
 
         if child.is_aligned() {
@@ -897,7 +907,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 position,
                 consumed: Vec::new(),
                 record: Record::Blank,
-                form: Form::Blank,
+                form: 0,
                 stack,
                 depth: classifier.depth + 1,
             };
@@ -910,7 +920,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     index = child.marker;
                     position = child.position;
                     consumed.extend(take(&mut child.consumed));
-                    forms.push(take(&mut child.form));
+                    forms.push(child.form);
                     stack = take(&mut child.stack);
                 }
                 Record::Panicked | Record::Failed => {
@@ -918,7 +928,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                     index = child.marker;
                     position = child.position;
                     consumed.extend(take(&mut child.consumed));
-                    forms.push(take(&mut child.form));
+                    forms.push(child.form);
                     stack = take(&mut child.stack);
                     break;
                 }
@@ -938,7 +948,12 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
         classifier.marker = index;
         classifier.position = position;
         classifier.consumed = consumed;
-        classifier.form = Form::multiple(forms);
+
+        let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
+        let form_id = former.forms.len();
+        former.forms.push(multi_form);
+        classifier.form = form_id;
+
         classifier.stack = stack;
     }
 }
@@ -984,7 +999,7 @@ for Repetition<'repetition, Input, Output, Failure>
                 position,
                 consumed: Vec::new(),
                 record: Record::Blank,
-                form: Form::Blank,
+                form: 0,
                 stack,
                 depth: classifier.depth + 1,
             };
@@ -1002,7 +1017,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         index = child.marker;
                         position = child.position;
                         consumed.extend(take(&mut child.consumed));
-                        forms.push(take(&mut child.form));
+                        forms.push(child.form);
                         stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
@@ -1021,7 +1036,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         index = child.marker;
                         position = child.position;
                         consumed.extend(take(&mut child.consumed));
-                        forms.push(take(&mut child.form));
+                        forms.push(child.form);
                         stack = take(&mut child.stack);
                         break;
                     }
@@ -1030,7 +1045,7 @@ for Repetition<'repetition, Input, Output, Failure>
                         index = child.marker;
                         position = child.position;
                         consumed.extend(take(&mut child.consumed));
-                        forms.push(take(&mut child.form));
+                        forms.push(child.form);
                         stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
@@ -1058,7 +1073,12 @@ for Repetition<'repetition, Input, Output, Failure>
             classifier.marker = index;
             classifier.position = position;
             classifier.consumed = consumed;
-            classifier.form = Form::multiple(forms);
+
+            let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
+            let form_id = former.forms.len();
+            former.forms.push(multi_form);
+            classifier.form = form_id;
+
             classifier.stack = stack;
         } else {
             if self.persist {

@@ -34,15 +34,16 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            move |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            move |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) { 
                     Ok(number) => {
-                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
                         
                         Ok(())
                     }
@@ -69,15 +70,16 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
                     Ok(number) => {
-                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
 
                         Ok(())
                     }
@@ -104,15 +106,16 @@ impl<'scanner> Scanner<'scanner> {
                     None,
                 ),
             ]),
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
                     Ok(number) => {
-                        classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
 
                         Ok(())
                     }
@@ -155,8 +158,9 @@ impl<'scanner> Scanner<'scanner> {
                     ])
                 ),
             ]),
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let number: Str = inputs.into_iter().collect();
 
@@ -165,7 +169,7 @@ impl<'scanner> Scanner<'scanner> {
                     
                     match parser.parse(&number) {
                         Ok(number) => {
-                            classifier.form = Form::output(Token::new(TokenKind::Float(Float::from(number)), span));
+                            *form = Form::output(Token::new(TokenKind::Float(Float::from(number)), span));
 
                             Ok(())
                         }
@@ -179,7 +183,7 @@ impl<'scanner> Scanner<'scanner> {
                     
                     match parser.parse(&number) {
                         Ok(number) => {
-                            classifier.form = Form::output(Token::new(TokenKind::Integer(number), span));
+                            *form = Form::output(Token::new(TokenKind::Integer(number), span));
 
                             Ok(())
                         }

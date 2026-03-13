@@ -22,8 +22,9 @@ impl<'scanner> Scanner<'scanner> {
             }),
         ])
         .with_transform(
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let span = inputs.borrow_span().clone();
                 let escape = inputs[1];
 
@@ -48,7 +49,7 @@ impl<'scanner> Scanner<'scanner> {
                     }
                 };
 
-                classifier.form = Form::Input(Character::new(escaped, span));
+                *form =Form::Input(Character::new(escaped, span));
 
                 Ok(())
             },
@@ -66,8 +67,9 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
                 let span = inputs.borrow_span().clone();
 
@@ -82,7 +84,7 @@ impl<'scanner> Scanner<'scanner> {
 
                         match from_u32(code_point) {
                             Some(ch) => {
-                                classifier.form = Form::Input(Character::new(ch, span));
+                                *form =Form::Input(Character::new(ch, span));
 
                                 Ok(())
                             },
@@ -113,8 +115,9 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
                 let span = inputs.borrow_span().clone();
 
@@ -129,7 +132,7 @@ impl<'scanner> Scanner<'scanner> {
 
                         match from_u32(code_point) {
                             Some(ch) => {
-                                classifier.form = Form::Input(Character::new(ch, span));
+                                *form =Form::Input(Character::new(ch, span));
 
                                 Ok(())
                             },
@@ -162,8 +165,9 @@ impl<'scanner> Scanner<'scanner> {
             Classifier::literal('}'),
         ])
         .with_transform(
-            |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let digits: Str = inputs
                     .iter()
                     .skip(3)
@@ -182,7 +186,7 @@ impl<'scanner> Scanner<'scanner> {
                 match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                     Some(code_point) => match from_u32(code_point) {
                         Some(ch) => {
-                            classifier.form = Form::Input(Character::new(ch, span));
+                            *form =Form::Input(Character::new(ch, span));
 
                             Ok(())
                         },
@@ -218,15 +222,16 @@ impl<'scanner> Scanner<'scanner> {
             ),
         ])
         .with_transform(
-            move |classifier| {
-                let inputs = classifier.form.collect_inputs();
+            move |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let inputs = form.collect_inputs();
                 let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
                 let span = inputs.span().clone();
 
                 match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                     Some(code_point) => match from_u32(code_point) {
                         Some(ch) => {
-                            classifier.form = Form::Input(Character::new(ch, span));
+                            *form =Form::Input(Character::new(ch, span));
 
                             Ok(())
                         },

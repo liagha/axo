@@ -35,10 +35,11 @@ impl<'parser> Parser<'parser> {
                     false
                 }
             }),
-            |classifier| {
-                let input = &classifier.form.collect_inputs()[0];
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let input = &form.collect_inputs()[0];
 
-                classifier.form = Form::output(
+                *form = Form::output(
                     Element::new(
                         ElementKind::literal(input.clone()),
                         input.span,
@@ -66,9 +67,10 @@ impl<'parser> Parser<'parser> {
             }),
             Self::primary(),
         ])
-            .with_transform(|classifier| {
-                let prefixes = classifier.form.collect_inputs();
-                let operand = classifier.form.collect_outputs()[0].clone();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let prefixes = form.collect_inputs();
+                let operand = form.collect_outputs()[0].clone();
                 let mut unary = operand;
 
                 for prefix in prefixes {
@@ -80,7 +82,7 @@ impl<'parser> Parser<'parser> {
                     );
                 }
 
-                classifier.form = Form::output(unary);
+                *form = Form::output(unary);
 
                 Ok(())
             })
@@ -108,8 +110,9 @@ impl<'parser> Parser<'parser> {
                     None,
                 ),
             ]),
-            |classifier| {
-                let sequence = classifier.form.as_forms();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let operand = sequence[0].unwrap_output();
                 let suffixes = sequence[1].as_forms();
                 let mut unary = operand.clone();
@@ -197,7 +200,7 @@ impl<'parser> Parser<'parser> {
                     }
                 }
 
-                classifier.form = Form::output(unary);
+                *form = Form::output(unary);
 
                 Ok(())
             },
@@ -231,8 +234,9 @@ impl<'parser> Parser<'parser> {
                     None,
                 ),
             ]),
-            move |classifier| {
-                let sequence = classifier.form.as_forms();
+            move |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
                 let mut left = sequence[0].unwrap_output().clone();
                 let operations = sequence[1].as_forms();
                 let mut pairs = Vec::new();
@@ -253,7 +257,7 @@ impl<'parser> Parser<'parser> {
 
                 left = Self::climb(left, pairs, 0);
 
-                classifier.form = Form::output(left);
+                *form = Form::output(left);
 
                 Ok(())
             },
@@ -331,11 +335,12 @@ impl<'parser> Parser<'parser> {
     {
         Classifier::with_fail(
             Classifier::anything(),
-            |classifier| {
-                let token = classifier.form.unwrap_input();
+            |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let token = form.unwrap_input();
 
                 ParseError::new(
-                    ErrorKind::UnexpectedToken(classifier.form.unwrap_input().clone().kind),
+                    ErrorKind::UnexpectedToken(form.unwrap_input().clone().kind),
                     token.span,
                 )
             },

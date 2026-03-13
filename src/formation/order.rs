@@ -3,7 +3,7 @@ use {
         classifier::Classifier,
         form::Form,
         former::Former,
-        helper::{Emitter, Formable, Inspector, Performer, Transformer},
+        helper::{Formable, Inspector, Performer},
     },
     crate::data::sync::Rc,
 };
@@ -30,7 +30,7 @@ Order<'align, Input, Output, Failure> for Align
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'align, Input, Output, Failure>,
+        _former: &mut Former<'_, 'align, Input, Output, Failure>,
         classifier: &mut Classifier<'align, Input, Output, Failure>,
     ) {
         classifier.set_align();
@@ -67,7 +67,7 @@ Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failur
 }
 
 pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>> {
-    pub emitter: Emitter<'fail, Input, Output, Failure>,
+    pub emitter: Rc<dyn Fn(&mut Former<'_, 'fail, Input, Output, Failure>, Classifier<'fail, Input, Output, Failure>) -> Failure + 'fail>,
 }
 
 impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>>
@@ -76,14 +76,17 @@ Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'fail, Input, Output, Failure>,
+        former: &mut Former<'_, 'fail, Input, Output, Failure>,
         classifier: &mut Classifier<'fail, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
-            let failure = (self.emitter)(classifier.clone());
+            let failure = (self.emitter)(former, classifier.clone());
+
+            let form_id = former.forms.len();
+            former.forms.push(Form::Failure(failure));
 
             classifier.set_fail();
-            classifier.form = Form::Failure(failure);
+            classifier.form = form_id;
         }
     }
 }
@@ -96,12 +99,12 @@ Order<'ignore, Input, Output, Failure> for Ignore
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'ignore, Input, Output, Failure>,
+        _former: &mut Former<'_, 'ignore, Input, Output, Failure>,
         classifier: &mut Classifier<'ignore, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_ignore();
-            classifier.form = Form::<Input, Output, Failure>::Blank;
+            classifier.form = 0;
         }
     }
 }
@@ -167,7 +170,7 @@ pub struct Panic<
     Output: Formable<'panic>,
     Failure: Formable<'panic>,
 > {
-    pub emitter: Emitter<'panic, Input, Output, Failure>,
+    pub emitter: Rc<dyn Fn(&mut Former<'_, 'panic, Input, Output, Failure>, Classifier<'panic, Input, Output, Failure>) -> Failure + 'panic>,
 }
 
 impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>>
@@ -176,15 +179,17 @@ Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'panic, Input, Output, Failure>,
+        former: &mut Former<'_, 'panic, Input, Output, Failure>,
         classifier: &mut Classifier<'panic, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
-            let failure = (self.emitter)(classifier.clone());
+            let failure = (self.emitter)(former, classifier.clone());
 
-            let form = Form::Failure(failure);
+            let form_id = former.forms.len();
+            former.forms.push(Form::Failure(failure));
+
             classifier.set_panic();
-            classifier.form = form;
+            classifier.form = form_id;
         }
     }
 }
@@ -197,7 +202,7 @@ Order<'pardon, Input, Output, Failure> for Pardon
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'pardon, Input, Output, Failure>,
+        _former: &mut Former<'_, 'pardon, Input, Output, Failure>,
         classifier: &mut Classifier<'pardon, Input, Output, Failure>,
     ) {
         classifier.set_empty();
@@ -218,7 +223,7 @@ impl<
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'perform, Input, Output, Failure>,
+        _former: &mut Former<'_, 'perform, Input, Output, Failure>,
         classifier: &mut Classifier<'perform, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
@@ -235,12 +240,12 @@ Order<'skip, Input, Output, Failure> for Skip
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'skip, Input, Output, Failure>,
+        _former: &mut Former<'_, 'skip, Input, Output, Failure>,
         classifier: &mut Classifier<'skip, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_empty();
-            classifier.form = Form::<Input, Output, Failure>::Blank;
+            classifier.form = 0;
         }
     }
 }
@@ -251,7 +256,7 @@ pub struct Transform<
     Output: Formable<'transform>,
     Failure: Formable<'transform>,
 > {
-    pub transformer: Transformer<'transform, Input, Output, Failure>,
+    pub transformer: Rc<dyn Fn(&mut Former<'_, 'transform, Input, Output, Failure>, &mut Classifier<'transform, Input, Output, Failure>) -> Result<(), Failure> + 'transform>,
 }
 
 impl<
@@ -264,18 +269,21 @@ impl<
     #[inline]
     fn order(
         &self,
-        _composer: &mut Former<'_, 'transform, Input, Output, Failure>,
+        former: &mut Former<'_, 'transform, Input, Output, Failure>,
         classifier: &mut Classifier<'transform, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
-            let result = self.transformer.clone()(classifier);
+            let result = (self.transformer)(former, classifier);
 
             match result {
                 Ok(_) => {
                 }
                 Err(error) => {
+                    let form_id = former.forms.len();
+                    former.forms.push(Form::Failure(error));
+
                     classifier.set_fail();
-                    classifier.form = Form::Failure(error);
+                    classifier.form = form_id;
                 }
             }
         }

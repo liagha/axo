@@ -53,21 +53,25 @@ pub struct Former<
     Failure: Formable<'former>,
 > {
     pub source: &'instance mut dyn Source<'former, Input>,
+    pub consumed: Vec<Input>,
+    pub forms: Vec<Form<'former, Input, Output, Failure>>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
 impl<
-        'instance,
-        'former,
-        Input: Formable<'former>,
-        Output: Formable<'former>,
-        Failure: Formable<'former>,
-    > Former<'instance, 'former, Input, Output, Failure>
+    'instance,
+    'former,
+    Input: Formable<'former>,
+    Output: Formable<'former>,
+    Failure: Formable<'former>,
+> Former<'instance, 'former, Input, Output, Failure>
 {
     #[inline(always)]
     pub fn new(source: &'instance mut dyn Source<'former, Input>) -> Self {
         Self {
             source,
+            consumed: Vec::new(),
+            forms: vec![Form::Blank], // Index 0 represents Blank
             _phantom: PhantomData,
         }
     }
@@ -92,6 +96,6 @@ impl<
             self.source.set_position(classifier.position);
         }
 
-        classifier.form
+        self.forms[classifier.form].clone()
     }
 }

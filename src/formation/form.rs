@@ -22,7 +22,7 @@ Default for Form<'form, Input, Output, Failure>
 }
 
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>>
-    Form<'form, Input, Output, Failure>
+Form<'form, Input, Output, Failure>
 {
     #[inline(always)]
     pub fn blank() -> Self {

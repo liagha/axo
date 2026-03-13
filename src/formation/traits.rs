@@ -46,29 +46,6 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     }
 }
 
-impl<
-        'classifier,
-        Input: Formable<'classifier> + Show<'classifier>,
-        Output: Formable<'classifier> + Show<'classifier>,
-        Failure: Formable<'classifier> + Show<'classifier>,
-    > Show<'classifier> for Classifier<'classifier, Input, Output, Failure>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'classifier> {
-        format!(
-            "Classifier(\n{}\n{}\n{}\n{}\n{}\n{}\n)",
-            format!("marker: {}", self.marker).indent(verbosity),
-            format!("consumed: {}", self.consumed.format(verbosity)).indent(verbosity),
-            format!("record: {:?}", self.record).indent(verbosity),
-            format!("form: {}", self.form.format(verbosity)).indent(verbosity),
-            format!("stack: {}", self.stack.format(verbosity)).indent(verbosity),
-            format!("depth: {}", self.depth).indent(verbosity),
-        )
-            .into()
-    }
-}
-
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Display
     for Form<'form, Input, Output, Failure>
 {

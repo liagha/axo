@@ -34,16 +34,18 @@ impl<'parser> Parser<'parser> {
                     None,
                 ),
                 Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)).with_panic(
-                    move |classifier| {
-                        let span = Form::multiple(classifier.stack).collect_inputs_iter().span();
+                    move |former, classifier| {
+                        let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = Form::multiple(stack).collect_inputs_iter().span();
 
                         ParseError::new(ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)), span)
                     }
                 ),
             ]),
-            move |classifier| {
-                let delimiters = classifier.form.collect_inputs();
-                let elements = classifier.form.collect_outputs();
+            move |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let delimiters = form.collect_inputs();
+                let elements = form.collect_outputs();
 
                 let Some(start) = delimiters.first() else {
                     return Err(ParseError::new(
@@ -105,7 +107,7 @@ impl<'parser> Parser<'parser> {
                     _ => unreachable!("unexpected bracket/separator combination"),
                 };
 
-                classifier.form = Form::output(Element::new(kind, span));
+                *form = Form::output(Element::new(kind, span));
 
                 Ok(())
             },
