@@ -8,7 +8,7 @@ use {
     crate::{
         data::{
             memory::{take},
-            sync::{Arc, Mutex},
+            sync::{Rc},
             Boolean, Offset, Scale,
         },
         tracker::{Location, Position},
@@ -21,7 +21,7 @@ pub struct Classifier<
     Output: Formable<'classifier>,
     Failure: Formable<'classifier>,
 > {
-    pub order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+    pub order: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     pub marker: Offset,
     pub position: Position<'classifier>,
     pub consumed: Vec<Input>,
@@ -40,7 +40,7 @@ impl<
 {
     #[inline]
     pub fn new(
-        classifier: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        classifier: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
         marker: Offset,
         position: Position<'classifier>,
     ) -> Self {
@@ -58,7 +58,7 @@ impl<
 
     #[inline]
     pub fn new_with_depth(
-        classifier: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        classifier: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
         marker: Offset,
         position: Position<'classifier>,
         depth: Scale,
@@ -78,7 +78,7 @@ impl<
     #[inline]
     fn create_child(
         &mut self,
-        order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        order: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     ) -> Self {
         Self {
             order,
@@ -150,8 +150,8 @@ impl<
     #[inline]
     pub fn literal(value: impl PartialEq<Input> + 'classifier) -> Self {
         Self::new(
-            Arc::new(Literal {
-                value: Arc::new(value),
+            Rc::new(Literal {
+                value: Rc::new(value),
             }),
             0,
             Position::new(Location::Void),
@@ -161,7 +161,7 @@ impl<
     #[inline]
     pub fn negate(classifier: Self) -> Self {
         Self::new(
-            Arc::new(Negate {
+            Rc::new(Negate {
                 classifier: Box::new(classifier),
             }),
             0,
@@ -175,8 +175,8 @@ impl<
         F: Fn(&Input) -> bool + 'classifier,
     {
         Self::new(
-            Arc::new(Predicate::<Input> {
-                function: Arc::new(predicate),
+            Rc::new(Predicate::<Input> {
+                function: Rc::new(predicate),
             }),
             0,
             Position::new(Location::Void),
@@ -186,7 +186,7 @@ impl<
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Arc::new(Alternative {
+            Rc::new(Alternative {
                 patterns,
                 perfection: vec![Record::Panicked, Record::Aligned],
                 blacklist: vec![Record::Blank],
@@ -199,7 +199,7 @@ impl<
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Arc::new(Sequence { patterns }),
+            Rc::new(Sequence { patterns }),
             0,
             Position::new(Location::Void),
         )
@@ -208,7 +208,7 @@ impl<
     #[inline]
     pub fn optional(classifier: Self) -> Self {
         Self::new(
-            Arc::new(Optional {
+            Rc::new(Optional {
                 classifier: Box::new(classifier),
             }),
             0,
@@ -219,7 +219,7 @@ impl<
     #[inline]
     pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Arc::new(Repetition {
+            Rc::new(Repetition {
                 classifier: Box::new(classifier),
                 minimum,
                 maximum,
@@ -233,7 +233,7 @@ impl<
     #[inline]
     pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Arc::new(Repetition {
+            Rc::new(Repetition {
                 classifier: Box::new(classifier),
                 minimum,
                 maximum,
@@ -247,7 +247,7 @@ impl<
     #[inline]
     pub fn wrapper(classifier: Self) -> Self {
         Self::new(
-            Arc::new(Wrapper {
+            Rc::new(Wrapper {
                 classifier: Box::new(classifier),
             }),
             0,
@@ -258,7 +258,7 @@ impl<
     #[inline]
     pub fn ranked(classifier: Self, precedence: i8) -> Self {
         Self::new(
-            Arc::new(Ranked {
+            Rc::new(Ranked {
                 classifier: Box::new(classifier),
                 precedence,
             }),
@@ -273,8 +273,8 @@ impl<
         F: Fn() -> Self + 'classifier,
     {
         Self::new(
-            Arc::new(Deferred {
-                function: Arc::new(factory),
+            Rc::new(Deferred {
+                function: Rc::new(factory),
             }),
             0,
             Position::new(Location::Void),
@@ -294,11 +294,11 @@ impl<
     #[inline]
     pub fn with_order(
         mut self,
-        order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        order: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     ) -> Self {
         let orders = vec![self.order.clone(), order];
-        let multiple: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
-            Arc::new(Multiple { orders });
+        let multiple: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
+            Rc::new(Multiple { orders });
 
         self.order = multiple;
         self
@@ -306,17 +306,17 @@ impl<
 
     #[inline]
     pub fn with_align(self) -> Self {
-        self.with_order(Arc::new(Align))
+        self.with_order(Rc::new(Align))
     }
 
     #[inline]
     pub fn with_branch(
         self,
-        found: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
-        missing: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        found: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        missing: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     ) -> Self {
-        let branch: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
-            Arc::new(Branch { found, missing });
+        let branch: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
+            Rc::new(Branch { found, missing });
 
         self.with_order(branch)
     }
@@ -326,14 +326,14 @@ impl<
     where
         F: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
-        self.with_order(Arc::new(Fail {
-            emitter: Arc::new(emitter),
+        self.with_order(Rc::new(Fail {
+            emitter: Rc::new(emitter),
         }))
     }
 
     #[inline]
     pub fn with_ignore(self) -> Self {
-        self.with_order(Arc::new(Ignore))
+        self.with_order(Rc::new(Ignore))
     }
 
     #[inline]
@@ -341,21 +341,21 @@ impl<
     where
         I: Fn(
             Classifier<'classifier, Input, Output, Failure>,
-        ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+        ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
         + 'classifier,
     {
-        self.with_order(Arc::new(Inspect {
-            inspector: Arc::new(inspector),
+        self.with_order(Rc::new(Inspect {
+            inspector: Rc::new(inspector),
         }))
     }
 
     #[inline]
     pub fn with_multiple(
         self,
-        orders: Vec<Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>,
+        orders: Vec<Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>,
     ) -> Self {
-        let multiple: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
-            Arc::new(Multiple { orders });
+        let multiple: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> =
+            Rc::new(Multiple { orders });
 
         self.with_order(multiple)
     }
@@ -370,26 +370,26 @@ impl<
 
     #[inline]
     pub fn with_pardon(self) -> Self {
-        self.with_order(Arc::new(Pardon))
+        self.with_order(Rc::new(Pardon))
     }
 
     #[inline]
     pub fn with_perform<F>(self, executor: F) -> Self
     where
-        F: FnMut() + 'classifier,
+        F: Fn() + 'classifier,
     {
         self.with_order(Self::perform(executor))
     }
 
     #[inline]
     pub fn with_skip(self) -> Self {
-        self.with_order(Arc::new(Skip))
+        self.with_order(Rc::new(Skip))
     }
 
     #[inline]
     pub fn with_transform<T>(self, transform: T) -> Self
     where
-        T: FnMut(
+        T: Fn(
             &mut Classifier<'classifier, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + 'classifier,
@@ -400,7 +400,7 @@ impl<
     #[inline]
     pub fn with_fallback(
         self,
-        order: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        order: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
     ) -> Self {
         self.with_branch(Self::perform(|| {}), order)
     }
@@ -418,99 +418,99 @@ impl<
     #[inline]
     pub fn transform<T>(
         transformer: T,
-    ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: FnMut(
+        T: Fn(
             &mut Classifier<'classifier, Input, Output, Failure>,
         ) -> Result<(), Failure>
         + 'classifier,
     {
-        Arc::new(Transform {
-            transformer: Arc::new(Mutex::new(transformer)),
+        Rc::new(Transform {
+            transformer: Rc::new(transformer),
         })
     }
 
     #[inline]
-    pub fn fail<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    pub fn fail<T>(emitter: T) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
-        Arc::new(Fail {
-            emitter: Arc::new(emitter),
+        Rc::new(Fail {
+            emitter: Rc::new(emitter),
         })
     }
 
     #[inline]
-    pub fn panic<T>(emitter: T) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    pub fn panic<T>(emitter: T) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: Fn(Classifier<'classifier, Input, Output, Failure>) -> Failure + 'classifier,
     {
-        Arc::new(Panic {
-            emitter: Arc::new(emitter),
+        Rc::new(Panic {
+            emitter: Rc::new(emitter),
         })
     }
 
     #[inline]
-    pub fn ignore() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
-        Arc::new(Ignore)
+    pub fn ignore() -> Rc<dyn Order<'classifier, Input, Output, Failure>> {
+        Rc::new(Ignore)
     }
 
     #[inline]
     pub fn inspect<T>(
         inspector: T,
-    ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
         T: Fn(
             Classifier<'classifier, Input, Output, Failure>,
-        ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+        ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
         + 'classifier,
     {
-        Arc::new(Inspect {
-            inspector: Arc::new(inspector),
+        Rc::new(Inspect {
+            inspector: Rc::new(inspector),
         })
     }
 
     #[inline]
     pub fn multiple(
-        orders: Vec<Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>,
-    ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
-        Arc::new(Multiple { orders })
+        orders: Vec<Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>>,
+    ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
+        Rc::new(Multiple { orders })
     }
 
     #[inline]
-    pub fn pardon() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
-        Arc::new(Pardon)
+    pub fn pardon() -> Rc<dyn Order<'classifier, Input, Output, Failure>> {
+        Rc::new(Pardon)
     }
 
     #[inline]
     pub fn perform<T>(
         executor: T,
-    ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
+    ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>
     where
-        T: FnMut() + 'classifier,
+        T: Fn() + 'classifier,
     {
-        Arc::new(Perform {
-            performer: Arc::new(Mutex::new(executor)),
+        Rc::new(Perform {
+            performer: Rc::new(executor),
         })
     }
 
     #[inline]
-    pub fn skip() -> Arc<dyn Order<'classifier, Input, Output, Failure>> {
-        Arc::new(Skip)
+    pub fn skip() -> Rc<dyn Order<'classifier, Input, Output, Failure>> {
+        Rc::new(Skip)
     }
 
     #[inline]
     pub fn branch(
-        found: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
-        missing: Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
-    ) -> Arc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
-        Arc::new(Branch { found, missing })
+        found: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+        missing: Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier>,
+    ) -> Rc<dyn Order<'classifier, Input, Output, Failure> + 'classifier> {
+        Rc::new(Branch { found, missing })
     }
 }
 
 #[derive(Clone)]
 pub struct Literal<'literal, Input> {
-    pub value: Arc<dyn PartialEq<Input> + 'literal>,
+    pub value: Rc<dyn PartialEq<Input> + 'literal>,
 }
 
 impl<
@@ -523,13 +523,13 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'literal, Input, Output, Failure>,
+        former: &mut Former<'_, 'literal, Input, Output, Failure>,
         classifier: &mut Classifier<'literal, Input, Output, Failure>,
     ) {
-        if let Some(peek) = composer.source.get(classifier.marker).cloned() {
+        if let Some(peek) = former.source.get(classifier.marker).cloned() {
             if self.value.eq(&peek) {
                 classifier.set_align();
-                composer
+                former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
                 classifier.consumed.push(peek.clone());
@@ -562,11 +562,11 @@ Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failur
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'negate, Input, Output, Failure>,
+        former: &mut Former<'_, 'negate, Input, Output, Failure>,
         classifier: &mut Classifier<'negate, Input, Output, Failure>,
     ) {
         let mut child = classifier.create_child(self.classifier.order.clone());
-        composer.build(&mut child);
+        former.build(&mut child);
 
         if child.is_aligned() {
             classifier.set_empty();
@@ -581,7 +581,7 @@ Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failur
 
 #[derive(Clone)]
 pub struct Predicate<'predicate, Input: Formable<'predicate>> {
-    pub function: Arc<dyn Fn(&Input) -> bool + 'predicate>,
+    pub function: Rc<dyn Fn(&Input) -> bool + 'predicate>,
 }
 
 impl<
@@ -594,14 +594,14 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'predicate, Input, Output, Failure>,
+        former: &mut Former<'_, 'predicate, Input, Output, Failure>,
         classifier: &mut Classifier<'predicate, Input, Output, Failure>,
     ) {
-        if let Some(peek) = composer.source.get(classifier.marker) {
+        if let Some(peek) = former.source.get(classifier.marker) {
             if (self.function)(peek) {
                 let value = peek.clone();
                 classifier.set_align();
-                composer
+                former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
                 classifier.consumed.push(value.clone());
@@ -641,7 +641,7 @@ where
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'alternative, Input, Output, Failure>,
+        former: &mut Former<'_, 'alternative, Input, Output, Failure>,
         classifier: &mut Classifier<'alternative, Input, Output, Failure>,
     ) {
         let mut best: Option<Classifier<'alternative, Input, Output, Failure>> = None;
@@ -660,7 +660,7 @@ where
                 depth: classifier.depth + 1,
             };
 
-            composer.build(&mut child);
+            former.build(&mut child);
 
             if self.blacklist.contains(&child.record) {
                 current_stack = take(&mut child.stack);
@@ -712,7 +712,7 @@ pub struct Deferred<
     Output: Formable<'deferred>,
     Failure: Formable<'deferred>,
 > {
-    pub function: Arc<dyn Fn() -> Classifier<'deferred, Input, Output, Failure> + 'deferred>,
+    pub function: Rc<dyn Fn() -> Classifier<'deferred, Input, Output, Failure> + 'deferred>,
 }
 
 impl<
@@ -725,7 +725,7 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'deferred, Input, Output, Failure>,
+        former: &mut Former<'_, 'deferred, Input, Output, Failure>,
         classifier: &mut Classifier<'deferred, Input, Output, Failure>,
     ) {
         let mut resolved = (self.function)();
@@ -733,7 +733,7 @@ impl<
         resolved.position = classifier.position;
         resolved.depth = classifier.depth + 1;
         resolved.stack = take(&mut classifier.stack);
-        composer.build(&mut resolved);
+        former.build(&mut resolved);
 
         classifier.marker = resolved.marker;
         classifier.position = resolved.position;
@@ -764,11 +764,11 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'optional, Input, Output, Failure>,
+        former: &mut Former<'_, 'optional, Input, Output, Failure>,
         classifier: &mut Classifier<'optional, Input, Output, Failure>,
     ) {
         let mut child = classifier.create_child(self.classifier.order.clone());
-        composer.build(&mut child);
+        former.build(&mut child);
 
         if child.is_effected() {
             classifier.marker = child.marker;
@@ -803,11 +803,11 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'wrapper, Input, Output, Failure>,
+        former: &mut Former<'_, 'wrapper, Input, Output, Failure>,
         classifier: &mut Classifier<'wrapper, Input, Output, Failure>,
     ) {
         let mut child = classifier.create_child(self.classifier.order.clone());
-        composer.build(&mut child);
+        former.build(&mut child);
 
         classifier.marker = child.marker;
         classifier.position = child.position;
@@ -835,11 +835,11 @@ Order<'ranked, Input, Output, Failure> for Ranked<'ranked, Input, Output, Failur
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'ranked, Input, Output, Failure>,
+        former: &mut Former<'_, 'ranked, Input, Output, Failure>,
         classifier: &mut Classifier<'ranked, Input, Output, Failure>,
     ) {
         let mut child = classifier.create_child(self.classifier.order.clone());
-        composer.build(&mut child);
+        former.build(&mut child);
 
         classifier.marker = child.marker;
         classifier.position = child.position;
@@ -880,7 +880,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'sequence, Input, Output, Failure>,
+        former: &mut Former<'_, 'sequence, Input, Output, Failure>,
         classifier: &mut Classifier<'sequence, Input, Output, Failure>,
     ) {
         let mut index = classifier.marker;
@@ -902,7 +902,7 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 depth: classifier.depth + 1,
             };
 
-            composer.build(&mut child);
+            former.build(&mut child);
 
             match child.record {
                 Record::Aligned => {
@@ -967,7 +967,7 @@ for Repetition<'repetition, Input, Output, Failure>
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'repetition, Input, Output, Failure>,
+        former: &mut Former<'_, 'repetition, Input, Output, Failure>,
         classifier: &mut Classifier<'repetition, Input, Output, Failure>,
     ) {
         let mut index = classifier.marker;
@@ -977,7 +977,7 @@ for Repetition<'repetition, Input, Output, Failure>
 
         let mut stack = take(&mut classifier.stack);
 
-        while composer.source.peek_ahead(index).is_some() {
+        while former.source.peek_ahead(index).is_some() {
             let mut child = Classifier {
                 order: self.classifier.order.clone(),
                 marker: index,
@@ -989,7 +989,7 @@ for Repetition<'repetition, Input, Output, Failure>
                 depth: classifier.depth + 1,
             };
 
-            composer.build(&mut child);
+            former.build(&mut child);
 
             if child.marker == index {
                 stack = take(&mut child.stack);

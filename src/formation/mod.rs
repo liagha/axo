@@ -8,7 +8,7 @@ pub mod helper {
     use {
         super::{classifier::Classifier, order::Order},
         crate::{
-            data::sync::{Arc, Mutex},
+            data::sync::{Rc},
             internal::hash::Hash,
             tracker::Peekable,
             format::Show,
@@ -37,24 +37,22 @@ pub mod helper {
     }
 
     pub type Emitter<'emitter, Input, Output, Failure> =
-    Arc<dyn Fn(Classifier<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
+    Rc<dyn Fn(Classifier<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
     pub type Evaluator<'evaluator, Input, Output, Failure> =
-    Arc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
-    pub type Inspector<'inspector, Input, Output, Failure> = Arc<
+    Rc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
+    pub type Inspector<'inspector, Input, Output, Failure> = Rc<
         dyn Fn(
             Classifier<'inspector, Input, Output, Failure>,
-        ) -> Arc<dyn Order<'inspector, Input, Output, Failure> + 'inspector>
+        ) -> Rc<dyn Order<'inspector, Input, Output, Failure> + 'inspector>
         + 'inspector,
     >;
-    pub type Performer<'performer> = Arc<Mutex<dyn FnMut() -> () + 'performer>>;
-    pub type Predicate<'predicate, Input> = Arc<dyn Fn(&Input) -> bool + 'predicate>;
+    pub type Performer<'performer> = Rc<dyn Fn() -> () + 'performer>;
+    pub type Predicate<'predicate, Input> = Rc<dyn Fn(&Input) -> bool + 'predicate>;
 
-    pub type Transformer<'transformer, Input, Output, Failure> = Arc<
-        Mutex<
-            dyn FnMut(
-                &mut Classifier<'transformer, Input, Output, Failure>,
-            ) -> Result<(), Failure>
-            + 'transformer,
-        >,
+    pub type Transformer<'transformer, Input, Output, Failure> = Rc<
+        dyn Fn(
+            &mut Classifier<'transformer, Input, Output, Failure>,
+        ) -> Result<(), Failure>
+        + 'transformer,
     >;
 }

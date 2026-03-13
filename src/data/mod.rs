@@ -76,6 +76,7 @@ pub mod slice {
 }
 
 pub mod sync {
+    pub use std::rc::Rc;
     pub use std::sync::{Arc, Mutex};
     pub use core::sync::atomic::{AtomicUsize, Ordering};
 }

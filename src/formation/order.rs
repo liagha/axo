@@ -5,7 +5,7 @@ use {
         former::Former,
         helper::{Emitter, Formable, Inspector, Performer, Transformer},
     },
-    crate::data::sync::Arc,
+    crate::data::sync::Rc,
 };
 
 pub trait Order<
@@ -17,7 +17,7 @@ pub trait Order<
 {
     fn order(
         &self,
-        composer: &mut Former<'_, 'order, Input, Output, Failure>,
+        former: &mut Former<'_, 'order, Input, Output, Failure>,
         classifier: &mut Classifier<'order, Input, Output, Failure>,
     );
 }
@@ -43,8 +43,8 @@ pub struct Branch<
     Output: Formable<'branch>,
     Failure: Formable<'branch>,
 > {
-    pub found: Arc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
-    pub missing: Arc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
+    pub found: Rc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
+    pub missing: Rc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
 }
 
 impl<'branch, Input: Formable<'branch>, Output: Formable<'branch>, Failure: Formable<'branch>>
@@ -53,7 +53,7 @@ Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failur
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'branch, Input, Output, Failure>,
+        former: &mut Former<'_, 'branch, Input, Output, Failure>,
         classifier: &mut Classifier<'branch, Input, Output, Failure>,
     ) {
         let chosen = if classifier.is_aligned() {
@@ -62,7 +62,7 @@ Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failur
             &self.missing
         };
 
-        chosen.order(composer, classifier);
+        chosen.order(former, classifier);
     }
 }
 
@@ -125,11 +125,11 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'inspector, Input, Output, Failure>,
+        former: &mut Former<'_, 'inspector, Input, Output, Failure>,
         classifier: &mut Classifier<'inspector, Input, Output, Failure>,
     ) {
         let order = (self.inspector)(classifier.clone());
-        order.order(composer, classifier);
+        order.order(former, classifier);
     }
 }
 
@@ -139,7 +139,7 @@ pub struct Multiple<
     Output: Formable<'multiple>,
     Failure: Formable<'multiple>,
 > {
-    pub orders: Vec<Arc<dyn Order<'multiple, Input, Output, Failure> + 'multiple>>,
+    pub orders: Vec<Rc<dyn Order<'multiple, Input, Output, Failure> + 'multiple>>,
 }
 
 impl<
@@ -152,11 +152,11 @@ impl<
     #[inline]
     fn order(
         &self,
-        composer: &mut Former<'_, 'multiple, Input, Output, Failure>,
+        former: &mut Former<'_, 'multiple, Input, Output, Failure>,
         classifier: &mut Classifier<'multiple, Input, Output, Failure>,
     ) {
         for order in self.orders.iter() {
-            order.order(composer, classifier);
+            order.order(former, classifier);
         }
     }
 }
@@ -222,10 +222,7 @@ impl<
         classifier: &mut Classifier<'perform, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
-            if let Ok(mut guard) = self.performer.lock() {
-                guard();
-                drop(guard);
-            }
+            self.performer.clone()();
         }
     }
 }
@@ -271,13 +268,7 @@ impl<
         classifier: &mut Classifier<'transform, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
-            let result = if let Ok(mut guard) = self.transformer.lock() {
-                let result = guard(classifier);
-                drop(guard);
-                result
-            } else {
-                return;
-            };
+            let result = self.transformer.clone()(classifier);
 
             match result {
                 Ok(_) => {
