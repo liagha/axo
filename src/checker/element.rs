@@ -4,7 +4,6 @@ use crate::{
     format::Show,
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
-    tracker::Span,
 };
 
 impl<'element> Checkable<'element> for Element<'element> {
@@ -13,24 +12,24 @@ impl<'element> Checkable<'element> for Element<'element> {
 
         let typ = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
-                TokenKind::Integer(_) => Type { kind: TypeKind::Integer { size: 64, signed: true }, span: literal.span },
-                TokenKind::Float(_) => Type { kind: TypeKind::Float { size: 64 }, span: literal.span },
-                TokenKind::Boolean(_) => Type { kind: TypeKind::Boolean, span: literal.span },
-                TokenKind::String(_) => Type { kind: TypeKind::String, span: literal.span },
-                TokenKind::Character(_) => Type { kind: TypeKind::Character, span: literal.span },
+                TokenKind::Integer(_) => Type::new(TypeKind::Integer { size: 64, signed: true }, literal.span),
+                TokenKind::Float(_) => Type::new(TypeKind::Float { size: 64 }, literal.span),
+                TokenKind::Boolean(_) => Type::new(TypeKind::Boolean, literal.span),
+                TokenKind::String(_) => Type::new(TypeKind::String, literal.span),
+                TokenKind::Character(_) => Type::new(TypeKind::Character, literal.span),
                 TokenKind::Identifier(_) => {
                     if let Some(identity) = self.reference {
                         checker.lookup(identity, literal.span)
                     } else {
                         checker.fresh(literal.span)
                     }
-                },
+                }
                 _ => Type::unit(literal.span),
             },
 
             ElementKind::Delimited(delimited) => match (
                 &delimited.start.kind,
-                delimited.separator.as_ref().map(|token| &token.kind),
+                delimited.separator.as_ref().map(|t| &t.kind),
                 &delimited.end.kind,
             ) {
                 (
@@ -47,7 +46,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                             member.check(checker);
                             members.push(member.typ.clone());
                         }
-                        Type { kind: TypeKind::Tuple { members }, span: Span::void() }
+                        Type::new(TypeKind::Tuple { members }, span)
                     }
                 }
 
@@ -57,7 +56,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     TokenKind::Punctuation(PunctuationKind::RightBrace),
                 ) => {
                     let scope = checker.environment.clone();
-                    let mut block = Type::new(TypeKind::Void, Span::void());
+                    let mut block = Type::new(TypeKind::Void, span);
                     let last = delimited.members.len().saturating_sub(1);
 
                     for (index, member) in delimited.members.iter_mut().enumerate() {
@@ -81,28 +80,28 @@ impl<'element> Checkable<'element> for Element<'element> {
                         member.check(checker);
                         inner = checker.unify(member.span, &inner, &member.typ);
                     }
-                    Type {
-                        kind: TypeKind::Array {
+                    Type::new(
+                        TypeKind::Array {
                             member: Box::new(inner),
                             size: delimited.members.len() as Scale,
                         },
-                        span: Span::void(),
-                    }
+                        span,
+                    )
                 }
 
-                _ => Type::unit(Span::void()),
+                _ => Type::unit(span),
             },
 
             ElementKind::Unary(unary) => {
                 unary.operand.check(checker);
 
-                let TokenKind::Operator(operator) = unary.operator.kind.clone() else {
+                let TokenKind::Operator(operator) = &unary.operator.kind else {
                     checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                     return;
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Exclamation] => checker.unify(span, &unary.operand.typ, &Type { kind: TypeKind::Boolean, span }),
+                    [OperatorKind::Exclamation] => checker.unify(span, &unary.operand.typ, &Type::new(TypeKind::Boolean, span)),
                     [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typ.clone(),
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
@@ -113,7 +112,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         };
 
                         if addressable {
-                            Type { kind: TypeKind::Pointer { target: Box::new(unary.operand.typ.clone()) }, span }
+                            Type::new(TypeKind::Pointer { target: Box::new(unary.operand.typ.clone()) }, span)
                         } else {
                             checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                             checker.fresh(span)
@@ -133,45 +132,59 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
 
             ElementKind::Binary(binary) => {
-                binary.left.check(checker);
-                binary.right.check(checker);
-
-                let TokenKind::Operator(operator) = binary.operator.kind.clone() else {
+                let TokenKind::Operator(operator) = &binary.operator.kind else {
                     checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
                     return;
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Equal] => checker.unify(span, &binary.left.typ, &binary.right.typ),
-                    [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                        let left = checker.concretize(&binary.left.typ);
-                        let right = checker.concretize(&binary.right.typ);
-
-                        if matches!(left.kind, TypeKind::Pointer { .. }) {
-                            left
-                        } else if matches!(right.kind, TypeKind::Pointer { .. }) {
-                            right
+                    [OperatorKind::Dot] => {
+                        binary.left.check(checker);
+                        if let ElementKind::Literal(Token { kind: TokenKind::Identifier(_), span: right_span }) = &binary.right.kind {
+                            let field_type = checker.fresh(*right_span);
+                            binary.right.typ = field_type.clone();
+                            field_type
                         } else {
-                            checker.unify(span, &left, &right)
+                            binary.right.check(checker);
+                            binary.right.typ.clone()
                         }
                     }
-                    [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                        checker.unify(span, &binary.left.typ, &binary.right.typ)
-                    }
-                    [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                        let boolean = Type { kind: TypeKind::Boolean, span };
-                        checker.unify(span, &binary.left.typ, &boolean);
-                        checker.unify(span, &binary.right.typ, &boolean);
-                        boolean
-                    }
-                    [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                        checker.unify(span, &binary.left.typ, &binary.right.typ);
-                        Type { kind: TypeKind::Boolean, span }
-                    }
-                    [OperatorKind::Dot] => binary.right.typ.clone(),
                     _ => {
-                        checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
-                        checker.fresh(span)
+                        binary.left.check(checker);
+                        binary.right.check(checker);
+
+                        match operator.as_slice() {
+                            [OperatorKind::Equal] => checker.unify(span, &binary.left.typ, &binary.right.typ),
+                            [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
+                                let left = checker.reify(&binary.left.typ);
+                                let right = checker.reify(&binary.right.typ);
+
+                                if matches!(left.kind, TypeKind::Pointer { .. }) {
+                                    left
+                                } else if matches!(right.kind, TypeKind::Pointer { .. }) {
+                                    right
+                                } else {
+                                    checker.unify(span, &left, &right)
+                                }
+                            }
+                            [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
+                                checker.unify(span, &binary.left.typ, &binary.right.typ)
+                            }
+                            [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
+                                let boolean = Type::new(TypeKind::Boolean, span);
+                                checker.unify(span, &binary.left.typ, &boolean);
+                                checker.unify(span, &binary.right.typ, &boolean);
+                                boolean
+                            }
+                            [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
+                                checker.unify(span, &binary.left.typ, &binary.right.typ);
+                                Type::new(TypeKind::Boolean, span)
+                            }
+                            _ => {
+                                checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
+                                checker.fresh(span)
+                            }
+                        }
                     }
                 }
             }
@@ -188,14 +201,14 @@ impl<'element> Checkable<'element> for Element<'element> {
                 let expected = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
                 checker.unify(span, &index.members[0].typ, &expected);
 
-                let target = checker.concretize(&index.target.typ);
+                let target = checker.reify(&index.target.typ);
 
                 match target.kind {
                     TypeKind::Pointer { target } => *target,
                     TypeKind::Array { member, .. } => *member,
                     TypeKind::Tuple { members } => {
                         if let ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) = index.members[0].kind {
-                            if let Some(position) = usize::try_from(value).ok().filter(|&position| position < members.len()) {
+                            if let Some(position) = usize::try_from(value).ok().filter(|&p| p < members.len()) {
                                 members[position].clone()
                             } else {
                                 checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
@@ -220,14 +233,14 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                for member in invoke.members.iter_mut() {
+                for member in &mut invoke.members {
                     member.check(checker);
                 }
 
-                let primitive = invoke.target.brand().and_then(|token| match token.kind {
+                let primitive = invoke.target.brand().and_then(|t| match &t.kind {
                     TokenKind::Identifier(name) => Some(name),
                     _ => None,
-                }).and_then(|name| name.as_str());
+                }).and_then(|n| n.as_str());
 
                 match primitive {
                     Some("if") => {
@@ -244,7 +257,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         invoke.target.check(checker);
 
                         let output = checker.fresh(span);
-                        let arguments = invoke.members.iter().map(|member| member.typ.clone()).collect();
+                        let arguments = invoke.members.iter().map(|m| m.typ.clone()).collect();
                         let function = Type::new(TypeKind::Function(Str::default(), arguments, Some(Box::new(output.clone()))), span);
 
                         let unified = checker.unify(span, &invoke.target.typ, &function);
@@ -259,14 +272,31 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
 
             ElementKind::Construct(construct) => {
-                for field in construct.members.iter_mut() {
+                construct.target.check(checker);
+
+                for field in &mut construct.members {
+                    if let ElementKind::Binary(binary) = &mut field.kind {
+                        if let TokenKind::Operator(operator) = &binary.operator.kind {
+                            if operator.as_slice() == [OperatorKind::Equal] {
+                                if let ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) = binary.left.kind {
+                                    binary.left.typ = checker.fresh(binary.left.span);
+                                } else {
+                                    binary.left.check(checker);
+                                }
+                                binary.right.check(checker);
+                                field.typ = checker.unify(field.span, &binary.left.typ, &binary.right.typ);
+                                continue;
+                            }
+                        }
+                    }
                     field.check(checker);
                 }
 
-                let members = construct.members.iter().map(|field| field.typ.clone()).collect();
-                let structure = Structure::new(Str::from(construct.target.brand().unwrap().format(0)), members);
+                let members = construct.members.iter().map(|f| f.typ.clone()).collect();
+                let head = construct.target.brand().unwrap().format(0).into();
+                let structure = Type::new(TypeKind::Structure(Structure::new(head, members)), span);
 
-                Type { kind: TypeKind::Structure(structure), span }
+                checker.unify(span, &construct.target.typ, &structure)
             }
 
             ElementKind::Symbolize(symbol) => {

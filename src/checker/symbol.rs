@@ -2,18 +2,28 @@ use crate::{
     checker::{Checkable, Checker, Type, TypeKind},
     data::Structure,
     format::Show,
-    parser::{Symbol, SymbolKind},
+    parser::{ElementKind, Symbol, SymbolKind},
+    scanner::TokenKind,
 };
 
 impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
     fn check(&mut self, checker: &mut Checker<'_, 'symbol>) {
         let typ = match &mut self.kind {
             SymbolKind::Binding(binding) => {
-                let declared = binding.annotation.as_ref().map(|annotation| {
-                    Type::annotation(annotation).unwrap_or_else(|error| {
-                        checker.errors.push(error);
-                        checker.fresh(self.span)
-                    })
+                let declared = binding.annotation.as_mut().map(|annotation| {
+                    match Type::annotation(annotation) {
+                        Ok(typ) => typ,
+                        Err(error) => {
+                            if let ElementKind::Literal(literal) = &annotation.kind {
+                                if matches!(literal.kind, TokenKind::Identifier(_)) {
+                                    annotation.check(checker);
+                                    return annotation.typ.clone();
+                                }
+                            }
+                            checker.errors.push(error);
+                            checker.fresh(self.span)
+                        }
+                    }
                 });
 
                 let inferred = binding.value.as_mut().map(|value| {
@@ -22,16 +32,15 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 });
 
                 match (declared, inferred) {
-                    (Some(source), Some(destination)) => checker.unify(self.span, &source, &destination),
+                    (Some(source), Some(target)) => checker.unify(self.span, &source, &target),
                     (Some(source), None) => source,
-                    (None, Some(destination)) => destination,
+                    (None, Some(target)) => target,
                     (None, None) => checker.fresh(self.span),
                 }
             }
 
             SymbolKind::Structure(structure) => {
                 let head = structure.target.brand().unwrap().format(0);
-
                 let members = structure.members.iter_mut().map(|member| {
                     member.check(checker);
                     member.typ.clone()
@@ -42,7 +51,6 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Union(union) => {
                 let head = union.target.brand().unwrap().format(0);
-
                 let members = union.members.iter_mut().map(|member| {
                     member.check(checker);
                     member.typ.clone()
@@ -55,17 +63,26 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 let head = function.target.brand().unwrap().format(0);
                 let scope = checker.environment.clone();
 
-                let members: Vec<_> = function.members.iter_mut().map(|member| {
+                let members = function.members.iter_mut().map(|member| {
                     member.check(checker);
                     checker.environment.insert(member.identity, member.typ.clone());
                     member.typ.clone()
                 }).collect();
 
-                let output = function.output.as_ref().map(|annotation| {
-                    Type::annotation(annotation).unwrap_or_else(|error| {
-                        checker.errors.push(error);
-                        checker.fresh(self.span)
-                    })
+                let output = function.output.as_mut().map(|annotation| {
+                    match Type::annotation(annotation) {
+                        Ok(typ) => typ,
+                        Err(error) => {
+                            if let ElementKind::Literal(literal) = &annotation.kind {
+                                if matches!(literal.kind, TokenKind::Identifier(_)) {
+                                    annotation.check(checker);
+                                    return annotation.typ.clone();
+                                }
+                            }
+                            checker.errors.push(error);
+                            checker.fresh(self.span)
+                        }
+                    }
                 });
 
                 if let Some(body) = &mut function.body {
@@ -78,17 +95,15 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                 checker.environment = scope;
 
                 let inferred = match (&output, &function.body) {
-                    (Some(expected), _) => Some(Box::new(checker.concretize(expected))),
-                    (None, Some(body)) => Some(Box::new(checker.concretize(&body.typ))),
+                    (Some(expected), _) => Some(Box::new(checker.reify(expected))),
+                    (None, Some(body)) => Some(Box::new(checker.reify(&body.typ))),
                     (None, None) => None,
                 };
 
                 Type::new(TypeKind::Function(head.into(), members, inferred), self.span)
             }
 
-            SymbolKind::Module(_) => {
-                Type::new(TypeKind::Void, self.span)
-            }
+            SymbolKind::Module(_) => Type::new(TypeKind::Void, self.span),
         };
 
         self.typ = typ;

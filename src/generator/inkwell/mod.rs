@@ -179,6 +179,15 @@ impl<'backend> Inkwell<'backend> {
 
                 typ.array_type(*size as u32).into()
             }
+            TypeKind::Tuple { members } => {
+                let mut typs = Vec::with_capacity(members.len());
+
+                for member in members {
+                    typs.push(self.to_basic_type(member, span.clone())?);
+                }
+
+                self.context.struct_type(&typs, false).into()
+            }
             TypeKind::Structure(structure) => {
                 if let Some(typ) = self
                     .get_entity(&structure.target)
@@ -193,12 +202,23 @@ impl<'backend> Inkwell<'backend> {
                     ) {
                     typ
                 } else {
-                    return Err(
-                        GenerateError::new(
-                            ErrorKind::InvalidType(typ.clone()),
-                            span
-                        )
-                    )
+                    let name = structure.target;
+
+                    let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
+                        self.context.opaque_struct_type(&name)
+                    });
+
+                    if shape.is_opaque() {
+                        let mut members = Vec::new();
+
+                        for member in &structure.members {
+                            members.push(self.to_basic_type(member, span.clone())?);
+                        }
+
+                        shape.set_body(&members, false);
+                    }
+
+                    shape.into()
                 }
             },
 
@@ -219,7 +239,7 @@ impl<'backend> Inkwell<'backend> {
         Ok(typ)
     }
 
-    pub fn from_basic_type(
+    pub fn to_type(
         &self,
         typ: BasicTypeEnum<'backend>,
         span: Span<'backend>,
@@ -245,13 +265,13 @@ impl<'backend> Inkwell<'backend> {
 
             BasicTypeEnum::PointerType(typ) => {
                 TypeKind::Pointer {
-                    target: Box::new(self.from_basic_type(typ.as_basic_type_enum(), span))
+                    target: Box::new(self.to_type(typ.as_basic_type_enum(), span))
                 }
             }
 
             BasicTypeEnum::StructType(structure) => {
                 let name = Str::from(structure.clone().get_name().clone().unwrap().to_str().unwrap().to_string());
-                let fields = structure.clone().get_field_types().iter().map(|basic| self.from_basic_type(*basic, span)).collect();
+                let fields = structure.clone().get_field_types().iter().map(|basic| self.to_type(*basic, span)).collect();
 
                 TypeKind::Structure(
                     Structure::new(
@@ -262,7 +282,7 @@ impl<'backend> Inkwell<'backend> {
             }
 
             BasicTypeEnum::ArrayType(array) => {
-                let member = self.from_basic_type(array.get_element_type(), span).into();
+                let member = self.to_type(array.get_element_type(), span).into();
 
 
                 TypeKind::Array {

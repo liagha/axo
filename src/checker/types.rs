@@ -31,15 +31,15 @@ impl<'source> Type<'source> {
                     "Int16" => TypeKind::Integer { size: 16, signed: true },
                     "Int32" => TypeKind::Integer { size: 32, signed: true },
                     "Int64" | "Integer" => TypeKind::Integer { size: 64, signed: true },
-                    
+
                     "UInt8" => TypeKind::Integer { size: 8, signed: false },
                     "UInt16" => TypeKind::Integer { size: 16, signed: false },
                     "UInt32" => TypeKind::Integer { size: 32, signed: false },
                     "UInt64" => TypeKind::Integer { size: 64, signed: false },
-                    
+
                     "Float32" => TypeKind::Float { size: 32 },
                     "Float64" | "Float" => TypeKind::Float { size: 64 },
-                    
+
                     "Boolean" => TypeKind::Boolean,
                     "Character" => TypeKind::Character,
                     "String" => TypeKind::String,

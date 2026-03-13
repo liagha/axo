@@ -191,10 +191,12 @@ impl<'session> Session<'session> {
             self.generate();
             if !self.errors.is_empty() { break 'pipeline; }
 
+            let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+            self.reporter.finish("compilation", duration);
+
             self.emit();
         }
-
-        let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         for error in &self.errors {
             match error {
@@ -208,8 +210,6 @@ impl<'session> Session<'session> {
                 CompileError::Track(error) => self.reporter.error(&error),
             }
         }
-
-        self.reporter.finish("compilation", duration);
     }
 
     pub fn scan(&mut self) {
@@ -304,8 +304,6 @@ impl<'session> Session<'session> {
         for module in modules {
             self.resolver.add(module);
         }
-
-        self.reporter.symbols(&self.resolver.scope.all());
     }
 
     pub fn resolve(&mut self) {
@@ -370,6 +368,8 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
+        self.reporter.symbols(&self.resolver.scope.all());
+
         self.reporter.finish("resolving", duration);
     }
 
@@ -431,7 +431,6 @@ impl<'session> Session<'session> {
 
     pub fn generate(&mut self) {
         let target_triple = inkwell::targets::TargetMachine::get_default_triple();
-
 
         for (identity, location) in &self.inputs.clone() {
             let stem = Str::from(location.stem().unwrap().to_string());

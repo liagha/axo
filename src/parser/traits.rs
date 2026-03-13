@@ -60,7 +60,7 @@ impl<'element> Show<'element> for ElementKind<'element> {
                     }
 
                     ElementKind::Construct(construct) => {
-                        construct.format(verbosity)
+                        format!("Construct({})", construct.format(verbosity)).into()
                     }
 
                     ElementKind::Symbolize(symbol) => {

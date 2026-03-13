@@ -1,34 +1,17 @@
-func main(): Integer {
-    var i = 0
+struct Point {
+    const x: Integer,
+    const y: Integer,
+}
 
-    while(
-        i < 10,
-        {
-            libc.println_i64(i)
+func get_position(const point: Point) {
+    libc.println_i64(point.z)
+    libc.println_i64(point.y)
+}
 
-            libc.print_str("Fac: ")
-            libc.println_i64(libc.factorial(i))
+func main() {
 
-            i = i + 1
-        }
-    )
+    var point = Point { x = 3, y = 4 }
 
-    const point = libc.Point { x = 3, y = 5 }
+    get_position(point)
 
-    libc.println_str("Old:")
-    libc.println_i64(point.x)
-
-    point.x = 6
-
-    libc.println_str("New:")
-
-    libc.println_i64(point.x)
-
-    libc.test_logic(2)
-
-    libc.test_array()
-
-    libc.test_user_input()
-
-    return(0)
 }

@@ -594,8 +594,13 @@ where
         if self.state != TimerState::Running {
             return Err(TimerError::NotRunning);
         }
+
         let elapsed = self.elapsed()?;
+
+        self.start_time = self.source.now();
+
         self.storage.push(elapsed)?;
+
         Ok(elapsed)
     }
 

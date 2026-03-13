@@ -354,7 +354,7 @@ impl<'parser> Parser<'parser> {
                         .with_ignore(),
                     Classifier::alternative([
                         Self::prefixed(),
-                        Self::literal(),
+                        Self::primary()
                     ]).with_panic(
                         |former, classifier| {
                             let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();

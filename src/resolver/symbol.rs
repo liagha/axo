@@ -1,19 +1,10 @@
 use {
-    super::{
-        Resolvable, Resolver,
-    },
-    crate::{
-        parser::{Symbol},
-    },
+    super::{Resolvable, Resolver},
+    crate::parser::{Symbol, SymbolKind},
 };
-use crate::parser::SymbolKind;
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
-    fn resolve(
-        &mut self,
-        resolver: &mut Resolver<'symbol>,
-    ) {
-        // Register the symbol initially so it is accessible recursively if needed
+    fn resolve(&mut self, resolver: &mut Resolver<'symbol>) {
         resolver.add(self.clone());
 
         match &mut self.kind {
@@ -33,10 +24,9 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.resolve(resolver);
                 }
 
-                // Capture the populated scope before exiting
-                let mut scope = resolver.scope.clone();
-                scope.parent = None;
-                self.scope = scope;
+                let mut local = resolver.scope.clone();
+                local.parent = None;
+                self.scope = local;
 
                 resolver.exit();
             }
@@ -47,10 +37,9 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.resolve(resolver);
                 }
 
-                // Capture the populated scope before exiting
-                let mut scope = resolver.scope.clone();
-                scope.parent = None;
-                self.scope = scope;
+                let mut local = resolver.scope.clone();
+                local.parent = None;
+                self.scope = local;
 
                 resolver.exit();
             }
@@ -69,18 +58,14 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     body.resolve(resolver);
                 }
 
-                // Capture the populated scope before exiting
-                let mut scope = resolver.scope.clone();
-                scope.parent = None;
-                self.scope = scope;
+                let local = resolver.scope.clone();
+                self.scope = local;
 
                 resolver.exit();
             }
             SymbolKind::Module(_) => {}
         }
 
-        // Re-add the finalized symbol to the resolver so that outer scopes
-        // receive the version with the fully populated `self.scope`.
         resolver.add(self.clone());
     }
 }

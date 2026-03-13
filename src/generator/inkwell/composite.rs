@@ -153,7 +153,10 @@ impl<'backend> Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("structure");
-        let shape = self.context.opaque_struct_type(string);
+
+        let shape = self.context.get_struct_type(string).unwrap_or_else(|| {
+            self.context.opaque_struct_type(string)
+        });
 
         let mut types = Vec::with_capacity(structure.members.len());
         let mut fields = Vec::with_capacity(structure.members.len());
@@ -167,7 +170,9 @@ impl<'backend> Inkwell<'backend> {
             }
         }
 
-        shape.set_body(&types, false);
+        if shape.is_opaque() {
+            shape.set_body(&types, false);
+        }
 
         self.insert_entity(
             identifier,
@@ -187,7 +192,10 @@ impl<'backend> Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let string = identifier.as_str().unwrap_or("union");
-        let shape = self.context.opaque_struct_type(string);
+
+        let shape = self.context.get_struct_type(string).unwrap_or_else(|| {
+            self.context.opaque_struct_type(string)
+        });
 
         let mut fields = Vec::with_capacity(structure.members.len());
         let mut largest_type: Option<BasicTypeEnum> = None;
@@ -202,16 +210,18 @@ impl<'backend> Inkwell<'backend> {
 
                 let size = self.size(typ);
                 if size >= max_size || largest_type.is_none() {
-                    max_size = size;
+                    max_size = max_size.max(size);
                     largest_type = Some(typ);
                 }
             }
         }
 
-        if let Some(largest) = largest_type {
-            shape.set_body(&[largest], false);
-        } else {
-            shape.set_body(&[], false);
+        if shape.is_opaque() {
+            if let Some(largest) = largest_type {
+                shape.set_body(&[largest], false);
+            } else {
+                shape.set_body(&[], false);
+            }
         }
 
         self.insert_entity(
@@ -356,17 +366,18 @@ impl<'backend> Inkwell<'backend> {
                     })?;
                 }
 
-                self.builder.build_load(shape, pointer, "union_val")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                let loaded = self.builder
+                    .build_load(shape, pointer, "union_val")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                Ok(loaded)
             }
 
-            Some(_) => Err(GenerateError::new(
-                ErrorKind::DataStructure(DataStructureError::NotAStructType { name: name_str }),
-                span,
-            )),
-
-            None => Err(GenerateError::new(
-                ErrorKind::DataStructure(DataStructureError::UnknownStructType { name: name_str }),
+            _ => Err(GenerateError::new(
+                ErrorKind::DataStructure(DataStructureError::UnknownField {
+                    struct_name: name_str.clone(),
+                    field_name: String::from("unknown_structure"),
+                }),
                 span,
             )),
         }

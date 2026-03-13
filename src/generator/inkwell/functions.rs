@@ -335,7 +335,7 @@ impl<'backend> super::Inkwell<'backend> {
                         bind.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
-                            typ: self.from_basic_type(parameter.get_type(), member.span),
+                            typ: self.to_type(parameter.get_type(), member.span),
                         },
                     );
                 }
@@ -542,7 +542,8 @@ impl<'backend> super::Inkwell<'backend> {
             for (position, argument) in invoke.members.iter().enumerate() {
                 let mut evaluated = self.analysis(argument.clone())?;
 
-                if let Some(kind) = expected.get(position) {
+                // FIX: Use `&kind` to copy the enum out of the reference
+                if let Some(&kind) = expected.get(position) {
                     if kind.is_pointer_type() {
                         if evaluated.is_array_value() {
                             let array_val = evaluated.into_array_value();
@@ -572,6 +573,14 @@ impl<'backend> super::Inkwell<'backend> {
 
                             evaluated = alloca.into();
                         }
+                    }
+
+                    if kind.is_struct_type() && evaluated.is_pointer_value() {
+                        // FIX: Cast `kind` into a struct type which implements `BasicType`
+                        let struct_type = kind.into_struct_type();
+                        evaluated = self.builder
+                            .build_load(struct_type, evaluated.into_pointer_value(), "struct_arg_load")
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     }
 
                     if evaluated.is_pointer_value() && kind.is_int_type() {
@@ -609,7 +618,7 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         Err(GenerateError::new(
-            ErrorKind::Function(FunctionError::Undefined {
+            ErrorKind::Function(crate::generator::FunctionError::Undefined {
                 name: invoke.target.to_string(),
             }),
             span,
