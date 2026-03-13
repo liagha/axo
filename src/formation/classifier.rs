@@ -571,8 +571,15 @@ Order<'negate, Input, Output, Failure> for Negate<'negate, Input, Output, Failur
         former: &mut Former<'_, 'negate, Input, Output, Failure>,
         classifier: &mut Classifier<'negate, Input, Output, Failure>,
     ) {
+        let checkpoint_consumed = former.consumed.len();
+        let checkpoint_forms = former.forms.len();
+
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
+
+        // Negate is a lookahead assertion; completely rollback all arena usage.
+        former.consumed.truncate(checkpoint_consumed);
+        former.forms.truncate(checkpoint_forms);
 
         if child.is_aligned() {
             classifier.set_empty();
@@ -658,6 +665,9 @@ where
         let initial_stack_len = classifier.stack.len();
         let mut current_stack = take(&mut classifier.stack);
 
+        let mut current_consumed_len = former.consumed.len();
+        let mut current_forms_len = former.forms.len();
+
         for pattern in &self.patterns {
             let mut child = Classifier {
                 order: pattern.order.clone(),
@@ -675,6 +685,8 @@ where
             if self.blacklist.contains(&child.record) {
                 current_stack = take(&mut child.stack);
                 current_stack.truncate(initial_stack_len);
+                former.consumed.truncate(current_consumed_len);
+                former.forms.truncate(current_forms_len);
                 continue;
             }
 
@@ -682,13 +694,19 @@ where
                 if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
                     *champion = child;
                     current_stack = take(&mut champion.stack);
+                    current_consumed_len = former.consumed.len();
+                    current_forms_len = former.forms.len();
                 } else {
                     current_stack = take(&mut child.stack);
                     current_stack.truncate(initial_stack_len);
+                    former.consumed.truncate(current_consumed_len);
+                    former.forms.truncate(current_forms_len);
                 }
             } else {
                 best = Some(child);
                 current_stack = take(&mut best.as_mut().unwrap().stack);
+                current_consumed_len = former.consumed.len();
+                current_forms_len = former.forms.len();
             }
 
             if let Some(ref champion) = best {
@@ -777,6 +795,9 @@ impl<
         former: &mut Former<'_, 'optional, Input, Output, Failure>,
         classifier: &mut Classifier<'optional, Input, Output, Failure>,
     ) {
+        let checkpoint_consumed = former.consumed.len();
+        let checkpoint_forms = former.forms.len();
+
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
@@ -788,6 +809,8 @@ impl<
             classifier.stack = take(&mut child.stack);
             classifier.set_align();
         } else {
+            former.consumed.truncate(checkpoint_consumed);
+            former.forms.truncate(checkpoint_forms);
             classifier.set_ignore();
         }
     }
@@ -898,7 +921,11 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
         let mut consumed = take(&mut classifier.consumed);
         let mut forms = Vec::with_capacity(SIZE);
 
+        let initial_consumed_len = former.consumed.len();
+        let initial_forms_len = former.forms.len();
+
         let mut stack = take(&mut classifier.stack);
+        let mut broke_on_blank = false;
 
         for pattern in &self.patterns {
             let mut child = Classifier {
@@ -940,21 +967,29 @@ for Sequence<'sequence, Input, Output, Failure, SIZE>
                 _ => {
                     classifier.record = child.record;
                     stack = take(&mut child.stack);
+                    broke_on_blank = true;
                     break;
                 }
             }
         }
 
-        classifier.marker = index;
-        classifier.position = position;
-        classifier.consumed = consumed;
+        if broke_on_blank {
+            // Unsuccessful sequence rollback cleans up partial progress efficiently
+            former.consumed.truncate(initial_consumed_len);
+            former.forms.truncate(initial_forms_len);
+            classifier.stack = stack;
+        } else {
+            classifier.marker = index;
+            classifier.position = position;
+            classifier.consumed = consumed;
 
-        let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
-        let form_id = former.forms.len();
-        former.forms.push(multi_form);
-        classifier.form = form_id;
+            let multi_form = Form::multiple(forms.into_iter().map(|id| former.forms[id].clone()).collect());
+            let form_id = former.forms.len();
+            former.forms.push(multi_form);
+            classifier.form = form_id;
 
-        classifier.stack = stack;
+            classifier.stack = stack;
+        }
     }
 }
 
@@ -990,9 +1025,15 @@ for Repetition<'repetition, Input, Output, Failure>
         let mut consumed = Vec::new();
         let mut forms = Vec::new();
 
+        let initial_consumed_len = former.consumed.len();
+        let initial_forms_len = former.forms.len();
+
         let mut stack = take(&mut classifier.stack);
 
         while former.source.peek_ahead(index).is_some() {
+            let loop_consumed_len = former.consumed.len();
+            let loop_forms_len = former.forms.len();
+
             let mut child = Classifier {
                 order: self.classifier.order.clone(),
                 marker: index,
@@ -1007,6 +1048,8 @@ for Repetition<'repetition, Input, Output, Failure>
             former.build(&mut child);
 
             if child.marker == index {
+                former.consumed.truncate(loop_consumed_len);
+                former.forms.truncate(loop_forms_len);
                 stack = take(&mut child.stack);
                 break;
             }
@@ -1021,11 +1064,15 @@ for Repetition<'repetition, Input, Output, Failure>
                         stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
+                        former.consumed.truncate(loop_consumed_len);
+                        former.forms.truncate(loop_forms_len);
                         index = child.marker;
                         position = child.position;
                         stack = take(&mut child.stack);
                     }
                     _ => {
+                        former.consumed.truncate(loop_consumed_len);
+                        former.forms.truncate(loop_forms_len);
                         stack = take(&mut child.stack);
                     }
                 }
@@ -1049,11 +1096,15 @@ for Repetition<'repetition, Input, Output, Failure>
                         stack = take(&mut child.stack);
                     }
                     Record::Ignored => {
+                        former.consumed.truncate(loop_consumed_len);
+                        former.forms.truncate(loop_forms_len);
                         index = child.marker;
                         position = child.position;
                         stack = take(&mut child.stack);
                     }
                     _ => {
+                        former.consumed.truncate(loop_consumed_len);
+                        former.forms.truncate(loop_forms_len);
                         stack = take(&mut child.stack);
                     }
                 }
@@ -1081,6 +1132,10 @@ for Repetition<'repetition, Input, Output, Failure>
 
             classifier.stack = stack;
         } else {
+            // Failed the minimum requirement, rollback ALL progress made inside loop
+            former.consumed.truncate(initial_consumed_len);
+            former.forms.truncate(initial_forms_len);
+
             if self.persist {
                 classifier.set_empty();
             }

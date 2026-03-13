@@ -70,8 +70,13 @@ impl<
     pub fn new(source: &'instance mut dyn Source<'former, Input>) -> Self {
         Self {
             source,
-            consumed: Vec::new(),
-            forms: vec![Form::Blank], // Index 0 represents Blank
+            consumed: Vec::with_capacity(2048),
+            forms: {
+                let mut forms = Vec::with_capacity(2048);
+                forms.push(Form::Blank);
+
+                forms
+            },
             _phantom: PhantomData,
         }
     }
