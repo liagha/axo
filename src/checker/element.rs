@@ -55,7 +55,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                     None | Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
                     TokenKind::Punctuation(PunctuationKind::RightBrace),
                 ) => {
-                    let scope = checker.environment.clone();
+                    checker.enter();
                     let mut block = Type::new(TypeKind::Void, span);
                     let last = delimited.members.len().saturating_sub(1);
 
@@ -66,7 +66,7 @@ impl<'element> Checkable<'element> for Element<'element> {
                         }
                     }
 
-                    checker.environment = scope;
+                    checker.leave();
                     block
                 }
 
@@ -140,14 +140,8 @@ impl<'element> Checkable<'element> for Element<'element> {
                 match operator.as_slice() {
                     [OperatorKind::Dot] => {
                         binary.left.check(checker);
-                        if let ElementKind::Literal(Token { kind: TokenKind::Identifier(_), span: right_span }) = &binary.right.kind {
-                            let field = checker.fresh(*right_span);
-                            binary.right.typ = field.clone();
-                            field
-                        } else {
-                            binary.right.check(checker);
-                            binary.right.typ.clone()
-                        }
+                        binary.right.check(checker);
+                        binary.right.typ.clone()
                     }
                     _ => {
                         binary.left.check(checker);
@@ -156,20 +150,20 @@ impl<'element> Checkable<'element> for Element<'element> {
                         match operator.as_slice() {
                             [OperatorKind::Equal] => checker.unify(span, &binary.left.typ, &binary.right.typ),
                             [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                                let lhs = checker.reify(&binary.left.typ);
-                                let rhs = checker.reify(&binary.right.typ);
+                                let left = checker.reify(&binary.left.typ);
+                                let right = checker.reify(&binary.right.typ);
 
-                                let is_void = |typ: &Type| matches!(&typ.kind, TypeKind::Pointer { target } if matches!(&target.kind, TypeKind::Void));
+                                let valid = |typ: &Type| matches!(&typ.kind, TypeKind::Integer { .. } | TypeKind::Float { .. } | TypeKind::Pointer { .. } | TypeKind::Variable(_));
 
-                                if is_void(&lhs) || is_void(&rhs) {
+                                if !valid(&left) || !valid(&right) {
                                     checker.errors.push(CheckError::new(ErrorKind::InvalidOperation(binary.operator.clone()), span));
                                     checker.fresh(span)
-                                } else if matches!(lhs.kind, TypeKind::Pointer { .. }) {
-                                    lhs
-                                } else if matches!(rhs.kind, TypeKind::Pointer { .. }) {
-                                    rhs
+                                } else if matches!(left.kind, TypeKind::Pointer { .. }) {
+                                    left
+                                } else if matches!(right.kind, TypeKind::Pointer { .. }) {
+                                    right
                                 } else {
-                                    checker.unify(span, &lhs, &rhs)
+                                    checker.unify(span, &left, &right)
                                 }
                             }
                             [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
@@ -204,10 +198,18 @@ impl<'element> Checkable<'element> for Element<'element> {
                 index.target.check(checker);
                 index.members[0].check(checker);
 
-                let expected = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
-                checker.unify(span, &index.members[0].typ, &expected);
-
                 let target = checker.reify(&index.target.typ);
+                let parameter = checker.reify(&index.members[0].typ);
+
+                let valid = match parameter.kind {
+                    TypeKind::Integer { .. } | TypeKind::Variable(_) => true,
+                    _ => false,
+                };
+
+                if !valid {
+                    let expected = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
+                    checker.errors.push(CheckError::new(ErrorKind::Mismatch(parameter.clone(), expected), span));
+                }
 
                 match target.kind {
                     TypeKind::Pointer { target } => *target,
@@ -307,13 +309,13 @@ impl<'element> Checkable<'element> for Element<'element> {
 
             ElementKind::Symbolize(symbol) => {
                 let pre = checker.fresh(span);
-                checker.environment.insert(symbol.identity, pre.clone());
+                checker.bind(symbol.identity, pre.clone());
 
                 symbol.check(checker);
 
                 let unified = checker.unify(span, &pre, &symbol.typ);
                 symbol.typ = unified.clone();
-                checker.environment.insert(symbol.identity, unified.clone());
+                checker.bind(symbol.identity, unified.clone());
 
                 unified
             }
@@ -321,7 +323,6 @@ impl<'element> Checkable<'element> for Element<'element> {
 
         self.typ = typ;
     }
-
 
     fn reify(&mut self, checker: &mut Checker<'_, 'element>) {
         self.typ = checker.reify(&self.typ);
@@ -342,19 +343,21 @@ impl<'element> Checkable<'element> for Element<'element> {
             }
             ElementKind::Index(index) => {
                 index.target.reify(checker);
-                
+
                 for member in &mut index.members {
                     member.reify(checker);
                 }
             }
             ElementKind::Invoke(invoke) => {
                 invoke.target.reify(checker);
-                
+
                 for member in &mut invoke.members {
                     member.reify(checker);
                 }
             }
             ElementKind::Construct(construct) => {
+                construct.target.reify(checker);
+
                 for member in &mut construct.members {
                     member.reify(checker);
                 }

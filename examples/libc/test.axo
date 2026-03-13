@@ -4,7 +4,7 @@ struct Point {
 }
 
 func get_position(const point: Point) {
-    libc.println_i64(point.z)
+    libc.println_i64(point.x)
     libc.println_i64(point.y)
 }
 

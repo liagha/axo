@@ -1,3 +1,4 @@
+// src/checker/types.rs
 use crate::{
     checker::{CheckError, Checker, ErrorKind},
     data::{Boolean, Identity, Scale, Str, Structure},
@@ -95,6 +96,34 @@ impl<'source> Type<'source> {
                     Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }, element.span))
                 } else {
                     Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
+                }
+            }
+
+            ElementKind::Binary(binary) => {
+                let TokenKind::Operator(operator) = &binary.operator.kind else {
+                    return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
+                };
+
+                match operator.as_slice() {
+                    [OperatorKind::Minus, OperatorKind::RightAngle] => {
+                        let mut parameters = Vec::new();
+
+                        match &binary.left.kind {
+                            ElementKind::Delimited(delimited) => {
+                                for member in &delimited.members {
+                                    parameters.push(Type::annotation(checker, member)?);
+                                }
+                            }
+                            _ => {
+                                parameters.push(Type::annotation(checker, &binary.left)?);
+                            }
+                        }
+
+                        let output = Type::annotation(checker, &binary.right)?;
+
+                        Ok(Type::new(TypeKind::Function(Str::default(), parameters, Some(Box::new(output))), element.span))
+                    }
+                    _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                 }
             }
 

@@ -1,5 +1,7 @@
 use {
-    super::{Resolvable, Resolver},
+    super::{
+        Resolvable, Resolver,
+    },
     crate::{
         parser::{Element, ElementKind, SymbolKind},
         scanner::{OperatorKind, Token, TokenKind},
@@ -7,15 +9,18 @@ use {
 };
 
 impl<'element> Resolvable<'element> for Element<'element> {
-    fn resolve(&mut self, resolver: &mut Resolver<'element>) {
+    fn resolve(
+        &mut self,
+        resolver: &mut Resolver<'element>,
+    ) {
         match &mut self.kind {
             ElementKind::Literal(_) => {}
 
             ElementKind::Delimited(delimited) => {
                 resolver.enter();
 
-                delimited.members.iter_mut().for_each(|member| {
-                    member.resolve(resolver);
+                delimited.members.iter_mut().for_each(|item| {
+                    item.resolve(resolver);
                 });
 
                 resolver.exit();
@@ -24,16 +29,51 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
+                let mut entered = false;
+
+                if let Some(reference) = construct.target.reference {
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                        if matches!(symbol.kind, SymbolKind::Structure(_) | SymbolKind::Union(_)) {
+                            let mut scope = symbol.scope.clone();
+                            scope.parent = Some(Box::new(resolver.scope.clone()));
+                            resolver.enter_scope(scope);
+                            entered = true;
+                        }
+                    }
+                }
+
                 for member in construct.members.iter_mut() {
                     member.resolve(resolver);
+                }
+
+                if entered {
+                    resolver.exit();
                 }
             }
 
             ElementKind::Invoke(invoke) => {
                 invoke.target.resolve(resolver);
 
+                let mut entered = false;
+
+                // Temporarily inject the function's scope to resolve named arguments.
+                if let Some(reference) = invoke.target.reference {
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                        if matches!(symbol.kind, SymbolKind::Function(_)) {
+                            let mut scope = symbol.scope.clone();
+                            scope.parent = Some(Box::new(resolver.scope.clone()));
+                            resolver.enter_scope(scope);
+                            entered = true;
+                        }
+                    }
+                }
+
                 for member in invoke.members.iter_mut() {
                     member.resolve(resolver);
+                }
+
+                if entered {
+                    resolver.exit();
                 }
             }
 
@@ -48,26 +88,26 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 match binary.operator.kind {
                     TokenKind::Operator(OperatorKind::Dot) => {
-                        let mut static_access = false;
+                        let mut is_namespace = false;
 
-                        if let Some(id) = binary.left.reference {
-                            if let Some(symbol) = resolver.scope.get_identity(id) {
-                                if matches!(
-                                    symbol.kind,
-                                    SymbolKind::Module(_)
-                                        | SymbolKind::Structure(_)
-                                        | SymbolKind::Union(_)
-                                ) {
-                                    static_access = true;
+                        if let Some(reference) = binary.left.reference {
+                            if let Some(symbol) = resolver.scope.get_identity(reference) {
+                                match &symbol.kind {
+                                    SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_) => {
+                                        is_namespace = true;
 
-                                    resolver.enter_scope(symbol.scope.clone());
-                                    binary.right.resolve(resolver);
-                                    resolver.exit();
+                                        resolver.enter_scope(symbol.scope.clone());
+
+                                        binary.right.resolve(resolver);
+
+                                        resolver.exit();
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
 
-                        if static_access {
+                        if is_namespace {
                             self.reference = binary.right.reference;
                         }
                     }
@@ -97,27 +137,29 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                      ..
                                  })
             | ElementKind::Construct(_)
-            | ElementKind::Invoke(_) => match resolver.scope.lookup(self) {
-                Ok(symbol) => {
-                    identity = Some(symbol.identity);
-                }
+            | ElementKind::Invoke(_) => {
+                match resolver.scope.lookup(self) {
+                    Ok(symbol) => {
+                        identity = Some(symbol.identity);
+                    }
 
-                Err(errors) => {
-                    resolver.errors.extend(errors);
+                    Err(errors) => {
+                        resolver.errors.extend(errors);
+                    }
                 }
-            },
+            }
             _ => {}
         }
 
-        if let Some(id) = identity {
-            self.reference = Some(id);
+        if let Some(identity) = identity {
+            self.reference = Some(identity);
 
             match &mut self.kind {
                 ElementKind::Construct(construct) => {
-                    construct.target.reference = Some(id);
+                    construct.target.reference = Some(identity);
                 }
                 ElementKind::Invoke(invoke) => {
-                    invoke.target.reference = Some(id);
+                    invoke.target.reference = Some(identity);
                 }
                 _ => {}
             }

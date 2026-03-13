@@ -1,3 +1,4 @@
+// src/checker/symbol.rs
 use crate::{
     checker::{Checkable, Checker, Type, TypeKind},
     data::Structure,
@@ -54,17 +55,22 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Function(function) => {
                 let head = function.target.brand().unwrap().format(0);
-                let scope = checker.environment.clone();
+
+                checker.enter();
 
                 let members = function.members.iter_mut().map(|member| {
                     member.check(checker);
-                    checker.environment.insert(member.identity, member.typ.clone());
+                    checker.bind(member.identity, member.typ.clone());
                     member.typ.clone()
                 }).collect();
 
-                let output = function.output.as_mut().map(|annotation| {
-                    match Type::annotation(checker, annotation) {
-                        Ok(typ) => typ,
+                let output = function.output.as_mut().map(|output| {
+                    match Type::annotation(checker, output) {
+                        Ok(typ) => {
+                            output.typ = typ.clone();
+
+                            typ
+                        },
                         Err(error) => {
                             checker.errors.push(error);
                             checker.fresh(self.span)
@@ -79,7 +85,7 @@ impl<'symbol> Checkable<'symbol> for Symbol<'symbol> {
                     }
                 }
 
-                checker.environment = scope;
+                checker.leave();
 
                 let inferred = match (&output, &function.body) {
                     (Some(expected), _) => Some(Box::new(checker.reify(expected))),

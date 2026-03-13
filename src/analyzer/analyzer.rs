@@ -113,11 +113,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::unit(self.span))
                 };
 
-                let output = if let Some(output) = &function.output {
-                    Type::annotation(&*output).ok()
-                } else {
-                    None
-                };
+                let output = function.output.clone().map(|output| output.typ);
 
                 let analyzed = Function::new(
                     Str::from(function.target.brand().unwrap().format(0)),
