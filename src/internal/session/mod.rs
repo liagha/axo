@@ -51,7 +51,6 @@ use {
 use {
     crate::{
         analyzer::AnalyzeError,
-        checker::{CheckError, Checker},
         generator::{Generator, GenerateError, Backend, Inkwell},
         tracker::Peekable,
     }
@@ -62,7 +61,6 @@ pub enum CompileError<'error> {
     Scan(ScanError<'error>),
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
-    Check(CheckError<'error>),
     Analyze(AnalyzeError<'error>),
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
@@ -182,9 +180,6 @@ impl<'session> Session<'session> {
             self.resolve();
             if !self.errors.is_empty() { break 'pipeline; }
 
-            self.check();
-            if !self.errors.is_empty() { break 'pipeline; }
-
             self.analyze();
             if !self.errors.is_empty() { break 'pipeline; }
 
@@ -204,7 +199,6 @@ impl<'session> Session<'session> {
                 CompileError::Scan(error) => self.reporter.error(&error),
                 CompileError::Parse(error) => self.reporter.error(&error),
                 CompileError::Resolve(error) => self.reporter.error(&error),
-                CompileError::Check(error) => self.reporter.error(&error),
                 CompileError::Analyze(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
@@ -371,33 +365,6 @@ impl<'session> Session<'session> {
         self.reporter.symbols(&self.resolver.scope.all());
 
         self.reporter.finish("resolving", duration);
-    }
-
-    pub fn check(&mut self) {
-        self.reporter.start("checking");
-
-        let identities: Vec<_> = self.inputs.keys().copied().collect();
-
-        for identity in identities {
-            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
-
-            let mut checker = Checker::new(elements, &self.resolver);
-
-            checker.check();
-
-            self.errors.extend(
-                checker
-                    .errors
-                    .into_iter()
-                    .map(|error| {
-                        CompileError::Check(error.clone())
-                    })
-            );
-        }
-
-        let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-        self.reporter.finish("checking", duration);
     }
 
     pub fn analyze(&mut self) {

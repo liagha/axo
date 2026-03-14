@@ -4,10 +4,12 @@ use {
         data::*,
         scanner::Token,
         tracker::Span,
-        checker::{Type, TypeKind},
+        resolver::{
+            Type, TypeKind,
+            next_identity,
+        },
     },
 };
-use crate::resolver::next_identity;
 
 pub struct Element<'element> {
     pub identity: Identity,

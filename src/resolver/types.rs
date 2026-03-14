@@ -1,8 +1,7 @@
-// src/checker/types.rs
 use crate::{
-    checker::{CheckError, Checker, ErrorKind},
     data::{Boolean, Identity, Scale, Str, Structure},
     parser::{Element, ElementKind},
+    resolver::{ResolveError, ErrorKind, Resolver},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
 };
@@ -22,7 +21,7 @@ impl<'source> Type<'source> {
         Self::new(TypeKind::Tuple { members: Vec::new() }, span)
     }
 
-    pub fn annotation(checker: &mut Checker<'_, 'source>, element: &Element<'source>) -> Result<Type<'source>, CheckError<'source>> {
+    pub fn annotation(resolver: &mut Resolver<'source>, element: &Element<'source>) -> Result<Type<'source>, ResolveError<'source>> {
         match &element.kind {
             ElementKind::Literal(Token { kind: TokenKind::Identifier(name), span }) => {
                 let text = name.as_str().unwrap();
@@ -43,9 +42,9 @@ impl<'source> Type<'source> {
                     "String" => TypeKind::String,
                     _ => {
                         if let Some(identity) = element.reference {
-                            return Ok(checker.lookup(identity, *span));
+                            return Ok(resolver.lookup(identity, *span));
                         }
-                        return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), *span));
+                        return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span));
                     }
                 };
 
@@ -63,13 +62,13 @@ impl<'source> Type<'source> {
                     TokenKind::Punctuation(PunctuationKind::RightBracket),
                 ) => {
                     if delimited.members.len() != 2 {
-                        return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
+                        return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
                     }
 
-                    let member = Type::annotation(checker, &delimited.members[0])?;
+                    let member = Type::annotation(resolver, &delimited.members[0])?;
                     let size = match delimited.members[1].kind {
                         ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => value as Scale,
-                        _ => return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                        _ => return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                     };
 
                     Ok(Type::new(TypeKind::Array { member: Box::new(member), size }, element.span))
@@ -82,26 +81,26 @@ impl<'source> Type<'source> {
                 ) => {
                     let mut members = Vec::with_capacity(delimited.members.len());
                     for member in &delimited.members {
-                        members.push(Type::annotation(checker, member)?);
+                        members.push(Type::annotation(resolver, member)?);
                     }
                     Ok(Type::new(TypeKind::Tuple { members }, element.span))
                 }
 
-                _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
             },
 
             ElementKind::Unary(unary) => {
                 if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
-                    let item = Type::annotation(checker, &unary.operand)?;
+                    let item = Type::annotation(resolver, &unary.operand)?;
                     Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }, element.span))
                 } else {
-                    Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
+                    Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
                 }
             }
 
             ElementKind::Binary(binary) => {
                 let TokenKind::Operator(operator) = &binary.operator.kind else {
-                    return Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
+                    return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
                 };
 
                 match operator.as_slice() {
@@ -111,23 +110,23 @@ impl<'source> Type<'source> {
                         match &binary.left.kind {
                             ElementKind::Delimited(delimited) => {
                                 for member in &delimited.members {
-                                    parameters.push(Type::annotation(checker, member)?);
+                                    parameters.push(Type::annotation(resolver, member)?);
                                 }
                             }
                             _ => {
-                                parameters.push(Type::annotation(checker, &binary.left)?);
+                                parameters.push(Type::annotation(resolver, &binary.left)?);
                             }
                         }
 
-                        let output = Type::annotation(checker, &binary.right)?;
+                        let output = Type::annotation(resolver, &binary.right)?;
 
                         Ok(Type::new(TypeKind::Function(Str::default(), parameters, Some(Box::new(output))), element.span))
                     }
-                    _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                    _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                 }
             }
 
-            _ => Err(CheckError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+            _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
         }
     }
 }

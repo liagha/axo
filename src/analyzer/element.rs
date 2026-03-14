@@ -3,9 +3,8 @@ use crate::{
     analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
     format::Show,
     parser::{Element, ElementKind},
-    resolver::Resolver,
     scanner::{OperatorKind, PunctuationKind, TokenKind},
-    checker::{Type, TypeKind},
+    resolver::{Resolver, Type, TypeKind},
 };
 
 impl<'element> Analyzable<'element> for Element<'element> {

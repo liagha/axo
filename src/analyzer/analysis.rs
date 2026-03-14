@@ -1,10 +1,10 @@
 use {
     crate::{
         data::*,
+        resolver::Type,
+        tracker::Span,
     }
 };
-use crate::checker::Type;
-use crate::tracker::Span;
 
 #[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {

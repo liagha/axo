@@ -29,7 +29,6 @@ pub mod tracker;
 pub mod data;
 
 pub mod analyzer;
-pub mod checker;
 
 fn main() {
     #[cfg(feature = "internal")]

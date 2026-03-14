@@ -8,24 +8,24 @@ mod primitives;
 mod variables;
 pub mod error;
 
-use inkwell::types::BasicType;
-use crate::analyzer::{Analysis, AnalysisKind};
-use crate::checker::{Type, TypeKind};
 use {
-    super::Backend,
-    crate::{data::Str, generator::GenerateError, internal::hash::Map},
+    crate::{
+        data::{Str, Scale, Structure},
+        generator::{GenerateError, ErrorKind, Backend},
+        internal::hash::Map,
+        analyzer::{Analysis, AnalysisKind},
+        resolver::{Type, TypeKind},
+        tracker::Span,
+    },
     inkwell::{
         basic_block::BasicBlock,
         builder::Builder,
         context::ContextRef,
         module::Module,
-        types::{BasicTypeEnum, StructType},
+        types::{BasicType, BasicTypeEnum, StructType},
         values::{BasicValueEnum, FunctionValue, PointerValue},
     },
 };
-use crate::data::{Scale, Structure};
-use crate::generator::ErrorKind;
-use crate::tracker::Span;
 
 #[derive(Clone)]
 pub enum Entity<'backend> {

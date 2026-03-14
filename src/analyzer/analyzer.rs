@@ -3,10 +3,9 @@ use crate::{
     analyzer::{Analysis, AnalyzeError, ErrorKind},
     format::Show,
     parser::{Element, Symbol, SymbolKind},
-    resolver::Resolver,
+    resolver::{Resolver, Type},
+    analyzer::AnalysisKind,
 };
-use crate::analyzer::AnalysisKind;
-use crate::checker::{Type};
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,

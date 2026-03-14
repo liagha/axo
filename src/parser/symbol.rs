@@ -1,17 +1,19 @@
-use crate::resolver::next_identity;
 use {
-    super::{Element, ElementKind},
     crate::{
         data::*,
         format::Debug,
         internal::hash::{Hash, Set},
-        resolver::scope::Scope,
+        parser::{Element, ElementKind},
+        resolver::{
+            scope::Scope,
+            Type, TypeKind,
+            next_identity,
+        },
         scanner::{OperatorKind, Token, TokenKind},
         tracker::Span,
     },
 };
 
-use crate::checker::{Type, TypeKind};
 
 pub struct Symbol<'symbol> {
     pub identity: Identity,

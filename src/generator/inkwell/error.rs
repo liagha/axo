@@ -1,6 +1,10 @@
-use crate::checker::Type;
-use crate::data::Scale;
-use crate::format::{Display, Formatter, Result, Show};
+use {
+    crate::{
+        resolver::Type,
+        data::Scale,
+        format::{Display, Formatter, Result, Show},
+    }
+};
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {

@@ -2,7 +2,7 @@ use {
     crate::{
         data::*,
         analyzer::{Analysis, AnalysisKind},
-        checker::{Type, TypeKind},
+        resolver::{Type, TypeKind},
         generator::{Backend, ErrorKind, GenerateError, inkwell::Entity},
         tracker::Span,
         generator::{

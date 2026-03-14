@@ -1,6 +1,8 @@
 use {
     crate::{
         format::{Show, Display, Formatter, Result},
+        resolver::{Type},
+        parser::Element,
         scanner::Token,
         data::Str,
     }
@@ -8,6 +10,9 @@ use {
 
 #[derive(Clone)]
 pub enum ErrorKind<'error> {
+    Mismatch(Type<'error>, Type<'error>),
+    InvalidOperation(Token<'error>),
+    InvalidAnnotation(Element<'error>),
     UndefinedSymbol {
         query: Token<'error>,
     },
@@ -30,6 +35,15 @@ impl<'error> Show<'error> for ErrorKind<'error> {
     
     fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
         match self {
+            ErrorKind::Mismatch(left, right) => {
+                format!("expected `{}` but got `{}`.", left.format(verbosity), right.format(verbosity)).into()
+            }
+            ErrorKind::InvalidOperation(token) => {
+                format!("invalid operation for operand types: `{}`.", token.format(verbosity)).into()
+            }
+            ErrorKind::InvalidAnnotation(element) => {
+                format!("invalid type annotation: `{}`.", element.format(verbosity)).into()
+            }
             ErrorKind::UndefinedSymbol { query } => {
                 format!("undefined symbol: `{}`.", query.format(verbosity))
             }

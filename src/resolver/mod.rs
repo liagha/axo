@@ -7,19 +7,18 @@ pub mod scope;
 mod symbol;
 mod traits;
 mod primitives;
+mod types;
 
 pub use resolver::*;
 
-pub(super) use {error::*, hint::*};
+pub(super) use {error::*, hint::*, types::*};
 
-use {
-    crate::{
-        data::{
-            Identity,
-            sync::{AtomicUsize, Ordering},
-        },
-        reporter::{Error, Hint},
-    }
+use crate::{
+    data::{
+        sync::{AtomicUsize, Ordering},
+        Identity,
+    },
+    reporter::{Error, Hint},
 };
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);

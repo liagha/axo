@@ -1,17 +1,19 @@
-use inkwell::types::BasicType;
 use {
     super::{Backend, Entity},
     crate::{
         analyzer::{Analysis, AnalysisKind},
-        checker::{Type, TypeKind},
+        resolver::{Type, TypeKind},
         data::*,
         data::Str,
-        generator::inkwell::error::VariableError,
-        generator::{ErrorKind, GenerateError},
+        generator::{
+            ErrorKind,
+            GenerateError,
+            inkwell::error::VariableError,
+        },
         tracker::Span,
     },
     inkwell::{
-        types::BasicTypeEnum,
+        types::{BasicType, BasicTypeEnum},
         values::{BasicValueEnum, PointerValue},
     },
 };
