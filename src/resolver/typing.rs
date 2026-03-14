@@ -14,8 +14,8 @@ impl<'typing> Type<'typing> {
         Self { kind, span }
     }
 
-    pub fn unit(span: Span<'typing>) -> Self {
-        Self::new(TypeKind::Tuple { members: Vec::new() }, span)
+    pub fn void(span: Span<'typing>) -> Self {
+        Self::new(TypeKind::Void, span)
     }
 }
 

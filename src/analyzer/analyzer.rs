@@ -109,7 +109,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = function.body.as_ref() {
                     body.analyze(resolver)?
                 } else {
-                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::unit(self.span))
+                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::void(self.span))
                 };
 
                 let output = function.output.clone().map(|output| output.typing);
@@ -133,7 +133,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self
                     .scope
-                    .all()
+                    .collect()
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();

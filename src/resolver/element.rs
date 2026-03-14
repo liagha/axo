@@ -7,6 +7,13 @@ use crate::{
 };
 
 impl<'element> Resolvable<'element> for Element<'element> {
+    fn declare(&mut self, resolver: &mut Resolver<'element>) {
+        if let ElementKind::Symbolize(symbol) = &mut self.kind {
+            symbol.declare(resolver);
+            self.typing = symbol.typing.clone();
+        }
+    }
+
     fn resolve(&mut self, resolver: &mut Resolver<'element>) {
         let span = self.span;
         let mut identity = None;
@@ -46,7 +53,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         resolver.fresh(literal.span)
                     }
                 }
-                _ => Type::unit(literal.span),
+                _ => Type::void(literal.span),
             },
 
             ElementKind::Delimited(delimited) => match (
@@ -111,7 +118,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     )
                 }
 
-                _ => Type::unit(span),
+                _ => Type::void(span),
             },
 
             ElementKind::Unary(unary) => {
@@ -166,7 +173,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         let mut namespace = None;
 
                         if let Some(reference) = binary.left.reference {
-                            if let Some(symbol) = resolver.scope.get_identity(reference) {
+                            if let Some(symbol) = resolver.scope.find(reference) {
                                 if matches!(symbol.kind, SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_)) {
                                     namespace = Some(symbol.scope.clone());
                                 }
@@ -181,7 +188,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             };
                             match target {
                                 TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) => {
-                                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                                    if let Some(symbol) = resolver.scope.find(reference) {
                                         namespace = Some(symbol.scope.clone());
                                     }
                                 }
@@ -310,7 +317,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 let mut namespace = false;
                 if let Some(reference) = invoke.target.reference {
-                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                    if let Some(symbol) = resolver.scope.find(reference) {
                         if matches!(symbol.kind, SymbolKind::Function(_)) {
                             resolver.enter_scope(symbol.scope.clone());
                             namespace = true;
@@ -344,7 +351,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     Some("while") => {
                         let boolean = Type::new(TypeKind::Boolean, span);
                         resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
-                        Type::unit(span)
+                        Type::void(span)
                     }
                     _ => {
                         let output = resolver.fresh(span);
@@ -367,11 +374,13 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 let mut identifier = 0;
                 let mut layout = Vec::new();
+                let mut namespace = None; // Fetch the nested scope mapping representing the structure mapping namespace
 
                 if let Some(reference) = construct.target.reference {
                     identifier = reference;
-                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                    if let Some(symbol) = resolver.scope.find(reference) {
                         if let SymbolKind::Structure(structure) | SymbolKind::Union(structure) = &symbol.kind {
+                            namespace = Some(symbol.scope.clone());
                             for member in &structure.members {
                                 if let SymbolKind::Binding(binding) = &member.kind {
                                     if let Some(token) = binding.target.brand() {
@@ -395,6 +404,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     for (key, typing) in &layout {
                                         if key == &name {
                                             field.typing = resolver.unify(field.span, typing, &binary.right.typing);
+
+                                            // Ensure binary.left has the correct resolution
+                                            if let Some(scope) = &namespace {
+                                                resolver.enter_scope(scope.clone());
+                                                binary.left.resolve(resolver);
+                                                resolver.exit();
+                                            } else {
+                                                binary.left.typing = typing.clone();
+                                            }
+
                                             matched = true;
                                             break;
                                         }
@@ -421,19 +440,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
             ElementKind::Symbolize(symbol) => {
                 self.reference = Some(symbol.identity);
-
-                let pre = resolver.fresh(span);
-                let mut placeholder = symbol.clone();
-                placeholder.typing = pre.clone();
-                resolver.add(placeholder);
-
                 symbol.resolve(resolver);
-
-                let unified = resolver.unify(span, &pre, &symbol.typing);
-                symbol.typing = unified.clone();
-                resolver.add(symbol.clone());
-
-                unified
+                symbol.typing.clone()
             }
         };
 

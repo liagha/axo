@@ -582,6 +582,7 @@ impl<'parser> Parser<'parser> {
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol =
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
+                
                 symbol.scope.extend(fields);
 
                 *form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));

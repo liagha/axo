@@ -131,7 +131,7 @@ impl<'session> Session<'session> {
             Visibility::Public,
         ).with_members(initializer.output.clone());
 
-        resolver.add(configuration);
+        resolver.insert(configuration);
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
 
@@ -296,7 +296,7 @@ impl<'session> Session<'session> {
             .collect();
 
         for module in modules {
-            self.resolver.add(module);
+            self.resolver.insert(module);
         }
     }
 
@@ -307,16 +307,14 @@ impl<'session> Session<'session> {
 
         for &identity in &identities {
             let module_identity = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
+            let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
             for element in elements.iter_mut() {
-                if let ElementKind::Symbolize(symbol) = &element.kind {
-                    self.resolver.add(symbol.clone());
-                }
+                element.declare(&mut self.resolver);
             }
 
             let mut scope = self.resolver.scope.clone();
@@ -325,13 +323,12 @@ impl<'session> Session<'session> {
 
             self.resolver.exit();
 
-            let old_module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
-            self.resolver.scope.replace(&old_module, module);
+            self.resolver.insert(module);
         }
 
         for &identity in &identities {
             let module_identity = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
+            let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
@@ -347,8 +344,7 @@ impl<'session> Session<'session> {
 
             self.resolver.exit();
 
-            let old_module = self.resolver.scope.get_identity(module_identity).unwrap().clone();
-            self.resolver.scope.replace(&old_module, module);
+            self.resolver.insert(module);
         }
 
         self.errors.extend(
@@ -362,7 +358,7 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-        self.reporter.symbols(&self.resolver.scope.all());
+        self.reporter.symbols(&self.resolver.scope.collect());
 
         self.reporter.finish("resolving", duration);
     }

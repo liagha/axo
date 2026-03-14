@@ -36,6 +36,7 @@ impl Clone for Resolver<'_> {
 }
 
 pub trait Resolvable<'resolvable> {
+    fn declare(&mut self, resolver: &mut Resolver<'resolvable>);
     fn resolve(&mut self, resolver: &mut Resolver<'resolvable>);
     fn reify(&mut self, resolver: &mut Resolver<'resolvable>);
 }
@@ -54,17 +55,27 @@ impl<'resolver> Resolver<'resolver> {
         self.input = input;
     }
 
-    pub fn enter_scope(&mut self, scope: Scope<Symbol<'resolver>>) {
-        let parent = replace(&mut self.scope, scope);
-        self.scope.attach(parent);
-    }
+    pub fn resolve(&mut self) {
+        let mut input = self.input.clone();
 
-    pub fn add(&mut self, symbol: Symbol<'resolver>) {
-        self.scope.add(symbol);
+        for element in input.iter_mut() {
+            element.resolve(self);
+        }
+
+        for element in input.iter_mut() {
+            element.reify(self);
+        }
+
+        self.input = input;
     }
 
     pub fn enter(&mut self) {
         let parent = replace(&mut self.scope, Scope::new());
+        self.scope.attach(parent);
+    }
+
+    pub fn enter_scope(&mut self, scope: Scope<Symbol<'resolver>>) {
+        let parent = replace(&mut self.scope, scope);
         self.scope.attach(parent);
     }
 
@@ -74,11 +85,8 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn lookup(&mut self, identity: Identity, span: Span<'resolver>) -> Type<'resolver> {
-        if let Some(symbol) = self.scope.get_identity(identity) {
-            return symbol.typing.clone();
-        }
-        self.fresh(span)
+    pub fn insert(&mut self, symbol: Symbol<'resolver>) {
+        self.scope.insert(symbol);
     }
 
     pub fn fresh(&mut self, span: Span<'resolver>) -> Type<'resolver> {
@@ -87,33 +95,14 @@ impl<'resolver> Resolver<'resolver> {
         Type::new(TypeKind::Variable(identity), span)
     }
 
-    pub fn reify(&mut self, typing: &Type<'resolver>) -> Type<'resolver> {
-        match &typing.kind {
-            TypeKind::Variable(identity) => {
-                if let Some(resolved) = self.variables[*identity].clone() {
-                    let deep = self.reify(&resolved);
-                    self.variables[*identity] = Some(deep.clone());
-                    deep
-                } else {
-                    typing.clone()
-                }
-            }
-            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typing.span),
-            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typing.span),
-            TypeKind::Tuple { members } => {
-                let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::new(TypeKind::Tuple { members: items }, typing.span)
-            }
-            TypeKind::Function(name, parameters, output) => {
-                let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
-                let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
-                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
-            }
-            _ => typing.clone(),
+    pub fn lookup(&mut self, identity: Identity, span: Span<'resolver>) -> Type<'resolver> {
+        if let Some(symbol) = self.scope.find(identity) {
+            return symbol.typing.clone();
         }
+        self.fresh(span)
     }
 
-    fn occurs(&self, identity: Identity, typing: &Type<'resolver>) -> bool {
+    pub fn occurs(&self, identity: Identity, typing: &Type<'resolver>) -> bool {
         match &typing.kind {
             TypeKind::Variable(variable) => {
                 if identity == *variable {
@@ -169,17 +158,17 @@ impl<'resolver> Resolver<'resolver> {
                 left
             }
 
-            (TypeKind::Array { member: left_member, size: left_size }, TypeKind::Array { member: right_member, size: right_size }) if left_size == right_size => {
-                let unified = self.unify(span, &left_member, &right_member);
+            (TypeKind::Array { member: left_item, size: left_size }, TypeKind::Array { member: right_item, size: right_size }) if left_size == right_size => {
+                let unified = self.unify(span, &left_item, &right_item);
                 Type::new(TypeKind::Array { member: Box::new(unified), size: left_size }, left.span)
             }
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
                 let unified = self.unify(span, &left_target, &right_target);
                 Type::new(TypeKind::Pointer { target: Box::new(unified) }, left.span)
             }
-            (TypeKind::Tuple { members: left_members }, TypeKind::Tuple { members: right_members }) if left_members.len() == right_members.len() => {
-                let mut unified = Vec::with_capacity(left_members.len());
-                for (left_item, right_item) in left_members.iter().zip(right_members.iter()) {
+            (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items }) if left_items.len() == right_items.len() => {
+                let mut unified = Vec::with_capacity(left_items.len());
+                for (left_item, right_item) in left_items.iter().zip(right_items.iter()) {
                     unified.push(self.unify(span, left_item, right_item));
                 }
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
@@ -193,11 +182,13 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
             (TypeKind::Pointer { target }, TypeKind::String) | (TypeKind::String, TypeKind::Pointer { target }) if matches!(target.kind, TypeKind::Integer { size: 8, .. }) => left,
 
-            (TypeKind::Function(name, left_parameters, left_output), TypeKind::Function(_, right_parameters, right_output)) if left_parameters.len() == right_parameters.len() => {
-                let mut unified = Vec::with_capacity(left_parameters.len());
+            (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => left,
 
-                for (left_item, right_item) in left_parameters.iter().zip(right_parameters.iter()) {
-                    unified.push(self.unify(span, left_item, right_item));
+            (TypeKind::Function(name, left_args, left_output), TypeKind::Function(_, right_args, right_output)) if left_args.len() == right_args.len() => {
+                let mut unified = Vec::with_capacity(left_args.len());
+
+                for (left_arg, right_arg) in left_args.iter().zip(right_args.iter()) {
+                    unified.push(self.unify(span, left_arg, right_arg));
                 }
 
                 let output = match (left_output, right_output) {
@@ -213,6 +204,32 @@ impl<'resolver> Resolver<'resolver> {
                 self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                 left
             }
+        }
+    }
+
+    pub fn reify(&mut self, typing: &Type<'resolver>) -> Type<'resolver> {
+        match &typing.kind {
+            TypeKind::Variable(identity) => {
+                if let Some(resolved) = self.variables[*identity].clone() {
+                    let deep = self.reify(&resolved);
+                    self.variables[*identity] = Some(deep.clone());
+                    deep
+                } else {
+                    typing.clone()
+                }
+            }
+            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typing.span),
+            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typing.span),
+            TypeKind::Tuple { members } => {
+                let items = members.iter().map(|item| self.reify(item)).collect();
+                Type::new(TypeKind::Tuple { members: items }, typing.span)
+            }
+            TypeKind::Function(name, parameters, output) => {
+                let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
+                let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
+                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
+            }
+            _ => typing.clone(),
         }
     }
 
@@ -323,19 +340,5 @@ impl<'resolver> Resolver<'resolver> {
 
             _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
         }
-    }
-
-    pub fn resolve(&mut self) {
-        let mut input = self.input.clone();
-
-        for element in input.iter_mut() {
-            element.resolve(self);
-        }
-
-        for element in input.iter_mut() {
-            element.reify(self);
-        }
-
-        self.input = input;
     }
 }

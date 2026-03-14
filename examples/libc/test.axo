@@ -10,10 +10,8 @@ func get_position(const point: Point) {
 
 func main() {
 
-    var point = Point { x = "test", y = 4 }
+    var point = Point { x = 3, y = 4 }
 
     get_position(point)
-
-    const number: Int8 = 2
 
 }

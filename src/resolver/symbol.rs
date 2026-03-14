@@ -6,87 +6,35 @@ use crate::{
 };
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
-    fn resolve(&mut self, resolver: &mut Resolver<'symbol>) {
-        if matches!(self.kind, SymbolKind::Function(_)) {
-            let (head, members, output) = if let SymbolKind::Function(function) = &mut self.kind {
+    fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
+        let span = self.span;
+
+        self.typing = match &self.kind {
+            SymbolKind::Function(function) => {
                 let head = function.target.brand().unwrap().format(0);
-
-                resolver.enter();
-
-                let members: Vec<_> = function.members.iter_mut().map(|member| {
-                    member.resolve(resolver);
-                    let placeholder = member.clone();
-                    resolver.add(placeholder);
-                    member.typing.clone()
-                }).collect();
-
-                let output = function.output.as_mut().map(|output| {
-                    output.resolve(resolver);
-                    match resolver.annotation(output) {
-                        Ok(typing) => {
-                            output.typing = typing.clone();
-                            typing
-                        },
-                        Err(error) => {
-                            resolver.errors.push(error);
-                            resolver.fresh(self.span)
-                        }
-                    }
-                });
-
-                (head, members, output)
-            } else {
-                unreachable!()
-            };
-
-            let current = Type::new(TypeKind::Function(head.clone().into(), members.clone(), output.clone().map(Box::new)), self.span);
-            self.typing = current;
-            resolver.add(self.clone());
-
-            if let SymbolKind::Function(function) = &mut self.kind {
-                if let Some(body) = &mut function.body {
-                    body.resolve(resolver);
-                    if let Some(expected) = &output {
-                        resolver.unify(self.span, expected, &body.typing);
-                    }
-                }
+                let parameters = function.members.iter().map(|_| resolver.fresh(span)).collect();
+                let output = resolver.fresh(span);
+                Type::new(TypeKind::Function(head.into(), parameters, Some(Box::new(output))), span)
             }
-
-            let mut scope = resolver.scope.clone();
-            scope.parent = None;
-            self.scope = scope;
-
-            resolver.exit();
-
-            let inferred = if let SymbolKind::Function(function) = &self.kind {
-                match (&output, &function.body) {
-                    (Some(expected), _) => Some(Box::new(resolver.reify(expected))),
-                    (None, Some(body)) => Some(Box::new(resolver.reify(&body.typing))),
-                    (None, None) => None,
-                }
-            } else {
-                unreachable!()
-            };
-
-            self.typing = Type::new(TypeKind::Function(head.into(), members, inferred), self.span);
-            resolver.add(self.clone());
-            return;
-        }
-
-        let mut placeholder = self.clone();
-        match &placeholder.kind {
             SymbolKind::Structure(structure) => {
                 let head = structure.target.brand().unwrap().format(0);
-                placeholder.typing = Type::new(TypeKind::Structure(self.identity, Structure::new(head.into(), Vec::new())), self.span);
-                resolver.add(placeholder);
+                Type::new(TypeKind::Structure(self.identity, Structure::new(head.into(), Vec::new())), span)
             }
             SymbolKind::Union(union) => {
                 let head = union.target.brand().unwrap().format(0);
-                placeholder.typing = Type::new(TypeKind::Union(self.identity, Structure::new(head.into(), Vec::new())), self.span);
-                resolver.add(placeholder);
+                Type::new(TypeKind::Union(self.identity, Structure::new(head.into(), Vec::new())), span)
             }
-            _ => {}
-        }
+            _ => resolver.fresh(span),
+        };
+
+        resolver.insert(self.clone());
+    }
+
+    fn resolve(&mut self, resolver: &mut Resolver<'symbol>) {
+        let span = self.span;
+        let identity = self.identity;
+
+        let expected = self.typing.clone();
 
         let typing = match &mut self.kind {
             SymbolKind::Binding(binding) => {
@@ -96,7 +44,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                         Ok(typing) => typing,
                         Err(error) => {
                             resolver.errors.push(error);
-                            resolver.fresh(self.span)
+                            resolver.fresh(span)
                         }
                     }
                 });
@@ -107,10 +55,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 });
 
                 match (declared, inferred) {
-                    (Some(source), Some(target)) => resolver.unify(self.span, &source, &target),
+                    (Some(source), Some(target)) => resolver.unify(span, &source, &target),
                     (Some(source), None) => source,
                     (None, Some(target)) => target,
-                    (None, None) => resolver.fresh(self.span),
+                    (None, None) => resolver.fresh(span),
                 }
             }
 
@@ -130,7 +78,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 resolver.exit();
 
-                Type::new(TypeKind::Structure(self.identity, Structure::new(head.into(), members)), self.span)
+                Type::new(TypeKind::Structure(identity, Structure::new(head.into(), members)), span)
             }
 
             SymbolKind::Union(union) => {
@@ -149,16 +97,67 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 resolver.exit();
 
-                Type::new(TypeKind::Union(self.identity, Structure::new(head.into(), members)), self.span)
+                Type::new(TypeKind::Union(identity, Structure::new(head.into(), members)), span)
             }
 
-            SymbolKind::Module(_) => Type::new(TypeKind::Void, self.span),
+            SymbolKind::Function(function) => {
+                let head = function.target.brand().unwrap().format(0);
 
-            SymbolKind::Function(_) => unreachable!(),
+                resolver.enter();
+
+                for member in &mut function.members {
+                    member.declare(resolver);
+                }
+
+                let members: Vec<_> = function.members.iter_mut().map(|member| {
+                    member.resolve(resolver);
+                    member.typing.clone()
+                }).collect();
+
+                let output = function.output.as_mut().map(|output| {
+                    output.resolve(resolver);
+                    match resolver.annotation(output) {
+                        Ok(typing) => {
+                            output.typing = typing.clone();
+                            typing
+                        }
+                        Err(error) => {
+                            resolver.errors.push(error);
+                            resolver.fresh(span)
+                        }
+                    }
+                });
+
+                if let Some(body) = &mut function.body {
+                    body.resolve(resolver);
+
+                    if let Some(expected) = &output {
+                        resolver.unify(span, expected, &body.typing);
+                    }
+                }
+
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
+
+                resolver.exit();
+
+                let inferred = match (&output, &function.body) {
+                    (Some(expected), _) => Some(Box::new(resolver.reify(expected))),
+                    (None, Some(body)) => Some(Box::new(resolver.reify(&body.typing))),
+                    (None, None) => None,
+                };
+
+                Type::new(TypeKind::Function(head.into(), members, inferred), span)
+            }
+
+            SymbolKind::Module(_) => Type::new(TypeKind::Void, span),
         };
 
-        self.typing = typing;
-        resolver.add(self.clone());
+        let unified = resolver.unify(span, &expected, &typing);
+        self.typing = unified;
+
+        resolver.insert(self.clone());
     }
 
     fn reify(&mut self, resolver: &mut Resolver<'symbol>) {
