@@ -11,4 +11,6 @@ func main() {
             libc.println_i64(i)
         }
     )
+
+    test_malloc()
 }

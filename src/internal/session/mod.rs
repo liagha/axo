@@ -69,6 +69,7 @@ pub enum CompileError<'error> {
 pub struct Session<'session> {
     pub timer: DefaultTimer,
     pub reporter: Reporter,
+    pub order: Vec<Identity>,
     pub inputs: Map<Identity, Location<'session>>,
     pub modules: Map<Identity, Identity>,
     pub initializer: Initializer<'session>,
@@ -154,6 +155,7 @@ impl<'session> Session<'session> {
             timer,
             reporter,
             inputs,
+            order: Vec::new(),
             modules: Map::new(),
             initializer,
             scanners: Map::new(),
@@ -173,6 +175,8 @@ impl<'session> Session<'session> {
 
             self.parse();
             if !self.errors.is_empty() { break 'pipeline; }
+
+            self.plan();
 
             self.register();
             if !self.errors.is_empty() { break 'pipeline; }
@@ -206,10 +210,84 @@ impl<'session> Session<'session> {
         }
     }
 
+    /// Computes and establishes compilation priority mapping using Topological Sort.
+    pub fn plan(&mut self) {
+        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
+
+        identities.sort();
+
+        let mut graph = Map::new();
+        let mut degreed = Map::new();
+
+        for &id in &identities {
+            graph.insert(id, Vec::new());
+            degreed.insert(id, 0);
+        }
+
+        for &identity in &identities {
+            let dependencies = self.dependencies(identity);
+            for dependency in dependencies {
+                if graph.contains_key(&dependency) {
+                    graph.get_mut(&dependency).unwrap().push(identity);
+                    *degreed.get_mut(&identity).unwrap() += 1;
+                }
+            }
+        }
+
+        let mut queue: Vec<_> = degreed
+            .iter()
+            .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
+            .collect();
+
+        queue.sort();
+
+        let mut sorted = Vec::new();
+
+        while !queue.is_empty() {
+            let identity = queue.remove(0);
+
+            sorted.push(identity);
+
+            if let Some(neighbors) = graph.get(&identity) {
+                for &next in neighbors {
+                    let degree = degreed.get_mut(&next).unwrap();
+
+                    *degree -= 1;
+
+                    if *degree == 0 {
+                        queue.push(next);
+                    }
+                }
+                queue.sort();
+            }
+        }
+
+        if sorted.len() != identities.len() {
+            for &identity in &identities {
+                if !sorted.contains(&identity) {
+                    sorted.push(identity);
+                }
+            }
+        }
+
+        self.order = sorted;
+    }
+
+    fn dependencies(&self, _identity: Identity) -> Vec<Identity> {
+        // TODO: Access AST from `self.parsers.get(&_identity).unwrap().output`
+        // to detect cross-module usages (e.g. `import` or `use` nodes)
+        // and map them back to their respective module Identity.
+        Vec::new()
+    }
+
     pub fn scan(&mut self) {
         self.reporter.start("scanning");
 
-        for (identity, location) in &self.inputs {
+        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
+        identities.sort();
+
+        for identity in identities {
+            let location = self.inputs.get(&identity).unwrap();
             let mut scanner = Scanner::new(*location);
 
             scanner.prepare();
@@ -226,7 +304,7 @@ impl<'session> Session<'session> {
                     })
             );
 
-            self.scanners.insert(*identity, scanner);
+            self.scanners.insert(identity, scanner);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -239,10 +317,14 @@ impl<'session> Session<'session> {
     pub fn parse(&mut self) {
         self.reporter.start("parsing");
 
-        for (identity, location) in &self.inputs {
+        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
+        identities.sort();
+
+        for identity in identities {
+            let location = self.inputs.get(&identity).unwrap();
             let mut parser = Parser::new(*location);
 
-            let tokens = self.scanners.get(identity).unwrap().output.clone();
+            let tokens = self.scanners.get(&identity).unwrap().output.clone();
 
             parser.set_input(tokens);
             parser.parse();
@@ -258,7 +340,7 @@ impl<'session> Session<'session> {
                     })
             );
 
-            self.parsers.insert(*identity, parser);
+            self.parsers.insert(identity, parser);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -267,9 +349,10 @@ impl<'session> Session<'session> {
     }
 
     pub fn register(&mut self) {
-        let modules: Vec<_> = self.inputs
+        let modules: Vec<_> = self.order
             .iter()
-            .map(|(identity, location)| {
+            .map(|&identity| {
+                let location = self.inputs.get(&identity).unwrap();
                 let stem = Str::from(location.stem().unwrap().to_string());
                 let span = Span::file(Str::from(location.to_string())).unwrap();
 
@@ -289,7 +372,7 @@ impl<'session> Session<'session> {
                     Visibility::Public,
                 );
 
-                self.modules.insert(*identity, symbol.identity);
+                self.modules.insert(identity, symbol.identity);
 
                 symbol
             })
@@ -303,9 +386,7 @@ impl<'session> Session<'session> {
     pub fn resolve(&mut self) {
         self.reporter.start("resolving");
 
-        let identities: Vec<_> = self.inputs.keys().copied().collect();
-
-        for &identity in &identities {
+        for &identity in &self.order {
             let module_identity = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
 
@@ -326,7 +407,7 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        for &identity in &identities {
+        for &identity in &self.order {
             let module_identity = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
 
@@ -364,9 +445,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn analyze(&mut self) {
-        let identities: Vec<_> = self.inputs.keys().copied().collect();
-
-        for identity in identities {
+        for &identity in &self.order {
             self.reporter.start("analyzing");
 
             let elements = self.parsers.get(&identity).unwrap().output.clone();
@@ -395,9 +474,10 @@ impl<'session> Session<'session> {
     pub fn generate(&mut self) {
         let target_triple = inkwell::targets::TargetMachine::get_default_triple();
 
-        for (identity, location) in &self.inputs.clone() {
+        for &identity in &self.order {
+            let location = self.inputs.get(&identity).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
-            let analysis = self.analyzers.get(identity).unwrap().output.clone();
+            let analysis = self.analyzers.get(&identity).unwrap().output.clone();
             let module = self.generator.backend.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&target_triple);
@@ -408,7 +488,7 @@ impl<'session> Session<'session> {
             let schema =
                 Self::schema(
                     *location,
-                    Resolver::schema(&mut self.resolver, *identity),
+                    Resolver::schema(&mut self.resolver, identity),
                 );
 
             self.reporter.start("generating");
@@ -429,7 +509,7 @@ impl<'session> Session<'session> {
                                 return;
                             }
 
-                            self.outputs.insert(*identity, schema);
+                            self.outputs.insert(identity, schema);
                         }
 
                         Err(error) => {
@@ -466,34 +546,38 @@ impl<'session> Session<'session> {
     pub fn emit(&mut self) {
         let mut objects = Map::new();
 
-        for (identity, location) in &self.outputs.clone() {
-            let object = Self::object(*location, None);
+        for &identity in &self.order {
+            if let Some(location) = self.outputs.get(&identity) {
+                let object = Self::object(*location, None);
 
-            let mut command = Command::new("clang");
-            command
-                .arg("-c")
-                .arg(location.to_string())
-                .arg("-o")
-                .arg(object.to_string());
+                let mut command = Command::new("clang");
+                command
+                    .arg("-c")
+                    .arg(location.to_string())
+                    .arg("-o")
+                    .arg(object.to_string());
 
-            let status = command.status().expect("failed to run clang");
+                let status = command.status().expect("failed to run clang");
 
-            if status.success() {
-                objects.insert(*identity, object);
-            } else {
-                panic!("clang failed compiling {}", location);
+                if status.success() {
+                    objects.insert(identity, object);
+                } else {
+                    panic!("clang failed compiling {}", location);
+                }
             }
         }
 
         let mut link = Command::new("clang");
 
-        for object in objects.values() {
-            link.arg(object.to_string());
+        for &identity in &self.order {
+            if let Some(object) = objects.get(&identity) {
+                link.arg(object.to_string());
+            }
         }
 
         link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
 
-        let executable = Self::executable(*objects.get(&0).unwrap(), None);
+        let executable = Self::executable(*self.outputs.get(&self.order[0]).unwrap(), None);
 
         link.arg("-o").arg(executable.to_string());
 

@@ -173,3 +173,49 @@ func test_user_input() {
         0
     })
 }
+
+// ─── Memory Allocation ───────────────────────────────────────────────
+
+func malloc(const size: UInt64): *UInt8 {
+    var ptr = mmap(
+        0,
+        size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        INVALID_FD,
+        0
+    )
+
+    if (ptr == MAP_FAILED, {
+        return(0)
+    }, {
+        return(ptr)
+    })
+}
+
+func free(const ptr: *UInt8, const size: UInt64) {
+    if (ptr != 0, {
+        munmap(ptr, size)
+    }, 0)
+}
+
+func test_malloc() {
+
+    var mem = malloc(8)
+
+    if (mem == 0, {
+        println_str("malloc failed")
+        return()
+    }, 0)
+
+    mem[0] = 65
+    mem[1] = 66
+    mem[2] = 67
+
+    print_char(mem[0])
+    print_char(mem[1])
+    print_char(mem[2])
+    println()
+
+    free(mem, 8)
+}

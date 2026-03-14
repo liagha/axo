@@ -374,7 +374,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 let mut identifier = 0;
                 let mut layout = Vec::new();
-                let mut namespace = None; // Fetch the nested scope mapping representing the structure mapping namespace
+                let mut namespace = None;
 
                 if let Some(reference) = construct.target.reference {
                     identifier = reference;
@@ -405,7 +405,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                         if key == &name {
                                             field.typing = resolver.unify(field.span, typing, &binary.right.typing);
 
-                                            // Ensure binary.left has the correct resolution
                                             if let Some(scope) = &namespace {
                                                 resolver.enter_scope(scope.clone());
                                                 binary.left.resolve(resolver);

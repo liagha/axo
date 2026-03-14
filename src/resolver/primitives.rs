@@ -10,6 +10,29 @@ use {
     },
 };
 
+pub enum Primitive {
+    Import = 0,
+    If = 1,
+    While = 2,
+    Continue = 3,
+    Break = 4,
+    Return = 5,
+    Int8 = 6,
+    Int16 = 7,
+    Int32 = 8,
+    Int64 = 9,
+    UInt8 = 10,
+    UInt16 = 11,
+    UInt32 = 12,
+    UInt64 = 13,
+    Float32 = 14,
+    Float64 = 15,
+    Boolean = 16,
+    Character = 17,
+    String = 18,
+    Void = 19,
+}
+
 impl<'resolver> Resolver<'resolver> {
     pub fn builtin(
         target: &Element<'resolver>,
