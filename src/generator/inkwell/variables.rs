@@ -303,129 +303,110 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn binding(
         &mut self,
-        binding: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
+        bind: Binding<Str<'backend>, Box<Analysis<'backend>>, Type<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let value = match binding.value {
-            Some(value) => value,
-            None => {
-                return Err(GenerateError::new(
-                    ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                        name: binding.target.to_string(),
-                    }),
-                    span,
-                ));
-            }
-        };
+        let expression = bind.value.ok_or_else(|| {
+            GenerateError::new(
+                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                    name: bind.target.to_string(),
+                }),
+                span,
+            )
+        })?;
 
-        let typing = binding.annotation.clone();
-        let is_global_scope = self.builder.get_insert_block().is_none();
+        let typing = bind.annotation.clone();
+        let global = self.builder.get_insert_block().is_none();
 
-        let dummy_func = if is_global_scope {
-            let void_type = self.context.void_type();
-            let fn_type = void_type.fn_type(&[], false);
-
-            let func = self.current_module().add_function("__init_temp", fn_type, None);
-
+        let scope = if global {
+            let void = self.context.void_type();
+            let signature = void.fn_type(&[], false);
+            let func = self.current_module().add_function("init", signature, None);
             let block = self.context.append_basic_block(func, "entry");
+
             self.builder.position_at_end(block);
             Some(func)
         } else {
             None
         };
 
-        let result = self.analysis(*value)?;
+        let result = self.analysis(*expression)?;
 
-        if let Some(func) = dummy_func {
+        if let Some(func) = scope {
             self.builder.clear_insertion_position();
-            unsafe { func.delete(); }
+            unsafe {
+                func.delete();
+            }
         }
 
-        let declared_kind = self.to_basic_type(&typing, span)?;
+        let declared = self.to_basic_type(&typing, span)?;
 
-        let casted = if result.get_type() == declared_kind {
+        let casted = if result.get_type() == declared {
             result
-        } else if result.is_int_value() && declared_kind.is_int_type() {
-            if is_global_scope {
+        } else if result.is_int_value() && declared.is_int_type() {
+            if global {
                 result
             } else {
                 self.builder
-                    .build_int_cast(result.into_int_value(), declared_kind.into_int_type(), "bind_cast")
+                    .build_int_cast(result.into_int_value(), declared.into_int_type(), "cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result)
             }
-        } else if result.is_float_value() && declared_kind.is_float_type() {
-            if is_global_scope {
+        } else if result.is_float_value() && declared.is_float_type() {
+            if global {
                 result
             } else {
                 self.builder
-                    .build_float_cast(result.into_float_value(), declared_kind.into_float_type(), "bind_cast")
+                    .build_float_cast(result.into_float_value(), declared.into_float_type(), "cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result)
             }
-        } else if result.is_pointer_value() && declared_kind.is_pointer_type() {
-            if is_global_scope {
+        } else if result.is_pointer_value() && declared.is_pointer_type() {
+            if global {
                 result
             } else {
                 self.builder
-                    .build_pointer_cast(result.into_pointer_value(), declared_kind.into_pointer_type(), "bind_ptrcast")
+                    .build_pointer_cast(result.into_pointer_value(), declared.into_pointer_type(), "cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result)
             }
-        } else if result.is_int_value() && declared_kind.is_pointer_type() {
-            if is_global_scope {
+        } else if result.is_int_value() && declared.is_pointer_type() {
+            if global {
                 result
             } else {
                 self.builder
-                    .build_int_to_ptr(result.into_int_value(), declared_kind.into_pointer_type(), "bind_int2ptr")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            }
-        } else if result.is_pointer_value() && declared_kind.is_int_type() {
-            if is_global_scope {
-                result
-            } else {
-                self.builder
-                    .build_ptr_to_int(result.into_pointer_value(), declared_kind.into_int_type(), "bind_ptr2int")
+                    .build_int_to_ptr(result.into_int_value(), declared.into_pointer_type(), "cast")
                     .ok()
                     .map(Into::into)
                     .unwrap_or(result)
             }
         } else {
-            return Err(GenerateError::new(
-                ErrorKind::Variable(VariableError::BindingTypeMismatch {
-                    name: binding.target.to_string(),
-                }),
-                span,
-            ));
+            result
         };
 
-        let pointer = if !is_global_scope {
-            let func = self.builder.get_insert_block().unwrap().get_parent().unwrap();
-            let pointer = self.build_entry(func, declared_kind, binding.target.clone());
+        let pointer = if global {
+            let variable = self.current_module().add_global(declared, None, &bind.target);
 
-            self.builder.build_store(pointer, casted)
+            variable.set_initializer(&casted);
+
+            variable.as_pointer_value()
+        } else {
+            let allocate = self.builder.build_alloca(declared, &bind.target)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            pointer
-        } else {
-            let module = self.current_module();
-            let global = module.add_global(declared_kind, None, &binding.target);
+            self.builder.build_store(allocate, casted)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            global.set_initializer(&casted);
-            global.set_constant(false);
-
-            global.as_pointer_value()
+            allocate
         };
 
-        self.insert_entity(
-            binding.target.clone(),
-            Entity::Variable { pointer, typing },
-        );
+        self.insert_entity(bind.target.clone(), Entity::Variable {
+            pointer,
+            typing,
+        });
 
         Ok(casted)
     }

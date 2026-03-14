@@ -73,6 +73,7 @@ impl<'backend> Inkwell<'backend> {
             scope.insert(name, entity);
         }
     }
+
     pub fn enter_scope(&mut self) {
         self.entities.push(Map::default());
     }
@@ -148,17 +149,21 @@ impl<'backend> Inkwell<'backend> {
         let typing = match &typing.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
+                    1 => self.context.bool_type().into(),
                     8 => self.context.i8_type().into(),
                     16 => self.context.i16_type().into(),
                     32 => self.context.i32_type().into(),
                     64 => self.context.i64_type().into(),
+                    128 => self.context.i128_type().into(),
                     size => self.context.custom_width_int_type(*size as u32).into(),
                 }
             },
             TypeKind::Float { size: bits } => {
                 match bits {
+                    16 => self.context.f16_type().into(),
                     32 => self.context.f32_type().into(),
                     64 => self.context.f64_type().into(),
+                    128 => self.context.f128_type().into(),
                     _ => self.context.f64_type().into(),
                 }
             },
@@ -176,16 +181,13 @@ impl<'backend> Inkwell<'backend> {
             },
             TypeKind::Array { member, size } => {
                 let typing = self.to_basic_type(member, span.clone())?;
-
                 typing.array_type(*size as u32).into()
             }
             TypeKind::Tuple { members } => {
                 let mut typs = Vec::with_capacity(members.len());
-
                 for member in members {
                     typs.push(self.to_basic_type(member, span.clone())?);
                 }
-
                 self.context.struct_type(&typs, false).into()
             }
             TypeKind::Structure(_, structure) => {
@@ -193,39 +195,43 @@ impl<'backend> Inkwell<'backend> {
                     .get_entity(&structure.target)
                     .and_then(
                         |entity| {
-                            if let Entity::Struct { structure: struct_type, .. } = entity {
-                                Some((*struct_type).into())
-                            } else {
-                                None
+                            match entity {
+                                Entity::Struct { structure: struct_type, .. } => Some((*struct_type).into()),
+                                Entity::Union { structure: struct_type, .. } => Some((*struct_type).into()),
+                                _ => None,
                             }
                         }
                     ) {
                     typing
                 } else {
-                    let name = structure.target;
+                    let name = structure.target.clone();
 
-                    let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
-                        self.context.opaque_struct_type(&name)
-                    });
-
-                    if shape.is_opaque() {
+                    if &*name == "" {
                         let mut members = Vec::new();
-
                         for member in &structure.members {
                             members.push(self.to_basic_type(member, span.clone())?);
                         }
+                        self.context.struct_type(&members, false).into()
+                    } else {
+                        let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
+                            self.context.opaque_struct_type(&name)
+                        });
 
-                        shape.set_body(&members, false);
+                        if shape.is_opaque() {
+                            let mut members = Vec::new();
+                            for member in &structure.members {
+                                members.push(self.to_basic_type(member, span.clone())?);
+                            }
+                            shape.set_body(&members, false);
+                        }
+
+                        shape.into()
                     }
-
-                    shape.into()
                 }
             },
-
             TypeKind::String => {
                 self.context.ptr_type(inkwell::AddressSpace::default()).into()
             }
-
             _ => {
                 return Err(
                     GenerateError::new(
@@ -247,31 +253,26 @@ impl<'backend> Inkwell<'backend> {
         let kind = match typing {
             BasicTypeEnum::IntType(integer) => {
                 let bits = integer.get_bit_width();
-
                 match bits {
                     1 => TypeKind::Boolean,
-                    8 | 16 | 32 | 64 => TypeKind::Integer { size: bits as usize, signed: true },
                     _ => TypeKind::Integer { size: bits as usize, signed: true },
                 }
             }
-
             BasicTypeEnum::FloatType(float) => {
                 let bits = float.get_bit_width();
-
                 TypeKind::Float {
                     size: bits as usize,
                 }
             }
-
-            BasicTypeEnum::PointerType(typing) => {
+            BasicTypeEnum::PointerType(_) => {
                 TypeKind::Pointer {
-                    target: Box::new(self.to_type(typing.as_basic_type_enum(), span))
+                    target: Box::new(Type::new(TypeKind::Integer { size: 8, signed: false }, span.clone()))
                 }
             }
-
             BasicTypeEnum::StructType(structure) => {
-                let name = Str::from(structure.clone().get_name().clone().unwrap().to_str().unwrap().to_string());
-                let fields = structure.clone().get_field_types().iter().map(|basic| self.to_type(*basic, span)).collect();
+                let name_str = structure.get_name().and_then(|n| n.to_str().ok()).unwrap_or("").to_string();
+                let name = Str::from(name_str);
+                let fields = structure.get_field_types().iter().map(|basic| self.to_type(*basic, span.clone())).collect();
 
                 TypeKind::Structure(
                     0,
@@ -281,23 +282,26 @@ impl<'backend> Inkwell<'backend> {
                     )
                 )
             }
-
             BasicTypeEnum::ArrayType(array) => {
-                let member = self.to_type(array.get_element_type(), span).into();
-
-
+                let member = self.to_type(array.get_element_type(), span.clone()).into();
                 TypeKind::Array {
                     member,
                     size: array.len() as Scale
                 }
             }
-
-            BasicTypeEnum::VectorType(_) => {
-                unimplemented!()
+            BasicTypeEnum::VectorType(vector) => {
+                let member = self.to_type(vector.get_element_type(), span.clone()).into();
+                TypeKind::Array {
+                    member,
+                    size: vector.get_size() as Scale
+                }
             }
-
-            BasicTypeEnum::ScalableVectorType(_) => {
-                unimplemented!()
+            BasicTypeEnum::ScalableVectorType(vector) => {
+                let member = self.to_type(vector.get_element_type(), span.clone()).into();
+                TypeKind::Array {
+                    member,
+                    size: 0
+                }
             }
         };
 
@@ -350,25 +354,19 @@ impl<'backend> Inkwell<'backend> {
         kind: BasicTypeEnum<'backend>,
         name: Str<'backend>,
     ) -> PointerValue<'backend> {
-        let previous = self.builder.get_insert_block();
+        let temporary_builder = self.context.create_builder();
 
         let entry = function
             .get_first_basic_block()
             .unwrap_or_else(|| self.context.append_basic_block(function, "entry"));
 
         if let Some(first) = entry.get_first_instruction() {
-            self.builder.position_before(&first);
+            temporary_builder.position_before(&first);
         } else {
-            self.builder.position_at_end(entry);
+            temporary_builder.position_at_end(entry);
         }
 
-        let allocation = self.builder.build_alloca(kind, &*name).unwrap();
-
-        if let Some(block) = previous {
-            self.builder.position_at_end(block);
-        }
-
-        allocation
+        temporary_builder.build_alloca(kind, &*name).unwrap()
     }
 
     pub fn current_module(&self) -> &Module<'backend> {
@@ -382,10 +380,18 @@ impl<'backend> Inkwell<'backend> {
 impl<'backend> Backend<'backend> for Inkwell<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
-            if let AnalysisKind::Structure(structure) = &analysis.kind {
-                if let Err(error) = self.structure(structure.clone(), analysis.span) {
-                    self.errors.push(error);
+            match &analysis.kind {
+                AnalysisKind::Structure(structure) => {
+                    if let Err(error) = self.structure(structure.clone(), analysis.span.clone()) {
+                        self.errors.push(error);
+                    }
                 }
+                AnalysisKind::Union(structure) => {
+                    if let Err(error) = self.union(structure.clone(), analysis.span.clone()) {
+                        self.errors.push(error);
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -403,7 +409,14 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
         for analysis in &analyses {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if function.entry {
-                    entry = Some((function, analysis.span));
+                    if entry.is_none() {
+                        entry = Some((function, analysis.span.clone()));
+                    } else {
+                        self.builder.clear_insertion_position();
+                        if let Err(error) = self.analysis(analysis.clone()) {
+                            self.errors.push(error);
+                        }
+                    }
                 } else {
                     self.builder.clear_insertion_position();
                     if let Err(error) = self.analysis(analysis.clone()) {
@@ -489,7 +502,7 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::Store(target, value) => self.store(target, value, instruction.span),
             AnalysisKind::Binding(binding) => self.binding(binding, instruction.span),
             AnalysisKind::Block(analyses) => self.block(analyses, instruction.span),
-            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(condition, then, otherwise, instruction.span),
+            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(*condition, *then, otherwise.map(|value| *value), instruction.span),
             AnalysisKind::While(condition, body) => self.r#while(condition, body, instruction.span),
             AnalysisKind::Structure(structure) => self.structure(structure, instruction.span),
             AnalysisKind::Union(structure) => self.union(structure, instruction.span),

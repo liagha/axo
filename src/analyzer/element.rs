@@ -253,7 +253,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         AnalysisKind::Conditional(
                             Box::new(condition),
                             Box::new(then),
-                            Box::new(otherwise),
+                            Some(Box::new(otherwise)),
                         )
                     }
                     Some("while") => {

@@ -1,19 +1,22 @@
+use inkwell::basic_block::BasicBlock;
+use inkwell::values::BasicValue;
 use {
     crate::{
-        data::*,
         analyzer::{Analysis, AnalysisKind},
-        resolver::{Type, TypeKind},
-        generator::{Backend, ErrorKind, GenerateError, inkwell::Entity},
-        tracker::Span,
+        data::*,
         generator::{
             inkwell::{
-                error::{ControlFlowError, FunctionError}
-            }
+                error::{ControlFlowError, FunctionError},
+                Entity,
+            },
+            Backend, ErrorKind, GenerateError,
         },
+        resolver::{Type, TypeKind},
+        tracker::Span,
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
-        values::{IntValue, BasicValueEnum, FunctionValue},
+        values::{BasicValueEnum, FunctionValue, IntValue},
         FloatPredicate, IntPredicate,
     },
 };
@@ -28,37 +31,39 @@ impl<'backend> super::Inkwell<'backend> {
 
     fn coerce(
         &mut self,
-        function: FunctionValue<'backend>,
+        callable: FunctionValue<'backend>,
         value: BasicValueEnum<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let target = match function.get_type().get_return_type() {
+        let expected = match callable.get_type().get_return_type() {
             Some(kind) => kind,
             None => return Ok(value),
         };
 
-        if value.get_type() == target {
+        if value.get_type() == expected {
             return Ok(value);
         }
 
-        match (value, target) {
-            (BasicValueEnum::IntValue(integer), target) if target.is_int_type() => {
-                let source_width = integer.get_type().get_bit_width();
-                let target_width = target.into_int_type().get_bit_width();
+        match (value, expected) {
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => {
+                let source = integer.get_type().get_bit_width();
+                let destination = target.get_bit_width();
 
-                if source_width > target_width {
-                    self.builder.build_int_truncate(integer, target.into_int_type(), "trunc")
+                if source > destination {
+                    self.builder
+                        .build_int_truncate(integer, target, "truncate")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
-                    self.builder.build_int_s_extend(integer, target.into_int_type(), "sext")
+                    self.builder
+                        .build_int_s_extend(integer, target, "sign_extend")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
-            },
-            (BasicValueEnum::FloatValue(float), target) if target.is_float_type() => self
+            }
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
                 .builder
-                .build_float_cast(float, target.into_float_type(), "cast")
+                .build_float_cast(float, target, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             _ => Err(GenerateError::new(
@@ -73,32 +78,35 @@ impl<'backend> super::Inkwell<'backend> {
         value: BasicValueEnum<'backend>,
         span: Span<'backend>,
     ) -> Result<IntValue<'backend>, GenerateError<'backend>> {
-        if value.is_int_value() {
-            let integer = value.into_int_value();
-            if integer.get_type().get_bit_width() == 1 {
-                Ok(integer)
-            } else {
-                self.builder
-                    .build_int_compare(
-                        IntPredicate::NE,
-                        integer,
-                        integer.get_type().const_zero(),
-                        "condition",
-                    )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+        match value {
+            BasicValueEnum::IntValue(integer) => {
+                if integer.get_type().get_bit_width() == 1 {
+                    Ok(integer)
+                } else {
+                    self.builder
+                        .build_int_compare(
+                            IntPredicate::NE,
+                            integer,
+                            integer.get_type().const_zero(),
+                            "condition",
+                        )
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                }
             }
-        } else if value.is_float_value() {
-            let float = value.into_float_value();
-            self.builder
+            BasicValueEnum::FloatValue(float) => self
+                .builder
                 .build_float_compare(
                     FloatPredicate::ONE,
                     float,
                     float.get_type().const_zero(),
                     "condition",
                 )
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-        } else {
-            Ok(self.context.bool_type().const_zero())
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            BasicValueEnum::PointerValue(pointer) => self
+                .builder
+                .build_is_not_null(pointer, "condition")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+            _ => Ok(self.context.bool_type().const_zero()),
         }
     }
 
@@ -112,111 +120,78 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(None);
         }
 
-        let argument = if let Some(passed) = arguments.first() {
-            Some(self.analysis(passed.clone())?)
-        } else {
-            None
+        let argument = match arguments.first() {
+            Some(passed) => Some(self.analysis(passed.clone())?),
+            None => None,
         };
 
         match name {
             "Int64" => Ok(Some(match argument {
-                Some(value) if value.is_int_value() => self
+                Some(BasicValueEnum::IntValue(integer)) => self
                     .builder
-                    .build_int_s_extend(value.into_int_value(), self.context.i64_type(), "cast")
+                    .build_int_s_extend(integer, self.context.i64_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
-                Some(value) if value.is_float_value() => self
+                Some(BasicValueEnum::FloatValue(float)) => self
                     .builder
-                    .build_float_to_signed_int(
-                        value.into_float_value(),
-                        self.context.i64_type(),
-                        "cast",
-                    )
+                    .build_float_to_signed_int(float, self.context.i64_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.i64_type().const_zero().into(),
             })),
-            "Int32" => Ok(Some(match argument {
-                Some(value) if value.is_int_value() => self
+            "Int32" | "Character" | "Char" => Ok(Some(match argument {
+                Some(BasicValueEnum::IntValue(integer)) => self
                     .builder
-                    .build_int_truncate(value.into_int_value(), self.context.i32_type(), "cast")
+                    .build_int_truncate(integer, self.context.i32_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
-                Some(value) if value.is_float_value() => self
+                Some(BasicValueEnum::FloatValue(float)) => self
                     .builder
-                    .build_float_to_signed_int(
-                        value.into_float_value(),
-                        self.context.i32_type(),
-                        "cast",
-                    )
+                    .build_float_to_signed_int(float, self.context.i32_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.i32_type().const_zero().into(),
             })),
             "Float" => Ok(Some(match argument {
-                Some(value) if value.is_float_value() => self
+                Some(BasicValueEnum::FloatValue(float)) => self
                     .builder
-                    .build_float_cast(
-                        value.into_float_value(),
-                        self.context.f64_type(),
-                        "cast",
-                    )
+                    .build_float_cast(float, self.context.f64_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
-                Some(value) if value.is_int_value() => self
+                Some(BasicValueEnum::IntValue(integer)) => self
                     .builder
-                    .build_signed_int_to_float(
-                        value.into_int_value(),
-                        self.context.f64_type(),
-                        "cast",
-                    )
+                    .build_signed_int_to_float(integer, self.context.f64_type(), "cast")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
                 _ => self.context.f64_type().const_zero().into(),
             })),
             "Boolean" => Ok(Some(match argument {
-                Some(value) if value.is_int_value() => {
-                    let integer = value.into_int_value();
-                    self.builder
-                        .build_int_compare(
-                            IntPredicate::NE,
-                            integer,
-                            integer.get_type().const_zero(),
-                            "cast",
-                        )
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                        .into()
-                }
-                Some(value) if value.is_float_value() => {
-                    let float = value.into_float_value();
-                    self.builder
-                        .build_float_compare(
-                            FloatPredicate::ONE,
-                            float,
-                            float.get_type().const_zero(),
-                            "cast",
-                        )
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                        .into()
-                }
-                _ => self.context.bool_type().const_zero().into(),
-            })),
-            "Character" | "Char" => Ok(Some(match argument {
-                Some(value) if value.is_int_value() => self
+                Some(BasicValueEnum::IntValue(integer)) => self
                     .builder
-                    .build_int_cast(value.into_int_value(), self.context.i32_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(value) if value.is_float_value() => self
-                    .builder
-                    .build_float_to_signed_int(
-                        value.into_float_value(),
-                        self.context.i32_type(),
+                    .build_int_compare(
+                        IntPredicate::NE,
+                        integer,
+                        integer.get_type().const_zero(),
                         "cast",
                     )
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                     .into(),
-                _ => self.context.i32_type().const_zero().into(),
+                Some(BasicValueEnum::FloatValue(float)) => self
+                    .builder
+                    .build_float_compare(
+                        FloatPredicate::ONE,
+                        float,
+                        float.get_type().const_zero(),
+                        "cast",
+                    )
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                    .into(),
+                Some(BasicValueEnum::PointerValue(pointer)) => self
+                    .builder
+                    .build_is_not_null(pointer, "cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                    .into(),
+                _ => self.context.bool_type().const_zero().into(),
             })),
             _ => Ok(None),
         }
@@ -242,16 +217,17 @@ impl<'backend> super::Inkwell<'backend> {
                 self.builder.position_at_end(block);
             }
         }
+
         if let Some(block) = caller {
             self.builder.position_at_end(block);
         }
 
-        Ok(BasicValueEnum::from(self.context.i64_type().const_zero()))
+        Ok(self.context.i64_type().const_zero().into())
     }
 
     pub fn function(
         &mut self,
-        method: Function<
+        routine: Function<
             Str<'backend>,
             Analysis<'backend>,
             Box<Analysis<'backend>>,
@@ -261,15 +237,15 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut parameters = vec![];
 
-        for member in &method.members {
-            if let AnalysisKind::Binding(bind) = &member.kind {
+        for member in &routine.members {
+            if let AnalysisKind::Binding(binding) = &member.kind {
                 let kind = {
-                    let resolved = self.to_basic_type(&bind.annotation, member.span)?;
+                    let resolved = self.to_basic_type(&binding.annotation, member.span)?;
 
-                    if matches!(method.interface, Interface::C) {
-                        if let TypeKind::String = &bind.annotation.kind {
+                    if matches!(routine.interface, Interface::C) {
+                        if let TypeKind::String = &binding.annotation.kind {
                             self.context.ptr_type(inkwell::AddressSpace::default()).into()
-                        } else if let TypeKind::Character = &bind.annotation.kind {
+                        } else if let TypeKind::Character = &binding.annotation.kind {
                             self.context.i8_type().into()
                         } else {
                             resolved
@@ -283,10 +259,9 @@ impl<'backend> super::Inkwell<'backend> {
             }
         }
 
-        let output = if let Some(annotation) = method.output {
-            Some(self.to_basic_type(&annotation, span)?)
-        } else {
-            None
+        let output = match &routine.output {
+            Some(annotation) => Some(self.to_basic_type(annotation, span)?),
+            None => None,
         };
 
         let signature = match output {
@@ -294,45 +269,45 @@ impl<'backend> super::Inkwell<'backend> {
             None => self.context.void_type().fn_type(&parameters, false),
         };
 
-        let identifier = method.target.as_str().unwrap_or("function");
+        let identifier = routine.target.as_str().unwrap_or("function");
 
-        let function = if matches!(method.interface, Interface::C) {
-            let callable = self.current_module().add_function(
+        let callable = if matches!(routine.interface, Interface::C) {
+            let external = self.current_module().add_function(
                 identifier,
                 signature,
                 Some(inkwell::module::Linkage::External),
             );
-            callable.set_section(Some("text"));
-            self.insert_entity(method.target.clone(), Entity::Function(callable));
-            callable
+            external.set_section(Some("text"));
+            self.insert_entity(routine.target.clone(), Entity::Function(external));
+            external
         } else {
-            let linkage = if method.entry {
+            let linkage = if routine.entry {
                 Some(inkwell::module::Linkage::External)
             } else {
-                Some(inkwell::module::Linkage::External)
+                Some(inkwell::module::Linkage::Internal)
             };
 
-            let callable = self.current_module().add_function(identifier, signature, linkage);
+            let internal = self.current_module().add_function(identifier, signature, linkage);
 
-            self.insert_entity(method.target.clone(), Entity::Function(callable));
-
+            self.insert_entity(routine.target.clone(), Entity::Function(internal));
             self.enter_scope();
 
-            let entry = self.context.append_basic_block(callable, "entry");
+            let entry = self.context.append_basic_block(internal, "entry");
             self.builder.position_at_end(entry);
-            callable
+            internal
         };
 
-        if !matches!(method.interface, Interface::C) {
-            for (parameter, member) in function.get_param_iter().zip(method.members.iter()) {
-                if let AnalysisKind::Binding(bind) = &member.kind {
-                    let allocate = self.build_entry(function, parameter.get_type(), bind.target.clone());
+        if !matches!(routine.interface, Interface::C) {
+            for (parameter, member) in callable.get_param_iter().zip(routine.members.iter()) {
+                if let AnalysisKind::Binding(binding) = &member.kind {
+                    let allocate = self.build_entry(callable, parameter.get_type(), binding.target.clone());
 
-                    self.builder.build_store(allocate, parameter)
+                    self.builder
+                        .build_store(allocate, parameter)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                     self.insert_entity(
-                        bind.target.clone(),
+                        binding.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
                             typing: self.to_type(parameter.get_type(), member.span),
@@ -342,16 +317,17 @@ impl<'backend> super::Inkwell<'backend> {
             }
 
             self.clear_loops();
-
-            let result = self.analysis(*method.body.clone())?;
+            let result = self.analysis(*routine.body.clone())?;
 
             if !self.terminated() {
                 if output.is_none() {
-                    self.builder.build_return(None)
+                    self.builder
+                        .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 } else {
-                    let value = self.coerce(function, result, span)?;
-                    self.builder.build_return(Some(&value))
+                    let value = self.coerce(callable, result, span)?;
+                    self.builder
+                        .build_return(Some(&value))
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
@@ -379,76 +355,83 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn conditional(
         &mut self,
-        condition: Box<Analysis<'backend>>,
-        positive: Box<Analysis<'backend>>,
-        negative: Box<Analysis<'backend>>,
+        condition: Analysis<'backend>,
+        truth: Analysis<'backend>,
+        fall: Option<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if self.terminated() {
-            return Ok(self.context.i64_type().const_zero().into());
+        let evaluated = self.analysis(condition)?;
+        let boolean = self.truth(evaluated, span)?;
+
+        let parent = self.builder
+            .get_insert_block()
+            .and_then(|block| block.get_parent())
+            .unwrap();
+
+        let pass = self.context.append_basic_block(parent, "pass");
+        let fail = self.context.append_basic_block(parent, "fail");
+        let merge = self.context.append_basic_block(parent, "merge");
+
+        self.builder.build_conditional_branch(boolean, pass, fail).ok();
+
+        // --- Evaluate Truth (Pass Block) ---
+        self.builder.position_at_end(pass);
+        let pass_value = self.analysis(truth)?;
+        let pass_end = self.builder.get_insert_block().unwrap();
+
+        // Check if `pass` was already terminated (e.g., by an early return or break)
+        let pass_terminated = pass_end.get_terminator().is_some();
+        if !pass_terminated {
+            self.builder.build_unconditional_branch(merge).ok();
         }
 
-        let evaluated = self.analysis(*condition)?;
-        let truth = self.truth(evaluated, span)?;
+        // --- Evaluate Fall (Fail Block) ---
+        self.builder.position_at_end(fail);
+        let fail_value = if let Some(expression) = fall {
+            self.analysis(expression)?
+        } else {
+            match pass_value.get_type() {
+                BasicTypeEnum::IntType(layout) => layout.const_zero().into(),
+                BasicTypeEnum::FloatType(layout) => layout.const_zero().into(),
+                BasicTypeEnum::PointerType(layout) => layout.const_null().into(),
+                BasicTypeEnum::StructType(layout) => layout.const_zero().into(),
+                BasicTypeEnum::ArrayType(layout) => layout.const_zero().into(),
+                BasicTypeEnum::VectorType(layout) => layout.const_zero().into(),
+                BasicTypeEnum::ScalableVectorType(layout) => layout.const_zero().into(),
+            }
+        };
+        let fail_end = self.builder.get_insert_block().unwrap();
 
-        let function = self.parent(span)?;
-        let consequence = self.context.append_basic_block(function, "consequence");
-        let alternative = self.context.append_basic_block(function, "alternative");
-        let merge = self.context.append_basic_block(function, "merge");
-
-        self.builder
-            .build_conditional_branch(truth, consequence, alternative)
-            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-        self.builder.position_at_end(consequence);
-        let leftwards = self.analysis(*positive)?;
-        let persists = !self.terminated();
-
-        if persists {
-            self.builder
-                .build_unconditional_branch(merge)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+        // Check if `fail` was already terminated
+        let fail_terminated = fail_end.get_terminator().is_some();
+        if !fail_terminated {
+            self.builder.build_unconditional_branch(merge).ok();
         }
 
-        self.builder.position_at_end(alternative);
-        let rightwards = self.analysis(*negative)?;
-        let continues = !self.terminated();
-
-        if continues {
-            self.builder
-                .build_unconditional_branch(merge)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-        }
-
+        // --- Merge Block ---
         self.builder.position_at_end(merge);
 
-        if persists && continues && leftwards.get_type() == rightwards.get_type() {
-            let result_alloca = self.build_entry(function, leftwards.get_type(), "cond_res".into());
+        let layout = pass_value.get_type();
+        let phi = self.builder.build_phi(layout, "phi").unwrap();
 
-            if let Some(left_block) = consequence.get_terminator().and_then(|t| t.get_parent()) {
-                self.builder.position_before(&left_block.get_terminator().unwrap());
-                self.builder.build_store(result_alloca, leftwards)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-            }
+        // Only map the values to the phi node if the branch actually reaches the merge block!
+        let mut incoming: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
 
-            if let Some(right_block) = alternative.get_terminator().and_then(|t| t.get_parent()) {
-                self.builder.position_before(&right_block.get_terminator().unwrap());
-                self.builder.build_store(result_alloca, rightwards)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-            }
-
-            self.builder.position_at_end(merge);
-            let value = self.builder.build_load(leftwards.get_type(), result_alloca, "cond_val")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-            Ok(value)
-        } else if persists {
-            Ok(leftwards)
-        } else if continues {
-            Ok(rightwards)
-        } else {
-            Ok(self.context.i64_type().const_zero().into())
+        if !pass_terminated {
+            incoming.push((&pass_value as &dyn BasicValue, pass_end));
         }
+
+        if !fail_terminated {
+            incoming.push((&fail_value as &dyn BasicValue, fail_end));
+        }
+
+        // If both branches terminated early (e.g., both returned), incoming will be empty.
+        // We only add incoming branches if there's at least one reaching the phi node.
+        if !incoming.is_empty() {
+            phi.add_incoming(&incoming);
+        }
+
+        Ok(phi.as_basic_value())
     }
 
     pub fn r#while(
@@ -461,13 +444,14 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let function = self.parent(span)?;
-        let heading = self.context.append_basic_block(function, "heading");
-        let core = self.context.append_basic_block(function, "core");
-        let end = self.context.append_basic_block(function, "end");
+        let callable = self.parent(span)?;
+        let heading = self.context.append_basic_block(callable, "heading");
+        let core = self.context.append_basic_block(callable, "core");
+        let end = self.context.append_basic_block(callable, "end");
 
-        let result_alloc = self.build_entry(function, self.context.i64_type().into(), "loop_res".into());
-        self.builder.build_store(result_alloc, self.context.i64_type().const_zero())
+        let allocate = self.build_entry(callable, self.context.i64_type().into(), "loop".into());
+        self.builder
+            .build_store(allocate, self.context.i64_type().const_zero())
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder
@@ -476,18 +460,15 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(heading);
         let evaluated = self.analysis(*condition)?;
-        let truth = self.truth(evaluated, span)?;
+        let boolean = self.truth(evaluated, span)?;
 
         self.builder
-            .build_conditional_branch(truth, core, end)
+            .build_conditional_branch(boolean, core, end)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(core);
-
-        self.enter_loop(heading, end, Some(result_alloc));
-
+        self.enter_loop(heading, end, Some(allocate));
         self.analysis(*body)?;
-
         self.exit_loop();
 
         if !self.terminated() {
@@ -497,37 +478,37 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         self.builder.position_at_end(end);
-
-        let final_value = self.builder.build_load(self.context.i64_type(), result_alloc, "loop_val")
+        let completed = self.builder
+            .build_load(self.context.i64_type(), allocate, "load")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        Ok(final_value)
+        Ok(completed)
     }
 
     pub fn invoke(
         &mut self,
-        invoke: Invoke<Str<'backend>, Analysis<'backend>>,
+        call: Invoke<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if let Some(value) = self.cast(&*invoke.target, &invoke.members, span)? {
+        if let Some(value) = self.cast(&call.target, &call.members, span)? {
             return Ok(value);
         }
 
-        let entity = self.get_entity(&invoke.target).and_then(|item| {
+        let entity = self.get_entity(&call.target).and_then(|item| {
             if let Entity::Function(callable) = item {
-                let current_module = self.current_module();
-                let identifier = invoke.target.as_str().unwrap_or("");
+                let module = self.current_module();
+                let identifier = call.target.as_str().unwrap_or("");
 
-                if let Some(existing_func) = current_module.get_function(identifier) {
-                    Some(existing_func)
+                if let Some(existing) = module.get_function(identifier) {
+                    Some(existing)
                 } else {
-                    let fn_type = callable.get_type();
-                    let external_func = current_module.add_function(
+                    let layout = callable.get_type();
+                    let external = module.add_function(
                         identifier,
-                        fn_type,
+                        layout,
                         Some(inkwell::module::Linkage::External),
                     );
-                    Some(external_func)
+                    Some(external)
                 }
             } else {
                 None
@@ -536,69 +517,62 @@ impl<'backend> super::Inkwell<'backend> {
 
         if let Some(callable) = entity {
             let mut arguments = vec![];
-
             let expected = callable.get_type().get_param_types();
 
-            for (position, argument) in invoke.members.iter().enumerate() {
+            for (position, argument) in call.members.iter().enumerate() {
                 let mut evaluated = self.analysis(argument.clone())?;
 
-                // FIX: Use `&kind` to copy the enum out of the reference
                 if let Some(&kind) = expected.get(position) {
                     if kind.is_pointer_type() {
                         if evaluated.is_array_value() {
-                            let array_val = evaluated.into_array_value();
-                            let parent_func = self.parent(span)?;
-                            let alloca = self.build_entry(parent_func, array_val.get_type().into(), "array_decay".into());
+                            let array = evaluated.into_array_value();
+                            let parent = self.parent(span)?;
+                            let slot = self.build_entry(parent, array.get_type().into(), "decay".into());
 
-                            self.builder.build_store(alloca, array_val)
+                            self.builder
+                                .build_store(slot, array)
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                             let zero = self.context.i32_type().const_zero();
                             evaluated = unsafe {
-                                self.builder.build_in_bounds_gep(
-                                    array_val.get_type(),
-                                    alloca,
-                                    &[zero, zero],
-                                    "decay_ptr"
-                                ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                            }.into();
-
+                                self.builder
+                                    .build_in_bounds_gep(
+                                        array.get_type(),
+                                        slot,
+                                        &[zero, zero],
+                                        "pointer",
+                                    )
+                                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+                            }
+                                .into();
                         } else if evaluated.is_struct_value() {
-                            let struct_val = evaluated.into_struct_value();
-                            let parent_func = self.parent(span)?;
-                            let alloca = self.build_entry(parent_func, struct_val.get_type().into(), "struct_decay".into());
+                            let structure = evaluated.into_struct_value();
+                            let parent = self.parent(span)?;
+                            let slot = self.build_entry(parent, structure.get_type().into(), "decay".into());
 
-                            self.builder.build_store(alloca, struct_val)
+                            self.builder
+                                .build_store(slot, structure)
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                            evaluated = alloca.into();
+                            evaluated = slot.into();
                         }
                     }
 
                     if kind.is_struct_type() && evaluated.is_pointer_value() {
-                        // FIX: Cast `kind` into a struct type which implements `BasicType`
-                        let struct_type = kind.into_struct_type();
+                        let layout = kind.into_struct_type();
                         evaluated = self.builder
-                            .build_load(struct_type, evaluated.into_pointer_value(), "struct_arg_load")
+                            .build_load(layout, evaluated.into_pointer_value(), "load")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     }
 
                     if evaluated.is_pointer_value() && kind.is_int_type() {
                         evaluated = self.builder
-                            .build_ptr_to_int(
-                                evaluated.into_pointer_value(),
-                                kind.into_int_type(),
-                                "cast"
-                            )
+                            .build_ptr_to_int(evaluated.into_pointer_value(), kind.into_int_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     } else if evaluated.is_int_value() && kind.is_pointer_type() {
                         evaluated = self.builder
-                            .build_int_to_ptr(
-                                evaluated.into_int_value(),
-                                kind.into_pointer_type(),
-                                "cast"
-                            )
+                            .build_int_to_ptr(evaluated.into_int_value(), kind.into_pointer_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     }
@@ -607,19 +581,20 @@ impl<'backend> super::Inkwell<'backend> {
                 arguments.push(evaluated.into());
             }
 
-            let result = self.builder.build_call(callable, &arguments, "call")
+            let result = self.builder
+                .build_call(callable, &arguments, "call")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return if let Some(value) = result.try_as_basic_value().basic() {
                 Ok(value)
             } else {
                 Ok(self.context.i64_type().const_zero().into())
-            }
+            };
         }
 
         Err(GenerateError::new(
-            ErrorKind::Function(crate::generator::FunctionError::Undefined {
-                name: invoke.target.to_string(),
+            ErrorKind::Function(FunctionError::Undefined {
+                name: call.target.to_string(),
             }),
             span,
         ))
@@ -634,24 +609,27 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let function = self.parent(span)?;
+        let callable = self.parent(span)?;
 
         match value {
             Some(item) => {
-                let result = self.analysis(*item)?;
-                if function.get_type().get_return_type().is_none() {
-                    self.builder.build_return(None)
+                let evaluated = self.analysis(*item)?;
+                if callable.get_type().get_return_type().is_none() {
+                    self.builder
+                        .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(self.context.i64_type().const_zero().into())
                 } else {
-                    let coerced = self.coerce(function, result, span)?;
-                    self.builder.build_return(Some(&coerced))
+                    let coerced = self.coerce(callable, evaluated, span)?;
+                    self.builder
+                        .build_return(Some(&coerced))
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(coerced)
                 }
             }
             None => {
-                self.builder.build_return(None)
+                self.builder
+                    .build_return(None)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 Ok(self.context.i64_type().const_zero().into())
             }
@@ -665,8 +643,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(alloc) = self.current_loop_result() {
-                self.builder.build_store(alloc, evaluated)
+            if let Some(allocate) = self.current_loop_result() {
+                self.builder
+                    .build_store(allocate, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -676,7 +655,8 @@ impl<'backend> super::Inkwell<'backend> {
         }
 
         if let Some(exit) = self.current_loop_exit() {
-            self.builder.build_unconditional_branch(exit)
+            self.builder
+                .build_unconditional_branch(exit)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
             return Err(GenerateError::new(
@@ -695,8 +675,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(alloc) = self.current_loop_result() {
-                self.builder.build_store(alloc, evaluated)
+            if let Some(allocate) = self.current_loop_result() {
+                self.builder
+                    .build_store(allocate, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -705,8 +686,9 @@ impl<'backend> super::Inkwell<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        if let Some(header) = self.current_loop_header() {
-            self.builder.build_unconditional_branch(header)
+        if let Some(heading) = self.current_loop_header() {
+            self.builder
+                .build_unconditional_branch(heading)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
             return Err(GenerateError::new(
@@ -725,54 +707,55 @@ impl<'backend> super::Inkwell<'backend> {
         self.builder
             .get_insert_block()
             .and_then(|block| block.get_parent())
-            .ok_or_else(|| GenerateError::new(
-                ErrorKind::Function(FunctionError::NotInFunctionContext),
-                span
-            ))
+            .ok_or_else(|| {
+                GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span)
+            })
     }
 
     pub fn explicit_cast(
         &mut self,
         value: Box<Analysis<'backend>>,
-        target_type: Type<'backend>,
+        layout: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let evaluated = self.analysis(*value.clone())?;
-        let llvm_target = self.to_basic_type(&target_type, span)?;
+        let expected = self.to_basic_type(&layout, span)?;
 
-        if evaluated.get_type() == llvm_target {
+        if evaluated.get_type() == expected {
             return Ok(evaluated);
         }
 
-        let target_signed = match &target_type.kind {
+        let signed = match &layout.kind {
             TypeKind::Integer { signed, .. } => *signed,
             _ => true,
         };
 
-        match (evaluated, llvm_target) {
+        match (evaluated, expected) {
             (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => {
-                let source_width = integer.get_type().get_bit_width();
-                let target_width = target.get_bit_width();
+                let source = integer.get_type().get_bit_width();
+                let destination = target.get_bit_width();
 
-                if source_width > target_width {
-                    self.builder.build_int_truncate(integer, target, "trunc")
+                if source > destination {
+                    self.builder
+                        .build_int_truncate(integer, target, "truncate")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else if source_width < target_width {
-                    let source_signed = self.infer_signedness(&value).unwrap_or(true);
-                    if source_signed {
-                        self.builder.build_int_s_extend(integer, target, "sext")
+                } else if source < destination {
+                    if self.infer_signedness(&value).unwrap_or(true) {
+                        self.builder
+                            .build_int_s_extend(integer, target, "sign_extend")
                             .map(Into::into)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     } else {
-                        self.builder.build_int_z_extend(integer, target, "zext")
+                        self.builder
+                            .build_int_z_extend(integer, target, "zero_extend")
                             .map(Into::into)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     }
                 } else {
                     Ok(integer.into())
                 }
-            },
+            }
 
             (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
                 .builder
@@ -781,29 +764,32 @@ impl<'backend> super::Inkwell<'backend> {
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => {
-                let source_signed = self.infer_signedness(&value).unwrap_or(true);
-                if source_signed {
-                    self.builder.build_signed_int_to_float(integer, target, "cast")
+                if self.infer_signedness(&value).unwrap_or(true) {
+                    self.builder
+                        .build_signed_int_to_float(integer, target, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
-                    self.builder.build_unsigned_int_to_float(integer, target, "cast")
+                    self.builder
+                        .build_unsigned_int_to_float(integer, target, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
-            },
+            }
 
             (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => {
-                if target_signed {
-                    self.builder.build_float_to_signed_int(float, target, "cast")
+                if signed {
+                    self.builder
+                        .build_float_to_signed_int(float, target, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
-                    self.builder.build_float_to_unsigned_int(float, target, "cast")
+                    self.builder
+                        .build_float_to_unsigned_int(float, target, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
-            },
+            }
 
             (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
                 .builder
@@ -817,10 +803,13 @@ impl<'backend> super::Inkwell<'backend> {
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            _ => Err(GenerateError::new(
-                ErrorKind::Cast,
-                span,
-            )),
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(target)) => self
+                .builder
+                .build_pointer_cast(pointer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+
+            _ => Err(GenerateError::new(ErrorKind::Cast, span)),
         }
     }
 
@@ -834,36 +823,30 @@ impl<'backend> super::Inkwell<'backend> {
         match evaluated {
             BasicValueEnum::IntValue(integer) => self
                 .builder
-                .build_int_neg(integer, "neg")
+                .build_int_neg(integer, "negate")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
             BasicValueEnum::FloatValue(float) => self
                 .builder
-                .build_float_neg(float, "fneg")
+                .build_float_neg(float, "float_negate")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            _ => Err(GenerateError::new(
-                ErrorKind::Negate,
-                span,
-            )),
+            _ => Err(GenerateError::new(ErrorKind::Negate, span)),
         }
     }
 
     pub fn size_of(
         &mut self,
-        typing: Type<'backend>,
+        layout: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let llvm_target = self.to_basic_type(&typing, span)?;
+        let expected = self.to_basic_type(&layout, span)?;
 
-        let size = llvm_target.size_of().ok_or_else(|| {
-            GenerateError::new(
-                ErrorKind::SizeOf,
-                span,
-            )
-        })?;
+        let size = expected
+            .size_of()
+            .ok_or_else(|| GenerateError::new(ErrorKind::SizeOf, span))?;
 
         Ok(size.into())
     }

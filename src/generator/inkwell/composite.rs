@@ -40,24 +40,22 @@ impl<'backend> Inkwell<'backend> {
 
     fn size(&self, typing: BasicTypeEnum<'backend>) -> u64 {
         match typing {
-            BasicTypeEnum::IntType(integer) => (integer.get_bit_width() as u64 + 7) / 8,
+            BasicTypeEnum::IntType(int) => (int.get_bit_width() as u64 + 7) / 8,
             BasicTypeEnum::FloatType(float) => (float.get_bit_width() as u64 + 7) / 8,
             BasicTypeEnum::PointerType(_) => 8,
             BasicTypeEnum::ArrayType(array) => array.len() as u64 * self.size(array.get_element_type()),
             BasicTypeEnum::StructType(structure) => {
-                let mut size = 0;
-
+                let mut total = 0;
                 for index in 0..structure.count_fields() {
-                    if let Some(field_ty) = structure.get_field_type_at_index(index) {
-                        size += self.size(field_ty);
+                    if let Some(field) = structure.get_field_type_at_index(index) {
+                        total += self.size(field);
                     }
                 }
-
-                size
+                total
             }
             BasicTypeEnum::VectorType(vector) => vector.get_size() as u64 * self.size(vector.get_element_type()),
-            BasicTypeEnum::ScalableVectorType(_) => {
-                unimplemented!("Statically sizing scalable vectors for unions is not supported")
+            BasicTypeEnum::ScalableVectorType(scalable) => {
+                scalable.get_size() as u64 * self.size(scalable.get_element_type())
             }
         }
     }

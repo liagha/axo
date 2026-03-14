@@ -17,15 +17,7 @@ impl<'element> Show<'element> for Element<'element> {
     type Verbosity = u8;
 
     fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
-        match verbosity {
-            0 => {
-                format!("{}", self.kind.format(verbosity))
-            }
-
-            _ => {
-                self.format(verbosity - 1).to_string()
-            }
-        }.into()
+        self.kind.format(verbosity)
     }
 }
 

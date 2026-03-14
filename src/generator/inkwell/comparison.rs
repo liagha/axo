@@ -126,12 +126,12 @@ impl<'backend> Inkwell<'backend> {
         if !floating {
             let limit = if signed { IntPredicate::SLE } else { IntPredicate::ULE };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "maximum")
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "less_equal")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(FloatPredicate::OLE, primary.into_float_value(), secondary.into_float_value(), "maximum")
+                self.builder.build_float_compare(FloatPredicate::OLE, primary.into_float_value(), secondary.into_float_value(), "less_equal")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }
@@ -184,12 +184,12 @@ impl<'backend> Inkwell<'backend> {
         if !floating {
             let limit = if signed { IntPredicate::SGE } else { IntPredicate::UGE };
             Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "minimum")
+                self.builder.build_int_compare(limit, primary.into_int_value(), secondary.into_int_value(), "greater_equal")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         } else {
             Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(FloatPredicate::OGE, primary.into_float_value(), secondary.into_float_value(), "minimum")
+                self.builder.build_float_compare(FloatPredicate::OGE, primary.into_float_value(), secondary.into_float_value(), "greater_equal")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
             ))
         }

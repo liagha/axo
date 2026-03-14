@@ -78,7 +78,7 @@ pub enum AnalysisKind<'analysis> {
     Conditional(
         Box<Analysis<'analysis>>,
         Box<Analysis<'analysis>>,
-        Box<Analysis<'analysis>>,
+        Option<Box<Analysis<'analysis>>>,
     ),
     While(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
     Return(Option<Box<Analysis<'analysis>>>),

@@ -8,6 +8,7 @@ use {
             Analysis,
         },
         generator::{
+            BuilderError,
             ErrorKind,
             GenerateError,
         },
@@ -22,7 +23,6 @@ use {
         },
     },
 };
-use crate::generator::BuilderError;
 
 impl<'backend> Inkwell<'backend> {
     fn check_boolean(
@@ -33,7 +33,7 @@ impl<'backend> Inkwell<'backend> {
         if !value.is_int_value() || value.into_int_value().get_type().get_bit_width() != 1 {
             return Err(GenerateError::new(ErrorKind::Boolean, span));
         }
-        
+
         Ok(value.into_int_value())
     }
 
@@ -46,8 +46,10 @@ impl<'backend> Inkwell<'backend> {
         let alpha = self.analysis(*left)?;
         let primary = self.check_boolean(alpha, span)?;
 
-        let block = self.builder.get_insert_block().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
-        let parent = block.get_parent().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
+        let block = self.builder.get_insert_block()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
+        let parent = block.get_parent()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
         let evaluate = self.context.append_basic_block(parent, "evaluate");
         let merge = self.context.append_basic_block(parent, "merge");
@@ -59,7 +61,8 @@ impl<'backend> Inkwell<'backend> {
         let beta = self.analysis(*right)?;
         let secondary = self.check_boolean(beta, span)?;
 
-        let current = self.builder.get_insert_block().unwrap();
+        let current = self.builder.get_insert_block()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
         self.builder.build_unconditional_branch(merge)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -85,8 +88,10 @@ impl<'backend> Inkwell<'backend> {
         let alpha = self.analysis(*left)?;
         let primary = self.check_boolean(alpha, span)?;
 
-        let block = self.builder.get_insert_block().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
-        let parent = block.get_parent().ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
+        let block = self.builder.get_insert_block()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
+        let parent = block.get_parent()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
         let evaluate = self.context.append_basic_block(parent, "evaluate");
         let merge = self.context.append_basic_block(parent, "merge");
@@ -98,7 +103,8 @@ impl<'backend> Inkwell<'backend> {
         let beta = self.analysis(*right)?;
         let secondary = self.check_boolean(beta, span)?;
 
-        let current = self.builder.get_insert_block().unwrap();
+        let current = self.builder.get_insert_block()
+            .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
         self.builder.build_unconditional_branch(merge)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 

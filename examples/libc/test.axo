@@ -1,17 +1,14 @@
-struct Point {
-    const x: Integer,
-    const y: Integer,
-}
-
-func get_position(const point: Point) {
-    libc.println_i64(point.x)
-    libc.println_i64(point.y)
-}
-
 func main() {
 
-    var point = Point { x = 3, y = 4 }
+    const i = 0
 
-    get_position(point)
+    while(i <= 10,
+        {
+            i = i + 1
 
+            if(i == 5, continue(), 0)
+
+            libc.println_i64(i)
+        }
+    )
 }
