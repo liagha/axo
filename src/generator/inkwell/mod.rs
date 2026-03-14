@@ -10,7 +10,7 @@ pub mod error;
 
 use {
     crate::{
-        data::{Str, Scale, Structure},
+        data::{Str},
         generator::{GenerateError, ErrorKind, Backend},
         internal::hash::Map,
         analyzer::{Analysis, AnalysisKind},
@@ -243,69 +243,6 @@ impl<'backend> Inkwell<'backend> {
         };
 
         Ok(typing)
-    }
-
-    pub fn to_type(
-        &self,
-        typing: BasicTypeEnum<'backend>,
-        span: Span<'backend>,
-    ) -> Type<'backend> {
-        let kind = match typing {
-            BasicTypeEnum::IntType(integer) => {
-                let bits = integer.get_bit_width();
-                match bits {
-                    1 => TypeKind::Boolean,
-                    _ => TypeKind::Integer { size: bits as usize, signed: true },
-                }
-            }
-            BasicTypeEnum::FloatType(float) => {
-                let bits = float.get_bit_width();
-                TypeKind::Float {
-                    size: bits as usize,
-                }
-            }
-            BasicTypeEnum::PointerType(_) => {
-                TypeKind::Pointer {
-                    target: Box::new(Type::new(TypeKind::Integer { size: 8, signed: false }, span.clone()))
-                }
-            }
-            BasicTypeEnum::StructType(structure) => {
-                let name_str = structure.get_name().and_then(|n| n.to_str().ok()).unwrap_or("").to_string();
-                let name = Str::from(name_str);
-                let fields = structure.get_field_types().iter().map(|basic| self.to_type(*basic, span.clone())).collect();
-
-                TypeKind::Structure(
-                    0,
-                    Structure::new(
-                        name,
-                        fields,
-                    )
-                )
-            }
-            BasicTypeEnum::ArrayType(array) => {
-                let member = self.to_type(array.get_element_type(), span.clone()).into();
-                TypeKind::Array {
-                    member,
-                    size: array.len() as Scale
-                }
-            }
-            BasicTypeEnum::VectorType(vector) => {
-                let member = self.to_type(vector.get_element_type(), span.clone()).into();
-                TypeKind::Array {
-                    member,
-                    size: vector.get_size() as Scale
-                }
-            }
-            BasicTypeEnum::ScalableVectorType(vector) => {
-                let member = self.to_type(vector.get_element_type(), span.clone()).into();
-                TypeKind::Array {
-                    member,
-                    size: 0
-                }
-            }
-        };
-
-        Type::new(kind, span)
     }
 
     pub fn new(context: ContextRef<'backend>) -> Self {

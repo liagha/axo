@@ -1,5 +1,3 @@
-use inkwell::basic_block::BasicBlock;
-use inkwell::values::BasicValue;
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
@@ -15,8 +13,9 @@ use {
         tracker::Span,
     },
     inkwell::{
+        basic_block::BasicBlock,
         types::{BasicType, BasicTypeEnum},
-        values::{BasicValueEnum, FunctionValue, IntValue},
+        values::{BasicValue, BasicValueEnum, FunctionValue, IntValue},
         FloatPredicate, IntPredicate,
     },
 };
@@ -203,16 +202,19 @@ impl<'backend> super::Inkwell<'backend> {
         analyses: Vec<Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let string = name.as_str().unwrap_or("module");
-        self.modules.insert(name, self.context.create_module(string));
+        let identifier = name.as_str().unwrap_or("module");
+        self.modules.insert(name, self.context.create_module(identifier));
 
         let caller = self.builder.get_insert_block();
+
         for analysis in analyses {
             if self.terminated() {
                 break;
             }
+
             let current = self.builder.get_insert_block();
             self.analysis(analysis)?;
+
             if let Some(block) = current {
                 self.builder.position_at_end(block);
             }
@@ -300,17 +302,17 @@ impl<'backend> super::Inkwell<'backend> {
         if !matches!(routine.interface, Interface::C) {
             for (parameter, member) in callable.get_param_iter().zip(routine.members.iter()) {
                 if let AnalysisKind::Binding(binding) = &member.kind {
-                    let allocate = self.build_entry(callable, parameter.get_type(), binding.target.clone());
+                    let allocation = self.build_entry(callable, parameter.get_type(), binding.target.clone());
 
                     self.builder
-                        .build_store(allocate, parameter)
+                        .build_store(allocation, parameter)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                     self.insert_entity(
                         binding.target.clone(),
                         Entity::Variable {
-                            pointer: allocate,
-                            typing: self.to_type(parameter.get_type(), member.span),
+                            pointer: allocation,
+                            typing: binding.annotation.clone(),
                         },
                     );
                 }
@@ -343,14 +345,16 @@ impl<'backend> super::Inkwell<'backend> {
         analyses: Vec<Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let mut last = self.context.i64_type().const_zero().into();
+        let mut evaluate = self.context.i64_type().const_zero().into();
+
         for analysis in analyses {
             if self.terminated() {
                 break;
             }
-            last = self.analysis(analysis)?;
+            evaluate = self.analysis(analysis)?;
         }
-        Ok(last)
+
+        Ok(evaluate)
     }
 
     pub fn conditional(
@@ -363,34 +367,35 @@ impl<'backend> super::Inkwell<'backend> {
         let evaluated = self.analysis(condition)?;
         let boolean = self.truth(evaluated, span)?;
 
-        let parent = self.builder
+        let current_block = self
+            .builder
             .get_insert_block()
-            .and_then(|block| block.get_parent())
-            .unwrap();
+            .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
 
-        let pass = self.context.append_basic_block(parent, "pass");
-        let fail = self.context.append_basic_block(parent, "fail");
-        let merge = self.context.append_basic_block(parent, "merge");
+        let parent = current_block
+            .get_parent()
+            .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
 
-        self.builder.build_conditional_branch(boolean, pass, fail).ok();
+        let truth_block = self.context.append_basic_block(parent, "truth");
+        let fall_block = self.context.append_basic_block(parent, "fall");
+        let merge_block = self.context.append_basic_block(parent, "merge");
 
-        // --- Evaluate Truth (Pass Block) ---
-        self.builder.position_at_end(pass);
-        let pass_value = self.analysis(truth)?;
-        let pass_end = self.builder.get_insert_block().unwrap();
+        self.builder.build_conditional_branch(boolean, truth_block, fall_block).ok();
 
-        // Check if `pass` was already terminated (e.g., by an early return or break)
-        let pass_terminated = pass_end.get_terminator().is_some();
-        if !pass_terminated {
-            self.builder.build_unconditional_branch(merge).ok();
+        self.builder.position_at_end(truth_block);
+        let truth_result = self.analysis(truth)?;
+        let truth_end = self.builder.get_insert_block().unwrap_or(truth_block);
+
+        let truth_ended = truth_end.get_terminator().is_some();
+        if !truth_ended {
+            self.builder.build_unconditional_branch(merge_block).ok();
         }
 
-        // --- Evaluate Fall (Fail Block) ---
-        self.builder.position_at_end(fail);
-        let fail_value = if let Some(expression) = fall {
+        self.builder.position_at_end(fall_block);
+        let fall_result = if let Some(expression) = fall {
             self.analysis(expression)?
         } else {
-            match pass_value.get_type() {
+            match truth_result.get_type() {
                 BasicTypeEnum::IntType(layout) => layout.const_zero().into(),
                 BasicTypeEnum::FloatType(layout) => layout.const_zero().into(),
                 BasicTypeEnum::PointerType(layout) => layout.const_null().into(),
@@ -400,38 +405,37 @@ impl<'backend> super::Inkwell<'backend> {
                 BasicTypeEnum::ScalableVectorType(layout) => layout.const_zero().into(),
             }
         };
-        let fail_end = self.builder.get_insert_block().unwrap();
 
-        // Check if `fail` was already terminated
-        let fail_terminated = fail_end.get_terminator().is_some();
-        if !fail_terminated {
-            self.builder.build_unconditional_branch(merge).ok();
+        let fall_end = self.builder.get_insert_block().unwrap_or(fall_block);
+
+        let fall_ended = fall_end.get_terminator().is_some();
+        if !fall_ended {
+            self.builder.build_unconditional_branch(merge_block).ok();
         }
 
-        // --- Merge Block ---
-        self.builder.position_at_end(merge);
+        self.builder.position_at_end(merge_block);
 
-        let layout = pass_value.get_type();
-        let phi = self.builder.build_phi(layout, "phi").unwrap();
+        let layout = truth_result.get_type();
+        let mapping = self
+            .builder
+            .build_phi(layout, "mapping")
+            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        // Only map the values to the phi node if the branch actually reaches the merge block!
         let mut incoming: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
 
-        if !pass_terminated {
-            incoming.push((&pass_value as &dyn BasicValue, pass_end));
+        if !truth_ended {
+            incoming.push((&truth_result, truth_end));
         }
 
-        if !fail_terminated {
-            incoming.push((&fail_value as &dyn BasicValue, fail_end));
+        if !fall_ended {
+            incoming.push((&fall_result, fall_end));
         }
 
-        // If both branches terminated early (e.g., both returned), incoming will be empty.
-        // We only add incoming branches if there's at least one reaching the phi node.
         if !incoming.is_empty() {
-            phi.add_incoming(&incoming);
+            mapping.add_incoming(&incoming);
         }
 
-        Ok(phi.as_basic_value())
+        Ok(mapping.as_basic_value())
     }
 
     pub fn r#while(
@@ -449,9 +453,10 @@ impl<'backend> super::Inkwell<'backend> {
         let core = self.context.append_basic_block(callable, "core");
         let end = self.context.append_basic_block(callable, "end");
 
-        let allocate = self.build_entry(callable, self.context.i64_type().into(), "loop".into());
+        let allocation = self.build_entry(callable, self.context.i64_type().into(), "loop".into());
+
         self.builder
-            .build_store(allocate, self.context.i64_type().const_zero())
+            .build_store(allocation, self.context.i64_type().const_zero())
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder
@@ -467,7 +472,7 @@ impl<'backend> super::Inkwell<'backend> {
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(core);
-        self.enter_loop(heading, end, Some(allocate));
+        self.enter_loop(heading, end, Some(allocation));
         self.analysis(*body)?;
         self.exit_loop();
 
@@ -479,7 +484,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.builder.position_at_end(end);
         let completed = self.builder
-            .build_load(self.context.i64_type(), allocate, "load")
+            .build_load(self.context.i64_type(), allocation, "load")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         Ok(completed)
@@ -497,7 +502,7 @@ impl<'backend> super::Inkwell<'backend> {
         let entity = self.get_entity(&call.target).and_then(|item| {
             if let Entity::Function(callable) = item {
                 let module = self.current_module();
-                let identifier = call.target.as_str().unwrap_or("");
+                let identifier = call.target.as_str().unwrap_or_default();
 
                 if let Some(existing) = module.get_function(identifier) {
                     Some(existing)
@@ -519,66 +524,66 @@ impl<'backend> super::Inkwell<'backend> {
             let mut arguments = vec![];
             let expected = callable.get_type().get_param_types();
 
-            for (position, argument) in call.members.iter().enumerate() {
-                let mut evaluated = self.analysis(argument.clone())?;
+            for (index, argument) in call.members.iter().enumerate() {
+                let mut argument_value = self.analysis(argument.clone())?;
 
-                if let Some(&kind) = expected.get(position) {
+                if let Some(&kind) = expected.get(index) {
                     if kind.is_pointer_type() {
-                        if evaluated.is_array_value() {
-                            let array = evaluated.into_array_value();
+                        if argument_value.is_array_value() {
+                            let array = argument_value.into_array_value();
                             let parent = self.parent(span)?;
-                            let slot = self.build_entry(parent, array.get_type().into(), "decay".into());
+                            let allocation = self.build_entry(parent, array.get_type().into(), "decay".into());
 
                             self.builder
-                                .build_store(slot, array)
+                                .build_store(allocation, array)
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                             let zero = self.context.i32_type().const_zero();
-                            evaluated = unsafe {
+                            argument_value = unsafe {
                                 self.builder
                                     .build_in_bounds_gep(
                                         array.get_type(),
-                                        slot,
+                                        allocation,
                                         &[zero, zero],
                                         "pointer",
                                     )
                                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             }
                                 .into();
-                        } else if evaluated.is_struct_value() {
-                            let structure = evaluated.into_struct_value();
+                        } else if argument_value.is_struct_value() {
+                            let structure = argument_value.into_struct_value();
                             let parent = self.parent(span)?;
-                            let slot = self.build_entry(parent, structure.get_type().into(), "decay".into());
+                            let allocation = self.build_entry(parent, structure.get_type().into(), "decay".into());
 
                             self.builder
-                                .build_store(slot, structure)
+                                .build_store(allocation, structure)
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                            evaluated = slot.into();
+                            argument_value = allocation.into();
                         }
                     }
 
-                    if kind.is_struct_type() && evaluated.is_pointer_value() {
+                    if kind.is_struct_type() && argument_value.is_pointer_value() {
                         let layout = kind.into_struct_type();
-                        evaluated = self.builder
-                            .build_load(layout, evaluated.into_pointer_value(), "load")
+                        argument_value = self.builder
+                            .build_load(layout, argument_value.into_pointer_value(), "load")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     }
 
-                    if evaluated.is_pointer_value() && kind.is_int_type() {
-                        evaluated = self.builder
-                            .build_ptr_to_int(evaluated.into_pointer_value(), kind.into_int_type(), "cast")
+                    if argument_value.is_pointer_value() && kind.is_int_type() {
+                        argument_value = self.builder
+                            .build_ptr_to_int(argument_value.into_pointer_value(), kind.into_int_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
-                    } else if evaluated.is_int_value() && kind.is_pointer_type() {
-                        evaluated = self.builder
-                            .build_int_to_ptr(evaluated.into_int_value(), kind.into_pointer_type(), "cast")
+                    } else if argument_value.is_int_value() && kind.is_pointer_type() {
+                        argument_value = self.builder
+                            .build_int_to_ptr(argument_value.into_int_value(), kind.into_pointer_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     }
                 }
 
-                arguments.push(evaluated.into());
+                arguments.push(argument_value.into());
             }
 
             let result = self.builder
@@ -643,9 +648,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(allocate) = self.current_loop_result() {
+            if let Some(allocation) = self.current_loop_result() {
                 self.builder
-                    .build_store(allocate, evaluated)
+                    .build_store(allocation, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -675,9 +680,9 @@ impl<'backend> super::Inkwell<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let evaluated = self.analysis(*item)?;
-            if let Some(allocate) = self.current_loop_result() {
+            if let Some(allocation) = self.current_loop_result() {
                 self.builder
-                    .build_store(allocate, evaluated)
+                    .build_store(allocation, evaluated)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
