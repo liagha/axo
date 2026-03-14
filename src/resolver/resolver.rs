@@ -1,13 +1,21 @@
 use {
-    super::{scope::Scope, ResolveError},
     crate::{
-        data::memory::replace,
-        parser::{Element, Symbol},
+        data::{
+            Identity,
+            Scale, Str,
+            memory::replace,
+        },
+        parser::{Element, ElementKind, Symbol},
+        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+        resolver::{
+            ResolveError,
+            ErrorKind,
+            Type, TypeKind,
+            scope::Scope,
+        },
+        tracker::Span,
     },
 };
-use crate::data::{Identity, Structure};
-use crate::resolver::{ErrorKind, Type, TypeKind};
-use crate::tracker::Span;
 
 pub struct Resolver<'resolver> {
     pub scope: Scope<Symbol<'resolver>>,
@@ -101,31 +109,25 @@ impl<'resolver> Resolver<'resolver> {
                 let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
                 Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
             }
-            TypeKind::Structure(identity, structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Structure(*identity, Structure::new(structure.target.clone(), members)), typing.span)
-            }
-            TypeKind::Union(identity, structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Union(*identity, Structure::new(structure.target.clone(), members)), typing.span)
-            }
-            TypeKind::Constructor(identity, structure) => {
-                let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Constructor(*identity, Structure::new(structure.target.clone(), members)), typing.span)
-            }
             _ => typing.clone(),
         }
     }
 
-    fn occurs(&mut self, identity: Identity, typing: &Type<'resolver>) -> bool {
-        let flattened = self.reify(typing);
-
-        match flattened.kind {
-            TypeKind::Variable(variable) => identity == variable,
-            TypeKind::Pointer { ref target } => self.occurs(identity, target),
-            TypeKind::Array { ref member, .. } => self.occurs(identity, member),
-            TypeKind::Tuple { ref members } => members.iter().any(|member| self.occurs(identity, member)),
-            TypeKind::Function(_, ref parameters, ref output) => {
+    fn occurs(&self, identity: Identity, typing: &Type<'resolver>) -> bool {
+        match &typing.kind {
+            TypeKind::Variable(variable) => {
+                if identity == *variable {
+                    return true;
+                }
+                if let Some(resolved) = &self.variables[*variable] {
+                    return self.occurs(identity, resolved);
+                }
+                false
+            }
+            TypeKind::Pointer { target } => self.occurs(identity, target),
+            TypeKind::Array { member, .. } => self.occurs(identity, member),
+            TypeKind::Tuple { members } => members.iter().any(|member| self.occurs(identity, member)),
+            TypeKind::Function(_, parameters, output) => {
                 if parameters.iter().any(|parameter| self.occurs(identity, parameter)) {
                     return true;
                 }
@@ -134,7 +136,6 @@ impl<'resolver> Resolver<'resolver> {
                 }
                 false
             }
-            TypeKind::Structure(_, ref structure) | TypeKind::Union(_, ref structure) | TypeKind::Constructor(_, ref structure) => structure.members.iter().any(|member| self.occurs(identity, member)),
             _ => false,
         }
     }
@@ -184,32 +185,13 @@ impl<'resolver> Resolver<'resolver> {
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
 
-            (TypeKind::Structure(left_identity, left_structure), TypeKind::Structure(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
-                let mut unified = Vec::with_capacity(left_structure.members.len());
-                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
-                    unified.push(self.unify(span, left_item, right_item));
-                }
-                Type::new(TypeKind::Structure(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
-            }
-            (TypeKind::Union(left_identity, left_structure), TypeKind::Union(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
-                let mut unified = Vec::with_capacity(left_structure.members.len());
-                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
-                    unified.push(self.unify(span, left_item, right_item));
-                }
-                Type::new(TypeKind::Union(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
-            }
-            (TypeKind::Constructor(left_identity, left_structure), TypeKind::Constructor(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
-                let mut unified = Vec::with_capacity(left_structure.members.len());
-                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
-                    unified.push(self.unify(span, left_item, right_item));
-                }
-                Type::new(TypeKind::Constructor(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
-            }
+            (TypeKind::Structure(left_identity, _), TypeKind::Structure(right_identity, _)) if left_identity == right_identity => left,
+            (TypeKind::Union(left_identity, _), TypeKind::Union(right_identity, _)) if left_identity == right_identity => left,
+            (TypeKind::Constructor(left_identity, _), TypeKind::Constructor(right_identity, _)) if left_identity == right_identity => left,
 
             (TypeKind::Integer { size: left_size, .. }, TypeKind::Integer { size: right_size, .. }) if left_size == right_size => left,
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
             (TypeKind::Pointer { target }, TypeKind::String) | (TypeKind::String, TypeKind::Pointer { target }) if matches!(target.kind, TypeKind::Integer { size: 8, .. }) => left,
-            (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => left,
 
             (TypeKind::Function(name, left_parameters, left_output), TypeKind::Function(_, right_parameters, right_output)) if left_parameters.len() == right_parameters.len() => {
                 let mut unified = Vec::with_capacity(left_parameters.len());
@@ -231,6 +213,115 @@ impl<'resolver> Resolver<'resolver> {
                 self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                 left
             }
+        }
+    }
+
+    pub fn annotation(&mut self, element: &Element<'resolver>) -> Result<Type<'resolver>, ResolveError<'resolver>> {
+        match &element.kind {
+            ElementKind::Literal(Token { kind: TokenKind::Identifier(name), span }) => {
+                let text = name.as_str().unwrap();
+
+                let kind = match text {
+                    "Int8" => TypeKind::Integer { size: 8, signed: true },
+                    "Int16" => TypeKind::Integer { size: 16, signed: true },
+                    "Int32" => TypeKind::Integer { size: 32, signed: true },
+                    "Int64" | "Integer" => TypeKind::Integer { size: 64, signed: true },
+                    "UInt8" => TypeKind::Integer { size: 8, signed: false },
+                    "UInt16" => TypeKind::Integer { size: 16, signed: false },
+                    "UInt32" => TypeKind::Integer { size: 32, signed: false },
+                    "UInt64" => TypeKind::Integer { size: 64, signed: false },
+                    "Float32" => TypeKind::Float { size: 32 },
+                    "Float64" | "Float" => TypeKind::Float { size: 64 },
+                    "Boolean" => TypeKind::Boolean,
+                    "Character" => TypeKind::Character,
+                    "String" => TypeKind::String,
+                    _ => {
+                        if let Some(identity) = element.reference {
+                            return Ok(self.lookup(identity, *span));
+                        }
+                        return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span));
+                    }
+                };
+
+                Ok(Type::new(kind, *span))
+            }
+
+            ElementKind::Delimited(delimited) => match (
+                &delimited.start.kind,
+                delimited.separator.as_ref().map(|token| &token.kind),
+                &delimited.end.kind,
+            ) {
+                (
+                    TokenKind::Punctuation(PunctuationKind::LeftBracket),
+                    Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
+                    TokenKind::Punctuation(PunctuationKind::RightBracket),
+                ) => {
+                    if delimited.members.len() != 2 {
+                        return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
+                    }
+
+                    let member = self.annotation(&delimited.members[0])?;
+                    let size = match delimited.members[1].kind {
+                        ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => value as Scale,
+                        _ => return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                    };
+
+                    Ok(Type::new(TypeKind::Array { member: Box::new(member), size }, element.span))
+                }
+
+                (
+                    TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
+                    Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                    TokenKind::Punctuation(PunctuationKind::RightParenthesis),
+                ) => {
+                    let mut members = Vec::with_capacity(delimited.members.len());
+                    for member in &delimited.members {
+                        members.push(self.annotation(member)?);
+                    }
+                    Ok(Type::new(TypeKind::Tuple { members }, element.span))
+                }
+
+                _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+            },
+
+            ElementKind::Unary(unary) => {
+                if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
+                    let item = self.annotation(&unary.operand)?;
+                    Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }, element.span))
+                } else {
+                    Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
+                }
+            }
+
+            ElementKind::Binary(binary) => {
+                let TokenKind::Operator(operator) = &binary.operator.kind else {
+                    return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span));
+                };
+
+                match operator.as_slice() {
+                    [OperatorKind::Minus, OperatorKind::RightAngle] => {
+                        let mut parameters = Vec::new();
+
+                        match &binary.left.kind {
+                            ElementKind::Delimited(delimited) => {
+                                for member in &delimited.members {
+                                    parameters.push(self.annotation(member)?);
+                                }
+                            }
+                            _ => {
+                                parameters.push(self.annotation(&binary.left)?);
+                            }
+                        }
+
+                        let output = self.annotation(&binary.right)?;
+
+                        Ok(Type::new(TypeKind::Function(Str::default(), parameters, Some(Box::new(output))), element.span))
+                    }
+                    _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                }
+            }
+
+            _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
         }
     }
 

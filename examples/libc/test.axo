@@ -14,4 +14,6 @@ func main() {
 
     get_position(point)
 
+    const number: Int8 = 2
+
 }

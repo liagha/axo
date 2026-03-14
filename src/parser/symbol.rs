@@ -14,7 +14,6 @@ use {
     },
 };
 
-
 pub struct Symbol<'symbol> {
     pub identity: Identity,
     pub usages: Set<Identity>,
@@ -23,6 +22,22 @@ pub struct Symbol<'symbol> {
     pub scope: Scope<Symbol<'symbol>>,
     pub visibility: Visibility,
     pub typing: Type<'symbol>,
+}
+
+#[derive(Clone, PartialEq, Hash)]
+pub enum SymbolKind<'symbol> {
+    Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
+    Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Union(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Function(
+        Function<
+            Box<Element<'symbol>>,
+            Symbol<'symbol>,
+            Option<Box<Element<'symbol>>>,
+            Option<Box<Element<'symbol>>>,
+        >,
+    ),
+    Module(Module<Box<Element<'symbol>>>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -74,22 +89,6 @@ impl<'symbol> Symbol<'symbol> {
     pub fn brand(&self) -> Option<&Token<'symbol>> {
         self.kind.brand()
     }
-}
-
-#[derive(Clone, PartialEq, Hash)]
-pub enum SymbolKind<'symbol> {
-    Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
-    Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Union(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Function(
-        Function<
-            Box<Element<'symbol>>,
-            Symbol<'symbol>,
-            Option<Box<Element<'symbol>>>,
-            Option<Box<Element<'symbol>>>,
-        >,
-    ),
-    Module(Module<Box<Element<'symbol>>>),
 }
 
 impl<'symbol> SymbolKind<'symbol> {

@@ -7,11 +7,11 @@ pub mod scope;
 mod symbol;
 mod traits;
 mod primitives;
-mod types;
+mod typing;
 
 pub use resolver::*;
 
-pub(super) use {error::*, hint::*, types::*};
+pub(super) use {error::*, hint::*, typing::*};
 
 use crate::{
     data::{

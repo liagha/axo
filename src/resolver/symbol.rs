@@ -22,7 +22,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let output = function.output.as_mut().map(|output| {
                     output.resolve(resolver);
-                    match Type::annotation(resolver, output) {
+                    match resolver.annotation(output) {
                         Ok(typing) => {
                             output.typing = typing.clone();
                             typing
@@ -73,11 +73,26 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             return;
         }
 
+        let mut placeholder = self.clone();
+        match &placeholder.kind {
+            SymbolKind::Structure(structure) => {
+                let head = structure.target.brand().unwrap().format(0);
+                placeholder.typing = Type::new(TypeKind::Structure(self.identity, Structure::new(head.into(), Vec::new())), self.span);
+                resolver.add(placeholder);
+            }
+            SymbolKind::Union(union) => {
+                let head = union.target.brand().unwrap().format(0);
+                placeholder.typing = Type::new(TypeKind::Union(self.identity, Structure::new(head.into(), Vec::new())), self.span);
+                resolver.add(placeholder);
+            }
+            _ => {}
+        }
+
         let typing = match &mut self.kind {
             SymbolKind::Binding(binding) => {
                 let declared = binding.annotation.as_mut().map(|annotation| {
                     annotation.resolve(resolver);
-                    match Type::annotation(resolver, annotation) {
+                    match resolver.annotation(annotation) {
                         Ok(typing) => typing,
                         Err(error) => {
                             resolver.errors.push(error);
@@ -100,9 +115,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Structure(structure) => {
+                let head = structure.target.brand().unwrap().format(0);
+
                 resolver.enter();
 
-                let head = structure.target.brand().unwrap().format(0);
                 let members = structure.members.iter_mut().map(|member| {
                     member.resolve(resolver);
                     member.typing.clone()
@@ -118,9 +134,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Union(union) => {
+                let head = union.target.brand().unwrap().format(0);
+
                 resolver.enter();
 
-                let head = union.target.brand().unwrap().format(0);
                 let members = union.members.iter_mut().map(|member| {
                     member.resolve(resolver);
                     member.typing.clone()
