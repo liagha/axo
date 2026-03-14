@@ -218,4 +218,6 @@ func test_malloc() {
     println()
 
     free(mem, 8)
+
+    return()
 }

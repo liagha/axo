@@ -1,7 +1,7 @@
 use {
     super::{
         Backend,
-        Inkwell,
+        Generator,
     },
     crate::{
         analyzer::{
@@ -24,7 +24,7 @@ use {
     },
 };
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     fn check_boolean(
         &self,
         value: BasicValueEnum<'backend>,

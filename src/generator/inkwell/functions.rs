@@ -20,7 +20,7 @@ use {
     },
 };
 
-impl<'backend> super::Inkwell<'backend> {
+impl<'backend> super::Generator<'backend> {
     fn terminated(&self) -> bool {
         self.builder
             .get_insert_block()
@@ -65,6 +65,25 @@ impl<'backend> super::Inkwell<'backend> {
                 .build_float_cast(float, target, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(target)) => self
+                .builder
+                .build_int_to_ptr(integer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
+                .builder
+                .build_ptr_to_int(pointer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(target)) => self
+                .builder
+                .build_pointer_cast(pointer, target, "cast")
+                .map(Into::into)
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
+
             _ => Err(GenerateError::new(
                 ErrorKind::Function(FunctionError::IncompatibleReturnType),
                 span,
@@ -106,93 +125,6 @@ impl<'backend> super::Inkwell<'backend> {
                 .build_is_not_null(pointer, "condition")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
             _ => Ok(self.context.bool_type().const_zero()),
-        }
-    }
-
-    fn cast(
-        &mut self,
-        name: &str,
-        arguments: &[Analysis<'backend>],
-        span: Span<'backend>,
-    ) -> Result<Option<BasicValueEnum<'backend>>, GenerateError<'backend>> {
-        if !matches!(name, "Int64" | "Int32" | "Float" | "Boolean" | "Character" | "Char") {
-            return Ok(None);
-        }
-
-        let argument = match arguments.first() {
-            Some(passed) => Some(self.analysis(passed.clone())?),
-            None => None,
-        };
-
-        match name {
-            "Int64" => Ok(Some(match argument {
-                Some(BasicValueEnum::IntValue(integer)) => self
-                    .builder
-                    .build_int_s_extend(integer, self.context.i64_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(BasicValueEnum::FloatValue(float)) => self
-                    .builder
-                    .build_float_to_signed_int(float, self.context.i64_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                _ => self.context.i64_type().const_zero().into(),
-            })),
-            "Int32" | "Character" | "Char" => Ok(Some(match argument {
-                Some(BasicValueEnum::IntValue(integer)) => self
-                    .builder
-                    .build_int_truncate(integer, self.context.i32_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(BasicValueEnum::FloatValue(float)) => self
-                    .builder
-                    .build_float_to_signed_int(float, self.context.i32_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                _ => self.context.i32_type().const_zero().into(),
-            })),
-            "Float" => Ok(Some(match argument {
-                Some(BasicValueEnum::FloatValue(float)) => self
-                    .builder
-                    .build_float_cast(float, self.context.f64_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(BasicValueEnum::IntValue(integer)) => self
-                    .builder
-                    .build_signed_int_to_float(integer, self.context.f64_type(), "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                _ => self.context.f64_type().const_zero().into(),
-            })),
-            "Boolean" => Ok(Some(match argument {
-                Some(BasicValueEnum::IntValue(integer)) => self
-                    .builder
-                    .build_int_compare(
-                        IntPredicate::NE,
-                        integer,
-                        integer.get_type().const_zero(),
-                        "cast",
-                    )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(BasicValueEnum::FloatValue(float)) => self
-                    .builder
-                    .build_float_compare(
-                        FloatPredicate::ONE,
-                        float,
-                        float.get_type().const_zero(),
-                        "cast",
-                    )
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                Some(BasicValueEnum::PointerValue(pointer)) => self
-                    .builder
-                    .build_is_not_null(pointer, "cast")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into(),
-                _ => self.context.bool_type().const_zero().into(),
-            })),
-            _ => Ok(None),
         }
     }
 
@@ -286,7 +218,7 @@ impl<'backend> super::Inkwell<'backend> {
             let linkage = if routine.entry {
                 Some(inkwell::module::Linkage::External)
             } else {
-                Some(inkwell::module::Linkage::Internal)
+                Some(inkwell::module::Linkage::External)
             };
 
             let internal = self.current_module().add_function(identifier, signature, linkage);
@@ -495,10 +427,6 @@ impl<'backend> super::Inkwell<'backend> {
         call: Invoke<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if let Some(value) = self.cast(&call.target, &call.members, span)? {
-            return Ok(value);
-        }
-
         let entity = self.get_entity(&call.target).and_then(|item| {
             if let Entity::Function(callable) = item {
                 let module = self.current_module();

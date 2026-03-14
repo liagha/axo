@@ -51,7 +51,7 @@ use {
 use {
     crate::{
         analyzer::AnalyzeError,
-        generator::{Generator, GenerateError, Backend, Inkwell},
+        generator::{Generator, GenerateError, Backend},
         tracker::Peekable,
     }
 };
@@ -77,7 +77,7 @@ pub struct Session<'session> {
     pub parsers: Map<Identity, Parser<'session>>,
     pub resolver: Resolver<'session>,
     pub analyzers: Map<Identity, Analyzer<'session>>,
-    pub generator: Generator<'session, Inkwell<'session>>,
+    pub generator: Generator<'session>,
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
     pub outputs: Map<Identity, Location<'session>>,
@@ -145,9 +145,7 @@ impl<'session> Session<'session> {
             ContextRef::new(context.raw())
         };
 
-        let backend = Inkwell::new(context_ref);
-
-        let generator = Generator::new(backend);
+        let generator = Generator::new(context_ref);
 
         logger.finish("initializing", duration);
 
@@ -478,12 +476,12 @@ impl<'session> Session<'session> {
             let location = self.inputs.get(&identity).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(&identity).unwrap().output.clone();
-            let module = self.generator.backend.context.create_module(stem.as_str().unwrap());
+            let module = self.generator.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&target_triple);
 
-            self.generator.backend.modules.insert(stem, module);
-            self.generator.backend.current_module = stem.clone();
+            self.generator.modules.insert(stem, module);
+            self.generator.current_module = stem.clone();
 
             let schema =
                 Self::schema(
@@ -493,15 +491,13 @@ impl<'session> Session<'session> {
 
             self.reporter.start("generating");
 
-            self.generator.backend.generate(analysis);
-
-            self.generator.errors.extend(self.generator.backend.errors.clone());
+            self.generator.generate(analysis);
 
             match schema.as_path() {
                 Ok(path) => {
                     match File::create(&path) {
                         Ok(mut file) => {
-                            if let Err(error) = file.write_all(self.generator.backend.current_module().print_to_string().to_string().as_bytes()) {
+                            if let Err(error) = file.write_all(self.generator.current_module().print_to_string().to_string().as_bytes()) {
                                 self.errors.push(
                                     CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
                                 );
@@ -527,20 +523,20 @@ impl<'session> Session<'session> {
                 }
             }
 
-            self.errors.extend(
-                self.generator
-                    .errors
-                    .iter()
-                    .map(|error| {
-                        CompileError::Generate(error.clone())
-                    })
-            );
-
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
             self.reporter
                 .finish("generating", duration);
         }
+
+        self.errors.extend(
+            self.generator
+                .errors
+                .iter()
+                .map(|error| {
+                    CompileError::Generate(error.clone())
+                })
+        );
     }
 
     pub fn emit(&mut self) {

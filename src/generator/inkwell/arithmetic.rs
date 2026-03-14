@@ -1,7 +1,7 @@
 use {
     crate::{
         analyzer::Analysis,
-        generator::{Backend, ErrorKind, GenerateError, Inkwell},
+        generator::{Backend, ErrorKind, GenerateError, Generator},
         tracker::Span,
     },
     inkwell::{
@@ -10,7 +10,7 @@ use {
     },
 };
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn normalize(
         &self,
         mut left: BasicValueEnum<'backend>,

@@ -1,15 +1,14 @@
 use {
-    super::{
-        Resolver,
-    },
     crate::{
         data::{Str, Delimited, Interface, Function},
         parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+        resolver::{Resolver},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::Span,
     },
 };
 
+#[allow(dead_code)]
 pub enum Primitive {
     Import = 0,
     If = 1,

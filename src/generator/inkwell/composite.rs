@@ -1,23 +1,22 @@
-use inkwell::values::IntValue;
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::{Index, Str, Structure},
         generator::{
-            inkwell::{Backend, Entity, GenerateError, Inkwell},
-            DataStructureError, ErrorKind,
+            inkwell::{Backend, Entity, GenerateError, Generator},
+            DataStructureError, BuilderError, ErrorKind,
         },
         tracker::Span,
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
-        values::BasicValueEnum,
+        values::{BasicValueEnum, IntValue},
         IntPredicate,
     },
 };
-use crate::generator::BuilderError;
+use crate::resolver::TypeKind;
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     fn fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<Str<'backend>>> {
         if let Some(Entity::Struct { fields, .. }) = self.find_entity(|entity| {
             matches!(entity, Entity::Struct { structure, .. } if structure.as_basic_type_enum() == target)
@@ -566,7 +565,7 @@ impl<'backend> Inkwell<'backend> {
         }
 
         let base = index.target.clone();
-        let target = self.analysis(*base)?;
+        let target = self.analysis(*base.clone())?;
         let offset = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
@@ -723,6 +722,28 @@ impl<'backend> Inkwell<'backend> {
                 return self
                     .builder
                     .build_load(shape.get_element_type(), slot, "value")
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    });
+            }
+            (BasicValueEnum::PointerValue(pointer), BasicValueEnum::IntValue(integer)) => {
+                let pointee = if let TypeKind::Pointer { target } = &base.typing.kind {
+                    self.to_basic_type(&target, base.span)?
+                } else {
+                    unreachable!()
+                };
+
+                let slot = unsafe {
+                    self.builder
+                        .build_in_bounds_gep(pointee, pointer, &[integer], "index")
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?
+                };
+
+                return self
+                    .builder
+                    .build_load(pointee, slot, "value")
                     .map_err(|error| {
                         GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                     });

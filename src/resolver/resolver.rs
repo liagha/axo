@@ -22,6 +22,7 @@ pub struct Resolver<'resolver> {
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
     pub variables: Vec<Option<Type<'resolver>>>,
+    pub returns: Vec<Type<'resolver>>,
 }
 
 impl Clone for Resolver<'_> {
@@ -31,6 +32,7 @@ impl Clone for Resolver<'_> {
             input: self.input.clone(),
             errors: self.errors.clone(),
             variables: self.variables.clone(),
+            returns: self.returns.clone(),
         }
     }
 }
@@ -48,6 +50,7 @@ impl<'resolver> Resolver<'resolver> {
             input: Vec::new(),
             errors: Vec::new(),
             variables: Vec::new(),
+            returns: Vec::new(),
         }
     }
 
@@ -158,8 +161,8 @@ impl<'resolver> Resolver<'resolver> {
                 left
             }
 
-            (TypeKind::Array { member: left_item, size: left_size }, TypeKind::Array { member: right_item, size: right_size }) if left_size == right_size => {
-                let unified = self.unify(span, &left_item, &right_item);
+            (TypeKind::Array { member: left_member, size: left_size }, TypeKind::Array { member: right_member, size: right_size }) if left_size == right_size => {
+                let unified = self.unify(span, &left_member, &right_member);
                 Type::new(TypeKind::Array { member: Box::new(unified), size: left_size }, left.span)
             }
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
@@ -168,8 +171,8 @@ impl<'resolver> Resolver<'resolver> {
             }
             (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items }) if left_items.len() == right_items.len() => {
                 let mut unified = Vec::with_capacity(left_items.len());
-                for (left_item, right_item) in left_items.iter().zip(right_items.iter()) {
-                    unified.push(self.unify(span, left_item, right_item));
+                for (first, second) in left_items.iter().zip(right_items.iter()) {
+                    unified.push(self.unify(span, first, second));
                 }
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
@@ -178,8 +181,8 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Union(left_identity, _), TypeKind::Union(right_identity, _)) if left_identity == right_identity => left,
             (TypeKind::Constructor(left_identity, _), TypeKind::Constructor(right_identity, _)) if left_identity == right_identity => left,
 
-            (TypeKind::Integer { size: left_size, .. }, TypeKind::Integer { size: right_size, .. }) if left_size == right_size => left,
-            (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
+            (TypeKind::Integer { .. }, TypeKind::Integer { .. }) => left,
+            (TypeKind::Float { .. }, TypeKind::Float { .. }) => left,
             (TypeKind::Pointer { target }, TypeKind::String) | (TypeKind::String, TypeKind::Pointer { target }) if matches!(target.kind, TypeKind::Integer { size: 8, .. }) => left,
 
             (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => left,
@@ -187,14 +190,14 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Function(name, left_args, left_output), TypeKind::Function(_, right_args, right_output)) if left_args.len() == right_args.len() => {
                 let mut unified = Vec::with_capacity(left_args.len());
 
-                for (left_arg, right_arg) in left_args.iter().zip(right_args.iter()) {
-                    unified.push(self.unify(span, left_arg, right_arg));
+                for (first, second) in left_args.iter().zip(right_args.iter()) {
+                    unified.push(self.unify(span, first, second));
                 }
 
                 let output = match (left_output, right_output) {
-                    (Some(left_kind), Some(right_kind)) => Some(Box::new(self.unify(span, &left_kind, &right_kind))),
-                    (Some(left_kind), None) => Some(left_kind),
-                    (None, Some(right_kind)) => Some(right_kind),
+                    (Some(first), Some(second)) => Some(Box::new(self.unify(span, &first, &second))),
+                    (Some(first), None) => Some(first),
+                    (None, Some(second)) => Some(second),
                     (None, None) => None,
                 };
 

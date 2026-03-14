@@ -200,10 +200,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             resolver.enter_scope(scope);
                             binary.right.resolve(resolver);
                             resolver.exit();
-                            self.reference = binary.right.reference;
                         } else {
                             binary.right.resolve(resolver);
                         }
+
+                        self.reference = binary.right.reference;
 
                         binary.right.typing.clone()
                     }
@@ -353,11 +354,43 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
                         Type::void(span)
                     }
+                    Some("return") => {
+                        let value = if invoke.members.is_empty() {
+                            Type::new(TypeKind::Void, span)
+                        } else {
+                            invoke.members[0].typing.clone()
+                        };
+
+                        if let Some(expected) = resolver.returns.last().cloned() {
+                            resolver.unify(span, &expected, &value);
+                        } else {
+                            let token = invoke.target.brand().unwrap().clone();
+                            resolver.errors.push(Error::new(ErrorKind::InvalidOperation(token), span));
+                        }
+
+                        Type::new(TypeKind::Unknown, span)
+                    }
+                    Some("continue") | Some("break") => {
+                        Type::new(TypeKind::Unknown, span)
+                    }
                     _ => {
                         let output = resolver.fresh(span);
-                        let arguments = invoke.members.iter().map(|member| member.typing.clone()).collect();
-                        let function = Type::new(TypeKind::Function(crate::data::Str::default(), arguments, Some(Box::new(output.clone()))), span);
+                        let mut arguments = Vec::new();
 
+                        if let ElementKind::Binary(binary) = &invoke.target.kind {
+                            if let TokenKind::Operator(operator) = &binary.operator.kind {
+                                if operator.as_slice() == [OperatorKind::Dot] {
+                                    let receiver = resolver.reify(&binary.left.typing);
+                                    if !matches!(receiver.kind, TypeKind::Void) {
+                                        arguments.push(binary.left.typing.clone());
+                                    }
+                                }
+                            }
+                        }
+
+                        arguments.extend(invoke.members.iter().map(|member| member.typing.clone()));
+
+                        let function = Type::new(TypeKind::Function(crate::data::Str::default(), arguments, Some(Box::new(output.clone()))), span);
                         let unified = resolver.unify(span, &invoke.target.typing, &function);
 
                         match unified.kind {

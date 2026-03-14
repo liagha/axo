@@ -4,7 +4,7 @@ use {
             Analysis,
         },
         generator::{
-            Inkwell,
+            Generator,
             Backend,
             ErrorKind,
             GenerateError,
@@ -26,7 +26,7 @@ use {
     },
 };
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn bitwise_and(
         &mut self,
         left: Box<Analysis<'backend>>,

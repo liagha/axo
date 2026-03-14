@@ -2,7 +2,7 @@ mod backend;
 mod generator;
 mod inkwell;
 
-pub use {backend::Backend, generator::Generator, inkwell::Inkwell};
+pub use {backend::Backend, inkwell::Generator};
 
 use crate::reporter::Error;
 pub use self::inkwell::error::*;

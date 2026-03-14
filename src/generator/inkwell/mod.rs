@@ -44,7 +44,7 @@ pub enum Entity<'backend> {
     Function(FunctionValue<'backend>),
 }
 
-pub struct Inkwell<'backend> {
+pub struct Generator<'backend> {
     pub context: ContextRef<'backend>,
     pub builder: Builder<'backend>,
     pub modules: Map<Str<'backend>, Module<'backend>>,
@@ -58,7 +58,7 @@ pub struct Inkwell<'backend> {
     loop_results: Vec<Option<PointerValue<'backend>>>,
 }
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn get_entity(&self, name: &Str<'backend>) -> Option<&Entity<'backend>> {
         for scope in self.entities.iter().rev() {
             if let Some(entity) = scope.get(name) {
@@ -314,7 +314,7 @@ impl<'backend> Inkwell<'backend> {
     }
 }
 
-impl<'backend> Backend<'backend> for Inkwell<'backend> {
+impl<'backend> Backend<'backend> for Generator<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
         for analysis in &analyses {
             match &analysis.kind {

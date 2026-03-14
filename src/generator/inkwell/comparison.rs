@@ -1,7 +1,7 @@
 use {
     super::{
         Backend,
-        Inkwell,
+        Generator,
     },
     crate::{
         analyzer::{
@@ -24,7 +24,7 @@ use {
     },
 };
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn equal(
         &mut self,
         left: Box<Analysis<'backend>>,

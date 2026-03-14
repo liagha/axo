@@ -1,6 +1,6 @@
 use {
     super::{
-        Inkwell,
+        Generator,
     },
     crate::data::{Boolean, Char, Float, Integer, Scale, Str},
     inkwell::values::BasicValueEnum,
@@ -8,7 +8,7 @@ use {
 use crate::generator::{ErrorKind, GenerateError};
 use crate::tracker::Span;
 
-impl<'backend> Inkwell<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn integer(
         &self,
         number: Integer,

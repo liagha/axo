@@ -18,7 +18,7 @@ use {
     },
 };
 
-impl<'backend> super::Inkwell<'backend> {
+impl<'backend> super::Generator<'backend> {
     fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.get_entity(name) {
@@ -110,6 +110,33 @@ impl<'backend> super::Inkwell<'backend> {
                                 return Ok(Some((slot, resolved)));
                             }
                         }
+                    } else if base_kind.is_pointer_type() {
+                        if let Some(pointee_type) = self.pointer_pointee_type(target) {
+                            if pointee_type.is_struct_type() {
+                                let shape = pointee_type.into_struct_type();
+                                let loaded_ptr = self.builder.build_load(base_kind, base_ptr, "load_ptr")
+                                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?
+                                    .into_pointer_value();
+
+                                let found = self.find_entity(|entity| {
+                                    matches!(entity, Entity::Struct { structure: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
+                                });
+
+                                if let Some(Entity::Struct { fields, .. }) = found {
+                                    if let Some(index) = fields.iter().position(|item| item == &field_name) {
+                                        let slot = self.builder.build_struct_gep(
+                                            shape,
+                                            loaded_ptr,
+                                            index as u32,
+                                            "pointer",
+                                        ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?;
+
+                                        let resolved = shape.get_field_type_at_index(index as u32).unwrap();
+                                        return Ok(Some((slot, resolved)));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -151,6 +178,22 @@ impl<'backend> super::Inkwell<'backend> {
 
                             return Ok(Some((slot, element_type)));
                         }
+                    } else if base_kind.is_pointer_type() {
+                        if let BasicValueEnum::IntValue(integer) = offset {
+                            if let Some(element_type) = self.pointer_pointee_type(&index.target) {
+                                let loaded_ptr = self.builder.build_load(base_kind, base_ptr, "load_ptr")
+                                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?
+                                    .into_pointer_value();
+
+                                let slot = unsafe {
+                                    self.builder
+                                        .build_in_bounds_gep(element_type, loaded_ptr, &[integer], "index_ptr")
+                                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), analysis.span))?
+                                };
+
+                                return Ok(Some((slot, element_type)));
+                            }
+                        }
                     }
                 }
 
@@ -185,6 +228,14 @@ impl<'backend> super::Inkwell<'backend> {
 
         match (value, pointee) {
             (BasicValueEnum::PointerValue(pointer), Some(kind)) => {
+                self.builder
+                    .build_load(kind, pointer, "deref_value")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+            }
+            (BasicValueEnum::IntValue(addr), Some(kind)) => {
+                let pointer = self.builder.build_int_to_ptr(addr, self.context.ptr_type(inkwell::AddressSpace::default()), "deref_cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
                 self.builder
                     .build_load(kind, pointer, "deref_value")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
@@ -278,7 +329,45 @@ impl<'backend> super::Inkwell<'backend> {
         };
 
         if let Some((slot, typing)) = existing_var {
-            self.builder.build_store(slot, result)
+            let declared = self.to_basic_type(&typing, span)?;
+
+            let casted = if result.get_type() == declared {
+                result
+            } else if result.is_int_value() && declared.is_int_type() {
+                self.builder
+                    .build_int_cast(result.into_int_value(), declared.into_int_type(), "assign_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            } else if result.is_float_value() && declared.is_float_type() {
+                self.builder
+                    .build_float_cast(result.into_float_value(), declared.into_float_type(), "assign_cast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            } else if result.is_pointer_value() && declared.is_pointer_type() {
+                self.builder
+                    .build_pointer_cast(result.into_pointer_value(), declared.into_pointer_type(), "assign_ptrcast")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            } else if result.is_int_value() && declared.is_pointer_type() {
+                self.builder
+                    .build_int_to_ptr(result.into_int_value(), declared.into_pointer_type(), "assign_int2ptr")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            } else if result.is_pointer_value() && declared.is_int_type() {
+                self.builder
+                    .build_ptr_to_int(result.into_pointer_value(), declared.into_int_type(), "assign_ptr2int")
+                    .ok()
+                    .map(Into::into)
+                    .unwrap_or(result)
+            } else {
+                result
+            };
+
+            self.builder.build_store(slot, casted)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             let new_entity = Entity::Variable {

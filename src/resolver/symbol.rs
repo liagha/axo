@@ -128,13 +128,15 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     }
                 });
 
+                let expectation = output.clone().unwrap_or_else(|| resolver.fresh(span));
+                resolver.returns.push(expectation.clone());
+
                 if let Some(body) = &mut function.body {
                     body.resolve(resolver);
-
-                    if let Some(expected) = &output {
-                        resolver.unify(span, expected, &body.typing);
-                    }
+                    resolver.unify(span, &expectation, &body.typing);
                 }
+
+                resolver.returns.pop();
 
                 let mut scope = resolver.scope.clone();
                 scope.parent = None;
@@ -142,11 +144,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 resolver.exit();
 
-                let inferred = match (&output, &function.body) {
-                    (Some(expected), _) => Some(Box::new(resolver.reify(expected))),
-                    (None, Some(body)) => Some(Box::new(resolver.reify(&body.typing))),
-                    (None, None) => None,
-                };
+                let inferred = Some(Box::new(resolver.reify(&expectation)));
 
                 Type::new(TypeKind::Function(head.into(), members, inferred), span)
             }
