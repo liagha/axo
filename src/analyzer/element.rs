@@ -12,30 +12,30 @@ impl<'element> Analyzable<'element> for Element<'element> {
         &self,
         resolver: &mut Resolver<'element>,
     ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
-        fn cast<'cast>(expression: Analysis<'cast>, typ: Type<'cast>) -> Analysis<'cast> {
-            if expression.typ == typ {
+        fn cast<'cast>(expression: Analysis<'cast>, typing: Type<'cast>) -> Analysis<'cast> {
+            if expression.typing == typing {
                 expression
             } else {
                 let span = expression.span;
 
-                Analysis::new(AnalysisKind::Cast(Box::new(expression), typ.clone()), span, typ)
+                Analysis::new(AnalysisKind::Cast(Box::new(expression), typing.clone()), span, typing)
             }
         }
 
-        let typ = self.typ.clone();
+        let typing = self.typing.clone();
 
         match &self.kind {
             ElementKind::Literal(literal) => {
                 let kind = match &literal.kind {
                     TokenKind::Integer(value) => {
-                        let (size, signed) = match &typ.kind {
+                        let (size, signed) = match &typing.kind {
                             TypeKind::Integer { size, signed } => (*size, *signed),
                             _ => (64, true),
                         };
                         AnalysisKind::Integer { value: *value, size, signed }
                     }
                     TokenKind::Float(value) => {
-                        let size = match &typ.kind {
+                        let size = match &typing.kind {
                             TypeKind::Float { size } => *size,
                             _ => 64,
                         };
@@ -48,7 +48,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
                 };
 
-                Ok(Analysis::new(kind, self.span, typ))
+                Ok(Analysis::new(kind, self.span, typing))
             }
 
             ElementKind::Delimited(delimited) => {
@@ -105,7 +105,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                     _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
                 };
-                Ok(Analysis::new(kind, self.span, typ))
+                Ok(Analysis::new(kind, self.span, typing))
             }
 
             ElementKind::Unary(unary) => {
@@ -122,7 +122,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span))
                     };
 
-                    return Ok(Analysis::new(kind, self.span, typ));
+                    return Ok(Analysis::new(kind, self.span, typing));
                 }
 
                 Err(AnalyzeError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span))
@@ -146,7 +146,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let target = binary.left.analyze(resolver)?;
                         let value = binary.right.analyze(resolver)?;
 
-                        let safely_cast_value = cast(value, target.typ.clone());
+                        let safely_cast_value = cast(value, target.typing.clone());
 
                         match &target.kind {
                             AnalysisKind::Usage(target_name) => AnalysisKind::Assign(target_name.clone(), Box::new(safely_cast_value)),
@@ -161,46 +161,46 @@ impl<'element> Analyzable<'element> for Element<'element> {
 
                         match op_kind.as_slice() {
                             [OperatorKind::Plus] => {
-                                match (&left.typ.kind, &right.typ.kind) {
+                                match (&left.typing.kind, &right.typing.kind) {
                                     (TypeKind::Pointer { target }, _) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.typ.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typ.clone());
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.typing.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typing.clone());
                                         AnalysisKind::Add(Box::new(left), Box::new(scaled))
                                     }
                                     (_, TypeKind::Pointer { target }) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), left.span, left.typ.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size_of)), left.span, left.typ.clone());
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), left.span, left.typing.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size_of)), left.span, left.typing.clone());
                                         AnalysisKind::Add(Box::new(scaled), Box::new(right))
                                     }
                                     _ => {
-                                        let l = cast(left, typ.clone());
-                                        let r = cast(right, typ.clone());
+                                        let l = cast(left, typing.clone());
+                                        let r = cast(right, typing.clone());
                                         AnalysisKind::Add(Box::new(l), Box::new(r))
                                     }
                                 }
                             },
                             [OperatorKind::Minus] => {
-                                match (&left.typ.kind, &right.typ.kind) {
+                                match (&left.typing.kind, &right.typing.kind) {
                                     (TypeKind::Pointer { target: target_left }, TypeKind::Pointer { .. }) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), self.span, typ.clone());
-                                        let raw_sub = Analysis::new(AnalysisKind::Subtract(Box::new(left), Box::new(right)), self.span, typ.clone());
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), self.span, typing.clone());
+                                        let raw_sub = Analysis::new(AnalysisKind::Subtract(Box::new(left), Box::new(right)), self.span, typing.clone());
                                         AnalysisKind::Divide(Box::new(raw_sub), Box::new(size_of))
                                     }
                                     (TypeKind::Pointer { target: target_left }, _) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), right.span, right.typ.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typ.clone());
+                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), right.span, right.typing.clone());
+                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typing.clone());
                                         AnalysisKind::Subtract(Box::new(left), Box::new(scaled))
                                     }
                                     _ => {
-                                        let l = cast(left, typ.clone());
-                                        let r = cast(right, typ.clone());
+                                        let l = cast(left, typing.clone());
+                                        let r = cast(right, typing.clone());
                                         AnalysisKind::Subtract(Box::new(l), Box::new(r))
                                     }
                                 }
                             },
-                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(cast(left, typ.clone())), Box::new(cast(right, typ.clone()))),
-                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(cast(left, typ.clone())), Box::new(cast(right, typ.clone()))),
-                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(cast(left, typ.clone())), Box::new(cast(right, typ.clone()))),
+                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
+                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
+                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
 
                             [OperatorKind::Ampersand, OperatorKind::Ampersand] => AnalysisKind::LogicalAnd(Box::new(left), Box::new(right)),
                             [OperatorKind::Pipe, OperatorKind::Pipe] => AnalysisKind::LogicalOr(Box::new(left), Box::new(right)),
@@ -221,7 +221,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     }
                 };
 
-                Ok(Analysis::new(kind, self.span, typ))
+                Ok(Analysis::new(kind, self.span, typing))
             },
 
             ElementKind::Index(index) => {
@@ -236,7 +236,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     Box::new(target),
                     indexes?,
                 ));
-                Ok(Analysis::new(kind, self.span, typ))
+                Ok(Analysis::new(kind, self.span, typing))
             }
 
             ElementKind::Invoke(invoke) => {
@@ -302,7 +302,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     }
                 };
 
-                Ok(Analysis::new(kind, self.span, typ))
+                Ok(Analysis::new(kind, self.span, typing))
             },
 
             ElementKind::Construct(constructor) => {
@@ -319,7 +319,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
 
                 let analyzed = Structure::new(Str::from(target), members);
-                Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span, typ))
+                Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span, typing))
             }
 
             ElementKind::Symbolize(symbol) => {

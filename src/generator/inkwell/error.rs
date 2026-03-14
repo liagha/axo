@@ -112,8 +112,8 @@ pub enum DataStructureError {
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            ErrorKind::InvalidType(typ) => {
-                write!(f, "invalid LLVM type {}", typ.format(2))
+            ErrorKind::InvalidType(typing) => {
+                write!(f, "invalid LLVM type {}", typing.format(2))
             }
             ErrorKind::UnsupportedFloatWidth(width) => {
                 write!(f, "invalid LLVM float width: {}", width)

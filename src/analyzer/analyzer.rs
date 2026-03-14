@@ -65,7 +65,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let analyzed = Binding::new(
                     Str::from(head.format(0)),
                     value.map(Box::new),
-                    self.typ.clone(),
+                    self.typing.clone(),
                     binding.kind,
                 );
 
@@ -112,7 +112,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::unit(self.span))
                 };
 
-                let output = function.output.clone().map(|output| output.typ);
+                let output = function.output.clone().map(|output| output.typing);
 
                 let analyzed = Function::new(
                     Str::from(function.target.brand().unwrap().format(0)),
@@ -145,6 +145,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        Ok(Analysis::new(kind, self.span, self.typ.clone()))
+        Ok(Analysis::new(kind, self.span, self.typing.clone()))
     }
 }

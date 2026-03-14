@@ -144,9 +144,9 @@ pub enum TypeKind<'source> {
     Void,
     Variable(Identity),
     Unknown,
-    Constructor(Structure<Str<'source>, Type<'source>>),
-    Structure(Structure<Str<'source>, Type<'source>>),
-    Union(Structure<Str<'source>, Type<'source>>),
+    Constructor(Identity, Structure<Str<'source>, Type<'source>>),
+    Structure(Identity, Structure<Str<'source>, Type<'source>>),
+    Union(Identity, Structure<Str<'source>, Type<'source>>),
     Function(Str<'source>, Vec<Type<'source>>, Option<Box<Type<'source>>>),
 }
 

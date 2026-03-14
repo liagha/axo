@@ -10,12 +10,12 @@ use {
 pub struct Analysis<'analysis> {
     pub kind: AnalysisKind<'analysis>,
     pub span: Span<'analysis>,
-    pub typ: Type<'analysis>,
+    pub typing: Type<'analysis>,
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, typ: Type<'analysis>) -> Self {
-        Self { kind, span, typ }
+    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, typing: Type<'analysis>) -> Self {
+        Self { kind, span, typing }
     }
 }
 

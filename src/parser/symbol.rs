@@ -22,7 +22,7 @@ pub struct Symbol<'symbol> {
     pub span: Span<'symbol>,
     pub scope: Scope<Symbol<'symbol>>,
     pub visibility: Visibility,
-    pub typ: Type<'symbol>,
+    pub typing: Type<'symbol>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -40,7 +40,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(),
             visibility,
-            typ: Type::new(TypeKind::Unknown, Span::void())
+            typing: Type::new(TypeKind::Unknown, Span::void())
         }
     }
 

@@ -335,7 +335,7 @@ impl<'backend> super::Inkwell<'backend> {
                         bind.target.clone(),
                         Entity::Variable {
                             pointer: allocate,
-                            typ: self.to_type(parameter.get_type(), member.span),
+                            typing: self.to_type(parameter.get_type(), member.span),
                         },
                     );
                 }
@@ -853,10 +853,10 @@ impl<'backend> super::Inkwell<'backend> {
 
     pub fn size_of(
         &mut self,
-        typ: Type<'backend>,
+        typing: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let llvm_target = self.to_basic_type(&typ, span)?;
+        let llvm_target = self.to_basic_type(&typing, span)?;
 
         let size = llvm_target.size_of().ok_or_else(|| {
             GenerateError::new(

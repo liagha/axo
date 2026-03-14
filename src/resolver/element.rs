@@ -23,16 +23,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
             }
         }
 
-        if let Some(id) = identity {
-            self.reference = Some(id);
+        if let Some(reference) = identity {
+            self.reference = Some(reference);
             match &mut self.kind {
-                ElementKind::Construct(construct) => construct.target.reference = Some(id),
-                ElementKind::Invoke(invoke) => invoke.target.reference = Some(id),
+                ElementKind::Construct(construct) => construct.target.reference = Some(reference),
+                ElementKind::Invoke(invoke) => invoke.target.reference = Some(reference),
                 _ => {}
             }
         }
 
-        let typ = match &mut self.kind {
+        let typing = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
                 TokenKind::Integer(_) => Type::new(TypeKind::Integer { size: 64, signed: true }, literal.span),
                 TokenKind::Float(_) => Type::new(TypeKind::Float { size: 64 }, literal.span),
@@ -40,8 +40,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 TokenKind::String(_) => Type::new(TypeKind::String, literal.span),
                 TokenKind::Character(_) => Type::new(TypeKind::Character, literal.span),
                 TokenKind::Identifier(_) => {
-                    if let Some(id) = self.reference {
-                        resolver.lookup(id, literal.span)
+                    if let Some(reference) = self.reference {
+                        resolver.lookup(reference, literal.span)
                     } else {
                         resolver.fresh(literal.span)
                     }
@@ -51,7 +51,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
             ElementKind::Delimited(delimited) => match (
                 &delimited.start.kind,
-                delimited.separator.as_ref().map(|t| &t.kind),
+                delimited.separator.as_ref().map(|token| &token.kind),
                 &delimited.end.kind,
             ) {
                 (
@@ -61,12 +61,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 ) => {
                     if delimited.separator.is_none() && delimited.members.len() == 1 {
                         delimited.members[0].resolve(resolver);
-                        delimited.members[0].typ.clone()
+                        delimited.members[0].typing.clone()
                     } else {
                         let mut members = Vec::with_capacity(delimited.members.len());
                         for member in &mut delimited.members {
                             member.resolve(resolver);
-                            members.push(member.typ.clone());
+                            members.push(member.typing.clone());
                         }
                         Type::new(TypeKind::Tuple { members }, span)
                     }
@@ -84,7 +84,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     for (index, member) in delimited.members.iter_mut().enumerate() {
                         member.resolve(resolver);
                         if index == last {
-                            block = member.typ.clone();
+                            block = member.typing.clone();
                         }
                     }
 
@@ -100,7 +100,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     let mut inner = resolver.fresh(span);
                     for member in &mut delimited.members {
                         member.resolve(resolver);
-                        inner = resolver.unify(member.span, &inner, &member.typ);
+                        inner = resolver.unify(member.span, &inner, &member.typing);
                     }
                     Type::new(
                         TypeKind::Array {
@@ -123,8 +123,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 };
 
                 match operator.as_slice() {
-                    [OperatorKind::Exclamation] => resolver.unify(span, &unary.operand.typ, &Type::new(TypeKind::Boolean, span)),
-                    [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typ.clone(),
+                    [OperatorKind::Exclamation] => resolver.unify(span, &unary.operand.typing, &Type::new(TypeKind::Boolean, span)),
+                    [OperatorKind::Tilde] | [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typing.clone(),
                     [OperatorKind::Ampersand] => {
                         let addressable = match &unary.operand.kind {
                             ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) | ElementKind::Index(_) => true,
@@ -134,7 +134,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         };
 
                         if addressable {
-                            Type::new(TypeKind::Pointer { target: Box::new(unary.operand.typ.clone()) }, span)
+                            Type::new(TypeKind::Pointer { target: Box::new(unary.operand.typing.clone()) }, span)
                         } else {
                             resolver.errors.push(Error::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                             resolver.fresh(span)
@@ -143,7 +143,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     [OperatorKind::Star] => {
                         let target = resolver.fresh(span);
                         let pointer = Type::new(TypeKind::Pointer { target: Box::new(target.clone()) }, span);
-                        resolver.unify(span, &unary.operand.typ, &pointer);
+                        resolver.unify(span, &unary.operand.typing, &pointer);
                         target
                     }
                     _ => {
@@ -163,59 +163,80 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 match operator.as_slice() {
                     [OperatorKind::Dot] => {
-                        let mut namespace = false;
-                        if let Some(id) = binary.left.reference {
-                            if let Some(symbol) = resolver.scope.get_identity(id) {
+                        let mut namespace = None;
+
+                        if let Some(reference) = binary.left.reference {
+                            if let Some(symbol) = resolver.scope.get_identity(reference) {
                                 if matches!(symbol.kind, SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_)) {
-                                    namespace = true;
-                                    resolver.enter_scope(symbol.scope.clone());
-                                    binary.right.resolve(resolver);
-                                    resolver.exit();
+                                    namespace = Some(symbol.scope.clone());
                                 }
                             }
                         }
 
-                        if namespace {
+                        if namespace.is_none() {
+                            let left = resolver.reify(&binary.left.typing);
+                            let target = match left.kind {
+                                TypeKind::Pointer { target } => target.kind,
+                                kind => kind,
+                            };
+                            match target {
+                                TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) => {
+                                    if let Some(symbol) = resolver.scope.get_identity(reference) {
+                                        namespace = Some(symbol.scope.clone());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if let Some(scope) = namespace {
+                            resolver.enter_scope(scope);
+                            binary.right.resolve(resolver);
+                            resolver.exit();
                             self.reference = binary.right.reference;
                         } else {
                             binary.right.resolve(resolver);
                         }
 
-                        binary.right.typ.clone()
+                        binary.right.typing.clone()
                     }
                     _ => {
                         binary.right.resolve(resolver);
 
                         match operator.as_slice() {
-                            [OperatorKind::Equal] => resolver.unify(span, &binary.left.typ, &binary.right.typ),
+                            [OperatorKind::Equal] => resolver.unify(span, &binary.left.typing, &binary.right.typing),
                             [OperatorKind::Plus] | [OperatorKind::Minus] | [OperatorKind::Star] | [OperatorKind::Slash] | [OperatorKind::Percent] => {
-                                let left = resolver.reify(&binary.left.typ);
-                                let right = resolver.reify(&binary.right.typ);
+                                let left = resolver.reify(&binary.left.typing);
+                                let right = resolver.reify(&binary.right.typing);
 
-                                let valid = |typ: &Type| matches!(&typ.kind, TypeKind::Integer { .. } | TypeKind::Float { .. } | TypeKind::Pointer { .. } | TypeKind::Variable(_));
+                                let valid = |typing: &Type| matches!(&typing.kind, TypeKind::Integer { .. } | TypeKind::Float { .. } | TypeKind::Pointer { .. } | TypeKind::Variable(_) | TypeKind::Unknown);
 
                                 if !valid(&left) || !valid(&right) {
                                     resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), span));
                                     resolver.fresh(span)
                                 } else if matches!(left.kind, TypeKind::Pointer { .. }) {
+                                    let integer = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
+                                    resolver.unify(span, &right, &integer);
                                     left
                                 } else if matches!(right.kind, TypeKind::Pointer { .. }) {
+                                    let integer = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
+                                    resolver.unify(span, &left, &integer);
                                     right
                                 } else {
                                     resolver.unify(span, &left, &right)
                                 }
                             }
                             [OperatorKind::Ampersand] | [OperatorKind::Pipe] | [OperatorKind::Caret] | [OperatorKind::LeftAngle, OperatorKind::LeftAngle] | [OperatorKind::RightAngle, OperatorKind::RightAngle] => {
-                                resolver.unify(span, &binary.left.typ, &binary.right.typ)
+                                resolver.unify(span, &binary.left.typing, &binary.right.typing)
                             }
                             [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
                                 let boolean = Type::new(TypeKind::Boolean, span);
-                                resolver.unify(span, &binary.left.typ, &boolean);
-                                resolver.unify(span, &binary.right.typ, &boolean);
+                                resolver.unify(span, &binary.left.typing, &boolean);
+                                resolver.unify(span, &binary.right.typing, &boolean);
                                 boolean
                             }
                             [OperatorKind::Equal, OperatorKind::Equal] | [OperatorKind::Exclamation, OperatorKind::Equal] | [OperatorKind::LeftAngle] | [OperatorKind::LeftAngle, OperatorKind::Equal] | [OperatorKind::RightAngle] | [OperatorKind::RightAngle, OperatorKind::Equal] => {
-                                resolver.unify(span, &binary.left.typ, &binary.right.typ);
+                                resolver.unify(span, &binary.left.typing, &binary.right.typing);
                                 Type::new(TypeKind::Boolean, span)
                             }
                             _ => {
@@ -230,17 +251,17 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Index(index) => {
                 if index.members.is_empty() {
                     resolver.errors.push(Error::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
-                    self.typ = resolver.fresh(span);
+                    self.typing = resolver.fresh(span);
                     return;
                 }
 
                 index.target.resolve(resolver);
                 index.members[0].resolve(resolver);
 
-                let target = resolver.reify(&index.target.typ);
-                let parameter = resolver.reify(&index.members[0].typ);
+                let target = resolver.reify(&index.target.typing);
+                let parameter = resolver.reify(&index.members[0].typing);
 
-                let valid = matches!(parameter.kind, TypeKind::Integer { .. } | TypeKind::Variable(_));
+                let valid = matches!(parameter.kind, TypeKind::Integer { .. } | TypeKind::Variable(_) | TypeKind::Unknown);
 
                 if !valid {
                     let expected = Type::new(TypeKind::Integer { size: 64, signed: true }, span);
@@ -252,7 +273,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     TypeKind::Array { member, .. } => *member,
                     TypeKind::Tuple { members } => {
                         if let ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) = index.members[0].kind {
-                            if let Some(position) = usize::try_from(value).ok().filter(|&p| p < members.len()) {
+                            if let Some(position) = usize::try_from(value).ok().filter(|&position| position < members.len()) {
                                 members[position].clone()
                             } else {
                                 resolver.errors.push(Error::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
@@ -269,6 +290,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         resolver.unify(span, &target, &pointer);
                         element
                     }
+                    TypeKind::Unknown => Type::new(TypeKind::Unknown, span),
                     _ => {
                         resolver.errors.push(Error::new(ErrorKind::InvalidOperation(Token::new(TokenKind::Punctuation(PunctuationKind::LeftBracket), span)), span));
                         resolver.fresh(span)
@@ -280,8 +302,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 invoke.target.resolve(resolver);
 
                 let mut namespace = false;
-                if let Some(id) = invoke.target.reference {
-                    if let Some(symbol) = resolver.scope.get_identity(id) {
+                if let Some(reference) = invoke.target.reference {
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
                         if matches!(symbol.kind, SymbolKind::Function(_)) {
                             resolver.enter_scope(symbol.scope.clone());
                             namespace = true;
@@ -297,28 +319,28 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     resolver.exit();
                 }
 
-                let primitive = invoke.target.brand().and_then(|t| match &t.kind {
+                let primitive = invoke.target.brand().and_then(|brand| match &brand.kind {
                     TokenKind::Identifier(name) => Some(name),
                     _ => None,
-                }).and_then(|n| n.as_str());
+                }).and_then(|name| name.as_str());
 
                 match primitive {
                     Some("if") => {
                         let boolean = Type::new(TypeKind::Boolean, span);
-                        resolver.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean);
-                        resolver.unify(span, &invoke.members[1].typ, &invoke.members[2].typ)
+                        resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
+                        resolver.unify(span, &invoke.members[1].typing, &invoke.members[2].typing)
                     }
                     Some("while") => {
                         let boolean = Type::new(TypeKind::Boolean, span);
-                        resolver.unify(invoke.members[0].span, &invoke.members[0].typ, &boolean);
+                        resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
                         Type::unit(span)
                     }
                     _ => {
                         let output = resolver.fresh(span);
-                        let arguments = invoke.members.iter().map(|m| m.typ.clone()).collect();
+                        let arguments = invoke.members.iter().map(|member| member.typing.clone()).collect();
                         let function = Type::new(TypeKind::Function(crate::data::Str::default(), arguments, Some(Box::new(output.clone()))), span);
 
-                        let unified = resolver.unify(span, &invoke.target.typ, &function);
+                        let unified = resolver.unify(span, &invoke.target.typing, &function);
 
                         match unified.kind {
                             TypeKind::Function(_, _, Some(kind)) => *kind,
@@ -332,27 +354,29 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
-                let mut namespace = false;
-                if let Some(id) = construct.target.reference {
-                    if let Some(symbol) = resolver.scope.get_identity(id) {
+                let mut namespace = None;
+                let mut identifier = 0;
+
+                if let Some(reference) = construct.target.reference {
+                    identifier = reference;
+                    if let Some(symbol) = resolver.scope.get_identity(reference) {
                         if matches!(symbol.kind, SymbolKind::Structure(_) | SymbolKind::Union(_)) {
-                            resolver.enter_scope(symbol.scope.clone());
-                            namespace = true;
+                            namespace = Some(symbol.scope.clone());
                         }
                     }
+                }
+
+                if let Some(scope) = &namespace {
+                    resolver.enter_scope(scope.clone());
                 }
 
                 for field in &mut construct.members {
                     if let ElementKind::Binary(binary) = &mut field.kind {
                         if let TokenKind::Operator(operator) = &binary.operator.kind {
                             if operator.as_slice() == [OperatorKind::Equal] {
-                                if let ElementKind::Literal(Token { kind: TokenKind::Identifier(_), .. }) = binary.left.kind {
-                                    binary.left.typ = resolver.fresh(binary.left.span);
-                                } else {
-                                    binary.left.resolve(resolver);
-                                }
+                                binary.left.resolve(resolver);
                                 binary.right.resolve(resolver);
-                                field.typ = resolver.unify(field.span, &binary.left.typ, &binary.right.typ);
+                                field.typing = resolver.unify(field.span, &binary.left.typing, &binary.right.typing);
                                 continue;
                             }
                         }
@@ -360,38 +384,40 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     field.resolve(resolver);
                 }
 
-                if namespace {
+                if namespace.is_some() {
                     resolver.exit();
                 }
 
-                let members = construct.members.iter().map(|f| f.typ.clone()).collect();
+                let members = construct.members.iter().map(|field| field.typing.clone()).collect();
                 let head = construct.target.brand().unwrap().format(0).into();
-                let structure = Type::new(TypeKind::Structure(Structure::new(head, members)), span);
+                let structure = Type::new(TypeKind::Structure(identifier, Structure::new(head, members)), span);
 
-                resolver.unify(span, &construct.target.typ, &structure)
+                resolver.unify(span, &construct.target.typing, &structure)
             }
 
             ElementKind::Symbolize(symbol) => {
                 self.reference = Some(symbol.identity);
 
                 let pre = resolver.fresh(span);
-                resolver.bind(symbol.identity, pre.clone());
+                let mut placeholder = symbol.clone();
+                placeholder.typing = pre.clone();
+                resolver.add(placeholder);
 
                 symbol.resolve(resolver);
 
-                let unified = resolver.unify(span, &pre, &symbol.typ);
-                symbol.typ = unified.clone();
-                resolver.bind(symbol.identity, unified.clone());
+                let unified = resolver.unify(span, &pre, &symbol.typing);
+                symbol.typing = unified.clone();
+                resolver.add(symbol.clone());
 
                 unified
             }
         };
 
-        self.typ = typ;
+        self.typing = typing;
     }
 
     fn reify(&mut self, resolver: &mut Resolver<'element>) {
-        self.typ = resolver.reify(&self.typ);
+        self.typing = resolver.reify(&self.typing);
 
         match &mut self.kind {
             ElementKind::Literal(_) => {}

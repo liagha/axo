@@ -31,7 +31,7 @@ use {
 pub enum Entity<'backend> {
     Variable {
         pointer: PointerValue<'backend>,
-        typ: Type<'backend>,
+        typing: Type<'backend>,
     },
     Struct {
         structure: StructType<'backend>,
@@ -144,8 +144,8 @@ impl<'backend> Inkwell<'backend> {
         self.modules.contains_key(name)
     }
 
-    pub fn to_basic_type(&self, typ: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
-        let typ = match &typ.kind {
+    pub fn to_basic_type(&self, typing: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+        let typing = match &typing.kind {
             TypeKind::Integer { size: bits, .. } => {
                 match bits {
                     8 => self.context.i8_type().into(),
@@ -175,9 +175,9 @@ impl<'backend> Inkwell<'backend> {
                     .into()
             },
             TypeKind::Array { member, size } => {
-                let typ = self.to_basic_type(member, span.clone())?;
+                let typing = self.to_basic_type(member, span.clone())?;
 
-                typ.array_type(*size as u32).into()
+                typing.array_type(*size as u32).into()
             }
             TypeKind::Tuple { members } => {
                 let mut typs = Vec::with_capacity(members.len());
@@ -188,8 +188,8 @@ impl<'backend> Inkwell<'backend> {
 
                 self.context.struct_type(&typs, false).into()
             }
-            TypeKind::Structure(structure) => {
-                if let Some(typ) = self
+            TypeKind::Structure(_, structure) => {
+                if let Some(typing) = self
                     .get_entity(&structure.target)
                     .and_then(
                         |entity| {
@@ -200,7 +200,7 @@ impl<'backend> Inkwell<'backend> {
                             }
                         }
                     ) {
-                    typ
+                    typing
                 } else {
                     let name = structure.target;
 
@@ -229,22 +229,22 @@ impl<'backend> Inkwell<'backend> {
             _ => {
                 return Err(
                     GenerateError::new(
-                        ErrorKind::InvalidType(typ.clone()),
+                        ErrorKind::InvalidType(typing.clone()),
                         span
                     )
                 );
             },
         };
 
-        Ok(typ)
+        Ok(typing)
     }
 
     pub fn to_type(
         &self,
-        typ: BasicTypeEnum<'backend>,
+        typing: BasicTypeEnum<'backend>,
         span: Span<'backend>,
     ) -> Type<'backend> {
-        let kind = match typ {
+        let kind = match typing {
             BasicTypeEnum::IntType(integer) => {
                 let bits = integer.get_bit_width();
 
@@ -263,9 +263,9 @@ impl<'backend> Inkwell<'backend> {
                 }
             }
 
-            BasicTypeEnum::PointerType(typ) => {
+            BasicTypeEnum::PointerType(typing) => {
                 TypeKind::Pointer {
-                    target: Box::new(self.to_type(typ.as_basic_type_enum(), span))
+                    target: Box::new(self.to_type(typing.as_basic_type_enum(), span))
                 }
             }
 
@@ -274,6 +274,7 @@ impl<'backend> Inkwell<'backend> {
                 let fields = structure.clone().get_field_types().iter().map(|basic| self.to_type(*basic, span)).collect();
 
                 TypeKind::Structure(
+                    0,
                     Structure::new(
                         name,
                         fields,
@@ -325,8 +326,8 @@ impl<'backend> Inkwell<'backend> {
         match &analysis.kind {
             AnalysisKind::Integer { signed, .. } => Some(*signed),
             AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
-                Some(Entity::Variable { typ, .. }) => {
-                    if let TypeKind::Integer { signed, .. } = &typ.kind {
+                Some(Entity::Variable { typing, .. }) => {
+                    if let TypeKind::Integer { signed, .. } = &typing.kind {
                         Some(*signed)
                     } else {
                         None
@@ -454,9 +455,9 @@ impl<'backend> Backend<'backend> for Inkwell<'backend> {
             AnalysisKind::String { value } => self.string(value, instruction.span),
             AnalysisKind::Array(values) => self.array(values, instruction.span),
             AnalysisKind::Tuple(values) => self.tuple(values, instruction.span),
-            AnalysisKind::Cast(value, typ) => self.explicit_cast(value, typ, instruction.span),
+            AnalysisKind::Cast(value, typing) => self.explicit_cast(value, typing, instruction.span),
             AnalysisKind::Negate(value) => self.negate(value, instruction.span),
-            AnalysisKind::SizeOf(typ) => self.size_of(typ, instruction.span),
+            AnalysisKind::SizeOf(typing) => self.size_of(typing, instruction.span),
             AnalysisKind::Add(left, right) => self.add(left, right, instruction.span),
             AnalysisKind::Subtract(left, right) => self.subtract(left, right, instruction.span),
             AnalysisKind::Multiply(left, right) => self.multiply(left, right, instruction.span),

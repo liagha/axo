@@ -17,10 +17,10 @@ impl<'scope> Show<'scope> for Scope<Symbol<'scope>> {
 
 use crate::resolver::{Type, TypeKind};
 
-impl<'typ> Show<'typ> for Type<'typ> {
+impl<'typing> Show<'typing> for Type<'typing> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'typ> {
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'typing> {
         match verbosity {
             0 => {
                 format!("{}", self.kind.format(verbosity))
@@ -37,10 +37,10 @@ impl<'typ> Show<'typ> for Type<'typ> {
     }
 }
 
-impl<'typ> Show<'typ> for TypeKind<'typ> {
+impl<'typing> Show<'typing> for TypeKind<'typing> {
     type Verbosity = u8;
 
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'typ> {
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'typing> {
         match verbosity {
             0 => {
                 match self {
@@ -69,13 +69,13 @@ impl<'typ> Show<'typ> for TypeKind<'typ> {
                         format!("Tuple({})", members.format(verbosity))
                     }
                     TypeKind::Void => "Void".to_string(),
-                    TypeKind::Constructor(_) => {
+                    TypeKind::Constructor(_,_) => {
                         "Constructor".to_string()
                     }
-                    TypeKind::Structure(_) => {
+                    TypeKind::Structure(_,_) => {
                         "Structure".to_string()
                     }
-                    TypeKind::Union(_) => {
+                    TypeKind::Union(_,_) => {
                         "Union".to_string()
                     }
                     TypeKind::Function(name, members, output) => {

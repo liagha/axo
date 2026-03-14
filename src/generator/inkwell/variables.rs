@@ -22,8 +22,8 @@ impl<'backend> super::Inkwell<'backend> {
     fn pointer_pointee_type(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(name) => match self.get_entity(name) {
-                Some(Entity::Variable { typ, .. }) => {
-                    if let TypeKind::Pointer { target } = &typ.kind {
+                Some(Entity::Variable { typing, .. }) => {
+                    if let TypeKind::Pointer { target } = &typing.kind {
                         self.to_basic_type(target, analysis.span).ok()
                     } else {
                         None
@@ -46,8 +46,8 @@ impl<'backend> super::Inkwell<'backend> {
             AnalysisKind::Usage(name) => {
                 if let Some(entity) = self.get_entity(name) {
                     match entity {
-                        Entity::Variable { pointer, typ } => {
-                            let kind = self.to_basic_type(typ, analysis.span)?;
+                        Entity::Variable { pointer, typing } => {
+                            let kind = self.to_basic_type(typing, analysis.span)?;
                             Ok(Some((*pointer, kind)))
                         }
                         Entity::Function(func) => {
@@ -206,8 +206,8 @@ impl<'backend> super::Inkwell<'backend> {
                 Entity::Function(function) => {
                     Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
-                Entity::Variable { pointer, typ } => {
-                    let kind = self.to_basic_type(typ, span)?;
+                Entity::Variable { pointer, typing } => {
+                    let kind = self.to_basic_type(typing, span)?;
 
                     if kind.is_array_type() || kind.is_struct_type() {
                         Ok(BasicValueEnum::from(*pointer))
@@ -273,17 +273,17 @@ impl<'backend> super::Inkwell<'backend> {
         let result = self.analysis(*value)?;
 
         let existing_var = match self.get_entity(&target) {
-            Some(Entity::Variable { pointer, typ }) => Some((*pointer, typ.clone())),
+            Some(Entity::Variable { pointer, typing }) => Some((*pointer, typing.clone())),
             _ => None,
         };
 
-        if let Some((slot, typ)) = existing_var {
+        if let Some((slot, typing)) = existing_var {
             self.builder.build_store(slot, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             let new_entity = Entity::Variable {
                 pointer: slot,
-                typ,
+                typing,
             };
 
             if !self.update_entity(&target, new_entity.clone()) {
@@ -318,7 +318,7 @@ impl<'backend> super::Inkwell<'backend> {
             }
         };
 
-        let typ = binding.annotation.clone();
+        let typing = binding.annotation.clone();
         let is_global_scope = self.builder.get_insert_block().is_none();
 
         let dummy_func = if is_global_scope {
@@ -341,7 +341,7 @@ impl<'backend> super::Inkwell<'backend> {
             unsafe { func.delete(); }
         }
 
-        let declared_kind = self.to_basic_type(&typ, span)?;
+        let declared_kind = self.to_basic_type(&typing, span)?;
 
         let casted = if result.get_type() == declared_kind {
             result
@@ -424,7 +424,7 @@ impl<'backend> super::Inkwell<'backend> {
 
         self.insert_entity(
             binding.target.clone(),
-            Entity::Variable { pointer, typ },
+            Entity::Variable { pointer, typing },
         );
 
         Ok(casted)

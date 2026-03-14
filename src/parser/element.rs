@@ -16,7 +16,7 @@ pub struct Element<'element> {
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
-    pub typ: Type<'element>,
+    pub typing: Type<'element>,
 }
 
 pub enum ElementKind<'element> {
@@ -39,7 +39,7 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { identity: next_identity(), kind, span, reference: None, typ: Type::new(TypeKind::Unknown, span) }
+        Element { identity: next_identity(), kind, span, reference: None, typing: Type::new(TypeKind::Unknown, span) }
     }
 }
 

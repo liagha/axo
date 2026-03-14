@@ -38,8 +38,8 @@ impl<'backend> Inkwell<'backend> {
         }
     }
 
-    fn size(&self, typ: BasicTypeEnum<'backend>) -> u64 {
-        match typ {
+    fn size(&self, typing: BasicTypeEnum<'backend>) -> u64 {
+        match typing {
             BasicTypeEnum::IntType(integer) => (integer.get_bit_width() as u64 + 7) / 8,
             BasicTypeEnum::FloatType(float) => (float.get_bit_width() as u64 + 7) / 8,
             BasicTypeEnum::PointerType(_) => 8,
@@ -205,13 +205,13 @@ impl<'backend> Inkwell<'backend> {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
 
-                let typ = self.to_basic_type(&binding.annotation, member.span)?;
-                fields.push((field.clone(), typ));
+                let typing = self.to_basic_type(&binding.annotation, member.span)?;
+                fields.push((field.clone(), typing));
 
-                let size = self.size(typ);
+                let size = self.size(typing);
                 if size >= max_size || largest_type.is_none() {
                     max_size = max_size.max(size);
-                    largest_type = Some(typ);
+                    largest_type = Some(typing);
                 }
             }
         }
@@ -338,7 +338,7 @@ impl<'backend> Inkwell<'backend> {
                     let field_type = fields
                         .iter()
                         .find(|(name, _)| name.as_str().unwrap_or("") == field_name)
-                        .map(|(_, typ)| *typ)
+                        .map(|(_, typing)| *typing)
                         .ok_or_else(|| {
                             GenerateError::new(
                                 ErrorKind::DataStructure(DataStructureError::UnknownField {
@@ -414,8 +414,8 @@ impl<'backend> Inkwell<'backend> {
         };
 
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            if let Some(Entity::Variable { pointer, typ }) = self.get_entity(identifier) {
-                let kind = self.to_basic_type(typ, span)?;
+            if let Some(Entity::Variable { pointer, typing }) = self.get_entity(identifier) {
+                let kind = self.to_basic_type(typing, span)?;
 
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
@@ -572,8 +572,8 @@ impl<'backend> Inkwell<'backend> {
         let offset = self.analysis(index.members[0].clone())?;
 
         if let AnalysisKind::Usage(identifier) = &index.target.kind {
-            if let Some(Entity::Variable { typ, pointer }) = self.get_entity(identifier) {
-                let kind = self.to_basic_type(typ, span)?;
+            if let Some(Entity::Variable { typing, pointer }) = self.get_entity(identifier) {
+                let kind = self.to_basic_type(typing, span)?;
 
                 if kind.is_struct_type() {
                     if let BasicValueEnum::IntValue(integer) = offset {

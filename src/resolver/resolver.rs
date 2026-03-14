@@ -1,7 +1,7 @@
 use {
     super::{scope::Scope, ResolveError},
     crate::{
-        data::{memory::replace},
+        data::memory::replace,
         parser::{Element, Symbol},
     },
 };
@@ -13,7 +13,6 @@ pub struct Resolver<'resolver> {
     pub scope: Scope<Symbol<'resolver>>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
-    pub history: Vec<Vec<(Identity, Type<'resolver>)>>,
     pub variables: Vec<Option<Type<'resolver>>>,
 }
 
@@ -23,17 +22,13 @@ impl Clone for Resolver<'_> {
             scope: self.scope.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
-            history: self.history.clone(),
             variables: self.variables.clone(),
         }
     }
 }
 
 pub trait Resolvable<'resolvable> {
-    fn resolve(
-        &mut self,
-        resolver: &mut Resolver<'resolvable>,
-    );
+    fn resolve(&mut self, resolver: &mut Resolver<'resolvable>);
     fn reify(&mut self, resolver: &mut Resolver<'resolvable>);
 }
 
@@ -43,7 +38,6 @@ impl<'resolver> Resolver<'resolver> {
             scope: Scope::new(),
             input: Vec::new(),
             errors: Vec::new(),
-            history: Vec::new(),
             variables: Vec::new(),
         }
     }
@@ -60,35 +54,21 @@ impl<'resolver> Resolver<'resolver> {
     pub fn add(&mut self, symbol: Symbol<'resolver>) {
         self.scope.add(symbol);
     }
+
     pub fn enter(&mut self) {
-        self.history.push(Vec::new());
         let parent = replace(&mut self.scope, Scope::new());
         self.scope.attach(parent);
     }
 
     pub fn exit(&mut self) {
-        self.history.pop();
         if let Some(parent) = self.scope.detach() {
             self.scope = parent;
         }
     }
 
-    pub fn bind(&mut self, identity: Identity, typ: Type<'resolver>) {
-        if let Some(frame) = self.history.last_mut() {
-            frame.push((identity, typ));
-        }
-    }
-
     pub fn lookup(&mut self, identity: Identity, span: Span<'resolver>) -> Type<'resolver> {
-        for frame in self.history.iter().rev() {
-            for (id, typ) in frame.iter().rev() {
-                if *id == identity {
-                    return typ.clone();
-                }
-            }
-        }
         if let Some(symbol) = self.scope.get_identity(identity) {
-            return symbol.typ.clone();
+            return symbol.typing.clone();
         }
         self.fresh(span)
     }
@@ -99,46 +79,46 @@ impl<'resolver> Resolver<'resolver> {
         Type::new(TypeKind::Variable(identity), span)
     }
 
-    pub fn reify(&mut self, typ: &Type<'resolver>) -> Type<'resolver> {
-        match &typ.kind {
+    pub fn reify(&mut self, typing: &Type<'resolver>) -> Type<'resolver> {
+        match &typing.kind {
             TypeKind::Variable(identity) => {
                 if let Some(resolved) = self.variables[*identity].clone() {
                     let deep = self.reify(&resolved);
                     self.variables[*identity] = Some(deep.clone());
                     deep
                 } else {
-                    typ.clone()
+                    typing.clone()
                 }
             }
-            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typ.span),
-            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typ.span),
+            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typing.span),
+            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typing.span),
             TypeKind::Tuple { members } => {
                 let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::new(TypeKind::Tuple { members: items }, typ.span)
+                Type::new(TypeKind::Tuple { members: items }, typing.span)
             }
             TypeKind::Function(name, parameters, output) => {
                 let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
                 let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
-                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typ.span)
+                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
             }
-            TypeKind::Structure(structure) => {
+            TypeKind::Structure(identity, structure) => {
                 let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Structure(Structure::new(structure.target.clone(), members)), typ.span)
+                Type::new(TypeKind::Structure(*identity, Structure::new(structure.target.clone(), members)), typing.span)
             }
-            TypeKind::Union(structure) => {
+            TypeKind::Union(identity, structure) => {
                 let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Union(Structure::new(structure.target.clone(), members)), typ.span)
+                Type::new(TypeKind::Union(*identity, Structure::new(structure.target.clone(), members)), typing.span)
             }
-            TypeKind::Constructor(structure) => {
+            TypeKind::Constructor(identity, structure) => {
                 let members = structure.members.iter().map(|member| self.reify(member)).collect();
-                Type::new(TypeKind::Constructor(Structure::new(structure.target.clone(), members)), typ.span)
+                Type::new(TypeKind::Constructor(*identity, Structure::new(structure.target.clone(), members)), typing.span)
             }
-            _ => typ.clone(),
+            _ => typing.clone(),
         }
     }
 
-    fn occurs(&mut self, identity: Identity, typ: &Type<'resolver>) -> bool {
-        let flattened = self.reify(typ);
+    fn occurs(&mut self, identity: Identity, typing: &Type<'resolver>) -> bool {
+        let flattened = self.reify(typing);
 
         match flattened.kind {
             TypeKind::Variable(variable) => identity == variable,
@@ -154,7 +134,7 @@ impl<'resolver> Resolver<'resolver> {
                 }
                 false
             }
-            TypeKind::Structure(ref structure) | TypeKind::Union(ref structure) | TypeKind::Constructor(ref structure) => structure.members.iter().any(|member| self.occurs(identity, member)),
+            TypeKind::Structure(_, ref structure) | TypeKind::Union(_, ref structure) | TypeKind::Constructor(_, ref structure) => structure.members.iter().any(|member| self.occurs(identity, member)),
             _ => false,
         }
     }
@@ -168,12 +148,14 @@ impl<'resolver> Resolver<'resolver> {
         }
 
         match (left.kind.clone(), right.kind.clone()) {
+            (TypeKind::Unknown, _) => right.clone(),
+            (_, TypeKind::Unknown) => left.clone(),
+
             (TypeKind::Variable(identity), _) => {
                 if self.occurs(identity, &right) {
                     self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                     return left;
                 }
-
                 self.variables[identity] = Some(right.clone());
                 right
             }
@@ -182,7 +164,6 @@ impl<'resolver> Resolver<'resolver> {
                     self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
                     return left;
                 }
-
                 self.variables[identity] = Some(left.clone());
                 left
             }
@@ -197,32 +178,32 @@ impl<'resolver> Resolver<'resolver> {
             }
             (TypeKind::Tuple { members: left_members }, TypeKind::Tuple { members: right_members }) if left_members.len() == right_members.len() => {
                 let mut unified = Vec::with_capacity(left_members.len());
-                for (l, r) in left_members.iter().zip(right_members.iter()) {
-                    unified.push(self.unify(span, l, r));
+                for (left_item, right_item) in left_members.iter().zip(right_members.iter()) {
+                    unified.push(self.unify(span, left_item, right_item));
                 }
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
 
-            (TypeKind::Structure(left_struct), TypeKind::Structure(right_struct)) if left_struct.target == right_struct.target && left_struct.members.len() == right_struct.members.len() => {
-                let mut unified = Vec::with_capacity(left_struct.members.len());
-                for (l, r) in left_struct.members.iter().zip(right_struct.members.iter()) {
-                    unified.push(self.unify(span, l, r));
+            (TypeKind::Structure(left_identity, left_structure), TypeKind::Structure(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
+                let mut unified = Vec::with_capacity(left_structure.members.len());
+                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
+                    unified.push(self.unify(span, left_item, right_item));
                 }
-                Type::new(TypeKind::Structure(Structure::new(left_struct.target.clone(), unified)), left.span)
+                Type::new(TypeKind::Structure(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
             }
-            (TypeKind::Union(left_struct), TypeKind::Union(right_struct)) if left_struct.target == right_struct.target && left_struct.members.len() == right_struct.members.len() => {
-                let mut unified = Vec::with_capacity(left_struct.members.len());
-                for (l, r) in left_struct.members.iter().zip(right_struct.members.iter()) {
-                    unified.push(self.unify(span, l, r));
+            (TypeKind::Union(left_identity, left_structure), TypeKind::Union(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
+                let mut unified = Vec::with_capacity(left_structure.members.len());
+                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
+                    unified.push(self.unify(span, left_item, right_item));
                 }
-                Type::new(TypeKind::Union(Structure::new(left_struct.target.clone(), unified)), left.span)
+                Type::new(TypeKind::Union(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
             }
-            (TypeKind::Constructor(left_struct), TypeKind::Constructor(right_struct)) if left_struct.target == right_struct.target && left_struct.members.len() == right_struct.members.len() => {
-                let mut unified = Vec::with_capacity(left_struct.members.len());
-                for (l, r) in left_struct.members.iter().zip(right_struct.members.iter()) {
-                    unified.push(self.unify(span, l, r));
+            (TypeKind::Constructor(left_identity, left_structure), TypeKind::Constructor(right_identity, right_structure)) if left_identity == right_identity && left_structure.members.len() == right_structure.members.len() => {
+                let mut unified = Vec::with_capacity(left_structure.members.len());
+                for (left_item, right_item) in left_structure.members.iter().zip(right_structure.members.iter()) {
+                    unified.push(self.unify(span, left_item, right_item));
                 }
-                Type::new(TypeKind::Constructor(Structure::new(left_struct.target.clone(), unified)), left.span)
+                Type::new(TypeKind::Constructor(left_identity, Structure::new(left_structure.target.clone(), unified)), left.span)
             }
 
             (TypeKind::Integer { size: left_size, .. }, TypeKind::Integer { size: right_size, .. }) if left_size == right_size => left,
@@ -230,11 +211,11 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Pointer { target }, TypeKind::String) | (TypeKind::String, TypeKind::Pointer { target }) if matches!(target.kind, TypeKind::Integer { size: 8, .. }) => left,
             (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => left,
 
-            (TypeKind::Function(name, left_params, left_output), TypeKind::Function(_, right_params, right_output)) if left_params.len() == right_params.len() => {
-                let mut unified = Vec::with_capacity(left_params.len());
+            (TypeKind::Function(name, left_parameters, left_output), TypeKind::Function(_, right_parameters, right_output)) if left_parameters.len() == right_parameters.len() => {
+                let mut unified = Vec::with_capacity(left_parameters.len());
 
-                for (l, r) in left_params.iter().zip(right_params.iter()) {
-                    unified.push(self.unify(span, l, r));
+                for (left_item, right_item) in left_parameters.iter().zip(right_parameters.iter()) {
+                    unified.push(self.unify(span, left_item, right_item));
                 }
 
                 let output = match (left_output, right_output) {
@@ -258,6 +239,10 @@ impl<'resolver> Resolver<'resolver> {
 
         for element in input.iter_mut() {
             element.resolve(self);
+        }
+
+        for element in input.iter_mut() {
+            element.reify(self);
         }
 
         self.input = input;
