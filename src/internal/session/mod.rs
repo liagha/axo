@@ -600,13 +600,13 @@ impl<'session> Session<'session> {
             panic!("linking failed");
         }
 
-        self.reporter.run(format!("{}", executable));
-
-        Command::new(executable.to_string()).status().expect("failed to execute");
-
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter.finish("emitting", duration);
+
+        self.reporter.run(format!("{}", executable));
+
+        Command::new(executable.to_string()).status().expect("failed to execute");
     }
 
     fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {

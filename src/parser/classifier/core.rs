@@ -52,7 +52,10 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::delimited(), Self::literal()])
+        Classifier::alternative([
+            Classifier::deferred(Self::delimited),
+            Classifier::deferred(Self::literal)
+        ])
     }
 
     pub fn prefixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
@@ -65,7 +68,7 @@ impl<'parser> Parser<'parser> {
                     false
                 }
             }),
-            Self::primary(),
+            Classifier::deferred(Self::primary),
         ])
             .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -92,7 +95,7 @@ impl<'parser> Parser<'parser> {
     {
         Classifier::with_transform(
             Classifier::sequence([
-                Self::primary(),
+                Classifier::deferred(Self::primary),
                 Classifier::repetition(
                     Classifier::alternative([
                         Self::group(Classifier::deferred(Self::element)),
@@ -208,13 +211,17 @@ impl<'parser> Parser<'parser> {
     }
 
     pub fn unary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::alternative([Self::prefixed(), Self::suffixed(), Self::primary()])
+        Classifier::alternative([
+            Classifier::deferred(Self::prefixed),
+            Classifier::deferred(Self::suffixed),
+            Classifier::deferred(Self::primary)
+        ])
     }
 
     pub fn binary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([Classifier::with_transform(
             Classifier::sequence([
-                Self::unary(),
+                Classifier::deferred(Self::unary),
                 Classifier::repetition(
                     Classifier::sequence([
                         Classifier::predicate(move |token: &Token| {
@@ -228,7 +235,7 @@ impl<'parser> Parser<'parser> {
                                 false
                             }
                         }),
-                        Self::unary(),
+                        Classifier::deferred(Self::unary),
                     ]),
                     1,
                     None,
@@ -319,14 +326,18 @@ impl<'parser> Parser<'parser> {
 
     pub fn expression() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
     {
-        Classifier::alternative([Self::binary(), Self::unary(), Self::primary()])
+        Classifier::alternative([
+            Classifier::deferred(Self::binary),
+            Classifier::deferred(Self::unary),
+            Classifier::deferred(Self::primary)
+        ])
     }
 
     pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative(
             [
-                Self::symbolization(),
-                Self::expression(),
+                Classifier::deferred(Self::symbolization),
+                Classifier::deferred(Self::expression),
             ]
         )
     }
@@ -350,8 +361,8 @@ impl<'parser> Parser<'parser> {
     pub fn parser() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::repetition(
             Classifier::alternative([
-                Self::element(),
-                Self::fallback(),
+                Classifier::deferred(Self::element),
+                Classifier::deferred(Self::fallback),
             ]),
             0,
             None,

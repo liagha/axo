@@ -1,13 +1,12 @@
 use {
-    super::super::{Element, ElementKind, ErrorKind, ParseError, Parser},
     crate::{
+        data::*,
+        tracker::{Span, Spanned},
         formation::{classifier::Classifier, form::Form},
         scanner::{PunctuationKind, Token, TokenKind},
-        tracker::Span,
+        parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     },
 };
-use crate::data::*;
-use crate::tracker::Spanned;
 
 impl<'parser> Parser<'parser> {
     fn delimited_form(

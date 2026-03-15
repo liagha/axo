@@ -1,22 +1,21 @@
 use {
-    super::super::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
     crate::{
         data::*,
         formation::{classifier::Classifier, form::Form},
         scanner::{OperatorKind, Token, TokenKind},
-        parser::error::ErrorKind,
         tracker::{Span, Spanned},
+        parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility, ErrorKind},
     },
 };
 
 impl<'parser> Parser<'parser> {
     pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::binding(),
-            Self::structure(),
-            Self::union(),
-            Self::function(),
-            Self::module(),
+            Classifier::deferred(Self::binding),
+            Classifier::deferred(Self::structure),
+            Classifier::deferred(Self::union),
+            Classifier::deferred(Self::function),
+            Classifier::deferred(Self::module),
         ])
     }
 
@@ -29,7 +28,7 @@ impl<'parser> Parser<'parser> {
                     false
                 }
             }),
-            Self::expression().with_panic(
+            Classifier::deferred(Self::expression).with_panic(
                 |former, classifier| {
                     let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                     let span = consumed.span();
@@ -158,7 +157,7 @@ impl<'parser> Parser<'parser> {
                         false
                     }
                 }),
-                Self::literal().with_panic(
+                Classifier::deferred(Self::literal).with_panic(
                     |former, classifier| {
                         let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                         let span = consumed.span();
@@ -167,7 +166,7 @@ impl<'parser> Parser<'parser> {
                     }
                 ),
             ]),
-            Self::expression().with_panic(
+            Classifier::deferred(Self::expression).with_panic(
                 |former, classifier| {
                     let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                     let span = consumed.span();
@@ -239,7 +238,7 @@ impl<'parser> Parser<'parser> {
                         false
                     }
                 }),
-                Self::literal().with_panic(
+                Classifier::deferred(Self::literal).with_panic(
                     |former, classifier| {
                         let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                         let span = consumed.span();
@@ -248,7 +247,7 @@ impl<'parser> Parser<'parser> {
                     }
                 ),
             ]),
-            Self::expression().with_panic(
+            Classifier::deferred(Self::expression).with_panic(
                 |former, classifier| {
                     let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                     let span = consumed.span();
@@ -316,7 +315,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
-                Self::literal().with_panic(
+                Classifier::deferred(Self::literal).with_panic(
                     |former, classifier| {
                         let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
                         let span = consumed.span();
@@ -335,7 +334,7 @@ impl<'parser> Parser<'parser> {
                             *form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
                             Ok(())
                         }),
-                ])).with_panic(
+                    ])).with_panic(
                     |former, classifier| {
                         let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
                         let span = stack.span();
@@ -353,8 +352,8 @@ impl<'parser> Parser<'parser> {
                     })
                         .with_ignore(),
                     Classifier::alternative([
-                        Self::prefixed(),
-                        Self::primary()
+                        Classifier::deferred(Self::prefixed),
+                        Classifier::deferred(Self::primary)
                     ]).with_panic(
                         |former, classifier| {
                             let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
@@ -368,10 +367,10 @@ impl<'parser> Parser<'parser> {
                         let form = former.forms.get_mut(classifier.form).unwrap();
                         let output = form.as_forms();
                         *form = output[0].clone();
-                        
+
                         Ok(())
                     }),
-                Self::expression().into_optional(),
+                Classifier::deferred(Self::expression).into_optional(),
             ])
                 .with_transform(|former, classifier| {
                     let form = former.forms.get_mut(classifier.form).unwrap();
@@ -450,7 +449,7 @@ impl<'parser> Parser<'parser> {
                 Classifier::predicate(|token: &Token| {
                     token.kind == TokenKind::Identifier(Str::from("func"))
                 }),
-                Self::literal(),
+                Classifier::deferred(Self::literal),
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
@@ -461,11 +460,11 @@ impl<'parser> Parser<'parser> {
                             let input = form.unwrap_input();
 
                             *form = Form::output(Element::new(ElementKind::literal(input.clone()), input.span));
-                            
+
                             Ok(())
                         }),
                 ])),
-                Self::expression().into_optional(),
+                Classifier::deferred(Self::expression).into_optional(),
             ])
                 .with_transform(|former, classifier| {
                     let form = former.forms.get_mut(classifier.form).unwrap();
@@ -550,7 +549,7 @@ impl<'parser> Parser<'parser> {
                     false
                 }
             }),
-            Self::literal().with_panic(
+            Classifier::deferred(Self::literal).with_panic(
                 |former, classifier| {
                     let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
                     let span = stack.span();
@@ -558,7 +557,7 @@ impl<'parser> Parser<'parser> {
                     ParseError::new(ErrorKind::ExpectedName, span)
                 }
             ),
-            Self::expression().with_panic(
+            Classifier::deferred(Self::expression).with_panic(
                 |former, classifier| {
                     let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
                     let span = stack.span();
@@ -582,7 +581,7 @@ impl<'parser> Parser<'parser> {
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
                 let mut symbol =
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
-                
+
                 symbol.scope.extend(fields);
 
                 *form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));
