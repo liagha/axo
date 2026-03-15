@@ -131,23 +131,23 @@ impl<'backend> Generator<'backend> {
 
     pub fn structure(
         &mut self,
-        data: Structure<Str<'backend>, Analysis<'backend>>,
+        structure: Structure<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = data.target.clone();
+        let identifier = structure.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
 
         let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
             self.context.opaque_struct_type(name)
         });
 
-        let mut types = Vec::with_capacity(data.members.len());
-        let mut fields = Vec::with_capacity(data.members.len());
+        let mut types = Vec::with_capacity(structure.members.len());
+        let mut members = Vec::with_capacity(structure.members.len());
 
-        for member in data.members {
+        for member in structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
-                fields.push(field.clone());
+                members.push(field.clone());
                 types.push(self.to_basic_type(&binding.annotation, member.span)?);
             } else {
                 self.analysis(member)?;
@@ -158,33 +158,33 @@ impl<'backend> Generator<'backend> {
             shape.set_body(&types, false);
         }
 
-        self.insert_entity(identifier, Entity::Struct { structure: shape, fields });
+        self.insert_entity(identifier, Entity::Structure { shape, members });
 
         Ok(self.context.i64_type().const_zero().into())
     }
 
     pub fn union(
         &mut self,
-        data: Structure<Str<'backend>, Analysis<'backend>>,
+        union: Structure<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = data.target.clone();
+        let identifier = union.target.clone();
         let name = identifier.as_str().unwrap_or("union");
 
         let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
             self.context.opaque_struct_type(name)
         });
 
-        let mut fields = Vec::with_capacity(data.members.len());
-        let mut largest: Option<BasicTypeEnum> = None;
+        let mut members = Vec::with_capacity(union.members.len());
         let mut maximum = 0;
+        let mut largest: Option<BasicTypeEnum> = None;
 
-        for member in data.members {
+        for member in union.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 let typing = self.to_basic_type(&binding.annotation, member.span)?;
 
-                fields.push((field.clone(), typing));
+                members.push((field.clone(), typing));
 
                 let limit = self.size(typing);
 
@@ -205,37 +205,37 @@ impl<'backend> Generator<'backend> {
             }
         }
 
-        self.insert_entity(identifier, Entity::Union { structure: shape, fields });
+        self.insert_entity(identifier, Entity::Union { shape, members });
 
         Ok(self.context.i64_type().const_zero().into())
     }
 
     pub fn constructor(
         &mut self,
-        data: Structure<Str<'backend>, Analysis<'backend>>,
+        constructor: Structure<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = data.target.clone();
+        let identifier = constructor.target.clone();
         let target = identifier.as_str().unwrap_or("").to_string();
 
         let entity = self.get_entity(&identifier).cloned();
 
         match entity {
-            Some(Entity::Struct { structure: shape, fields }) => {
+            Some(Entity::Structure { shape, members }) => {
                 let mut current = shape.get_undef();
                 let mut position = 0usize;
 
-                for member in data.members {
+                for member in constructor.members {
                     let (index, name, assign) = match &member.kind {
                         AnalysisKind::Assign(field, assign) => {
-                            let found = fields
+                            let found = members
                                 .iter()
                                 .position(|item| item == field)
                                 .ok_or_else(|| {
                                     GenerateError::new(
                                         ErrorKind::DataStructure(DataStructureError::UnknownField {
-                                            struct_name: target.clone(),
-                                            field_name: field.as_str().unwrap_or("").to_string(),
+                                            target: target.clone(),
+                                            member: field.as_str().unwrap_or("").to_string(),
                                         }),
                                         span,
                                     )
@@ -250,10 +250,10 @@ impl<'backend> Generator<'backend> {
                             )
                         }
                         _ => {
-                            if position >= fields.len() {
+                            if position >= members.len() {
                                 return Err(GenerateError::new(
                                     ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
-                                        struct_name: target,
+                                        target,
                                     }),
                                     span,
                                 ));
@@ -289,11 +289,11 @@ impl<'backend> Generator<'backend> {
                 Ok(current.into())
             }
 
-            Some(Entity::Union { structure: shape, fields }) => {
-                if data.members.len() > 1 {
+            Some(Entity::Union { shape, members }) => {
+                if constructor.members.len() > 1 {
                     return Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
-                            struct_name: target,
+                            target,
                         }),
                         span,
                     ));
@@ -310,7 +310,7 @@ impl<'backend> Generator<'backend> {
 
                 let pointer = self.build_entry(parent, shape.into(), Str::from("initialize"));
 
-                if let Some(member) = data.members.into_iter().next() {
+                if let Some(member) = constructor.members.into_iter().next() {
                     let (name, assign) = match &member.kind {
                         AnalysisKind::Assign(field, assign) => {
                             (field.as_str().unwrap_or("").to_string(), *assign.clone())
@@ -323,15 +323,15 @@ impl<'backend> Generator<'backend> {
                         }
                     };
 
-                    let typing = fields
+                    let typing = members
                         .iter()
                         .find(|(item, _)| item.as_str().unwrap_or("") == name)
                         .map(|(_, typing)| *typing)
                         .ok_or_else(|| {
                             GenerateError::new(
                                 ErrorKind::DataStructure(DataStructureError::UnknownField {
-                                    struct_name: target.clone(),
-                                    field_name: name.clone(),
+                                    target: target.clone(),
+                                    member: name.clone(),
                                 }),
                                 span,
                             )
@@ -369,8 +369,8 @@ impl<'backend> Generator<'backend> {
 
             _ => Err(GenerateError::new(
                 ErrorKind::DataStructure(DataStructureError::UnknownField {
-                    struct_name: target,
-                    field_name: String::from("unknown"),
+                    target,
+                    member: String::from("unknown"),
                 }),
                 span,
             )),
@@ -387,7 +387,7 @@ impl<'backend> Generator<'backend> {
             let namespace = self.has_module(identifier)
                 || matches!(
                     self.get_entity(identifier),
-                    Some(Entity::Struct { .. } | Entity::Union { .. })
+                    Some(Entity::Structure { .. } | Entity::Union { .. })
                 );
 
             if namespace {
@@ -420,17 +420,17 @@ impl<'backend> Generator<'backend> {
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
                     let entity = self.find_entity(|item| match item {
-                        Entity::Struct { structure, .. } => structure.as_basic_type_enum() == kind,
-                        Entity::Union { structure, .. } => structure.as_basic_type_enum() == kind,
+                        Entity::Structure { shape: structure, .. } => structure.as_basic_type_enum() == kind,
+                        Entity::Union { shape: structure, .. } => structure.as_basic_type_enum() == kind,
                         _ => false,
                     });
 
                     let mut position = None;
                     let mut resolution = None;
 
-                    if let Some(Entity::Struct { fields, .. }) = entity {
+                    if let Some(Entity::Structure { members: fields, .. }) = entity {
                         position = fields.iter().position(|item| item == &field);
-                    } else if let Some(Entity::Union { fields, .. }) = entity {
+                    } else if let Some(Entity::Union { members: fields, .. }) = entity {
                         resolution = fields.iter().find(|(name, _)| name == &field).map(|(_, typing)| *typing);
                     }
 
@@ -469,17 +469,17 @@ impl<'backend> Generator<'backend> {
         if let BasicValueEnum::StructValue(data) = value {
             let kind = data.get_type().as_basic_type_enum();
             let entity = self.find_entity(|item| match item {
-                Entity::Struct { structure, .. } => structure.as_basic_type_enum() == kind,
-                Entity::Union { structure, .. } => structure.as_basic_type_enum() == kind,
+                Entity::Structure { shape: structure, .. } => structure.as_basic_type_enum() == kind,
+                Entity::Union { shape: structure, .. } => structure.as_basic_type_enum() == kind,
                 _ => false,
             });
 
             let mut position = None;
             let mut resolution = None;
 
-            if let Some(Entity::Struct { fields, .. }) = entity {
+            if let Some(Entity::Structure { members: fields, .. }) = entity {
                 position = fields.iter().position(|item| item == &field);
-            } else if let Some(Entity::Union { fields, .. }) = entity {
+            } else if let Some(Entity::Union { members: fields, .. }) = entity {
                 resolution = fields.iter().find(|(name, _)| name == &field).map(|(_, typing)| *typing);
             }
 

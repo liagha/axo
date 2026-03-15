@@ -1,10 +1,12 @@
 use {
-    super::{ErrorKind, ResolveError},
     crate::{
         data::{Float, Str},
         internal::operation::Range,
+        resolver::{
+            Resolvable, HintKind, ResolveHint,
+            ErrorKind, ResolveError
+        },
         parser::{Element, ElementKind, Symbol, SymbolKind},
-        resolver::{Resolvable, HintKind, ResolveHint},
         scanner::{Token, TokenKind},
     },
     matchete::{string::*, Assessment, Assessor, Resemblance, Resembler, Scheme},

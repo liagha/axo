@@ -95,8 +95,8 @@ pub enum DataStructureError {
     NotAStructType { name: String },
     UnknownStructType { name: String },
     ConstructorFieldTypeMismatch { struct_name: String, field_name: String },
-    UnknownField { struct_name: String, field_name: String },
-    TooManyInitializers { struct_name: String },
+    UnknownField { target: String, member: String },
+    TooManyInitializers { target: String },
     ConstructorPositionalArgTypeMismatch { struct_name: String, index: usize },
     InvalidModuleAccess,
     InvalidMemberAccessExpression,
@@ -318,10 +318,10 @@ impl Display for DataStructureError {
             DataStructureError::ConstructorFieldTypeMismatch { struct_name, field_name } => {
                 write!(f, "type mismatch for field '{}' in constructor for '{}'", field_name, struct_name)
             }
-            DataStructureError::UnknownField { struct_name, field_name } => {
+            DataStructureError::UnknownField { target: struct_name, member: field_name } => {
                 write!(f, "struct '{}' has no field named '{}'", struct_name, field_name)
             }
-            DataStructureError::TooManyInitializers { struct_name } => {
+            DataStructureError::TooManyInitializers { target: struct_name } => {
                 write!(f, "too many positional initializers for struct '{}'", struct_name)
             }
             DataStructureError::ConstructorPositionalArgTypeMismatch { struct_name, index } => {

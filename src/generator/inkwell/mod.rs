@@ -33,13 +33,13 @@ pub enum Entity<'backend> {
         pointer: PointerValue<'backend>,
         typing: Type<'backend>,
     },
-    Struct {
-        structure: StructType<'backend>,
-        fields: Vec<Str<'backend>>,
+    Structure {
+        shape: StructType<'backend>,
+        members: Vec<Str<'backend>>,
     },
     Union {
-        structure: StructType<'backend>,
-        fields: Vec<(Str<'backend>, BasicTypeEnum<'backend>)>,
+        shape: StructType<'backend>,
+        members: Vec<(Str<'backend>, BasicTypeEnum<'backend>)>,
     },
     Function(FunctionValue<'backend>),
 }
@@ -170,11 +170,11 @@ impl<'backend> Generator<'backend> {
                 typing.array_type(*size as u32).into()
             }
             TypeKind::Tuple { members } => {
-                let mut typs = Vec::with_capacity(members.len());
+                let mut typings = Vec::with_capacity(members.len());
                 for member in members {
-                    typs.push(self.to_basic_type(member, span.clone())?);
+                    typings.push(self.to_basic_type(member, span.clone())?);
                 }
-                self.context.struct_type(&typs, false).into()
+                self.context.struct_type(&typings, false).into()
             }
             TypeKind::Structure(_, structure) => {
                 if let Some(typing) = self
@@ -182,8 +182,8 @@ impl<'backend> Generator<'backend> {
                     .and_then(
                         |entity| {
                             match entity {
-                                Entity::Struct { structure: struct_type, .. } => Some((*struct_type).into()),
-                                Entity::Union { structure: struct_type, .. } => Some((*struct_type).into()),
+                                Entity::Structure { shape: struct_type, .. } => Some((*struct_type).into()),
+                                Entity::Union { shape: struct_type, .. } => Some((*struct_type).into()),
                                 _ => None,
                             }
                         }
@@ -218,7 +218,7 @@ impl<'backend> Generator<'backend> {
             TypeKind::Union(_, union) => {
                 if let Some(typing) = self.get_entity(&union.target).and_then(|entity| {
                     match entity {
-                        Entity::Union { structure, .. } => Some((*structure).into()),
+                        Entity::Union { shape: structure, .. } => Some((*structure).into()),
                         _ => None,
                     }
                 }) {

@@ -102,10 +102,10 @@ impl<'backend> super::Generator<'backend> {
                         let shape = kind.into_struct_type();
 
                         let found = self.find_entity(|entity| {
-                            matches!(entity, Entity::Struct { structure: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
+                            matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
                         });
 
-                        if let Some(Entity::Struct { fields, .. }) = found {
+                        if let Some(Entity::Structure { members: fields, .. }) = found {
                             if let Some(index) = fields.iter().position(|item| item == &field) {
                                 let slot = self
                                     .builder
@@ -141,10 +141,10 @@ impl<'backend> super::Generator<'backend> {
 
                                 let loaded = load.into_pointer_value();
                                 let found = self.find_entity(|entity| {
-                                    matches!(entity, Entity::Struct { structure: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
+                                    matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
                                 });
 
-                                if let Some(Entity::Struct { fields, .. }) = found {
+                                if let Some(Entity::Structure { members: fields, .. }) = found {
                                     if let Some(index) =
                                         fields.iter().position(|item| item == &field)
                                     {
