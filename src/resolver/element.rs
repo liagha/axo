@@ -175,8 +175,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         if let Some(reference) = binary.left.reference {
                             if let Some(symbol) = resolver.scope.find(reference) {
-                                if matches!(symbol.kind, SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_)) {
-                                    namespace = Some(symbol.scope.clone());
+                                match &symbol.kind {
+                                    SymbolKind::Module(_) | SymbolKind::Structure(_) | SymbolKind::Union(_) => {
+                                        namespace = Some(symbol.scope.clone());
+                                    }
+                                    SymbolKind::Enumeration(_) => {
+                                        namespace = Some(symbol.scope.clone());
+                                        // Allow static access to Enum Bindings (variants)
+                                        instanced = true;
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -188,7 +196,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 kind => kind,
                             };
                             match target {
-                                TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) => {
+                                TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) | TypeKind::Enumeration(reference, _) => {
                                     if let Some(symbol) = resolver.scope.find(reference) {
                                         namespace = Some(symbol.scope.clone());
                                         instanced = true;
@@ -251,9 +259,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 let unified = resolver.unify(span, &binary.left.typing, &binary.right.typing);
                                 let check = resolver.reify(&unified);
 
+                                // Added TypeKind::Enumeration(_, _) so enum variants can be evaluated with `==` and `!=`
                                 let valid = matches!(
                                     check.kind,
-                                    TypeKind::Integer { .. } | TypeKind::Float { .. } | TypeKind::Boolean | TypeKind::Character | TypeKind::String | TypeKind::Pointer { .. } | TypeKind::Variable(_)
+                                    TypeKind::Integer { .. } | TypeKind::Float { .. } | TypeKind::Boolean | TypeKind::Character | TypeKind::String | TypeKind::Pointer { .. } | TypeKind::Variable(_) | TypeKind::Enumeration(_, _)
                                 );
 
                                 if !valid {
@@ -406,9 +415,21 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let mut identity = 0;
                 let mut scope = None;
                 let mut union = false;
+                let mut enumeration = false;
+
+                if let TypeKind::Constructor(id, _) = &construct.target.typing.kind {
+                    if let Some(symbol) = resolver.scope.find(*id) {
+                        if let SymbolKind::Enumeration(_) = &symbol.kind {
+                            enumeration = true;
+                            identity = *id;
+                        }
+                    }
+                }
 
                 if let Some(reference) = construct.target.reference {
-                    identity = reference;
+                    if !enumeration {
+                        identity = reference;
+                    }
                     if let Some(symbol) = resolver.scope.find(reference) {
                         if let SymbolKind::Structure(_) = &symbol.kind {
                             scope = Some(symbol.scope.clone());
@@ -458,7 +479,9 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(0).into());
                 let structure = Structure::new(head, layout);
 
-                if union {
+                if enumeration {
+                    Type::new(TypeKind::Enumeration(identity, structure), span)
+                } else if union {
                     Type::new(TypeKind::Union(identity, structure), span)
                 } else {
                     Type::new(TypeKind::Structure(identity, structure), span)
@@ -514,6 +537,23 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     if let Some(symbol) = resolver.scope.find(reference) {
                         let mut members = Vec::new();
                         let mut is_union = false;
+                        let mut is_enumeration = false;
+                        let mut identity = reference;
+
+                        match &self.typing.kind {
+                            TypeKind::Union(id, _) => {
+                                is_union = true;
+                                identity = *id;
+                            }
+                            TypeKind::Enumeration(id, _) => {
+                                is_enumeration = true;
+                                identity = *id;
+                            }
+                            TypeKind::Structure(id, _) => {
+                                identity = *id;
+                            }
+                            _ => {}
+                        }
 
                         match &symbol.kind {
                             SymbolKind::Structure(structure) => {
@@ -524,7 +564,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
                             }
                             SymbolKind::Union(structure) => {
-                                is_union = true;
                                 for member in &structure.members {
                                     if member.is_instance() {
                                         members.push(member.typing.clone());
@@ -543,10 +582,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(0).into());
                         let structure = Structure::new(head, layout);
 
-                        if is_union {
-                            self.typing = Type::new(TypeKind::Union(reference, structure), self.span);
+                        if is_enumeration {
+                            self.typing = Type::new(TypeKind::Enumeration(identity, structure), self.span);
+                        } else if is_union {
+                            self.typing = Type::new(TypeKind::Union(identity, structure), self.span);
                         } else {
-                            self.typing = Type::new(TypeKind::Structure(reference, structure), self.span);
+                            self.typing = Type::new(TypeKind::Structure(identity, structure), self.span);
                         }
                     }
                 }
@@ -560,7 +601,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
     fn is_instance(&self) -> bool {
         matches!(
             self.typing.kind,
-            TypeKind::Structure(_, _) | TypeKind::Union(_, _)
+            TypeKind::Structure(_, _) | TypeKind::Union(_, _) | TypeKind::Enumeration(_, _)
         )
     }
 }

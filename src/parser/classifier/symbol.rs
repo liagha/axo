@@ -14,6 +14,7 @@ impl<'parser> Parser<'parser> {
             Classifier::deferred(Self::binding),
             Classifier::deferred(Self::structure),
             Classifier::deferred(Self::union),
+            Classifier::deferred(Self::enumeration),
             Classifier::deferred(Self::function),
             Classifier::deferred(Self::module),
         ])

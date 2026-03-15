@@ -120,13 +120,13 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                         binding.format(verbosity)
                     }
                     SymbolKind::Structure(structure) => {
-                        structure.format(verbosity)
+                        format!("Structure({})", structure.format(verbosity)).into()
                     }
                     SymbolKind::Union(union) => {
-                        union.format(verbosity)
+                        format!("Union({})", union.format(verbosity)).into()
                     }
                     SymbolKind::Enumeration(enumeration) => {
-                        enumeration.format(verbosity)
+                        format!("Enumeration({})", enumeration.format(verbosity)).into()
                     }
                     SymbolKind::Function(function) => {
                         function.format(verbosity)

@@ -13,6 +13,12 @@ union FloatOrInt {
     const float: Float,
 }
 
+enum Color {
+    const Red,
+    const Blue,
+    const Yellow,
+}
+
 func main() {
     libc.test_malloc()
 
@@ -24,6 +30,14 @@ func main() {
     const idk = FloatOrInt {
         int = 3
     }
+
+    const color = Color.Red
+
+    if(
+        color == Color.Red,
+        libc.println_str("Red"),
+        libc.println_str("Not Red")
+    )
 
     libc.println_i64(idk.int);
 

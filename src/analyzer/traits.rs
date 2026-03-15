@@ -280,13 +280,13 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                         binding.format(verbosity)
                     }
                     AnalysisKind::Structure(structure) => {
-                        structure.format(verbosity)
+                        format!("Structure{}", structure.format(verbosity)).into()
                     }
                     AnalysisKind::Union(union) => {
-                        union.format(verbosity)
+                        format!("Union{}", union.format(verbosity)).into()
                     }
                     AnalysisKind::Enumeration(enumeration) => {
-                        enumeration.format(verbosity)
+                        format!("Enumeration{}", enumeration.format(verbosity)).into()
                     }
                     AnalysisKind::Function(function) => {
                         function.format(verbosity)

@@ -248,7 +248,7 @@ impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity =
     fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
         match verbosity {
             0 => format!(
-                "Structure({})[{}]",
+                "({})[{}]",
                 self.target.format(verbosity),
                 self.members.format(verbosity)
             )

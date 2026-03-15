@@ -1,4 +1,3 @@
-use inkwell::values::BasicValue;
 use {
     super::{Backend, Entity},
     crate::{
@@ -15,7 +14,7 @@ use {
     },
     inkwell::{
         types::{BasicType, BasicTypeEnum},
-        values::{BasicValueEnum, PointerValue},
+        values::{BasicValue, BasicValueEnum, PointerValue},
     },
 };
 
@@ -170,6 +169,31 @@ impl<'backend> super::Generator<'backend> {
                                 }
                             }
                         }
+                    }
+                }
+
+                // Fallback for namespaced Globals and Methods (e.g. Color.Red or Point.print_position)
+                if let AnalysisKind::Usage(target_name) = &target.kind {
+                    let full_name = format!("{}.{}", target_name, field);
+                    let module = self.current_module();
+
+                    if let Some(global) = module.get_global(&full_name) {
+                        let ptr = global.as_pointer_value();
+                        let kind: BasicTypeEnum = match global.get_value_type() {
+                            inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::StructType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
+                            _ => return Ok(None),
+                        };
+                        return Ok(Some((ptr, kind)));
+                    }
+
+                    if let Some(func) = module.get_function(&full_name) {
+                        let ptr = func.as_global_value().as_pointer_value();
+                        return Ok(Some((ptr, ptr.get_type().into())));
                     }
                 }
 

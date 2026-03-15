@@ -54,6 +54,20 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(TypeKind::Constructor(self.identity, Structure::new(head.into(), Vec::new())), span)
             }
+            SymbolKind::Enumeration(enumeration) => {
+                let head = enumeration.target.brand().unwrap().format(0);
+
+                resolver.enter();
+                for member in &mut enumeration.members {
+                    member.declare(resolver);
+                }
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
+                resolver.exit();
+
+                Type::new(TypeKind::Constructor(self.identity, Structure::new(head.into(), Vec::new())), span)
+            }
             _ => resolver.fresh(span),
         };
 
@@ -130,8 +144,38 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(TypeKind::Constructor(identity, Structure::new(head.into(), members)), span)
             }
 
-            SymbolKind::Enumeration(_enumeration) => {
-                unimplemented!()
+            SymbolKind::Enumeration(enumeration) => {
+                let head = enumeration.target.brand().unwrap().format(0);
+
+                resolver.enter_scope(self.scope.clone());
+
+                let mut members = Vec::new();
+
+                for member in &mut enumeration.members {
+                    member.resolve(resolver);
+
+                    let instance = Type::new(TypeKind::Enumeration(identity, Structure::new(head.clone().into(), Vec::new())), member.span);
+
+                    if let SymbolKind::Binding(_) = member.kind {
+                        member.typing = resolver.unify(member.span, &member.typing, &instance);
+                        resolver.insert(member.clone());
+                    } else if let SymbolKind::Structure(_) | SymbolKind::Union(_) | SymbolKind::Enumeration(_) = member.kind {
+                        if let TypeKind::Constructor(_, structure) = &member.typing.kind {
+                            member.typing = Type::new(TypeKind::Constructor(identity, structure.clone()), member.span);
+                            resolver.insert(member.clone());
+                        }
+                    }
+
+                    members.push(member.typing.clone());
+                }
+
+                let mut scope = resolver.scope.clone();
+                scope.parent = None;
+                self.scope = scope;
+
+                resolver.exit();
+
+                Type::new(TypeKind::Constructor(identity, Structure::new(head.into(), members)), span)
             }
 
             SymbolKind::Function(function) => {
@@ -216,7 +260,14 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let head = union.target.brand().unwrap().format(0).into();
                 self.typing = Type::new(TypeKind::Constructor(self.identity, Structure::new(head, layout)), self.span);
             }
-            SymbolKind::Enumeration(_) => {}
+            SymbolKind::Enumeration(enumeration) => {
+                for member in &mut enumeration.members {
+                    member.reify(resolver);
+                }
+                let layout = enumeration.members.iter().map(|m| m.typing.clone()).collect();
+                let head = enumeration.target.brand().unwrap().format(0).into();
+                self.typing = Type::new(TypeKind::Constructor(self.identity, Structure::new(head, layout)), self.span);
+            }
             SymbolKind::Function(function) => {
                 for member in &mut function.members {
                     member.reify(resolver);

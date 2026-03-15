@@ -78,6 +78,9 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
                     TypeKind::Union(_,_) => {
                         "Union".to_string()
                     }
+                    TypeKind::Enumeration(_, _) => {
+                        "Enumeration".to_string()
+                    }
                     TypeKind::Function(name, members, output) => {
                         format!("Function({})[{}]:{}", name.format(verbosity), members.format(verbosity), output.format(verbosity))
                     }
