@@ -8,6 +8,11 @@ struct Point {
     }
 }
 
+union FloatOrInt {
+    const int: Integer,
+    const float: Float,
+}
+
 func main() {
     libc.test_malloc()
 
@@ -15,6 +20,12 @@ func main() {
         x = 333,
         y = 454
     }
+
+    const idk = FloatOrInt {
+        int = 3
+    }
+
+    libc.println_i64(idk.int);
 
     Point.print_position(point)
 }

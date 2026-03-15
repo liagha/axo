@@ -156,6 +156,9 @@ impl<'backend> Generator<'backend> {
             TypeKind::Character => {
                 self.context.i32_type().into()
             },
+            TypeKind::String => {
+                self.context.ptr_type(inkwell::AddressSpace::default()).into()
+            }
             TypeKind::Pointer { .. } => {
                 self
                     .context
@@ -212,9 +215,66 @@ impl<'backend> Generator<'backend> {
                     }
                 }
             },
-            TypeKind::String => {
-                self.context.ptr_type(inkwell::AddressSpace::default()).into()
-            }
+            TypeKind::Union(_, union) => {
+                if let Some(typing) = self.get_entity(&union.target).and_then(|entity| {
+                    match entity {
+                        Entity::Union { structure, .. } => Some((*structure).into()),
+                        _ => None,
+                    }
+                }) {
+                    typing
+                } else {
+                    let name = union.target.clone();
+
+                    if &*name == "" {
+                        let mut largest: Option<BasicTypeEnum> = None;
+                        let mut maximum = 0;
+
+                        for member in &union.members {
+                            let typing = self.to_basic_type(member, span.clone())?;
+                            let limit = self.size(typing);
+
+                            if limit >= maximum || largest.is_none() {
+                                maximum = limit;
+                                largest = Some(typing);
+                            }
+                        }
+
+                        if let Some(target) = largest {
+                            self.context.struct_type(&[target], false).into()
+                        } else {
+                            self.context.struct_type(&[], false).into()
+                        }
+                    } else {
+                        let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
+                            self.context.opaque_struct_type(&name)
+                        });
+
+                        if shape.is_opaque() {
+                            let mut largest: Option<BasicTypeEnum> = None;
+                            let mut maximum = 0;
+
+                            for member in &union.members {
+                                let typing = self.to_basic_type(member, span.clone())?;
+                                let limit = self.size(typing);
+
+                                if limit >= maximum || largest.is_none() {
+                                    maximum = limit;
+                                    largest = Some(typing);
+                                }
+                            }
+
+                            if let Some(target) = largest {
+                                shape.set_body(&[target], false);
+                            } else {
+                                shape.set_body(&[], false);
+                            }
+                        }
+
+                        shape.into()
+                    }
+                }
+            },
             _ => {
                 return Err(
                     GenerateError::new(
@@ -422,7 +482,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::Store(target, value) => self.store(target, value, instruction.span),
             AnalysisKind::Binding(binding) => self.binding(binding, instruction.span),
             AnalysisKind::Block(analyses) => self.block(analyses, instruction.span),
-            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(*condition, *then, otherwise.map(|value| *value), instruction.span),
+            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(*condition, *then, otherwise.map(|value| *value), instruction.span, false),
             AnalysisKind::While(condition, body) => self.r#while(condition, body, instruction.span),
             AnalysisKind::Structure(structure) => self.structure(structure, instruction.span),
             AnalysisKind::Union(structure) => self.union(structure, instruction.span),

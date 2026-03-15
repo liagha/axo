@@ -1,4 +1,3 @@
-// src/resolver/symbol.rs
 use crate::{
     data::Structure,
     format::Show,
@@ -131,7 +130,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(TypeKind::Constructor(identity, Structure::new(head.into(), members)), span)
             }
 
-            SymbolKind::Enumeration(enumeration) => {
+            SymbolKind::Enumeration(_enumeration) => {
                 unimplemented!()
             }
 

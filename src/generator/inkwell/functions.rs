@@ -21,7 +21,7 @@ use {
 };
 
 impl<'backend> super::Generator<'backend> {
-    fn align(&self, layout: BasicTypeEnum<'backend>) -> u32 {
+    pub fn align(&self, layout: BasicTypeEnum<'backend>) -> u32 {
         if layout.is_pointer_type() || layout.is_struct_type() || layout.is_array_type() {
             return 8;
         }
@@ -310,6 +310,7 @@ impl<'backend> super::Generator<'backend> {
         truth: Analysis<'backend>,
         fall: Option<Analysis<'backend>>,
         span: Span<'backend>,
+        needed: bool,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let check = self.analysis(condition)?;
         let flag = self.truth(check, span)?;
@@ -375,6 +376,21 @@ impl<'backend> super::Generator<'backend> {
         if edges.is_empty() {
             self.builder.build_unreachable().ok();
             return Ok(left);
+        }
+
+        if !needed {
+            return Ok(left);
+        }
+
+        if edges.len() == 1 {
+            return Ok(edges[0].0.as_basic_value_enum());
+        }
+
+        let first = edges[0].0.as_basic_value_enum();
+        let identical = edges.iter().all(|(val, _)| val.as_basic_value_enum() == first);
+
+        if identical {
+            return Ok(first);
         }
 
         let layout = left.get_type();

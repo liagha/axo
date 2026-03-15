@@ -1,4 +1,3 @@
-// src/formation/former.rs
 pub mod record {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum Record {

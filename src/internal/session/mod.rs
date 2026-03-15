@@ -1,4 +1,3 @@
-// src/internal/session/mod.rs
 mod registry;
 
 use {

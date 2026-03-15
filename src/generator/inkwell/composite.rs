@@ -17,30 +17,7 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
-    fn fields(&self, target: BasicTypeEnum<'backend>) -> Option<Vec<Str<'backend>>> {
-        if let Some(Entity::Struct { fields, .. }) = self.find_entity(|entity| {
-            matches!(entity, Entity::Struct { structure, .. } if structure.as_basic_type_enum() == target)
-        }) {
-            Some(fields.clone())
-        } else {
-            None
-        }
-    }
-
-    fn union_fields(
-        &self,
-        target: BasicTypeEnum<'backend>,
-    ) -> Option<Vec<(Str<'backend>, BasicTypeEnum<'backend>)>> {
-        if let Some(Entity::Union { fields, .. }) = self.find_entity(|entity| {
-            matches!(entity, Entity::Union { structure, .. } if structure.as_basic_type_enum() == target)
-        }) {
-            Some(fields.clone())
-        } else {
-            None
-        }
-    }
-
-    fn size(&self, typing: BasicTypeEnum<'backend>) -> u64 {
+    pub fn size(&self, typing: BasicTypeEnum<'backend>) -> u64 {
         typing
             .size_of()
             .and_then(|value| value.get_zero_extended_constant())
@@ -79,14 +56,14 @@ impl<'backend> Generator<'backend> {
                     .get_parent()
                     .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
-                let failure = self.context.append_basic_block(parent, "failure");
-                let success = self.context.append_basic_block(parent, "success");
+                let fail = self.context.append_basic_block(parent, "fail");
+                let pass = self.context.append_basic_block(parent, "pass");
 
                 self.builder
-                    .build_conditional_branch(value, failure, success)
+                    .build_conditional_branch(value, fail, pass)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                self.builder.position_at_end(failure);
+                self.builder.position_at_end(fail);
 
                 self.builder
                     .build_call(function, &[], "")
@@ -96,7 +73,7 @@ impl<'backend> Generator<'backend> {
                     .build_unreachable()
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                self.builder.position_at_end(success);
+                self.builder.position_at_end(pass);
             }
         }
 
@@ -154,27 +131,25 @@ impl<'backend> Generator<'backend> {
 
     pub fn structure(
         &mut self,
-        structure: Structure<Str<'backend>, Analysis<'backend>>,
+        data: Structure<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = structure.target.clone();
+        let identifier = data.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
 
         let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
             self.context.opaque_struct_type(name)
         });
 
-        let mut types = Vec::with_capacity(structure.members.len());
-        let mut fields = Vec::with_capacity(structure.members.len());
+        let mut types = Vec::with_capacity(data.members.len());
+        let mut fields = Vec::with_capacity(data.members.len());
 
-        // Consuming members directly ensures we can evaluate nested functions properly
-        for member in structure.members {
+        for member in data.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 fields.push(field.clone());
                 types.push(self.to_basic_type(&binding.annotation, member.span)?);
             } else {
-                // Allows embedded methods inside structures to be generated
                 self.analysis(member)?;
             }
         }
@@ -190,21 +165,21 @@ impl<'backend> Generator<'backend> {
 
     pub fn union(
         &mut self,
-        structure: Structure<Str<'backend>, Analysis<'backend>>,
+        data: Structure<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = structure.target.clone();
+        let identifier = data.target.clone();
         let name = identifier.as_str().unwrap_or("union");
 
         let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
             self.context.opaque_struct_type(name)
         });
 
-        let mut fields = Vec::with_capacity(structure.members.len());
+        let mut fields = Vec::with_capacity(data.members.len());
         let mut largest: Option<BasicTypeEnum> = None;
         let mut maximum = 0;
 
-        for member in structure.members {
+        for member in data.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 let typing = self.to_basic_type(&binding.annotation, member.span)?;
@@ -218,7 +193,6 @@ impl<'backend> Generator<'backend> {
                     largest = Some(typing);
                 }
             } else {
-                // Allows embedded methods inside unions to be generated
                 self.analysis(member)?;
             }
         }
@@ -238,10 +212,10 @@ impl<'backend> Generator<'backend> {
 
     pub fn constructor(
         &mut self,
-        structure: Structure<Str<'backend>, Analysis<'backend>>,
+        data: Structure<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = structure.target.clone();
+        let identifier = data.target.clone();
         let target = identifier.as_str().unwrap_or("").to_string();
 
         let entity = self.get_entity(&identifier).cloned();
@@ -251,10 +225,10 @@ impl<'backend> Generator<'backend> {
                 let mut current = shape.get_undef();
                 let mut position = 0usize;
 
-                for member in structure.members {
-                    let (index, name, assigned) = match &member.kind {
-                        AnalysisKind::Assign(field, assigned) => {
-                            let idx = fields
+                for member in data.members {
+                    let (index, name, assign) = match &member.kind {
+                        AnalysisKind::Assign(field, assign) => {
+                            let found = fields
                                 .iter()
                                 .position(|item| item == field)
                                 .ok_or_else(|| {
@@ -267,12 +241,12 @@ impl<'backend> Generator<'backend> {
                                     )
                                 })?;
 
-                            position = idx + 1;
+                            position = found + 1;
 
                             (
-                                idx,
+                                found,
                                 field.as_str().unwrap_or("").to_string(),
-                                *assigned.clone(),
+                                *assign.clone(),
                             )
                         }
                         _ => {
@@ -285,15 +259,15 @@ impl<'backend> Generator<'backend> {
                                 ));
                             }
 
-                            let idx = position;
+                            let found = position;
                             position += 1;
 
-                            (idx, format!("position {}", idx), member)
+                            (found, format!("position {}", found), member)
                         }
                     };
 
                     let kind = shape.get_field_type_at_index(index as u32).unwrap();
-                    let value = self.analysis(assigned)?;
+                    let value = self.analysis(assign)?;
 
                     let cast = self.convert(value, kind).ok_or_else(|| {
                         GenerateError::new(
@@ -316,7 +290,7 @@ impl<'backend> Generator<'backend> {
             }
 
             Some(Entity::Union { structure: shape, fields }) => {
-                if structure.members.len() > 1 {
+                if data.members.len() > 1 {
                     return Err(GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::TooManyInitializers {
                             struct_name: target,
@@ -334,12 +308,12 @@ impl<'backend> Generator<'backend> {
                     .get_parent()
                     .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
-                let pointer = self.build_entry(parent, shape.into(), Str::from("init"));
+                let pointer = self.build_entry(parent, shape.into(), Str::from("initialize"));
 
-                if let Some(member) = structure.members.into_iter().next() {
-                    let (name, assigned) = match &member.kind {
-                        AnalysisKind::Assign(field, assigned) => {
-                            (field.as_str().unwrap_or("").to_string(), *assigned.clone())
+                if let Some(member) = data.members.into_iter().next() {
+                    let (name, assign) = match &member.kind {
+                        AnalysisKind::Assign(field, assign) => {
+                            (field.as_str().unwrap_or("").to_string(), *assign.clone())
                         }
                         _ => {
                             return Err(GenerateError::new(
@@ -363,7 +337,7 @@ impl<'backend> Generator<'backend> {
                             )
                         })?;
 
-                    let value = self.analysis(assigned)?;
+                    let value = self.analysis(assign)?;
 
                     let cast = self.convert(value, typing).ok_or_else(|| {
                         GenerateError::new(
@@ -410,14 +384,13 @@ impl<'backend> Generator<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            // TREAT STRUCTS AND UNIONS AS NAMESPACES, ALLOWING STATIC METHOD INVOCATIONS
-            let is_namespace = self.has_module(identifier)
+            let namespace = self.has_module(identifier)
                 || matches!(
                     self.get_entity(identifier),
                     Some(Entity::Struct { .. } | Entity::Union { .. })
                 );
 
-            if is_namespace {
+            if namespace {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
@@ -446,38 +419,46 @@ impl<'backend> Generator<'backend> {
 
                 if kind.is_struct_type() {
                     let shape = kind.into_struct_type();
+                    let entity = self.find_entity(|item| match item {
+                        Entity::Struct { structure, .. } => structure.as_basic_type_enum() == kind,
+                        Entity::Union { structure, .. } => structure.as_basic_type_enum() == kind,
+                        _ => false,
+                    });
 
-                    if let Some(fields) = self.fields(kind) {
-                        if let Some(index) = fields.iter().position(|item| item == &field) {
-                            let slot = self
-                                .builder
-                                .build_struct_gep(shape, *pointer, index as u32, "slot")
-                                .map_err(|error| {
-                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                                })?;
+                    let mut position = None;
+                    let mut resolution = None;
 
-                            let resolved = shape.get_field_type_at_index(index as u32).unwrap();
+                    if let Some(Entity::Struct { fields, .. }) = entity {
+                        position = fields.iter().position(|item| item == &field);
+                    } else if let Some(Entity::Union { fields, .. }) = entity {
+                        resolution = fields.iter().find(|(name, _)| name == &field).map(|(_, typing)| *typing);
+                    }
 
-                            return self
-                                .builder
-                                .build_load(resolved, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
-                        }
-                    } else if let Some(fields) = self.union_fields(kind) {
-                        if let Some((_, resolved)) = fields.iter().find(|(name, _)| name == &field) {
-                            let space = pointer.get_type().get_address_space();
-                            let destination = self.context.ptr_type(space);
+                    if let Some(index) = position {
+                        let slot = self
+                            .builder
+                            .build_struct_gep(shape, *pointer, index as u32, "slot")
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                            let slot = self
-                                .builder
-                                .build_pointer_cast(*pointer, destination, "cast")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        let resolved = shape.get_field_type_at_index(index as u32).unwrap();
 
-                            return self
-                                .builder
-                                .build_load(*resolved, slot, "value")
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
-                        }
+                        return self
+                            .builder
+                            .build_load(resolved, slot, "value")
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
+                    } else if let Some(resolved) = resolution {
+                        let space = pointer.get_type().get_address_space();
+                        let destination = self.context.ptr_type(space);
+
+                        let slot = self
+                            .builder
+                            .build_pointer_cast(*pointer, destination, "cast")
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                        return self
+                            .builder
+                            .build_load(resolved, slot, "value")
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
                     }
                 }
             }
@@ -485,45 +466,57 @@ impl<'backend> Generator<'backend> {
 
         let value = self.analysis(*target)?;
 
-        if let BasicValueEnum::StructValue(structure) = value {
-            if let Some(fields) = self.fields(structure.get_type().as_basic_type_enum()) {
-                if let Some(index) = fields.iter().position(|item| item == &field) {
-                    return self
-                        .builder
-                        .build_extract_value(structure, index as u32, "extract")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                        .map(Into::into);
-                }
-            } else if let Some(fields) = self.union_fields(structure.get_type().as_basic_type_enum()) {
-                if let Some((_, resolved)) = fields.iter().find(|(name, _)| name == &field) {
-                    let block = self
-                        .builder
-                        .get_insert_block()
-                        .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
+        if let BasicValueEnum::StructValue(data) = value {
+            let kind = data.get_type().as_basic_type_enum();
+            let entity = self.find_entity(|item| match item {
+                Entity::Struct { structure, .. } => structure.as_basic_type_enum() == kind,
+                Entity::Union { structure, .. } => structure.as_basic_type_enum() == kind,
+                _ => false,
+            });
 
-                    let parent = block
-                        .get_parent()
-                        .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
+            let mut position = None;
+            let mut resolution = None;
 
-                    let pointer = self.build_entry(parent, structure.get_type().into(), Str::from("spill"));
+            if let Some(Entity::Struct { fields, .. }) = entity {
+                position = fields.iter().position(|item| item == &field);
+            } else if let Some(Entity::Union { fields, .. }) = entity {
+                resolution = fields.iter().find(|(name, _)| name == &field).map(|(_, typing)| *typing);
+            }
 
-                    self.builder
-                        .build_store(pointer, structure)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            if let Some(index) = position {
+                return self
+                    .builder
+                    .build_extract_value(data, index as u32, "extract")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                    .map(Into::into);
+            } else if let Some(resolved) = resolution {
+                let block = self
+                    .builder
+                    .get_insert_block()
+                    .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::BlockInsertion), span))?;
 
-                    let space = pointer.get_type().get_address_space();
-                    let destination = self.context.ptr_type(space);
+                let parent = block
+                    .get_parent()
+                    .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
-                    let slot = self
-                        .builder
-                        .build_pointer_cast(pointer, destination, "cast")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                let pointer = self.build_entry(parent, data.get_type().into(), Str::from("spill"));
 
-                    return self
-                        .builder
-                        .build_load(*resolved, slot, "value")
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
-                }
+                self.builder
+                    .build_store(pointer, data)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                let space = pointer.get_type().get_address_space();
+                let destination = self.context.ptr_type(space);
+
+                let slot = self
+                    .builder
+                    .build_pointer_cast(pointer, destination, "cast")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                return self
+                    .builder
+                    .build_load(resolved, slot, "value")
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
             }
         }
 
@@ -537,20 +530,20 @@ impl<'backend> Generator<'backend> {
 
     pub fn array(
         &mut self,
-        elements: Vec<Analysis<'backend>>,
+        items: Vec<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if elements.is_empty() {
+        if items.is_empty() {
             return Err(GenerateError::new(
                 ErrorKind::DataStructure(DataStructureError::EmptyArray),
                 span,
             ));
         }
 
-        let mut values = Vec::with_capacity(elements.len());
+        let mut values = Vec::with_capacity(items.len());
 
-        for element in elements {
-            values.push(self.analysis(element)?);
+        for item in items {
+            values.push(self.analysis(item)?);
         }
 
         let kind = values[0].get_type();
@@ -597,13 +590,13 @@ impl<'backend> Generator<'backend> {
 
     pub fn tuple(
         &mut self,
-        elements: Vec<Analysis<'backend>>,
+        items: Vec<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let mut values = Vec::with_capacity(elements.len());
+        let mut values = Vec::with_capacity(items.len());
 
-        for element in elements {
-            values.push(self.analysis(element)?);
+        for item in items {
+            values.push(self.analysis(item)?);
         }
 
         let types: Vec<BasicTypeEnum> = values.iter().map(|item| item.get_type()).collect();
@@ -623,27 +616,27 @@ impl<'backend> Generator<'backend> {
 
     pub fn index(
         &mut self,
-        index: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
+        data: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if index.members.is_empty() {
+        if data.members.is_empty() {
             return Err(GenerateError::new(
                 ErrorKind::DataStructure(DataStructureError::IndexMissingArgument),
                 span,
             ));
         }
 
-        let base = index.target.clone();
-        let target = self.analysis(*base.clone())?;
-        let offset = self.analysis(index.members[0].clone())?;
+        let base = data.target.clone();
+        let value = self.analysis(*base.clone())?;
+        let offset = self.analysis(data.members[0].clone())?;
 
-        if let AnalysisKind::Usage(identifier) = &index.target.kind {
+        if let AnalysisKind::Usage(identifier) = &data.target.kind {
             if let Some(Entity::Variable { typing, pointer }) = self.get_entity(identifier) {
                 let kind = self.to_basic_type(typing, span)?;
 
                 if kind.is_struct_type() {
-                    if let BasicValueEnum::IntValue(integer) = offset {
-                        let constant = integer.get_zero_extended_constant().ok_or_else(|| {
+                    if let BasicValueEnum::IntValue(int) = offset {
+                        let index = int.get_zero_extended_constant().ok_or_else(|| {
                             GenerateError::new(
                                 ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant),
                                 span,
@@ -653,10 +646,10 @@ impl<'backend> Generator<'backend> {
                         let shape = kind.into_struct_type();
                         let slot = self
                             .builder
-                            .build_struct_gep(shape, *pointer, constant as u32, "index")
+                            .build_struct_gep(shape, *pointer, index as u32, "index")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                        let field = shape.get_field_type_at_index(constant as u32).unwrap();
+                        let field = shape.get_field_type_at_index(index as u32).unwrap();
 
                         return self
                             .builder
@@ -664,13 +657,13 @@ impl<'backend> Generator<'backend> {
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
                     }
                 } else if kind.is_array_type() {
-                    if let BasicValueEnum::IntValue(integer) = offset {
+                    if let BasicValueEnum::IntValue(int) = offset {
                         let shape = kind.into_array_type();
-                        let limit = integer.get_type().const_int(shape.len() as u64, false);
+                        let limit = int.get_type().const_int(shape.len() as u64, false);
 
                         let exceeds = self
                             .builder
-                            .build_int_compare(IntPredicate::UGE, integer, limit, "check")
+                            .build_int_compare(IntPredicate::UGE, int, limit, "check")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                         let block = self
@@ -682,22 +675,22 @@ impl<'backend> Generator<'backend> {
                             .get_parent()
                             .ok_or_else(|| GenerateError::new(ErrorKind::BuilderError(BuilderError::Parent), span))?;
 
-                        let failure = self.context.append_basic_block(parent, "failure");
-                        let success = self.context.append_basic_block(parent, "success");
+                        let fail = self.context.append_basic_block(parent, "fail");
+                        let pass = self.context.append_basic_block(parent, "pass");
 
                         self.builder
-                            .build_conditional_branch(exceeds, failure, success)
+                            .build_conditional_branch(exceeds, fail, pass)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                        self.builder.position_at_end(failure);
+                        self.builder.position_at_end(fail);
                         self.trap(None, span)?;
 
-                        self.builder.position_at_end(success);
+                        self.builder.position_at_end(pass);
 
-                        let zero = integer.get_type().const_zero();
+                        let zero = int.get_type().const_zero();
                         let slot = unsafe {
                             self.builder
-                                .build_in_bounds_gep(shape, *pointer, &[zero, integer], "index")
+                                .build_in_bounds_gep(shape, *pointer, &[zero, int], "index")
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                         };
 
@@ -710,9 +703,9 @@ impl<'backend> Generator<'backend> {
             }
         }
 
-        match (target, offset) {
-            (BasicValueEnum::StructValue(structure), BasicValueEnum::IntValue(integer)) => {
-                let constant = integer.get_zero_extended_constant().ok_or_else(|| {
+        match (value, offset) {
+            (BasicValueEnum::StructValue(data), BasicValueEnum::IntValue(int)) => {
+                let index = int.get_zero_extended_constant().ok_or_else(|| {
                     GenerateError::new(
                         ErrorKind::DataStructure(DataStructureError::TupleIndexNotConstant),
                         span,
@@ -721,15 +714,15 @@ impl<'backend> Generator<'backend> {
 
                 return self
                     .builder
-                    .build_extract_value(structure, constant as u32, "extract")
+                    .build_extract_value(data, index as u32, "extract")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     .map(Into::into);
             }
-            (BasicValueEnum::ArrayValue(array), BasicValueEnum::IntValue(integer)) => {
-                if let Some(constant) = integer.get_zero_extended_constant() {
+            (BasicValueEnum::ArrayValue(array), BasicValueEnum::IntValue(int)) => {
+                if let Some(index) = int.get_zero_extended_constant() {
                     return self
                         .builder
-                        .build_extract_value(array, constant as u32, "extract")
+                        .build_extract_value(array, index as u32, "extract")
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                         .map(Into::into);
                 }
@@ -750,29 +743,29 @@ impl<'backend> Generator<'backend> {
                     .build_store(pointer, array)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                let limit = integer.get_type().const_int(shape.len() as u64, false);
+                let limit = int.get_type().const_int(shape.len() as u64, false);
 
                 let exceeds = self
                     .builder
-                    .build_int_compare(IntPredicate::UGE, integer, limit, "check")
+                    .build_int_compare(IntPredicate::UGE, int, limit, "check")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                let failure = self.context.append_basic_block(parent, "failure");
-                let success = self.context.append_basic_block(parent, "success");
+                let fail = self.context.append_basic_block(parent, "fail");
+                let pass = self.context.append_basic_block(parent, "pass");
 
                 self.builder
-                    .build_conditional_branch(exceeds, failure, success)
+                    .build_conditional_branch(exceeds, fail, pass)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                self.builder.position_at_end(failure);
+                self.builder.position_at_end(fail);
                 self.trap(None, span)?;
 
-                self.builder.position_at_end(success);
+                self.builder.position_at_end(pass);
 
-                let zero = integer.get_type().const_zero();
+                let zero = int.get_type().const_zero();
                 let slot = unsafe {
                     self.builder
-                        .build_in_bounds_gep(shape, pointer, &[zero, integer], "index")
+                        .build_in_bounds_gep(shape, pointer, &[zero, int], "index")
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 };
 
@@ -781,7 +774,7 @@ impl<'backend> Generator<'backend> {
                     .build_load(shape.get_element_type(), slot, "value")
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span));
             }
-            (BasicValueEnum::PointerValue(pointer), BasicValueEnum::IntValue(integer)) => {
+            (BasicValueEnum::PointerValue(pointer), BasicValueEnum::IntValue(int)) => {
                 let pointee = if let TypeKind::Pointer { target } = &base.typing.kind {
                     self.to_basic_type(target, base.span)?
                 } else {
@@ -790,7 +783,7 @@ impl<'backend> Generator<'backend> {
 
                 let slot = unsafe {
                     self.builder
-                        .build_in_bounds_gep(pointee, pointer, &[integer], "index")
+                        .build_in_bounds_gep(pointee, pointer, &[int], "index")
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                 };
 

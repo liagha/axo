@@ -28,6 +28,10 @@ pub enum ErrorKind<'error> {
         target: Token<'error>,
         member: Token<'error>,
     },
+    ExcessiveUnionMembers {
+        target: Token<'error>,
+        members: Vec<Token<'error>>,
+    },
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -58,6 +62,13 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
             ErrorKind::DefinedMember { target, member } => {
                 format!("the member `{}` is already defined in `{}`.", member.format(verbosity), target.format(verbosity))
+            }
+            ErrorKind::ExcessiveUnionMembers { target, members } => {
+                format!(
+                    "union `{}` can only have one member initialized, but {} were provided.",
+                    target.format(verbosity),
+                    members.len()
+                ).into()
             }
         }.into()
     }

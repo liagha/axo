@@ -1,16 +1,14 @@
-// src/resolver/assessor.rs
 use {
     super::{ErrorKind, ResolveError},
     crate::{
         data::{Float, Str},
         internal::operation::Range,
         parser::{Element, ElementKind, Symbol, SymbolKind},
-        resolver::{HintKind, ResolveHint},
+        resolver::{Resolvable, HintKind, ResolveHint},
         scanner::{Token, TokenKind},
     },
     matchete::{string::*, Assessment, Assessor, Resemblance, Resembler, Scheme},
 };
-use crate::resolver::Resolvable;
 
 pub struct Aligner<'aligner> {
     pub assessor: Assessor<'aligner, String, String, ()>,
@@ -352,6 +350,89 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     };
                 }
             }
+            (ElementKind::Construct(construct), SymbolKind::Union(union)) => {
+                score += self.shaping;
+
+                let candidates = union
+                    .members
+                    .iter()
+                    .filter(|member| member.is_instance())
+                    .filter_map(|member| member.brand())
+                    .collect::<Vec<_>>();
+
+                let members = construct
+                    .members
+                    .iter()
+                    .filter_map(|member| match &member.kind {
+                        ElementKind::Binary(binary) => binary.left.brand(),
+                        _ => member.brand(),
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                let mut errors = Vec::new();
+
+                if members.len() > 1 {
+                    if let Some(target) = union.target.brand() {
+                        errors.push(ResolveError {
+                            kind: ErrorKind::ExcessiveUnionMembers {
+                                target: target.clone(),
+                                members: members.clone(),
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        });
+                    }
+                } else if members.is_empty() {
+                    if let Some(target) = union.target.brand() {
+                        errors.push(ResolveError {
+                            kind: ErrorKind::MissingMember {
+                                target: target.clone(),
+                                member: target.clone(),
+                            },
+                            span: query.span.clone(),
+                            hints: Vec::new(),
+                        });
+                    }
+                }
+
+                for member in &members {
+                    if !candidates.contains(&member) {
+                        if let Some(target) = union.target.brand() {
+                            errors.push(ResolveError {
+                                kind: ErrorKind::UndefinedMember {
+                                    target: target.clone(),
+                                    member: member.clone(),
+                                },
+                                span: query.span.clone(),
+                                hints: Vec::new(),
+                            });
+                        }
+                    }
+                }
+
+                if errors.is_empty() && members.len() == 1 {
+                    score += self.binding;
+                } else {
+                    let matching = members
+                        .iter()
+                        .filter(|member| candidates.contains(member))
+                        .count();
+
+                    let ratio = if !members.is_empty() {
+                        (matching as f64 / members.len() as f64) * (1.0 / members.len() as f64)
+                    } else {
+                        0.0
+                    };
+                    score += self.binding * ratio;
+                }
+
+                return Assessment {
+                    resemblance: Resemblance::from(score),
+                    errors,
+                };
+            }
+
             _ => {}
         };
 

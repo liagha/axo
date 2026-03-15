@@ -1,4 +1,3 @@
-// src/resolver/element.rs
 use crate::{
     data::{Scale, Structure},
     format::Show,
