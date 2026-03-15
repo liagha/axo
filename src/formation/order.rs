@@ -1,83 +1,73 @@
-use {
-    super::{
-        classifier::Classifier,
-        form::Form,
-        former::Former,
-        helper::{Formable, Inspector, Performer},
-    },
-    crate::data::sync::Rc,
+// src/formation/order.rs
+use super::{
+    classifier::Classifier,
+    form::Form,
+    former::Former,
+    helper::Formable,
 };
 
-pub trait Order<
-    'order,
-    Input: Formable<'order>,
-    Output: Formable<'order>,
-    Failure: Formable<'order>,
->
-{
+pub trait Order<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     fn order(
         &self,
-        former: &mut Former<'_, 'order, Input, Output, Failure>,
-        classifier: &mut Classifier<'order, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     );
 }
 
 pub struct Align;
 
-impl<'align, Input: Formable<'align>, Output: Formable<'align>, Failure: Formable<'align>>
-Order<'align, Input, Output, Failure> for Align
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Align
 {
     #[inline]
     fn order(
         &self,
-        _former: &mut Former<'_, 'align, Input, Output, Failure>,
-        classifier: &mut Classifier<'align, Input, Output, Failure>,
+        _former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         classifier.set_align();
     }
 }
 
-pub struct Branch<
-    'branch,
-    Input: Formable<'branch>,
-    Output: Formable<'branch>,
-    Failure: Formable<'branch>,
-> {
-    pub found: Rc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
-    pub missing: Rc<dyn Order<'branch, Input, Output, Failure> + 'branch>,
+pub struct Branch<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub found: &'a dyn Order<'a, Input, Output, Failure>,
+    pub missing: &'a dyn Order<'a, Input, Output, Failure>,
 }
 
-impl<'branch, Input: Formable<'branch>, Output: Formable<'branch>, Failure: Formable<'branch>>
-Order<'branch, Input, Output, Failure> for Branch<'branch, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'branch, Input, Output, Failure>,
-        classifier: &mut Classifier<'branch, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         let chosen = if classifier.is_aligned() {
-            &self.found
+            self.found
         } else {
-            &self.missing
+            self.missing
         };
 
         chosen.order(former, classifier);
     }
 }
 
-pub struct Fail<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>> {
-    pub emitter: Rc<dyn Fn(&mut Former<'_, 'fail, Input, Output, Failure>, Classifier<'fail, Input, Output, Failure>) -> Failure + 'fail>,
+pub struct Fail<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub emitter: &'a dyn Fn(
+        &mut Former<'_, 'a, Input, Output, Failure>,
+        Classifier<'a, Input, Output, Failure>,
+    ) -> Failure,
 }
 
-impl<'fail, Input: Formable<'fail>, Output: Formable<'fail>, Failure: Formable<'fail>>
-Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'fail, Input, Output, Failure>,
-        classifier: &mut Classifier<'fail, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
             let failure = (self.emitter)(former, classifier.clone());
@@ -93,14 +83,14 @@ Order<'fail, Input, Output, Failure> for Fail<'fail, Input, Output, Failure>
 
 pub struct Ignore;
 
-impl<'ignore, Input: Formable<'ignore>, Output: Formable<'ignore>, Failure: Formable<'ignore>>
-Order<'ignore, Input, Output, Failure> for Ignore
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Ignore
 {
     #[inline]
     fn order(
         &self,
-        _former: &mut Former<'_, 'ignore, Input, Output, Failure>,
-        classifier: &mut Classifier<'ignore, Input, Output, Failure>,
+        _former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_ignore();
@@ -109,54 +99,38 @@ Order<'ignore, Input, Output, Failure> for Ignore
     }
 }
 
-pub struct Inspect<
-    'inspector,
-    Input: Formable<'inspector>,
-    Output: Formable<'inspector>,
-    Failure: Formable<'inspector>,
-> {
-    pub inspector: Inspector<'inspector, Input, Output, Failure>,
+pub struct Inspect<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub inspector: &'a dyn Fn(
+        Classifier<'a, Input, Output, Failure>,
+    ) -> &'a dyn Order<'a, Input, Output, Failure>,
 }
 
-impl<
-    'inspector,
-    Input: Formable<'inspector>,
-    Output: Formable<'inspector>,
-    Failure: Formable<'inspector>,
-> Order<'inspector, Input, Output, Failure> for Inspect<'inspector, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Inspect<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'inspector, Input, Output, Failure>,
-        classifier: &mut Classifier<'inspector, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let order = (self.inspector)(classifier.clone());
-        order.order(former, classifier);
+        let target = (self.inspector)(classifier.clone());
+        target.order(former, classifier);
     }
 }
 
-pub struct Multiple<
-    'multiple,
-    Input: Formable<'multiple>,
-    Output: Formable<'multiple>,
-    Failure: Formable<'multiple>,
-> {
-    pub orders: Vec<Rc<dyn Order<'multiple, Input, Output, Failure> + 'multiple>>,
+pub struct Multiple<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub orders: Vec<&'a dyn Order<'a, Input, Output, Failure>>,
 }
 
-impl<
-    'multiple,
-    Input: Formable<'multiple>,
-    Output: Formable<'multiple>,
-    Failure: Formable<'multiple>,
-> Order<'multiple, Input, Output, Failure> for Multiple<'multiple, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'multiple, Input, Output, Failure>,
-        classifier: &mut Classifier<'multiple, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         for order in self.orders.iter() {
             order.order(former, classifier);
@@ -164,23 +138,21 @@ impl<
     }
 }
 
-pub struct Panic<
-    'panic,
-    Input: Formable<'panic>,
-    Output: Formable<'panic>,
-    Failure: Formable<'panic>,
-> {
-    pub emitter: Rc<dyn Fn(&mut Former<'_, 'panic, Input, Output, Failure>, Classifier<'panic, Input, Output, Failure>) -> Failure + 'panic>,
+pub struct Panic<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub emitter: &'a dyn Fn(
+        &mut Former<'_, 'a, Input, Output, Failure>,
+        Classifier<'a, Input, Output, Failure>,
+    ) -> Failure,
 }
 
-impl<'panic, Input: Formable<'panic>, Output: Formable<'panic>, Failure: Formable<'panic>>
-Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Panic<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'panic, Input, Output, Failure>,
-        classifier: &mut Classifier<'panic, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
             let failure = (self.emitter)(former, classifier.clone());
@@ -196,52 +168,48 @@ Order<'panic, Input, Output, Failure> for Panic<'panic, Input, Output, Failure>
 
 pub struct Pardon;
 
-impl<'pardon, Input: Formable<'pardon>, Output: Formable<'pardon>, Failure: Formable<'pardon>>
-Order<'pardon, Input, Output, Failure> for Pardon
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Pardon
 {
     #[inline]
     fn order(
         &self,
-        _former: &mut Former<'_, 'pardon, Input, Output, Failure>,
-        classifier: &mut Classifier<'pardon, Input, Output, Failure>,
+        _former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         classifier.set_empty();
     }
 }
 
-pub struct Perform<'perform> {
-    pub performer: Performer<'perform>,
+pub struct Perform<'a> {
+    pub performer: &'a dyn Fn(),
 }
 
-impl<
-    'perform,
-    Input: Formable<'perform>,
-    Output: Formable<'perform>,
-    Failure: Formable<'perform>,
-> Order<'perform, Input, Output, Failure> for Perform<'perform>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Perform<'a>
 {
     #[inline]
     fn order(
         &self,
-        _former: &mut Former<'_, 'perform, Input, Output, Failure>,
-        classifier: &mut Classifier<'perform, Input, Output, Failure>,
+        _former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
-            self.performer.clone()();
+            (self.performer)();
         }
     }
 }
 
 pub struct Skip;
 
-impl<'skip, Input: Formable<'skip>, Output: Formable<'skip>, Failure: Formable<'skip>>
-Order<'skip, Input, Output, Failure> for Skip
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Skip
 {
     #[inline]
     fn order(
         &self,
-        _former: &mut Former<'_, 'skip, Input, Output, Failure>,
-        classifier: &mut Classifier<'skip, Input, Output, Failure>,
+        _former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_empty();
@@ -250,41 +218,29 @@ Order<'skip, Input, Output, Failure> for Skip
     }
 }
 
-pub struct Transform<
-    'transform,
-    Input: Formable<'transform>,
-    Output: Formable<'transform>,
-    Failure: Formable<'transform>,
-> {
-    pub transformer: Rc<dyn Fn(&mut Former<'_, 'transform, Input, Output, Failure>, &mut Classifier<'transform, Input, Output, Failure>) -> Result<(), Failure> + 'transform>,
+pub struct Transform<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub transformer: &'a dyn Fn(
+        &mut Former<'_, 'a, Input, Output, Failure>,
+        &mut Classifier<'a, Input, Output, Failure>,
+    ) -> Result<(), Failure>,
 }
 
-impl<
-    'transform,
-    Input: Formable<'transform>,
-    Output: Formable<'transform>,
-    Failure: Formable<'transform>,
-> Order<'transform, Input, Output, Failure> for Transform<'transform, Input, Output, Failure>
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Transform<'a, Input, Output, Failure>
 {
     #[inline]
     fn order(
         &self,
-        former: &mut Former<'_, 'transform, Input, Output, Failure>,
-        classifier: &mut Classifier<'transform, Input, Output, Failure>,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
-            let result = (self.transformer)(former, classifier);
+            if let Err(error) = (self.transformer)(former, classifier) {
+                let form_id = former.forms.len();
+                former.forms.push(Form::Failure(error));
 
-            match result {
-                Ok(_) => {
-                }
-                Err(error) => {
-                    let form_id = former.forms.len();
-                    former.forms.push(Form::Failure(error));
-
-                    classifier.set_fail();
-                    classifier.form = form_id;
-                }
+                classifier.set_fail();
+                classifier.form = form_id;
             }
         }
     }

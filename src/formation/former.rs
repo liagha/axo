@@ -1,3 +1,4 @@
+// src/formation/former.rs
 pub mod record {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum Record {
@@ -42,37 +43,21 @@ use {
         form::Form,
         helper::{Formable, Source},
     },
-    crate::data::{
-        memory::{
-            replace,
-            PhantomData
-        }
-    },
+    crate::data::memory::{replace, PhantomData},
 };
 
-pub struct Former<
-    'instance,
-    'former,
-    Input: Formable<'former>,
-    Output: Formable<'former>,
-    Failure: Formable<'former>,
-> {
-    pub source: &'instance mut dyn Source<'former, Input>,
+pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub source: &'b mut dyn Source<'a, Input>,
     pub consumed: Vec<Input>,
-    pub forms: Vec<Form<'former, Input, Output, Failure>>,
+    pub forms: Vec<Form<'a, Input, Output, Failure>>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
-impl<
-    'instance,
-    'former,
-    Input: Formable<'former>,
-    Output: Formable<'former>,
-    Failure: Formable<'former>,
-> Former<'instance, 'former, Input, Output, Failure>
+impl<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Former<'b, 'a, Input, Output, Failure>
 {
     #[inline(always)]
-    pub fn new(source: &'instance mut dyn Source<'former, Input>) -> Self {
+    pub fn new(source: &'b mut dyn Source<'a, Input>) -> Self {
         Self {
             source,
             consumed: Vec::with_capacity(2048),
@@ -87,25 +72,25 @@ impl<
     }
 
     #[inline(always)]
-    pub fn build(&mut self, classifier: &mut Classifier<'former, Input, Output, Failure>) {
-        classifier.order.clone().order(self, classifier);
+    pub fn build(&mut self, classifier: &mut Classifier<'a, Input, Output, Failure>) {
+        classifier.order.order(self, classifier);
     }
 
     #[inline(always)]
     pub fn form(
         &mut self,
-        classifier: Classifier<'former, Input, Output, Failure>,
-    ) -> Form<'former, Input, Output, Failure> {
+        classifier: Classifier<'a, Input, Output, Failure>,
+    ) -> Form<'a, Input, Output, Failure> {
         let initial = self.source.position();
-        let mut classifier = Classifier::new(classifier.order, 0, initial);
+        let mut active = Classifier::new(classifier.order, 0, initial);
 
-        self.build(&mut classifier);
+        self.build(&mut active);
 
-        if classifier.is_effected() {
-            self.source.set_index(classifier.marker);
-            self.source.set_position(classifier.position);
+        if active.is_effected() {
+            self.source.set_index(active.marker);
+            self.source.set_position(active.position);
         }
 
-        replace(&mut self.forms[classifier.form], Form::Blank)
+        replace(&mut self.forms[active.form], Form::Blank)
     }
 }

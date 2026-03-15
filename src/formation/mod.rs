@@ -1,3 +1,4 @@
+// src/formation/mod.rs
 pub mod classifier;
 pub mod form;
 pub mod former;
@@ -8,51 +9,49 @@ pub mod helper {
     use {
         super::{classifier::Classifier, order::Order},
         crate::{
-            data::sync::{Rc},
-            internal::hash::Hash,
-            tracker::Peekable,
             format::Show,
+            internal::hash::Hash,
+            tracker::{Peekable, Spanned},
         },
     };
-    use crate::tracker::Spanned;
 
-    pub trait Formable<'formable>: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + Spanned<'formable> + 'formable {}
-
-    impl<'formable, T> Formable<'formable> for T where
-        T: Clone + Eq + Hash + PartialEq + Show<'formable, Verbosity = u8> + Spanned<'formable> + 'formable
+    pub trait Formable<'a>:
+    Clone + Eq + Hash + PartialEq + Show<'a, Verbosity = u8> + Spanned<'a> + 'a
     {
     }
 
-    pub trait Source<'source, Input>: Peekable<'source, Input>
+    impl<'a, T> Formable<'a> for T where
+        T: Clone + Eq + Hash + PartialEq + Show<'a, Verbosity = u8> + Spanned<'a> + 'a
+    {
+    }
+
+    pub trait Source<'a, Input>: Peekable<'a, Input>
     where
-        Input: Formable<'source>,
+        Input: Formable<'a>,
     {
     }
 
-    impl<'source, Target, Input> Source<'source, Input> for Target
+    impl<'a, Target, Input> Source<'a, Input> for Target
     where
-        Target: Peekable<'source, Input>,
-        Input: Formable<'source>,
+        Target: Peekable<'a, Input>,
+        Input: Formable<'a>,
     {
     }
 
-    pub type Emitter<'emitter, Input, Output, Failure> =
-    Rc<dyn Fn(Classifier<'emitter, Input, Output, Failure>) -> Failure + 'emitter>;
-    pub type Evaluator<'evaluator, Input, Output, Failure> =
-    Rc<dyn Fn() -> Classifier<'evaluator, Input, Output, Failure> + 'evaluator>;
-    pub type Inspector<'inspector, Input, Output, Failure> = Rc<
-        dyn Fn(
-            Classifier<'inspector, Input, Output, Failure>,
-        ) -> Rc<dyn Order<'inspector, Input, Output, Failure> + 'inspector>
-        + 'inspector,
-    >;
-    pub type Performer<'performer> = Rc<dyn Fn() -> () + 'performer>;
-    pub type Predicate<'predicate, Input> = Rc<dyn Fn(&Input) -> bool + 'predicate>;
+    pub type Emitter<'a, Input, Output, Failure> =
+    &'a dyn Fn(Classifier<'a, Input, Output, Failure>) -> Failure;
 
-    pub type Transformer<'transformer, Input, Output, Failure> = Rc<
-        dyn Fn(
-            &mut Classifier<'transformer, Input, Output, Failure>,
-        ) -> Result<(), Failure>
-        + 'transformer,
-    >;
+    pub type Evaluator<'a, Input, Output, Failure> =
+    &'a dyn Fn() -> Classifier<'a, Input, Output, Failure>;
+
+    pub type Inspector<'a, Input, Output, Failure> =
+    &'a dyn Fn(Classifier<'a, Input, Output, Failure>) -> &'a dyn Order<'a, Input, Output, Failure>;
+
+    pub type Performer<'a> = &'a dyn Fn();
+
+    pub type Predicate<'a, Input> = &'a dyn Fn(&Input) -> bool;
+
+    pub type Transformer<'a, Input, Output, Failure> = &'a dyn Fn(
+        &mut Classifier<'a, Input, Output, Failure>,
+    ) -> Result<(), Failure>;
 }
