@@ -40,9 +40,6 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                         format!("Tuple({})", tuple.format(verbosity)).into()
                     }
 
-                    AnalysisKind::Cast(analysis, typing) => {
-                        format!("Cast({}, {})", analysis.format(verbosity), typing.format(verbosity)).into()
-                    }
                     AnalysisKind::Negate(analysis) => {
                         format!("Negate({})", analysis.format(verbosity)).into()
                     }

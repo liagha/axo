@@ -27,7 +27,7 @@ use {
     },
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Entity<'backend> {
     Variable {
         pointer: PointerValue<'backend>,
@@ -438,7 +438,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                     }
                 }
                 AnalysisKind::Enumeration(enumeration) => {
-                    if let Err(error) = self.union(enumeration.clone(), analysis.span.clone()) {
+                    if let Err(error) = self.enumeration(enumeration.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
                 }
@@ -519,7 +519,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::String { value } => self.string(value, analysis.span),
             AnalysisKind::Array(values) => self.array(values, analysis.span),
             AnalysisKind::Tuple(values) => self.tuple(values, analysis.span),
-            AnalysisKind::Cast(value, typing) => self.explicit_cast(value, typing, analysis.span),
             AnalysisKind::Negate(value) => self.negate(value, analysis.span),
             AnalysisKind::SizeOf(typing) => self.size_of(typing, analysis.span),
             AnalysisKind::Add(left, right) => self.add(left, right, analysis.span),

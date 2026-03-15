@@ -526,6 +526,7 @@ impl<'session> Session<'session> {
         }
 
         link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
+        link.arg("/home/ali/Projects/axo/examples/libc/runtime.o".to_string());
 
         let executable = Self::executable(*self.outputs.get(&self.order[0]).unwrap(), None);
 

@@ -1,0 +1,5 @@
+func str_to_ptr(C, const s: String): *UInt8
+func int_to_ptr(C, const v: Integer): *UInt8
+func ptr_to_int(C, const p: *UInt8): Integer
+func int_to_u64(C, const v: Integer): UInt64
+func int_to_u8(C, const v: Integer): UInt8

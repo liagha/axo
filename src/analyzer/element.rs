@@ -4,7 +4,7 @@ use crate::{
     format::Show,
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, TokenKind},
-    resolver::{Resolver, Type, TypeKind},
+    resolver::{Resolver, TypeKind},
 };
 
 impl<'element> Analyzable<'element> for Element<'element> {
@@ -12,16 +12,6 @@ impl<'element> Analyzable<'element> for Element<'element> {
         &self,
         resolver: &mut Resolver<'element>,
     ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
-        fn cast<'cast>(expression: Analysis<'cast>, typing: Type<'cast>) -> Analysis<'cast> {
-            if expression.typing == typing {
-                expression
-            } else {
-                let span = expression.span;
-
-                Analysis::new(AnalysisKind::Cast(Box::new(expression), typing.clone()), span, typing)
-            }
-        }
-
         let typing = self.typing.clone();
 
         match &self.kind {
@@ -146,11 +136,9 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         let target = binary.left.analyze(resolver)?;
                         let value = binary.right.analyze(resolver)?;
 
-                        let safely_cast_value = cast(value, target.typing.clone());
-
                         match &target.kind {
-                            AnalysisKind::Usage(target_name) => AnalysisKind::Assign(target_name.clone(), Box::new(safely_cast_value)),
-                            AnalysisKind::Dereference(_) | AnalysisKind::Access(_, _) | AnalysisKind::Index(_) => AnalysisKind::Store(Box::new(target), Box::new(safely_cast_value)),
+                            AnalysisKind::Usage(target_name) => AnalysisKind::Assign(target_name.clone(), Box::new(value)),
+                            AnalysisKind::Dereference(_) | AnalysisKind::Access(_, _) | AnalysisKind::Index(_) => AnalysisKind::Store(Box::new(target), Box::new(value)),
                             _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span))
                         }
                     }
@@ -173,9 +161,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                         AnalysisKind::Add(Box::new(scaled), Box::new(right))
                                     }
                                     _ => {
-                                        let l = cast(left, typing.clone());
-                                        let r = cast(right, typing.clone());
-                                        AnalysisKind::Add(Box::new(l), Box::new(r))
+                                        AnalysisKind::Add(Box::new(left), Box::new(right))
                                     }
                                 }
                             },
@@ -192,15 +178,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                         AnalysisKind::Subtract(Box::new(left), Box::new(scaled))
                                     }
                                     _ => {
-                                        let l = cast(left, typing.clone());
-                                        let r = cast(right, typing.clone());
-                                        AnalysisKind::Subtract(Box::new(l), Box::new(r))
+                                        AnalysisKind::Add(Box::new(left), Box::new(right))
                                     }
                                 }
                             },
-                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
-                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
-                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(cast(left, typing.clone())), Box::new(cast(right, typing.clone()))),
+                            [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(left), Box::new(right)),
+                            [OperatorKind::Slash] => AnalysisKind::Divide(Box::new(left), Box::new(right)),
+                            [OperatorKind::Percent] => AnalysisKind::Modulus(Box::new(left), Box::new(right)),
 
                             [OperatorKind::Ampersand, OperatorKind::Ampersand] => AnalysisKind::LogicalAnd(Box::new(left), Box::new(right)),
                             [OperatorKind::Pipe, OperatorKind::Pipe] => AnalysisKind::LogicalOr(Box::new(left), Box::new(right)),

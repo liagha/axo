@@ -13,137 +13,21 @@ use {
 impl<'backend> Generator<'backend> {
     pub fn normalize(
         &self,
-        mut left: BasicValueEnum<'backend>,
-        mut right: BasicValueEnum<'backend>,
-        mut signs: [bool; 2],
+        left: BasicValueEnum<'backend>,
+        right: BasicValueEnum<'backend>,
         span: Span<'backend>,
     ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, bool), GenerateError<'backend>> {
-        let pointer = self.context.i64_type();
-
-        if left.is_pointer_value() {
-            signs[0] = false;
-            left = self.builder
-                .build_ptr_to_int(left.into_pointer_value(), pointer, "cast")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                .into();
+        if left.get_type() != right.get_type() {
+            return Err(GenerateError::new(ErrorKind::Normalize, span));
         }
-
-        if right.is_pointer_value() {
-            signs[1] = false;
-            right = self.builder
-                .build_ptr_to_int(right.into_pointer_value(), pointer, "cast")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                .into();
-        }
-
-        if left.is_int_value() && right.is_int_value() {
-            let first = left.into_int_value();
-            let second = right.into_int_value();
-
-            let first_size = first.get_type().get_bit_width();
-            let second_size = second.get_type().get_bit_width();
-
-            if first_size < second_size {
-                let target = second.get_type();
-                let extended = if signs[0] {
-                    self.builder.build_int_s_extend(first, target, "extend")
-                } else {
-                    self.builder.build_int_z_extend(first, target, "extend")
-                }
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                return Ok((extended.into(), right, false));
-            }
-
-            if second_size < first_size {
-                let target = first.get_type();
-                let extended = if signs[1] {
-                    self.builder.build_int_s_extend(second, target, "extend")
-                } else {
-                    self.builder.build_int_z_extend(second, target, "extend")
-                }
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                return Ok((left, extended.into(), false));
-            }
-
-            return Ok((left, right, false));
-        }
-
-        let mut target = self.context.f64_type();
 
         if left.is_float_value() && right.is_float_value() {
-            let first_type = left.into_float_value().get_type();
-            let second_type = right.into_float_value().get_type();
-
-            if first_type == second_type {
-                target = first_type;
-            }
-        } else if left.is_float_value() {
-            target = left.into_float_value().get_type();
-        } else if right.is_float_value() {
-            target = right.into_float_value().get_type();
+            Ok((left, right, true))
+        } else if left.is_int_value() && right.is_int_value() {
+            Ok((left, right, false))
+        } else {
+            Err(GenerateError::new(ErrorKind::Normalize, span))
         }
-
-        let primary = if left.is_float_value() {
-            let value = left.into_float_value();
-
-            if value.get_type() != target {
-                self.builder
-                    .build_float_ext(value, target, "extend")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            } else {
-                left
-            }
-        } else if left.is_int_value() {
-            let value = left.into_int_value();
-
-            if signs[0] {
-                self.builder
-                    .build_signed_int_to_float(value, target, "convert")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            } else {
-                self.builder
-                    .build_unsigned_int_to_float(value, target, "convert")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            }
-        } else {
-            return Err(GenerateError::new(ErrorKind::Normalize, span));
-        };
-
-        let secondary = if right.is_float_value() {
-            let value = right.into_float_value();
-
-            if value.get_type() != target {
-                self.builder
-                    .build_float_ext(value, target, "extend")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            } else {
-                right
-            }
-        } else if right.is_int_value() {
-            let value = right.into_int_value();
-
-            if signs[1] {
-                self.builder
-                    .build_signed_int_to_float(value, target, "convert")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            } else {
-                self.builder
-                    .build_unsigned_int_to_float(value, target, "convert")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                    .into()
-            }
-        } else {
-            return Err(GenerateError::new(ErrorKind::Normalize, span));
-        };
-
-        Ok((primary, secondary, true))
     }
 
     pub fn add(
@@ -152,13 +36,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_sign = self.infer_signedness(&left).unwrap_or(true);
-        let right_sign = self.infer_signedness(&right).unwrap_or(true);
-
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(left_value, right_value, [left_sign, right_sign], span)?;
+        let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
             let result = self.builder
@@ -181,13 +62,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_sign = self.infer_signedness(&left).unwrap_or(true);
-        let right_sign = self.infer_signedness(&right).unwrap_or(true);
-
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(left_value, right_value, [left_sign, right_sign], span)?;
+        let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
             let result = self.builder
@@ -210,13 +88,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let left_sign = self.infer_signedness(&left).unwrap_or(true);
-        let right_sign = self.infer_signedness(&right).unwrap_or(true);
-
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(left_value, right_value, [left_sign, right_sign], span)?;
+        let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
             let result = self.builder
@@ -245,7 +120,7 @@ impl<'backend> Generator<'backend> {
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(left_value, right_value, [left_sign, right_sign], span)?;
+        let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
             let result = self.builder
@@ -317,7 +192,7 @@ impl<'backend> Generator<'backend> {
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(left_value, right_value, [left_sign, right_sign], span)?;
+        let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
             let result = self.builder

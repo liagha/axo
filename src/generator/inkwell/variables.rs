@@ -1,11 +1,13 @@
 use {
-    super::{Backend, Entity},
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::Str,
         data::*,
         generator::{
-            inkwell::error::VariableError,
+            inkwell::{
+                Backend, Entity,
+                error::VariableError,
+            },
             ErrorKind,
             GenerateError,
         },
@@ -69,22 +71,6 @@ impl<'backend> super::Generator<'backend> {
                     )),
                     (BasicValueEnum::PointerValue(pointer), Some(resolved)) => {
                         Ok(Some((pointer, resolved)))
-                    }
-                    (BasicValueEnum::IntValue(addr), Some(resolved)) => {
-                        let ptr = self
-                            .builder
-                            .build_int_to_ptr(
-                                addr,
-                                self.context.ptr_type(inkwell::AddressSpace::default()),
-                                "cast",
-                            )
-                            .map_err(|error| {
-                                GenerateError::new(
-                                    ErrorKind::BuilderError(error.into()),
-                                    analysis.span,
-                                )
-                            })?;
-                        Ok(Some((ptr, resolved)))
                     }
                     _ => Ok(None),
                 }
@@ -328,31 +314,6 @@ impl<'backend> super::Generator<'backend> {
 
                 Ok(load)
             }
-            (BasicValueEnum::IntValue(addr), Some(kind)) => {
-                let pointer = self
-                    .builder
-                    .build_int_to_ptr(
-                        addr,
-                        self.context.ptr_type(inkwell::AddressSpace::default()),
-                        "cast",
-                    )
-                    .map_err(|error| {
-                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                    })?;
-
-                let load = self
-                    .builder
-                    .build_load(kind, pointer, "deref")
-                    .map_err(|error| {
-                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                    })?;
-
-                if let Some(inst) = load.as_instruction_value() {
-                    inst.set_alignment(self.align(kind)).ok();
-                }
-
-                Ok(load)
-            }
             _ => Err(GenerateError::new(
                 ErrorKind::Variable(VariableError::DereferenceNonPointer),
                 span,
@@ -463,45 +424,9 @@ impl<'backend> super::Generator<'backend> {
         if let Some((slot, typing)) = existing {
             let declared = self.to_basic_type(&typing, span)?;
 
-            let casted = if result.get_type() == declared {
-                result
-            } else if result.is_int_value() && declared.is_int_type() {
-                self.builder
-                    .build_int_cast(result.into_int_value(), declared.into_int_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_float_value() && declared.is_float_type() {
-                self.builder
-                    .build_float_cast(result.into_float_value(), declared.into_float_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_pointer_value() && declared.is_pointer_type() {
-                self.builder
-                    .build_pointer_cast(result.into_pointer_value(), declared.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_int_value() && declared.is_pointer_type() {
-                self.builder
-                    .build_int_to_ptr(result.into_int_value(), declared.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_pointer_value() && declared.is_int_type() {
-                self.builder
-                    .build_ptr_to_int(result.into_pointer_value(), declared.into_int_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else {
-                result
-            };
-
             let store = self
                 .builder
-                .build_store(slot, casted)
+                .build_store(slot, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             store.set_alignment(self.align(declared)).ok();
 
@@ -565,55 +490,9 @@ impl<'backend> super::Generator<'backend> {
 
         let declared = self.to_basic_type(&typing, span)?;
 
-        let casted = if result.get_type() == declared {
-            result
-        } else if result.is_int_value() && declared.is_int_type() {
-            if global {
-                result
-            } else {
-                self.builder
-                    .build_int_cast(result.into_int_value(), declared.into_int_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            }
-        } else if result.is_float_value() && declared.is_float_type() {
-            if global {
-                result
-            } else {
-                self.builder
-                    .build_float_cast(result.into_float_value(), declared.into_float_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            }
-        } else if result.is_pointer_value() && declared.is_pointer_type() {
-            if global {
-                result
-            } else {
-                self.builder
-                    .build_pointer_cast(result.into_pointer_value(), declared.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            }
-        } else if result.is_int_value() && declared.is_pointer_type() {
-            if global {
-                result
-            } else {
-                self.builder
-                    .build_int_to_ptr(result.into_int_value(), declared.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            }
-        } else {
-            result
-        };
-
         let pointer = if global {
             let variable = self.current_module().add_global(declared, None, &bind.target);
-            variable.set_initializer(&casted);
+            variable.set_initializer(&result);
             variable.set_alignment(self.align(declared));
             variable.as_pointer_value()
         } else {
@@ -628,7 +507,7 @@ impl<'backend> super::Generator<'backend> {
 
             let store = self
                 .builder
-                .build_store(allocate, casted)
+                .build_store(allocate, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             store.set_alignment(self.align(declared)).ok();
 
@@ -643,7 +522,7 @@ impl<'backend> super::Generator<'backend> {
             },
         );
 
-        Ok(casted)
+        Ok(result)
     }
 
     pub fn store(
@@ -655,48 +534,17 @@ impl<'backend> super::Generator<'backend> {
         let result = self.analysis(*value.clone())?;
 
         if let Some((pointer, kind)) = self.lvalue(&target)? {
-            let casted = if result.get_type() == kind {
-                result
-            } else if result.is_int_value() && kind.is_int_type() {
-                self.builder
-                    .build_int_cast(result.into_int_value(), kind.into_int_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_float_value() && kind.is_float_type() {
-                self.builder
-                    .build_float_cast(result.into_float_value(), kind.into_float_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_pointer_value() && kind.is_pointer_type() {
-                self.builder
-                    .build_pointer_cast(result.into_pointer_value(), kind.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_int_value() && kind.is_pointer_type() {
-                self.builder
-                    .build_int_to_ptr(result.into_int_value(), kind.into_pointer_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else if result.is_pointer_value() && kind.is_int_type() {
-                self.builder
-                    .build_ptr_to_int(result.into_pointer_value(), kind.into_int_type(), "cast")
-                    .ok()
-                    .map(Into::into)
-                    .unwrap_or(result)
-            } else {
+
+            if result.get_type() != kind {
                 return Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::AssignmentTypeMismatch),
                     span,
                 ));
-            };
+            }
 
             let store = self
                 .builder
-                .build_store(pointer, casted)
+                .build_store(pointer, result)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             store.set_alignment(self.align(kind)).ok();
         } else {

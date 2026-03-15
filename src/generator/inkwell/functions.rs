@@ -41,69 +41,6 @@ impl<'backend> super::Generator<'backend> {
             .is_some()
     }
 
-    fn coerce(
-        &mut self,
-        function: FunctionValue<'backend>,
-        value: BasicValueEnum<'backend>,
-        span: Span<'backend>,
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let target = match function.get_type().get_return_type() {
-            Some(kind) => kind,
-            None => return Ok(value),
-        };
-
-        if value.get_type() == target {
-            return Ok(value);
-        }
-
-        match (value, target) {
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(layout)) => {
-                let start = integer.get_type().get_bit_width();
-                let limit = layout.get_bit_width();
-
-                if start > limit {
-                    self.builder
-                        .build_int_truncate(integer, layout, "truncate")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else {
-                    self.builder
-                        .build_int_s_extend(integer, layout, "extend")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                }
-            }
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(layout)) => self
-                .builder
-                .build_float_cast(float, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(layout)) => self
-                .builder
-                .build_int_to_ptr(integer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(layout)) => self
-                .builder
-                .build_ptr_to_int(pointer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(layout)) => self
-                .builder
-                .build_pointer_cast(pointer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            _ => Err(GenerateError::new(
-                ErrorKind::Function(FunctionError::IncompatibleReturnType),
-                span,
-            )),
-        }
-    }
-
     fn truth(
         &mut self,
         value: BasicValueEnum<'backend>,
@@ -276,9 +213,17 @@ impl<'backend> super::Generator<'backend> {
                         .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 } else {
-                    let value = self.coerce(function, result, span)?;
+                    let expected = function.get_type().get_return_type().unwrap();
+
+                    if result.get_type() != expected {
+                        return Err(GenerateError::new(
+                            ErrorKind::Function(FunctionError::IncompatibleReturnType),
+                            span,
+                        ));
+                    }
+
                     self.builder
-                        .build_return(Some(&value))
+                        .build_return(Some(&result))
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
@@ -497,82 +442,25 @@ impl<'backend> super::Generator<'backend> {
 
         if let Some(function) = entity {
             let mut arguments = vec![];
-            let target = function.get_type().get_param_types();
+            let params = function.get_type().get_param_types();
 
             for (index, argument) in call.members.iter().enumerate() {
                 let mut value = self.analysis(argument.clone())?;
 
-                if let Some(&kind) = target.get(index) {
-                    if kind.is_pointer_type() {
-                        if value.is_array_value() {
-                            let array = value.into_array_value();
-                            let parent = self.parent(span)?;
-                            let pointer = self.build_entry(parent, array.get_type().into(), "decay".into());
-                            let align = self.align(array.get_type().into());
-
-                            self.builder
-                                .build_store(pointer, array)
+                if let Some(layout) = params.get(index) {
+                    if let Ok(expected) = BasicTypeEnum::try_from(*layout) {
+                        if value.get_type() != expected && value.is_pointer_value() {
+                            let align = self.align(expected);
+                            value = self.builder
+                                .build_load(expected, value.into_pointer_value(), "load")
                                 .and_then(|inst| {
-                                    inst.set_alignment(align).ok();
+                                    if let Some(instruction) = inst.as_instruction_value() {
+                                        instruction.set_alignment(align).ok();
+                                    }
                                     Ok(inst)
                                 })
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                            let zero = self.context.i32_type().const_zero();
-                            value = unsafe {
-                                self.builder
-                                    .build_in_bounds_gep(
-                                        array.get_type(),
-                                        pointer,
-                                        &[zero, zero],
-                                        "pointer",
-                                    )
-                                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                            }
-                                .into();
-                        } else if value.is_struct_value() {
-                            let record = value.into_struct_value();
-                            let parent = self.parent(span)?;
-                            let pointer = self.build_entry(parent, record.get_type().into(), "decay".into());
-                            let align = self.align(record.get_type().into());
-
-                            self.builder
-                                .build_store(pointer, record)
-                                .and_then(|inst| {
-                                    inst.set_alignment(align).ok();
-                                    Ok(inst)
-                                })
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                            value = pointer.into();
                         }
-                    }
-
-                    if kind.is_struct_type() && value.is_pointer_value() {
-                        let layout = kind.into_struct_type();
-                        let align = self.align(layout.into());
-
-                        value = self.builder
-                            .build_load(layout, value.into_pointer_value(), "load")
-                            .and_then(|val| {
-                                if let Some(inst) = val.as_instruction_value() {
-                                    inst.set_alignment(align).ok();
-                                }
-                                Ok(val)
-                            })
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                    }
-
-                    if value.is_pointer_value() && kind.is_int_type() {
-                        value = self.builder
-                            .build_ptr_to_int(value.into_pointer_value(), kind.into_int_type(), "cast")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                            .into();
-                    } else if value.is_int_value() && kind.is_pointer_type() {
-                        value = self.builder
-                            .build_int_to_ptr(value.into_int_value(), kind.into_pointer_type(), "cast")
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-                            .into();
                     }
                 }
 
@@ -612,17 +500,22 @@ impl<'backend> super::Generator<'backend> {
         match value {
             Some(item) => {
                 let check = self.analysis(*item)?;
-                if function.get_type().get_return_type().is_none() {
+                if let Some(layout) = function.get_type().get_return_type() {
+                    if check.get_type() != layout {
+                        return Err(GenerateError::new(
+                            ErrorKind::Function(FunctionError::IncompatibleReturnType),
+                            span,
+                        ));
+                    }
+                    self.builder
+                        .build_return(Some(&check))
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    Ok(check)
+                } else {
                     self.builder
                         .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(self.context.i64_type().const_zero().into())
-                } else {
-                    let value = self.coerce(function, check, span)?;
-                    self.builder
-                        .build_return(Some(&value))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                    Ok(value)
                 }
             }
             None => {
@@ -718,107 +611,6 @@ impl<'backend> super::Generator<'backend> {
             .ok_or_else(|| {
                 GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span)
             })
-    }
-
-    pub fn explicit_cast(
-        &mut self,
-        value: Box<Analysis<'backend>>,
-        layout: Type<'backend>,
-        span: Span<'backend>,
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let check = self.analysis(*value.clone())?;
-        let target = self.to_basic_type(&layout, span)?;
-
-        if check.get_type() == target {
-            return Ok(check);
-        }
-
-        let signed = match &layout.kind {
-            TypeKind::Integer { signed, .. } => *signed,
-            _ => true,
-        };
-
-        match (check, target) {
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(layout)) => {
-                let start = integer.get_type().get_bit_width();
-                let limit = layout.get_bit_width();
-
-                if start > limit {
-                    self.builder
-                        .build_int_truncate(integer, layout, "truncate")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else if start < limit {
-                    if self.infer_signedness(&value).unwrap_or(true) {
-                        self.builder
-                            .build_int_s_extend(integer, layout, "extend")
-                            .map(Into::into)
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                    } else {
-                        self.builder
-                            .build_int_z_extend(integer, layout, "extend")
-                            .map(Into::into)
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                    }
-                } else {
-                    Ok(integer.into())
-                }
-            }
-
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(layout)) => self
-                .builder
-                .build_float_cast(float, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(layout)) => {
-                if self.infer_signedness(&value).unwrap_or(true) {
-                    self.builder
-                        .build_signed_int_to_float(integer, layout, "cast")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else {
-                    self.builder
-                        .build_unsigned_int_to_float(integer, layout, "cast")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                }
-            }
-
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(layout)) => {
-                if signed {
-                    self.builder
-                        .build_float_to_signed_int(float, layout, "cast")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else {
-                    self.builder
-                        .build_float_to_unsigned_int(float, layout, "cast")
-                        .map(Into::into)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                }
-            }
-
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(layout)) => self
-                .builder
-                .build_ptr_to_int(pointer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(layout)) => self
-                .builder
-                .build_int_to_ptr(integer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(layout)) => self
-                .builder
-                .build_pointer_cast(pointer, layout, "cast")
-                .map(Into::into)
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
-
-            _ => Err(GenerateError::new(ErrorKind::Cast, span)),
-        }
     }
 
     pub fn negate(

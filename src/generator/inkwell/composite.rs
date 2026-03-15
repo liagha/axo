@@ -86,46 +86,9 @@ impl<'backend> Generator<'backend> {
         target: BasicTypeEnum<'backend>,
     ) -> Option<BasicValueEnum<'backend>> {
         if value.get_type() == target {
-            return Some(value);
-        }
-
-        match (value, target) {
-            (BasicValueEnum::IntValue(left), BasicTypeEnum::IntType(right)) => self
-                .builder
-                .build_int_cast(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::FloatValue(left), BasicTypeEnum::FloatType(right)) => self
-                .builder
-                .build_float_cast(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::IntValue(left), BasicTypeEnum::FloatType(right)) => self
-                .builder
-                .build_signed_int_to_float(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::FloatValue(left), BasicTypeEnum::IntType(right)) => self
-                .builder
-                .build_float_to_signed_int(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::PointerValue(left), BasicTypeEnum::PointerType(right)) => self
-                .builder
-                .build_pointer_cast(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::PointerValue(left), BasicTypeEnum::IntType(right)) => self
-                .builder
-                .build_ptr_to_int(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            (BasicValueEnum::IntValue(left), BasicTypeEnum::PointerType(right)) => self
-                .builder
-                .build_int_to_ptr(left, right, "cast")
-                .ok()
-                .map(Into::into),
-            _ => None,
+            Some(value)
+        } else {
+            None
         }
     }
 
@@ -209,6 +172,7 @@ impl<'backend> Generator<'backend> {
 
         Ok(self.context.i64_type().const_zero().into())
     }
+
 
     pub fn enumeration(
         &mut self,

@@ -42,7 +42,6 @@ pub enum AnalysisKind<'analysis> {
     Array(Vec<Analysis<'analysis>>),
     Tuple(Vec<Analysis<'analysis>>),
 
-    Cast(Box<Analysis<'analysis>>, Type<'analysis>),
     Negate(Box<Analysis<'analysis>>),
     SizeOf(Type<'analysis>),
 

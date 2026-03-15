@@ -173,11 +173,8 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Union(left_id, _), TypeKind::Union(right_id, _)) if left_id == right_id => left,
             (TypeKind::Constructor(left_id, _), TypeKind::Constructor(right_id, _)) if left_id == right_id => left,
 
-            (TypeKind::Integer { .. }, TypeKind::Integer { .. }) => left,
-            (TypeKind::Float { .. }, TypeKind::Float { .. }) => left,
-            (TypeKind::Pointer { target }, TypeKind::String) | (TypeKind::String, TypeKind::Pointer { target }) if matches!(target.kind, TypeKind::Integer { size: 8, .. }) => left,
-
-            (TypeKind::Pointer { .. }, TypeKind::Integer { .. }) | (TypeKind::Integer { .. }, TypeKind::Pointer { .. }) => left,
+            (TypeKind::Integer { size: left_size, signed: left_signed }, TypeKind::Integer { size: right_size, signed: right_signed }) if left_size == right_size && left_signed == right_signed => left,
+            (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
 
             (TypeKind::Function(name, left_args, left_output), TypeKind::Function(_, right_args, right_output)) if left_args.len() == right_args.len() => {
                 let mut unified = Vec::with_capacity(left_args.len());

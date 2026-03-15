@@ -31,13 +31,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             Ok(BasicValueEnum::from(
@@ -58,13 +55,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             Ok(BasicValueEnum::from(
@@ -92,7 +86,7 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             let limit = if signed { IntPredicate::SLT } else { IntPredicate::ULT };
@@ -121,7 +115,7 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             let limit = if signed { IntPredicate::SLE } else { IntPredicate::ULE };
@@ -150,7 +144,7 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             let limit = if signed { IntPredicate::SGT } else { IntPredicate::UGT };
@@ -179,7 +173,7 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if !floating {
             let limit = if signed { IntPredicate::SGE } else { IntPredicate::UGE };

@@ -33,13 +33,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
             return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("and") }), span));
@@ -57,13 +54,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
             return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("or") }), span));
@@ -98,13 +92,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
             return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("xor") }), span));
@@ -122,13 +113,10 @@ impl<'backend> Generator<'backend> {
         right: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let first = self.infer_signedness(&left).unwrap_or(true);
-        let second = self.infer_signedness(&right).unwrap_or(true);
-
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
             return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }), span));
@@ -164,7 +152,7 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, [first, second], span)?;
+        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
             return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }), span));
