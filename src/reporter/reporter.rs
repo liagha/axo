@@ -52,11 +52,11 @@ impl Reporter {
         }
     }
 
-    pub fn run(&self, target: &PathBuf) {
+    pub fn run(&self, target: String) {
         if self.is_verbose() {
             xprintln!(
                 "Running {}." => Color::Blue,
-                format!("`{}`", target.to_string_lossy()) => Color::White
+                format!("`{}`", target) => Color::White
             );
 
             xprintln!();

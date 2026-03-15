@@ -42,7 +42,12 @@ use {
         form::Form,
         helper::{Formable, Source},
     },
-    crate::data::memory::PhantomData,
+    crate::data::{
+        memory::{
+            replace,
+            PhantomData
+        }
+    },
 };
 
 pub struct Former<
@@ -101,6 +106,6 @@ impl<
             self.source.set_position(classifier.position);
         }
 
-        self.forms[classifier.form].clone()
+        replace(&mut self.forms[classifier.form], Form::Blank)
     }
 }

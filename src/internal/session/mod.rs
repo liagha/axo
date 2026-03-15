@@ -540,6 +540,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn emit(&mut self) {
+        self.reporter.start("emitting");
+
         let mut objects = Map::new();
 
         for &identity in &self.order {
@@ -577,13 +579,34 @@ impl<'session> Session<'session> {
 
         link.arg("-o").arg(executable.to_string());
 
+        let program = link.get_program().to_string_lossy();
+
+        let args: Vec<String> = link
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+
+        let clean_cmd_string = if args.is_empty() {
+            program.into_owned()
+        } else {
+            format!("{} {}", program, args.join(" "))
+        };
+
+        self.reporter.run(format!("{}", clean_cmd_string));
+
         let status = link.status().expect("failed to link");
 
         if !status.success() {
             panic!("linking failed");
         }
 
+        self.reporter.run(format!("{}", executable));
+
         Command::new(executable.to_string()).status().expect("failed to execute");
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.reporter.finish("emitting", duration);
     }
 
     fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
