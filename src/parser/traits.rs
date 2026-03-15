@@ -1,9 +1,12 @@
-use broccli::{Color, TextStyle};
-use crate::format::Show;
 use {
-    super::{Element, ElementKind, Symbol, SymbolKind},
+    broccli::{Color, TextStyle},
     crate::{
-        data::memory::discriminant,
+        parser::{Element, ElementKind, Symbol, SymbolKind},
+        data::{
+            memory::discriminant,
+            Str,
+        },
+        format::Show,
         internal::{
             hash::{Hash, Hasher},
             operation::Ordering,
@@ -11,7 +14,6 @@ use {
         tracker::{Span, Spanned},
     },
 };
-use crate::data::Str;
 
 impl<'element> Show<'element> for Element<'element> {
     type Verbosity = u8;
@@ -122,6 +124,9 @@ impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
                     }
                     SymbolKind::Union(union) => {
                         union.format(verbosity)
+                    }
+                    SymbolKind::Enumeration(enumeration) => {
+                        enumeration.format(verbosity)
                     }
                     SymbolKind::Function(function) => {
                         function.format(verbosity)

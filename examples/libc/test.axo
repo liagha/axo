@@ -1,3 +1,20 @@
+struct Point {
+    const x: Integer,
+    const y: Integer,
+
+    func print_position(const point: Point) {
+        libc.println_i64(point.x)
+        libc.println_i64(point.y)
+    }
+}
+
 func main() {
     libc.test_malloc()
+
+    const point = Point {
+        x = 333,
+        y = 454
+    }
+
+    Point.print_position(point)
 }

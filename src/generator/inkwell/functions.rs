@@ -21,6 +21,19 @@ use {
 };
 
 impl<'backend> super::Generator<'backend> {
+    fn align(&self, layout: BasicTypeEnum<'backend>) -> u32 {
+        if layout.is_pointer_type() || layout.is_struct_type() || layout.is_array_type() {
+            return 8;
+        }
+        if layout.is_int_type() && layout.into_int_type().get_bit_width() >= 64 {
+            return 8;
+        }
+        if layout.is_float_type() {
+            return 8;
+        }
+        4
+    }
+
     fn terminated(&self) -> bool {
         self.builder
             .get_insert_block()
@@ -30,57 +43,57 @@ impl<'backend> super::Generator<'backend> {
 
     fn coerce(
         &mut self,
-        callable: FunctionValue<'backend>,
+        function: FunctionValue<'backend>,
         value: BasicValueEnum<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let expected = match callable.get_type().get_return_type() {
+        let target = match function.get_type().get_return_type() {
             Some(kind) => kind,
             None => return Ok(value),
         };
 
-        if value.get_type() == expected {
+        if value.get_type() == target {
             return Ok(value);
         }
 
-        match (value, expected) {
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => {
-                let source = integer.get_type().get_bit_width();
-                let destination = target.get_bit_width();
+        match (value, target) {
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(layout)) => {
+                let start = integer.get_type().get_bit_width();
+                let limit = layout.get_bit_width();
 
-                if source > destination {
+                if start > limit {
                     self.builder
-                        .build_int_truncate(integer, target, "truncate")
+                        .build_int_truncate(integer, layout, "truncate")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
                     self.builder
-                        .build_int_s_extend(integer, target, "sign_extend")
+                        .build_int_s_extend(integer, layout, "extend")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
             }
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(layout)) => self
                 .builder
-                .build_float_cast(float, target, "cast")
+                .build_float_cast(float, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(target)) => self
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(layout)) => self
                 .builder
-                .build_int_to_ptr(integer, target, "cast")
+                .build_int_to_ptr(integer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(layout)) => self
                 .builder
-                .build_ptr_to_int(pointer, target, "cast")
+                .build_ptr_to_int(pointer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(target)) => self
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(layout)) => self
                 .builder
-                .build_pointer_cast(pointer, target, "cast")
+                .build_pointer_cast(pointer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
@@ -130,12 +143,12 @@ impl<'backend> super::Generator<'backend> {
 
     pub fn module(
         &mut self,
-        name: Str<'backend>,
+        target: Str<'backend>,
         analyses: Vec<Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let identifier = name.as_str().unwrap_or("module");
-        self.modules.insert(name, self.context.create_module(identifier));
+        let name = target.as_str().unwrap_or("module");
+        self.modules.insert(target, self.context.create_module(name));
 
         let caller = self.builder.get_insert_block();
 
@@ -169,12 +182,12 @@ impl<'backend> super::Generator<'backend> {
         >,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let mut parameters = vec![];
+        let mut params = vec![];
 
         for member in &routine.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                let kind = {
-                    let resolved = self.to_basic_type(&binding.annotation, member.span)?;
+                let layout = {
+                    let layout = self.to_basic_type(&binding.annotation, member.span)?;
 
                     if matches!(routine.interface, Interface::C) {
                         if let TypeKind::String = &binding.annotation.kind {
@@ -182,14 +195,14 @@ impl<'backend> super::Generator<'backend> {
                         } else if let TypeKind::Character = &binding.annotation.kind {
                             self.context.i8_type().into()
                         } else {
-                            resolved
+                            layout
                         }
                     } else {
-                        resolved
+                        layout
                     }
                 };
 
-                parameters.push(kind.into());
+                params.push(layout.into());
             }
         }
 
@@ -199,15 +212,15 @@ impl<'backend> super::Generator<'backend> {
         };
 
         let signature = match output {
-            Some(kind) => kind.fn_type(&parameters, false),
-            None => self.context.void_type().fn_type(&parameters, false),
+            Some(layout) => layout.fn_type(&params, false),
+            None => self.context.void_type().fn_type(&params, false),
         };
 
-        let identifier = routine.target.as_str().unwrap_or("function");
+        let name = routine.target.as_str().unwrap_or("function");
 
-        let callable = if matches!(routine.interface, Interface::C) {
+        let function = if matches!(routine.interface, Interface::C) {
             let external = self.current_module().add_function(
-                identifier,
+                name,
                 signature,
                 Some(inkwell::module::Linkage::External),
             );
@@ -221,10 +234,9 @@ impl<'backend> super::Generator<'backend> {
                 Some(inkwell::module::Linkage::External)
             };
 
-            let internal = self.current_module().add_function(identifier, signature, linkage);
+            let internal = self.current_module().add_function(name, signature, linkage);
 
             self.insert_entity(routine.target.clone(), Entity::Function(internal));
-            self.enter_scope();
 
             let entry = self.context.append_basic_block(internal, "entry");
             self.builder.position_at_end(entry);
@@ -232,18 +244,23 @@ impl<'backend> super::Generator<'backend> {
         };
 
         if !matches!(routine.interface, Interface::C) {
-            for (parameter, member) in callable.get_param_iter().zip(routine.members.iter()) {
+            for (param, member) in function.get_param_iter().zip(routine.members.iter()) {
                 if let AnalysisKind::Binding(binding) = &member.kind {
-                    let allocation = self.build_entry(callable, parameter.get_type(), binding.target.clone());
+                    let pointer = self.build_entry(function, param.get_type(), binding.target.clone());
+                    let align = self.align(param.get_type());
 
                     self.builder
-                        .build_store(allocation, parameter)
+                        .build_store(pointer, param)
+                        .and_then(|inst| {
+                            inst.set_alignment(align).ok();
+                            Ok(inst)
+                        })
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                     self.insert_entity(
                         binding.target.clone(),
                         Entity::Variable {
-                            pointer: allocation,
+                            pointer,
                             typing: binding.annotation.clone(),
                         },
                     );
@@ -259,14 +276,12 @@ impl<'backend> super::Generator<'backend> {
                         .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 } else {
-                    let value = self.coerce(callable, result, span)?;
+                    let value = self.coerce(function, result, span)?;
                     self.builder
                         .build_return(Some(&value))
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
-
-            self.exit_scope();
         }
 
         Ok(self.context.i64_type().const_zero().into())
@@ -277,16 +292,16 @@ impl<'backend> super::Generator<'backend> {
         analyses: Vec<Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let mut evaluate = self.context.i64_type().const_zero().into();
+        let mut value = self.context.i64_type().const_zero().into();
 
         for analysis in analyses {
             if self.terminated() {
                 break;
             }
-            evaluate = self.analysis(analysis)?;
+            value = self.analysis(analysis)?;
         }
 
-        Ok(evaluate)
+        Ok(value)
     }
 
     pub fn conditional(
@@ -296,38 +311,38 @@ impl<'backend> super::Generator<'backend> {
         fall: Option<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let evaluated = self.analysis(condition)?;
-        let boolean = self.truth(evaluated, span)?;
+        let check = self.analysis(condition)?;
+        let flag = self.truth(check, span)?;
 
-        let current_block = self
+        let current = self
             .builder
             .get_insert_block()
             .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
 
-        let parent = current_block
+        let parent = current
             .get_parent()
             .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
 
-        let truth_block = self.context.append_basic_block(parent, "truth");
-        let fall_block = self.context.append_basic_block(parent, "fall");
-        let merge_block = self.context.append_basic_block(parent, "merge");
+        let pass = self.context.append_basic_block(parent, "pass");
+        let fail = self.context.append_basic_block(parent, "fail");
+        let merge = self.context.append_basic_block(parent, "merge");
 
-        self.builder.build_conditional_branch(boolean, truth_block, fall_block).ok();
+        self.builder.build_conditional_branch(flag, pass, fail).ok();
 
-        self.builder.position_at_end(truth_block);
-        let truth_result = self.analysis(truth)?;
-        let truth_end = self.builder.get_insert_block().unwrap_or(truth_block);
+        self.builder.position_at_end(pass);
+        let left = self.analysis(truth)?;
+        let left_end = self.builder.get_insert_block().unwrap_or(pass);
+        let left_done = left_end.get_terminator().is_some();
 
-        let truth_ended = truth_end.get_terminator().is_some();
-        if !truth_ended {
-            self.builder.build_unconditional_branch(merge_block).ok();
+        if !left_done {
+            self.builder.build_unconditional_branch(merge).ok();
         }
 
-        self.builder.position_at_end(fall_block);
-        let fall_result = if let Some(expression) = fall {
+        self.builder.position_at_end(fail);
+        let right = if let Some(expression) = fall {
             self.analysis(expression)?
         } else {
-            match truth_result.get_type() {
+            match left.get_type() {
                 BasicTypeEnum::IntType(layout) => layout.const_zero().into(),
                 BasicTypeEnum::FloatType(layout) => layout.const_zero().into(),
                 BasicTypeEnum::PointerType(layout) => layout.const_null().into(),
@@ -338,36 +353,39 @@ impl<'backend> super::Generator<'backend> {
             }
         };
 
-        let fall_end = self.builder.get_insert_block().unwrap_or(fall_block);
+        let right_end = self.builder.get_insert_block().unwrap_or(fail);
+        let right_done = right_end.get_terminator().is_some();
 
-        let fall_ended = fall_end.get_terminator().is_some();
-        if !fall_ended {
-            self.builder.build_unconditional_branch(merge_block).ok();
+        if !right_done {
+            self.builder.build_unconditional_branch(merge).ok();
         }
 
-        self.builder.position_at_end(merge_block);
+        self.builder.position_at_end(merge);
 
-        let layout = truth_result.get_type();
-        let mapping = self
+        let mut edges: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
+
+        if !left_done {
+            edges.push((&left, left_end));
+        }
+
+        if !right_done {
+            edges.push((&right, right_end));
+        }
+
+        if edges.is_empty() {
+            self.builder.build_unreachable().ok();
+            return Ok(left);
+        }
+
+        let layout = left.get_type();
+        let phi = self
             .builder
             .build_phi(layout, "mapping")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        let mut incoming: Vec<(&dyn BasicValue, BasicBlock)> = Vec::new();
+        phi.add_incoming(&edges);
 
-        if !truth_ended {
-            incoming.push((&truth_result, truth_end));
-        }
-
-        if !fall_ended {
-            incoming.push((&fall_result, fall_end));
-        }
-
-        if !incoming.is_empty() {
-            mapping.add_incoming(&incoming);
-        }
-
-        Ok(mapping.as_basic_value())
+        Ok(phi.as_basic_value())
     }
 
     pub fn r#while(
@@ -380,43 +398,54 @@ impl<'backend> super::Generator<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let callable = self.parent(span)?;
-        let heading = self.context.append_basic_block(callable, "heading");
-        let core = self.context.append_basic_block(callable, "core");
-        let end = self.context.append_basic_block(callable, "end");
+        let parent = self.parent(span)?;
+        let start = self.context.append_basic_block(parent, "start");
+        let core = self.context.append_basic_block(parent, "core");
+        let exit = self.context.append_basic_block(parent, "exit");
 
-        let allocation = self.build_entry(callable, self.context.i64_type().into(), "loop".into());
+        let pointer = self.build_entry(parent, self.context.i64_type().into(), "loop".into());
+        let align = self.align(self.context.i64_type().into());
 
         self.builder
-            .build_store(allocation, self.context.i64_type().const_zero())
+            .build_store(pointer, self.context.i64_type().const_zero())
+            .and_then(|inst| {
+                inst.set_alignment(align).ok();
+                Ok(inst)
+            })
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder
-            .build_unconditional_branch(heading)
+            .build_unconditional_branch(start)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-        self.builder.position_at_end(heading);
-        let evaluated = self.analysis(*condition)?;
-        let boolean = self.truth(evaluated, span)?;
+        self.builder.position_at_end(start);
+        let check = self.analysis(*condition)?;
+        let flag = self.truth(check, span)?;
 
         self.builder
-            .build_conditional_branch(boolean, core, end)
+            .build_conditional_branch(flag, core, exit)
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.builder.position_at_end(core);
-        self.enter_loop(heading, end, Some(allocation));
+        self.enter_loop(start, exit, Some(pointer));
         self.analysis(*body)?;
         self.exit_loop();
 
         if !self.terminated() {
             self.builder
-                .build_unconditional_branch(heading)
+                .build_unconditional_branch(start)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         }
 
-        self.builder.position_at_end(end);
+        self.builder.position_at_end(exit);
         let completed = self.builder
-            .build_load(self.context.i64_type(), allocation, "load")
+            .build_load(self.context.i64_type(), pointer, "load")
+            .and_then(|value| {
+                if let Some(inst) = value.as_instruction_value() {
+                    inst.set_alignment(align).ok();
+                }
+                Ok(value)
+            })
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         Ok(completed)
@@ -427,15 +456,17 @@ impl<'backend> super::Generator<'backend> {
         call: Invoke<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        let name = call.target.as_str().unwrap_or_default();
+
         let entity = self.get_entity(&call.target).and_then(|item| {
-            if let Entity::Function(callable) = item {
+            if let Entity::Function(function) = item {
                 let module = self.current_module();
-                let identifier = call.target.as_str().unwrap_or_default();
+                let identifier = function.get_name().to_str().unwrap_or(name);
 
                 if let Some(existing) = module.get_function(identifier) {
                     Some(existing)
                 } else {
-                    let layout = callable.get_type();
+                    let layout = function.get_type();
                     let external = module.add_function(
                         identifier,
                         layout,
@@ -448,78 +479,96 @@ impl<'backend> super::Generator<'backend> {
             }
         });
 
-        if let Some(callable) = entity {
+        if let Some(function) = entity {
             let mut arguments = vec![];
-            let expected = callable.get_type().get_param_types();
+            let target = function.get_type().get_param_types();
 
             for (index, argument) in call.members.iter().enumerate() {
-                let mut argument_value = self.analysis(argument.clone())?;
+                let mut value = self.analysis(argument.clone())?;
 
-                if let Some(&kind) = expected.get(index) {
+                if let Some(&kind) = target.get(index) {
                     if kind.is_pointer_type() {
-                        if argument_value.is_array_value() {
-                            let array = argument_value.into_array_value();
+                        if value.is_array_value() {
+                            let array = value.into_array_value();
                             let parent = self.parent(span)?;
-                            let allocation = self.build_entry(parent, array.get_type().into(), "decay".into());
+                            let pointer = self.build_entry(parent, array.get_type().into(), "decay".into());
+                            let align = self.align(array.get_type().into());
 
                             self.builder
-                                .build_store(allocation, array)
+                                .build_store(pointer, array)
+                                .and_then(|inst| {
+                                    inst.set_alignment(align).ok();
+                                    Ok(inst)
+                                })
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
                             let zero = self.context.i32_type().const_zero();
-                            argument_value = unsafe {
+                            value = unsafe {
                                 self.builder
                                     .build_in_bounds_gep(
                                         array.get_type(),
-                                        allocation,
+                                        pointer,
                                         &[zero, zero],
                                         "pointer",
                                     )
                                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             }
                                 .into();
-                        } else if argument_value.is_struct_value() {
-                            let structure = argument_value.into_struct_value();
+                        } else if value.is_struct_value() {
+                            let record = value.into_struct_value();
                             let parent = self.parent(span)?;
-                            let allocation = self.build_entry(parent, structure.get_type().into(), "decay".into());
+                            let pointer = self.build_entry(parent, record.get_type().into(), "decay".into());
+                            let align = self.align(record.get_type().into());
 
                             self.builder
-                                .build_store(allocation, structure)
+                                .build_store(pointer, record)
+                                .and_then(|inst| {
+                                    inst.set_alignment(align).ok();
+                                    Ok(inst)
+                                })
                                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                            argument_value = allocation.into();
+                            value = pointer.into();
                         }
                     }
 
-                    if kind.is_struct_type() && argument_value.is_pointer_value() {
+                    if kind.is_struct_type() && value.is_pointer_value() {
                         let layout = kind.into_struct_type();
-                        argument_value = self.builder
-                            .build_load(layout, argument_value.into_pointer_value(), "load")
+                        let align = self.align(layout.into());
+
+                        value = self.builder
+                            .build_load(layout, value.into_pointer_value(), "load")
+                            .and_then(|val| {
+                                if let Some(inst) = val.as_instruction_value() {
+                                    inst.set_alignment(align).ok();
+                                }
+                                Ok(val)
+                            })
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     }
 
-                    if argument_value.is_pointer_value() && kind.is_int_type() {
-                        argument_value = self.builder
-                            .build_ptr_to_int(argument_value.into_pointer_value(), kind.into_int_type(), "cast")
+                    if value.is_pointer_value() && kind.is_int_type() {
+                        value = self.builder
+                            .build_ptr_to_int(value.into_pointer_value(), kind.into_int_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
-                    } else if argument_value.is_int_value() && kind.is_pointer_type() {
-                        argument_value = self.builder
-                            .build_int_to_ptr(argument_value.into_int_value(), kind.into_pointer_type(), "cast")
+                    } else if value.is_int_value() && kind.is_pointer_type() {
+                        value = self.builder
+                            .build_int_to_ptr(value.into_int_value(), kind.into_pointer_type(), "cast")
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
                             .into();
                     }
                 }
 
-                arguments.push(argument_value.into());
+                arguments.push(value.into());
             }
 
             let result = self.builder
-                .build_call(callable, &arguments, "call")
+                .build_call(function, &arguments, "call")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            return if let Some(value) = result.try_as_basic_value().basic() {
-                Ok(value)
+            return if let Some(bound) = result.try_as_basic_value().basic() {
+                Ok(bound)
             } else {
                 Ok(self.context.i64_type().const_zero().into())
             };
@@ -542,22 +591,22 @@ impl<'backend> super::Generator<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let callable = self.parent(span)?;
+        let function = self.parent(span)?;
 
         match value {
             Some(item) => {
-                let evaluated = self.analysis(*item)?;
-                if callable.get_type().get_return_type().is_none() {
+                let check = self.analysis(*item)?;
+                if function.get_type().get_return_type().is_none() {
                     self.builder
                         .build_return(None)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                     Ok(self.context.i64_type().const_zero().into())
                 } else {
-                    let coerced = self.coerce(callable, evaluated, span)?;
+                    let value = self.coerce(function, check, span)?;
                     self.builder
-                        .build_return(Some(&coerced))
+                        .build_return(Some(&value))
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                    Ok(coerced)
+                    Ok(value)
                 }
             }
             None => {
@@ -575,10 +624,15 @@ impl<'backend> super::Generator<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
-            let evaluated = self.analysis(*item)?;
-            if let Some(allocation) = self.current_loop_result() {
+            let check = self.analysis(*item)?;
+            if let Some(pointer) = self.current_loop_result() {
+                let align = self.align(check.get_type());
                 self.builder
-                    .build_store(allocation, evaluated)
+                    .build_store(pointer, check)
+                    .and_then(|inst| {
+                        inst.set_alignment(align).ok();
+                        Ok(inst)
+                    })
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -607,10 +661,15 @@ impl<'backend> super::Generator<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
-            let evaluated = self.analysis(*item)?;
-            if let Some(allocation) = self.current_loop_result() {
+            let check = self.analysis(*item)?;
+            if let Some(pointer) = self.current_loop_result() {
+                let align = self.align(check.get_type());
                 self.builder
-                    .build_store(allocation, evaluated)
+                    .build_store(pointer, check)
+                    .and_then(|inst| {
+                        inst.set_alignment(align).ok();
+                        Ok(inst)
+                    })
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             }
         }
@@ -619,9 +678,9 @@ impl<'backend> super::Generator<'backend> {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        if let Some(heading) = self.current_loop_header() {
+        if let Some(start) = self.current_loop_header() {
             self.builder
-                .build_unconditional_branch(heading)
+                .build_unconditional_branch(start)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
         } else {
             return Err(GenerateError::new(
@@ -651,11 +710,11 @@ impl<'backend> super::Generator<'backend> {
         layout: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let evaluated = self.analysis(*value.clone())?;
-        let expected = self.to_basic_type(&layout, span)?;
+        let check = self.analysis(*value.clone())?;
+        let target = self.to_basic_type(&layout, span)?;
 
-        if evaluated.get_type() == expected {
-            return Ok(evaluated);
+        if check.get_type() == target {
+            return Ok(check);
         }
 
         let signed = match &layout.kind {
@@ -663,25 +722,25 @@ impl<'backend> super::Generator<'backend> {
             _ => true,
         };
 
-        match (evaluated, expected) {
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(target)) => {
-                let source = integer.get_type().get_bit_width();
-                let destination = target.get_bit_width();
+        match (check, target) {
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::IntType(layout)) => {
+                let start = integer.get_type().get_bit_width();
+                let limit = layout.get_bit_width();
 
-                if source > destination {
+                if start > limit {
                     self.builder
-                        .build_int_truncate(integer, target, "truncate")
+                        .build_int_truncate(integer, layout, "truncate")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
-                } else if source < destination {
+                } else if start < limit {
                     if self.infer_signedness(&value).unwrap_or(true) {
                         self.builder
-                            .build_int_s_extend(integer, target, "sign_extend")
+                            .build_int_s_extend(integer, layout, "extend")
                             .map(Into::into)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     } else {
                         self.builder
-                            .build_int_z_extend(integer, target, "zero_extend")
+                            .build_int_z_extend(integer, layout, "extend")
                             .map(Into::into)
                             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                     }
@@ -690,55 +749,55 @@ impl<'backend> super::Generator<'backend> {
                 }
             }
 
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(target)) => self
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::FloatType(layout)) => self
                 .builder
-                .build_float_cast(float, target, "cast")
+                .build_float_cast(float, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(target)) => {
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::FloatType(layout)) => {
                 if self.infer_signedness(&value).unwrap_or(true) {
                     self.builder
-                        .build_signed_int_to_float(integer, target, "cast")
+                        .build_signed_int_to_float(integer, layout, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
                     self.builder
-                        .build_unsigned_int_to_float(integer, target, "cast")
+                        .build_unsigned_int_to_float(integer, layout, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
             }
 
-            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(target)) => {
+            (BasicValueEnum::FloatValue(float), BasicTypeEnum::IntType(layout)) => {
                 if signed {
                     self.builder
-                        .build_float_to_signed_int(float, target, "cast")
+                        .build_float_to_signed_int(float, layout, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 } else {
                     self.builder
-                        .build_float_to_unsigned_int(float, target, "cast")
+                        .build_float_to_unsigned_int(float, layout, "cast")
                         .map(Into::into)
                         .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
                 }
             }
 
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(target)) => self
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::IntType(layout)) => self
                 .builder
-                .build_ptr_to_int(pointer, target, "cast")
+                .build_ptr_to_int(pointer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(target)) => self
+            (BasicValueEnum::IntValue(integer), BasicTypeEnum::PointerType(layout)) => self
                 .builder
-                .build_int_to_ptr(integer, target, "cast")
+                .build_int_to_ptr(integer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
-            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(target)) => self
+            (BasicValueEnum::PointerValue(pointer), BasicTypeEnum::PointerType(layout)) => self
                 .builder
-                .build_pointer_cast(pointer, target, "cast")
+                .build_pointer_cast(pointer, layout, "cast")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
@@ -751,9 +810,9 @@ impl<'backend> super::Generator<'backend> {
         value: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let evaluated = self.analysis(*value)?;
+        let check = self.analysis(*value)?;
 
-        match evaluated {
+        match check {
             BasicValueEnum::IntValue(integer) => self
                 .builder
                 .build_int_neg(integer, "negate")
@@ -762,7 +821,7 @@ impl<'backend> super::Generator<'backend> {
 
             BasicValueEnum::FloatValue(float) => self
                 .builder
-                .build_float_neg(float, "float_negate")
+                .build_float_neg(float, "negate")
                 .map(Into::into)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span)),
 
@@ -775,9 +834,9 @@ impl<'backend> super::Generator<'backend> {
         layout: Type<'backend>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let expected = self.to_basic_type(&layout, span)?;
+        let target = self.to_basic_type(&layout, span)?;
 
-        let size = expected
+        let size = target
             .size_of()
             .ok_or_else(|| GenerateError::new(ErrorKind::SizeOf, span))?;
 

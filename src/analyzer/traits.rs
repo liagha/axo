@@ -285,6 +285,9 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                     AnalysisKind::Union(union) => {
                         union.format(verbosity)
                     }
+                    AnalysisKind::Enumeration(enumeration) => {
+                        enumeration.format(verbosity)
+                    }
                     AnalysisKind::Function(function) => {
                         function.format(verbosity)
                     }

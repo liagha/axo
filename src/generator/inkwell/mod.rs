@@ -50,7 +50,7 @@ pub struct Generator<'backend> {
     pub modules: Map<Str<'backend>, Module<'backend>>,
     pub current_module: Str<'backend>,
 
-    entities: Vec<Map<Str<'backend>, Entity<'backend>>>,
+    entities: Map<Str<'backend>, Entity<'backend>>,
     pub errors: Vec<GenerateError<'backend>>,
 
     loop_headers: Vec<BasicBlock<'backend>>,
@@ -60,26 +60,11 @@ pub struct Generator<'backend> {
 
 impl<'backend> Generator<'backend> {
     pub fn get_entity(&self, name: &Str<'backend>) -> Option<&Entity<'backend>> {
-        for scope in self.entities.iter().rev() {
-            if let Some(entity) = scope.get(name) {
-                return Some(entity);
-            }
-        }
-        None
+        self.entities.get(name)
     }
 
     pub fn insert_entity(&mut self, name: Str<'backend>, entity: Entity<'backend>) {
-        if let Some(scope) = self.entities.last_mut() {
-            scope.insert(name, entity);
-        }
-    }
-
-    pub fn enter_scope(&mut self) {
-        self.entities.push(Map::default());
-    }
-
-    pub fn exit_scope(&mut self) {
-        self.entities.pop();
+        self.entities.insert(name, entity);
     }
 
     pub fn clear_loops(&mut self) {
@@ -118,26 +103,24 @@ impl<'backend> Generator<'backend> {
     }
 
     pub fn update_entity(&mut self, name: &Str<'backend>, new_entity: Entity<'backend>) -> bool {
-        for scope in self.entities.iter_mut().rev() {
-            if scope.contains_key(name) {
-                scope.insert(name.clone(), new_entity);
-                return true;
-            }
+        if self.entities.contains_key(name) {
+            self.entities.insert(name.clone(), new_entity);
+            true
+        } else {
+            false
         }
-        false
     }
 
     pub fn find_entity<F>(&self, mut predicate: F) -> Option<&Entity<'backend>>
     where
         F: FnMut(&Entity<'backend>) -> bool,
     {
-        for scope in self.entities.iter().rev() {
-            for entity in scope.values() {
-                if predicate(entity) {
-                    return Some(entity);
-                }
+        for entity in self.entities.values() {
+            if predicate(entity) {
+                return Some(entity);
             }
         }
+
         None
     }
 
@@ -254,7 +237,7 @@ impl<'backend> Generator<'backend> {
             context,
             builder,
             current_module: Default::default(),
-            entities: vec![Default::default()],
+            entities: Default::default(),
             modules: Default::default(),
             errors: Vec::new(),
             loop_headers: Vec::new(),
@@ -443,6 +426,9 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::While(condition, body) => self.r#while(condition, body, instruction.span),
             AnalysisKind::Structure(structure) => self.structure(structure, instruction.span),
             AnalysisKind::Union(structure) => self.union(structure, instruction.span),
+            AnalysisKind::Enumeration(_) => {
+                unimplemented!()
+            },
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, instruction.span),
             AnalysisKind::Function(function) => self.function(function, instruction.span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, instruction.span),

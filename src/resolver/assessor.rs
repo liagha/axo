@@ -1,3 +1,4 @@
+// src/resolver/assessor.rs
 use {
     super::{ErrorKind, ResolveError},
     crate::{
@@ -9,6 +10,7 @@ use {
     },
     matchete::{string::*, Assessment, Assessor, Resemblance, Resembler, Scheme},
 };
+use crate::resolver::Resolvable;
 
 pub struct Aligner<'aligner> {
     pub assessor: Assessor<'aligner, String, String, ()>,
@@ -237,11 +239,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / invoke.members.len() as f64));
 
                     for member in invoke.members[function.members.len()..].iter() {
-                        if let (Some(target_brand), Some(member_brand)) = (invoke.target.brand(), member.brand()) {
+                        if let (Some(target), Some(member_brand)) = (invoke.target.brand(), member.brand()) {
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::MissingMember {
-                                        target: target_brand.clone(),
+                                        target: target.clone(),
                                         member: member_brand.clone(),
                                     },
                                     member.span.clone(),
@@ -254,11 +256,11 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / function.members.len() as f64));
 
                     for member in function.members[invoke.members.len()..].iter() {
-                        if let (Some(target_brand), Some(member_brand)) = (function.target.brand(), member.brand()) {
+                        if let (Some(target), Some(member_brand)) = (function.target.brand(), member.brand()) {
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::UndefinedMember {
-                                        target: target_brand.clone(),
+                                        target: target.clone(),
                                         member: member_brand.clone(),
                                     },
                                     member.span.clone(),
@@ -282,13 +284,17 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 let candidates = structure
                     .members
                     .iter()
+                    .filter(|member| member.is_instance())
                     .filter_map(|member| member.brand())
                     .collect::<Vec<_>>();
 
                 let members = construct
                     .members
                     .iter()
-                    .filter_map(|member| member.brand())
+                    .filter_map(|member| match &member.kind {
+                        ElementKind::Binary(binary) => binary.left.brand(),
+                        _ => member.brand(),
+                    })
                     .collect::<Vec<_>>();
 
                 if candidates == members {
@@ -312,10 +318,10 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     for member in members.clone() {
                         if !candidates.contains(&member) {
-                            if let Some(target_brand) = structure.target.brand() {
+                            if let Some(target) = structure.target.brand() {
                                 errors.push(ResolveError {
                                     kind: ErrorKind::UndefinedMember {
-                                        target: target_brand.clone(),
+                                        target: target.clone(),
                                         member: member.clone(),
                                     },
                                     span: query.span.clone(),
@@ -327,10 +333,10 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     for candidate in candidates {
                         if !members.contains(&candidate) {
-                            if let Some(target_brand) = structure.target.brand() {
+                            if let Some(target) = structure.target.brand() {
                                 errors.push(ResolveError {
                                     kind: ErrorKind::MissingMember {
-                                        target: target_brand.clone(),
+                                        target: target.clone(),
                                         member: candidate.clone(),
                                     },
                                     span: query.span.clone(),

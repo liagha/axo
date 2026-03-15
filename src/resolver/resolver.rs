@@ -1,20 +1,9 @@
-use {
-    crate::{
-        data::{
-            Identity,
-            Scale, Str,
-            memory::replace,
-        },
-        parser::{Element, ElementKind, Symbol},
-        scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
-        resolver::{
-            ResolveError,
-            ErrorKind,
-            Type, TypeKind,
-            scope::Scope,
-        },
-        tracker::Span,
-    },
+use crate::{
+    data::{memory::replace, Identity, Scale, Str},
+    parser::{Element, ElementKind, Symbol},
+    resolver::{scope::Scope, ErrorKind, ResolveError, Type, TypeKind},
+    scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
+    tracker::Span,
 };
 
 pub struct Resolver<'resolver> {
@@ -41,6 +30,9 @@ pub trait Resolvable<'resolvable> {
     fn declare(&mut self, resolver: &mut Resolver<'resolvable>);
     fn resolve(&mut self, resolver: &mut Resolver<'resolvable>);
     fn reify(&mut self, resolver: &mut Resolver<'resolvable>);
+    fn is_instance(&self) -> bool {
+        false
+    }
 }
 
 impl<'resolver> Resolver<'resolver> {
@@ -118,9 +110,9 @@ impl<'resolver> Resolver<'resolver> {
             }
             TypeKind::Pointer { target } => self.occurs(identity, target),
             TypeKind::Array { member, .. } => self.occurs(identity, member),
-            TypeKind::Tuple { members } => members.iter().any(|member| self.occurs(identity, member)),
+            TypeKind::Tuple { members } => members.iter().any(|item| self.occurs(identity, item)),
             TypeKind::Function(_, parameters, output) => {
-                if parameters.iter().any(|parameter| self.occurs(identity, parameter)) {
+                if parameters.iter().any(|item| self.occurs(identity, item)) {
                     return true;
                 }
                 if let Some(kind) = output {
@@ -161,8 +153,8 @@ impl<'resolver> Resolver<'resolver> {
                 left
             }
 
-            (TypeKind::Array { member: left_member, size: left_size }, TypeKind::Array { member: right_member, size: right_size }) if left_size == right_size => {
-                let unified = self.unify(span, &left_member, &right_member);
+            (TypeKind::Array { member: left_item, size: left_size }, TypeKind::Array { member: right_item, size: right_size }) if left_size == right_size => {
+                let unified = self.unify(span, &left_item, &right_item);
                 Type::new(TypeKind::Array { member: Box::new(unified), size: left_size }, left.span)
             }
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
@@ -177,9 +169,9 @@ impl<'resolver> Resolver<'resolver> {
                 Type::new(TypeKind::Tuple { members: unified }, left.span)
             }
 
-            (TypeKind::Structure(left_identity, _), TypeKind::Structure(right_identity, _)) if left_identity == right_identity => left,
-            (TypeKind::Union(left_identity, _), TypeKind::Union(right_identity, _)) if left_identity == right_identity => left,
-            (TypeKind::Constructor(left_identity, _), TypeKind::Constructor(right_identity, _)) if left_identity == right_identity => left,
+            (TypeKind::Structure(left_id, _), TypeKind::Structure(right_id, _)) if left_id == right_id => left,
+            (TypeKind::Union(left_id, _), TypeKind::Union(right_id, _)) if left_id == right_id => left,
+            (TypeKind::Constructor(left_id, _), TypeKind::Constructor(right_id, _)) if left_id == right_id => left,
 
             (TypeKind::Integer { .. }, TypeKind::Integer { .. }) => left,
             (TypeKind::Float { .. }, TypeKind::Float { .. }) => left,
@@ -228,7 +220,7 @@ impl<'resolver> Resolver<'resolver> {
                 Type::new(TypeKind::Tuple { members: items }, typing.span)
             }
             TypeKind::Function(name, parameters, output) => {
-                let arguments = parameters.iter().map(|parameter| self.reify(parameter)).collect();
+                let arguments = parameters.iter().map(|item| self.reify(item)).collect();
                 let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
                 Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
             }
@@ -257,7 +249,18 @@ impl<'resolver> Resolver<'resolver> {
                     "String" => TypeKind::String,
                     _ => {
                         if let Some(identity) = element.reference {
-                            return Ok(self.lookup(identity, *span));
+                            let typing = self.lookup(identity, *span);
+                            if let TypeKind::Constructor(identifier, layout) = &typing.kind {
+                                if let Some(symbol) = self.scope.find(*identifier) {
+                                    if matches!(symbol.kind, crate::parser::SymbolKind::Structure(_)) {
+                                        return Ok(Type::new(TypeKind::Structure(*identifier, layout.clone()), *span));
+                                    }
+                                    if matches!(symbol.kind, crate::parser::SymbolKind::Union(_)) {
+                                        return Ok(Type::new(TypeKind::Union(*identifier, layout.clone()), *span));
+                                    }
+                                }
+                            }
+                            return Ok(typing);
                         }
                         return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span));
                     }

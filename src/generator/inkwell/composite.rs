@@ -167,11 +167,15 @@ impl<'backend> Generator<'backend> {
         let mut types = Vec::with_capacity(structure.members.len());
         let mut fields = Vec::with_capacity(structure.members.len());
 
-        for member in &structure.members {
+        // Consuming members directly ensures we can evaluate nested functions properly
+        for member in structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 fields.push(field.clone());
                 types.push(self.to_basic_type(&binding.annotation, member.span)?);
+            } else {
+                // Allows embedded methods inside structures to be generated
+                self.analysis(member)?;
             }
         }
 
@@ -200,7 +204,7 @@ impl<'backend> Generator<'backend> {
         let mut largest: Option<BasicTypeEnum> = None;
         let mut maximum = 0;
 
-        for member in &structure.members {
+        for member in structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let field = binding.target.clone();
                 let typing = self.to_basic_type(&binding.annotation, member.span)?;
@@ -213,6 +217,9 @@ impl<'backend> Generator<'backend> {
                     maximum = limit;
                     largest = Some(typing);
                 }
+            } else {
+                // Allows embedded methods inside unions to be generated
+                self.analysis(member)?;
             }
         }
 
@@ -403,7 +410,14 @@ impl<'backend> Generator<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let AnalysisKind::Usage(identifier) = &target.kind {
-            if self.has_module(identifier) {
+            // TREAT STRUCTS AND UNIONS AS NAMESPACES, ALLOWING STATIC METHOD INVOCATIONS
+            let is_namespace = self.has_module(identifier)
+                || matches!(
+                    self.get_entity(identifier),
+                    Some(Entity::Struct { .. } | Entity::Union { .. })
+                );
+
+            if is_namespace {
                 return match &member.kind {
                     AnalysisKind::Usage(name) => self.usage(name.clone(), span),
                     AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),

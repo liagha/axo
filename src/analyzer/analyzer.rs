@@ -99,6 +99,20 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 AnalysisKind::Union(analyzed)
             }
+            SymbolKind::Enumeration(enumeration) => {
+                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = enumeration
+                    .members
+                    .iter()
+                    .map(|member| member.analyze(resolver))
+                    .collect();
+
+                let analyzed = Structure::new(
+                    Str::from(enumeration.target.brand().unwrap().format(0)),
+                    members?,
+                );
+
+                AnalysisKind::Enumeration(analyzed) 
+            }
             SymbolKind::Function(function) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
                     .members

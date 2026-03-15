@@ -1,3 +1,4 @@
+// src/resolver/element.rs
 use crate::{
     data::{Scale, Structure},
     format::Show,
@@ -171,6 +172,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 match operator.as_slice() {
                     [OperatorKind::Dot] => {
                         let mut namespace = None;
+                        let mut instanced = false;
 
                         if let Some(reference) = binary.left.reference {
                             if let Some(symbol) = resolver.scope.find(reference) {
@@ -190,6 +192,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) => {
                                     if let Some(symbol) = resolver.scope.find(reference) {
                                         namespace = Some(symbol.scope.clone());
+                                        instanced = true;
                                     }
                                 }
                                 _ => {}
@@ -199,6 +202,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         if let Some(scope) = namespace {
                             resolver.enter_scope(scope);
                             binary.right.resolve(resolver);
+
+                            if let Some(reference) = binary.right.reference {
+                                if let Some(member) = resolver.scope.find(reference) {
+                                    if !instanced && member.is_instance() {
+                                        resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.right.span));
+                                        binary.right.typing = resolver.fresh(binary.right.span);
+                                    }
+                                }
+                            }
+
                             resolver.exit();
                         } else {
                             binary.right.resolve(resolver);
@@ -316,22 +329,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Invoke(invoke) => {
                 invoke.target.resolve(resolver);
 
-                let mut namespace = false;
-                if let Some(reference) = invoke.target.reference {
-                    if let Some(symbol) = resolver.scope.find(reference) {
-                        if matches!(symbol.kind, SymbolKind::Function(_)) {
-                            resolver.enter_scope(symbol.scope.clone());
-                            namespace = true;
-                        }
-                    }
-                }
-
                 for member in &mut invoke.members {
                     member.resolve(resolver);
-                }
-
-                if namespace {
-                    resolver.exit();
                 }
 
                 let primitive = invoke.target.brand().and_then(|brand| match &brand.kind {
@@ -381,7 +380,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             if let TokenKind::Operator(operator) = &binary.operator.kind {
                                 if operator.as_slice() == [OperatorKind::Dot] {
                                     let receiver = resolver.reify(&binary.left.typing);
-                                    if !matches!(receiver.kind, TypeKind::Void) {
+                                    if !matches!(receiver.kind, TypeKind::Void | TypeKind::Constructor(_, _)) {
                                         arguments.push(binary.left.typing.clone());
                                     }
                                 }
@@ -405,69 +404,66 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
-                let mut identifier = 0;
-                let mut layout = Vec::new();
-                let mut namespace = None;
+                let mut identity = 0;
+                let mut scope = None;
+                let mut union = false;
 
                 if let Some(reference) = construct.target.reference {
-                    identifier = reference;
+                    identity = reference;
                     if let Some(symbol) = resolver.scope.find(reference) {
-                        if let SymbolKind::Structure(structure) | SymbolKind::Union(structure) = &symbol.kind {
-                            namespace = Some(symbol.scope.clone());
-                            for member in &structure.members {
-                                if let SymbolKind::Binding(binding) = &member.kind {
-                                    if let Some(token) = binding.target.brand() {
-                                        layout.push((token.format(0), member.typing.clone()));
-                                    }
-                                }
-                            }
+                        if let SymbolKind::Structure(_) = &symbol.kind {
+                            scope = Some(symbol.scope.clone());
+                        } else if let SymbolKind::Union(_) = &symbol.kind {
+                            scope = Some(symbol.scope.clone());
+                            union = true;
                         }
                     }
                 }
 
-                for field in &mut construct.members {
-                    if let ElementKind::Binary(binary) = &mut field.kind {
-                        if let TokenKind::Operator(operator) = &binary.operator.kind {
-                            if operator.as_slice() == [OperatorKind::Equal] {
-                                binary.right.resolve(resolver);
-
-                                let mut matched = false;
-                                if let Some(token) = binary.left.brand() {
-                                    let name = token.format(0);
-                                    for (key, typing) in &layout {
-                                        if key == &name {
-                                            field.typing = resolver.unify(field.span, typing, &binary.right.typing);
-
-                                            if let Some(scope) = &namespace {
-                                                resolver.enter_scope(scope.clone());
-                                                binary.left.resolve(resolver);
-                                                resolver.exit();
-                                            } else {
-                                                binary.left.typing = typing.clone();
-                                            }
-
-                                            matched = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if !matched {
-                                    field.typing = resolver.fresh(field.span);
-                                    resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), field.span));
-                                }
-                                continue;
-                            }
-                        }
-                    }
-                    field.resolve(resolver);
+                if let Some(env) = scope {
+                    resolver.enter_scope(env);
+                } else {
+                    resolver.enter();
                 }
 
-                let members = layout.into_iter().map(|(_, typing)| typing).collect();
-                let head = construct.target.brand().unwrap().format(0).into();
-                let structure = Type::new(TypeKind::Structure(identifier, Structure::new(head, members)), span);
+                for member in &mut construct.members {
+                    member.resolve(resolver);
+                }
 
-                resolver.unify(span, &construct.target.typing, &structure)
+                resolver.exit();
+
+                let mut layout = Vec::new();
+
+                if let Some(reference) = construct.target.reference {
+                    if let Some(symbol) = resolver.scope.find(reference) {
+                        match &symbol.kind {
+                            SymbolKind::Structure(structure) => {
+                                for member in &structure.members {
+                                    if member.is_instance() {
+                                        layout.push(member.typing.clone());
+                                    }
+                                }
+                            }
+                            SymbolKind::Union(structure) => {
+                                for member in &structure.members {
+                                    if member.is_instance() {
+                                        layout.push(member.typing.clone());
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(0).into());
+                let structure = Structure::new(head, layout);
+
+                if union {
+                    Type::new(TypeKind::Union(identity, structure), span)
+                } else {
+                    Type::new(TypeKind::Structure(identity, structure), span)
+                }
             }
 
             ElementKind::Symbolize(symbol) => {
@@ -514,10 +510,58 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 for member in &mut construct.members {
                     member.reify(resolver);
                 }
+
+                if let Some(reference) = construct.target.reference {
+                    if let Some(symbol) = resolver.scope.find(reference) {
+                        let mut members = Vec::new();
+                        let mut is_union = false;
+
+                        match &symbol.kind {
+                            SymbolKind::Structure(structure) => {
+                                for member in &structure.members {
+                                    if member.is_instance() {
+                                        members.push(member.typing.clone());
+                                    }
+                                }
+                            }
+                            SymbolKind::Union(structure) => {
+                                is_union = true;
+                                for member in &structure.members {
+                                    if member.is_instance() {
+                                        members.push(member.typing.clone());
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+
+                        let mut layout = Vec::new();
+
+                        for typing in members {
+                            layout.push(resolver.reify(&typing));
+                        }
+
+                        let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(0).into());
+                        let structure = Structure::new(head, layout);
+
+                        if is_union {
+                            self.typing = Type::new(TypeKind::Union(reference, structure), self.span);
+                        } else {
+                            self.typing = Type::new(TypeKind::Structure(reference, structure), self.span);
+                        }
+                    }
+                }
             }
             ElementKind::Symbolize(symbol) => {
                 symbol.reify(resolver);
             }
         }
+    }
+
+    fn is_instance(&self) -> bool {
+        matches!(
+            self.typing.kind,
+            TypeKind::Structure(_, _) | TypeKind::Union(_, _)
+        )
     }
 }

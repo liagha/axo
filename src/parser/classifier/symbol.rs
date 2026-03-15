@@ -309,6 +309,100 @@ impl<'parser> Parser<'parser> {
             })
     }
 
+    pub fn enumeration() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+        Classifier::sequence([
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
+                    if let TokenKind::Identifier(id) = &token.kind {
+                        id.as_str() == Some("enum")
+                    } else {
+                        false
+                    }
+                }),
+                Classifier::deferred(Self::literal).with_panic(
+                    |former, classifier| {
+                        let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                        let span = consumed.span();
+
+                        ParseError::new(ErrorKind::ExpectedHead, span)
+                    }
+                ),
+            ]),
+            Classifier::deferred(Self::expression).with_panic(
+                |former, classifier| {
+                    let consumed = classifier.consumed.iter().map(|index| former.consumed.get(*index).unwrap().clone()).collect::<Vec<_>>();
+                    let span = consumed.span();
+
+                    ParseError::new(ErrorKind::ExpectedBody, span)
+                }
+            ),
+        ])
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
+                let head = sequence[0].as_forms();
+
+                let keyword = head[0].unwrap_input();
+                let name = head[1].unwrap_output().clone();
+
+                let body = sequence[1].unwrap_output().clone();
+
+                let mut visibility = Visibility::Public;
+
+                let members: Vec<_> = Self::get_body(body.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => {
+                            match symbol.kind {
+                                SymbolKind::Binding(ref binding) => {
+                                    if binding.value.is_some() {
+                                        unimplemented!("Error here")
+                                    }
+
+                                    Some(symbol)
+                                }
+                                _ => {
+                                    Some(symbol)
+                                }
+                            }
+                        },
+                        ElementKind::Literal(Token {
+                                                 kind: TokenKind::Identifier(identifier),
+                                                 ..
+                                             }) => {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
+
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
+
+                                _ => {}
+                            }
+
+                            None
+                        }
+                        _ => None,
+                    })
+                    .collect();
+
+                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Symbol::new(
+                        SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
+                        span,
+                        visibility,
+                    )),
+                    span,
+                ));
+
+                Ok(())
+            })
+    }
+
     pub fn function() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Classifier::sequence([

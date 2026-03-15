@@ -1,59 +1,25 @@
+// src/internal/session/mod.rs
 mod registry;
 
 use {
     crate::{
+        analyzer::AnalyzeError,
         data::*,
-        initializer::{
-            Initializer,
-            InitializeError,
-        },
+        generator::{Backend, GenerateError, Generator},
+        initializer::{InitializeError, Initializer},
         internal::{
-            platform::{
-                PathBuf,
-                File,
-                Command,
-                Write,
-            },
-            hash::{
-                Map,
-            },
+            hash::Map,
+            platform::{Command, File, PathBuf, Write},
             timer::{DefaultTimer, Duration},
         },
-        parser::{
-            Element, ElementKind,
-            Symbol, SymbolKind,
-            ParseError,
-            Parser, Visibility,
-        },
+        parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
         reporter::Reporter,
-        resolver::{
-            Resolver,
-            Resolvable,
-            ResolveError,
-        },
+        resolver::{Resolvable, ResolveError, Resolver},
+        scanner::{ScanError, Scanner, Token, TokenKind},
+        tracker::{self, Location, Peekable, Span, TrackError},
         analyzer::Analyzer,
-        scanner::{
-            Scanner,
-            Token, TokenKind,
-            ScanError,
-        },
-        tracker::{
-            self,
-            Location, Span,
-            TrackError,
-        },
     },
-    inkwell::{
-        context::{Context, ContextRef},
-    },
-};
-
-use {
-    crate::{
-        analyzer::AnalyzeError,
-        generator::{Generator, GenerateError, Backend},
-        tracker::Peekable,
-    }
+    inkwell::context::{Context, ContextRef},
 };
 
 pub enum CompileError<'error> {
@@ -92,9 +58,9 @@ impl<'session> Session<'session> {
         let mut resolver = Resolver::new();
 
         let verbosity = Resolver::verbosity(&mut resolver);
-        let logger = Reporter::new(verbosity);
+        let reporter = Reporter::new(verbosity);
 
-        logger.start("initializing");
+        reporter.start("initializing");
 
         let mut inputs = Map::new();
 
@@ -102,13 +68,11 @@ impl<'session> Session<'session> {
             inputs.insert(inputs.len(), target.clone());
         });
 
-        let errors =
-            initializer
-                .errors
-                .iter()
-                .map(|error| {
-                    CompileError::Initialize(error.clone())
-                }).collect::<Vec<_>>();
+        let errors = initializer
+            .errors
+            .iter()
+            .map(|error| CompileError::Initialize(error.clone()))
+            .collect::<Vec<_>>();
 
         let configuration = Symbol::new(
             SymbolKind::Module(
@@ -137,17 +101,14 @@ impl<'session> Session<'session> {
         let duration = Duration::from_nanos(timer.lap().unwrap());
 
         let verbosity = Resolver::verbosity(&mut resolver);
-
         let reporter = Reporter::new(verbosity);
 
         let context = Context::create();
-        let context_ref = unsafe {
-            ContextRef::new(context.raw())
-        };
+        let context_ref = unsafe { ContextRef::new(context.raw()) };
 
         let generator = Generator::new(context_ref);
 
-        logger.finish("initializing", duration);
+        reporter.finish("initializing", duration);
 
         Session {
             timer,
@@ -168,7 +129,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn compile(&mut self) {
-        'pipeline : {
+        'pipeline: {
             self.scan();
 
             self.parse();
@@ -208,10 +169,8 @@ impl<'session> Session<'session> {
         }
     }
 
-    /// Computes and establishes compilation priority mapping using Topological Sort.
     pub fn plan(&mut self) {
         let mut identities: Vec<_> = self.inputs.keys().copied().collect();
-
         identities.sort();
 
         let mut graph = Map::new();
@@ -272,9 +231,6 @@ impl<'session> Session<'session> {
     }
 
     fn dependencies(&self, _identity: Identity) -> Vec<Identity> {
-        // TODO: Access AST from `self.parsers.get(&_identity).unwrap().output`
-        // to detect cross-module usages (e.g. `import` or `use` nodes)
-        // and map them back to their respective module Identity.
         Vec::new()
     }
 
@@ -297,19 +253,14 @@ impl<'session> Session<'session> {
                 scanner
                     .errors
                     .iter()
-                    .map(|error| {
-                        CompileError::Scan(error.clone())
-                    })
+                    .map(|error| CompileError::Scan(error.clone()))
             );
 
             self.scanners.insert(identity, scanner);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-        self
-            .reporter
-            .finish("scanning", duration);
+        self.reporter.finish("scanning", duration);
     }
 
     pub fn parse(&mut self) {
@@ -333,16 +284,13 @@ impl<'session> Session<'session> {
                 parser
                     .errors
                     .iter()
-                    .map(|error| {
-                        CompileError::Parse(error.clone())
-                    })
+                    .map(|error| CompileError::Parse(error.clone()))
             );
 
             self.parsers.insert(identity, parser);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
         self.reporter.finish("parsing", duration);
     }
 
@@ -385,8 +333,8 @@ impl<'session> Session<'session> {
         self.reporter.start("resolving");
 
         for &identity in &self.order {
-            let module_identity = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
+            let module_id = *self.modules.get(&identity).unwrap();
+            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
@@ -401,13 +349,12 @@ impl<'session> Session<'session> {
             module.scope = scope;
 
             self.resolver.exit();
-
             self.resolver.insert(module);
         }
 
         for &identity in &self.order {
-            let module_identity = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.find(module_identity).unwrap().clone();
+            let module_id = *self.modules.get(&identity).unwrap();
+            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
 
             self.resolver.enter_scope(module.scope.clone());
 
@@ -422,7 +369,26 @@ impl<'session> Session<'session> {
             module.scope = scope;
 
             self.resolver.exit();
+            self.resolver.insert(module);
+        }
 
+        for &identity in &self.order {
+            let module_id = *self.modules.get(&identity).unwrap();
+            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
+
+            self.resolver.enter_scope(module.scope.clone());
+
+            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+
+            for element in elements.iter_mut() {
+                element.reify(&mut self.resolver);
+            }
+
+            let mut scope = self.resolver.scope.clone();
+            scope.parent = None;
+            module.scope = scope;
+
+            self.resolver.exit();
             self.resolver.insert(module);
         }
 
@@ -430,15 +396,12 @@ impl<'session> Session<'session> {
             self.resolver
                 .errors
                 .iter()
-                .map(|error| {
-                    CompileError::Resolve(error.clone())
-                })
+                .map(|error| CompileError::Resolve(error.clone()))
         );
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter.symbols(&self.resolver.scope.collect());
-
         self.reporter.finish("resolving", duration);
     }
 
@@ -456,21 +419,18 @@ impl<'session> Session<'session> {
                 analyzer
                     .errors
                     .iter()
-                    .map(|error| {
-                        CompileError::Analyze(error.clone())
-                    })
+                    .map(|error| CompileError::Analyze(error.clone()))
             );
 
             self.analyzers.insert(identity, analyzer);
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
             self.reporter.finish("analyzing", duration);
         }
     }
 
     pub fn generate(&mut self) {
-        let target_triple = inkwell::targets::TargetMachine::get_default_triple();
+        let triple = inkwell::targets::TargetMachine::get_default_triple();
 
         for &identity in &self.order {
             let location = self.inputs.get(&identity).unwrap();
@@ -478,16 +438,15 @@ impl<'session> Session<'session> {
             let analysis = self.analyzers.get(&identity).unwrap().output.clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
 
-            module.set_triple(&target_triple);
+            module.set_triple(&triple);
 
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem.clone();
 
-            let schema =
-                Self::schema(
-                    *location,
-                    Resolver::schema(&mut self.resolver, identity),
-                );
+            let schema = Self::schema(
+                *location,
+                Resolver::schema(&mut self.resolver, identity),
+            );
 
             self.reporter.start("generating");
 
@@ -517,25 +476,19 @@ impl<'session> Session<'session> {
                 }
 
                 Err(error) => {
-                    self.errors.push(
-                        CompileError::Track(error)
-                    )
+                    self.errors.push(CompileError::Track(error))
                 }
             }
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self.reporter
-                .finish("generating", duration);
+            self.reporter.finish("generating", duration);
         }
 
         self.errors.extend(
             self.generator
                 .errors
                 .iter()
-                .map(|error| {
-                    CompileError::Generate(error.clone())
-                })
+                .map(|error| CompileError::Generate(error.clone()))
         );
     }
 
@@ -586,13 +539,13 @@ impl<'session> Session<'session> {
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
 
-        let clean_cmd_string = if args.is_empty() {
+        let command = if args.is_empty() {
             program.into_owned()
         } else {
             format!("{} {}", program, args.join(" "))
         };
 
-        self.reporter.run(format!("{}", clean_cmd_string));
+        self.reporter.run(format!("{}", command));
 
         let status = link.status().expect("failed to link");
 
@@ -603,7 +556,6 @@ impl<'session> Session<'session> {
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
         self.reporter.finish("emitting", duration);
-
         self.reporter.run(format!("{}", executable));
 
         Command::new(executable.to_string()).status().expect("failed to execute");
@@ -615,7 +567,6 @@ impl<'session> Session<'session> {
         } else {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
-
             parent.join(location.stem().unwrap()).with_extension("ll")
         };
 
@@ -628,7 +579,6 @@ impl<'session> Session<'session> {
         } else {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
-
             parent.join(location.stem().unwrap()).with_extension("o")
         };
 
@@ -641,7 +591,6 @@ impl<'session> Session<'session> {
         } else {
             let path = location.to_path().unwrap();
             let parent = path.parent().unwrap();
-
             parent.join(location.stem().unwrap()).with_extension("")
         };
 
