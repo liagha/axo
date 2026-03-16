@@ -1,9 +1,12 @@
 use crate::{
-    format::{Debug, Display, Formatter, Result},
+    data::Str,
+    format::{
+        Show, Verbosity,
+        Debug, Display,
+        Formatter, Result
+    },
     scanner::TokenKind,
 };
-use crate::data::Str;
-use crate::format::Show;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
@@ -18,9 +21,7 @@ pub enum ErrorKind<'error> {
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+    fn format(&self, verbosity: Verbosity) -> Str<'error> {
         match self {
             ErrorKind::ExpectedName => "expected name.".to_string(),
             ErrorKind::ExpectedHead => "expected head.".to_string(),
@@ -42,12 +43,12 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(0))
+        write!(f, "{}", self.format(Verbosity::Minimal))
     }
 }
 
 impl<'error> Debug for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(0))
+        write!(f, "{}", self.format(Verbosity::Minimal))
     }
 }

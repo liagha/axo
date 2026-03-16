@@ -2,7 +2,7 @@ use {
     crate::{
         data::Str,
         reporter::Error,
-        format::{Show, Debug, Display, Formatter, Result}
+        format::{Show, Verbosity, Debug, Display, Formatter, Result}
     }
 };
 
@@ -11,9 +11,7 @@ where
     K: Clone + Display,
     H: Clone + Display,
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+    fn format(&self, verbosity: Verbosity) -> Str<'error> {
         match verbosity {
             _ => {
                 let (msg, details) = self.handle();
@@ -30,7 +28,7 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(0))
+        write!(f, "{}", self.format(Verbosity::Minimal))
     }
 }
 
@@ -40,6 +38,6 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(1))
+        write!(f, "{}", self.format(Verbosity::Detailed))
     }
 }

@@ -1,17 +1,15 @@
 use {
     crate::{
         data::Str,
-        format::Show,
+        format::{Show, Verbosity},
         analyzer::{Analysis, AnalysisKind}
     },
 };
 
 impl<'analysis> Show<'analysis> for Analysis<'analysis> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'analysis> {
+    fn format(&self, verbosity: Verbosity) -> Str<'analysis> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match &self.kind {
                     AnalysisKind::Integer {
                         value,
@@ -302,7 +300,7 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                 }
             },
 
-            _ => self.format(verbosity - 1),
+            _ => self.format(verbosity.fallback()),
         }
     }
 }

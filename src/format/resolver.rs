@@ -1,16 +1,14 @@
 use {
     crate::{
         data::Str,
-        format::Show,
+        format::{Show, Verbosity},
         parser::Symbol,
         resolver::scope::Scope,
     },
 };
 
 impl<'scope> Show<'scope> for Scope<Symbol<'scope>> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'scope> {
+    fn format(&self, verbosity: Verbosity) -> Str<'scope> {
         match verbosity {
             _ => {
                 format!("{}", self.symbols.format(verbosity))
@@ -22,31 +20,27 @@ impl<'scope> Show<'scope> for Scope<Symbol<'scope>> {
 use crate::resolver::{Type, TypeKind};
 
 impl<'typing> Show<'typing> for Type<'typing> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'typing> {
+    fn format(&self, verbosity: Verbosity) -> Str<'typing> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!("{}", self.kind.format(verbosity))
             }
 
-            1 => {
+            Verbosity::Detailed => {
                 format!("Type({})", self.kind.format(verbosity))
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }
 }
 
 impl<'typing> Show<'typing> for TypeKind<'typing> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'typing> {
+    fn format(&self, verbosity: Verbosity) -> Str<'typing> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match self {
                     TypeKind::Integer { size, signed } => {
                         format!("Integer[{}{}]", if *signed { "Signed | " } else { "" }, size)
@@ -96,7 +90,7 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }

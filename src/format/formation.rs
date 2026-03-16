@@ -1,7 +1,7 @@
 use {
     crate::{
         data::Str,
-        format::Show,
+        format::{Show, Verbosity},
         formation::{
             form::Form,
             helper::Formable,
@@ -12,11 +12,9 @@ use {
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Show<'form>
 for Form<'form, Input, Output, Failure>
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'form> {
+    fn format(&self, verbosity: Verbosity) -> Str<'form> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match self.clone() {
                     Form::Blank => {
                         "Blank".to_string()
@@ -42,7 +40,7 @@ for Form<'form, Input, Output, Failure>
                 }
             }
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }

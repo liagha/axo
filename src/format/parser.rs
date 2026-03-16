@@ -2,25 +2,21 @@ use {
     broccli::{Color, TextStyle},
     crate::{
         data::Str,
-        format::Show,
+        format::{Show, Verbosity},
         parser::{Element, ElementKind, Symbol, SymbolKind},
     },
 };
 
 impl<'element> Show<'element> for Element<'element> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
+    fn format(&self, verbosity: Verbosity) -> Str<'element> {
         self.kind.format(verbosity)
     }
 }
 
 impl<'element> Show<'element> for ElementKind<'element> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'element> {
+    fn format(&self, verbosity: Verbosity) -> Str<'element> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match self {
                     ElementKind::Literal(literal) => {
                         literal.format(verbosity)
@@ -56,18 +52,16 @@ impl<'element> Show<'element> for ElementKind<'element> {
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }
 }
 
 impl<'symbol> Show<'symbol> for Symbol<'symbol> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
+    fn format(&self, verbosity: Verbosity) -> Str<'symbol> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "{}. {}{}",
                     self.identity.colorize(Color::Blue),
@@ -80,7 +74,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                 )
             }
 
-            1 => {
+            Verbosity::Detailed => {
                 format!(
                     "{}. {}: {:?}{}",
                     self.identity.colorize(Color::Blue),
@@ -95,16 +89,14 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }
 }
 
 impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'symbol> {
+    fn format(&self, verbosity: Verbosity) -> Str<'symbol> {
         match verbosity {
             _ => {
                 match self {

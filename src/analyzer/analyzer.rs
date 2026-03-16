@@ -1,7 +1,7 @@
 use crate::{
     data::*,
     analyzer::{Analysis, AnalyzeError, ErrorKind},
-    format::Show,
+    format::{Show, Verbosity},
     parser::{Element, Symbol, SymbolKind},
     resolver::{Resolver, Type},
     analyzer::AnalysisKind,
@@ -63,7 +63,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
                 let analyzed = Binding::new(
-                    Str::from(head.format(0)),
+                    Str::from(head.format(Verbosity::Minimal)),
                     value.map(Box::new),
                     self.typing.clone(),
                     binding.kind,
@@ -79,7 +79,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(structure.target.brand().unwrap().format(0)),
+                    Str::from(structure.target.brand().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -93,7 +93,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(union.target.brand().unwrap().format(0)),
+                    Str::from(union.target.brand().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -107,7 +107,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(enumeration.target.brand().unwrap().format(0)),
+                    Str::from(enumeration.target.brand().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -129,7 +129,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let output = function.output.clone().map(|output| output.typing);
 
                 let analyzed = Function::new(
-                    Str::from(function.target.brand().unwrap().format(0)),
+                    Str::from(function.target.brand().unwrap().format(Verbosity::Minimal)),
                     members?,
                     Box::new(body),
                     output,
@@ -153,7 +153,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 AnalysisKind::Module(
-                    Str::from(target.format(0)),
+                    Str::from(target.format(Verbosity::Minimal)),
                     members?,
                 )
             }

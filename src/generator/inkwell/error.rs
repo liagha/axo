@@ -5,6 +5,7 @@ use {
         format::{Display, Formatter, Result, Show},
     }
 };
+use crate::format::Verbosity;
 
 #[derive(Clone, Debug)]
 pub enum ErrorKind<'error> {
@@ -113,7 +114,7 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             ErrorKind::InvalidType(typing) => {
-                write!(f, "invalid LLVM type {}", typing.format(2))
+                write!(f, "invalid LLVM type {}", typing.format(Verbosity::Detailed))
             }
             ErrorKind::UnsupportedFloatWidth(width) => {
                 write!(f, "invalid LLVM float width: {}", width)

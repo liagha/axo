@@ -1,53 +1,47 @@
 use {
     crate::{
         data::Str,
-        format::Show,
+        format::{Show, Verbosity},
         scanner::{Character, Token, TokenKind},
     }
 };
 
 impl<'character> Show<'character> for Character<'character> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'character> {
+    fn format(&self, verbosity: Verbosity) -> Str<'character> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!("Character({})", self.value)
             }
 
-            1 => {
+            Verbosity::Detailed => {
                 format!("Character({}, {:?})", self.value, self.span)
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }
 }
 
 impl<'token> Show<'token> for Token<'token> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
+    fn format(&self, verbosity: Verbosity) -> Str<'token> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!("{}", self.kind.format(verbosity))
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }
 }
 
 impl<'token> Show<'token> for TokenKind<'token> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
+    fn format(&self, verbosity: Verbosity) -> Str<'token> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match self {
                     TokenKind::Boolean(boolean) => format!("{}", boolean),
                     TokenKind::Float(number) => format!("{}", number),
@@ -61,7 +55,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
                 }
             }
 
-            1 => {
+            Verbosity::Detailed => {
                 match self {
                     TokenKind::Boolean(boolean) => format!("Boolean({})", boolean),
                     TokenKind::Float(number) => format!("Float({})", number),
@@ -76,7 +70,7 @@ impl<'token> Show<'token> for TokenKind<'token> {
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }

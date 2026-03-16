@@ -2,6 +2,7 @@ use {
     crate::{
         format::{
             Show,
+            Verbosity,
             Display,
             Formatter,
             Result
@@ -29,11 +30,9 @@ pub enum ErrorKind<'error> {
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+    fn format(&self, verbosity: Verbosity) -> Str<'error> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 match self {
                     ErrorKind::InvalidOperation(token) => {
                         format!("invalid operation token: {}.", token.format(verbosity))
@@ -64,7 +63,7 @@ impl<'error> Show<'error> for ErrorKind<'error> {
             }
 
             _ => {
-                self.format(verbosity - 1).to_string()
+                self.format(verbosity.fallback()).to_string()
             }
         }.into()
     }
@@ -72,6 +71,6 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(1))
+        write!(f, "{}", self.format(Verbosity::Detailed))
     }
 }

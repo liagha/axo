@@ -9,5 +9,5 @@ mod scanner;
 
 pub use {
     core::fmt::{Debug, Display, Formatter, Result},
-    show::Show,
+    show::{Show, Verbosity},
 };

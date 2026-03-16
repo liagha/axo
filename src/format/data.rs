@@ -1,22 +1,20 @@
 use {
     crate::{
         data::*,
-        format::Show,
+        format::{Show, Verbosity},
     }
 };
 
 impl<
     'show,
-    Target: Show<'show, Verbosity = u8>,
-    Value: Show<'show, Verbosity = u8>,
-    Type: Show<'show, Verbosity = u8>,
+    Target: Show<'show>,
+    Value: Show<'show>,
+    Type: Show<'show>,
 > Show<'show> for Binding<Target, Value, Type>
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => format!(
+            Verbosity::Minimal => format!(
                 "Binding({:?} | {}{}{})",
                 self.kind,
                 self.target.format(verbosity),
@@ -29,43 +27,39 @@ impl<
             )
                 .into(),
 
-            _ => self.format(verbosity - 1),
+            _ => self.format(verbosity.fallback()),
         }
     }
 }
 
-impl<'show, Target: Show<'show, Verbosity= u8>, Member: Show<'show, Verbosity= u8>> Show<'show>
+impl<'show, Target: Show<'show>, Member: Show<'show>> Show<'show>
 for Aggregate<Target, Member>
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => format!(
+            Verbosity::Minimal => format!(
                 "({})[{}]",
                 self.target.format(verbosity),
                 self.members.format(verbosity)
             )
                 .into(),
 
-            _ => self.format(verbosity - 1),
+            _ => self.format(verbosity.fallback()),
         }
     }
 }
 
 impl<
     'show,
-    Target: Show<'show, Verbosity= u8>,
-    Parameter: Show<'show, Verbosity= u8>,
-    Body: Show<'show, Verbosity= u8>,
-    Output: Show<'show, Verbosity= u8>,
+    Target: Show<'show>,
+    Parameter: Show<'show>,
+    Body: Show<'show>,
+    Output: Show<'show>,
 > Show<'show> for Function<Target, Parameter, Body, Output>
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => format!(
+            Verbosity::Minimal => format!(
                 "Function({}{} : {})[{}]{{ {} }}",
                 format!("{:?} | ", self.interface),
                 self.target.format(verbosity),
@@ -75,35 +69,31 @@ impl<
             )
                 .into(),
 
-            _ => self.format(verbosity - 1),
+            _ => self.format(verbosity.fallback()),
         }
     }
 }
 
-impl<'show, Target: Show<'show, Verbosity= u8>> Show<'show>
+impl<'show, Target: Show<'show>> Show<'show>
 for Module<Target>
 {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => format!(
+            Verbosity::Minimal => format!(
                 "Module({})",
                 self.target.format(verbosity),
             )
                 .into(),
 
-            _ => self.format(verbosity - 1),
+            _ => self.format(verbosity.fallback()),
         }
     }
 }
 
-impl<'show, Delimiter: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Delimited<Delimiter, Member> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+impl<'show, Delimiter: Show<'show>, Member: Show<'show>> Show<'show> for Delimited<Delimiter, Member> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "Delimited({} | {})[{}]({})",
                     self.start.format(verbosity),
@@ -114,18 +104,16 @@ impl<'show, Delimiter: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosit
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }
 }
 
-impl<'show, Left: Show<'show, Verbosity = u8>, Operator: Show<'show, Verbosity = u8>, Right: Show<'show, Verbosity = u8>> Show<'show> for Binary<Left, Operator, Right> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+impl<'show, Left: Show<'show>, Operator: Show<'show>, Right: Show<'show>> Show<'show> for Binary<Left, Operator, Right> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "Binary({} {} {})",
                     self.left.format(verbosity),
@@ -135,18 +123,16 @@ impl<'show, Left: Show<'show, Verbosity = u8>, Operator: Show<'show, Verbosity =
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }
 }
 
-impl<'show, Operator: Show<'show, Verbosity = u8>, Operand: Show<'show, Verbosity = u8>> Show<'show> for Unary<Operator, Operand> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+impl<'show, Operator: Show<'show>, Operand: Show<'show>> Show<'show> for Unary<Operator, Operand> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "Unary({} {})",
                     self.operator.format(verbosity),
@@ -155,18 +141,16 @@ impl<'show, Operator: Show<'show, Verbosity = u8>, Operand: Show<'show, Verbosit
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }
 }
 
-impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Index<Target, Member> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+impl<'show, Target: Show<'show>, Member: Show<'show>> Show<'show> for Index<Target, Member> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "Index({})[{}]",
                     self.target.format(verbosity),
@@ -175,18 +159,16 @@ impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity =
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }
 }
 
-impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show> for Invoke<Target, Member> {
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
+impl<'show, Target: Show<'show>, Member: Show<'show>> Show<'show> for Invoke<Target, Member> {
+    fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
-            0 => {
+            Verbosity::Minimal => {
                 format!(
                     "Invoke({})[{}]",
                     self.target.format(verbosity),
@@ -195,7 +177,7 @@ impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity =
             }
 
             _ => {
-                self.format(verbosity - 1)
+                self.format(verbosity.fallback())
             }
         }
     }

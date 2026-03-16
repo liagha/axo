@@ -1,6 +1,6 @@
 use crate::{
     data::Aggregate,
-    format::Show,
+    format::{Show, Verbosity},
     parser::{ElementKind, Symbol, SymbolKind},
     resolver::{Resolvable, Resolver, Type, TypeKind},
 };
@@ -15,7 +15,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 resolver.fresh(span)
             }
             SymbolKind::Function(function) => {
-                let head = function.target.brand().unwrap().format(0);
+                let head = function.target.brand().unwrap().format(Verbosity::Minimal);
                 let members = function.members.iter().map(|_| resolver.fresh(span)).collect();
                 let output = resolver.fresh(span);
 
@@ -34,7 +34,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(TypeKind::Function(head.into(), members, Some(Box::new(output))), span)
             }
             SymbolKind::Structure(structure) => {
-                let head = structure.target.brand().unwrap().format(0);
+                let head = structure.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter();
 
@@ -50,7 +50,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)
             }
             SymbolKind::Union(union) => {
-                let head = union.target.brand().unwrap().format(0);
+                let head = union.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter();
                 for member in &mut union.members {
@@ -64,7 +64,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)
             }
             SymbolKind::Enumeration(enumeration) => {
-                let head = enumeration.target.brand().unwrap().format(0);
+                let head = enumeration.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter();
                 for member in &mut enumeration.members {
@@ -202,7 +202,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Structure(structure) => {
-                let head = structure.target.brand().unwrap().format(0);
+                let head = structure.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter_scope(self.scope.clone());
 
@@ -221,7 +221,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Union(union) => {
-                let head = union.target.brand().unwrap().format(0);
+                let head = union.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter_scope(self.scope.clone());
 
@@ -240,7 +240,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Enumeration(enumeration) => {
-                let head = enumeration.target.brand().unwrap().format(0);
+                let head = enumeration.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter_scope(self.scope.clone());
 
@@ -274,7 +274,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
 
             SymbolKind::Function(function) => {
-                let head = function.target.brand().unwrap().format(0);
+                let head = function.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter_scope(self.scope.clone());
 
@@ -346,7 +346,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.reify(resolver);
                 }
                 let layout = structure.members.iter().map(|member| member.typing.clone()).collect();
-                let head = structure.target.brand().unwrap().format(0).into();
+                let head = structure.target.brand().unwrap().format(Verbosity::Minimal).into();
                 self.typing = Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head, layout)), self.span);
             }
             SymbolKind::Union(union) => {
@@ -354,7 +354,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.reify(resolver);
                 }
                 let layout = union.members.iter().map(|member| member.typing.clone()).collect();
-                let head = union.target.brand().unwrap().format(0).into();
+                let head = union.target.brand().unwrap().format(Verbosity::Minimal).into();
                 self.typing = Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head, layout)), self.span);
             }
             SymbolKind::Enumeration(enumeration) => {
@@ -362,7 +362,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.reify(resolver);
                 }
                 let layout = enumeration.members.iter().map(|member| member.typing.clone()).collect();
-                let head = enumeration.target.brand().unwrap().format(0).into();
+                let head = enumeration.target.brand().unwrap().format(Verbosity::Minimal).into();
                 self.typing = Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head, layout)), self.span);
             }
             SymbolKind::Function(function) => {

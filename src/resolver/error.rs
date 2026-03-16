@@ -1,6 +1,6 @@
 use {
     crate::{
-        format::{Show, Display, Formatter, Result},
+        format::{Show, Display, Formatter, Result, Verbosity},
         resolver::{Type},
         parser::Element,
         scanner::Token,
@@ -35,9 +35,7 @@ pub enum ErrorKind<'error> {
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
-    type Verbosity = u8;
-    
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
+    fn format(&self, verbosity: Verbosity) -> Str<'error> {
         match self {
             ErrorKind::Mismatch(left, right) => {
                 format!("expected `{}` but got `{}`.", left.format(verbosity), right.format(verbosity)).into()
@@ -76,6 +74,6 @@ impl<'error> Show<'error> for ErrorKind<'error> {
 
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(1))
+        write!(f, "{}", self.format(Verbosity::Minimal))
     }
 }

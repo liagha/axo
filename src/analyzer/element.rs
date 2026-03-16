@@ -1,7 +1,7 @@
 use crate::{
     data::*,
     analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
-    format::Show,
+    format::{Show, Verbosity},
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, TokenKind, Token},
     resolver::{Resolver, TypeKind},
@@ -377,7 +377,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 let target = constructor
                     .target
                     .brand()
-                    .map(|s| s.format(1))
+                    .map(|s| s.format(Verbosity::Minimal))
                     .unwrap_or_default();
 
                 let members: Vec<Analysis<'element>> = constructor

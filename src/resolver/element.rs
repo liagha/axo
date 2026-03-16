@@ -1,6 +1,6 @@
 use crate::{
     data::{Aggregate, Scale},
-    format::Show,
+    format::{Show, Verbosity},
     parser::{Element, ElementKind, SymbolKind},
     resolver::{Error, ErrorKind, Resolvable, Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -628,7 +628,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 resolver.exit();
 
-                let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(0).into());
+                let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(Verbosity::Minimal).into());
                 let aggregate = Aggregate::new(head, layout);
 
                 if is_enumeration {

@@ -1,8 +1,12 @@
 use {
     crate::{
         data::Str,
-        format::Display,
-        format::Show,
+        format::{
+            Show,
+            Display,
+            Verbosity,
+        },
+        analyzer::Analysis,
         internal::{
             timer::Duration,
             platform::PathBuf,
@@ -13,21 +17,20 @@ use {
     },
     broccli::{xprintln, Color},
 };
-use crate::analyzer::Analysis;
 
 pub struct Reporter {
-    pub verbosity: u8,
+    pub verbosity: Verbosity,
 }
 
 impl Reporter {
     pub fn new(verbosity: u8) -> Self {
         Self {
-            verbosity,
+            verbosity: verbosity.into(),
         }
     }
     
     pub fn is_verbose(&self) -> bool {
-        self.verbosity > 0
+        self.verbosity != Verbosity::Off
     }
 
     pub fn start(&self, stage: &str) {

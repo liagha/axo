@@ -1,8 +1,11 @@
 use crate::{
-    format::{self, Display, Formatter},
+    format::{
+        Display, Formatter,
+        Show, Verbosity,
+        Result,
+    },
     scanner::Token,
 };
-use crate::format::Show;
 
 #[derive(Clone)]
 pub enum HintKind<'hint> {
@@ -13,10 +16,10 @@ pub enum HintKind<'hint> {
 }
 
 impl<'hint> Display for HintKind<'hint> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> format::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             HintKind::SimilarBrand { candidate, how } => {
-                write!(f, "did you mean `{}`? they {}", candidate.format(1), how)
+                write!(f, "did you mean `{}`? they {}", candidate.format(Verbosity::Minimal), how)
             }
         }
     }
