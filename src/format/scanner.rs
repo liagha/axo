@@ -1,0 +1,83 @@
+use {
+    crate::{
+        data::Str,
+        format::Show,
+        scanner::{Character, Token, TokenKind},
+    }
+};
+
+impl<'character> Show<'character> for Character<'character> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'character> {
+        match verbosity {
+            0 => {
+                format!("Character({})", self.value)
+            }
+
+            1 => {
+                format!("Character({}, {:?})", self.value, self.span)
+            }
+
+            _ => {
+                self.format(verbosity - 1).to_string()
+            }
+        }.into()
+    }
+}
+
+impl<'token> Show<'token> for Token<'token> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
+        match verbosity {
+            0 => {
+                format!("{}", self.kind.format(verbosity))
+            }
+
+            _ => {
+                self.format(verbosity - 1).to_string()
+            }
+        }.into()
+    }
+}
+
+impl<'token> Show<'token> for TokenKind<'token> {
+    type Verbosity = u8;
+
+    fn format(&self, verbosity: Self::Verbosity) -> Str<'token> {
+        match verbosity {
+            0 => {
+                match self {
+                    TokenKind::Boolean(boolean) => format!("{}", boolean),
+                    TokenKind::Float(number) => format!("{}", number),
+                    TokenKind::Integer(number) => format!("{}", number),
+                    TokenKind::Operator(operator) => format!("{:?}", operator),
+                    TokenKind::Punctuation(punctuation) => format!("{:?}", punctuation),
+                    TokenKind::Identifier(identifier) => format!("{}", identifier),
+                    TokenKind::String(string) => format!("\"{}\"", string),
+                    TokenKind::Character(character) => format!("'{}'", character),
+                    TokenKind::Comment(comment) => format!("//{}", comment),
+                }
+            }
+
+            1 => {
+                match self {
+                    TokenKind::Boolean(boolean) => format!("Boolean({})", boolean),
+                    TokenKind::Float(number) => format!("Float({})", number),
+                    TokenKind::Integer(number) => format!("Integer({})", number),
+                    TokenKind::Operator(operator) => format!("Operator({:?})", operator),
+                    TokenKind::Punctuation(punctuation) => format!("Punctuation({:?})", punctuation),
+                    TokenKind::Identifier(identifier) => format!("Identifier({})", identifier),
+                    TokenKind::String(string) => format!("String({})", string),
+                    TokenKind::Character(character) => format!("Character('{}')", character),
+                    TokenKind::Comment(comment) => format!("Comment({})", comment),
+                }
+            }
+
+            _ => {
+                self.format(verbosity - 1).to_string()
+            }
+        }.into()
+    }
+}

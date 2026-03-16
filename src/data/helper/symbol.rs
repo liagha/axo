@@ -1,7 +1,6 @@
 use {
     crate::{
-        format::Show,
-        data::{Boolean, Str},
+        data::{Boolean},
         internal::hash::{Hash, Hasher},
     },
 };
@@ -208,98 +207,5 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
 impl<Target: Clone> Clone for Module<Target> {
     fn clone(&self) -> Self {
         Module::new(self.target.clone())
-    }
-}
-
-impl<
-        'show,
-        Target: Show<'show, Verbosity = u8>,
-        Value: Show<'show, Verbosity = u8>,
-        Type: Show<'show, Verbosity = u8>,
-    > Show<'show> for Binding<Target, Value, Type>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!(
-                "Binding({:?} | {}{}{})",
-                self.kind,
-                self.target.format(verbosity),
-                format!(" : {}", self.annotation.format(verbosity)),
-                if let Some(value) = &self.value {
-                    format!(" = {}", value.format(verbosity))
-                } else {
-                    "".to_string()
-                }
-            )
-            .into(),
-
-            _ => self.format(verbosity - 1),
-        }
-    }
-}
-
-impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show>
-    for Aggregate<Target, Member>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!(
-                "({})[{}]",
-                self.target.format(verbosity),
-                self.members.format(verbosity)
-            )
-            .into(),
-
-            _ => self.format(verbosity - 1),
-        }
-    }
-}
-
-impl<
-        'show,
-        Target: Show<'show, Verbosity = u8>,
-        Parameter: Show<'show, Verbosity = u8>,
-        Body: Show<'show, Verbosity = u8>,
-        Output: Show<'show, Verbosity = u8>,
-    > Show<'show> for Function<Target, Parameter, Body, Output>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!(
-                "Function({}{} : {})[{}]{{ {} }}",
-                format!("{:?} | ", self.interface),
-                self.target.format(verbosity),
-                self.output.format(verbosity),
-                self.members.format(verbosity),
-                self.body.format(verbosity)
-            )
-            .into(),
-
-            _ => self.format(verbosity - 1),
-        }
-    }
-}
-
-impl<'show, Target: Show<'show, Verbosity = u8>> Show<'show>
-for Module<Target>
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'show> {
-        match verbosity {
-            0 => format!(
-                "Module({})",
-                self.target.format(verbosity),
-            )
-                .into(),
-
-            _ => self.format(verbosity - 1),
-        }
     }
 }

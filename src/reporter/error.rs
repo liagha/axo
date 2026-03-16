@@ -1,14 +1,12 @@
 use {
-    super::Hint,
     crate::{
+        reporter::{Hint, Failure},
         data::{Number, Str},
-        format::{Debug, Display, Formatter, Result},
-        reporter,
+        format::{Display},
         tracker::Span,
     },
     broccli::{Color, TextStyle},
 };
-use crate::format::Show;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Error<'error, K, H = Str<'error>>
@@ -21,49 +19,11 @@ where
     pub hints: Vec<Hint<H>>,
 }
 
-impl<'error, K, H> reporter::Failure for Error<'error, K, H>
+impl<'error, K, H> Failure for Error<'error, K, H>
 where
     K: Clone + Display,
     H: Clone + Display,
 {
-}
-
-impl<'error, K, H> Show<'error> for Error<'error, K, H>
-where
-    K: Clone + Display,
-    H: Clone + Display,
-{
-    type Verbosity = u8;
-
-    fn format(&self, verbosity: Self::Verbosity) -> Str<'error> {
-        match verbosity {
-            _ => {
-                let (msg, details) = self.handle();
-
-                format!("{} \n {}", msg, details).into()
-            }
-        }
-    }
-}
-
-impl<'error, K, H> Display for Error<'error, K, H>
-where
-    K: Clone + Display,
-    H: Clone + Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(0))
-    }
-}
-
-impl<'error, K, H> Debug for Error<'error, K, H>
-where
-    K: Clone + Display,
-    H: Clone + Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(1))
-    }
 }
 
 impl<'error, K, H> Error<'error, K, H>

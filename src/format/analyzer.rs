@@ -1,6 +1,10 @@
-use crate::analyzer::{Analysis, AnalysisKind};
-use crate::data::Str;
-use crate::format::Show;
+use {
+    crate::{
+        data::Str,
+        format::Show,
+        analyzer::{Analysis, AnalysisKind}
+    },
+};
 
 impl<'analysis> Show<'analysis> for Analysis<'analysis> {
     type Verbosity = u8;
@@ -46,7 +50,7 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                     AnalysisKind::SizeOf(analysis) => {
                         format!("SizeOf({})", analysis.format(verbosity)).into()
                     }
-                    
+
                     AnalysisKind::Add(left, right) => {
                         format!(
                             "Add({}, {})",
