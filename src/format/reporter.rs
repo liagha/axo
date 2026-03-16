@@ -13,10 +13,22 @@ where
 {
     fn format(&self, verbosity: Verbosity) -> Str<'error> {
         match verbosity {
-            _ => {
+            Verbosity::Off => "".into(),
+            Verbosity::Minimal => {
+                let (msg, _) = self.handle();
+                format!("{}", msg).into()
+            }
+            Verbosity::Detailed => {
                 let (msg, details) = self.handle();
-
-                format!("{} \n {}", msg, details).into()
+                format!("Error({} | {})", msg, details).into()
+            }
+            Verbosity::Debug => {
+                let (msg, details) = self.handle();
+                format!(
+                    "Error {{\n{},\n{}\n}}",
+                    format!("message: {}", msg).indent(verbosity),
+                    format!("details: {}", details).indent(verbosity)
+                ).into()
             }
         }
     }

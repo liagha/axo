@@ -58,34 +58,58 @@ impl<'show, T: Show<'show>> Show<'show> for Box<T> {
 
 impl<'show, T: Show<'show>> Show<'show> for Option<T> {
     fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        match self {
-            Some(value) => {
-                format!("Some({})", value.format(verbosity))
-            }
-            None => "None".to_string(),
+        match verbosity {
+            Verbosity::Off => "".into(),
+            Verbosity::Minimal => match self {
+                Some(value) => value.format(verbosity),
+                None => "".into(),
+            },
+            Verbosity::Detailed => match self {
+                Some(value) => format!("Some({})", value.format(verbosity)).into(),
+                None => "None".into(),
+            },
+            Verbosity::Debug => match self {
+                Some(value) => format!(
+                    "Some(\n{}\n)",
+                    value.format(verbosity).indent(verbosity)
+                ).into(),
+                None => "None".into(),
+            },
         }
-            .into()
     }
 }
 
 impl<'show, Item: Show<'show>> Show<'show> for [Item] {
     fn format(&self, verbosity: Verbosity) -> Str<'show> {
         match verbosity {
+            Verbosity::Off => "".into(),
             Verbosity::Minimal => Str::from(
                 self.iter()
-                    .map(|form| Str::from(form.format(verbosity)))
-                    .collect::<Vec<Str>>()
+                    .map(|form| form.format(verbosity).to_string())
+                    .collect::<Vec<String>>()
                     .join(", "),
             ),
-
             Verbosity::Detailed => Str::from(
-                self.iter()
-                    .map(|form| Str::from(form.format(verbosity)))
-                    .collect::<Vec<Str>>()
-                    .join(",\n"),
+                format!(
+                    "[{}]",
+                    self.iter()
+                        .map(|form| form.format(verbosity).to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
             ),
-
-            _ => self.format(verbosity.fallback()),
+            Verbosity::Debug => {
+                if self.is_empty() {
+                    return "[]".into();
+                }
+                Str::from(format!(
+                    "[\n{}\n]",
+                    self.iter()
+                        .map(|form| form.format(verbosity).indent(verbosity).to_string())
+                        .collect::<Vec<String>>()
+                        .join(",\n")
+                ))
+            }
         }
     }
 }
