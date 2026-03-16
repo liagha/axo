@@ -3,9 +3,26 @@ use crate::{
     analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
     format::Show,
     parser::{Element, ElementKind},
-    scanner::{OperatorKind, PunctuationKind, TokenKind},
+    scanner::{OperatorKind, PunctuationKind, TokenKind, Token},
     resolver::{Resolver, TypeKind},
 };
+
+fn mutate<'element>(
+    target: Analysis<'element>,
+    value: Analysis<'element>,
+    operator: &Token<'element>,
+) -> Result<AnalysisKind<'element>, AnalyzeError<'element>> {
+    match &target.kind {
+        AnalysisKind::Usage(name) => Ok(AnalysisKind::Assign(name.clone(), Box::new(value))),
+        AnalysisKind::Dereference(_) | AnalysisKind::Access(_, _) | AnalysisKind::Index(_) => {
+            Ok(AnalysisKind::Store(Box::new(target), Box::new(value)))
+        }
+        _ => Err(AnalyzeError::new(
+            ErrorKind::InvalidOperation(operator.clone()),
+            operator.span,
+        )),
+    }
+}
 
 impl<'element> Analyzable<'element> for Element<'element> {
     fn analyze(
@@ -80,7 +97,9 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         _,
                         TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                     ) => {
-                        if delimited.separator.is_none() && delimited.members.len() == 1 {
+                        if delimited.members.is_empty() {
+                            AnalysisKind::Tuple(Vec::new())
+                        } else if delimited.separator.is_none() && delimited.members.len() == 1 {
                             return delimited.members[0].analyze(resolver);
                         } else {
                             let items: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> = delimited
@@ -109,6 +128,16 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         [OperatorKind::Minus] => AnalysisKind::Negate(Box::new(operand)),
                         [OperatorKind::Ampersand] => AnalysisKind::AddressOf(Box::new(operand)),
                         [OperatorKind::Star] => AnalysisKind::Dereference(Box::new(operand)),
+                        [OperatorKind::Plus, OperatorKind::Plus] => {
+                            let step = Analysis::new(AnalysisKind::Integer { value: 1, size: 64, signed: true }, unary.operator.span, typing.clone());
+                            let value = Analysis::new(AnalysisKind::Add(Box::new(operand.clone()), Box::new(step)), self.span, typing.clone());
+                            mutate(operand, value, &unary.operator)?
+                        }
+                        [OperatorKind::Minus, OperatorKind::Minus] => {
+                            let step = Analysis::new(AnalysisKind::Integer { value: 1, size: 64, signed: true }, unary.operator.span, typing.clone());
+                            let value = Analysis::new(AnalysisKind::Subtract(Box::new(operand.clone()), Box::new(step)), self.span, typing.clone());
+                            mutate(operand, value, &unary.operator)?
+                        }
                         _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span))
                     };
 
@@ -135,12 +164,67 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     [OperatorKind::Equal] => {
                         let target = binary.left.analyze(resolver)?;
                         let value = binary.right.analyze(resolver)?;
-
-                        match &target.kind {
-                            AnalysisKind::Usage(target_name) => AnalysisKind::Assign(target_name.clone(), Box::new(value)),
-                            AnalysisKind::Dereference(_) | AnalysisKind::Access(_, _) | AnalysisKind::Index(_) => AnalysisKind::Store(Box::new(target), Box::new(value)),
-                            _ => return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span))
-                        }
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Plus, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::Add(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Minus, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::Subtract(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Star, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::Multiply(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Slash, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::Divide(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Percent, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::Modulus(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Ampersand, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::BitwiseAnd(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Pipe, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::BitwiseOr(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::Caret, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::LogicalXOr(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::LeftAngle, OperatorKind::LeftAngle, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::ShiftLeft(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
+                    }
+                    [OperatorKind::RightAngle, OperatorKind::RightAngle, OperatorKind::Equal] => {
+                        let target = binary.left.analyze(resolver)?;
+                        let right = binary.right.analyze(resolver)?;
+                        let value = Analysis::new(AnalysisKind::ShiftRight(Box::new(target.clone()), Box::new(right)), self.span, typing.clone());
+                        mutate(target, value, &binary.operator)?
                     }
 
                     _ => {
@@ -151,35 +235,35 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             [OperatorKind::Plus] => {
                                 match (&left.typing.kind, &right.typing.kind) {
                                     (TypeKind::Pointer { target }, _) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.typing.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typing.clone());
-                                        AnalysisKind::Add(Box::new(left), Box::new(scaled))
+                                        let size = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.typing.clone());
+                                        let scale = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size)), right.span, right.typing.clone());
+                                        AnalysisKind::Add(Box::new(left), Box::new(scale))
                                     }
                                     (_, TypeKind::Pointer { target }) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target).clone()), left.span, left.typing.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size_of)), left.span, left.typing.clone());
-                                        AnalysisKind::Add(Box::new(scaled), Box::new(right))
+                                        let size = Analysis::new(AnalysisKind::SizeOf((**target).clone()), left.span, left.typing.clone());
+                                        let scale = Analysis::new(AnalysisKind::Multiply(Box::new(left.clone()), Box::new(size)), left.span, left.typing.clone());
+                                        AnalysisKind::Add(Box::new(scale), Box::new(right))
                                     }
-                                    _ => {
-                                        AnalysisKind::Add(Box::new(left), Box::new(right))
-                                    }
+                                    _ => AnalysisKind::Add(Box::new(left), Box::new(right))
                                 }
                             },
                             [OperatorKind::Minus] => {
                                 match (&left.typing.kind, &right.typing.kind) {
-                                    (TypeKind::Pointer { target: target_left }, TypeKind::Pointer { .. }) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), self.span, typing.clone());
-                                        let raw_sub = Analysis::new(AnalysisKind::Subtract(Box::new(left), Box::new(right)), self.span, typing.clone());
-                                        AnalysisKind::Divide(Box::new(raw_sub), Box::new(size_of))
+                                    (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
+                                        if left_target == right_target {
+                                            let size = Analysis::new(AnalysisKind::SizeOf((**left_target).clone()), self.span, typing.clone());
+                                            let difference = Analysis::new(AnalysisKind::Subtract(Box::new(left), Box::new(right)), self.span, typing.clone());
+                                            AnalysisKind::Divide(Box::new(difference), Box::new(size))
+                                        } else {
+                                            return Err(AnalyzeError::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
+                                        }
                                     }
-                                    (TypeKind::Pointer { target: target_left }, _) => {
-                                        let size_of = Analysis::new(AnalysisKind::SizeOf((**target_left).clone()), right.span, right.typing.clone());
-                                        let scaled = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size_of)), right.span, right.typing.clone());
-                                        AnalysisKind::Subtract(Box::new(left), Box::new(scaled))
+                                    (TypeKind::Pointer { target }, _) => {
+                                        let size = Analysis::new(AnalysisKind::SizeOf((**target).clone()), right.span, right.typing.clone());
+                                        let scale = Analysis::new(AnalysisKind::Multiply(Box::new(right.clone()), Box::new(size)), right.span, right.typing.clone());
+                                        AnalysisKind::Subtract(Box::new(left), Box::new(scale))
                                     }
-                                    _ => {
-                                        AnalysisKind::Add(Box::new(left), Box::new(right))
-                                    }
+                                    _ => AnalysisKind::Subtract(Box::new(left), Box::new(right))
                                 }
                             },
                             [OperatorKind::Star] => AnalysisKind::Multiply(Box::new(left), Box::new(right)),

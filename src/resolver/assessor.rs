@@ -239,12 +239,13 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / invoke.members.len() as f64));
 
                     for member in invoke.members[function.members.len()..].iter() {
-                        if let (Some(target), Some(member_brand)) = (invoke.target.brand(), member.brand()) {
+                        if let Some(brand) = member.brand() {
+                            let target = invoke.target.brand().cloned().unwrap_or_else(|| brand.clone());
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::MissingMember {
-                                        target: target.clone(),
-                                        member: member_brand.clone(),
+                                        target,
+                                        member: brand.clone(),
                                     },
                                     member.span.clone(),
                                 )
@@ -256,12 +257,13 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / function.members.len() as f64));
 
                     for member in function.members[invoke.members.len()..].iter() {
-                        if let (Some(target), Some(member_brand)) = (function.target.brand(), member.brand()) {
+                        if let Some(brand) = member.brand() {
+                            let target = function.target.brand().cloned().unwrap_or_else(|| brand.clone());
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::UndefinedMember {
-                                        target: target.clone(),
-                                        member: member_brand.clone(),
+                                        target,
+                                        member: brand.clone(),
                                     },
                                     member.span.clone(),
                                 )
@@ -300,10 +302,15 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 if candidates == members {
                     score += self.binding;
                 } else {
-                    let matching = members
-                        .iter()
-                        .filter(|member| candidates.contains(member))
-                        .count();
+                    let mut unique = Vec::new();
+                    let mut matching = 0;
+
+                    for member in &members {
+                        if candidates.contains(member) && !unique.contains(member) {
+                            matching += 1;
+                            unique.push(*member);
+                        }
+                    }
 
                     let expected = candidates.len().max(members.len());
                     let ratio = if expected > 0 {
@@ -316,13 +323,13 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     let mut errors = Vec::new();
 
-                    for member in members.clone() {
-                        if !candidates.contains(&member) {
+                    for member in &members {
+                        if !candidates.contains(member) {
                             if let Some(target) = structure.target.brand() {
                                 errors.push(ResolveError {
                                     kind: ErrorKind::UndefinedMember {
                                         target: target.clone(),
-                                        member: member.clone(),
+                                        member: (*member).clone(),
                                     },
                                     span: query.span.clone(),
                                     hints: Vec::new(),
@@ -369,17 +376,17 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         ElementKind::Binary(binary) => binary.left.brand(),
                         _ => member.brand(),
                     })
-                    .cloned()
                     .collect::<Vec<_>>();
 
                 let mut errors = Vec::new();
 
                 if members.len() > 1 {
                     if let Some(target) = union.target.brand() {
+                        let values = members.iter().map(|item| (*item).clone()).collect();
                         errors.push(ResolveError {
                             kind: ErrorKind::ExcessiveUnionMembers {
                                 target: target.clone(),
-                                members: members.clone(),
+                                members: values,
                             },
                             span: query.span.clone(),
                             hints: Vec::new(),
@@ -399,12 +406,12 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 }
 
                 for member in &members {
-                    if !candidates.contains(&member) {
+                    if !candidates.contains(member) {
                         if let Some(target) = union.target.brand() {
                             errors.push(ResolveError {
                                 kind: ErrorKind::UndefinedMember {
                                     target: target.clone(),
-                                    member: member.clone(),
+                                    member: (*member).clone(),
                                 },
                                 span: query.span.clone(),
                                 hints: Vec::new(),
@@ -416,10 +423,15 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                 if errors.is_empty() && members.len() == 1 {
                     score += self.binding;
                 } else {
-                    let matching = members
-                        .iter()
-                        .filter(|member| candidates.contains(member))
-                        .count();
+                    let mut unique = Vec::new();
+                    let mut matching = 0;
+
+                    for member in &members {
+                        if candidates.contains(member) && !unique.contains(member) {
+                            matching += 1;
+                            unique.push(*member);
+                        }
+                    }
 
                     let ratio = if !members.is_empty() {
                         (matching as f64 / members.len() as f64) * (1.0 / members.len() as f64)

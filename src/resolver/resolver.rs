@@ -68,9 +68,9 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn fresh(&mut self, span: Span<'resolver>) -> Type<'resolver> {
         let identity = self.variables.len();
-        
+
         self.variables.push(None);
-        
+
         Type::new(TypeKind::Variable(identity), span)
     }
 
@@ -119,8 +119,14 @@ impl<'resolver> Resolver<'resolver> {
         }
 
         match (left.kind.clone(), right.kind.clone()) {
-            (TypeKind::Unknown, _) => right.clone(),
-            (_, TypeKind::Unknown) => left.clone(),
+            (TypeKind::Unknown, _) => {
+                self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
+                right.clone()
+            }
+            (_, TypeKind::Unknown) => {
+                self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
+                left.clone()
+            }
 
             (TypeKind::Variable(identity), _) => {
                 if self.occurs(identity, &right) {
@@ -162,7 +168,7 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Integer { size: left_size, signed: left_signed }, TypeKind::Integer { size: right_size, signed: right_signed }) if left_size == right_size && left_signed == right_signed => left,
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
 
-            (TypeKind::Function(name, left_args, left_output), TypeKind::Function(_, right_args, right_output)) if left_args.len() == right_args.len() => {
+            (TypeKind::Function(left_name, left_args, left_output), TypeKind::Function(right_name, right_args, right_output)) if left_args.len() == right_args.len() => {
                 let mut unified = Vec::with_capacity(left_args.len());
 
                 for (first, second) in left_args.iter().zip(right_args.iter()) {
@@ -175,6 +181,8 @@ impl<'resolver> Resolver<'resolver> {
                     (None, Some(second)) => Some(second),
                     (None, None) => None,
                 };
+
+                let name = if left_name.is_empty() { right_name } else { left_name };
 
                 Type::new(TypeKind::Function(name, unified, output), left.span)
             }
@@ -211,6 +219,30 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
+    pub fn evaluate(&self, element: &Element<'resolver>) -> Result<Scale, ResolveError<'resolver>> {
+        match &element.kind {
+            ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => Ok(*value as Scale),
+            ElementKind::Binary(binary) => {
+                let left = self.evaluate(&binary.left)?;
+                let right = self.evaluate(&binary.right)?;
+
+                if let TokenKind::Operator(operator) = &binary.operator.kind {
+                    match operator.as_slice() {
+                        [OperatorKind::Plus] => Ok(left + right),
+                        [OperatorKind::Minus] => Ok(left - right),
+                        [OperatorKind::Star] => Ok(left * right),
+                        [OperatorKind::Slash] => Ok(left / right),
+                        [OperatorKind::Percent] => Ok(left % right),
+                        _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+                    }
+                } else {
+                    Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
+                }
+            }
+            _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
+        }
+    }
+
     pub fn annotation(&mut self, element: &Element<'resolver>) -> Result<Type<'resolver>, ResolveError<'resolver>> {
         match &element.kind {
             ElementKind::Literal(Token { kind: TokenKind::Identifier(name), span }) => {
@@ -230,6 +262,7 @@ impl<'resolver> Resolver<'resolver> {
                     "Boolean" => TypeKind::Boolean,
                     "Character" => TypeKind::Character,
                     "String" => TypeKind::String,
+                    "Void" | "Unit" => TypeKind::Tuple { members: Vec::new() },
                     _ => {
                         if let Some(identity) = element.reference {
                             let typing = self.lookup(identity, *span);
@@ -267,24 +300,27 @@ impl<'resolver> Resolver<'resolver> {
                     }
 
                     let member = self.annotation(&delimited.members[0])?;
-                    let size = match delimited.members[1].kind {
-                        ElementKind::Literal(Token { kind: TokenKind::Integer(value), .. }) => value as Scale,
-                        _ => return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
-                    };
+                    let size = self.evaluate(&delimited.members[1])?;
 
                     Ok(Type::new(TypeKind::Array { member: Box::new(member), size }, element.span))
                 }
 
                 (
                     TokenKind::Punctuation(PunctuationKind::LeftParenthesis),
-                    Some(TokenKind::Punctuation(PunctuationKind::Comma)),
+                    _,
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
-                    let mut members = Vec::with_capacity(delimited.members.len());
-                    for member in &delimited.members {
-                        members.push(self.annotation(member)?);
+                    if delimited.members.is_empty() {
+                        Ok(Type::new(TypeKind::Tuple { members: Vec::new() }, element.span))
+                    } else if delimited.separator.is_none() && delimited.members.len() == 1 {
+                        self.annotation(&delimited.members[0])
+                    } else {
+                        let mut members = Vec::with_capacity(delimited.members.len());
+                        for member in &delimited.members {
+                            members.push(self.annotation(member)?);
+                        }
+                        Ok(Type::new(TypeKind::Tuple { members }, element.span))
                     }
-                    Ok(Type::new(TypeKind::Tuple { members }, element.span))
                 }
 
                 _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
@@ -309,7 +345,7 @@ impl<'resolver> Resolver<'resolver> {
                         let mut parameters = Vec::new();
 
                         match &binary.left.kind {
-                            ElementKind::Delimited(delimited) => {
+                            ElementKind::Delimited(delimited) if matches!(delimited.start.kind, TokenKind::Punctuation(PunctuationKind::LeftParenthesis)) => {
                                 for member in &delimited.members {
                                     parameters.push(self.annotation(member)?);
                                 }

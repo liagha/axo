@@ -148,12 +148,12 @@ impl<'session> Session<'session> {
             self.generate();
             if !self.errors.is_empty() { break 'pipeline; }
 
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self.reporter.finish("compilation", duration);
-
             self.emit();
         }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.reporter.finish("compilation", duration);
 
         for error in &self.errors {
             match error {
