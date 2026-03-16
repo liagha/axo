@@ -139,7 +139,7 @@ impl<'session> Session<'session> {
 
             self.plan();
 
-            self.register();
+            self.populate();
             if !self.errors.is_empty() { break 'pipeline; }
 
             self.resolve();
@@ -296,7 +296,7 @@ impl<'session> Session<'session> {
         self.reporter.finish("parsing", duration);
     }
 
-    pub fn register(&mut self) {
+    pub fn populate(&mut self) {
         let modules: Vec<_> = self.order
             .iter()
             .map(|&identity| {
@@ -362,7 +362,7 @@ impl<'session> Session<'session> {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
             let module_scope = replace(&mut module.scope, Scope::new());
-            
+
             self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
@@ -385,7 +385,7 @@ impl<'session> Session<'session> {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
             let module_scope = replace(&mut module.scope, Scope::new());
-            
+
             self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;

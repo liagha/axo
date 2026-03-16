@@ -15,17 +15,16 @@ union FloatOrInt {
 
 enum Color {
     const Red,
-    const Blue,
     const Yellow,
 
     struct GrayScale {
         const value: Integer
     }
 
-    enum Etc {
+    enum Blue {
         Cyan,
-        Pink,
-        Purple
+        LightBlue,
+        DarkBlue
     }
 }
 
@@ -43,7 +42,7 @@ func main() {
 
     const red = Color.Yellow
 
-    const etc = Color.Etc.Cyan
+    const cyan = Color.Blue.Cyan
 
     const black = Color.GrayScale {
         value = 100
@@ -51,14 +50,5 @@ func main() {
 
     const Color.GrayScale { value } = black;
 
-    libc.println_i64(value)
-
-    if(red == Color.Red,
-        libc.println_str("Red"),
-        libc.println_str("Not Red")
-    )
-
-    libc.println_i64(idk.int);
-
-    Point.print_position(point)
+    value
 }

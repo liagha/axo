@@ -1,0 +1,28 @@
+enum Color {
+    const Red,
+    const Yellow,
+
+    struct GrayScale {
+        const value: Integer
+    }
+
+    enum Blue {
+        Cyan,
+        LightBlue,
+        DarkBlue
+    }
+}
+
+func main() {
+    const red = Color.Yellow
+
+    const cyan = Color.Blue.Cyan
+
+    const black = Color.GrayScale {
+        value = 100
+    }
+
+    const Color.GrayScale { value } = black;
+
+    value
+}
