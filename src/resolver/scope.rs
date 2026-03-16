@@ -75,6 +75,7 @@ impl<'scope> Scope<Symbol<'scope>> {
         if let Some(symbol) = self.symbols.iter().find(|symbol| symbol.identity == target) {
             return Some(symbol);
         }
+
         self.parent.as_ref()?.find(target)
     }
 

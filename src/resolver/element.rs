@@ -31,19 +31,26 @@ fn lvalue(node: &Element) -> bool {
 impl<'element> Resolvable<'element> for Element<'element> {
     fn declare(&mut self, resolver: &mut Resolver<'element>) {
         match &mut self.kind {
-            ElementKind::Symbolize(sym) => {
-                sym.declare(resolver);
-                self.typing = sym.typing.clone();
+            ElementKind::Symbolize(symbol) => {
+                symbol.declare(resolver);
+                
+                self.typing = symbol.typing.clone();
             }
-            ElementKind::Construct(cons) => {
-                cons.target.declare(resolver);
-                for member in &mut cons.members {
+            ElementKind::Construct(construct) => {
+                construct.target.declare(resolver);
+                
+                for member in &mut construct.members {
                     member.declare(resolver);
                 }
             }
-            ElementKind::Binary(bin) => {
-                bin.left.declare(resolver);
-                bin.right.declare(resolver);
+            ElementKind::Binary(binary) => {
+                binary.left.declare(resolver);
+                binary.right.declare(resolver);
+            }
+            ElementKind::Delimited(delimited) => {
+                for member in delimited.members.iter_mut() {
+                    member.declare(resolver);
+                }
             }
             _ => {}
         }
@@ -228,11 +235,22 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     }
                                 }
 
-                                if let TypeKind::Structure(ref_id, _) | TypeKind::Union(ref_id, _) | TypeKind::Enumeration(ref_id, _) = left.kind {
-                                    if let Some(sym) = resolver.scope.find(ref_id) {
-                                        scope = Some(sym.scope.clone());
-                                        inst = true;
+                                match left.kind {
+                                    TypeKind::Structure(ref_id, _) | TypeKind::Union(ref_id, _) | TypeKind::Enumeration(ref_id, _) => {
+                                        if let Some(sym) = resolver.scope.find(ref_id) {
+                                            scope = Some(sym.scope.clone());
+                                            inst = true;
+                                        }
                                     }
+                                    TypeKind::Constructor(ref_id, _) => {
+                                        if let Some(sym) = resolver.scope.find(ref_id) {
+                                            scope = Some(sym.scope.clone());
+                                            if let SymbolKind::Enumeration(_) = sym.kind {
+                                                inst = true;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
 

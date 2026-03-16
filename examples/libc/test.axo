@@ -21,6 +21,12 @@ enum Color {
     struct GrayScale {
         const value: Integer
     }
+
+    enum Etc {
+        Cyan,
+        Pink,
+        Purple
+    }
 }
 
 func main() {
@@ -37,17 +43,18 @@ func main() {
 
     const red = Color.Yellow
 
+    const etc = Color.Etc.Cyan
+
     const black = Color.GrayScale {
         value = 100
     }
 
+    const Color.GrayScale { value } = black;
+
+    libc.println_i64(value)
+
     if(red == Color.Red,
         libc.println_str("Red"),
-        libc.println_str("Not Red")
-    )
-
-    if(const Color.GrayScale { value } = black,
-        libc.println_i64(value),
         libc.println_str("Not Red")
     )
 

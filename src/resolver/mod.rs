@@ -9,7 +9,10 @@ mod traits;
 mod primitives;
 mod typing;
 
-pub use resolver::*;
+pub use {
+    resolver::*,
+    scope::*,
+};
 
 pub(super) use {error::*, hint::*, typing::*};
 

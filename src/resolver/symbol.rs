@@ -1,4 +1,3 @@
-// src/resolver/symbol.rs
 use crate::{
     data::Aggregate,
     format::Show,
@@ -16,34 +15,39 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 resolver.fresh(span)
             }
             SymbolKind::Function(function) => {
-                let head = function.target.brand().unwrap().format(0);
-                let parameters = function.members.iter().map(|_| resolver.fresh(span)).collect();
+                let name = function.target.brand().unwrap().format(0);
+                let members = function.members.iter().map(|_| resolver.fresh(span)).collect();
                 let output = resolver.fresh(span);
 
                 resolver.enter();
+
                 for member in &mut function.members {
                     member.declare(resolver);
                 }
+
                 let mut scope = resolver.scope.clone();
                 scope.parent = None;
                 self.scope = scope;
+
                 resolver.exit();
 
-                Type::new(TypeKind::Function(head.into(), parameters, Some(Box::new(output))), span)
+                Type::new(TypeKind::Function(name, members, Some(Box::new(output))), span)
             }
             SymbolKind::Structure(structure) => {
-                let head = structure.target.brand().unwrap().format(0);
+                let name = structure.target.brand().unwrap().format(0);
 
                 resolver.enter();
+
                 for member in &mut structure.members {
                     member.declare(resolver);
                 }
+
                 let mut scope = resolver.scope.clone();
                 scope.parent = None;
                 self.scope = scope;
                 resolver.exit();
 
-                Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)
+                Type::new(TypeKind::Constructor(self.identity, Aggregate::new(name, Vec::new())), span)
             }
             SymbolKind::Union(union) => {
                 let head = union.target.brand().unwrap().format(0);
@@ -114,6 +118,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 match &mut binding.target.kind {
                     ElementKind::Construct(construct) => {
+                        println!("Construct {}", construct.format(0));
+
                         refutable = true;
 
                         construct.target.resolve(resolver);
@@ -239,8 +245,9 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                         member.typing = resolver.unify(member.span, &member.typing, &instance);
                         resolver.insert(member.clone());
                     } else if let SymbolKind::Structure(_) | SymbolKind::Union(_) | SymbolKind::Enumeration(_) = member.kind {
-                        if let TypeKind::Constructor(_, structure) = &member.typing.kind {
-                            member.typing = Type::new(TypeKind::Constructor(identity, structure.clone()), member.span);
+                        if let TypeKind::Constructor(orig_id, structure) = &member.typing.kind {
+                            // Fix: Use the nested structure's original id (`*orig_id`), do not override with parent enum `identity`
+                            member.typing = Type::new(TypeKind::Constructor(*orig_id, structure.clone()), member.span);
                             resolver.insert(member.clone());
                         }
                     }

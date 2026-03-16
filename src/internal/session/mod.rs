@@ -3,7 +3,10 @@ mod registry;
 use {
     crate::{
         analyzer::AnalyzeError,
-        data::*,
+        data::{
+            *,
+            memory::replace,
+        },
         generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
@@ -13,7 +16,7 @@ use {
         },
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
         reporter::Reporter,
-        resolver::{Resolvable, ResolveError, Resolver},
+        resolver::{Resolvable, ResolveError, Resolver, Scope},
         scanner::{ScanError, Scanner, Token, TokenKind},
         tracker::{self, Location, Peekable, Span, TrackError},
         analyzer::Analyzer,
@@ -334,8 +337,9 @@ impl<'session> Session<'session> {
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-
-            self.resolver.enter_scope(module.scope.clone());
+            let module_scope = replace(&mut module.scope, Scope::new());
+            
+            self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
@@ -343,19 +347,23 @@ impl<'session> Session<'session> {
                 element.declare(&mut self.resolver);
             }
 
-            let mut scope = self.resolver.scope.clone();
-            scope.parent = None;
-            module.scope = scope;
+            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
 
-            self.resolver.exit();
+            if let Some(parent) = current_scope.detach() {
+                self.resolver.scope = parent;
+            }
+
+            module.scope = current_scope;
+
             self.resolver.insert(module);
         }
 
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-
-            self.resolver.enter_scope(module.scope.clone());
+            let module_scope = replace(&mut module.scope, Scope::new());
+            
+            self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
@@ -363,19 +371,22 @@ impl<'session> Session<'session> {
                 element.resolve(&mut self.resolver);
             }
 
-            let mut scope = self.resolver.scope.clone();
-            scope.parent = None;
-            module.scope = scope;
+            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
 
-            self.resolver.exit();
+            if let Some(parent) = current_scope.detach() {
+                self.resolver.scope = parent;
+            }
+
+            module.scope = current_scope;
             self.resolver.insert(module);
         }
 
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-
-            self.resolver.enter_scope(module.scope.clone());
+            let module_scope = replace(&mut module.scope, Scope::new());
+            
+            self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
 
@@ -383,19 +394,21 @@ impl<'session> Session<'session> {
                 element.reify(&mut self.resolver);
             }
 
-            let mut scope = self.resolver.scope.clone();
-            scope.parent = None;
-            module.scope = scope;
+            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
 
-            self.resolver.exit();
+            if let Some(parent) = current_scope.detach() {
+                self.resolver.scope = parent;
+            }
+
+            module.scope = current_scope;
             self.resolver.insert(module);
         }
 
         self.errors.extend(
             self.resolver
                 .errors
-                .iter()
-                .map(|error| CompileError::Resolve(error.clone()))
+                .drain(..)
+                .map(CompileError::Resolve)
         );
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());

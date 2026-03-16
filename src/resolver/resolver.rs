@@ -119,15 +119,8 @@ impl<'resolver> Resolver<'resolver> {
         }
 
         match (left.kind.clone(), right.kind.clone()) {
-            (TypeKind::Unknown, _) => {
-                self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
-                right.clone()
-            }
-            (_, TypeKind::Unknown) => {
-                self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
-                left.clone()
-            }
-
+            (TypeKind::Unknown, _) => right.clone(),
+            (_, TypeKind::Unknown) => left.clone(),
             (TypeKind::Variable(identity), _) => {
                 if self.occurs(identity, &right) {
                     self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
