@@ -35,11 +35,21 @@ func main() {
         int = 3
     }
 
-    const red = Color.Red
+    const red = Color.Yellow
 
     const black = Color.GrayScale {
         value = 100
     }
+
+    if(red == Color.Red,
+        libc.println_str("Red"),
+        libc.println_str("Not Red")
+    )
+
+    if(const Color.GrayScale { value } = black,
+        libc.println_i64(value),
+        libc.println_str("Not Red")
+    )
 
     libc.println_i64(idk.int);
 

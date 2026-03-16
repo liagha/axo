@@ -5,11 +5,10 @@ use {
         data::*,
         generator::{
             inkwell::{
-                Backend, Entity,
                 error::VariableError,
+                Backend, Entity,
             },
-            ErrorKind,
-            GenerateError,
+            ErrorKind, GenerateError,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -23,7 +22,7 @@ use {
 impl<'backend> super::Generator<'backend> {
     fn pointee(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
-            AnalysisKind::Usage(name) => match self.get_entity(name) {
+            AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
                 Some(Entity::Variable { typing, .. }) => {
                     if let TypeKind::Pointer { target } = &typing.kind {
                         self.to_basic_type(target, analysis.span).ok()
@@ -43,16 +42,16 @@ impl<'backend> super::Generator<'backend> {
         analysis: &Analysis<'backend>,
     ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
         match &analysis.kind {
-            AnalysisKind::Usage(name) => {
-                if let Some(entity) = self.get_entity(name) {
+            AnalysisKind::Usage(identifier) => {
+                if let Some(entity) = self.get_entity(identifier) {
                     match entity {
                         Entity::Variable { pointer, typing } => {
                             let kind = self.to_basic_type(typing, analysis.span)?;
                             Ok(Some((*pointer, kind)))
                         }
-                        Entity::Function(func) => {
-                            let ptr = func.as_global_value().as_pointer_value();
-                            Ok(Some((ptr, ptr.get_type().into())))
+                        Entity::Function(function) => {
+                            let pointer = function.as_global_value().as_pointer_value();
+                            Ok(Some((pointer, pointer.get_type().into())))
                         }
                         _ => Ok(None),
                     }
@@ -76,8 +75,8 @@ impl<'backend> super::Generator<'backend> {
                 }
             }
             AnalysisKind::Access(target, member) => {
-                let field = if let AnalysisKind::Usage(name) = &member.kind {
-                    name.clone()
+                let field = if let AnalysisKind::Usage(identifier) = &member.kind {
+                    identifier.clone()
                 } else {
                     return Ok(None);
                 };
@@ -120,8 +119,8 @@ impl<'backend> super::Generator<'backend> {
                                         )
                                     })?;
 
-                                if let Some(inst) = load.as_instruction_value() {
-                                    inst.set_alignment(self.align(kind)).ok();
+                                if let Some(instruction) = load.as_instruction_value() {
+                                    instruction.set_alignment(self.align(kind)).ok();
                                 }
 
                                 let loaded = load.into_pointer_value();
@@ -158,28 +157,27 @@ impl<'backend> super::Generator<'backend> {
                     }
                 }
 
-                // Fallback for namespaced Globals and Methods (e.g. Color.Red or Point.print_position)
-                if let AnalysisKind::Usage(target_name) = &target.kind {
-                    let full_name = format!("{}.{}", target_name, field);
+                if let AnalysisKind::Usage(identifier) = &target.kind {
+                    let path = format!("{}.{}", identifier, field);
                     let module = self.current_module();
 
-                    if let Some(global) = module.get_global(&full_name) {
-                        let ptr = global.as_pointer_value();
+                    if let Some(global) = module.get_global(&path) {
+                        let pointer = global.as_pointer_value();
                         let kind: BasicTypeEnum = match global.get_value_type() {
-                            inkwell::types::AnyTypeEnum::ArrayType(t) => t.into(),
-                            inkwell::types::AnyTypeEnum::StructType(t) => t.into(),
-                            inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
-                            inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
-                            inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
-                            inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
+                            inkwell::types::AnyTypeEnum::ArrayType(defined) => defined.into(),
+                            inkwell::types::AnyTypeEnum::StructType(defined) => defined.into(),
+                            inkwell::types::AnyTypeEnum::FloatType(defined) => defined.into(),
+                            inkwell::types::AnyTypeEnum::IntType(defined) => defined.into(),
+                            inkwell::types::AnyTypeEnum::PointerType(defined) => defined.into(),
+                            inkwell::types::AnyTypeEnum::VectorType(defined) => defined.into(),
                             _ => return Ok(None),
                         };
-                        return Ok(Some((ptr, kind)));
+                        return Ok(Some((pointer, kind)));
                     }
 
-                    if let Some(func) = module.get_function(&full_name) {
-                        let ptr = func.as_global_value().as_pointer_value();
-                        return Ok(Some((ptr, ptr.get_type().into())));
+                    if let Some(function) = module.get_function(&path) {
+                        let pointer = function.as_global_value().as_pointer_value();
+                        return Ok(Some((pointer, pointer.get_type().into())));
                     }
                 }
 
@@ -248,8 +246,8 @@ impl<'backend> super::Generator<'backend> {
                                         )
                                     })?;
 
-                                if let Some(inst) = load.as_instruction_value() {
-                                    inst.set_alignment(self.align(kind)).ok();
+                                if let Some(instruction) = load.as_instruction_value() {
+                                    instruction.set_alignment(self.align(kind)).ok();
                                 }
 
                                 let loaded = load.into_pointer_value();
@@ -303,13 +301,13 @@ impl<'backend> super::Generator<'backend> {
             (BasicValueEnum::PointerValue(pointer), Some(kind)) => {
                 let load = self
                     .builder
-                    .build_load(kind, pointer, "deref")
+                    .build_load(kind, pointer, "dereference")
                     .map_err(|error| {
                         GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                     })?;
 
-                if let Some(inst) = load.as_instruction_value() {
-                    inst.set_alignment(self.align(kind)).ok();
+                if let Some(instruction) = load.as_instruction_value() {
+                    instruction.set_alignment(self.align(kind)).ok();
                 }
 
                 Ok(load)
@@ -328,13 +326,13 @@ impl<'backend> super::Generator<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
-                Entity::Function(func) => {
-                    Ok(BasicValueEnum::from(func.as_global_value().as_pointer_value()))
+                Entity::Function(function) => {
+                    Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
                 }
                 Entity::Variable { pointer, typing } => {
                     let kind = self.to_basic_type(typing, span)?;
 
-                    if kind.is_array_type() || kind.is_struct_type() {
+                    if kind.is_array_type() {
                         Ok(BasicValueEnum::from(*pointer))
                     } else {
                         let load = self
@@ -344,8 +342,8 @@ impl<'backend> super::Generator<'backend> {
                                 GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                             })?;
 
-                        if let Some(inst) = load.as_instruction_value() {
-                            inst.set_alignment(self.align(kind)).ok();
+                        if let Some(instruction) = load.as_instruction_value() {
+                            instruction.set_alignment(self.align(kind)).ok();
                         }
 
                         Ok(load)
@@ -364,14 +362,14 @@ impl<'backend> super::Generator<'backend> {
 
         if let Some(global) = module.get_global(&identifier) {
             let kind: BasicTypeEnum = match global.get_value_type() {
-                inkwell::types::AnyTypeEnum::ArrayType(_)
-                | inkwell::types::AnyTypeEnum::StructType(_) => {
+                inkwell::types::AnyTypeEnum::ArrayType(_) => {
                     return Ok(BasicValueEnum::from(global.as_pointer_value()));
                 }
-                inkwell::types::AnyTypeEnum::FloatType(t) => t.into(),
-                inkwell::types::AnyTypeEnum::IntType(t) => t.into(),
-                inkwell::types::AnyTypeEnum::PointerType(t) => t.into(),
-                inkwell::types::AnyTypeEnum::VectorType(t) => t.into(),
+                inkwell::types::AnyTypeEnum::StructType(defined) => defined.into(),
+                inkwell::types::AnyTypeEnum::FloatType(defined) => defined.into(),
+                inkwell::types::AnyTypeEnum::IntType(defined) => defined.into(),
+                inkwell::types::AnyTypeEnum::PointerType(defined) => defined.into(),
+                inkwell::types::AnyTypeEnum::VectorType(defined) => defined.into(),
                 _ => {
                     return Err(GenerateError::new(
                         ErrorKind::Variable(VariableError::NotAValue {
@@ -389,15 +387,15 @@ impl<'backend> super::Generator<'backend> {
                     GenerateError::new(ErrorKind::BuilderError(error.into()), span)
                 })?;
 
-            if let Some(inst) = load.as_instruction_value() {
-                inst.set_alignment(self.align(kind)).ok();
+            if let Some(instruction) = load.as_instruction_value() {
+                instruction.set_alignment(self.align(kind)).ok();
             }
 
             return Ok(load);
         }
 
-        if let Some(func) = module.get_function(&identifier) {
-            return Ok(BasicValueEnum::from(func.as_global_value().as_pointer_value()));
+        if let Some(function) = module.get_function(&identifier) {
+            return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
         }
 
         Err(GenerateError::new(
@@ -422,7 +420,7 @@ impl<'backend> super::Generator<'backend> {
         };
 
         if let Some((slot, typing)) = existing {
-            let declared = self.to_basic_type(&typing, span)?;
+            let declared = result.get_type();
 
             let store = self
                 .builder
@@ -470,25 +468,25 @@ impl<'backend> super::Generator<'backend> {
         let scope = if global {
             let void = self.context.void_type();
             let signature = void.fn_type(&[], false);
-            let func = self.current_module().add_function("init", signature, None);
-            let block = self.context.append_basic_block(func, "entry");
+            let function = self.current_module().add_function("init", signature, None);
+            let block = self.context.append_basic_block(function, "entry");
 
             self.builder.position_at_end(block);
-            Some(func)
+            Some(function)
         } else {
             None
         };
 
         let result = self.analysis(*expression)?;
 
-        if let Some(func) = scope {
+        if let Some(function) = scope {
             self.builder.clear_insertion_position();
             unsafe {
-                func.delete();
+                function.delete();
             }
         }
 
-        let declared = self.to_basic_type(&typing, span)?;
+        let declared = result.get_type();
 
         let pointer = if global {
             let variable = self.current_module().add_global(declared, None, &bind.target);
@@ -501,8 +499,8 @@ impl<'backend> super::Generator<'backend> {
                 .build_alloca(declared, &bind.target)
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            if let Some(inst) = allocate.as_instruction_value() {
-                inst.set_alignment(self.align(declared)).ok();
+            if let Some(instruction) = allocate.as_instruction_value() {
+                instruction.set_alignment(self.align(declared)).ok();
             }
 
             let store = self
@@ -534,7 +532,6 @@ impl<'backend> super::Generator<'backend> {
         let result = self.analysis(*value.clone())?;
 
         if let Some((pointer, kind)) = self.lvalue(&target)? {
-
             if result.get_type() != kind {
                 return Err(GenerateError::new(
                     ErrorKind::Variable(VariableError::AssignmentTypeMismatch),

@@ -27,9 +27,9 @@ pub struct Symbol<'symbol> {
 #[derive(Clone, PartialEq, Hash)]
 pub enum SymbolKind<'symbol> {
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
-    Structure(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Union(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Enumeration(Structure<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Structure(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Union(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
+    Enumeration(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
     Function(
         Function<
             Box<Element<'symbol>>,

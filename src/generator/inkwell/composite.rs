@@ -1,7 +1,7 @@
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
-        data::{Index, Str, Structure},
+        data::{Index, Str, Aggregate},
         generator::{
             inkwell::{Backend, Entity, GenerateError, Generator},
             BuilderError, DataStructureError, ErrorKind,
@@ -94,7 +94,7 @@ impl<'backend> Generator<'backend> {
 
     pub fn structure(
         &mut self,
-        structure: Structure<Str<'backend>, Analysis<'backend>>,
+        structure: Aggregate<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
@@ -128,7 +128,7 @@ impl<'backend> Generator<'backend> {
 
     pub fn union(
         &mut self,
-        union: Structure<Str<'backend>, Analysis<'backend>>,
+        union: Aggregate<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = union.target.clone();
@@ -176,7 +176,7 @@ impl<'backend> Generator<'backend> {
 
     pub fn enumeration(
         &mut self,
-        enumeration: Structure<Str<'backend>, Analysis<'backend>>,
+        enumeration: Aggregate<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = enumeration.target.clone();
@@ -246,7 +246,7 @@ impl<'backend> Generator<'backend> {
 
     pub fn constructor(
         &mut self,
-        constructor: Structure<Str<'backend>, Analysis<'backend>>,
+        constructor: Aggregate<Str<'backend>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = constructor.target.clone();

@@ -32,7 +32,7 @@ pub enum ElementKind<'element> {
 
     Invoke(Invoke<Box<Element<'element>>, Element<'element>>),
 
-    Construct(Structure<Box<Element<'element>>, Element<'element>>),
+    Construct(Aggregate<Box<Element<'element>>, Element<'element>>),
 
     Symbolize(Symbol<'element>),
 }
@@ -77,7 +77,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn construct(construct: Structure<Box<Element<'element>>, Element<'element>>) -> Self {
+    pub fn construct(construct: Aggregate<Box<Element<'element>>, Element<'element>>) -> Self {
         ElementKind::Construct(construct)
     }
 
@@ -184,7 +184,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_construct(self) -> Structure<Box<Element<'element>>, Element<'element>> {
+    pub fn unwrap_construct(self) -> Aggregate<Box<Element<'element>>, Element<'element>> {
         match self {
             ElementKind::Construct(construct) => construct,
             _ => panic!("called `unwrap_construct` on non-Construct variant."),
@@ -253,7 +253,7 @@ impl<'element> ElementKind<'element> {
     #[inline(always)]
     pub fn try_unwrap_construct(
         &self,
-    ) -> Option<&Structure<Box<Element<'element>>, Element<'element>>> {
+    ) -> Option<&Aggregate<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Construct(construct) => Some(construct),
             _ => None,
@@ -329,7 +329,7 @@ impl<'element> ElementKind<'element> {
     #[inline(always)]
     pub fn try_unwrap_construct_mut(
         &mut self,
-    ) -> Option<&mut Structure<Box<Element<'element>>, Element<'element>>> {
+    ) -> Option<&mut Aggregate<Box<Element<'element>>, Element<'element>>> {
         match self {
             ElementKind::Construct(construct) => Some(construct),
             _ => None,

@@ -22,7 +22,7 @@ pub enum BindingKind {
 }
 
 #[derive(Debug, Eq)]
-pub struct Structure<Target, Field> {
+pub struct Aggregate<Target, Field> {
     pub target: Target,
     pub members: Vec<Field>,
 }
@@ -68,10 +68,10 @@ impl<Target, Value, Type> Binding<Target, Value, Type> {
     }
 }
 
-impl<Target, Field> Structure<Target, Field> {
+impl<Target, Field> Aggregate<Target, Field> {
     #[inline]
     pub fn new(target: Target, fields: Vec<Field>) -> Self {
-        Structure {
+        Aggregate {
             target,
             members: fields,
         }
@@ -115,7 +115,7 @@ impl<Target: Hash, Value: Hash, Type: Hash> Hash for Binding<Target, Value, Type
     }
 }
 
-impl<Target: Hash, Field: Hash> Hash for Structure<Target, Field> {
+impl<Target: Hash, Field: Hash> Hash for Aggregate<Target, Field> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
         self.members.hash(state);
@@ -150,7 +150,7 @@ impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq
     }
 }
 
-impl<Target: PartialEq, Field: PartialEq> PartialEq for Structure<Target, Field> {
+impl<Target: PartialEq, Field: PartialEq> PartialEq for Aggregate<Target, Field> {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.members == other.members
     }
@@ -184,9 +184,9 @@ impl<Target: Clone, Value: Clone, Type: Clone> Clone for Binding<Target, Value, 
     }
 }
 
-impl<Target: Clone, Field: Clone> Clone for Structure<Target, Field> {
+impl<Target: Clone, Field: Clone> Clone for Aggregate<Target, Field> {
     fn clone(&self) -> Self {
-        Structure::new(self.target.clone(), self.members.clone())
+        Aggregate::new(self.target.clone(), self.members.clone())
     }
 }
 
@@ -241,7 +241,7 @@ impl<
 }
 
 impl<'show, Target: Show<'show, Verbosity = u8>, Member: Show<'show, Verbosity = u8>> Show<'show>
-    for Structure<Target, Member>
+    for Aggregate<Target, Member>
 {
     type Verbosity = u8;
 

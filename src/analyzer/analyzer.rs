@@ -78,7 +78,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let analyzed = Structure::new(
+                let analyzed = Aggregate::new(
                     Str::from(structure.target.brand().unwrap().format(0)),
                     members?,
                 );
@@ -92,7 +92,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let analyzed = Structure::new(
+                let analyzed = Aggregate::new(
                     Str::from(union.target.brand().unwrap().format(0)),
                     members?,
                 );
@@ -106,7 +106,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let analyzed = Structure::new(
+                let analyzed = Aggregate::new(
                     Str::from(enumeration.target.brand().unwrap().format(0)),
                     members?,
                 );

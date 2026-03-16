@@ -187,7 +187,7 @@ impl<'parser> Parser<'parser> {
                                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                                     ) => {
                                         unary = Element::new(
-                                            ElementKind::construct(Structure::new(
+                                            ElementKind::construct(Aggregate::new(
                                                 Box::new(unary),
                                                 delimited.members,
                                             )),

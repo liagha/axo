@@ -46,24 +46,6 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn set_input(&mut self, input: Vec<Element<'resolver>>) {
-        self.input = input;
-    }
-
-    pub fn resolve(&mut self) {
-        let mut input = self.input.clone();
-
-        for element in input.iter_mut() {
-            element.resolve(self);
-        }
-
-        for element in input.iter_mut() {
-            element.reify(self);
-        }
-
-        self.input = input;
-    }
-
     pub fn enter(&mut self) {
         let parent = replace(&mut self.scope, Scope::new());
         self.scope.attach(parent);
@@ -86,7 +68,9 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn fresh(&mut self, span: Span<'resolver>) -> Type<'resolver> {
         let identity = self.variables.len();
+        
         self.variables.push(None);
+        
         Type::new(TypeKind::Variable(identity), span)
     }
 
@@ -103,9 +87,11 @@ impl<'resolver> Resolver<'resolver> {
                 if identity == *variable {
                     return true;
                 }
+
                 if let Some(resolved) = &self.variables[*variable] {
                     return self.occurs(identity, resolved);
                 }
+
                 false
             }
             TypeKind::Pointer { target } => self.occurs(identity, target),

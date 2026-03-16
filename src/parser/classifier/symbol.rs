@@ -218,7 +218,7 @@ impl<'parser> Parser<'parser> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Structure(Structure::new(Box::new(name), members)),
+                        SymbolKind::Structure(Aggregate::new(Box::new(name), members)),
                         span,
                         visibility,
                     )),
@@ -299,7 +299,7 @@ impl<'parser> Parser<'parser> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Union(Structure::new(Box::new(name), members)),
+                        SymbolKind::Union(Aggregate::new(Box::new(name), members)),
                         span,
                         visibility,
                     )),
@@ -393,7 +393,7 @@ impl<'parser> Parser<'parser> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Symbol::new(
-                        SymbolKind::Enumeration(Structure::new(Box::new(name), members)),
+                        SymbolKind::Enumeration(Aggregate::new(Box::new(name), members)),
                         span,
                         visibility,
                     )),

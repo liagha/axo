@@ -302,7 +302,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     .map(|member| member.analyze(resolver))
                     .collect::<Result<Vec<Analysis<'element>>, AnalyzeError<'element>>>()?;
 
-                let analyzed = Structure::new(Str::from(target), members);
+                let analyzed = Aggregate::new(Str::from(target), members);
                 Ok(Analysis::new(AnalysisKind::Constructor(analyzed), self.span, typing))
             }
 

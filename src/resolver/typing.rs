@@ -1,5 +1,5 @@
 use crate::{
-    data::{Boolean, Identity, Scale, Str, Structure},
+    data::{Boolean, Identity, Scale, Str, Aggregate},
     tracker::Span,
 };
 
@@ -32,10 +32,10 @@ pub enum TypeKind<'typing> {
     Void,
     Variable(Identity),
     Unknown,
-    Constructor(Identity, Structure<Str<'typing>, Type<'typing>>),
-    Structure(Identity, Structure<Str<'typing>, Type<'typing>>),
-    Union(Identity, Structure<Str<'typing>, Type<'typing>>),
-    Enumeration(Identity, Structure<Str<'typing>, Type<'typing>>),
+    Constructor(Identity, Aggregate<Str<'typing>, Type<'typing>>),
+    Structure(Identity, Aggregate<Str<'typing>, Type<'typing>>),
+    Union(Identity, Aggregate<Str<'typing>, Type<'typing>>),
+    Enumeration(Identity, Aggregate<Str<'typing>, Type<'typing>>),
     Function(Str<'typing>, Vec<Type<'typing>>, Option<Box<Type<'typing>>>),
 }
 

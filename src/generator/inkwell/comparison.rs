@@ -25,6 +25,23 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    pub fn tag(
+        &self,
+        value: BasicValueEnum<'backend>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        if value.is_struct_value() {
+            let shape = value.into_struct_value();
+            let extract = self.builder.build_extract_value(shape, 0, "tag").map_err(|error| {
+                GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+            })?;
+
+            Ok(extract)
+        } else {
+            Ok(value)
+        }
+    }
+
     pub fn equal(
         &mut self,
         left: Box<Analysis<'backend>>,
@@ -34,18 +51,27 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
+        let primary = self.tag(alpha, span)?;
+        let secondary = self.tag(beta, span)?;
+
+        let (primary_value, secondary_value, floating) = self.normalize(primary, secondary, span)?;
 
         if !floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(IntPredicate::EQ, primary.into_int_value(), secondary.into_int_value(), "equal")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-            ))
+            let truth = self.builder.build_int_compare(
+                IntPredicate::EQ,
+                primary_value.into_int_value(),
+                secondary_value.into_int_value(),
+                "equal",
+            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            Ok(truth.into())
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(FloatPredicate::OEQ, primary.into_float_value(), secondary.into_float_value(), "equal")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-            ))
+            let truth = self.builder.build_float_compare(
+                FloatPredicate::OEQ,
+                primary_value.into_float_value(),
+                secondary_value.into_float_value(),
+                "equal",
+            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            Ok(truth.into())
         }
     }
 
@@ -58,18 +84,27 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
 
-        let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
+        let primary = self.tag(alpha, span)?;
+        let secondary = self.tag(beta, span)?;
+
+        let (primary_value, secondary_value, floating) = self.normalize(primary, secondary, span)?;
 
         if !floating {
-            Ok(BasicValueEnum::from(
-                self.builder.build_int_compare(IntPredicate::NE, primary.into_int_value(), secondary.into_int_value(), "unequal")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-            ))
+            let truth = self.builder.build_int_compare(
+                IntPredicate::NE,
+                primary_value.into_int_value(),
+                secondary_value.into_int_value(),
+                "unequal",
+            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            Ok(truth.into())
         } else {
-            Ok(BasicValueEnum::from(
-                self.builder.build_float_compare(FloatPredicate::ONE, primary.into_float_value(), secondary.into_float_value(), "unequal")
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
-            ))
+            let truth = self.builder.build_float_compare(
+                FloatPredicate::ONE,
+                primary_value.into_float_value(),
+                secondary_value.into_float_value(),
+                "unequal",
+            ).map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+            Ok(truth.into())
         }
     }
 
