@@ -24,6 +24,35 @@ use {
     inkwell::context::{Context, ContextRef},
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InputKind {
+    Source,
+    Schema,
+    Object,
+}
+
+impl InputKind {
+    pub fn from_path(path: &str) -> Option<Self> {
+        if path.ends_with(".axo") {
+            Some(InputKind::Source)
+        } else if path.ends_with(".ll") {
+            Some(InputKind::Schema)
+        } else if path.ends_with(".o") {
+            Some(InputKind::Object)
+        } else {
+            None
+        }
+    }
+
+    pub fn extension(&self) -> &'static str {
+        match self {
+            InputKind::Source => "axo",
+            InputKind::Schema => "ll",
+            InputKind::Object => "o",
+        }
+    }
+}
+
 pub enum CompileError<'error> {
     Initialize(InitializeError<'error>),
     Scan(ScanError<'error>),
@@ -32,13 +61,14 @@ pub enum CompileError<'error> {
     Analyze(AnalyzeError<'error>),
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
+    InvalidInput(Location<'error>),
 }
 
 pub struct Session<'session> {
     pub timer: DefaultTimer,
     pub reporter: Reporter,
     pub order: Vec<Identity>,
-    pub inputs: Map<Identity, Location<'session>>,
+    pub inputs: Map<Identity, (InputKind, Location<'session>)>,
     pub modules: Map<Identity, Identity>,
     pub initializer: Initializer<'session>,
     pub scanners: Map<Identity, Scanner<'session>>,
@@ -66,15 +96,23 @@ impl<'session> Session<'session> {
 
         let mut inputs = Map::new();
 
+        let mut errors = Vec::new();
+
         initializer.initialize().iter().for_each(|target| {
-            inputs.insert(inputs.len(), target.clone());
+            let kind = InputKind::from_path(&*target.to_string());
+
+            if let Some(kind) = kind {
+                inputs.insert(inputs.len(), (kind, target.clone()));
+            } else {
+                errors.push(CompileError::InvalidInput(target.clone()));
+            }
         });
 
-        let errors = initializer
+        errors.extend(initializer
             .errors
             .iter()
             .map(|error| CompileError::Initialize(error.clone()))
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>());
 
         let configuration = Symbol::new(
             SymbolKind::Module(
@@ -167,12 +205,17 @@ impl<'session> Session<'session> {
                 CompileError::Analyze(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
+                CompileError::InvalidInput(_) => {},
             }
         }
     }
 
     pub fn plan(&mut self) {
-        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
+        // Only plan Source files (.axo). .ll and .o bypass AST/Scope dependencies.
+        let mut identities: Vec<_> = self.inputs.iter()
+            .filter_map(|(&id, (kind, _))| if *kind == InputKind::Source { Some(id) } else { None })
+            .collect();
+
         identities.sort();
 
         let mut graph = Map::new();
@@ -243,22 +286,26 @@ impl<'session> Session<'session> {
         identities.sort();
 
         for identity in identities {
-            let location = self.inputs.get(&identity).unwrap();
-            let mut scanner = Scanner::new(*location);
+            let (kind, location) = self.inputs.get(&identity).unwrap();
 
-            scanner.prepare();
-            scanner.scan();
+            // Only attempt to tokenize source code
+            if *kind == InputKind::Source {
+                let mut scanner = Scanner::new(*location);
 
-            self.reporter.tokens(&scanner.output);
+                scanner.prepare();
+                scanner.scan();
 
-            self.errors.extend(
-                scanner
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Scan(error.clone()))
-            );
+                self.reporter.tokens(&scanner.output);
 
-            self.scanners.insert(identity, scanner);
+                self.errors.extend(
+                    scanner
+                        .errors
+                        .iter()
+                        .map(|error| CompileError::Scan(error.clone()))
+                );
+
+                self.scanners.insert(identity, scanner);
+            }
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -272,24 +319,28 @@ impl<'session> Session<'session> {
         identities.sort();
 
         for identity in identities {
-            let location = self.inputs.get(&identity).unwrap();
-            let mut parser = Parser::new(*location);
+            let (kind, location) = self.inputs.get(&identity).unwrap();
 
-            let tokens = self.scanners.get(&identity).unwrap().output.clone();
+            // Only attempt to parse source code tokens
+            if *kind == InputKind::Source {
+                let mut parser = Parser::new(*location);
 
-            parser.set_input(tokens);
-            parser.parse();
+                let tokens = self.scanners.get(&identity).unwrap().output.clone();
 
-            self.reporter.elements(&parser.output);
+                parser.set_input(tokens);
+                parser.parse();
 
-            self.errors.extend(
-                parser
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Parse(error.clone()))
-            );
+                self.reporter.elements(&parser.output);
 
-            self.parsers.insert(identity, parser);
+                self.errors.extend(
+                    parser
+                        .errors
+                        .iter()
+                        .map(|error| CompileError::Parse(error.clone()))
+                );
+
+                self.parsers.insert(identity, parser);
+            }
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -300,7 +351,7 @@ impl<'session> Session<'session> {
         let modules: Vec<_> = self.order
             .iter()
             .map(|&identity| {
-                let location = self.inputs.get(&identity).unwrap();
+                let (_, location) = self.inputs.get(&identity).unwrap();
                 let stem = Str::from(location.stem().unwrap().to_string());
                 let span = Span::file(Str::from(location.to_string())).unwrap();
 
@@ -334,11 +385,12 @@ impl<'session> Session<'session> {
     pub fn resolve(&mut self) {
         self.reporter.start("resolving");
 
+        // Runs safely over InputKind::Source dependencies exclusively
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
             let mut module = self.resolver.scope.find(module_id).unwrap().clone();
             let module_scope = replace(&mut module.scope, Scope::new());
-            
+
             self.resolver.enter_scope(module_scope);
 
             let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
@@ -357,6 +409,8 @@ impl<'session> Session<'session> {
 
             self.resolver.insert(module);
         }
+
+        self.reporter.symbols(&self.resolver.scope.collect());
 
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
@@ -413,7 +467,6 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
 
-        self.reporter.symbols(&self.resolver.scope.collect());
         self.reporter.finish("resolving", duration);
     }
 
@@ -445,7 +498,7 @@ impl<'session> Session<'session> {
         let triple = inkwell::targets::TargetMachine::get_default_triple();
 
         for &identity in &self.order {
-            let location = self.inputs.get(&identity).unwrap();
+            let (_, location) = self.inputs.get(&identity).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(&identity).unwrap().output.clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
@@ -476,6 +529,7 @@ impl<'session> Session<'session> {
                                 return;
                             }
 
+                            // Keep track of emitted .ll file outputs
                             self.outputs.insert(identity, schema);
                         }
 
@@ -508,15 +562,38 @@ impl<'session> Session<'session> {
         self.reporter.start("emitting");
 
         let mut objects = Map::new();
+        let mut direct_objects = Vec::new();
 
-        for &identity in &self.order {
-            if let Some(location) = self.outputs.get(&identity) {
-                let object = Self::object(*location, None);
+        // 1. Process compilation units and aggregate into object files
+        for (&identity, &(ref kind, ref location)) in &self.inputs {
+            let schema_location = match kind {
+                InputKind::Source => {
+                    // It was generated in `generate()`
+                    if let Some(out_loc) = self.outputs.get(&identity) {
+                        Some(*out_loc)
+                    } else {
+                        None
+                    }
+                },
+                InputKind::Schema => {
+                    // It was provided directly to the pipeline
+                    Some(*location)
+                },
+                InputKind::Object => {
+                    // Passed directly, so we track it for the link stage and bypass `clang -c`
+                    direct_objects.push(*location);
+                    None
+                }
+            };
+
+            // If we have an intermediate `.ll` schema target, compile to `.o`
+            if let Some(ll_location) = schema_location {
+                let object = Self::object(ll_location, None);
 
                 let mut command = Command::new("clang");
                 command
                     .arg("-c")
-                    .arg(location.to_string())
+                    .arg(ll_location.to_string())
                     .arg("-o")
                     .arg(object.to_string());
 
@@ -525,23 +602,41 @@ impl<'session> Session<'session> {
                 if status.success() {
                     objects.insert(identity, object);
                 } else {
-                    panic!("clang failed compiling {}", location);
+                    panic!("clang failed compiling {}", ll_location);
                 }
             }
         }
 
+        // 2. Link object files into Final Output Binary
         let mut link = Command::new("clang");
 
-        for &identity in &self.order {
-            if let Some(object) = objects.get(&identity) {
-                link.arg(object.to_string());
-            }
+        // Add dynamically compiled objects
+        for object in objects.values() {
+            link.arg(object.to_string());
+        }
+
+        // Add precompiled objects directly input into the compiler
+        for object in direct_objects {
+            link.arg(object.to_string());
         }
 
         link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
         link.arg("/home/ali/Projects/axo/examples/libc/runtime.o".to_string());
 
-        let executable = Self::executable(*self.outputs.get(&self.order[0]).unwrap(), None);
+        // Select the name for the final binary target
+        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
+        identities.sort();
+
+        // Base name either on source dependency roots, or alternatively on the first supplied item.
+        let base_identity = self.order.first().copied().unwrap_or_else(|| {
+            *identities.first().expect("No input files were provided to compile")
+        });
+
+        let base_location = self.outputs.get(&base_identity)
+            .copied()
+            .unwrap_or_else(|| self.inputs.get(&base_identity).unwrap().1);
+
+        let executable = Self::executable(base_location, None);
 
         link.arg("-o").arg(executable.to_string());
 

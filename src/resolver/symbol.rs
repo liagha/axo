@@ -43,8 +43,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 }
 
                 let mut scope = resolver.scope.clone();
+                
                 scope.parent = None;
                 self.scope = scope;
+                
                 resolver.exit();
 
                 Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)
@@ -53,12 +55,16 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let head = union.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter();
+                
                 for member in &mut union.members {
                     member.declare(resolver);
                 }
+                
                 let mut scope = resolver.scope.clone();
+                
                 scope.parent = None;
                 self.scope = scope;
+                
                 resolver.exit();
 
                 Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)
@@ -67,12 +73,16 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let head = enumeration.target.brand().unwrap().format(Verbosity::Minimal);
 
                 resolver.enter();
+                
                 for member in &mut enumeration.members {
                     member.declare(resolver);
                 }
+                
                 let mut scope = resolver.scope.clone();
+                
                 scope.parent = None;
                 self.scope = scope;
+                
                 resolver.exit();
 
                 Type::new(TypeKind::Constructor(self.identity, Aggregate::new(head.into(), Vec::new())), span)

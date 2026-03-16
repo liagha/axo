@@ -22,9 +22,9 @@ enum Color {
     }
 
     enum Blue {
-        Cyan,
-        LightBlue,
-        DarkBlue
+        const Cyan,
+        const LightBlue,
+        const DarkBlue
     }
 }
 

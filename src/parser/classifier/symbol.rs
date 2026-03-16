@@ -354,18 +354,7 @@ impl<'parser> Parser<'parser> {
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => {
-                            match symbol.kind {
-                                SymbolKind::Binding(ref binding) => {
-                                    if binding.value.is_some() {
-                                        unimplemented!("Error here")
-                                    }
-
-                                    Some(symbol)
-                                }
-                                _ => {
-                                    Some(symbol)
-                                }
-                            }
+                            Some(symbol)
                         },
                         ElementKind::Literal(Token {
                                                  kind: TokenKind::Identifier(identifier),
