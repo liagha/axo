@@ -502,12 +502,13 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 construct.target.resolve(resolver);
 
                 let layout = Vec::new();
+                let mut typing = None;
 
                 if let Some(reference) = self.reference {
                     if let Some(symbol) = resolver.scope.find(reference).cloned() {
                         match symbol.kind {
                             SymbolKind::Structure(mut structure) => {
-                                resolver.enter();
+                                resolver.enter_scope(symbol.scope.clone());
 
                                 for member in &mut structure.members {
                                     if member.is_instance() {
@@ -520,9 +521,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
 
                                 resolver.exit();
+                                typing = Some(TypeKind::Structure(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
                             SymbolKind::Union(mut union) => {
-                                resolver.enter();
+                                resolver.enter_scope(symbol.scope.clone());
 
                                 for member in &mut union.members {
                                     if member.is_instance() {
@@ -535,9 +537,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
 
                                 resolver.exit();
+                                typing = Some(TypeKind::Union(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
                             SymbolKind::Enumeration(mut enumeration) => {
-                                resolver.enter();
+                                resolver.enter_scope(symbol.scope.clone());
 
                                 for member in &mut enumeration.members {
                                     if member.is_instance() {
@@ -550,6 +553,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
 
                                 resolver.exit();
+                                typing = Some(TypeKind::Enumeration(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
                             _ => {}
                         }
@@ -559,7 +563,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let head = construct.target.target().unwrap();
                 let aggregate = Aggregate::new(head, layout);
 
-                Type::new(self.reference.unwrap(), TypeKind::Constructor(aggregate))
+                Type::new(self.reference.unwrap(), typing.unwrap_or(TypeKind::Constructor(aggregate)))
             }
 
             ElementKind::Symbolize(symbol) => {
