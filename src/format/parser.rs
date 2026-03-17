@@ -57,7 +57,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                 if self.scope.is_empty() {
                     "".into()
                 } else {
-                    format!(" => {}", self.scope.format(verbosity))
+                    " => Scope".to_string()
                 }
             ).into(),
             Verbosity::Debug => format!(
@@ -65,7 +65,7 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                 format!("identity: {}", self.identity.colorize(Color::Blue)).indent(verbosity),
                 format!("kind: {}", self.kind.format(verbosity)).indent(verbosity),
                 format!("visibility: {:?}", self.visibility).indent(verbosity),
-                format!("scope: {}", self.scope.format(verbosity)).indent(verbosity)
+                "scope: Scope".to_string().indent(verbosity)
             ).into(),
         }
     }

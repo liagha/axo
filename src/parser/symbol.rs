@@ -5,9 +5,9 @@ use {
         internal::hash::{Hash, Set},
         parser::{Element, ElementKind},
         resolver::{
+            next_identity,
             scope::Scope,
             Type, TypeKind,
-            next_identity,
         },
         scanner::{OperatorKind, TokenKind},
         tracker::Span,
@@ -19,7 +19,7 @@ pub struct Symbol<'symbol> {
     pub usages: Set<Identity>,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
-    pub scope: Scope<Symbol<'symbol>>,
+    pub scope: Scope,
     pub visibility: Visibility,
     pub typing: Type<'symbol>,
 }
@@ -54,16 +54,16 @@ impl<'symbol> Symbol<'symbol> {
             usages: Default::default(),
             kind,
             span,
-            scope: Scope::new(),
+            scope: Scope::new(None),
             visibility,
-            typing: Type::from(TypeKind::Unknown)
+            typing: Type::from(TypeKind::Unknown),
         }
     }
 
-    pub fn with_members<I: IntoIterator<Item=Symbol<'symbol>>>(self, members: I) -> Self {
+    pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
             scope: Scope {
-                symbols: Set::from_iter(members),
+                symbols: Set::from_iter(members.into_iter().map(|member| member.identity)),
                 parent: None,
             },
             identity: self.identity,
@@ -72,10 +72,10 @@ impl<'symbol> Symbol<'symbol> {
     }
 
     pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
-        self.scope.symbols.extend(members);
+        self.scope.symbols.extend(members.into_iter().map(|member| member.identity));
     }
 
-    pub fn with_scope(self, scope: Scope<Symbol<'symbol>>) -> Self {
+    pub fn with_scope(self, scope: Scope) -> Self {
         Self {
             scope,
             identity: self.identity,
@@ -83,7 +83,7 @@ impl<'symbol> Symbol<'symbol> {
         }
     }
 
-    pub fn set_scope(&mut self, scope: Scope<Symbol<'symbol>>) {
+    pub fn set_scope(&mut self, scope: Scope) {
         self.scope = scope;
     }
 
@@ -105,10 +105,10 @@ impl<'symbol> Element<'symbol> {
             ElementKind::Literal(literal) => {
                 if let TokenKind::Identifier(identifier) = literal.kind {
                     Some(identifier)
-                } else { 
+                } else {
                     None
                 }
-            },
+            }
             ElementKind::Construct(construct) => construct.target.target(),
             ElementKind::Index(index) => index.target.target(),
             ElementKind::Invoke(invoke) => invoke.target.target(),

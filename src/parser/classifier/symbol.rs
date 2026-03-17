@@ -657,16 +657,9 @@ impl<'parser> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
 
-                let fields = Self::get_body(body.clone())
-                    .iter()
-                    .filter(|item| item.kind.is_symbolize())
-                    .map(|item| item.kind.clone().unwrap_symbolize().clone())
-                    .collect::<Vec<_>>();
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
-                let mut symbol =
+                let symbol =
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
-
-                symbol.scope.extend(fields);
 
                 *form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));
 

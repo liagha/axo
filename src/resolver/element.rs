@@ -1,5 +1,5 @@
 use crate::{
-    data::{Aggregate, Delimited, Str, Scale},
+    data::{Aggregate, Delimited, Scale, Str},
     parser::{Element, ElementKind, SymbolKind},
     resolver::{Error, ErrorKind, Resolvable, Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -28,14 +28,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 symbol.declare(resolver);
                 self.typing = symbol.typing.clone();
             }
-            ElementKind::Delimited(
-                Delimited {
-                    start: Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. },
-                    members,
-                    separator: None | Some(Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), .. }),
-                    end: Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. },
-                }
-            ) => {
+            ElementKind::Delimited(Delimited {
+                                       start: Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. },
+                                       members,
+                                       separator: None | Some(Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), .. }),
+                                       end: Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. },
+                                   }) => {
                 for member in members {
                     member.declare(resolver);
                 }
@@ -51,7 +49,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 | ElementKind::Construct(_)
                 | ElementKind::Invoke(_)
         ) {
-            match resolver.scope.lookup(self) {
+            let scope = resolver.scopes.get(&resolver.active).unwrap().clone();
+            match scope.lookup(self, &resolver.scopes, &resolver.registry) {
                 Ok(symbol) => {
                     self.reference = Some(symbol.identity);
                     match &mut self.kind {
@@ -142,12 +141,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         inner = resolver.unify(member.span, &inner, &member.typing);
                     }
 
-                    Type::from(
-                        TypeKind::Array {
-                            member: Box::new(inner),
-                            size: delimited.members.len() as Scale,
-                        },
-                    )
+                    Type::from(TypeKind::Array {
+                        member: Box::new(inner),
+                        size: delimited.members.len() as Scale,
+                    })
                 }
 
                 _ => Type::from(TypeKind::Void),
@@ -160,7 +157,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     TokenKind::Operator(operator) => match operator.as_slice() {
                         [OperatorKind::Exclamation] => {
                             resolver.unify(unary.operand.span, &unary.operand.typing, &Type::from(TypeKind::Boolean))
-                        },
+                        }
                         [OperatorKind::Tilde] => {
                             let expect = resolver.reify(&unary.operand.typing);
 
@@ -239,7 +236,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             } else {
                                 resolver.errors.push(Error::new(
                                     ErrorKind::InvalidOperation(binary.operator.clone()),
-                                    binary.operator.span
+                                    binary.operator.span,
                                 ));
 
                                 resolver.fresh()
@@ -249,7 +246,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             binary.right.resolve(resolver);
 
                             resolver.unify(binary.right.span, &binary.left.typing, &binary.right.typing)
-                        },
+                        }
                         [OperatorKind::Plus]
                         | [OperatorKind::Minus]
                         | [OperatorKind::Star]
@@ -385,9 +382,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 *base
                             }
                         }
-                        TypeKind::Array { member, .. } => {
-                            *member
-                        }
+                        TypeKind::Array { member, .. } => *member,
                         TypeKind::Tuple { members } => {
                             let value = if let ElementKind::Literal(Token { kind: TokenKind::Integer(literal), .. }) = index.members[0].kind {
                                 usize::try_from(literal).unwrap()
@@ -477,9 +472,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         Type::from(TypeKind::Unknown)
                     }
-                    Some("continue") | Some("break") => {
-                        Type::from(TypeKind::Unknown)
-                    }
+                    Some("continue") | Some("break") => Type::from(TypeKind::Unknown),
                     _ => {
                         for member in &mut invoke.members {
                             member.resolve(resolver);
@@ -509,7 +502,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let mut typing = None;
 
                 if let Some(reference) = self.reference {
-                    if let Some(symbol) = resolver.scope.find(reference).cloned() {
+                    if let Some(symbol) = resolver.get_symbol(reference).cloned() {
                         match symbol.kind {
                             SymbolKind::Structure(mut structure) => {
                                 resolver.enter_scope(symbol.scope.clone());

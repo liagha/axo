@@ -1,29 +1,27 @@
 use {
     super::{
         assessor::{Affinity, Aligner},
-        Resolver,
-        ErrorKind, ResolveError,
+        Resolver, ErrorKind, ResolveError,
     },
     crate::{
         data::Identity,
-        internal::hash::Set,
-        parser::Symbol,
-        parser::Element,
+        internal::{hash::Map, hash::Set},
+        parser::{Element, Symbol},
     },
     matchete::{Assessor, Scheme},
 };
 
 #[derive(Clone)]
-pub struct Scope<Value> {
-    pub symbols: Set<Value>,
-    pub parent: Option<Box<Scope<Value>>>,
+pub struct Scope {
+    pub symbols: Set<Identity>,
+    pub parent: Option<Identity>,
 }
 
-impl<'scope> Scope<Symbol<'scope>> {
-    pub fn new() -> Self {
+impl Scope {
+    pub fn new(parent: Option<Identity>) -> Self {
         Self {
             symbols: Set::new(),
-            parent: None,
+            parent,
         }
     }
 
@@ -31,55 +29,61 @@ impl<'scope> Scope<Symbol<'scope>> {
         self.symbols.is_empty()
     }
 
-    pub fn attach(&mut self, parent: Scope<Symbol<'scope>>) {
-        self.parent = Some(Box::new(parent));
+    pub fn insert(&mut self, identity: Identity) {
+        self.symbols.remove(&identity);
+        self.symbols.insert(identity);
     }
 
-    pub fn detach(&mut self) -> Option<Scope<Symbol<'scope>>> {
-        self.parent.take().map(|boxed| *boxed)
-    }
-
-    pub fn insert(&mut self, symbol: Symbol<'scope>) {
-        self.symbols.remove(&symbol);
-        self.symbols.insert(symbol);
-    }
-
-    pub fn extend(&mut self, items: Vec<Symbol<'scope>>) {
+    pub fn extend(&mut self, items: Vec<Identity>) {
         self.symbols.extend(items);
     }
 
-    pub fn replace(&mut self, old: &Symbol<'scope>, new: Symbol<'scope>) {
-        if self.symbols.remove(old) {
+    pub fn replace(&mut self, old: Identity, new: Identity) {
+        if self.symbols.remove(&old) {
             self.symbols.insert(new);
         }
     }
-    
-    pub fn remove(&mut self, symbol: &Symbol<'scope>) -> bool {
-        self.symbols.remove(symbol)
+
+    pub fn remove(&mut self, identity: &Identity) -> bool {
+        self.symbols.remove(identity)
     }
 
-    pub fn collect(&self) -> Vec<Symbol<'scope>> {
+    pub fn collect<'a>(
+        &self,
+        scopes: &Map<Identity, Scope>,
+        registry: &Map<Identity, Symbol<'a>>,
+    ) -> Vec<Symbol<'a>> {
         let mut symbols = Vec::new();
         let mut current = Some(self);
 
         while let Some(scope) = current {
-            symbols.extend(scope.symbols.iter().cloned());
-            current = scope.parent.as_deref();
+            for identity in &scope.symbols {
+                if let Some(symbol) = registry.get(identity) {
+                    symbols.push(symbol.clone());
+                }
+            }
+            current = scope.parent.and_then(|id| scopes.get(&id));
         }
 
         symbols.sort();
         symbols
     }
 
-    pub fn find(&self, target: Identity) -> Option<&Symbol<'scope>> {
-        if let Some(symbol) = self.symbols.iter().find(|symbol| symbol.identity == target) {
-            return Some(symbol);
+    pub fn find(&self, target: Identity, scopes: &Map<Identity, Scope>) -> Option<Identity> {
+        if self.symbols.contains(&target) {
+            return Some(target);
         }
 
-        self.parent.as_ref()?.find(target)
+        let parent = self.parent?;
+        scopes.get(&parent)?.find(target, scopes)
     }
 
-    pub fn lookup(&mut self, target: &Element<'scope>) -> Result<Symbol<'scope>, Vec<ResolveError<'scope>>> {
+    pub fn lookup<'a>(
+        &self,
+        target: &Element<'a>,
+        scopes: &Map<Identity, Scope>,
+        registry: &Map<Identity, Symbol<'a>>,
+    ) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
         if let Some(symbol) = Resolver::builtin(target) {
             return Ok(symbol);
         }
@@ -93,7 +97,7 @@ impl<'scope> Scope<Symbol<'scope>> {
             .dimension(&mut aligner, 0.4)
             .scheme(Scheme::Multiplicative);
 
-        let candidates = &*self.collect();
+        let candidates = &*self.collect(scopes, registry);
         let champion = assessor.champion(target, candidates);
 
         if let Some(champion) = champion {

@@ -1,6 +1,6 @@
 use crate::{
-    data::{memory::replace, Identity, Scale},
-    internal::{hash::Map},
+    data::{Identity, Scale},
+    internal::hash::Map,
     parser::{Element, ElementKind, Symbol},
     resolver::{scope::Scope, ErrorKind, ResolveError, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -8,23 +8,27 @@ use crate::{
 };
 
 pub struct Resolver<'resolver> {
-    pub scope: Scope<Symbol<'resolver>>,
+    pub active: Identity,
+    pub scopes: Map<Identity, Scope>,
     pub registry: Map<Identity, Symbol<'resolver>>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
     pub variables: Vec<Option<Type<'resolver>>>,
     pub returns: Vec<Type<'resolver>>,
+    pub counter: Identity,
 }
 
 impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
-            scope: self.scope.clone(),
+            active: self.active,
+            scopes: self.scopes.clone(),
             registry: self.registry.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
             variables: self.variables.clone(),
             returns: self.returns.clone(),
+            counter: self.counter,
         }
     }
 }
@@ -40,35 +44,61 @@ pub trait Resolvable<'resolvable> {
 
 impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
+        let mut scopes = Map::new();
+        scopes.insert(0, Scope::new(None));
+
         Self {
-            scope: Scope::new(),
+            active: 0,
+            scopes,
             registry: Map::new(),
             input: Vec::new(),
             errors: Vec::new(),
             variables: Vec::new(),
             returns: Vec::new(),
+            counter: 1,
         }
+    }
+    
+    pub fn scope(&self) -> &Scope {
+        self.scopes.get(&self.active).unwrap()
+    }
+
+    pub fn scope_mut(&mut self) -> &mut Scope {
+        self.scopes.get_mut(&self.active).unwrap()
     }
 
     pub fn enter(&mut self) {
-        let parent = replace(&mut self.scope, Scope::new());
-        self.scope.attach(parent);
+        let next = self.counter;
+        self.counter += 1;
+
+        self.scopes.insert(next, Scope::new(Some(self.active)));
+        self.active = next;
     }
 
-    pub fn enter_scope(&mut self, scope: Scope<Symbol<'resolver>>) {
-        let parent = replace(&mut self.scope, scope);
-        self.scope.attach(parent);
+    pub fn enter_scope(&mut self, mut scope: Scope) {
+        let next = self.counter;
+        self.counter += 1;
+
+        scope.parent = Some(self.active);
+        self.scopes.insert(next, scope);
+        self.active = next;
     }
 
     pub fn exit(&mut self) {
-        if let Some(parent) = self.scope.detach() {
-            self.scope = parent;
+        if let Some(scope) = self.scopes.get(&self.active) {
+            if let Some(parent) = scope.parent {
+                self.active = parent;
+            }
         }
     }
 
     pub fn insert(&mut self, symbol: Symbol<'resolver>) {
-        self.registry.insert(symbol.identity, symbol.clone());
-        self.scope.insert(symbol);
+        let identity = symbol.identity;
+        self.registry.insert(identity, symbol);
+
+        if let Some(scope) = self.scopes.get_mut(&self.active) {
+            scope.insert(identity);
+        }
     }
 
     pub fn get_symbol(&self, identity: Identity) -> Option<&Symbol<'resolver>> {
@@ -84,8 +114,12 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn lookup(&mut self, identity: Identity) -> Type<'resolver> {
-        if let Some(symbol) = self.scope.find(identity) {
-            return symbol.typing.clone();
+        if let Some(scope) = self.scopes.get(&self.active) {
+            if let Some(found) = scope.find(identity, &self.scopes) {
+                if let Some(symbol) = self.registry.get(&found) {
+                    return symbol.typing.clone();
+                }
+            }
         }
         self.fresh()
     }

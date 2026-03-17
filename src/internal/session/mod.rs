@@ -2,11 +2,8 @@ mod registry;
 
 use {
     crate::{
-        analyzer::AnalyzeError,
-        data::{
-            *,
-            memory::replace,
-        },
+        analyzer::{AnalyzeError, Analyzer},
+        data::{memory::replace, *},
         generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
@@ -19,7 +16,6 @@ use {
         resolver::{Resolvable, ResolveError, Resolver, Scope},
         scanner::{ScanError, Scanner, Token, TokenKind},
         tracker::{self, Location, Peekable, Span, TrackError},
-        analyzer::Analyzer,
     },
     inkwell::context::{Context, ContextRef},
 };
@@ -95,7 +91,6 @@ impl<'session> Session<'session> {
         reporter.start("initializing");
 
         let mut inputs = Map::new();
-
         let mut errors = Vec::new();
 
         initializer.initialize().iter().for_each(|target| {
@@ -108,44 +103,35 @@ impl<'session> Session<'session> {
             }
         });
 
-        errors.extend(initializer
-            .errors
-            .iter()
-            .map(|error| CompileError::Initialize(error.clone()))
-            .collect::<Vec<_>>());
+        errors.extend(
+            initializer
+                .errors
+                .iter()
+                .map(|error| CompileError::Initialize(error.clone()))
+                .collect::<Vec<_>>(),
+        );
 
         let configuration = Symbol::new(
-            SymbolKind::Module(
-                Module::new(
-                    Box::from(
-                        Element::new(
-                            ElementKind::Literal(
-                                Token::new(
-                                    TokenKind::Identifier(
-                                        Str::from("config")
-                                    ),
-                                    Span::void(),
-                                ),
-                            ),
-                            Span::void(),
-                        )
-                    )
-                )
-            ),
+            SymbolKind::Module(Module::new(Box::from(Element::new(
+                ElementKind::Literal(Token::new(
+                    TokenKind::Identifier(Str::from("config")),
+                    Span::void(),
+                )),
+                Span::void(),
+            )))),
             Span::void(),
             Visibility::Public,
-        ).with_members(initializer.output.clone());
+        )
+            .with_members(initializer.output.clone());
 
         resolver.insert(configuration);
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
-
         let verbosity = Resolver::verbosity(&mut resolver);
         let reporter = Reporter::new(verbosity);
 
         let context = Context::create();
         let context_ref = unsafe { ContextRef::new(context.raw()) };
-
         let generator = Generator::new(context_ref);
 
         reporter.finish("initializing", duration);
@@ -173,27 +159,36 @@ impl<'session> Session<'session> {
             self.scan();
 
             self.parse();
-            if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
 
             self.plan();
 
             self.populate();
-            if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
 
             self.resolve();
-            if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
 
             self.analyze();
-            if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
 
             self.generate();
-            if !self.errors.is_empty() { break 'pipeline; }
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
 
             self.emit();
         }
 
         let duration = Duration::from_nanos(self.timer.stop().unwrap());
-
         self.reporter.finish("compilation", duration);
 
         for error in &self.errors {
@@ -205,13 +200,15 @@ impl<'session> Session<'session> {
                 CompileError::Analyze(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
-                CompileError::InvalidInput(_) => {},
+                CompileError::InvalidInput(_) => {}
             }
         }
     }
 
     pub fn plan(&mut self) {
-        let mut identities: Vec<_> = self.inputs.iter()
+        let mut identities: Vec<_> = self
+            .inputs
+            .iter()
             .filter_map(|(&id, (kind, _))| if *kind == InputKind::Source { Some(id) } else { None })
             .collect();
 
@@ -246,13 +243,11 @@ impl<'session> Session<'session> {
 
         while !queue.is_empty() {
             let identity = queue.remove(0);
-
             sorted.push(identity);
 
             if let Some(neighbors) = graph.get(&identity) {
                 for &next in neighbors {
                     let degree = degreed.get_mut(&next).unwrap();
-
                     *degree -= 1;
 
                     if *degree == 0 {
@@ -287,7 +282,6 @@ impl<'session> Session<'session> {
         for identity in identities {
             let (kind, location) = self.inputs.get(&identity).unwrap();
 
-            // Only attempt to tokenize source code
             if *kind == InputKind::Source {
                 let mut scanner = Scanner::new(*location);
 
@@ -300,7 +294,7 @@ impl<'session> Session<'session> {
                     scanner
                         .errors
                         .iter()
-                        .map(|error| CompileError::Scan(error.clone()))
+                        .map(|error| CompileError::Scan(error.clone())),
                 );
 
                 self.scanners.insert(identity, scanner);
@@ -320,10 +314,8 @@ impl<'session> Session<'session> {
         for identity in identities {
             let (kind, location) = self.inputs.get(&identity).unwrap();
 
-            // Only attempt to parse source code tokens
             if *kind == InputKind::Source {
                 let mut parser = Parser::new(*location);
-
                 let tokens = self.scanners.get(&identity).unwrap().output.clone();
 
                 parser.set_input(tokens);
@@ -335,7 +327,7 @@ impl<'session> Session<'session> {
                     parser
                         .errors
                         .iter()
-                        .map(|error| CompileError::Parse(error.clone()))
+                        .map(|error| CompileError::Parse(error.clone())),
                 );
 
                 self.parsers.insert(identity, parser);
@@ -347,7 +339,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn populate(&mut self) {
-        let modules: Vec<_> = self.order
+        let modules: Vec<_> = self
+            .order
             .iter()
             .map(|&identity| {
                 let (_, location) = self.inputs.get(&identity).unwrap();
@@ -355,14 +348,10 @@ impl<'session> Session<'session> {
                 let span = Span::file(Str::from(location.to_string())).unwrap();
 
                 let head = Element::new(
-                    ElementKind::Literal(
-                        Token::new(
-                            TokenKind::Identifier(stem),
-                            span,
-                        )
-                    ),
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
                     span,
-                ).into();
+                )
+                    .into();
 
                 let symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
@@ -371,7 +360,6 @@ impl<'session> Session<'session> {
                 );
 
                 self.modules.insert(identity, symbol.identity);
-
                 symbol
             })
             .collect();
@@ -384,11 +372,10 @@ impl<'session> Session<'session> {
     pub fn resolve(&mut self) {
         self.reporter.start("resolving");
 
-        // Runs safely over InputKind::Source dependencies exclusively
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new());
+            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
+            let module_scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(module_scope);
 
@@ -398,23 +385,20 @@ impl<'session> Session<'session> {
                 element.declare(&mut self.resolver);
             }
 
-            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
+            let active = self.resolver.active;
+            self.resolver.exit();
 
-            if let Some(parent) = current_scope.detach() {
-                self.resolver.scope = parent;
-            }
-
-            module.scope = current_scope;
-
+            module.scope = self.resolver.scopes.remove(&active).unwrap();
             self.resolver.insert(module);
         }
 
-        self.reporter.symbols(&self.resolver.scope.collect());
+        let scope = self.resolver.scopes.get(&self.resolver.active).unwrap().clone();
+        self.reporter.symbols(&scope.collect(&self.resolver.scopes, &self.resolver.registry));
 
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new());
+            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
+            let module_scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(module_scope);
 
@@ -424,20 +408,17 @@ impl<'session> Session<'session> {
                 element.resolve(&mut self.resolver);
             }
 
-            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
+            let active = self.resolver.active;
+            self.resolver.exit();
 
-            if let Some(parent) = current_scope.detach() {
-                self.resolver.scope = parent;
-            }
-
-            module.scope = current_scope;
+            module.scope = self.resolver.scopes.remove(&active).unwrap();
             self.resolver.insert(module);
         }
 
         for &identity in &self.order {
             let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.scope.find(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new());
+            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
+            let module_scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(module_scope);
 
@@ -447,25 +428,16 @@ impl<'session> Session<'session> {
                 element.reify(&mut self.resolver);
             }
 
-            let mut current_scope = replace(&mut self.resolver.scope, Scope::new());
+            let active = self.resolver.active;
+            self.resolver.exit();
 
-            if let Some(parent) = current_scope.detach() {
-                self.resolver.scope = parent;
-            }
-
-            module.scope = current_scope;
+            module.scope = self.resolver.scopes.remove(&active).unwrap();
             self.resolver.insert(module);
         }
 
-        self.errors.extend(
-            self.resolver
-                .errors
-                .drain(..)
-                .map(CompileError::Resolve)
-        );
+        self.errors.extend(self.resolver.errors.drain(..).map(CompileError::Resolve));
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
         self.reporter.finish("resolving", duration);
     }
 
@@ -483,7 +455,7 @@ impl<'session> Session<'session> {
                 analyzer
                     .errors
                     .iter()
-                    .map(|error| CompileError::Analyze(error.clone()))
+                    .map(|error| CompileError::Analyze(error.clone())),
             );
 
             self.analyzers.insert(identity, analyzer);
@@ -507,42 +479,31 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem.clone();
 
-            let schema = Self::schema(
-                *location,
-                Resolver::schema(&mut self.resolver, identity),
-            );
+            let schema = Self::schema(*location, Resolver::schema(&mut self.resolver, identity));
 
             self.reporter.start("generating");
-
             self.generator.generate(analysis);
 
             match schema.as_path() {
-                Ok(path) => {
-                    match File::create(&path) {
-                        Ok(mut file) => {
-                            if let Err(error) = file.write_all(self.generator.current_module().print_to_string().to_string().as_bytes()) {
-                                self.errors.push(
-                                    CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
-                                );
-
-                                return;
-                            }
-
-                            // Keep track of emitted .ll file outputs
-                            self.outputs.insert(identity, schema);
+                Ok(path) => match File::create(&path) {
+                    Ok(mut file) => {
+                        if let Err(error) = file.write_all(
+                            self.generator.current_module().print_to_string().to_string().as_bytes(),
+                        ) {
+                            self.errors.push(CompileError::Track(TrackError::new(
+                                tracker::error::ErrorKind::from_io(error, schema),
+                                Span::void(),
+                            )));
+                            return;
                         }
-
-                        Err(error) => {
-                            self.errors.push(
-                                CompileError::Track(TrackError::new(tracker::error::ErrorKind::from_io(error, schema), Span::void()))
-                            )
-                        }
+                        self.outputs.insert(identity, schema);
                     }
-                }
-
-                Err(error) => {
-                    self.errors.push(CompileError::Track(error))
-                }
+                    Err(error) => self.errors.push(CompileError::Track(TrackError::new(
+                        tracker::error::ErrorKind::from_io(error, schema),
+                        Span::void(),
+                    ))),
+                },
+                Err(error) => self.errors.push(CompileError::Track(error)),
             }
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -553,7 +514,7 @@ impl<'session> Session<'session> {
             self.generator
                 .errors
                 .iter()
-                .map(|error| CompileError::Generate(error.clone()))
+                .map(|error| CompileError::Generate(error.clone())),
         );
     }
 
@@ -561,86 +522,74 @@ impl<'session> Session<'session> {
         self.reporter.start("emitting");
 
         let mut objects = Map::new();
-        let mut direct_objects = Vec::new();
+        let mut direct = Vec::new();
 
-        // 1. Process compilation units and aggregate into object files
         for (&identity, &(ref kind, ref location)) in &self.inputs {
-            let schema_location = match kind {
+            let location = match kind {
                 InputKind::Source => {
-                    // It was generated in `generate()`
-                    if let Some(out_loc) = self.outputs.get(&identity) {
-                        Some(*out_loc)
+                    if let Some(output) = self.outputs.get(&identity) {
+                        Some(*output)
                     } else {
                         None
                     }
-                },
-                InputKind::Schema => {
-                    // It was provided directly to the pipeline
-                    Some(*location)
-                },
+                }
+                InputKind::Schema => Some(*location),
                 InputKind::Object => {
-                    // Passed directly, so we track it for the link stage and bypass `clang -c`
-                    direct_objects.push(*location);
+                    direct.push(*location);
                     None
                 }
             };
 
-            // If we have an intermediate `.ll` schema target, compile to `.o`
-            if let Some(ll_location) = schema_location {
-                let object = Self::object(ll_location, None);
-
+            if let Some(target) = location {
+                let object = Self::object(target, None);
                 let mut command = Command::new("clang");
+
                 command
                     .arg("-c")
-                    .arg(ll_location.to_string())
+                    .arg(target.to_string())
                     .arg("-o")
                     .arg(object.to_string());
 
-                let status = command.status().expect("failed to run clang");
+                let status = command.status().expect("failed");
 
                 if status.success() {
                     objects.insert(identity, object);
                 } else {
-                    panic!("clang failed compiling {}", ll_location);
+                    panic!("failed {}", target);
                 }
             }
         }
 
-        // 2. Link object files into Final Output Binary
         let mut link = Command::new("clang");
 
-        // Add dynamically compiled objects
         for object in objects.values() {
             link.arg(object.to_string());
         }
 
-        // Add precompiled objects directly input into the compiler
-        for object in direct_objects {
+        for object in direct {
             link.arg(object.to_string());
         }
 
         link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
         link.arg("/home/ali/Projects/axo/examples/libc/runtime.o".to_string());
 
-        // Select the name for the final binary target
         let mut identities: Vec<_> = self.inputs.keys().copied().collect();
         identities.sort();
 
-        // Base name either on source dependency roots, or alternatively on the first supplied item.
-        let base_identity = self.order.first().copied().unwrap_or_else(|| {
-            *identities.first().expect("No input files were provided to compile")
+        let identity = self.order.first().copied().unwrap_or_else(|| {
+            *identities.first().expect("missing")
         });
 
-        let base_location = self.outputs.get(&base_identity)
+        let location = self
+            .outputs
+            .get(&identity)
             .copied()
-            .unwrap_or_else(|| self.inputs.get(&base_identity).unwrap().1);
+            .unwrap_or_else(|| self.inputs.get(&identity).unwrap().1);
 
-        let executable = Self::executable(base_location, None);
-
+        let executable = Self::executable(location, None);
         link.arg("-o").arg(executable.to_string());
 
         let program = link.get_program().to_string_lossy();
-
         let args: Vec<String> = link
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
@@ -654,22 +603,21 @@ impl<'session> Session<'session> {
 
         self.reporter.run(format!("{}", command));
 
-        let status = link.status().expect("failed to link");
+        let status = link.status().expect("failed");
 
         if !status.success() {
-            panic!("linking failed");
+            panic!("failed");
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
         self.reporter.finish("emitting", duration);
         self.reporter.run(format!("{}", executable));
 
-        Command::new(executable.to_string()).status().expect("failed to execute");
+        Command::new(executable.to_string()).status().expect("failed");
     }
 
     fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let schema = if let Some(schema) = configuration {
+        let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
             let path = location.to_path().unwrap();
@@ -677,11 +625,11 @@ impl<'session> Session<'session> {
             parent.join(location.stem().unwrap()).with_extension("ll")
         };
 
-        Location::Entry(Str::from(schema))
+        Location::Entry(Str::from(target))
     }
 
     fn object(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let schema = if let Some(schema) = configuration {
+        let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
             let path = location.to_path().unwrap();
@@ -689,11 +637,11 @@ impl<'session> Session<'session> {
             parent.join(location.stem().unwrap()).with_extension("o")
         };
 
-        Location::Entry(Str::from(schema))
+        Location::Entry(Str::from(target))
     }
 
     fn executable(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let schema = if let Some(schema) = configuration {
+        let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
             let path = location.to_path().unwrap();
@@ -701,6 +649,6 @@ impl<'session> Session<'session> {
             parent.join(location.stem().unwrap()).with_extension("")
         };
 
-        Location::Entry(Str::from(schema))
+        Location::Entry(Str::from(target))
     }
 }

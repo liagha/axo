@@ -4,9 +4,9 @@ use crate::{data::Str, internal::hash::Set};
 pub enum Verbosity {
     Off,
     #[default]
-    Minimal,  // Formerly 0
-    Detailed, // Formerly 1
-    Debug,    // Formerly 2 and above
+    Minimal,  
+    Detailed,
+    Debug,
 }
 
 impl From<u8> for Verbosity {

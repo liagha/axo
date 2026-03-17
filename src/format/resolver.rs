@@ -2,25 +2,9 @@ use {
     crate::{
         data::Str,
         format::{Show, Verbosity},
-        parser::Symbol,
-        resolver::{Type, TypeKind, scope::Scope},
+        resolver::{Type, TypeKind},
     },
 };
-
-impl<'scope> Show<'scope> for Scope<Symbol<'scope>> {
-    fn format(&self, verbosity: Verbosity) -> Str<'scope> {
-        match verbosity {
-            Verbosity::Off => "".into(),
-            Verbosity::Minimal => self.symbols.format(verbosity),
-            Verbosity::Detailed => format!("Scope({})", self.symbols.format(verbosity)).into(),
-            Verbosity::Debug => format!(
-                "Scope {{\n{}\n}}",
-                format!("symbols: {}", self.symbols.format(verbosity)).indent(verbosity)
-            ).into(),
-        }
-    }
-}
-
 
 impl<'typing> Show<'typing> for Type<'typing> {
     fn format(&self, verbosity: Verbosity) -> Str<'typing> {

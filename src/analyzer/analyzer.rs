@@ -143,7 +143,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self
                     .scope
-                    .collect()
+                    .collect(&resolver.scopes, &resolver.registry)
                     .iter()
                     .map(|member| member.analyze(resolver))
                     .collect();
