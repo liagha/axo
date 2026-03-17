@@ -56,7 +56,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(),
             visibility,
-            typing: Type::from_kind(TypeKind::Unknown)
+            typing: Type::from(TypeKind::Unknown)
         }
     }
 

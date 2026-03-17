@@ -1,10 +1,12 @@
-struct Point {
-    const x: Integer,
-    const y: Integer,
+struct Test {
+    struct Point {
+        const x: Integer,
+        const y: Integer,
 
-    func print_position(const point: Point) {
-        libc.println_i64(point.x)
-        libc.println_i64(point.y)
+        func print_position(const point: Point) {
+            libc.println_i64(point.x)
+            libc.println_i64(point.y)
+        }
     }
 }
 

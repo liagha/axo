@@ -66,11 +66,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
         self.typing = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
-                TokenKind::Integer(_) => Type::from_kind(TypeKind::Integer { size: 64, signed: true }),
-                TokenKind::Float(_) => Type::from_kind(TypeKind::Float { size: 64 }),
-                TokenKind::Boolean(_) => Type::from_kind(TypeKind::Boolean),
-                TokenKind::String(_) => Type::from_kind(TypeKind::String),
-                TokenKind::Character(_) => Type::from_kind(TypeKind::Character),
+                TokenKind::Integer(_) => Type::from(TypeKind::Integer { size: 64, signed: true }),
+                TokenKind::Float(_) => Type::from(TypeKind::Float { size: 64 }),
+                TokenKind::Boolean(_) => Type::from(TypeKind::Boolean),
+                TokenKind::String(_) => Type::from(TypeKind::String),
+                TokenKind::Character(_) => Type::from(TypeKind::Character),
                 TokenKind::Identifier(_) => {
                     if let Some(reference) = self.reference {
                         resolver.lookup(reference)
@@ -78,7 +78,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         resolver.fresh()
                     }
                 }
-                _ => Type::from_kind(TypeKind::Void),
+                _ => Type::from(TypeKind::Void),
             },
 
             ElementKind::Delimited(delimited) => match (
@@ -102,7 +102,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             members.push(member.typing.clone());
                         }
 
-                        Type::from_kind(TypeKind::Tuple { members })
+                        Type::from(TypeKind::Tuple { members })
                     }
                 }
 
@@ -113,7 +113,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 ) => {
                     resolver.enter();
 
-                    let mut block = Type::from_kind(TypeKind::Void);
+                    let mut block = Type::from(TypeKind::Void);
 
                     let last = delimited.members.len().saturating_sub(1);
 
@@ -142,7 +142,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         inner = resolver.unify(member.span, &inner, &member.typing);
                     }
 
-                    Type::from_kind(
+                    Type::from(
                         TypeKind::Array {
                             member: Box::new(inner),
                             size: delimited.members.len() as Scale,
@@ -150,7 +150,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     )
                 }
 
-                _ => Type::from_kind(TypeKind::Void),
+                _ => Type::from(TypeKind::Void),
             },
 
             ElementKind::Unary(unary) => {
@@ -159,7 +159,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 match &unary.operator.kind {
                     TokenKind::Operator(operator) => match operator.as_slice() {
                         [OperatorKind::Exclamation] => {
-                            resolver.unify(unary.operand.span, &unary.operand.typing, &Type::from_kind(TypeKind::Boolean))
+                            resolver.unify(unary.operand.span, &unary.operand.typing, &Type::from(TypeKind::Boolean))
                         },
                         [OperatorKind::Tilde] => {
                             let expect = resolver.reify(&unary.operand.typing);
@@ -211,31 +211,37 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 left = resolver.reify(&target);
                             }
 
-                            let mut target = None;
+                            let mut scope = None;
 
                             if let Some(reference) = binary.left.reference {
-                                if let Some(symbol) = resolver.scope.find(reference).cloned() {
+                                if let Some(symbol) = resolver.get_symbol(reference).cloned() {
                                     if !symbol.is_instance() {
-                                        target = Some(symbol.scope);
+                                        scope = Some(symbol.scope);
                                     }
                                 }
                             }
 
-                            if target.is_none() {
-                                if let Some(symbol) = resolver.scope.find(left.identity).cloned() {
-                                    target = Some(symbol.scope);
+                            if scope.is_none() {
+                                if let Some(symbol) = resolver.get_symbol(left.identity).cloned() {
+                                    scope = Some(symbol.scope);
                                 }
                             }
 
-                            if let Some(scope) = target {
+                            if let Some(scope) = scope {
                                 resolver.enter_scope(scope);
+
                                 binary.right.resolve(resolver);
+
                                 resolver.exit();
 
                                 self.reference = binary.right.reference;
                                 binary.right.typing.clone()
                             } else {
-                                resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
+                                resolver.errors.push(Error::new(
+                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    binary.operator.span
+                                ));
+
                                 resolver.fresh()
                             }
                         }
@@ -304,7 +310,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
                             binary.right.resolve(resolver);
 
-                            let boolean = Type::from_kind(TypeKind::Boolean);
+                            let boolean = Type::from(TypeKind::Boolean);
 
                             resolver.unify(binary.right.span, &binary.left.typing, &boolean);
                             resolver.unify(binary.right.span, &binary.right.typing, &boolean);
@@ -339,7 +345,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.right.span));
                             }
 
-                            Type::from_kind(TypeKind::Boolean)
+                            Type::from(TypeKind::Boolean)
                         }
                         _ => {
                             binary.right.resolve(resolver);
@@ -367,7 +373,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     let target = resolver.reify(&index.target.typing);
                     let member = resolver.reify(&index.members[0].typing);
 
-                    let expect = Type::from_kind(TypeKind::Integer { size: 64, signed: true });
+                    let expect = Type::from(TypeKind::Integer { size: 64, signed: true });
 
                     resolver.unify(index.members.borrow_span(), &member, &expect);
 
@@ -420,13 +426,13 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 match target {
                     Some("if") => {
                         if invoke.members.len() < 2 {
-                            Type::from_kind(TypeKind::Void)
+                            Type::from(TypeKind::Void)
                         } else {
                             resolver.enter();
 
                             invoke.members[0].resolve(resolver);
 
-                            let boolean = Type::from_kind(TypeKind::Boolean);
+                            let boolean = Type::from(TypeKind::Boolean);
 
                             resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
 
@@ -439,7 +445,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                                 resolver.unify(invoke.members[2].span, &then, &invoke.members[2].typing)
                             } else {
-                                let void = Type::from_kind(TypeKind::Void);
+                                let void = Type::from(TypeKind::Void);
                                 resolver.unify(invoke.members[1].span, &then, &void);
                                 void
                             };
@@ -452,27 +458,27 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     Some("while") => {
                         invoke.members[0].resolve(resolver);
 
-                        let boolean = Type::from_kind(TypeKind::Boolean);
+                        let boolean = Type::from(TypeKind::Boolean);
 
                         resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
 
-                        Type::from_kind(TypeKind::Void)
+                        Type::from(TypeKind::Void)
                     }
                     Some("return") => {
                         if !invoke.members.is_empty() {
                             invoke.members[0].resolve(resolver);
                         }
 
-                        let value = invoke.members.first().map_or_else(|| Type::from_kind(TypeKind::Void), |member| member.typing.clone());
+                        let value = invoke.members.first().map_or_else(|| Type::from(TypeKind::Void), |member| member.typing.clone());
 
                         if let Some(expect) = resolver.returns.last().cloned() {
                             resolver.unify(self.span, &expect, &value);
                         }
 
-                        Type::from_kind(TypeKind::Unknown)
+                        Type::from(TypeKind::Unknown)
                     }
                     Some("continue") | Some("break") => {
-                        Type::from_kind(TypeKind::Unknown)
+                        Type::from(TypeKind::Unknown)
                     }
                     _ => {
                         for member in &mut invoke.members {
@@ -484,12 +490,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
-                        let mut function = Type::from_kind(TypeKind::Function(Str::default(), members, Some(Box::new(output.clone()))));
+                        let mut function = Type::from(TypeKind::Function(Str::default(), members, Some(Box::new(output.clone()))));
                         function = resolver.unify(self.span, &invoke.target.typing, &function);
 
                         match function.kind {
                             TypeKind::Function(_, _, Some(kind)) => *kind,
-                            TypeKind::Function(_, _, None) => Type::from_kind(TypeKind::Void),
+                            TypeKind::Function(_, _, None) => Type::from(TypeKind::Void),
                             _ => output,
                         }
                     }

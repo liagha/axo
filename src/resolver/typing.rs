@@ -12,8 +12,10 @@ impl<'typing> Type<'typing> {
     pub fn new(identity: Identity, kind: TypeKind<'typing>) -> Self {
         Self { identity, kind }
     }
+}
 
-    pub fn from_kind(kind: TypeKind<'typing>) -> Self {
+impl<'typing> From<TypeKind<'typing>> for Type<'typing> {
+    fn from(kind: TypeKind<'typing>) -> Self {
         Self::new(0, kind)
     }
 }

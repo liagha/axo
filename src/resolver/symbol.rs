@@ -228,7 +228,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 Type::new(self.identity, TypeKind::Function(head.into(), members, inferred))
             }
 
-            SymbolKind::Module(_) => Type::from_kind(TypeKind::Void),
+            SymbolKind::Module(_) => Type::from(TypeKind::Void),
         };
 
         let unified = resolver.unify(self.span, &expected, &typing);

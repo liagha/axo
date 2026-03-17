@@ -1,5 +1,6 @@
 use crate::{
     data::{memory::replace, Identity, Scale},
+    internal::{hash::Map},
     parser::{Element, ElementKind, Symbol},
     resolver::{scope::Scope, ErrorKind, ResolveError, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -8,6 +9,7 @@ use crate::{
 
 pub struct Resolver<'resolver> {
     pub scope: Scope<Symbol<'resolver>>,
+    pub registry: Map<Identity, Symbol<'resolver>>,
     pub input: Vec<Element<'resolver>>,
     pub errors: Vec<ResolveError<'resolver>>,
     pub variables: Vec<Option<Type<'resolver>>>,
@@ -18,6 +20,7 @@ impl Clone for Resolver<'_> {
     fn clone(&self) -> Self {
         Self {
             scope: self.scope.clone(),
+            registry: self.registry.clone(),
             input: self.input.clone(),
             errors: self.errors.clone(),
             variables: self.variables.clone(),
@@ -39,6 +42,7 @@ impl<'resolver> Resolver<'resolver> {
     pub fn new() -> Self {
         Self {
             scope: Scope::new(),
+            registry: Map::new(),
             input: Vec::new(),
             errors: Vec::new(),
             variables: Vec::new(),
@@ -63,7 +67,12 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn insert(&mut self, symbol: Symbol<'resolver>) {
+        self.registry.insert(symbol.identity, symbol.clone());
         self.scope.insert(symbol);
+    }
+
+    pub fn get_symbol(&self, identity: Identity) -> Option<&Symbol<'resolver>> {
+        self.registry.get(&identity)
     }
 
     pub fn fresh(&mut self) -> Type<'resolver> {
@@ -140,18 +149,18 @@ impl<'resolver> Resolver<'resolver> {
 
             (TypeKind::Array { member: left_item, size: left_size }, TypeKind::Array { member: right_item, size: right_size }) if left_size == right_size => {
                 let unified = self.unify(span, &left_item, &right_item);
-                Type::from_kind(TypeKind::Array { member: Box::new(unified), size: left_size })
+                Type::from(TypeKind::Array { member: Box::new(unified), size: left_size })
             }
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
                 let unified = self.unify(span, &left_target, &right_target);
-                Type::from_kind(TypeKind::Pointer { target: Box::new(unified) })
+                Type::from(TypeKind::Pointer { target: Box::new(unified) })
             }
             (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items }) if left_items.len() == right_items.len() => {
                 let mut unified = Vec::with_capacity(left_items.len());
                 for (first, second) in left_items.iter().zip(right_items.iter()) {
                     unified.push(self.unify(span, first, second));
                 }
-                Type::from_kind(TypeKind::Tuple { members: unified })
+                Type::from(TypeKind::Tuple { members: unified })
             }
 
             (TypeKind::Structure(_), TypeKind::Structure(_))
@@ -197,11 +206,11 @@ impl<'resolver> Resolver<'resolver> {
                     typing.clone()
                 }
             }
-            TypeKind::Pointer { target } => Type::from_kind(TypeKind::Pointer { target: Box::new(self.reify(target)) }),
-            TypeKind::Array { member, size } => Type::from_kind(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }),
+            TypeKind::Pointer { target } => Type::from(TypeKind::Pointer { target: Box::new(self.reify(target)) }),
+            TypeKind::Array { member, size } => Type::from(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }),
             TypeKind::Tuple { members } => {
                 let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::from_kind(TypeKind::Tuple { members: items })
+                Type::from(TypeKind::Tuple { members: items })
             }
             TypeKind::Function(name, parameters, output) => {
                 let arguments = parameters.iter().map(|item| self.reify(item)).collect();
@@ -267,7 +276,7 @@ impl<'resolver> Resolver<'resolver> {
                     }
                 };
 
-                Ok(Type::from_kind(kind))
+                Ok(Type::from(kind))
             }
 
             ElementKind::Delimited(delimited) => match (
@@ -287,7 +296,7 @@ impl<'resolver> Resolver<'resolver> {
                     let member = self.annotation(&delimited.members[0])?;
                     let size = self.evaluate(&delimited.members[1])?;
 
-                    Ok(Type::from_kind(TypeKind::Array { member: Box::new(member), size }))
+                    Ok(Type::from(TypeKind::Array { member: Box::new(member), size }))
                 }
 
                 (
@@ -296,7 +305,7 @@ impl<'resolver> Resolver<'resolver> {
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
                     if delimited.members.is_empty() {
-                        Ok(Type::from_kind(TypeKind::Tuple { members: Vec::new() }))
+                        Ok(Type::from(TypeKind::Tuple { members: Vec::new() }))
                     } else if delimited.separator.is_none() && delimited.members.len() == 1 {
                         self.annotation(&delimited.members[0])
                     } else {
@@ -304,7 +313,7 @@ impl<'resolver> Resolver<'resolver> {
                         for member in &delimited.members {
                             members.push(self.annotation(member)?);
                         }
-                        Ok(Type::from_kind(TypeKind::Tuple { members }))
+                        Ok(Type::from(TypeKind::Tuple { members }))
                     }
                 }
 
