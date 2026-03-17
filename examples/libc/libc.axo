@@ -185,3 +185,13 @@ func test_malloc() {
 
     return()
 }
+
+func struct_field_access() {
+    const point = Point { x = 4, y = 5 }
+
+    println_str("Point:")
+    print_str("  X:")
+    println_i64(point.x)
+    print_str("  Y:")
+    println_i64(point.y)
+}

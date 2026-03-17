@@ -123,7 +123,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = function.body.as_ref() {
                     body.analyze(resolver)?
                 } else {
-                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::void(self.span))
+                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::void())
                 };
 
                 let output = function.output.clone().map(|output| output.typing);

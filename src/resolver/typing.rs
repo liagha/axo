@@ -1,21 +1,19 @@
 use crate::{
     data::{Boolean, Identity, Scale, Str, Aggregate},
-    tracker::Span,
 };
 
 #[derive(Clone, Debug)]
 pub struct Type<'typing> {
     pub kind: TypeKind<'typing>,
-    pub span: Span<'typing>,
 }
 
 impl<'typing> Type<'typing> {
-    pub fn new(kind: TypeKind<'typing>, span: Span<'typing>) -> Self {
-        Self { kind, span }
+    pub fn new(kind: TypeKind<'typing>) -> Self {
+        Self { kind }
     }
 
-    pub fn void(span: Span<'typing>) -> Self {
-        Self::new(TypeKind::Void, span)
+    pub fn void() -> Self {
+        Self::new(TypeKind::Void)
     }
 }
 

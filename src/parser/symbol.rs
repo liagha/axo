@@ -56,7 +56,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(),
             visibility,
-            typing: Type::new(TypeKind::Unknown, Span::void())
+            typing: Type::new(TypeKind::Unknown)
         }
     }
 

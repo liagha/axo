@@ -13,6 +13,10 @@ enum Color {
     }
 }
 
+struct Point {
+    const x: Integer, const y: Integer,
+}
+
 func main() {
     const red = Color.Yellow
 

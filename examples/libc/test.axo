@@ -31,24 +31,9 @@ enum Color {
 func main() {
     libc.test_malloc()
 
-    const point = Point {
-        x = 333,
-        y = 454
-    }
+    libc.test_logic(6)
 
-    const idk = FloatOrInt {
-        int = 3
-    }
+    libc.test_array()
 
-    const red = Color.Yellow
-
-    const cyan = Color.Blue.Cyan
-
-    const black = Color.GrayScale {
-        value = 100
-    }
-
-    const Color.GrayScale { value } = black;
-
-    value
+    libc.struct_field_access()
 }

@@ -66,19 +66,19 @@ impl<'resolver> Resolver<'resolver> {
         self.scope.insert(symbol);
     }
 
-    pub fn fresh(&mut self, span: Span<'resolver>) -> Type<'resolver> {
+    pub fn fresh(&mut self) -> Type<'resolver> {
         let identity = self.variables.len();
 
         self.variables.push(None);
 
-        Type::new(TypeKind::Variable(identity), span)
+        Type::new(TypeKind::Variable(identity))
     }
 
-    pub fn lookup(&mut self, identity: Identity, span: Span<'resolver>) -> Type<'resolver> {
+    pub fn lookup(&mut self, identity: Identity) -> Type<'resolver> {
         if let Some(symbol) = self.scope.find(identity) {
             return symbol.typing.clone();
         }
-        self.fresh(span)
+        self.fresh()
     }
 
     pub fn occurs(&self, identity: Identity, typing: &Type<'resolver>) -> bool {
@@ -140,18 +140,18 @@ impl<'resolver> Resolver<'resolver> {
 
             (TypeKind::Array { member: left_item, size: left_size }, TypeKind::Array { member: right_item, size: right_size }) if left_size == right_size => {
                 let unified = self.unify(span, &left_item, &right_item);
-                Type::new(TypeKind::Array { member: Box::new(unified), size: left_size }, left.span)
+                Type::new(TypeKind::Array { member: Box::new(unified), size: left_size })
             }
             (TypeKind::Pointer { target: left_target }, TypeKind::Pointer { target: right_target }) => {
                 let unified = self.unify(span, &left_target, &right_target);
-                Type::new(TypeKind::Pointer { target: Box::new(unified) }, left.span)
+                Type::new(TypeKind::Pointer { target: Box::new(unified) })
             }
             (TypeKind::Tuple { members: left_items }, TypeKind::Tuple { members: right_items }) if left_items.len() == right_items.len() => {
                 let mut unified = Vec::with_capacity(left_items.len());
                 for (first, second) in left_items.iter().zip(right_items.iter()) {
                     unified.push(self.unify(span, first, second));
                 }
-                Type::new(TypeKind::Tuple { members: unified }, left.span)
+                Type::new(TypeKind::Tuple { members: unified })
             }
 
             (TypeKind::Structure(left_id, _), TypeKind::Structure(right_id, _)) if left_id == right_id => left,
@@ -177,7 +177,7 @@ impl<'resolver> Resolver<'resolver> {
 
                 let name = if left_name.is_empty() { right_name } else { left_name };
 
-                Type::new(TypeKind::Function(name, unified, output), left.span)
+                Type::new(TypeKind::Function(name, unified, output))
             }
             _ => {
                 self.errors.push(ResolveError::new(ErrorKind::Mismatch(left.clone(), right.clone()), span));
@@ -197,16 +197,16 @@ impl<'resolver> Resolver<'resolver> {
                     typing.clone()
                 }
             }
-            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }, typing.span),
-            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }, typing.span),
+            TypeKind::Pointer { target } => Type::new(TypeKind::Pointer { target: Box::new(self.reify(target)) }),
+            TypeKind::Array { member, size } => Type::new(TypeKind::Array { member: Box::new(self.reify(member)), size: *size }),
             TypeKind::Tuple { members } => {
                 let items = members.iter().map(|item| self.reify(item)).collect();
-                Type::new(TypeKind::Tuple { members: items }, typing.span)
+                Type::new(TypeKind::Tuple { members: items })
             }
             TypeKind::Function(name, parameters, output) => {
                 let arguments = parameters.iter().map(|item| self.reify(item)).collect();
                 let returnable = output.as_ref().map(|kind| Box::new(self.reify(kind)));
-                Type::new(TypeKind::Function(name.clone(), arguments, returnable), typing.span)
+                Type::new(TypeKind::Function(name.clone(), arguments, returnable))
             }
             _ => typing.clone(),
         }
@@ -258,14 +258,14 @@ impl<'resolver> Resolver<'resolver> {
                     "Void" | "Unit" => TypeKind::Tuple { members: Vec::new() },
                     _ => {
                         if let Some(identity) = element.reference {
-                            let typing = self.lookup(identity, *span);
+                            let typing = self.lookup(identity);
                             if let TypeKind::Constructor(identifier, layout) = &typing.kind {
                                 if let Some(symbol) = self.scope.find(*identifier) {
                                     if matches!(symbol.kind, crate::parser::SymbolKind::Structure(_)) {
-                                        return Ok(Type::new(TypeKind::Structure(*identifier, layout.clone()), *span));
+                                        return Ok(Type::new(TypeKind::Structure(*identifier, layout.clone())));
                                     }
                                     if matches!(symbol.kind, crate::parser::SymbolKind::Union(_)) {
-                                        return Ok(Type::new(TypeKind::Union(*identifier, layout.clone()), *span));
+                                        return Ok(Type::new(TypeKind::Union(*identifier, layout.clone())));
                                     }
                                 }
                             }
@@ -275,7 +275,7 @@ impl<'resolver> Resolver<'resolver> {
                     }
                 };
 
-                Ok(Type::new(kind, *span))
+                Ok(Type::new(kind))
             }
 
             ElementKind::Delimited(delimited) => match (
@@ -295,7 +295,7 @@ impl<'resolver> Resolver<'resolver> {
                     let member = self.annotation(&delimited.members[0])?;
                     let size = self.evaluate(&delimited.members[1])?;
 
-                    Ok(Type::new(TypeKind::Array { member: Box::new(member), size }, element.span))
+                    Ok(Type::new(TypeKind::Array { member: Box::new(member), size }))
                 }
 
                 (
@@ -304,7 +304,7 @@ impl<'resolver> Resolver<'resolver> {
                     TokenKind::Punctuation(PunctuationKind::RightParenthesis),
                 ) => {
                     if delimited.members.is_empty() {
-                        Ok(Type::new(TypeKind::Tuple { members: Vec::new() }, element.span))
+                        Ok(Type::new(TypeKind::Tuple { members: Vec::new() }))
                     } else if delimited.separator.is_none() && delimited.members.len() == 1 {
                         self.annotation(&delimited.members[0])
                     } else {
@@ -312,7 +312,7 @@ impl<'resolver> Resolver<'resolver> {
                         for member in &delimited.members {
                             members.push(self.annotation(member)?);
                         }
-                        Ok(Type::new(TypeKind::Tuple { members }, element.span))
+                        Ok(Type::new(TypeKind::Tuple { members }))
                     }
                 }
 
@@ -322,7 +322,7 @@ impl<'resolver> Resolver<'resolver> {
             ElementKind::Unary(unary) => {
                 if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
                     let item = self.annotation(&unary.operand)?;
-                    Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }, element.span))
+                    Ok(Type::new(TypeKind::Pointer { target: Box::from(item) }))
                 } else {
                     Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span))
                 }
@@ -350,7 +350,7 @@ impl<'resolver> Resolver<'resolver> {
 
                         let output = self.annotation(&binary.right)?;
 
-                        Ok(Type::new(TypeKind::Function(Str::default(), parameters, Some(Box::new(output))), element.span))
+                        Ok(Type::new(TypeKind::Function(Str::default(), parameters, Some(Box::new(output)))))
                     }
                     _ => Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), element.span)),
                 }
