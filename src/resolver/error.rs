@@ -11,6 +11,9 @@ use {
 #[derive(Clone)]
 pub enum ErrorKind<'error> {
     Mismatch(Type<'error>, Type<'error>),
+    EmptyIndex,
+    IndexOutOfBounds(usize, usize),
+    UnIndexable,
     InvalidOperation(Token<'error>),
     InvalidAnnotation(Element<'error>),
     UndefinedSymbol {
@@ -39,6 +42,15 @@ impl<'error> Show<'error> for ErrorKind<'error> {
         match self {
             ErrorKind::Mismatch(left, right) => {
                 format!("expected `{}` but got `{}`.", left.format(verbosity), right.format(verbosity)).into()
+            }
+            ErrorKind::EmptyIndex => {
+                "the index was empty!".to_string().into()
+            }
+            ErrorKind::IndexOutOfBounds(index, len) => {
+                format!("index `{}` out of bounds of `{}`.", index, len).into()
+            }
+            ErrorKind::UnIndexable => {
+                "the index target is unindexable.".to_string().into()
             }
             ErrorKind::InvalidOperation(token) => {
                 format!("invalid operation for operand types: `{}`.", token.format(verbosity)).into()

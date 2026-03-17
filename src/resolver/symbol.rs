@@ -255,25 +255,31 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 for member in &mut structure.members {
                     member.reify(resolver);
                 }
+
                 let layout = structure.members.iter().map(|member| member.typing.clone()).collect();
                 let head = structure.target.target().unwrap().into();
-                self.typing = Type::new(self.identity, TypeKind::Constructor(Aggregate::new(head, layout)));
+
+                self.typing = Type::new(self.identity, TypeKind::Structure(Aggregate::new(head, layout)));
             }
             SymbolKind::Union(union) => {
                 for member in &mut union.members {
                     member.reify(resolver);
                 }
+
                 let layout = union.members.iter().map(|member| member.typing.clone()).collect();
                 let head = union.target.target().unwrap().into();
-                self.typing = Type::new(self.identity, TypeKind::Constructor(Aggregate::new(head, layout)));
+
+                self.typing = Type::new(self.identity, TypeKind::Union(Aggregate::new(head, layout)));
             }
             SymbolKind::Enumeration(enumeration) => {
                 for member in &mut enumeration.members {
                     member.reify(resolver);
                 }
+
                 let layout = enumeration.members.iter().map(|member| member.typing.clone()).collect();
                 let head = enumeration.target.target().unwrap().into();
-                self.typing = Type::new(self.identity, TypeKind::Constructor(Aggregate::new(head, layout)));
+
+                self.typing = Type::new(self.identity, TypeKind::Enumeration(Aggregate::new(head, layout)));
             }
             SymbolKind::Function(function) => {
                 for member in &mut function.members {
