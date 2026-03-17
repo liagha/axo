@@ -467,8 +467,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         if let Some(expect) = resolver.returns.last().cloned() {
                             resolver.unify(self.span, &expect, &value);
-                        } else {
-                            todo!()
                         }
 
                         Type::from_kind(TypeKind::Unknown)
@@ -563,7 +561,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let head = construct.target.target().unwrap();
                 let aggregate = Aggregate::new(head, layout);
 
-                Type::new(self.reference.unwrap(), typing.unwrap_or(TypeKind::Constructor(aggregate)))
+                Type::new(self.reference.unwrap(), typing.unwrap_or(TypeKind::Structure(aggregate)))
             }
 
             ElementKind::Symbolize(symbol) => {

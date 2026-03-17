@@ -3,7 +3,7 @@ use {
         data::Str,
         format::{Show, Verbosity},
         parser::Symbol,
-        resolver::scope::Scope,
+        resolver::{Type, TypeKind, scope::Scope},
     },
 };
 
@@ -21,7 +21,6 @@ impl<'scope> Show<'scope> for Scope<Symbol<'scope>> {
     }
 }
 
-use crate::resolver::{Type, TypeKind};
 
 impl<'typing> Show<'typing> for Type<'typing> {
     fn format(&self, verbosity: Verbosity) -> Str<'typing> {
@@ -123,12 +122,6 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
                 Verbosity::Minimal => "_".into(),
                 Verbosity::Detailed => "Unknown".into(),
                 Verbosity::Debug => "Unknown {}".into(),
-                _ => "".into(),
-            },
-            TypeKind::Constructor(constructor) => match verbosity {
-                Verbosity::Minimal => format!("{}", constructor.format(verbosity)).into(),
-                Verbosity::Detailed => format!("Constructor({})", constructor.format(verbosity)).into(),
-                Verbosity::Debug => format!("Constructor {{\n{}\n}}", constructor.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
             TypeKind::Structure(structure) => match verbosity {

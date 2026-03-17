@@ -472,6 +472,7 @@ where
     storage: L,
     state: TimerState,
     start_time: T,
+    last_time: T,
     accumulated: T,
     target_duration: Option<T>,
 }
@@ -488,6 +489,7 @@ where
             storage: lap_storage,
             state: TimerState::Stopped,
             start_time: T::zero(),
+            last_time: T::zero(),
             accumulated: T::zero(),
             target_duration: None,
         }
@@ -501,6 +503,7 @@ where
 
         self.state = TimerState::Running;
         self.start_time = self.source.now();
+        self.last_time = self.source.now();
         self.accumulated = T::zero();
         self.storage.clear();
 
@@ -508,10 +511,7 @@ where
     }
 
     pub fn stop(&mut self) -> TimerResult<T> {
-        if self.state == TimerState::Stopped {
-            return Err(TimerError::NotRunning);
-        }
-        let elapsed = self.elapsed()?;
+        let elapsed = self.elapsed(self.start_time)?;
         self.state = TimerState::Stopped;
         self.accumulated = T::zero();
         Ok(elapsed)
@@ -520,7 +520,7 @@ where
     pub fn pause(&mut self) -> TimerResult<T> {
         match self.state {
             TimerState::Running => {
-                let elapsed = self.elapsed()?;
+                let elapsed = self.elapsed(self.start_time)?;
                 self.accumulated = elapsed;
                 self.state = TimerState::Paused;
                 Ok(elapsed)
@@ -545,11 +545,12 @@ where
     pub fn reset(&mut self) {
         self.state = TimerState::Stopped;
         self.start_time = T::zero();
+        self.last_time = T::zero();
         self.accumulated = T::zero();
         self.storage.clear();
     }
 
-    pub fn elapsed(&self) -> TimerResult<T> {
+    pub fn elapsed(&self, from: T) -> TimerResult<T> {
         match self.state {
             TimerState::Stopped => {
                 if self.accumulated > T::zero() {
@@ -561,10 +562,10 @@ where
             TimerState::Paused => Ok(self.accumulated),
             TimerState::Running => {
                 let now = self.source.now();
-                if now < self.start_time {
+                if now < from {
                     Err(TimerError::Overflow)
                 } else {
-                    now.checked_sub(self.start_time)
+                    now.checked_sub(from)
                         .and_then(|diff| self.accumulated.checked_add(diff))
                         .ok_or(TimerError::Overflow)
                 }
@@ -586,7 +587,7 @@ where
 
     pub fn is_expired(&self) -> bool {
         self.target_duration
-            .map(|duration| self.elapsed().map_or(false, |elapsed| elapsed >= duration))
+            .map(|duration| self.elapsed(self.start_time).map_or(false, |elapsed| elapsed >= duration))
             .unwrap_or(false)
     }
 
@@ -595,9 +596,9 @@ where
             return Err(TimerError::NotRunning);
         }
 
-        let elapsed = self.elapsed()?;
+        let elapsed = self.elapsed(self.last_time)?;
 
-        self.start_time = self.source.now();
+        self.last_time = self.source.now();
 
         self.storage.push(elapsed)?;
 
@@ -668,7 +669,7 @@ where
     pub fn remaining(&self) -> TimerResult<Option<T>> {
         self.target_duration
             .map(|duration| {
-                let elapsed = self.elapsed()?;
+                let elapsed = self.elapsed(self.start_time)?;
                 Ok(if elapsed >= duration {
                     T::zero()
                 } else {
@@ -767,7 +768,7 @@ where
         if self.timer.state() != TimerState::Running {
             return Ok(());
         }
-        let elapsed = self.timer.elapsed()?;
+        let elapsed = self.timer.elapsed(self.timer.start_time)?;
         let remaining = self.timer.remaining()?;
         if elapsed.saturating_sub(self.last_tick) >= self.tick_interval {
             self.last_tick = elapsed;

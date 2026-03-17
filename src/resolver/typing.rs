@@ -31,7 +31,6 @@ pub enum TypeKind<'typing> {
     Void,
     Variable(Identity),
     Unknown,
-    Constructor(Aggregate<Str<'typing>, Type<'typing>>),
     Structure(Aggregate<Str<'typing>, Type<'typing>>),
     Union(Aggregate<Str<'typing>, Type<'typing>>),
     Enumeration(Aggregate<Str<'typing>, Type<'typing>>),

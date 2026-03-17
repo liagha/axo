@@ -192,7 +192,7 @@ impl<'session> Session<'session> {
             self.emit();
         }
 
-        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        let duration = Duration::from_nanos(self.timer.stop().unwrap());
 
         self.reporter.finish("compilation", duration);
 
@@ -211,7 +211,6 @@ impl<'session> Session<'session> {
     }
 
     pub fn plan(&mut self) {
-        // Only plan Source files (.axo). .ll and .o bypass AST/Scope dependencies.
         let mut identities: Vec<_> = self.inputs.iter()
             .filter_map(|(&id, (kind, _))| if *kind == InputKind::Source { Some(id) } else { None })
             .collect();

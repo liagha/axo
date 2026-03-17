@@ -1,6 +1,6 @@
 use crate::{
     data::{memory::replace, Identity, Scale},
-    parser::{Element, ElementKind, Symbol, SymbolKind},
+    parser::{Element, ElementKind, Symbol},
     resolver::{scope::Scope, ErrorKind, ResolveError, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
@@ -156,8 +156,7 @@ impl<'resolver> Resolver<'resolver> {
 
             (TypeKind::Structure(_), TypeKind::Structure(_))
             | (TypeKind::Union(_), TypeKind::Union(_))
-            | (TypeKind::Enumeration(_), TypeKind::Enumeration(_))
-            | (TypeKind::Constructor(_), TypeKind::Constructor(_)) if left.identity == right.identity => left,
+            | (TypeKind::Enumeration(_), TypeKind::Enumeration(_)) if left.identity == right.identity => left,
 
             (TypeKind::Integer { size: left_size, signed: left_signed }, TypeKind::Integer { size: right_size, signed: right_signed }) if left_size == right_size && left_signed == right_signed => left,
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
@@ -261,17 +260,6 @@ impl<'resolver> Resolver<'resolver> {
                     _ => {
                         if let Some(identity) = element.reference {
                             let typing = self.lookup(identity);
-
-                            if let TypeKind::Constructor(layout) = &typing.kind {
-                                if let Some(symbol) = self.scope.find(identity) {
-                                    if matches!(symbol.kind, SymbolKind::Structure(_)) {
-                                        return Ok(Type::new(identity, TypeKind::Structure(layout.clone())));
-                                    }
-                                    if matches!(symbol.kind, SymbolKind::Union(_)) {
-                                        return Ok(Type::new(identity, TypeKind::Union(layout.clone())));
-                                    }
-                                }
-                            }
 
                             return Ok(typing);
                         }
