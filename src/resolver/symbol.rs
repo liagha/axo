@@ -8,7 +8,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
         self.typing = match &mut self.kind {
             SymbolKind::Binding(binding) => {
-                binding.target.declare(resolver);
                 resolver.fresh()
             }
             SymbolKind::Function(function) => {
