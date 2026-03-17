@@ -9,7 +9,7 @@ use {
             Type, TypeKind,
             next_identity,
         },
-        scanner::{OperatorKind, Token, TokenKind},
+        scanner::{OperatorKind, TokenKind},
         tracker::Span,
     },
 };
@@ -56,7 +56,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(),
             visibility,
-            typing: Type::new(TypeKind::Unknown)
+            typing: Type::from_kind(TypeKind::Unknown)
         }
     }
 
@@ -87,43 +87,41 @@ impl<'symbol> Symbol<'symbol> {
         self.scope = scope;
     }
 
-    pub fn brand(&self) -> Option<&Token<'symbol>> {
-        self.kind.brand()
-    }
-}
-
-impl<'symbol> SymbolKind<'symbol> {
-    pub fn brand(&self) -> Option<&Token<'symbol>> {
-        match self {
-            SymbolKind::Binding(binding) => binding.target.brand(),
-            SymbolKind::Structure(structure) => structure.target.brand(),
-            SymbolKind::Union(union) => union.target.brand(),
-            SymbolKind::Enumeration(enumeration) => enumeration.target.brand(),
-            SymbolKind::Function(function) => function.target.brand(),
-            SymbolKind::Module(module) => module.target.brand(),
+    pub fn target(&self) -> Option<Str<'symbol>> {
+        match &self.kind {
+            SymbolKind::Binding(binding) => binding.target.target(),
+            SymbolKind::Structure(structure) => structure.target.target(),
+            SymbolKind::Union(union) => union.target.target(),
+            SymbolKind::Enumeration(enumeration) => enumeration.target.target(),
+            SymbolKind::Function(function) => function.target.target(),
+            SymbolKind::Module(module) => module.target.target(),
         }
     }
 }
 
 impl<'symbol> Element<'symbol> {
-    pub fn brand(&self) -> Option<&Token<'symbol>> {
+    pub fn target(&self) -> Option<Str<'symbol>> {
         match &self.kind {
             ElementKind::Literal(literal) => {
-                Some(literal)
+                if let TokenKind::Identifier(identifier) = literal.kind {
+                    Some(identifier)
+                } else { 
+                    None
+                }
             },
-            ElementKind::Construct(construct) => construct.target.brand(),
-            ElementKind::Index(index) => index.target.brand(),
-            ElementKind::Invoke(invoke) => invoke.target.brand(),
-            ElementKind::Symbolize(symbol) => symbol.brand(),
+            ElementKind::Construct(construct) => construct.target.target(),
+            ElementKind::Index(index) => index.target.target(),
+            ElementKind::Invoke(invoke) => invoke.target.target(),
+            ElementKind::Symbolize(symbol) => symbol.target(),
             ElementKind::Binary(binary) => match binary.operator.kind {
-                TokenKind::Operator(OperatorKind::Colon) => binary.left.brand(),
+                TokenKind::Operator(OperatorKind::Colon) => binary.left.target(),
                 TokenKind::Operator(OperatorKind::Composite(ref operators))
                 if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
                     {
-                        binary.right.brand()
+                        binary.right.target()
                     }
-                TokenKind::Operator(OperatorKind::Equal) => binary.left.brand(),
-                TokenKind::Operator(OperatorKind::Dot) => binary.right.brand(),
+                TokenKind::Operator(OperatorKind::Equal) => binary.left.target(),
+                TokenKind::Operator(OperatorKind::Dot) => binary.right.target(),
                 _ => None,
             },
             _ => None,

@@ -36,12 +36,9 @@ impl<'resolver> Resolver<'resolver> {
     pub fn builtin(
         target: &Element<'resolver>,
     ) -> Option<Symbol<'resolver>> {
-        let name = target.brand().and_then(|token| match token.kind {
-            TokenKind::Identifier(identifier) => identifier.as_str().map(|name| name.to_string()),
-            _ => None,
-        })?;
+        let name = target.target()?;
 
-        match name.as_str() {
+        match name.as_str()? {
             "Int8" => Some(Resolver::function("Int8", "Integer")),
             "Int16" => Some(Resolver::function("Int16", "Integer")),
             "Int32" => Some(Resolver::function("Int32", "Integer")),

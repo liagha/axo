@@ -140,8 +140,8 @@ for Aligner<'aligner>
         query: &Element<'aligner>,
         candidate: &Symbol<'aligner>,
     ) -> Assessment<ResolveError<'aligner>> {
-        if let (Some(query), Some(candidate)) = (query.brand(), candidate.brand()) {
-            let assessment = self.assessment(query, &candidate);
+        if let (Some(target), Some(candidate)) = (query.target(), candidate.target()) {
+            let assessment = self.assessment(&target, &candidate);
 
             if assessment.errors.is_empty() {
                 let score = assessment.resemblance.to_f64();
@@ -158,7 +158,7 @@ for Aligner<'aligner>
                         resemblance: Resemblance::Disparity,
                         errors: vec![ResolveError {
                             kind: ErrorKind::UndefinedSymbol {
-                                query: query.clone(),
+                                query: target.clone(),
                             },
                             span: query.span.clone(),
                             hints: vec![ResolveHint::new(HintKind::SimilarBrand {
@@ -172,7 +172,7 @@ for Aligner<'aligner>
                         resemblance: Resemblance::Disparity,
                         errors: vec![ResolveError {
                             kind: ErrorKind::UndefinedSymbol {
-                                query: query.clone(),
+                                query: target.clone(),
                             },
                             span: query.span.clone(),
                             hints: Vec::new(),
@@ -239,13 +239,12 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / invoke.members.len() as f64));
 
                     for member in invoke.members[function.members.len()..].iter() {
-                        if let Some(brand) = member.brand() {
-                            let target = invoke.target.brand().cloned().unwrap_or_else(|| brand.clone());
+                        if let (Some(target), Some(missing)) = (query.target(), member.target()) {
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::MissingMember {
                                         target,
-                                        member: brand.clone(),
+                                        member: missing,
                                     },
                                     member.span.clone(),
                                 )
@@ -257,13 +256,12 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     score += self.binding * (1.0 - (diff / function.members.len() as f64));
 
                     for member in function.members[invoke.members.len()..].iter() {
-                        if let Some(brand) = member.brand() {
-                            let target = function.target.brand().cloned().unwrap_or_else(|| brand.clone());
+                        if let (Some(target), Some(undefined)) = (query.target(), member.target()) {
                             errors.push(
                                 ResolveError::new(
                                     ErrorKind::UndefinedMember {
                                         target,
-                                        member: brand.clone(),
+                                        member: undefined,
                                     },
                                     member.span.clone(),
                                 )
@@ -287,15 +285,15 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     .members
                     .iter()
                     .filter(|member| member.is_instance())
-                    .filter_map(|member| member.brand())
+                    .filter_map(|member| member.target())
                     .collect::<Vec<_>>();
 
                 let members = construct
                     .members
                     .iter()
                     .filter_map(|member| match &member.kind {
-                        ElementKind::Binary(binary) => binary.left.brand(),
-                        _ => member.brand(),
+                        ElementKind::Binary(binary) => binary.left.target(),
+                        _ => member.target(),
                     })
                     .collect::<Vec<_>>();
 
@@ -325,7 +323,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     for member in &members {
                         if !candidates.contains(member) {
-                            if let Some(target) = structure.target.brand() {
+                            if let Some(target) = structure.target.target() {
                                 errors.push(ResolveError {
                                     kind: ErrorKind::UndefinedMember {
                                         target: target.clone(),
@@ -340,7 +338,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                     for candidate in candidates {
                         if !members.contains(&candidate) {
-                            if let Some(target) = structure.target.brand() {
+                            if let Some(target) = structure.target.target() {
                                 errors.push(ResolveError {
                                     kind: ErrorKind::MissingMember {
                                         target: target.clone(),
@@ -366,22 +364,22 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                     .members
                     .iter()
                     .filter(|member| member.is_instance())
-                    .filter_map(|member| member.brand())
+                    .filter_map(|member| member.target())
                     .collect::<Vec<_>>();
 
                 let members = construct
                     .members
                     .iter()
                     .filter_map(|member| match &member.kind {
-                        ElementKind::Binary(binary) => binary.left.brand(),
-                        _ => member.brand(),
+                        ElementKind::Binary(binary) => binary.left.target(),
+                        _ => member.target(),
                     })
                     .collect::<Vec<_>>();
 
                 let mut errors = Vec::new();
 
                 if members.len() > 1 {
-                    if let Some(target) = union.target.brand() {
+                    if let Some(target) = union.target.target() {
                         let values = members.iter().map(|item| (*item).clone()).collect();
                         errors.push(ResolveError {
                             kind: ErrorKind::ExcessiveUnionMembers {
@@ -393,7 +391,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
                         });
                     }
                 } else if members.is_empty() {
-                    if let Some(target) = union.target.brand() {
+                    if let Some(target) = union.target.target() {
                         errors.push(ResolveError {
                             kind: ErrorKind::MissingMember {
                                 target: target.clone(),
@@ -407,7 +405,7 @@ impl<'aligner> Resembler<Element<'aligner>, Symbol<'aligner>, ResolveError<'alig
 
                 for member in &members {
                     if !candidates.contains(member) {
-                        if let Some(target) = union.target.brand() {
+                        if let Some(target) = union.target.target() {
                             errors.push(ResolveError {
                                 kind: ErrorKind::UndefinedMember {
                                     target: target.clone(),

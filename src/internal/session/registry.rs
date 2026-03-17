@@ -21,7 +21,15 @@ impl<'registry> Resolver<'registry> {
         let result = self.scope.lookup(&identifier).ok()?;
 
         if let SymbolKind::Binding(binding) = result.kind {
-            binding.value.as_ref().map(|v| v.brand().clone().unwrap_or_else(|| unreachable!())).cloned()
+            if let Some(value) = binding.value {
+                if let ElementKind::Literal(literal) = value.kind {
+                    Some(literal)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -61,7 +69,7 @@ impl<'registry> Resolver<'registry> {
                 kind: TokenKind::Integer(value),
                 ..
             }) => value as u8,
-            _ => 2,
+            _ => 1,
         }
     }
 

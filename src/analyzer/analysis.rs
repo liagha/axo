@@ -97,7 +97,7 @@ pub enum AnalysisKind<'analysis> {
         Function<
             Str<'analysis>,
             Analysis<'analysis>,
-            Box<Analysis<'analysis>>,
+            Option<Box<Analysis<'analysis>>>,
             Option<Type<'analysis>>,
         >,
     ),

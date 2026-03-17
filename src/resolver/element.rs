@@ -1,6 +1,5 @@
 use crate::{
-    data::{Aggregate, Delimited, Scale},
-    format::{Show, Verbosity},
+    data::{Aggregate, Delimited, Str, Scale},
     parser::{Element, ElementKind, SymbolKind},
     resolver::{Error, ErrorKind, Resolvable, Resolver, Type, TypeKind},
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
@@ -68,11 +67,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
         self.typing = match &mut self.kind {
             ElementKind::Literal(literal) => match literal.kind {
-                TokenKind::Integer(_) => Type::new(TypeKind::Integer { size: 64, signed: true }),
-                TokenKind::Float(_) => Type::new(TypeKind::Float { size: 64 }),
-                TokenKind::Boolean(_) => Type::new(TypeKind::Boolean),
-                TokenKind::String(_) => Type::new(TypeKind::String),
-                TokenKind::Character(_) => Type::new(TypeKind::Character),
+                TokenKind::Integer(_) => Type::from_kind(TypeKind::Integer { size: 64, signed: true }),
+                TokenKind::Float(_) => Type::from_kind(TypeKind::Float { size: 64 }),
+                TokenKind::Boolean(_) => Type::from_kind(TypeKind::Boolean),
+                TokenKind::String(_) => Type::from_kind(TypeKind::String),
+                TokenKind::Character(_) => Type::from_kind(TypeKind::Character),
                 TokenKind::Identifier(_) => {
                     if let Some(reference) = self.reference {
                         resolver.lookup(reference)
@@ -80,7 +79,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         resolver.fresh()
                     }
                 }
-                _ => Type::void(),
+                _ => Type::from_kind(TypeKind::Void),
             },
 
             ElementKind::Delimited(delimited) => match (
@@ -104,7 +103,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             members.push(member.typing.clone());
                         }
 
-                        Type::new(TypeKind::Tuple { members })
+                        Type::from_kind(TypeKind::Tuple { members })
                     }
                 }
 
@@ -115,7 +114,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 ) => {
                     resolver.enter();
 
-                    let mut block = Type::new(TypeKind::Void);
+                    let mut block = Type::from_kind(TypeKind::Void);
 
                     let last = delimited.members.len().saturating_sub(1);
 
@@ -144,7 +143,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         inner = resolver.unify(member.span, &inner, &member.typing);
                     }
 
-                    Type::new(
+                    Type::from_kind(
                         TypeKind::Array {
                             member: Box::new(inner),
                             size: delimited.members.len() as Scale,
@@ -152,7 +151,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     )
                 }
 
-                _ => Type::void(),
+                _ => Type::from_kind(TypeKind::Void),
             },
 
             ElementKind::Unary(unary) => {
@@ -161,7 +160,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 match &unary.operator.kind {
                     TokenKind::Operator(operator) => match operator.as_slice() {
                         [OperatorKind::Exclamation] => {
-                            resolver.unify(span, &unary.operand.typing, &Type::new(TypeKind::Boolean))
+                            resolver.unify(span, &unary.operand.typing, &Type::from_kind(TypeKind::Boolean))
                         },
                         [OperatorKind::Tilde] => {
                             let expect = resolver.reify(&unary.operand.typing);
@@ -175,7 +174,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         [OperatorKind::Plus] | [OperatorKind::Minus] => unary.operand.typing.clone(),
                         [OperatorKind::Ampersand] => {
                             if assignable(&unary.operand) {
-                                Type::new(TypeKind::Pointer { target: Box::new(unary.operand.typing.clone()) })
+                                Type::new(unary.operand.typing.identity, TypeKind::Pointer { target: Box::new(unary.operand.typing.clone()) })
                             } else {
                                 resolver.errors.push(Error::new(ErrorKind::InvalidOperation(unary.operator.clone()), unary.operator.span));
                                 resolver.fresh()
@@ -183,7 +182,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
                         [OperatorKind::Star] => {
                             let target = resolver.fresh();
-                            let pointer = Type::new(TypeKind::Pointer { target: Box::new(target.clone()) });
+                            let pointer = Type::new(target.identity, TypeKind::Pointer { target: Box::new(target.clone()) });
 
                             resolver.unify(span, &unary.operand.typing, &pointer);
 
@@ -231,9 +230,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 while let TypeKind::Pointer { target } = left.kind {
                                     left = *target;
                                 }
+                                
+                                let reference = left.identity;
 
                                 match left.kind {
-                                    TypeKind::Structure(reference, _) | TypeKind::Union(reference, _) | TypeKind::Enumeration(reference, _) => {
+                                    TypeKind::Structure(_) | TypeKind::Union(_) | TypeKind::Enumeration(_) => {
                                         if let Some(symbol) = resolver.scope.find(reference) {
                                             scope = Some(symbol.scope.clone());
                                             instance = true;
@@ -242,7 +243,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                             }
                                         }
                                     }
-                                    TypeKind::Constructor(reference, _) => {
+                                    TypeKind::Constructor(_) => {
                                         if let Some(symbol) = resolver.scope.find(reference) {
                                             scope = Some(symbol.scope.clone());
                                             if matches!(symbol.kind, SymbolKind::Enumeration(_)) {
@@ -279,7 +280,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             if let Some(reference) = enumeration {
                                 if let Some(member) = binary.right.reference.and_then(|value| resolver.scope.find(value)) {
                                     if member.is_instance() {
-                                        Type::new(TypeKind::Enumeration(reference, Aggregate::new(crate::data::Str::default(), Vec::new())))
+                                        Type::new(reference, TypeKind::Enumeration(Aggregate::new(Str::default(), Vec::new())))
                                     } else {
                                         binary.right.typing.clone()
                                     }
@@ -349,7 +350,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     }
                                 }
                                 [OperatorKind::Ampersand, OperatorKind::Ampersand] | [OperatorKind::Pipe, OperatorKind::Pipe] => {
-                                    let boolean = Type::new(TypeKind::Boolean);
+                                    let boolean = Type::from_kind(TypeKind::Boolean);
 
                                     resolver.unify(span, &binary.left.typing, &boolean);
                                     resolver.unify(span, &binary.right.typing, &boolean);
@@ -374,7 +375,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                             | TypeKind::String
                                             | TypeKind::Pointer { .. }
                                             | TypeKind::Variable(_)
-                                            | TypeKind::Enumeration(_, _)
+                                            | TypeKind::Enumeration(_)
                                             | TypeKind::Unknown
                                     );
 
@@ -382,7 +383,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                         resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), span));
                                     }
 
-                                    Type::new(TypeKind::Boolean)
+                                    Type::from_kind(TypeKind::Boolean)
                                 }
                                 _ => {
                                     resolver.errors.push(Error::new(ErrorKind::InvalidOperation(binary.operator.clone()), binary.operator.span));
@@ -409,7 +410,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     let target = resolver.reify(&index.target.typing);
                     let member = resolver.reify(&index.members[0].typing);
 
-                    let expect = Type::new(TypeKind::Integer { size: 64, signed: true });
+                    let expect = Type::from_kind(TypeKind::Integer { size: 64, signed: true });
 
                     resolver.unify(span, &member, &expect);
 
@@ -440,7 +441,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
                         TypeKind::Variable(_) => {
                             let element = resolver.fresh();
-                            let pointer = Type::new(TypeKind::Pointer { target: Box::new(element.clone()) });
+                            let pointer = Type::new(element.identity, TypeKind::Pointer { target: Box::new(element.clone()) });
 
                             resolver.unify(span, &target, &pointer);
 
@@ -457,67 +458,66 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Invoke(invoke) => {
                 invoke.target.resolve(resolver);
 
-                let primitive = invoke.target.brand().and_then(|brand| match &brand.kind {
-                    TokenKind::Identifier(name) => Some(name),
-                    _ => None,
-                }).and_then(|name| name.as_str());
+                let target = invoke.target.target().and_then(|name| name.as_str());
 
-                match primitive {
+                match target {
                     Some("if") => {
                         if invoke.members.len() < 2 {
-                            Type::void()
+                            Type::from_kind(TypeKind::Void)
                         } else {
                             resolver.enter();
+
                             invoke.members[0].resolve(resolver);
-                            let boolean = Type::new(TypeKind::Boolean);
+
+                            let boolean = Type::from_kind(TypeKind::Boolean);
+
                             resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
 
                             invoke.members[1].resolve(resolver);
+
                             let then = invoke.members[1].typing.clone();
 
                             let typing = if invoke.members.len() == 3 {
                                 invoke.members[2].resolve(resolver);
+
                                 resolver.unify(span, &then, &invoke.members[2].typing)
                             } else {
-                                let void = Type::new(TypeKind::Void);
+                                let void = Type::from_kind(TypeKind::Void);
                                 resolver.unify(invoke.members[1].span, &then, &void);
                                 void
                             };
 
                             resolver.exit();
+
                             typing
                         }
                     }
                     Some("while") => {
-                        if !invoke.members.is_empty() {
-                            invoke.members[0].resolve(resolver);
-                            let boolean = Type::new(TypeKind::Boolean);
-                            resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
-                        }
-                        if invoke.members.len() > 1 {
-                            resolver.enter();
-                            invoke.members[1].resolve(resolver);
-                            resolver.exit();
-                        }
-                        Type::void()
+                        invoke.members[0].resolve(resolver);
+
+                        let boolean = Type::from_kind(TypeKind::Boolean);
+
+                        resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
+
+                        Type::from_kind(TypeKind::Void)
                     }
                     Some("return") => {
                         if !invoke.members.is_empty() {
                             invoke.members[0].resolve(resolver);
                         }
 
-                        let value = invoke.members.first().map_or_else(|| Type::new(TypeKind::Void), |member| member.typing.clone());
+                        let value = invoke.members.first().map_or_else(|| Type::from_kind(TypeKind::Void), |member| member.typing.clone());
 
                         if let Some(expect) = resolver.returns.last().cloned() {
                             resolver.unify(span, &expect, &value);
                         } else {
-                            let token = invoke.target.brand().unwrap().clone();
-                            resolver.errors.push(Error::new(ErrorKind::InvalidOperation(token), span));
+                            todo!()
                         }
-                        Type::new(TypeKind::Unknown)
+
+                        Type::from_kind(TypeKind::Unknown)
                     }
                     Some("continue") | Some("break") => {
-                        Type::new(TypeKind::Unknown)
+                        Type::from_kind(TypeKind::Unknown)
                     }
                     _ => {
                         for member in &mut invoke.members {
@@ -525,27 +525,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
 
                         let output = resolver.fresh();
-                        let mut arguments = Vec::new();
+                        let mut members = Vec::new();
 
-                        if let ElementKind::Binary(binary) = &invoke.target.kind {
-                            if let TokenKind::Operator(operator) = &binary.operator.kind {
-                                if operator.as_slice() == [OperatorKind::Dot] {
-                                    let receiver = resolver.reify(&binary.left.typing);
-                                    if !matches!(receiver.kind, TypeKind::Void | TypeKind::Constructor(_, _)) {
-                                        arguments.push(binary.left.typing.clone());
-                                    }
-                                }
-                            }
-                        }
+                        members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
-                        arguments.extend(invoke.members.iter().map(|member| member.typing.clone()));
+                        let mut function = Type::from_kind(TypeKind::Function(Str::default(), members, Some(Box::new(output.clone()))));
+                        function = resolver.unify(span, &invoke.target.typing, &function);
 
-                        let function = Type::new(TypeKind::Function(crate::data::Str::default(), arguments, Some(Box::new(output.clone()))));
-                        let merged = resolver.unify(span, &invoke.target.typing, &function);
-
-                        match merged.kind {
+                        match function.kind {
                             TypeKind::Function(_, _, Some(kind)) => *kind,
-                            TypeKind::Function(_, _, None) => Type::new(TypeKind::Void),
+                            TypeKind::Function(_, _, None) => Type::from_kind(TypeKind::Void),
                             _ => output,
                         }
                     }
@@ -555,108 +544,53 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
-                let mut component = 0;
-                let mut scope = None;
-                let mut is_union = false;
-                let mut is_enumeration = false;
+                let layout = Vec::new();
 
-                if let TypeKind::Constructor(identity, _) = &construct.target.typing.kind {
-                    if let Some(symbol) = resolver.scope.find(*identity) {
-                        if let SymbolKind::Enumeration(_) = &symbol.kind {
-                            is_enumeration = true;
-                            component = *identity;
-                        }
-                    }
-                }
-
-                let mut layout = Vec::new();
-
-                if let Some(reference) = construct.target.reference {
-                    if !is_enumeration {
-                        component = reference;
-                    }
-                    if let Some(symbol) = resolver.scope.find(reference) {
-                        match &symbol.kind {
-                            SymbolKind::Structure(structure) => {
-                                scope = Some(symbol.scope.clone());
-                                for member in &structure.members {
+                if let Some(reference) = self.reference {
+                    if let Some(symbol) = resolver.scope.find(reference).cloned() {
+                        match symbol.kind {
+                            SymbolKind::Structure(mut structure) => {
+                                resolver.enter();
+                                
+                                for member in &mut structure.members {
                                     if member.is_instance() {
-                                        layout.push(member.typing.clone());
+                                        member.resolve(resolver);
                                     }
                                 }
+                                
+                                for member in &mut construct.members {
+                                    member.resolve(resolver);
+                                }
+                                
+                                resolver.exit();
                             }
-                            SymbolKind::Union(union_symbol) => {
-                                scope = Some(symbol.scope.clone());
-                                is_union = true;
-                                for member in &union_symbol.members {
+                            SymbolKind::Union(mut union) => {
+                                resolver.enter();
+
+                                for member in &mut union.members {
                                     if member.is_instance() {
-                                        layout.push(member.typing.clone());
+                                        member.resolve(resolver);
                                     }
                                 }
+
+                                for member in &mut construct.members {
+                                    member.resolve(resolver);
+                                }
+
+                                resolver.exit();
+                            }
+                            SymbolKind::Enumeration(_enumeration) => {
+                                todo!()
                             }
                             _ => {}
                         }
                     }
                 }
 
-                if let Some(environment) = scope {
-                    resolver.enter_scope(environment);
-                } else {
-                    resolver.enter();
-                }
-
-                if is_union {
-                    if construct.members.len() != 1 {
-                        let token = construct.target.brand().cloned().unwrap_or_else(|| Token::new(TokenKind::Identifier(crate::data::Str::default()), span));
-                        resolver.errors.push(Error::new(ErrorKind::InvalidOperation(token), span));
-                    }
-                    for member in &mut construct.members {
-                        member.resolve(resolver);
-                    }
-                    if let Some(member) = construct.members.first() {
-                        let mut is_valid = false;
-                        let actual = resolver.reify(&member.typing);
-                        for expect in &layout {
-                            let check = resolver.reify(expect);
-                            if actual == check {
-                                resolver.unify(member.span, &member.typing, expect);
-                                is_valid = true;
-                                break;
-                            }
-                        }
-                        if !is_valid && !layout.is_empty() {
-                            resolver.unify(member.span, &member.typing, &layout[0]);
-                        }
-                    }
-                } else if is_enumeration {
-                    for member in &mut construct.members {
-                        member.resolve(resolver);
-                    }
-                } else {
-                    if construct.members.len() != layout.len() {
-                        let token = construct.target.brand().cloned().unwrap_or_else(|| Token::new(TokenKind::Identifier(crate::data::Str::default()), span));
-                        resolver.errors.push(Error::new(ErrorKind::InvalidOperation(token), span));
-                    }
-                    for (index, member) in construct.members.iter_mut().enumerate() {
-                        member.resolve(resolver);
-                        if let Some(expect) = layout.get(index) {
-                            resolver.unify(member.span, &member.typing, expect);
-                        }
-                    }
-                }
-
-                resolver.exit();
-
-                let head = construct.target.brand().map_or_else(crate::data::Str::default, |brand| brand.format(Verbosity::Minimal).into());
+                let head = construct.target.target().unwrap();
                 let aggregate = Aggregate::new(head, layout);
 
-                if is_enumeration {
-                    Type::new(TypeKind::Enumeration(component, aggregate))
-                } else if is_union {
-                    Type::new(TypeKind::Union(component, aggregate))
-                } else {
-                    Type::new(TypeKind::Structure(component, aggregate))
-                }
+                Type::new(self.reference.unwrap(), TypeKind::Constructor(aggregate))
             }
 
             ElementKind::Symbolize(symbol) => {
@@ -711,7 +645,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
     fn is_instance(&self) -> bool {
         matches!(
             self.typing.kind,
-            TypeKind::Structure(_, _) | TypeKind::Union(_, _) | TypeKind::Enumeration(_, _)
+            TypeKind::Structure(_) | TypeKind::Union(_) | TypeKind::Enumeration(_)
         )
     }
 }

@@ -125,28 +125,28 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
                 Verbosity::Debug => "Unknown {}".into(),
                 _ => "".into(),
             },
-            TypeKind::Constructor(_, _) => match verbosity {
-                Verbosity::Minimal => "Constructor".into(),
-                Verbosity::Detailed => "Constructor(...)".into(),
-                Verbosity::Debug => "Constructor {\n    ...\n}".into(),
+            TypeKind::Constructor(constructor) => match verbosity {
+                Verbosity::Minimal => format!("{}", constructor.format(verbosity)).into(),
+                Verbosity::Detailed => format!("Constructor({})", constructor.format(verbosity)).into(),
+                Verbosity::Debug => format!("Constructor {{\n{}\n}}", constructor.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
-            TypeKind::Structure(_, _) => match verbosity {
-                Verbosity::Minimal => "struct".into(),
-                Verbosity::Detailed => "Structure(...)".into(),
-                Verbosity::Debug => "Structure {\n    ...\n}".into(),
+            TypeKind::Structure(structure) => match verbosity {
+                Verbosity::Minimal => format!("struct {}", structure.format(verbosity)).into(),
+                Verbosity::Detailed => format!("Structure({})", structure.format(verbosity)).into(),
+                Verbosity::Debug => format!("Structure {{\n{}\n}}", structure.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
-            TypeKind::Union(_, _) => match verbosity {
-                Verbosity::Minimal => "union".into(),
-                Verbosity::Detailed => "Union(...)".into(),
-                Verbosity::Debug => "Union {\n    ...\n}".into(),
+            TypeKind::Union(union) => match verbosity {
+                Verbosity::Minimal => format!("union {}", union.format(verbosity)).into(),
+                Verbosity::Detailed => format!("Union({})", union.format(verbosity)).into(),
+                Verbosity::Debug => format!("Union {{\n{}\n}}", union.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
-            TypeKind::Enumeration(_, _) => match verbosity {
-                Verbosity::Minimal => "enum".into(),
-                Verbosity::Detailed => "Enumeration(...)".into(),
-                Verbosity::Debug => "Enumeration {\n    ...\n}".into(),
+            TypeKind::Enumeration(enumeration) => match verbosity {
+                Verbosity::Minimal => format!("enum {}", enumeration.format(verbosity)).into(),
+                Verbosity::Detailed => format!("Enumeration({})", enumeration.format(verbosity)).into(),
+                Verbosity::Debug => format!("Enumeration {{\n{}\n}}", enumeration.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
         }

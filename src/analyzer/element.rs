@@ -308,9 +308,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
             }
 
             ElementKind::Invoke(invoke) => {
-                let name = invoke.target.brand().and_then(|token| {
-                    if let TokenKind::Identifier(name) = token.kind { Some(name) } else { None }
-                });
+                let name = invoke.target.target();
 
                 let kind = match name.as_ref().and_then(|s| s.as_str()) {
                     Some("if") => {
@@ -376,7 +374,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
             ElementKind::Construct(constructor) => {
                 let target = constructor
                     .target
-                    .brand()
+                    .target()
                     .map(|s| s.format(Verbosity::Minimal))
                     .unwrap_or_default();
 

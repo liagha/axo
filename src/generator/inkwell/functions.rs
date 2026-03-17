@@ -114,7 +114,7 @@ impl<'backend> super::Generator<'backend> {
         routine: Function<
             Str<'backend>,
             Analysis<'backend>,
-            Box<Analysis<'backend>>,
+            Option<Box<Analysis<'backend>>>,
             Option<Type<'backend>>,
         >,
         span: Span<'backend>,
@@ -205,7 +205,12 @@ impl<'backend> super::Generator<'backend> {
             }
 
             self.clear_loops();
-            let result = self.analysis(*routine.body.clone())?;
+            
+            let result = if let Some(body) = routine.body {
+                Some(self.analysis(*body.clone())?)
+            } else { 
+                None
+            };
 
             if !self.terminated() {
                 if output.is_none() {
@@ -215,16 +220,18 @@ impl<'backend> super::Generator<'backend> {
                 } else {
                     let expected = function.get_type().get_return_type().unwrap();
 
-                    if result.get_type() != expected {
-                        return Err(GenerateError::new(
-                            ErrorKind::Function(FunctionError::IncompatibleReturnType),
-                            span,
-                        ));
-                    }
+                    if let Some(result) = result {
+                        if result.get_type() != expected {
+                            return Err(GenerateError::new(
+                                ErrorKind::Function(FunctionError::IncompatibleReturnType),
+                                span,
+                            ));
+                        }
 
-                    self.builder
-                        .build_return(Some(&result))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        self.builder
+                            .build_return(Some(&result))
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    }
                 }
             }
         }

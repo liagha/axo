@@ -14,23 +14,23 @@ pub enum ErrorKind<'error> {
     InvalidOperation(Token<'error>),
     InvalidAnnotation(Element<'error>),
     UndefinedSymbol {
-        query: Token<'error>,
+        query: Str<'error>,
     },
     MissingMember {
-        target: Token<'error>,
-        member: Token<'error>,
+        target: Str<'error>,
+        member: Str<'error>,
     },
     UndefinedMember {
-        target: Token<'error>,
-        member: Token<'error>,
+        target: Str<'error>,
+        member: Str<'error>,
     },
     DefinedMember {
-        target: Token<'error>,
-        member: Token<'error>,
+        target: Str<'error>,
+        member: Str<'error>,
     },
     ExcessiveUnionMembers {
-        target: Token<'error>,
-        members: Vec<Token<'error>>,
+        target: Str<'error>,
+        members: Vec<Str<'error>>,
     },
 }
 

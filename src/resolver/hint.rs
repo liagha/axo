@@ -4,13 +4,13 @@ use crate::{
         Show, Verbosity,
         Result,
     },
-    scanner::Token,
+    data::Str,
 };
 
 #[derive(Clone)]
 pub enum HintKind<'hint> {
     SimilarBrand {
-        candidate: Token<'hint>,
+        candidate: Str<'hint>,
         how: String,
     },
 }

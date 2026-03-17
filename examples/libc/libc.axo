@@ -195,3 +195,13 @@ func struct_field_access() {
     print_str("  Y:")
     println_i64(point.y)
 }
+
+func add(const a: Integer, const b: Integer): Integer {
+    return(a + b)
+}
+
+
+func random_test_one() {
+    println_str("Added:")
+    println_i64(add(3, 6))
+}

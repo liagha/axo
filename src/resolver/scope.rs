@@ -101,7 +101,7 @@ impl<'scope> Scope<Symbol<'scope>> {
         } else if assessor.errors.is_empty() {
             Err(vec![ResolveError {
                 kind: ErrorKind::UndefinedSymbol {
-                    query: target.brand().unwrap().clone(),
+                    query: target.target().unwrap().clone(),
                 },
                 span: target.span.clone(),
                 hints: Vec::new(),

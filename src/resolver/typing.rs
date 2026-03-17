@@ -4,16 +4,17 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Type<'typing> {
+    pub identity: Identity,
     pub kind: TypeKind<'typing>,
 }
 
 impl<'typing> Type<'typing> {
-    pub fn new(kind: TypeKind<'typing>) -> Self {
-        Self { kind }
+    pub fn new(identity: Identity, kind: TypeKind<'typing>) -> Self {
+        Self { identity, kind }
     }
 
-    pub fn void() -> Self {
-        Self::new(TypeKind::Void)
+    pub fn from_kind(kind: TypeKind<'typing>) -> Self {
+        Self::new(0, kind)
     }
 }
 
@@ -30,10 +31,10 @@ pub enum TypeKind<'typing> {
     Void,
     Variable(Identity),
     Unknown,
-    Constructor(Identity, Aggregate<Str<'typing>, Type<'typing>>),
-    Structure(Identity, Aggregate<Str<'typing>, Type<'typing>>),
-    Union(Identity, Aggregate<Str<'typing>, Type<'typing>>),
-    Enumeration(Identity, Aggregate<Str<'typing>, Type<'typing>>),
+    Constructor(Aggregate<Str<'typing>, Type<'typing>>),
+    Structure(Aggregate<Str<'typing>, Type<'typing>>),
+    Union(Aggregate<Str<'typing>, Type<'typing>>),
+    Enumeration(Aggregate<Str<'typing>, Type<'typing>>),
     Function(Str<'typing>, Vec<Type<'typing>>, Option<Box<Type<'typing>>>),
 }
 

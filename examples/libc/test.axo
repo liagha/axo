@@ -36,4 +36,6 @@ func main() {
     libc.test_array()
 
     libc.struct_field_access()
+
+    libc.random_test_one()
 }

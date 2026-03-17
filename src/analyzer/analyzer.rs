@@ -3,7 +3,7 @@ use crate::{
     analyzer::{Analysis, AnalyzeError, ErrorKind},
     format::{Show, Verbosity},
     parser::{Element, Symbol, SymbolKind},
-    resolver::{Resolver, Type},
+    resolver::{Resolver},
     analyzer::AnalysisKind,
 };
 
@@ -59,7 +59,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 let head = binding
                     .target
-                    .brand()
+                    .target()
                     .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
 
                 let analyzed = Binding::new(
@@ -79,7 +79,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(structure.target.brand().unwrap().format(Verbosity::Minimal)),
+                    Str::from(structure.target.target().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -93,7 +93,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(union.target.brand().unwrap().format(Verbosity::Minimal)),
+                    Str::from(union.target.target().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -107,7 +107,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(enumeration.target.brand().unwrap().format(Verbosity::Minimal)),
+                    Str::from(enumeration.target.target().unwrap().format(Verbosity::Minimal)),
                     members?,
                 );
 
@@ -120,18 +120,14 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let body = if let Some(body) = function.body.as_ref() {
-                    body.analyze(resolver)?
-                } else {
-                    Analysis::new(AnalysisKind::Block(Vec::new()), self.span, Type::void())
-                };
+                let body = function.body.clone().map(|body| body.analyze(resolver).ok().map(Box::new)).flatten();
 
                 let output = function.output.clone().map(|output| output.typing);
 
                 let analyzed = Function::new(
-                    Str::from(function.target.brand().unwrap().format(Verbosity::Minimal)),
+                    Str::from(function.target.target().unwrap().format(Verbosity::Minimal)),
                     members?,
-                    Box::new(body),
+                    body,
                     output,
                     function.interface,
                     function.entry,
@@ -142,7 +138,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
             SymbolKind::Module(module) => {
                 let target = module
                     .target
-                    .brand()
+                    .target()
                     .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, module.target.span))?;
 
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self

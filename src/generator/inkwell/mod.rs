@@ -180,7 +180,7 @@ impl<'backend> Generator<'backend> {
                 }
                 self.context.struct_type(&typings, false).into()
             }
-            TypeKind::Structure(_, structure) => {
+            TypeKind::Structure(structure) => {
                 if let Some(typing) = self
                     .get_entity(&structure.target)
                     .and_then(
@@ -219,7 +219,7 @@ impl<'backend> Generator<'backend> {
                     }
                 }
             },
-            TypeKind::Union(_, union) => {
+            TypeKind::Union(union) => {
                 if let Some(typing) = self.get_entity(&union.target).and_then(|entity| {
                     match entity {
                         Entity::Union { shape: structure, .. } => Some((*structure).into()),
@@ -279,7 +279,7 @@ impl<'backend> Generator<'backend> {
                     }
                 }
             },
-            TypeKind::Enumeration(_, enumeration) => {
+            TypeKind::Enumeration(enumeration) => {
                 if let Some(typing) = self.get_entity(&enumeration.target).and_then(|entity| {
                     match entity {
                         Entity::Enumeration { shape, .. } => Some((*shape).into()),
