@@ -8,7 +8,7 @@ use {
         initializer::{InitializeError, Initializer},
         internal::{
             hash::Map,
-            platform::{Command, File, PathBuf, Write},
+            platform::{Command, File, PathBuf, Write, create_dir_all},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
@@ -18,11 +18,10 @@ use {
         tracker::{self, Location, Peekable, Span, TrackError},
     },
     inkwell::context::{Context, ContextRef},
-    std::fs::create_dir_all,
 };
 
-const FORMATTER: &[u8] = include_bytes!("/home/ali/Projects/axo/examples/libc/formatter.o");
-const RUNTIME: &[u8] = include_bytes!("/home/ali/Projects/axo/examples/libc/runtime.o");
+const FORMATTER: &[u8] = include_bytes!("/home/ali/Projects/axo/runtime/formatter.o");
+const RUNTIME: &[u8] = include_bytes!("/home/ali/Projects/axo/runtime/runtime.o");
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputKind {
