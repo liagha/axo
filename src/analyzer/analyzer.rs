@@ -58,12 +58,10 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .transpose()?;
 
                 let head = binding
-                    .target
-                    .target()
-                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, binding.target.span))?;
+                    .target.analyze(resolver)?;
 
                 let analyzed = Binding::new(
-                    Str::from(head.format(Verbosity::Minimal)),
+                    Box::new(head),
                     value.map(Box::new),
                     self.typing.clone(),
                     binding.kind,

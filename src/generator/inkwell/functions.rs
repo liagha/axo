@@ -183,24 +183,26 @@ impl<'backend> super::Generator<'backend> {
         if !matches!(routine.interface, Interface::C) {
             for (param, member) in function.get_param_iter().zip(routine.members.iter()) {
                 if let AnalysisKind::Binding(binding) = &member.kind {
-                    let pointer = self.build_entry(function, param.get_type(), binding.target.clone());
-                    let align = self.align(param.get_type());
+                    if let AnalysisKind::Usage(target) = binding.target.kind {
+                        let pointer = self.build_entry(function, param.get_type(), target.clone());
+                        let align = self.align(param.get_type());
 
-                    self.builder
-                        .build_store(pointer, param)
-                        .and_then(|inst| {
-                            inst.set_alignment(align).ok();
-                            Ok(inst)
-                        })
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        self.builder
+                            .build_store(pointer, param)
+                            .and_then(|inst| {
+                                inst.set_alignment(align).ok();
+                                Ok(inst)
+                            })
+                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-                    self.insert_entity(
-                        binding.target.clone(),
-                        Entity::Variable {
-                            pointer,
-                            typing: binding.annotation.clone(),
-                        },
-                    );
+                        self.insert_entity(
+                            target.clone(),
+                            Entity::Variable {
+                                pointer,
+                                typing: binding.annotation.clone(),
+                            },
+                        );
+                    }
                 }
             }
 

@@ -89,7 +89,7 @@ pub enum AnalysisKind<'analysis> {
     Constructor(Aggregate<Str<'analysis>, Analysis<'analysis>>),
     Assign(Str<'analysis>, Box<Analysis<'analysis>>),
     Store(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
-    Binding(Binding<Str<'analysis>, Box<Analysis<'analysis>>, Type<'analysis>>),
+    Binding(Binding<Box<Analysis<'analysis>>, Box<Analysis<'analysis>>, Type<'analysis>>),
     Structure(Aggregate<Str<'analysis>, Analysis<'analysis>>),
     Union(Aggregate<Str<'analysis>, Analysis<'analysis>>),
     Enumeration(Aggregate<Str<'analysis>, Analysis<'analysis>>),

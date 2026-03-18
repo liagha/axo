@@ -109,9 +109,12 @@ impl<'backend> Generator<'backend> {
 
         for member in structure.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                let field = binding.target.clone();
-                members.push(field.clone());
-                types.push(self.to_basic_type(&binding.annotation, member.span)?);
+                if let AnalysisKind::Usage(target) = binding.target.kind {
+                    let field = target.clone();
+
+                    members.push(field.clone());
+                    types.push(self.to_basic_type(&binding.annotation, member.span)?);
+                }
             } else {
                 self.analysis(member)?;
             }
@@ -144,16 +147,18 @@ impl<'backend> Generator<'backend> {
 
         for member in union.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                let field = binding.target.clone();
-                let typing = self.to_basic_type(&binding.annotation, member.span)?;
+                if let AnalysisKind::Usage(target) = binding.target.kind {
+                    let field = target.clone();
+                    let typing = self.to_basic_type(&binding.annotation, member.span)?;
 
-                members.push((field.clone(), typing));
+                    members.push((field.clone(), typing));
 
-                let limit = self.size(typing);
+                    let limit = self.size(typing);
 
-                if limit >= maximum || largest.is_none() {
-                    maximum = limit;
-                    largest = Some(typing);
+                    if limit >= maximum || largest.is_none() {
+                        maximum = limit;
+                        largest = Some(typing);
+                    }
                 }
             } else {
                 self.analysis(member)?;
@@ -193,9 +198,12 @@ impl<'backend> Generator<'backend> {
 
         for member in enumeration.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
-                let field = binding.target.clone();
-                members.push((field, index, None));
-                index += 1;
+                if let AnalysisKind::Usage(target) = binding.target.kind {
+                    let field = target.clone();
+
+                    members.push((field, index, None));
+                    index += 1;
+                }
             } else {
                 let field = match &member.kind {
                     AnalysisKind::Structure(structure) => Some(structure.target.clone()),
