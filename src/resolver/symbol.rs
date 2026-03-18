@@ -7,7 +7,8 @@ use crate::{
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
         self.typing = match &mut self.kind {
-            SymbolKind::Binding(_binding) => {
+            SymbolKind::Binding(binding) => {
+                binding.target.declare(resolver);
                 resolver.fresh()
             }
             SymbolKind::Function(function) => {
@@ -112,13 +113,9 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     (None, None) => resolver.fresh(),
                 };
 
-                match &mut binding.target.kind {
-                    _ => {
-                        resolver.unify(self.span, &binding.target.typing, &typing);
+                resolver.unify(self.span, &binding.target.typing, &typing);
 
-                        typing
-                    }
-                }
+                typing
             }
 
             SymbolKind::Structure(structure) => {

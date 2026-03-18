@@ -500,7 +500,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
 
-                let layout = Vec::new();
+                let mut layout = Vec::new();
                 let mut typing = None;
 
                 if let Some(reference) = self.reference {
@@ -512,43 +512,58 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 for member in &mut structure.members {
                                     if member.is_instance() {
                                         member.resolve(resolver);
+                                        layout.push(member.typing.clone());
                                     }
                                 }
 
-                                for member in &mut construct.members {
+                                for (index, member) in construct.members.iter_mut().enumerate() {
                                     member.resolve(resolver);
+
+                                    if let Some(member_type) = layout.get(index) {
+                                        resolver.unify(member.span, &member.typing, member_type);
+                                    }
                                 }
 
                                 resolver.exit();
                                 typing = Some(TypeKind::Structure(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
-                            SymbolKind::Union(mut union) => {
+                            SymbolKind::Union(mut structure) => {
                                 resolver.enter_scope(symbol.scope.clone());
 
-                                for member in &mut union.members {
+                                for member in &mut structure.members {
                                     if member.is_instance() {
                                         member.resolve(resolver);
+                                        layout.push(member.typing.clone());
                                     }
                                 }
 
-                                for member in &mut construct.members {
+                                for (index, member) in construct.members.iter_mut().enumerate() {
                                     member.resolve(resolver);
+
+                                    if let Some(member_type) = layout.get(index) {
+                                        resolver.unify(member.span, &member.typing, member_type);
+                                    }
                                 }
 
                                 resolver.exit();
                                 typing = Some(TypeKind::Union(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
-                            SymbolKind::Enumeration(mut enumeration) => {
+                            SymbolKind::Enumeration(mut structure) => {
                                 resolver.enter_scope(symbol.scope.clone());
 
-                                for member in &mut enumeration.members {
+                                for member in &mut structure.members {
                                     if member.is_instance() {
                                         member.resolve(resolver);
+                                        layout.push(member.typing.clone());
                                     }
                                 }
 
-                                for member in &mut construct.members {
+                                for (index, member) in construct.members.iter_mut().enumerate() {
                                     member.resolve(resolver);
+
+                                    if let Some(member_type) = layout.get(index) {
+                                        resolver.unify(member.span, &member.typing, member_type);
+                                    }
                                 }
 
                                 resolver.exit();

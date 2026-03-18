@@ -18,6 +18,7 @@ struct Point {
 }
 
 func main() {
+    const point = Point { x = 4, y = 6 }
     const red = Color.Yellow
 
     const cyan = Color.Blue.Cyan
@@ -26,7 +27,8 @@ func main() {
         value = 100
     }
 
-    const Color.GrayScale { value } = black;
+    Point { const x, const y } = point
 
-    value
+    x
+    y
 }
