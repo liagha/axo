@@ -29,7 +29,6 @@ pub enum SymbolKind<'symbol> {
     Binding(Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>),
     Structure(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
     Union(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
-    Enumeration(Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>),
     Function(
         Function<
             Box<Element<'symbol>>,
@@ -92,7 +91,6 @@ impl<'symbol> Symbol<'symbol> {
             SymbolKind::Binding(binding) => binding.target.target(),
             SymbolKind::Structure(structure) => structure.target.target(),
             SymbolKind::Union(union) => union.target.target(),
-            SymbolKind::Enumeration(enumeration) => enumeration.target.target(),
             SymbolKind::Function(function) => function.target.target(),
             SymbolKind::Module(module) => module.target.target(),
         }

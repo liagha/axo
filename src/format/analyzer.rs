@@ -217,12 +217,6 @@ impl<'analysis> Show<'analysis> for Analysis<'analysis> {
                 Verbosity::Debug => format!("Union {{\n{}\n}}", union.format(verbosity).indent(verbosity)).into(),
                 _ => "".into()
             },
-            AnalysisKind::Enumeration(enumeration) => match verbosity {
-                Verbosity::Minimal => format!("enum {}", enumeration.format(verbosity)).into(),
-                Verbosity::Detailed => format!("Enumeration({})", enumeration.format(verbosity)).into(),
-                Verbosity::Debug => format!("Enumeration {{\n{}\n}}", enumeration.format(verbosity).indent(verbosity)).into(),
-                _ => "".into()
-            },
             AnalysisKind::Function(function) => function.format(verbosity),
             AnalysisKind::Module(name, members) => match verbosity {
                 Verbosity::Minimal => format!("mod {} {{ {} }}", name.format(verbosity), members.format(verbosity)).into(),

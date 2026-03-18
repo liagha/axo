@@ -97,20 +97,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 AnalysisKind::Union(analyzed)
             }
-            SymbolKind::Enumeration(enumeration) => {
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = enumeration
-                    .members
-                    .iter()
-                    .map(|member| member.analyze(resolver))
-                    .collect();
-
-                let analyzed = Aggregate::new(
-                    Str::from(enumeration.target.target().unwrap().format(Verbosity::Minimal)),
-                    members?,
-                );
-
-                AnalysisKind::Enumeration(analyzed) 
-            }
             SymbolKind::Function(function) => {
                 let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = function
                     .members

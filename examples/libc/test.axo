@@ -15,21 +15,6 @@ union FloatOrInt {
     const float: Float,
 }
 
-enum Color {
-    const Red,
-    const Yellow,
-
-    struct GrayScale {
-        const value: Integer
-    }
-
-    enum Blue {
-        const Cyan,
-        const LightBlue,
-        const DarkBlue
-    }
-}
-
 func main() {
     libc.test_malloc()
 

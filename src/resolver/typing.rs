@@ -35,7 +35,6 @@ pub enum TypeKind<'typing> {
     Unknown,
     Structure(Aggregate<Str<'typing>, Type<'typing>>),
     Union(Aggregate<Str<'typing>, Type<'typing>>),
-    Enumeration(Aggregate<Str<'typing>, Type<'typing>>),
     Function(Str<'typing>, Vec<Type<'typing>>, Option<Box<Type<'typing>>>),
 }
 

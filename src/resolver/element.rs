@@ -336,7 +336,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     | TypeKind::String
                                     | TypeKind::Pointer { .. }
                                     | TypeKind::Variable(_)
-                                    | TypeKind::Enumeration(_)
                                     | TypeKind::Unknown
                             );
 
@@ -548,27 +547,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 resolver.exit();
                                 typing = Some(TypeKind::Union(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
                             }
-                            SymbolKind::Enumeration(mut structure) => {
-                                resolver.enter_scope(symbol.scope.clone());
-
-                                for member in &mut structure.members {
-                                    if member.is_instance() {
-                                        member.resolve(resolver);
-                                        layout.push(member.typing.clone());
-                                    }
-                                }
-
-                                for (index, member) in construct.members.iter_mut().enumerate() {
-                                    member.resolve(resolver);
-
-                                    if let Some(member_type) = layout.get(index) {
-                                        resolver.unify(member.span, &member.typing, member_type);
-                                    }
-                                }
-
-                                resolver.exit();
-                                typing = Some(TypeKind::Enumeration(Aggregate::new(construct.target.target().unwrap(), layout.clone())));
-                            }
                             _ => {}
                         }
                     }
@@ -632,7 +610,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
     fn is_instance(&self) -> bool {
         matches!(
             self.typing.kind,
-            TypeKind::Structure(_) | TypeKind::Union(_) | TypeKind::Enumeration(_)
+            TypeKind::Structure(_) | TypeKind::Union(_)
         )
     }
 }

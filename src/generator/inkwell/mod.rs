@@ -41,10 +41,6 @@ pub enum Entity<'backend> {
         shape: StructType<'backend>,
         members: Vec<(Str<'backend>, BasicTypeEnum<'backend>)>,
     },
-    Enumeration {
-        shape: StructType<'backend>,
-        members: Vec<(Str<'backend>, i32, Option<BasicTypeEnum<'backend>>)>,
-    },
     Function(FunctionValue<'backend>),
 }
 
@@ -279,68 +275,6 @@ impl<'backend> Generator<'backend> {
                     }
                 }
             },
-            TypeKind::Enumeration(enumeration) => {
-                if let Some(typing) = self.get_entity(&enumeration.target).and_then(|entity| {
-                    match entity {
-                        Entity::Enumeration { shape, .. } => Some((*shape).into()),
-                        _ => None,
-                    }
-                }) {
-                    typing
-                } else {
-                    let name = enumeration.target.clone();
-
-                    if &*name == "" {
-                        let mut largest: Option<BasicTypeEnum> = None;
-                        let mut maximum = 0;
-
-                        for member in &enumeration.members {
-                            let typing = self.to_basic_type(member, span.clone())?;
-                            let limit = self.size(typing);
-
-                            if limit >= maximum || largest.is_none() {
-                                maximum = limit;
-                                largest = Some(typing);
-                            }
-                        }
-
-                        let tag = self.context.i64_type().into();
-                        if let Some(target) = largest {
-                            self.context.struct_type(&[tag, target], false).into()
-                        } else {
-                            self.context.struct_type(&[tag], false).into()
-                        }
-                    } else {
-                        let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
-                            self.context.opaque_struct_type(&name)
-                        });
-
-                        if shape.is_opaque() {
-                            let mut largest: Option<BasicTypeEnum> = None;
-                            let mut maximum = 0;
-
-                            for member in &enumeration.members {
-                                let typing = self.to_basic_type(member, span.clone())?;
-                                let limit = self.size(typing);
-
-                                if limit >= maximum || largest.is_none() {
-                                    maximum = limit;
-                                    largest = Some(typing);
-                                }
-                            }
-
-                            let tag = self.context.i64_type().into();
-                            if let Some(target) = largest {
-                                shape.set_body(&[tag, target], false);
-                            } else {
-                                shape.set_body(&[tag], false);
-                            }
-                        }
-
-                        shape.into()
-                    }
-                }
-            }
             _ => {
                 return Err(
                     GenerateError::new(
@@ -434,11 +368,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                 }
                 AnalysisKind::Union(union) => {
                     if let Err(error) = self.union(union.clone(), analysis.span.clone()) {
-                        self.errors.push(error);
-                    }
-                }
-                AnalysisKind::Enumeration(enumeration) => {
-                    if let Err(error) = self.enumeration(enumeration.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
                 }
@@ -556,7 +485,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::While(condition, body) => self.r#while(condition, body, analysis.span),
             AnalysisKind::Structure(structure) => self.structure(structure, analysis.span),
             AnalysisKind::Union(structure) => self.union(structure, analysis.span),
-            AnalysisKind::Enumeration(structure) => self.enumeration(structure, analysis.span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, analysis.span),
             AnalysisKind::Function(function) => self.function(function, analysis.span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, analysis.span),

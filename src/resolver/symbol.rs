@@ -61,22 +61,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(self.identity, TypeKind::Union(Aggregate::new(head.into(), Vec::new())))
             }
-            SymbolKind::Enumeration(enumeration) => {
-                let head = enumeration.target.target().unwrap();
-
-                resolver.enter();
-
-                for member in &mut enumeration.members {
-                    member.declare(resolver);
-                }
-
-                let active = resolver.active;
-                resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
-                self.scope.parent = None;
-
-                Type::new(self.identity, TypeKind::Enumeration(Aggregate::new(head.into(), Vec::new())))
-            }
             SymbolKind::Module(_) => unimplemented!("module declaration not implemented!"),
         };
 
@@ -154,25 +138,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 self.scope.parent = None;
 
                 Type::new(self.identity, TypeKind::Union(Aggregate::new(head.into(), members)))
-            }
-
-            SymbolKind::Enumeration(enumeration) => {
-                let head = enumeration.target.target().unwrap();
-
-                let scope = replace(&mut self.scope, Scope::new(None));
-                resolver.enter_scope(scope);
-
-                let members = enumeration.members.iter_mut().map(|member| {
-                    member.resolve(resolver);
-                    member.typing.clone()
-                }).collect();
-
-                let active = resolver.active;
-                resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
-                self.scope.parent = None;
-
-                Type::new(self.identity, TypeKind::Enumeration(Aggregate::new(head.into(), members)))
             }
 
             SymbolKind::Function(function) => {
@@ -262,16 +227,6 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let head = union.target.target().unwrap().into();
 
                 self.typing = Type::new(self.identity, TypeKind::Union(Aggregate::new(head, layout)));
-            }
-            SymbolKind::Enumeration(enumeration) => {
-                for member in &mut enumeration.members {
-                    member.reify(resolver);
-                }
-
-                let layout = enumeration.members.iter().map(|member| member.typing.clone()).collect();
-                let head = enumeration.target.target().unwrap().into();
-
-                self.typing = Type::new(self.identity, TypeKind::Enumeration(Aggregate::new(head, layout)));
             }
             SymbolKind::Function(function) => {
                 for member in &mut function.members {

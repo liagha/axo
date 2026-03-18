@@ -120,12 +120,6 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
                 Verbosity::Debug => format!("Union {{\n{}\n}}", union.format(verbosity).indent(verbosity)).into(),
                 _ => "".into(),
             },
-            TypeKind::Enumeration(enumeration) => match verbosity {
-                Verbosity::Minimal => format!("enum {}", enumeration.format(verbosity)).into(),
-                Verbosity::Detailed => format!("Enumeration({})", enumeration.format(verbosity)).into(),
-                Verbosity::Debug => format!("Enumeration {{\n{}\n}}", enumeration.format(verbosity).indent(verbosity)).into(),
-                _ => "".into(),
-            },
         }
     }
 }

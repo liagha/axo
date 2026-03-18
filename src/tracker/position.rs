@@ -47,18 +47,7 @@ impl<'location> Location<'location> {
             Location::Entry(path) => {
                 let path = PathBuf::from(path);
 
-                if path.clone().exists() {
-                    Ok(path.clone())
-                } else {
-                    let kind = ErrorKind::NotFound(*self);
-
-                    Err(
-                        TrackError::new(
-                            kind,
-                            Span::void(),
-                        )
-                    )
-                }
+                Ok(path.clone())
             }
             _ => {
                 let kind = ErrorKind::NotAnEntry(*self);

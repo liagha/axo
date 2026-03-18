@@ -18,7 +18,11 @@ use {
         tracker::{self, Location, Peekable, Span, TrackError},
     },
     inkwell::context::{Context, ContextRef},
+    std::fs::create_dir_all,
 };
+
+const FORMATTER: &[u8] = include_bytes!("/home/ali/Projects/axo/examples/libc/formatter.o");
+const RUNTIME: &[u8] = include_bytes!("/home/ali/Projects/axo/examples/libc/runtime.o");
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputKind {
@@ -467,6 +471,7 @@ impl<'session> Session<'session> {
 
     pub fn generate(&mut self) {
         let triple = inkwell::targets::TargetMachine::get_default_triple();
+        let base = self.base();
 
         for &identity in &self.order {
             let (_, location) = self.inputs.get(&identity).unwrap();
@@ -479,30 +484,35 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem.clone();
 
-            let schema = Self::schema(*location, Resolver::schema(&mut self.resolver, identity));
+            let schema = Self::schema(&base, *location, Resolver::schema(&mut self.resolver, identity));
 
             self.reporter.start("generating");
             self.generator.generate(analysis);
 
             match schema.as_path() {
-                Ok(path) => match File::create(&path) {
-                    Ok(mut file) => {
-                        if let Err(error) = file.write_all(
-                            self.generator.current_module().print_to_string().to_string().as_bytes(),
-                        ) {
-                            self.errors.push(CompileError::Track(TrackError::new(
-                                tracker::error::ErrorKind::from_io(error, schema),
-                                Span::void(),
-                            )));
-                            return;
+                Ok(path) => {
+                    let dir = path.parent().unwrap();
+                    let _ = create_dir_all(dir);
+
+                    match File::create(&path) {
+                        Ok(mut file) => {
+                            if let Err(error) = file.write_all(
+                                self.generator.current_module().print_to_string().to_string().as_bytes(),
+                            ) {
+                                self.errors.push(CompileError::Track(TrackError::new(
+                                    tracker::error::ErrorKind::from_io(error, schema),
+                                    Span::void(),
+                                )));
+                                return;
+                            }
+                            self.outputs.insert(identity, schema);
                         }
-                        self.outputs.insert(identity, schema);
+                        Err(error) => self.errors.push(CompileError::Track(TrackError::new(
+                            tracker::error::ErrorKind::from_io(error, schema),
+                            Span::void(),
+                        ))),
                     }
-                    Err(error) => self.errors.push(CompileError::Track(TrackError::new(
-                        tracker::error::ErrorKind::from_io(error, schema),
-                        Span::void(),
-                    ))),
-                },
+                }
                 Err(error) => self.errors.push(CompileError::Track(error)),
             }
 
@@ -521,6 +531,7 @@ impl<'session> Session<'session> {
     pub fn emit(&mut self) {
         self.reporter.start("emitting");
 
+        let base = self.base();
         let mut objects = Map::new();
         let mut direct = Vec::new();
 
@@ -541,7 +552,10 @@ impl<'session> Session<'session> {
             };
 
             if let Some(target) = location {
-                let object = Self::object(target, None);
+                let object = Self::object(&base, target, None);
+                let directory = object.to_path().unwrap().parent().unwrap().to_path_buf();
+                let _ = create_dir_all(&directory);
+
                 let mut command = Command::new("clang");
 
                 command
@@ -560,6 +574,15 @@ impl<'session> Session<'session> {
             }
         }
 
+        let object_directory = base.join("build").join("objects");
+        let _ = create_dir_all(&object_directory);
+
+        let formatter = object_directory.join("formatter.o");
+        let runtime = object_directory.join("runtime.o");
+
+        File::create(&formatter).unwrap().write_all(FORMATTER).unwrap();
+        File::create(&runtime).unwrap().write_all(RUNTIME).unwrap();
+
         let mut link = Command::new("clang");
 
         for object in objects.values() {
@@ -570,8 +593,8 @@ impl<'session> Session<'session> {
             link.arg(object.to_string());
         }
 
-        link.arg("/home/ali/Projects/axo/examples/libc/formatter.o".to_string());
-        link.arg("/home/ali/Projects/axo/examples/libc/runtime.o".to_string());
+        link.arg(formatter);
+        link.arg(runtime);
 
         let mut identities: Vec<_> = self.inputs.keys().copied().collect();
         identities.sort();
@@ -586,19 +609,19 @@ impl<'session> Session<'session> {
             .copied()
             .unwrap_or_else(|| self.inputs.get(&identity).unwrap().1);
 
-        let executable = Self::executable(location, None);
+        let executable = Self::executable(&base, location, None);
         link.arg("-o").arg(executable.to_string());
 
         let program = link.get_program().to_string_lossy();
-        let args: Vec<String> = link
+        let arguments: Vec<String> = link
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
 
-        let command = if args.is_empty() {
+        let command = if arguments.is_empty() {
             program.into_owned()
         } else {
-            format!("{} {}", program, args.join(" "))
+            format!("{} {}", program, arguments.join(" "))
         };
 
         self.reporter.run(format!("{}", command));
@@ -616,37 +639,60 @@ impl<'session> Session<'session> {
         Command::new(executable.to_string()).status().expect("failed");
     }
 
-    fn schema(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+    fn base(&self) -> PathBuf {
+        let paths: Vec<_> = self.inputs.values().filter_map(|(_, loc)| loc.to_path().ok()).collect();
+
+        if paths.is_empty() {
+            return PathBuf::from(".");
+        }
+
+        let mut base = paths[0].parent().unwrap().to_path_buf();
+
+        for path in &paths[1..] {
+            let directory = path.parent().unwrap();
+            let mut current = PathBuf::new();
+            let mut base_iterator = base.components();
+            let mut directory_iterator = directory.components();
+
+            while let (Some(b), Some(d)) = (base_iterator.next(), directory_iterator.next()) {
+                if b == d {
+                    current.push(b);
+                } else {
+                    break;
+                }
+            }
+
+            base = current;
+        }
+
+        base
+    }
+
+    fn schema(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
         let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
-            let path = location.to_path().unwrap();
-            let parent = path.parent().unwrap();
-            parent.join(location.stem().unwrap()).with_extension("ll")
+            base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll")
         };
 
         Location::Entry(Str::from(target))
     }
 
-    fn object(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+    fn object(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
         let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
-            let path = location.to_path().unwrap();
-            let parent = path.parent().unwrap();
-            parent.join(location.stem().unwrap()).with_extension("o")
+            base.join("build").join("objects").join(location.stem().unwrap()).with_extension("o")
         };
 
         Location::Entry(Str::from(target))
     }
 
-    fn executable(location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
+    fn executable(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
         let target = if let Some(schema) = configuration {
             PathBuf::from(schema.to_string())
         } else {
-            let path = location.to_path().unwrap();
-            let parent = path.parent().unwrap();
-            parent.join(location.stem().unwrap()).with_extension("")
+            base.join("build").join(location.stem().unwrap()).with_extension("")
         };
 
         Location::Entry(Str::from(target))
