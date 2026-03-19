@@ -1,0 +1,6 @@
+func string_pointer(C, const string: String): *UInt8
+func integer_pointer(C, const value: Integer): *UInt8
+func pointer_integer(C, const pointer: *UInt8): Integer
+func integer_uint64(C, const value: Integer): UInt64
+func integer_uint8(C, const value: Integer): UInt8
+

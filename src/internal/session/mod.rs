@@ -7,8 +7,8 @@ use {
         generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
-            hash::{Set, Map},
-            platform::{Command, File, PathBuf, Write, create_dir_all},
+            hash::{Map, Set},
+            platform::{create_dir_all, Command, File, PathBuf, Write},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
@@ -20,24 +20,37 @@ use {
     inkwell::context::{Context, ContextRef},
 };
 
-const FORMATTER: &[u8] = include_bytes!("/home/ali/Projects/axo/runtime/formatter.o");
-const RUNTIME: &[u8] = include_bytes!("/home/ali/Projects/axo/runtime/runtime.o");
+const RUNTIME: &[&str] = &[
+    "/home/ali/Projects/axo/runtime/cast.axo",
+    "/home/ali/Projects/axo/runtime/cast.c",
+    "/home/ali/Projects/axo/runtime/file.axo",
+    "/home/ali/Projects/axo/runtime/file.c",
+    "/home/ali/Projects/axo/runtime/memory.axo",
+    "/home/ali/Projects/axo/runtime/memory.c",
+    "/home/ali/Projects/axo/runtime/print.axo",
+    "/home/ali/Projects/axo/runtime/print.c",
+    "/home/ali/Projects/axo/runtime/process.axo",
+    "/home/ali/Projects/axo/runtime/process.c",
+];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputKind {
     Source,
     Schema,
     Object,
+    C,
 }
 
 impl InputKind {
-    pub fn from_path(path: &str) -> Option<Self> {
-        if path.ends_with(".axo") {
+    pub fn from_path(string: &str) -> Option<Self> {
+        if string.ends_with(".axo") {
             Some(InputKind::Source)
-        } else if path.ends_with(".ll") {
+        } else if string.ends_with(".ll") {
             Some(InputKind::Schema)
-        } else if path.ends_with(".o") {
+        } else if string.ends_with(".o") {
             Some(InputKind::Object)
+        } else if string.ends_with(".c") {
+            Some(InputKind::C)
         } else {
             None
         }
@@ -48,6 +61,7 @@ impl InputKind {
             InputKind::Source => "axo",
             InputKind::Schema => "ll",
             InputKind::Object => "o",
+            InputKind::C => "c",
         }
     }
 }
@@ -60,7 +74,7 @@ pub enum CompileError<'error> {
     Analyze(AnalyzeError<'error>),
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
-    InvalidInput(Location<'error>),
+    Invalid(Location<'error>),
 }
 
 pub struct Session<'session> {
@@ -81,6 +95,37 @@ pub struct Session<'session> {
 }
 
 impl<'session> Session<'session> {
+    fn traverse(target: &Location<'session>, inputs: &mut Map<Identity, (InputKind, Location<'session>)>) -> bool {
+        let Ok(path) = target.to_path() else {
+            return false;
+        };
+
+        if !path.is_dir() {
+            return false;
+        }
+
+        let mut stack = vec![path];
+
+        while let Some(current) = stack.pop() {
+            if let Ok(entries) = std::fs::read_dir(current) {
+                for entry in entries.flatten() {
+                    let child = entry.path();
+                    if child.is_dir() {
+                        stack.push(child);
+                    } else {
+                        let string = child.to_string_lossy().into_owned();
+                        if let Some(kind) = InputKind::from_path(&string) {
+                            let location = Location::Entry(Str::from(string));
+                            inputs.insert(inputs.len(), (kind, location));
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
     pub fn start() -> Self {
         let mut timer = DefaultTimer::new_default();
         let _ = timer.start();
@@ -88,21 +133,29 @@ impl<'session> Session<'session> {
         let mut initializer = Initializer::new(Location::Flag);
         let mut resolver = Resolver::new();
 
-        let verbosity = Resolver::verbosity(&mut resolver);
-        let reporter = Reporter::new(verbosity);
+        let verbose = Resolver::verbosity(&mut resolver);
+        let reporter = Reporter::new(verbose);
 
         reporter.start("initializing");
 
         let mut inputs = Map::new();
         let mut errors = Vec::new();
 
-        initializer.initialize().iter().for_each(|target| {
-            let kind = InputKind::from_path(&*target.to_string());
+        for path in RUNTIME {
+            if let Some(kind) = InputKind::from_path(path) {
+                let location = Location::Entry(Str::from(path.to_string()));
+                inputs.insert(inputs.len(), (kind, location));
+            }
+        }
 
-            if let Some(kind) = kind {
-                inputs.insert(inputs.len(), (kind, target.clone()));
-            } else {
-                errors.push(CompileError::InvalidInput(target.clone()));
+        initializer.initialize().iter().for_each(|target| {
+            if !Self::traverse(target, &mut inputs) {
+                let string = target.to_string();
+                if let Some(kind) = InputKind::from_path(&string) {
+                    inputs.insert(inputs.len(), (kind, target.clone()));
+                } else {
+                    errors.push(CompileError::Invalid(target.clone()));
+                }
             }
         });
 
@@ -130,12 +183,12 @@ impl<'session> Session<'session> {
         resolver.insert(configuration);
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
-        let verbosity = Resolver::verbosity(&mut resolver);
-        let reporter = Reporter::new(verbosity);
+        let verbose = Resolver::verbosity(&mut resolver);
+        let reporter = Reporter::new(verbose);
 
         let context = Context::create();
-        let context_ref = unsafe { ContextRef::new(context.raw()) };
-        let generator = Generator::new(context_ref);
+        let reference = unsafe { ContextRef::new(context.raw()) };
+        let generator = Generator::new(reference);
 
         reporter.finish("initializing", duration);
 
@@ -203,7 +256,7 @@ impl<'session> Session<'session> {
                 CompileError::Analyze(error) => self.reporter.error(&error),
                 CompileError::Generate(error) => self.reporter.error(&error),
                 CompileError::Track(error) => self.reporter.error(&error),
-                CompileError::InvalidInput(_) => {}
+                CompileError::Invalid(_) => {}
             }
         }
     }
@@ -330,11 +383,11 @@ impl<'session> Session<'session> {
     pub fn scan(&mut self) {
         self.reporter.start("scanning");
 
-        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
-        identities.sort();
+        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        keys.sort();
 
-        for identity in identities {
-            let (kind, location) = self.inputs.get(&identity).unwrap();
+        for key in keys {
+            let (kind, location) = self.inputs.get(&key).unwrap();
 
             if *kind == InputKind::Source {
                 let mut scanner = Scanner::new(*location);
@@ -351,7 +404,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Scan(error.clone())),
                 );
 
-                self.scanners.insert(identity, scanner);
+                self.scanners.insert(key, scanner);
             }
         }
 
@@ -362,15 +415,15 @@ impl<'session> Session<'session> {
     pub fn parse(&mut self) {
         self.reporter.start("parsing");
 
-        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
-        identities.sort();
+        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        keys.sort();
 
-        for identity in identities {
-            let (kind, location) = self.inputs.get(&identity).unwrap();
+        for key in keys {
+            let (kind, location) = self.inputs.get(&key).unwrap();
 
             if *kind == InputKind::Source {
                 let mut parser = Parser::new(*location);
-                let tokens = self.scanners.get(&identity).unwrap().output.clone();
+                let tokens = self.scanners.get(&key).unwrap().output.clone();
 
                 parser.set_input(tokens);
                 parser.parse();
@@ -384,7 +437,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Parse(error.clone())),
                 );
 
-                self.parsers.insert(identity, parser);
+                self.parsers.insert(key, parser);
             }
         }
 
@@ -395,14 +448,14 @@ impl<'session> Session<'session> {
     pub fn resolve(&mut self) {
         self.reporter.start("resolving");
 
-        for &identity in &self.order {
-            let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new(None));
+        for &key in &self.order {
+            let target = *self.modules.get(&key).unwrap();
+            let mut module = self.resolver.get_symbol(target).unwrap().clone();
+            let scope = replace(&mut module.scope, Scope::new(None));
 
-            self.resolver.enter_scope(module_scope);
+            self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
 
             for element in elements.iter_mut() {
                 element.declare(&mut self.resolver);
@@ -418,14 +471,14 @@ impl<'session> Session<'session> {
         let scope = self.resolver.scopes.get(&self.resolver.active).unwrap().clone();
         self.reporter.symbols(&scope.collect(&self.resolver.scopes, &self.resolver.registry));
 
-        for &identity in &self.order {
-            let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new(None));
+        for &key in &self.order {
+            let target = *self.modules.get(&key).unwrap();
+            let mut module = self.resolver.get_symbol(target).unwrap().clone();
+            let scope = replace(&mut module.scope, Scope::new(None));
 
-            self.resolver.enter_scope(module_scope);
+            self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
 
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
@@ -438,14 +491,14 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        for &identity in &self.order {
-            let module_id = *self.modules.get(&identity).unwrap();
-            let mut module = self.resolver.get_symbol(module_id).unwrap().clone();
-            let module_scope = replace(&mut module.scope, Scope::new(None));
+        for &key in &self.order {
+            let target = *self.modules.get(&key).unwrap();
+            let mut module = self.resolver.get_symbol(target).unwrap().clone();
+            let scope = replace(&mut module.scope, Scope::new(None));
 
-            self.resolver.enter_scope(module_scope);
+            self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&identity).unwrap().output;
+            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
 
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
@@ -465,10 +518,10 @@ impl<'session> Session<'session> {
     }
 
     pub fn analyze(&mut self) {
-        for &identity in &self.order {
+        for &key in &self.order {
             self.reporter.start("analyzing");
 
-            let elements = self.parsers.get(&identity).unwrap().output.clone();
+            let elements = self.parsers.get(&key).unwrap().output.clone();
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
 
@@ -481,7 +534,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Analyze(error.clone())),
             );
 
-            self.analyzers.insert(identity, analyzer);
+            self.analyzers.insert(key, analyzer);
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
             self.reporter.finish("analyzing", duration);
@@ -492,10 +545,10 @@ impl<'session> Session<'session> {
         let triple = inkwell::targets::TargetMachine::get_default_triple();
         let base = self.base();
 
-        for &identity in &self.order {
-            let (_, location) = self.inputs.get(&identity).unwrap();
+        for &key in &self.order {
+            let (_, location) = self.inputs.get(&key).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
-            let analysis = self.analyzers.get(&identity).unwrap().output.clone();
+            let analysis = self.analyzers.get(&key).unwrap().output.clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&triple);
@@ -503,33 +556,33 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem.clone();
 
-            let schema = Self::schema(&base, *location, Resolver::schema(&mut self.resolver, identity));
+            let custom = Resolver::schema(&mut self.resolver, key);
+            let schema = Self::schema(&base, *location, custom);
 
             self.reporter.start("generating");
             self.generator.generate(analysis);
 
             match schema.as_path() {
                 Ok(path) => {
-                    let dir = path.parent().unwrap();
-                    let _ = create_dir_all(dir);
+                    let parent = path.parent().unwrap();
+                    let _ = create_dir_all(parent);
 
                     match File::create(&path) {
                         Ok(mut file) => {
-                            if let Err(error) = file.write_all(
-                                self.generator.current_module().print_to_string().to_string().as_bytes(),
-                            ) {
-                                self.errors.push(CompileError::Track(TrackError::new(
-                                    tracker::error::ErrorKind::from_io(error, schema),
-                                    Span::void(),
-                                )));
+                            let string = self.generator.current_module().print_to_string().to_string();
+                            if let Err(error) = file.write_all(string.as_bytes()) {
+                                let kind = tracker::error::ErrorKind::from_io(error, schema);
+                                let track = TrackError::new(kind, Span::void());
+                                self.errors.push(CompileError::Track(track));
                                 return;
                             }
-                            self.outputs.insert(identity, schema);
+                            self.outputs.insert(key, schema);
                         }
-                        Err(error) => self.errors.push(CompileError::Track(TrackError::new(
-                            tracker::error::ErrorKind::from_io(error, schema),
-                            Span::void(),
-                        ))),
+                        Err(error) => {
+                            let kind = tracker::error::ErrorKind::from_io(error, schema);
+                            let track = TrackError::new(kind, Span::void());
+                            self.errors.push(CompileError::Track(track));
+                        }
                     }
                 }
                 Err(error) => self.errors.push(CompileError::Track(error)),
@@ -554,53 +607,44 @@ impl<'session> Session<'session> {
         let mut objects = Map::new();
         let mut direct = Vec::new();
 
-        for (&identity, &(ref kind, ref location)) in &self.inputs {
-            let location = match kind {
+        for (&key, &(ref kind, ref location)) in &self.inputs {
+            let target = match kind {
                 InputKind::Source => {
-                    if let Some(output) = self.outputs.get(&identity) {
+                    if let Some(output) = self.outputs.get(&key) {
                         Some(*output)
                     } else {
                         None
                     }
                 }
-                InputKind::Schema => Some(*location),
+                InputKind::Schema | InputKind::C => Some(*location),
                 InputKind::Object => {
                     direct.push(*location);
                     None
                 }
             };
 
-            if let Some(target) = location {
-                let object = Self::object(&base, target, None);
-                let directory = object.to_path().unwrap().parent().unwrap().to_path_buf();
-                let _ = create_dir_all(&directory);
+            if let Some(path) = target {
+                let object = Self::object(&base, *location, kind, None);
+                let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
+                let _ = create_dir_all(&parent);
 
                 let mut command = Command::new("clang");
 
                 command
                     .arg("-c")
-                    .arg(target.to_string())
+                    .arg(path.to_string())
                     .arg("-o")
                     .arg(object.to_string());
 
                 let status = command.status().expect("failed");
 
                 if status.success() {
-                    objects.insert(identity, object);
+                    objects.insert(key, object);
                 } else {
-                    panic!("failed {}", target);
+                    panic!("failed {}", path);
                 }
             }
         }
-
-        let object_directory = base.join("build").join("objects");
-        let _ = create_dir_all(&object_directory);
-
-        let formatter = object_directory.join("formatter.o");
-        let runtime = object_directory.join("runtime.o");
-
-        File::create(&formatter).unwrap().write_all(FORMATTER).unwrap();
-        File::create(&runtime).unwrap().write_all(RUNTIME).unwrap();
 
         let mut link = Command::new("clang");
 
@@ -612,21 +656,18 @@ impl<'session> Session<'session> {
             link.arg(object.to_string());
         }
 
-        link.arg(formatter);
-        link.arg(runtime);
+        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        keys.sort();
 
-        let mut identities: Vec<_> = self.inputs.keys().copied().collect();
-        identities.sort();
-
-        let identity = self.order.first().copied().unwrap_or_else(|| {
-            *identities.first().expect("missing")
+        let key = self.order.last().copied().unwrap_or_else(|| {
+            *keys.last().expect("missing")
         });
 
         let location = self
             .outputs
-            .get(&identity)
+            .get(&key)
             .copied()
-            .unwrap_or_else(|| self.inputs.get(&identity).unwrap().1);
+            .unwrap_or_else(|| self.inputs.get(&key).unwrap().1);
 
         let executable = Self::executable(&base, location, None);
         link.arg("-o").arg(executable.to_string());
@@ -634,16 +675,16 @@ impl<'session> Session<'session> {
         let program = link.get_program().to_string_lossy();
         let arguments: Vec<String> = link
             .get_args()
-            .map(|arg| arg.to_string_lossy().into_owned())
+            .map(|argument| argument.to_string_lossy().into_owned())
             .collect();
 
-        let command = if arguments.is_empty() {
+        let execution = if arguments.is_empty() {
             program.into_owned()
         } else {
             format!("{} {}", program, arguments.join(" "))
         };
 
-        self.reporter.run(format!("{}", command));
+        self.reporter.run(format!("{}", execution));
 
         let status = link.status().expect("failed");
 
@@ -659,7 +700,7 @@ impl<'session> Session<'session> {
     }
 
     fn base(&self) -> PathBuf {
-        let paths: Vec<_> = self.inputs.values().filter_map(|(_, loc)| loc.to_path().ok()).collect();
+        let paths: Vec<_> = self.inputs.values().filter_map(|(_, location)| location.to_path().ok()).collect();
 
         if paths.is_empty() {
             return PathBuf::from(".");
@@ -668,14 +709,14 @@ impl<'session> Session<'session> {
         let mut base = paths[0].parent().unwrap().to_path_buf();
 
         for path in &paths[1..] {
-            let directory = path.parent().unwrap();
+            let parent = path.parent().unwrap();
             let mut current = PathBuf::new();
-            let mut base_iterator = base.components();
-            let mut directory_iterator = directory.components();
+            let mut left = base.components();
+            let mut right = parent.components();
 
-            while let (Some(b), Some(d)) = (base_iterator.next(), directory_iterator.next()) {
-                if b == d {
-                    current.push(b);
+            while let (Some(first), Some(second)) = (left.next(), right.next()) {
+                if first == second {
+                    current.push(first);
                 } else {
                     break;
                 }
@@ -687,9 +728,9 @@ impl<'session> Session<'session> {
         base
     }
 
-    fn schema(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(schema) = configuration {
-            PathBuf::from(schema.to_string())
+    fn schema(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
+        let target = if let Some(path) = custom {
+            PathBuf::from(path.to_string())
         } else {
             base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll")
         };
@@ -697,19 +738,23 @@ impl<'session> Session<'session> {
         Location::Entry(Str::from(target))
     }
 
-    fn object(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(schema) = configuration {
-            PathBuf::from(schema.to_string())
+    fn object(base: &PathBuf, location: Location<'session>, kind: &InputKind, custom: Option<Str<'session>>) -> Location<'session> {
+        let target = if let Some(path) = custom {
+            PathBuf::from(path.to_string())
         } else {
-            base.join("build").join("objects").join(location.stem().unwrap()).with_extension("o")
+            base.join("build")
+                .join("objects")
+                .join(kind.extension())
+                .join(location.stem().unwrap())
+                .with_extension("o")
         };
 
         Location::Entry(Str::from(target))
     }
 
-    fn executable(base: &PathBuf, location: Location<'session>, configuration: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(schema) = configuration {
-            PathBuf::from(schema.to_string())
+    fn executable(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
+        let target = if let Some(path) = custom {
+            PathBuf::from(path.to_string())
         } else {
             base.join("build").join(location.stem().unwrap()).with_extension("")
         };

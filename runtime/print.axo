@@ -1,0 +1,9 @@
+func print_integer(C, const value: Int64)
+func print_float(C, const value: Float)
+func print_boolean(C, const value: Boolean)
+func print_string(C, const string: String)
+func print_character(C, const character: UInt8)
+func print_newline(C)
+func print_hexadecimal(C, const value: Int64)
+func print_pointer(C, const pointer: *UInt8)
+
