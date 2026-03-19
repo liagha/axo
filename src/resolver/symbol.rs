@@ -5,6 +5,42 @@ use crate::{
 };
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
+    fn depending(&self, resolver: &mut Resolver<'symbol>) {
+        match &self.kind {
+            SymbolKind::Binding(binding) => {
+                binding.target.depending(resolver);
+                if let Some(annotation) = &binding.annotation {
+                    annotation.depending(resolver);
+                }
+                if let Some(value) = &binding.value {
+                    value.depending(resolver);
+                }
+            }
+            SymbolKind::Structure(structure) => {
+                for member in &structure.members {
+                    member.depending(resolver);
+                }
+            }
+            SymbolKind::Union(union) => {
+                for member in &union.members {
+                    member.depending(resolver);
+                }
+            }
+            SymbolKind::Function(function) => {
+                for member in &function.members {
+                    member.depending(resolver);
+                }
+                if let Some(output) = &function.output {
+                    output.depending(resolver);
+                }
+                if let Some(body) = &function.body {
+                    body.depending(resolver);
+                }
+            }
+            SymbolKind::Module(_) => {}
+        }
+    }
+
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
         self.typing = match &mut self.kind {
             SymbolKind::Binding(binding) => {

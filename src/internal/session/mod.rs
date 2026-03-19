@@ -7,7 +7,7 @@ use {
         generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
-            hash::Map,
+            hash::{Set, Map},
             platform::{Command, File, PathBuf, Write, create_dir_all},
             timer::{DefaultTimer, Duration},
         },
@@ -166,12 +166,12 @@ impl<'session> Session<'session> {
                 break 'pipeline;
             }
 
-            self.plan();
-
             self.populate();
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
+
+            self.plan();
 
             self.resolve();
             if !self.errors.is_empty() {
@@ -208,72 +208,123 @@ impl<'session> Session<'session> {
         }
     }
 
-    pub fn plan(&mut self) {
-        let mut identities: Vec<_> = self
+    pub fn populate(&mut self) {
+        let modules: Vec<_> = self
             .inputs
             .iter()
-            .filter_map(|(&id, (kind, _))| if *kind == InputKind::Source { Some(id) } else { None })
+            .map(|(identity, (_, location))| {
+                let stem = Str::from(location.stem().unwrap().to_string());
+                let span = Span::file(Str::from(location.to_string())).unwrap();
+
+                let head = Element::new(
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
+                    span,
+                )
+                    .into();
+
+                let symbol = Symbol::new(
+                    SymbolKind::Module(Module::new(head)),
+                    span,
+                    Visibility::Public,
+                );
+
+                self.modules.insert(*identity, symbol.identity);
+                symbol
+            })
             .collect();
 
-        identities.sort();
+        for module in modules {
+            self.resolver.insert(module);
+        }
+    }
+
+    pub fn plan(&mut self) {
+        let mut sources: Vec<_> = self
+            .inputs
+            .iter()
+            .filter_map(|(&identity, (kind, _))| if *kind == InputKind::Source { Some(identity) } else { None })
+            .collect();
+
+        sources.sort();
 
         let mut graph = Map::new();
-        let mut degreed = Map::new();
+        let mut degrees = Map::new();
 
-        for &id in &identities {
-            graph.insert(id, Vec::new());
-            degreed.insert(id, 0);
+        for &identity in &sources {
+            graph.insert(identity, Vec::new());
+            degrees.insert(identity, 0);
         }
 
-        for &identity in &identities {
+        for &identity in &sources {
             let dependencies = self.dependencies(identity);
-            for dependency in dependencies {
-                if graph.contains_key(&dependency) {
-                    graph.get_mut(&dependency).unwrap().push(identity);
-                    *degreed.get_mut(&identity).unwrap() += 1;
+
+            for symbol in dependencies {
+                let resolved = self.modules.iter().find_map(|(&key, &value)| {
+                    if value == symbol {
+                        Some(key)
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(dependency) = resolved {
+                    if graph.contains_key(&dependency) {
+                        graph.get_mut(&dependency).unwrap().push(identity);
+                        *degrees.get_mut(&identity).unwrap() += 1;
+                    }
                 }
             }
         }
 
-        let mut queue: Vec<_> = degreed
+        let mut queue: Vec<_> = degrees
             .iter()
-            .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
+            .filter_map(|(&identity, &degree)| if degree == 0 { Some(identity) } else { None })
             .collect();
 
         queue.sort();
 
-        let mut sorted = Vec::new();
+        let mut order = Vec::new();
 
         while !queue.is_empty() {
             let identity = queue.remove(0);
-            sorted.push(identity);
+            order.push(identity);
 
             if let Some(neighbors) = graph.get(&identity) {
-                for &next in neighbors {
-                    let degree = degreed.get_mut(&next).unwrap();
+                for &neighbor in neighbors {
+                    let degree = degrees.get_mut(&neighbor).unwrap();
                     *degree -= 1;
 
                     if *degree == 0 {
-                        queue.push(next);
+                        queue.push(neighbor);
                     }
                 }
                 queue.sort();
             }
         }
 
-        if sorted.len() != identities.len() {
-            for &identity in &identities {
-                if !sorted.contains(&identity) {
-                    sorted.push(identity);
+        if order.len() != sources.len() {
+            for &identity in &sources {
+                if !order.contains(&identity) {
+                    order.push(identity);
                 }
             }
         }
 
-        self.order = sorted;
+        self.order = order;
     }
 
-    fn dependencies(&self, _identity: Identity) -> Vec<Identity> {
-        Vec::new()
+    fn dependencies(&mut self, identity: Identity) -> Set<Identity> {
+        let elements = &self.parsers.get(&identity).unwrap().output;
+
+        for element in elements.iter() {
+            element.depending(&mut self.resolver);
+        }
+
+        let dependencies = self.resolver.dependencies.clone();
+
+        self.resolver.dependencies.clear();
+
+        dependencies
     }
 
     pub fn scan(&mut self) {
@@ -339,37 +390,6 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
         self.reporter.finish("parsing", duration);
-    }
-
-    pub fn populate(&mut self) {
-        let modules: Vec<_> = self
-            .order
-            .iter()
-            .map(|&identity| {
-                let (_, location) = self.inputs.get(&identity).unwrap();
-                let stem = Str::from(location.stem().unwrap().to_string());
-                let span = Span::file(Str::from(location.to_string())).unwrap();
-
-                let head = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
-                    span,
-                )
-                    .into();
-
-                let symbol = Symbol::new(
-                    SymbolKind::Module(Module::new(head)),
-                    span,
-                    Visibility::Public,
-                );
-
-                self.modules.insert(identity, symbol.identity);
-                symbol
-            })
-            .collect();
-
-        for module in modules {
-            self.resolver.insert(module);
-        }
     }
 
     pub fn resolve(&mut self) {

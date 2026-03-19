@@ -56,7 +56,7 @@ impl<'registry> Resolver<'registry> {
                      kind: TokenKind::Integer(value),
                      ..
                  }) => value as u8,
-            _ => 1,
+            _ => 0,
         }
     }
 

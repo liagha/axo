@@ -1,8 +1,17 @@
 use crate::{
     data::{Identity, Scale},
-    internal::hash::Map,
+    internal::{
+        hash::{
+            Map, Set,
+        },
+    },
     parser::{Element, ElementKind, Symbol},
-    resolver::{scope::Scope, ErrorKind, ResolveError, Type, TypeKind},
+    resolver::{
+        scope::Scope,
+        ErrorKind, ResolveError,
+        Type, TypeKind,
+        next_identity,
+    },
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Span,
 };
@@ -15,7 +24,7 @@ pub struct Resolver<'resolver> {
     pub errors: Vec<ResolveError<'resolver>>,
     pub variables: Vec<Option<Type<'resolver>>>,
     pub returns: Vec<Type<'resolver>>,
-    pub counter: Identity,
+    pub dependencies: Set<Identity>,
 }
 
 impl Clone for Resolver<'_> {
@@ -28,12 +37,13 @@ impl Clone for Resolver<'_> {
             errors: self.errors.clone(),
             variables: self.variables.clone(),
             returns: self.returns.clone(),
-            counter: self.counter,
+            dependencies: self.dependencies.clone(),
         }
     }
 }
 
 pub trait Resolvable<'resolvable> {
+    fn depending(&self, resolver: &mut Resolver<'resolvable>);
     fn declare(&mut self, resolver: &mut Resolver<'resolvable>);
     fn resolve(&mut self, resolver: &mut Resolver<'resolvable>);
     fn reify(&mut self, resolver: &mut Resolver<'resolvable>);
@@ -55,7 +65,7 @@ impl<'resolver> Resolver<'resolver> {
             errors: Vec::new(),
             variables: Vec::new(),
             returns: Vec::new(),
-            counter: 1,
+            dependencies: Set::new(),
         }
     }
     
@@ -68,16 +78,14 @@ impl<'resolver> Resolver<'resolver> {
     }
 
     pub fn enter(&mut self) {
-        let next = self.counter;
-        self.counter += 1;
+        let next = next_identity();
 
         self.scopes.insert(next, Scope::new(Some(self.active)));
         self.active = next;
     }
 
     pub fn enter_scope(&mut self, mut scope: Scope) {
-        let next = self.counter;
-        self.counter += 1;
+        let next = next_identity();
 
         scope.parent = Some(self.active);
         self.scopes.insert(next, scope);
