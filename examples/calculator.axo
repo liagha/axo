@@ -1,0 +1,50 @@
+struct Token {
+    const kind: String,
+    const value: Float
+}
+
+struct Lexer {
+    const input: String,
+    const position: UInt64
+}
+
+func main() {
+    const input = input.get_input("Enter your calculation: ")
+    const lexer = Lexer { input = input, position = 0 }
+
+    const current_token = next_token(lexer)
+
+    while(current_token.kind != "EOF", {
+        current_token = next_token(lexer)
+    })
+}
+
+func next_token(const lexer: Lexer): Token {
+    while(lexer.position < string.string_length(lexer.input), {
+        const current_char = string.character_at(lexer.input, lexer.position)
+
+        if(string.is_whitespace(current_char), {
+            lexer.position = lexer.position + 1
+            continue()
+        }, 0)
+
+        if(current_char == "+", {
+            lexer.position = lexer.position + 1;
+            return(Token { kind = "PLUS", value = 0.0 })
+        }, 0)
+
+        if(string.is_digit(current_char), {
+            const start = lexer.position
+
+            while(lexer.position < string.string_length(lexer.input) && string.is_digit(string.character_at(lexer.input, lexer.position)), {
+                lexer.position = lexer.position + 1
+            })
+
+            const num_str = string.string_substring(lexer.input, start, lexer.position)
+
+            return (Token { kind = "NUMBER", value = string.parse_float(num_str) })
+        }, 0)
+    })
+
+    return(Token { kind = "EOF", value = 0.0 })
+}
