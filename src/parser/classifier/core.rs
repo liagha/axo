@@ -29,7 +29,7 @@ impl<'parser> Parser<'parser> {
                 ) || if let TokenKind::Identifier(identifier) = &token.kind {
                     !matches!(
                         identifier.unwrap_str(),
-                        "var" | "const" | "struct" | "union" | "func" | "module"
+                        "static" | "var" | "const" | "struct" | "union" | "func" | "module"
                     )
                 } else {
                     false

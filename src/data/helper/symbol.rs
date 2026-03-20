@@ -15,6 +15,7 @@ pub struct Binding<Target, Value, Type> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BindingKind {
+    Static,
     Constant,
     Variable,
     Meta,

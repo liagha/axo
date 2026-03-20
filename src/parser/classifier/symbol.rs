@@ -23,7 +23,7 @@ impl<'parser> Parser<'parser> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(id) = &token.kind {
-                    matches!(id.as_str().unwrap(), "var" | "const" | "meta")
+                    matches!(id.as_str().unwrap(), "static" | "var" | "const" | "meta")
                 } else {
                     false
                 }
@@ -44,6 +44,7 @@ impl<'parser> Parser<'parser> {
 
                 let kind = if let TokenKind::Identifier(identifier) = keyword.kind {
                     match identifier.as_str().unwrap() {
+                        "static" => BindingKind::Static,
                         "const" => BindingKind::Constant,
                         "var" => BindingKind::Variable,
                         "meta" => BindingKind::Meta,

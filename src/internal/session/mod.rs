@@ -190,7 +190,8 @@ impl<'session> Session<'session> {
         let reference = unsafe { ContextRef::new(context.raw()) };
         let generator = Generator::new(reference);
 
-        reporter.finish("initializing", duration);
+        let initial = errors.len();
+        reporter.finish("initializing", duration, initial);
 
         Session {
             timer,
@@ -245,35 +246,43 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.stop().unwrap());
-        self.reporter.finish("compilation", duration);
+        self.reporter.finish("compilation", duration, self.errors.len());
 
         for error in &self.errors {
             match error {
-                CompileError::Initialize(error) => self.reporter.error(&error),
-                CompileError::Scan(error) => self.reporter.error(&error),
-                CompileError::Parse(error) => self.reporter.error(&error),
-                CompileError::Resolve(error) => self.reporter.error(&error),
-                CompileError::Analyze(error) => self.reporter.error(&error),
-                CompileError::Generate(error) => self.reporter.error(&error),
-                CompileError::Track(error) => self.reporter.error(&error),
+                CompileError::Initialize(error) => self.reporter.error(error),
+                CompileError::Scan(error) => self.reporter.error(error),
+                CompileError::Parse(error) => self.reporter.error(error),
+                CompileError::Resolve(error) => self.reporter.error(error),
+                CompileError::Analyze(error) => self.reporter.error(error),
+                CompileError::Generate(error) => self.reporter.error(error),
+                CompileError::Track(error) => self.reporter.error(error),
                 CompileError::Invalid(_) => {}
             }
         }
     }
 
     pub fn populate(&mut self) {
-        let modules: Vec<_> = self
-            .inputs
-            .iter()
-            .map(|(identity, (_, location))| {
+        // Collect and sort keys to ensure deterministic iteration
+        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        keys.sort();
+
+        let modules: Vec<_> = keys
+            .into_iter()
+            .filter_map(|identity| {
+                let (kind, location) = self.inputs.get(&identity).unwrap();
+
+                if *kind != InputKind::Source {
+                    return None;
+                }
+
                 let stem = Str::from(location.stem().unwrap().to_string());
                 let span = Span::file(Str::from(location.to_string())).unwrap();
 
                 let head = Element::new(
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
                     span,
-                )
-                    .into();
+                ).into();
 
                 let symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
@@ -281,8 +290,8 @@ impl<'session> Session<'session> {
                     Visibility::Public,
                 );
 
-                self.modules.insert(*identity, symbol.identity);
-                symbol
+                self.modules.insert(identity, symbol.identity);
+                Some(symbol)
             })
             .collect();
 
@@ -364,6 +373,14 @@ impl<'session> Session<'session> {
         }
 
         self.order = order;
+
+        let sequence: Vec<String> = self
+            .order
+            .iter()
+            .map(|key| self.inputs.get(key).unwrap().1.stem().unwrap().to_string())
+            .collect();
+
+        self.reporter.order(&sequence);
     }
 
     fn dependencies(&mut self, identity: Identity) -> Set<Identity> {
@@ -381,6 +398,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn scan(&mut self) {
+        let initial = self.errors.len();
         self.reporter.start("scanning");
 
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
@@ -409,10 +427,11 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("scanning", duration);
+        self.reporter.finish("scanning", duration, self.errors.len() - initial);
     }
 
     pub fn parse(&mut self) {
+        let initial = self.errors.len();
         self.reporter.start("parsing");
 
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
@@ -442,10 +461,11 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("parsing", duration);
+        self.reporter.finish("parsing", duration, self.errors.len() - initial);
     }
 
     pub fn resolve(&mut self) {
+        let initial = self.errors.len();
         self.reporter.start("resolving");
 
         for &key in &self.order {
@@ -514,18 +534,19 @@ impl<'session> Session<'session> {
         self.errors.extend(self.resolver.errors.drain(..).map(CompileError::Resolve));
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("resolving", duration);
+        self.reporter.finish("resolving", duration, self.errors.len() - initial);
     }
 
     pub fn analyze(&mut self) {
         for &key in &self.order {
+            let initial = self.errors.len();
             self.reporter.start("analyzing");
 
             let elements = self.parsers.get(&key).unwrap().output.clone();
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
 
-            self.reporter.analysis(&*analyzer.output);
+            self.reporter.analysis(&analyzer.output);
 
             self.errors.extend(
                 analyzer
@@ -537,7 +558,7 @@ impl<'session> Session<'session> {
             self.analyzers.insert(key, analyzer);
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-            self.reporter.finish("analyzing", duration);
+            self.reporter.finish("analyzing", duration, self.errors.len() - initial);
         }
     }
 
@@ -546,6 +567,7 @@ impl<'session> Session<'session> {
         let base = self.base();
 
         for &key in &self.order {
+            let initial = self.errors.len();
             let (_, location) = self.inputs.get(&key).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(&key).unwrap().output.clone();
@@ -554,7 +576,7 @@ impl<'session> Session<'session> {
             module.set_triple(&triple);
 
             self.generator.modules.insert(stem, module);
-            self.generator.current_module = stem.clone();
+            self.generator.current_module = stem;
 
             let custom = Resolver::schema(&mut self.resolver, key);
             let schema = Self::schema(&base, *location, custom);
@@ -589,7 +611,7 @@ impl<'session> Session<'session> {
             }
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-            self.reporter.finish("generating", duration);
+            self.reporter.finish("generating", duration, self.errors.len() - initial);
         }
 
         self.errors.extend(
@@ -601,6 +623,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn emit(&mut self) {
+        let initial = self.errors.len();
         self.reporter.start("emitting");
 
         let base = self.base();
@@ -684,7 +707,7 @@ impl<'session> Session<'session> {
             format!("{} {}", program, arguments.join(" "))
         };
 
-        self.reporter.run(format!("{}", execution));
+        self.reporter.run(execution);
 
         let status = link.status().expect("failed");
 
@@ -693,7 +716,7 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("emitting", duration);
+        self.reporter.finish("emitting", duration, self.errors.len() - initial);
         self.reporter.run(format!("{}", executable));
 
         Command::new(executable.to_string()).status().expect("failed");

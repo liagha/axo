@@ -1,17 +1,10 @@
 use {
     crate::{
-        data::Str,
-        format::{
-            Show,
-            Display,
-            Verbosity,
-        },
         analyzer::Analysis,
-        internal::{
-            timer::Duration,
-            platform::PathBuf,
-        },
-        parser::Element,
+        data::Str,
+        format::{Display, Show, Verbosity},
+        internal::{platform::PathBuf, timer::Duration},
+        parser::{Element, Symbol},
         reporter::Error,
         scanner::Token,
     },
@@ -28,145 +21,117 @@ impl Reporter {
             verbosity: verbosity.into(),
         }
     }
-    
-    pub fn is_verbose(&self) -> bool {
+
+    pub fn active(&self) -> bool {
         self.verbosity != Verbosity::Off
     }
 
     pub fn start(&self, stage: &str) {
-        if self.is_verbose() {
+        if self.active() {
             xprintln!(
                 "Started {}." => Color::Blue,
-                format!("`{}`", stage) => Color::White,
+                format!("`{}`", stage) => Color::White
+            );
+            xprintln!();
+        }
+    }
+
+    pub fn finish(&self, stage: &str, duration: Duration, count: usize) {
+        if self.active() {
+            let suffix = if count > 0 {
+                format!(" ({} errors)", count)
+            } else {
+                String::new()
+            };
+
+            xprintln!(
+                "Finished {} {}s{}" => Color::Green,
+                format!("`{}` in", stage) => Color::White,
+                duration.as_secs_f64(),
+                suffix => Color::Red
             );
             xprintln!();
         }
     }
 
     pub fn generate(&self, kind: &str, target: &PathBuf) {
-        if self.is_verbose() {
+        if self.active() {
             xprintln!(
                 "Generated {} {}." => Color::Green,
                 format!("({})", kind) => Color::White,
                 format!("`{}`", target.to_string_lossy()) => Color::White
             );
-
             xprintln!();
         }
     }
 
     pub fn run(&self, target: String) {
-        if self.is_verbose() {
+        if self.active() {
             xprintln!(
                 "Running {}." => Color::Blue,
                 format!("`{}`", target) => Color::White
             );
-
             xprintln!();
         }
     }
 
-    pub fn finish(&self, stage: &str, duration: Duration) {
-        if self.is_verbose() {
+    pub fn section(&self, head: &str, color: Color, body: String) {
+        if self.active() && !body.is_empty() {
             xprintln!(
-                "Finished {} {}s." => Color::Green,
-                format!("`{}` in", stage) => Color::White,
-                duration.as_secs_f64(),
+                "{}{}\n{}" => Color::White,
+                head => color,
+                ":" => Color::White,
+                Str::from(body).indent(self.verbosity) => Color::White
             );
-            
             xprintln!();
         }
     }
 
     pub fn tokens(&self, tokens: &[Token]) {
-        if self.is_verbose() {
-            let tree = tokens
-                .iter()
-                .map(|token| Str::from(format!("{}", token.format(self.verbosity))))
-                .collect::<Vec<Str>>()
-                .join(", ");
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}{}\n{}" => Color::White,
-                    "Tokens" => Color::Cyan,
-                    ":" => Color::White,
-                    tree.indent(self.verbosity) => Color::White
-                );
-
-                xprintln!();
-            }
-        }
+        let body = tokens
+            .iter()
+            .map(|token| format!("{}", token.format(self.verbosity)))
+            .collect::<Vec<String>>()
+            .join(", ");
+        self.section("Tokens", Color::Cyan, body);
     }
 
     pub fn elements(&self, elements: &[Element]) {
-        if self.is_verbose() {
-            let tree = elements
-                .iter()
-                .map(|element| Str::from(format!("{}", element.format(self.verbosity))))
-                .collect::<Vec<Str>>()
-                .join("\n");
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}{}\n{}" => Color::White,
-                    "Elements" => Color::Cyan,
-                    ":" => Color::White,
-                    tree.indent(self.verbosity) => Color::White
-                );
-                xprintln!();
-            }
-        }
+        let body = elements
+            .iter()
+            .map(|element| format!("{}", element.format(self.verbosity)))
+            .collect::<Vec<String>>()
+            .join("\n");
+        self.section("Elements", Color::Cyan, body);
     }
 
-    pub fn symbols<'reporter>(
-        &self,
-        symbols: &[
-            crate::parser::Symbol<'reporter>
-        ],
-    ) {
-        if self.is_verbose() {
-            let mut tree = String::new();
-            for symbol in symbols {
-                tree.push_str(&format!("{}", symbol.format(self.verbosity)));
-                tree.push('\n');
-            }
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}{}\n{}" => Color::White,
-                    "Symbols" => Color::Blue,
-                    ":" => Color::White,
-                    Str::from(tree).indent(self.verbosity) => Color::White,
-                );
-                xprintln!();
-            }
-        }
+    pub fn symbols(&self, symbols: &[Symbol]) {
+        let body = symbols
+            .iter()
+            .map(|symbol| format!("{}", symbol.format(self.verbosity)))
+            .collect::<Vec<String>>()
+            .join("\n");
+        self.section("Symbols", Color::Blue, body);
     }
 
-    pub fn analysis<'reporter>(
-        &self,
-        analysis: &[
-            Analysis<'reporter>
-        ],
-    ) {
-        if self.is_verbose() {
-            let mut tree = String::new();
+    pub fn analysis(&self, analysis: &[Analysis]) {
+        let body = analysis
+            .iter()
+            .map(|item| format!("{}", item.format(self.verbosity)))
+            .collect::<Vec<String>>()
+            .join("\n");
+        self.section("Analysis", Color::Blue, body);
+    }
 
-            for analysis in analysis {
-                tree.push_str(&format!("{}", analysis.format(self.verbosity)));
-                tree.push('\n');
-            }
-
-            if !tree.is_empty() {
-                xprintln!(
-                    "{}{}\n{}" => Color::White,
-                    "Analysis" => Color::Blue,
-                    ":" => Color::White,
-                    Str::from(tree).indent(self.verbosity) => Color::White,
-                );
-                xprintln!();
-            }
+    pub fn order(&self, sequence: &[String]) {
+        if self.active() && !sequence.is_empty() {
+            xprintln!(
+                "{}{} {}" => Color::White,
+                "Order" => Color::Magenta,
+                ":" => Color::White,
+                sequence.join(" -> ") => Color::White
+            );
+            xprintln!();
         }
     }
 
@@ -177,10 +142,10 @@ impl Reporter {
     {
         let (message, details) = error.handle();
         xprintln!(
-                    "{}\n{}" => Color::Red,
-                    message => Color::White,
-                    details => Color::White
-                );
+            "{}\n{}" => Color::Red,
+            message => Color::White,
+            details => Color::White
+        );
         xprintln!();
     }
 
@@ -190,7 +155,7 @@ impl Reporter {
         H: Clone + Display,
     {
         for error in errors {
-            self.error(&error);
+            self.error(error);
         }
     }
 }
