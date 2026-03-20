@@ -31,6 +31,10 @@ const RUNTIME: &[&str] = &[
     "/home/ali/Projects/axo/runtime/print.c",
     "/home/ali/Projects/axo/runtime/process.axo",
     "/home/ali/Projects/axo/runtime/process.c",
+    "/home/ali/Projects/axo/runtime/string.axo",
+    "/home/ali/Projects/axo/runtime/string.c",
+    "/home/ali/Projects/axo/runtime/input.axo",
+    "/home/ali/Projects/axo/runtime/input.c",
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,0 +1,2 @@
+func get_input(C, const prompt: String): String
+

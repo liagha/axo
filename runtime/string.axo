@@ -1,0 +1,7 @@
+func string_length(C, const string: String): UInt64
+func character_at(C, const string: String, const index: UInt64): UInt8
+func is_whitespace(C, const character: UInt8): Boolean
+func is_digit(C, const character: UInt8): Boolean
+func string_substring(C, const string: String, const start: UInt64, const end: UInt64): String
+func parse_float(C, const string: String): Float
+

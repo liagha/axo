@@ -1,3 +1,6 @@
 func main() {
-    print.print_string("hey\n")
+    const name = input.get_input("What's your name? ")
+    print.print_string("Hey ")
+    print.print_string(name)
+    print.print_string("!\n")
 }

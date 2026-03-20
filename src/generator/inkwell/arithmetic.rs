@@ -25,6 +25,22 @@ impl<'backend> Generator<'backend> {
             Ok((left, right, true))
         } else if left.is_int_value() && right.is_int_value() {
             Ok((left, right, false))
+        }  else if left.is_pointer_value() && right.is_pointer_value() {
+            let left = left.into_pointer_value();
+            let right = right.into_pointer_value();
+
+            let context = left.get_type().get_context();
+            let integer = context.i64_type();
+
+            let left = self.builder
+                .build_ptr_to_int(left, integer, "left_cast")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+            let right = self.builder
+                .build_ptr_to_int(right, integer, "right_cast")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+            Ok((left.into(), right.into(), false))
         } else {
             Err(GenerateError::new(ErrorKind::Normalize, span))
         }
