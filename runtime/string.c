@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 uint64_t string_length(const char* string) {
     return strlen(string);
@@ -11,12 +12,12 @@ uint8_t character_at(const char* string, uint64_t index) {
     return (uint8_t)string[index];
 }
 
-int is_whitespace(uint8_t character) {
-    return isspace(character);
+bool is_whitespace(uint8_t character) {
+    return isspace(character) != 0;
 }
 
-int is_digit(uint8_t character) {
-    return isdigit(character);
+bool is_digit(uint8_t character) {
+    return isdigit(character) != 0;
 }
 
 const char* string_substring(const char* string, uint64_t start, uint64_t end) {

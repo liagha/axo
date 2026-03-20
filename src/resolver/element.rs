@@ -5,6 +5,7 @@ use crate::{
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Spanned,
 };
+use crate::format::{Show, Verbosity};
 
 fn assignable(element: &Element) -> bool {
     match &element.kind {
@@ -256,6 +257,8 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         [OperatorKind::Dot] => {
                             let mut left = resolver.reify(&binary.left.typing);
 
+                            println!("{} - {}", binary.left.kind.format(Verbosity::Minimal), left.format(Verbosity::Minimal));
+
                             while let TypeKind::Pointer { target } = left.kind {
                                 left = resolver.reify(&target);
                             }
@@ -278,9 +281,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                             if let Some(scope) = scope {
                                 resolver.enter_scope(scope);
-
                                 binary.right.resolve(resolver);
-
                                 resolver.exit();
 
                                 self.reference = binary.right.reference;
@@ -290,7 +291,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                     ErrorKind::InvalidOperation(binary.operator.clone()),
                                     binary.operator.span,
                                 ));
-
                                 resolver.fresh()
                             }
                         }

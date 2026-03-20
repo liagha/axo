@@ -2,7 +2,6 @@
 name = "axo"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
 
 [features]
 default = [
@@ -30,8 +29,7 @@ broccli = { version = "0.0.22" }
 hashish = { version = "0.0.1" }
 log = { version = "0.4.27"}
 matchete = { path = "matchete", optional = true }
-walkdir = { version = "2.5.0" }
-inkwell = { version = "0.8.0", features = ["llvm19-1-prefer-static"], optional = true }
+inkwell = { version = "0.8.0", features = ["llvm19-1-prefer-dynamic"], optional = true }
 
 [workspace]
 members = [
