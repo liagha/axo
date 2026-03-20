@@ -208,6 +208,10 @@ impl<'resolver> Resolver<'resolver> {
             (TypeKind::Structure(_), TypeKind::Structure(_))
             | (TypeKind::Union(_), TypeKind::Union(_)) if left.identity == right.identity => left,
 
+            (TypeKind::Integer { size: 8, .. }, TypeKind::Character) => right.clone(),
+
+            (TypeKind::Character, TypeKind::Integer { size: 8, .. }) => left.clone(),
+
             (TypeKind::Integer { size: left_size, signed: left_signed }, TypeKind::Integer { size: right_size, signed: right_signed }) if left_size == right_size && left_signed == right_signed => left,
             (TypeKind::Float { size: left_size }, TypeKind::Float { size: right_size }) if left_size == right_size => left,
 

@@ -502,11 +502,17 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
                     }
                     Some("while") => {
-                        invoke.members[0].resolve(resolver);
+                        if !invoke.members.is_empty() {
+                            invoke.members[0].resolve(resolver);
 
-                        let boolean = Type::from(TypeKind::Boolean);
+                            let boolean = Type::from(TypeKind::Boolean);
 
-                        resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
+                            resolver.unify(invoke.members[0].span, &invoke.members[0].typing, &boolean);
+                        }
+
+                        if invoke.members.len() > 1 {
+                            invoke.members[1].resolve(resolver);
+                        }
 
                         Type::from(TypeKind::Void)
                     }

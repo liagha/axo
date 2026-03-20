@@ -20,3 +20,15 @@ uint8_t integer_uint8(int64_t value) {
     return (uint8_t)value;
 }
 
+int32_t uint8_character(uint8_t value) {
+    return (int32_t)value;
+}
+
+uint8_t character_uint8(int32_t value) {
+    return (uint8_t)value;
+}
+
+int64_t character_integer(int32_t value) {
+    return (int64_t)value;
+}
+

@@ -156,12 +156,19 @@ impl<'backend> super::Generator<'backend> {
         let name = routine.target.as_str().unwrap_or("function");
 
         let function = if matches!(routine.interface, Interface::C) {
-            let external = self.current_module().add_function(
-                name,
-                signature,
-                Some(inkwell::module::Linkage::External),
-            );
-            external.set_section(Some("text"));
+            let module = self.current_module();
+            let external = if let Some(existing) = module.get_function(name) {
+                existing
+            } else {
+                let func = module.add_function(
+                    name,
+                    signature,
+                    Some(inkwell::module::Linkage::External),
+                );
+                func.set_section(Some("text"));
+                func
+            };
+
             self.insert_entity(routine.target.clone(), Entity::Function(external));
             external
         } else {
@@ -171,12 +178,22 @@ impl<'backend> super::Generator<'backend> {
                 Some(inkwell::module::Linkage::External)
             };
 
-            let internal = self.current_module().add_function(name, signature, linkage);
+            let module = self.current_module();
+            let internal = if let Some(existing) = module.get_function(name) {
+                existing
+            } else {
+                module.add_function(name, signature, linkage)
+            };
 
             self.insert_entity(routine.target.clone(), Entity::Function(internal));
 
-            let entry = self.context.append_basic_block(internal, "entry");
-            self.builder.position_at_end(entry);
+            if internal.get_basic_blocks().is_empty() {
+                let entry = self.context.append_basic_block(internal, "entry");
+                self.builder.position_at_end(entry);
+            } else if let Some(last_block) = internal.get_last_basic_block() {
+                self.builder.position_at_end(last_block);
+            }
+
             internal
         };
 
@@ -207,10 +224,10 @@ impl<'backend> super::Generator<'backend> {
             }
 
             self.clear_loops();
-            
+
             let result = if let Some(body) = routine.body {
                 Some(self.analysis(*body.clone())?)
-            } else { 
+            } else {
                 None
             };
 

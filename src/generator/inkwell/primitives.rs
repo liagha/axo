@@ -53,7 +53,7 @@ impl<'backend> Generator<'backend> {
     }
 
     pub fn character(&self, value: Char) -> BasicValueEnum<'backend> {
-        BasicValueEnum::from(self.context.i32_type().const_int(value as u64, false))
+        BasicValueEnum::from(self.context.i8_type().const_int(value as u64, false))
     }
 
     pub fn string(
