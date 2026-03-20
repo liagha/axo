@@ -57,17 +57,6 @@ impl<'resolver> Resolver<'resolver> {
         Type::new(identity, TypeKind::Variable(identity))
     }
 
-    pub fn lookup(&mut self, identity: Identity) -> Type<'resolver> {
-        if let Some(scope) = self.scopes.get(&self.active) {
-            if let Some(found) = scope.find(identity, &self.scopes) {
-                if let Some(symbol) = self.registry.get(&found) {
-                    return symbol.typing.clone();
-                }
-            }
-        }
-        self.fresh()
-    }
-
     pub fn occurs(&self, identity: Identity, typing: &Type<'resolver>) -> bool {
         match &typing.kind {
             TypeKind::Variable(variable) => {
@@ -246,14 +235,13 @@ impl<'resolver> Resolver<'resolver> {
                     "Boolean" => TypeKind::Boolean,
                     "Character" => TypeKind::Character,
                     "String" => TypeKind::String,
-                    "Void" | "Unit" => TypeKind::Tuple { members: Vec::new() },
+                    "Void" => TypeKind::Void,
                     _ => {
-                        if let Some(identity) = element.reference {
-                            let typing = self.lookup(identity);
-
-                            return Ok(typing);
+                        return if let Ok(symbol) = self.active().lookup(element, &self.scopes, &self.registry) {
+                            Ok(symbol.typing)
+                        } else {
+                            Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span))
                         }
-                        return Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span));
                     }
                 };
 

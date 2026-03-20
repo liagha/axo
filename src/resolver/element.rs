@@ -124,10 +124,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 TokenKind::String(_) => Type::from(TypeKind::String),
                 TokenKind::Character(_) => Type::from(TypeKind::Character),
                 TokenKind::Identifier(_) => {
-                    if let Some(reference) = self.reference {
-                        resolver.lookup(reference)
+                    if let Ok(symbol) = resolver.active().lookup(self, &resolver.scopes, &resolver.registry) {
+                        symbol.typing
                     } else {
-                        resolver.fresh()
+                        self.typing.clone()
                     }
                 }
                 _ => Type::from(TypeKind::Void),
@@ -539,6 +539,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
                         let mut function = Type::from(TypeKind::Function(Str::default(), members, Some(Box::new(output.clone()))));
+                        println!("Functions:\n\t{}\n\t{}", invoke.target.typing.format(Verbosity::Detailed), function.format(Verbosity::Detailed));
                         function = resolver.unify(self.span, &invoke.target.typing, &function);
 
                         match function.kind {

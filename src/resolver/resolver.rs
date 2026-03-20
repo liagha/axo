@@ -67,11 +67,11 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
     
-    pub fn scope(&self) -> &Scope {
+    pub fn active(&self) -> &Scope {
         self.scopes.get(&self.active).unwrap()
     }
 
-    pub fn scope_mut(&mut self) -> &mut Scope {
+    pub fn active_mut(&mut self) -> &mut Scope {
         self.scopes.get_mut(&self.active).unwrap()
     }
 
