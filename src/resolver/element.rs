@@ -257,8 +257,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         [OperatorKind::Dot] => {
                             let mut left = resolver.reify(&binary.left.typing);
 
-                            println!("{} - {}", binary.left.kind.format(Verbosity::Minimal), left.format(Verbosity::Minimal));
-
                             while let TypeKind::Pointer { target } = left.kind {
                                 left = resolver.reify(&target);
                             }

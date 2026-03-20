@@ -1,4 +1,3 @@
-mod assessor;
 mod element;
 mod error;
 mod hint;

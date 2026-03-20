@@ -1,6 +1,5 @@
 use {
     super::{
-        assessor::{Affinity, Aligner},
         ErrorKind, ResolveError, Resolver,
     },
     crate::{
@@ -10,7 +9,6 @@ use {
         scanner::{Token, TokenKind},
         resolver::Resolvable,
     },
-    matchete::{Assessor, Scheme},
 };
 
 #[derive(Clone)]
@@ -170,24 +168,8 @@ impl Scope {
         }
 
         if let Some(symbol) = self.exact(target, scopes, registry) {
-            return Ok(symbol);
-        }
-
-        let mut aligner = Aligner::new();
-        let mut affinity = Affinity::new();
-
-        let mut assessor = Assessor::new()
-            .floor(0.9)
-            .dimension(&mut affinity, 0.6)
-            .dimension(&mut aligner, 0.4)
-            .scheme(Scheme::Multiplicative);
-
-        let candidates = &*self.collect(scopes, registry);
-        let champion = assessor.champion(target, candidates);
-
-        if let Some(champion) = champion {
-            Ok(champion)
-        } else if assessor.errors.is_empty() {
+            Ok(symbol)
+        } else {
             Err(vec![ResolveError {
                 kind: ErrorKind::UndefinedSymbol {
                     query: target.target().unwrap().clone(),
@@ -195,8 +177,6 @@ impl Scope {
                 span: target.span.clone(),
                 hints: Vec::new(),
             }])
-        } else {
-            Err(assessor.errors.clone())
         }
     }
 }
