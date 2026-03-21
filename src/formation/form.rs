@@ -1,6 +1,10 @@
 use {
-    super::helper::Formable,
-    crate::{data::slice, format::Debug, internal::hash::Hash},
+    crate::{
+        data::slice,
+        format::Debug,
+        internal::hash::Hash,
+        formation::helper::Formable,
+    },
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

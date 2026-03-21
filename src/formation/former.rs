@@ -37,16 +37,21 @@ pub mod record {
 }
 
 use {
-    super::{
-        classifier::Classifier,
-        form::Form,
-        helper::{Formable, Source},
-    },
     crate::{
-        data::{memory::{replace, PhantomData, Rc}, Identity, Offset},
+        formation::{
+            classifier::Classifier,
+            form::Form,
+            helper::{Formable, Source},
+        },
+        data::{
+            memory::{
+                replace, Rc
+            },
+            Identity, Offset
+        },
+        internal::hash::Map,
         tracker::Position,
     },
-    std::collections::HashMap,
 };
 
 pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn super::order::Order<'a, Input, Output, Failure> + 'a>)>;
@@ -69,8 +74,7 @@ pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Fo
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
     pub cache: Cache<'a, Input, Output, Failure>,
-    pub memo: HashMap<(usize, usize), Memo<'a, Input, Output, Failure>>,
-    pub _phantom: PhantomData<(Input, Output, Failure)>,
+    pub memo: Map<(usize, Offset), Memo<'a, Input, Output, Failure>>,
 }
 
 impl<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -88,8 +92,7 @@ Former<'b, 'a, Input, Output, Failure>
                 forms
             },
             cache: Vec::with_capacity(32),
-            memo: HashMap::with_capacity(512),
-            _phantom: PhantomData,
+            memo: Map::with_capacity(512),
         }
     }
 

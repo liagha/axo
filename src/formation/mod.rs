@@ -1,5 +1,9 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::data::Identity;
+use crate::{
+    data::{
+        Identity,
+        sync::{AtomicUsize, Ordering},
+    },
+};
 
 pub mod classifier;
 pub mod form;
@@ -10,14 +14,12 @@ mod traits;
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub(super) fn next_identity() -> Identity {
-    crate::resolver::COUNTER.fetch_add(1, Ordering::Relaxed)
+    COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
 pub mod helper {
     use {
-        super::{classifier::Classifier, order::Order},
         crate::{
-            data::memory::Rc,
             format::Show,
             internal::hash::Hash,
             tracker::{Peekable, Spanned},
@@ -46,21 +48,4 @@ pub mod helper {
         Input: Formable<'a>,
     {
     }
-
-    pub type Emitter<'a, Input, Output, Failure> =
-    Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> Failure + 'a>;
-
-    pub type Evaluator<'a, Input, Output, Failure> =
-    Rc<dyn Fn() -> Classifier<'a, Input, Output, Failure> + 'a>;
-
-    pub type Inspector<'a, Input, Output, Failure> =
-    Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> Rc<dyn Order<'a, Input, Output, Failure>> + 'a>;
-
-    pub type Performer = Rc<dyn Fn()>;
-
-    pub type Predicate<'a, Input> = Rc<dyn Fn(&Input) -> bool + 'a>;
-
-    pub type Transformer<'a, Input, Output, Failure> = &'a dyn Fn(
-        &mut Classifier<'a, Input, Output, Failure>,
-    ) -> Result<(), Failure>;
 }

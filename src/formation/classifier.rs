@@ -1,36 +1,24 @@
 use {
-    super::{
-        form::Form,
-        former::{record::Record, Former, Memo},
-        helper::Formable,
-        order::*,
-    },
     crate::{
-        data::{memory::{take, replace, swap, Rc}, Boolean, Offset, Scale, Identity},
+        formation::{
+            form::Form,
+            former::{record::Record, Former, Memo},
+            helper::Formable,
+            order::*,
+        },
+        data::{
+            memory::{
+                take, replace, swap,
+                Rc
+            },
+            Boolean,
+            Offset,
+            Scale,
+            Identity
+        },
         tracker::{Location, Position},
     },
 };
-
-
-fn static_align<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-    Rc::new(Align)
-}
-
-fn static_ignore<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-    Rc::new(Ignore)
-}
-
-fn static_pardon<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-    Rc::new(Pardon)
-}
-
-fn static_skip<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-    Rc::new(Skip)
-}
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub identity: Identity,
@@ -308,7 +296,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_align(self) -> Self {
-        self.with_order(static_align())
+        self.with_order(Rc::new(Align))
     }
 
     #[inline]
@@ -332,7 +320,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_ignore(self) -> Self {
-        self.with_order(static_ignore())
+        self.with_order(Rc::new(Ignore))
     }
 
     #[inline]
@@ -363,7 +351,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_pardon(self) -> Self {
-        self.with_order(static_pardon())
+        self.with_order(Rc::new(Pardon))
     }
 
     #[inline]
@@ -376,7 +364,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_skip(self) -> Self {
-        self.with_order(static_skip())
+        self.with_order(Rc::new(Skip))
     }
 
     #[inline]
@@ -442,7 +430,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn ignore() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-        static_ignore()
+        Rc::new(Ignore)
     }
 
     pub fn inspect<I>(&self, inspector: I) -> Self
@@ -465,7 +453,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn pardon() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-        static_pardon()
+        Rc::new(Pardon)
     }
 
     #[inline]
@@ -480,7 +468,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn skip() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
-        static_skip()
+        Rc::new(Skip)
     }
 
     #[inline]
