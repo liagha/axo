@@ -1,8 +1,17 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::data::Identity;
+
 pub mod classifier;
 pub mod form;
 pub mod former;
 pub mod order;
 mod traits;
+
+pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub(super) fn next_identity() -> Identity {
+    crate::resolver::COUNTER.fetch_add(1, Ordering::Relaxed)
+}
 
 pub mod helper {
     use {

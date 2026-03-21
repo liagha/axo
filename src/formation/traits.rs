@@ -57,6 +57,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Clone for Classifier<'form, Input, Output, Failure> {
     fn clone(&self) -> Self {
         Self {
+            identity: self.identity,
             order: self.order,
             marker: self.marker.clone(),
             position: self.position.clone(),

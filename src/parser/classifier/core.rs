@@ -1,4 +1,3 @@
-// src/parser/classifier/core.rs
 use crate::{
     data::*,
     formation::{classifier::Classifier, form::Form},

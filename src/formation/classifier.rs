@@ -6,12 +6,10 @@ use {
         order::*,
     },
     crate::{
-        data::{memory::take, Boolean, Offset, Scale},
+        data::{memory::{take, replace, swap}, sync::OnceLock, Boolean, Offset, Scale, Identity},
         tracker::{Location, Position},
     },
 };
- 
-use std::sync::OnceLock;
 
 fn static_align<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
 ) -> &'a dyn Order<'a, Input, Output, Failure> {
@@ -38,13 +36,14 @@ fn static_skip<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<
 }
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub identity: Identity,
     pub order: &'a dyn Order<'a, Input, Output, Failure>,
     pub marker: Offset,
     pub position: Position<'a>,
-    pub consumed: Vec<usize>,
+    pub consumed: Vec<Identity>,
     pub record: Record,
-    pub form: usize,
-    pub stack: Vec<usize>,
+    pub form: Identity,
+    pub stack: Vec<Identity>,
     pub depth: Scale,
 }
 
@@ -58,6 +57,7 @@ Classifier<'a, Input, Output, Failure>
         position: Position<'a>,
     ) -> Self {
         Self {
+            identity: super::next_identity(),
             order,
             marker,
             position,
@@ -70,27 +70,33 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn new_with_depth(
+    fn create(
         order: &'a dyn Order<'a, Input, Output, Failure>,
         marker: Offset,
         position: Position<'a>,
+        consumed: Vec<Identity>,
+        record: Record,
+        form: Identity,
+        stack: Vec<Identity>,
         depth: Scale,
     ) -> Self {
         Self {
+            identity: super::next_identity(),
             order,
             marker,
             position,
-            consumed: Vec::new(),
-            record: Record::Blank,
-            form: 0,
-            stack: Vec::new(),
-            depth,
+            consumed,
+            record,
+            form,
+            stack,
+            depth
         }
     }
 
     #[inline]
     fn create_child(&mut self, order: &'a dyn Order<'a, Input, Output, Failure>) -> Self {
         Self {
+            identity: super::next_identity(),
             order,
             marker: self.marker,
             position: self.position,
@@ -658,16 +664,16 @@ where
         let mut form_forms = former.forms.len();
 
         for pattern in &self.patterns {
-            let mut child = Classifier {
-                order: pattern.order,
-                marker: classifier.marker,
-                position: classifier.position,
+            let mut child = Classifier::create(
+                pattern.order,
+                classifier.marker,
+                classifier.position,
                 consumed,
-                record: Record::Blank,
-                form: 0,
+                Record::Blank,
+                0,
                 stack,
-                depth: classifier.depth + 1,
-            };
+                classifier.depth + 1,
+            );
 
             former.build(&mut child);
 
@@ -683,7 +689,7 @@ where
 
             if let Some(ref mut champion) = best {
                 if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
-                    std::mem::swap(champion, &mut child);
+                    swap(champion, &mut child);
                     stack = child.stack;
                     consumed = child.consumed;
                     stack.truncate(base_stack);
@@ -765,20 +771,28 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let mut target = self.cached.get_or_init(|| (self.function)()).clone();
-        target.marker = classifier.marker;
-        target.position = classifier.position;
-        target.depth = classifier.depth + 1;
-        target.consumed = take(&mut classifier.consumed);
-        target.stack = take(&mut classifier.stack);
-        former.build(&mut target);
+        let cached = self.cached.get_or_init(|| (self.function)());
+        let cached_order = cached.order;
 
-        classifier.marker = target.marker;
-        classifier.position = target.position;
-        classifier.consumed = target.consumed;
-        classifier.record = target.record;
-        classifier.form = target.form;
-        classifier.stack = target.stack;
+        let mut child = Classifier::create(
+            cached_order,
+            classifier.marker,
+            classifier.position,
+            take(&mut classifier.consumed),
+            Record::Blank,
+            0,
+            take(&mut classifier.stack),
+            classifier.depth + 1,
+        );
+
+        former.build(&mut child);
+
+        classifier.marker = child.marker;
+        classifier.position = child.position;
+        classifier.consumed = child.consumed;
+        classifier.record = child.record;
+        classifier.form = child.form;
+        classifier.stack = child.stack;
     }
 }
 
@@ -921,16 +935,16 @@ Order<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE>
         let mut broke = false;
 
         for pattern in &self.patterns {
-            let mut child = Classifier {
-                order: pattern.order,
-                marker: mark,
-                position: pos,
+            let mut child = Classifier::create(
+                pattern.order,
+                mark,
+                pos,
                 consumed,
-                record: Record::Blank,
-                form: 0,
+                Record::Blank,
+                0,
                 stack,
-                depth: classifier.depth + 1,
-            };
+                classifier.depth + 1,
+            );
 
             former.build(&mut child);
 
@@ -978,7 +992,7 @@ Order<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE>
             let group = Form::multiple(
                 forms
                     .into_iter()
-                    .map(|id| std::mem::replace(&mut former.forms[id], Form::Blank))
+                    .map(|id| replace(&mut former.forms[id], Form::Blank))
                     .collect(),
             );
 
@@ -1024,16 +1038,16 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
             let step_consumed = consumed.len();
             let step_stack = stack.len();
 
-            let mut child = Classifier {
-                order: self.classifier.order,
-                marker: mark,
-                position: pos,
+            let mut child = Classifier::create(
+                self.classifier.order,
+                mark,
+                pos,
                 consumed,
-                record: Record::Blank,
-                form: 0,
+                Record::Blank,
+                0,
                 stack,
-                depth: classifier.depth + 1,
-            };
+                classifier.depth + 1,
+            );
 
             former.build(&mut child);
 
@@ -1103,7 +1117,7 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
             }
 
             if let Some(max) = self.maximum {
-                if forms.len() >= max as usize {
+                if forms.len() >= max as Identity {
                     break;
                 }
             }
@@ -1112,7 +1126,7 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
         classifier.consumed = consumed;
         classifier.stack = stack;
 
-        if forms.len() >= self.minimum as usize {
+        if forms.len() >= self.minimum as Identity {
             if self.persist {
                 classifier.set_align();
             }
@@ -1122,7 +1136,7 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
             let group = Form::multiple(
                 forms
                     .into_iter()
-                    .map(|id| std::mem::replace(&mut former.forms[id], Form::Blank))
+                    .map(|id| replace(&mut former.forms[id], Form::Blank))
                     .collect(),
             );
 

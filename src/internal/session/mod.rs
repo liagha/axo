@@ -267,7 +267,6 @@ impl<'session> Session<'session> {
     }
 
     pub fn populate(&mut self) {
-        // Collect and sort keys to ensure deterministic iteration
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
         keys.sort();
 

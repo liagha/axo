@@ -1,4 +1,3 @@
-// src/parser/classifier/delimited.rs
 use {
     crate::{
         data::*,

@@ -137,6 +137,25 @@ Order<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
     }
 }
 
+pub struct Pair<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub first: &'a dyn Order<'a, Input, Output, Failure>,
+    pub second: &'a dyn Order<'a, Input, Output, Failure>,
+}
+
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
+Order<'a, Input, Output, Failure> for Pair<'a, Input, Output, Failure>
+{
+    #[inline]
+    fn order(
+        &self,
+        former: &mut Former<'_, 'a, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, Input, Output, Failure>,
+    ) {
+        self.first.order(former, classifier);
+        self.second.order(former, classifier);
+    }
+}
+
 pub struct Panic<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub emitter: &'a dyn Fn(
         &mut Former<'_, 'a, Input, Output, Failure>,

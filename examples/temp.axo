@@ -1,5 +1,5 @@
 func main() {
-    const name = input.get_input("What's your name? ")
+    const name = "ali"
     print.print_string("Hey ")
     print.print_string(name)
     print.print_string("!\n")

@@ -67,17 +67,16 @@ pub mod memory {
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, take},
+        mem::{discriminant, replace, take, swap},
     };
 }
 
 pub mod slice {
-    pub use core::slice::{from_raw_parts, from_ref, Iter, SliceIndex};
+    pub use core::slice::{from_ref, Iter, SliceIndex};
 }
 
 pub mod sync {
-    pub use std::rc::Rc;
-    pub use std::sync::{Arc, Mutex};
+    pub use std::sync::OnceLock;
     pub use core::sync::atomic::{AtomicUsize, Ordering};
 }
 
