@@ -1,8 +1,6 @@
 use {
-    super::{
-        Character,  
-    },
     crate::{
+        scanner::Character,
         format::{Debug, Display, Formatter, Result},
         tracker::TrackError,
         text::numeral::ParseNumberError,

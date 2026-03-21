@@ -237,7 +237,7 @@ impl<'resolver> Resolver<'resolver> {
                     "String" => TypeKind::String,
                     "Void" => TypeKind::Void,
                     _ => {
-                        return if let Ok(symbol) = self.active().lookup(element, &self.scopes, &self.registry) {
+                        return if let Ok(symbol) = self.lookup(element) {
                             Ok(symbol.typing)
                         } else {
                             Err(ResolveError::new(ErrorKind::InvalidAnnotation(element.clone()), *span))

@@ -1,6 +1,6 @@
 use {
-    super::Character,
     crate::{
+        scanner::Character,
         data::{slice, Str},
         format::{Debug, Display, Formatter, Result},
     },

@@ -1,13 +1,11 @@
 use {
-    super::{
-        Backend,
-        Generator,
-    },
     crate::{
         analyzer::{
             Analysis,
         },
         generator::{
+            Backend,
+            Generator,
             BuilderError,
             ErrorKind,
             GenerateError,

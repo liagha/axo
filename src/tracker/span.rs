@@ -1,11 +1,10 @@
 use {
-    super::{Location, Position, Spanned},
     crate::{
+        tracker::{Location, Position, Spanned, TrackError},
         data::{Boolean, Offset, Str},
         internal::{hash::Hash, operation::Ordering},
     },
 };
-use crate::tracker::TrackError;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Span<'span> {

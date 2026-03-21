@@ -7,7 +7,7 @@ use {
                 error::{ControlFlowError, FunctionError},
                 Entity,
             },
-            Backend, ErrorKind, GenerateError,
+            Generator, Backend, ErrorKind, GenerateError,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -20,7 +20,7 @@ use {
     },
 };
 
-impl<'backend> super::Generator<'backend> {
+impl<'backend> Generator<'backend> {
     pub fn align(&self, layout: BasicTypeEnum<'backend>) -> u32 {
         if layout.is_pointer_type() || layout.is_struct_type() || layout.is_array_type() {
             return 8;

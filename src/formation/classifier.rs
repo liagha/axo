@@ -1,6 +1,7 @@
 use {
     crate::{
         formation::{
+            next_identity,
             form::Form,
             former::{record::Record, Former, Memo},
             helper::Formable,
@@ -42,7 +43,7 @@ Classifier<'a, Input, Output, Failure>
         position: Position<'a>,
     ) -> Self {
         Self {
-            identity: super::next_identity(),
+            identity: next_identity(),
             order,
             marker,
             position,
@@ -66,7 +67,7 @@ Classifier<'a, Input, Output, Failure>
         depth: Scale,
     ) -> Self {
         Self {
-            identity: super::next_identity(),
+            identity: next_identity(),
             order,
             marker,
             position,
@@ -81,7 +82,7 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     fn create_child(&mut self, order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>) -> Self {
         Self {
-            identity: super::next_identity(),
+            identity: next_identity(),
             order,
             marker: self.marker,
             position: self.position,

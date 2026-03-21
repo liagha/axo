@@ -1,15 +1,13 @@
 use {
-    super::InitializeError,
     crate::{
-        data::{Offset, Scale, Str},
-        formation::{classifier::Classifier, form::Form, former::Former},
-        parser::{Element, ParseError},
+        initializer::InitializeError,
+        parser::{Element, ElementKind, Symbol, SymbolKind, ParseError},
+        data::{Binding, Offset, Scale, Str},
+        formation::{Classifier, Form, Former},
         scanner::{PunctuationKind, Scanner, Token, TokenKind},
         tracker::{Location, Peekable, Position},
     },
 };
-use crate::data::{Binding};
-use crate::parser::{ElementKind, Symbol, SymbolKind};
 
 pub struct Initializer<'initializer> {
     pub index: Offset,

@@ -1,8 +1,8 @@
 use {
-    super::{Element, ParseError},
     crate::{
+        parser::{Element, ParseError},
         data::{Offset, Scale},
-        formation::{classifier::Classifier, form::Form, former::Former},
+        formation::{Classifier, Form, Former},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::{Location, Peekable, Position},
     },

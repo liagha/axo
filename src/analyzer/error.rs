@@ -26,7 +26,6 @@ pub enum ErrorKind<'error> {
         name: String,
         expected: String,
     },
-    Unimplemented,
 }
 
 impl<'error> Show<'error> for ErrorKind<'error> {
@@ -55,9 +54,6 @@ impl<'error> Show<'error> for ErrorKind<'error> {
                     }
                     ErrorKind::InvalidPrimitiveContext { name, expected } => {
                         format!("invalid '{}' usage: expected {}.", name, expected)
-                    }
-                    ErrorKind::Unimplemented => {
-                        "unimplemented operation.".to_string()
                     }
                 }
             }

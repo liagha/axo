@@ -8,6 +8,7 @@ use {
                 error::VariableError,
                 Backend, Entity,
             },
+            Generator,
             ErrorKind, GenerateError,
         },
         resolver::{Type, TypeKind},
@@ -19,7 +20,7 @@ use {
     },
 };
 
-impl<'backend> super::Generator<'backend> {
+impl<'backend> Generator<'backend> {
     fn pointee(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {

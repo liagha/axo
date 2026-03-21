@@ -88,39 +88,51 @@ impl Reporter {
     }
 
     pub fn tokens(&self, tokens: &[Token]) {
-        let body = tokens
-            .iter()
-            .map(|token| format!("{}", token.format(self.verbosity)))
-            .collect::<Vec<String>>()
-            .join(", ");
-        self.section("Tokens", Color::Cyan, body);
+        self.section(
+            "Tokens",
+            Color::Cyan,
+            tokens
+                .iter()
+                .map(|token| format!("{}", token.format(self.verbosity)))
+                .collect::<Vec<String>>()
+                .join(", "),
+        );
     }
 
     pub fn elements(&self, elements: &[Element]) {
-        let body = elements
-            .iter()
-            .map(|element| format!("{}", element.format(self.verbosity)))
-            .collect::<Vec<String>>()
-            .join("\n");
-        self.section("Elements", Color::Cyan, body);
+        self.section(
+            "Elements",
+            Color::Cyan,
+            elements
+                .iter()
+                .map(|element| format!("{}", element.format(self.verbosity)))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
     }
 
     pub fn symbols(&self, symbols: &[Symbol]) {
-        let body = symbols
-            .iter()
-            .map(|symbol| format!("{}", symbol.format(self.verbosity)))
-            .collect::<Vec<String>>()
-            .join("\n");
-        self.section("Symbols", Color::Blue, body);
+        self.section(
+            "Symbols",
+            Color::Blue,
+            symbols
+                .iter()
+                .map(|symbol| format!("{}", symbol.format(self.verbosity)))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
     }
 
     pub fn analysis(&self, analysis: &[Analysis]) {
-        let body = analysis
-            .iter()
-            .map(|item| format!("{}", item.format(self.verbosity)))
-            .collect::<Vec<String>>()
-            .join("\n");
-        self.section("Analysis", Color::Blue, body);
+        self.section(
+            "Analysis",
+            Color::Blue,
+            analysis
+                .iter()
+                .map(|item| format!("{}", item.format(self.verbosity)))
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
     }
 
     pub fn order(&self, sequence: &[String]) {

@@ -1,6 +1,6 @@
 use {
-    super::{OperatorKind, PunctuationKind},
     crate::{
+        scanner::{OperatorKind, PunctuationKind},
         data::{Boolean, Char, Float, Integer, Str},
         tracker::Span,
     },

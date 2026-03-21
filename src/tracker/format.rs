@@ -1,8 +1,7 @@
 use {
-    super::{Position, Span},
     crate::{
+        tracker::{Position, Span, Location},
         format::{Debug, Display, Formatter, Result},
-        tracker::Location,
     },
 };
 

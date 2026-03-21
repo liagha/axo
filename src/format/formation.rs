@@ -3,7 +3,7 @@ use {
         data::Str,
         format::{Show, Verbosity},
         formation::{
-            form::Form,
+            Form,
             helper::Formable,
         },
     }

@@ -1,9 +1,9 @@
 use {
-    super::Symbol,
     crate::{
         data::*,
         scanner::Token,
         tracker::Span,
+        parser::Symbol,
         resolver::{
             Type, TypeKind,
             next_identity,

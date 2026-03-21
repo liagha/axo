@@ -1,8 +1,7 @@
 use {
-    super::Generator,
     crate::{
         data::{Boolean, Char, Float, Integer, Scale, Str},
-        generator::{ErrorKind, GenerateError},
+        generator::{Generator, ErrorKind, GenerateError},
         tracker::Span,
     },
     inkwell::values::BasicValueEnum,

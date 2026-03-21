@@ -1,6 +1,6 @@
 use crate::{
     data::*,
-    analyzer::{Analysis, AnalyzeError, ErrorKind},
+    analyzer::{Analysis, AnalyzeError},
     format::{Show, Verbosity},
     parser::{Element, Symbol, SymbolKind},
     resolver::{Resolver},
@@ -119,23 +119,8 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
 
                 AnalysisKind::Function(analyzed)
             }
-            SymbolKind::Module(module) => {
-                let target = module
-                    .target
-                    .target()
-                    .ok_or_else(|| AnalyzeError::new(ErrorKind::Unimplemented, module.target.span))?;
-
-                let members: Result<Vec<Analysis<'symbol>>, AnalyzeError<'symbol>> = self
-                    .scope
-                    .collect(&resolver.scopes, &resolver.registry)
-                    .iter()
-                    .map(|member| member.analyze(resolver))
-                    .collect();
-
-                AnalysisKind::Module(
-                    Str::from(target.format(Verbosity::Minimal)),
-                    members?,
-                )
+            SymbolKind::Module(_) => {
+                unimplemented!("module analyzing isn't implemented!")
             }
         };
 

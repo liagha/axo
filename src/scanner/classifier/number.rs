@@ -1,8 +1,8 @@
 use {
-    super::super::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
     crate::{
+        scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
         data::{Float, Str},
-        formation::{classifier::Classifier, form::Form},
+        formation::{Classifier, Form},
         text::parser,
         tracker::Spanned,
     },

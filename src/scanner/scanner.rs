@@ -1,10 +1,9 @@
 use {
-    super::{Character, ScanError, Token},
     crate::{
+        scanner::{Character, ScanError, Token, ErrorKind},
         data::{Str, Offset, Scale},
-        formation::{form::Form, former::Former},
+        formation::{Form, Former},
         tracker::{Location, Peekable, Position},
-        scanner::error::ErrorKind,
     },
 };
 

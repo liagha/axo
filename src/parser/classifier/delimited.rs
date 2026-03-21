@@ -1,7 +1,7 @@
 use {
     crate::{
         data::*,
-        formation::{classifier::Classifier, form::Form},
+        formation::{Classifier, Form},
         parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::Span,
@@ -9,14 +9,14 @@ use {
 };
 
 impl<'parser> Parser<'parser> {
-    fn delimited_form(
+    fn builder(
         open: PunctuationKind,
         close: PunctuationKind,
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        let separator = Classifier::predicate(|t: &Token| {
+        let separator = Classifier::predicate(|token: &Token| {
             matches!(
-                t.kind,
+                token.kind,
                 TokenKind::Punctuation(PunctuationKind::Comma)
                     | TokenKind::Punctuation(PunctuationKind::Semicolon)
             )
@@ -74,19 +74,19 @@ impl<'parser> Parser<'parser> {
     pub fn bundle(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
+        Self::builder(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
     }
 
     pub fn block(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
+        Self::builder(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
     }
 
     pub fn group(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
+        Self::builder(
             PunctuationKind::LeftParenthesis,
             PunctuationKind::RightParenthesis,
             item,
@@ -96,7 +96,7 @@ impl<'parser> Parser<'parser> {
     pub fn sequence(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
+        Self::builder(
             PunctuationKind::LeftParenthesis,
             PunctuationKind::RightParenthesis,
             item,
@@ -106,7 +106,7 @@ impl<'parser> Parser<'parser> {
     pub fn collection(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
+        Self::builder(
             PunctuationKind::LeftBracket,
             PunctuationKind::RightBracket,
             item,
@@ -116,7 +116,7 @@ impl<'parser> Parser<'parser> {
     pub fn series(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
+        Self::builder(
             PunctuationKind::LeftBracket,
             PunctuationKind::RightBracket,
             item,
@@ -125,17 +125,17 @@ impl<'parser> Parser<'parser> {
 
     pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
-            Self::delimited_form(
+            Self::builder(
                 PunctuationKind::LeftBrace,
                 PunctuationKind::RightBrace,
                 Classifier::deferred(Self::element),
             ),
-            Self::delimited_form(
+            Self::builder(
                 PunctuationKind::LeftParenthesis,
                 PunctuationKind::RightParenthesis,
                 Classifier::deferred(Self::element),
             ),
-            Self::delimited_form(
+            Self::builder(
                 PunctuationKind::LeftBracket,
                 PunctuationKind::RightBracket,
                 Classifier::deferred(Self::element),

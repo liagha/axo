@@ -1,14 +1,13 @@
 use {
-    super::{InitializeError, Initializer},
     crate::{
-        data::Str,
-        formation::{classifier::Classifier, form::Form},
+        initializer::{InitializeError, Initializer},
+        data::{Str, Binding, BindingKind},
+        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+        formation::{Classifier, Form},
         scanner::{OperatorKind, Token, TokenKind},
         tracker::{Spanned},
     },
 };
-use crate::data::{Binding, BindingKind};
-use crate::parser::{Element, ElementKind, Symbol, SymbolKind, Visibility};
 
 impl<'initializer> Initializer<'initializer> {
     fn path_string(tokens: Vec<Token<'initializer>>) -> String {

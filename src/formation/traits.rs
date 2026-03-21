@@ -1,6 +1,6 @@
 use {
-    super::{classifier::Classifier, form::Form, helper::Formable},
     crate::{
+        formation::{classifier::Classifier, form::Form, helper::Formable},
         tracker::{Span, Spanned},
     },
 };

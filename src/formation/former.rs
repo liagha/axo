@@ -39,8 +39,9 @@ pub mod record {
 use {
     crate::{
         formation::{
-            classifier::Classifier,
-            form::Form,
+            Classifier,
+            Form,
+            Order,
             helper::{Formable, Source},
         },
         data::{
@@ -54,7 +55,7 @@ use {
     },
 };
 
-pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn super::order::Order<'a, Input, Output, Failure> + 'a>)>;
+pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Order<'a, Input, Output, Failure> + 'a>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub record: record::Record,

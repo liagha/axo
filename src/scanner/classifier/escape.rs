@@ -1,11 +1,15 @@
 use {
-    super::super::{Character, CharacterError, ErrorKind, EscapeError, ScanError, Scanner, Token},
     crate::{
+        scanner::{
+            Scanner, Token,
+            Character, CharacterError,
+            ErrorKind, EscapeError, ScanError,
+        },
         data::{
             character::{from_u32, parse_radix},
             Str,
         },
-        formation::{classifier::Classifier, form::Form},
+        formation::{Classifier, Form},
         tracker::Spanned,
     },
 };

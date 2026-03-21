@@ -1,11 +1,15 @@
-use super::{
-    classifier::Classifier,
-    form::Form,
-    former::Former,
-    helper::Formable,
+use {
+    crate::{
+        data::memory::Rc,
+        formation::{
+            Classifier,
+            Form,
+            Former,
+            helper::Formable,
+        },
+    },
 };
 
-use crate::data::memory::Rc;
 
 pub trait Order<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     fn order(

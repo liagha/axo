@@ -2,13 +2,13 @@ mod escape;
 mod number;
 
 use {
-    super::{
-        Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind,
-        ScanError, Scanner, Token, TokenKind,
-    },
     crate::{
+        scanner::{
+            Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind,
+            ScanError, Scanner, Token, TokenKind,
+        },
         data::Str,
-        formation::{classifier::Classifier, form::Form},
+        formation::{Classifier, Form},
         tracker::Spanned,
     },
 };

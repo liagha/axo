@@ -4,3 +4,5 @@ func main() {
     print.print_string(name)
     print.print_string("!\n")
 }
+
+var

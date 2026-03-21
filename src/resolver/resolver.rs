@@ -1,27 +1,24 @@
 use crate::{
-    data::{Identity},
-    internal::{
-        hash::{
-            Map, Set,
-        },
-    },
+    data::Identity,
+    internal::hash::{Map, Set},
     parser::{Element, Symbol},
     resolver::{
+        next_identity,
         scope::Scope,
+        ErrorKind,
         ResolveError,
         Type,
-        next_identity,
     },
 };
 
-pub struct Resolver<'resolver> {
+pub struct Resolver<'a> {
     pub active: Identity,
     pub scopes: Map<Identity, Scope>,
-    pub registry: Map<Identity, Symbol<'resolver>>,
-    pub input: Vec<Element<'resolver>>,
-    pub errors: Vec<ResolveError<'resolver>>,
-    pub variables: Vec<Option<Type<'resolver>>>,
-    pub returns: Vec<Type<'resolver>>,
+    pub registry: Map<Identity, Symbol<'a>>,
+    pub input: Vec<Element<'a>>,
+    pub errors: Vec<ResolveError<'a>>,
+    pub variables: Vec<Option<Type<'a>>>,
+    pub returns: Vec<Type<'a>>,
     pub dependencies: Set<Identity>,
 }
 
@@ -40,17 +37,17 @@ impl Clone for Resolver<'_> {
     }
 }
 
-pub trait Resolvable<'resolvable> {
-    fn depending(&self, resolver: &mut Resolver<'resolvable>);
-    fn declare(&mut self, resolver: &mut Resolver<'resolvable>);
-    fn resolve(&mut self, resolver: &mut Resolver<'resolvable>);
-    fn reify(&mut self, resolver: &mut Resolver<'resolvable>);
+pub trait Resolvable<'a> {
+    fn depending(&self, resolver: &mut Resolver<'a>);
+    fn declare(&mut self, resolver: &mut Resolver<'a>);
+    fn resolve(&mut self, resolver: &mut Resolver<'a>);
+    fn reify(&mut self, resolver: &mut Resolver<'a>);
     fn is_instance(&self) -> bool {
         false
     }
 }
 
-impl<'resolver> Resolver<'resolver> {
+impl<'a> Resolver<'a> {
     pub fn new() -> Self {
         let mut scopes = Map::new();
         scopes.insert(0, Scope::new(None));
@@ -66,7 +63,7 @@ impl<'resolver> Resolver<'resolver> {
             dependencies: Set::new(),
         }
     }
-    
+
     pub fn active(&self) -> &Scope {
         self.scopes.get(&self.active).unwrap()
     }
@@ -98,7 +95,7 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn insert(&mut self, symbol: Symbol<'resolver>) {
+    pub fn insert(&mut self, symbol: Symbol<'a>) {
         let identity = symbol.identity;
         self.registry.insert(identity, symbol);
 
@@ -107,7 +104,68 @@ impl<'resolver> Resolver<'resolver> {
         }
     }
 
-    pub fn get_symbol(&self, identity: Identity) -> Option<&Symbol<'resolver>> {
+    pub fn get_symbol(&self, identity: Identity) -> Option<&Symbol<'a>> {
         self.registry.get(&identity)
+    }
+
+    pub fn collect(&self) -> Vec<Symbol<'a>> {
+        let mut symbols = Vec::new();
+        let mut current = Some(self.active());
+
+        while let Some(scope) = current {
+            for identity in &scope.symbols {
+                if let Some(symbol) = self.registry.get(identity) {
+                    symbols.push(symbol.clone());
+                }
+            }
+            current = scope.parent.and_then(|id| self.scopes.get(&id));
+        }
+
+        symbols.sort();
+        symbols
+    }
+
+    pub fn find(&self, target: Identity) -> Option<Identity> {
+        let mut current = Some(self.active());
+
+        while let Some(scope) = current {
+            if scope.has(target) {
+                return Some(target);
+            }
+            current = scope.parent.and_then(|id| self.scopes.get(&id));
+        }
+
+        None
+    }
+
+    pub fn exact(&self, target: &Element<'a>) -> Option<Symbol<'a>> {
+        let mut current = Some(self.active());
+
+        while let Some(scope) = current {
+            if let Some(symbol) = scope.exact(target, self) {
+                return Some(symbol);
+            }
+            current = scope.parent.and_then(|id| self.scopes.get(&id));
+        }
+
+        None
+    }
+
+    pub fn lookup(&self, target: &Element<'a>) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
+        if let Some(symbol) = Self::builtin(target) {
+            return Ok(symbol);
+        }
+
+        if let Some(symbol) = self.exact(target) {
+            Ok(symbol)
+        } else {
+            Err(vec![ResolveError {
+                kind: ErrorKind::UndefinedSymbol {
+                    query: target.target().unwrap().clone(),
+                },
+                span: target.span.clone(),
+                hints: Vec::new(),
+            }])
+        }
     }
 }

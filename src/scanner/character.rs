@@ -1,6 +1,6 @@
 use {
-    super::Scanner,
     crate::{
+        scanner::Scanner,
         data::{Char, Str},
         text::{is_alphabetic, is_alphanumeric, is_numeric, is_whitespace},
         tracker::{Position, Span},

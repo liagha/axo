@@ -1,6 +1,6 @@
 use {
-    super::Resolver,
     crate::{
+        internal::session::Resolver,
         data::{Identity, Str},
         parser::{Element, ElementKind, SymbolKind},
         scanner::{Token, TokenKind},
@@ -10,13 +10,20 @@ use {
 
 impl<'registry> Resolver<'registry> {
     fn get_configuration(&mut self, key: Str<'registry>) -> Option<Token<'registry>> {
+        let config = Element::new(
+            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("configuration")), Span::void())),
+            Span::void(),
+        );
+
+        let configuration = self.active().exact(&config, self)?;
+
         let identifier = Element::new(
             ElementKind::Literal(Token::new(TokenKind::Identifier(key), Span::void())),
             Span::void(),
         );
 
-        let scope = self.scopes.get(&self.active)?;
-        let result = scope.lookup(&identifier, &self.scopes, &self.registry).ok()?;
+        let scope = configuration.scope;
+        let result = scope.lookup(&identifier, self).ok()?;
 
         if let SymbolKind::Binding(binding) = result.kind {
             if let Some(value) = binding.value {

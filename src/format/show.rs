@@ -12,8 +12,9 @@ pub enum Verbosity {
 impl From<u8> for Verbosity {
     fn from(level: u8) -> Self {
         match level {
-            0 => Self::Minimal,
-            1 => Self::Detailed,
+            0 => Self::Off,
+            1 => Self::Minimal,
+            2 => Self::Detailed,
             _ => Self::Debug,
         }
     }

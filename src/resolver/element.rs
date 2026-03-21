@@ -27,9 +27,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Literal(literal) => {
                 match &literal.kind {
                     TokenKind::Identifier(_) => {
-                        let scope = resolver.scopes.get(&resolver.active).unwrap();
-
-                        if let Some(symbol) = scope.exact(self, &resolver.scopes, &resolver.registry) {
+                        if let Some(symbol) = resolver.exact(self) {
                             resolver.dependencies.insert(symbol.identity);
                         }
                     }
@@ -101,8 +99,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 | ElementKind::Construct(_)
                 | ElementKind::Invoke(_)
         ) {
-            let scope = resolver.scopes.get(&resolver.active).unwrap().clone();
-            match scope.lookup(self, &resolver.scopes, &resolver.registry) {
+            match resolver.lookup(self) {
                 Ok(symbol) => {
                     self.reference = Some(symbol.identity);
                     match &mut self.kind {
@@ -123,7 +120,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 TokenKind::String(_) => Type::from(TypeKind::String),
                 TokenKind::Character(_) => Type::from(TypeKind::Character),
                 TokenKind::Identifier(_) => {
-                    if let Ok(symbol) = resolver.active().lookup(self, &resolver.scopes, &resolver.registry) {
+                    if let Ok(symbol) = resolver.lookup(self) {
                         symbol.typing
                     } else {
                         self.typing.clone()

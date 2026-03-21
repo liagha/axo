@@ -5,11 +5,18 @@ use crate::{
     },
 };
 
-pub mod classifier;
-pub mod form;
-pub mod former;
-pub mod order;
+mod classifier;
+mod form;
+mod former;
+mod order;
 mod traits;
+
+pub use {
+    classifier::*,
+    former::*,
+    form::*,
+    order::*,
+};
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -17,7 +24,7 @@ pub(super) fn next_identity() -> Identity {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-pub mod helper {
+pub(super) mod helper {
     use {
         crate::{
             format::Show,

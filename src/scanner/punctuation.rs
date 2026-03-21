@@ -1,6 +1,8 @@
 use {
-    super::Character,
-    crate::format::{self, Debug, Display, Formatter},
+    crate::{
+        scanner::Character,
+        format::{self, Debug, Display, Formatter}
+    },
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

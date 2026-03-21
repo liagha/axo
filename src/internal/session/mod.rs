@@ -174,7 +174,7 @@ impl<'session> Session<'session> {
         let configuration = Symbol::new(
             SymbolKind::Module(Module::new(Box::from(Element::new(
                 ElementKind::Literal(Token::new(
-                    TokenKind::Identifier(Str::from("config")),
+                    TokenKind::Identifier(Str::from("configuration")),
                     Span::void(),
                 )),
                 Span::void(),
@@ -491,8 +491,7 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        let scope = self.resolver.scopes.get(&self.resolver.active).unwrap().clone();
-        self.reporter.symbols(&scope.collect(&self.resolver.scopes, &self.resolver.registry));
+        self.reporter.symbols(&self.resolver.collect());
 
         for &key in &self.order {
             let target = *self.modules.get(&key).unwrap();

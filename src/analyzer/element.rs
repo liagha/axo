@@ -52,7 +52,9 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     TokenKind::String(value) => AnalysisKind::String { value: *value },
                     TokenKind::Character(value) => AnalysisKind::Character { value: *value },
                     TokenKind::Identifier(identifier) => AnalysisKind::Usage(identifier.clone()),
-                    _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
+                    _ => {
+                        unreachable!("unreachable token kind.");
+                    }
                 };
 
                 Ok(Analysis::new(kind, self.span, typing))
@@ -112,8 +114,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         }
                     }
 
-                    _ => return Err(AnalyzeError::new(ErrorKind::Unimplemented, self.span)),
+                    _ => {
+                        unreachable!("unknown delimited kind!")
+                    },
                 };
+
                 Ok(Analysis::new(kind, self.span, typing))
             }
 

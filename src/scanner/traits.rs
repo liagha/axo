@@ -1,6 +1,6 @@
 use {
-    super::{Character, Token},
     crate::{
+        scanner::{Character, Token},
         tracker::{Span, Spanned},
     },
 };

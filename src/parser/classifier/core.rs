@@ -1,6 +1,6 @@
 use crate::{
     data::*,
-    formation::{classifier::Classifier, form::Form},
+    formation::{Classifier, Form},
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Span, Spanned},
