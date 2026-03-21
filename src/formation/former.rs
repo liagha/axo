@@ -42,18 +42,34 @@ use {
         form::Form,
         helper::{Formable, Source},
     },
-    crate::data::memory::{replace, PhantomData},
+    crate::{
+        data::{memory::{replace, PhantomData, Rc}, Identity, Offset},
+        tracker::Position,
+    },
+    std::collections::HashMap,
 };
 
-use crate::data::memory::Rc;
-
 pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn super::order::Order<'a, Input, Output, Failure> + 'a>)>;
+
+pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub record: record::Record,
+    pub advance: Offset,
+    pub position: Position<'a>,
+    pub forms: Vec<Form<'a, Input, Output, Failure>>,
+    pub inputs: Vec<Input>,
+    pub consumed: Vec<Identity>,
+    pub stack: Vec<Identity>,
+    pub form: Identity,
+    pub form_base: Offset,
+    pub input_base: Offset,
+}
 
 pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub source: &'b mut dyn Source<'a, Input>,
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
     pub cache: Cache<'a, Input, Output, Failure>,
+    pub memo: HashMap<(usize, usize), Memo<'a, Input, Output, Failure>>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
@@ -72,6 +88,7 @@ Former<'b, 'a, Input, Output, Failure>
                 forms
             },
             cache: Vec::with_capacity(32),
+            memo: HashMap::with_capacity(512),
             _phantom: PhantomData,
         }
     }

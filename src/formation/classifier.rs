@@ -1,7 +1,7 @@
 use {
     super::{
         form::Form,
-        former::{record::Record, Former},
+        former::{record::Record, Former, Memo},
         helper::Formable,
         order::*,
     },
@@ -10,6 +10,7 @@ use {
         tracker::{Location, Position},
     },
 };
+
 
 fn static_align<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
 ) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
@@ -753,6 +754,37 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         let key = self.factory as usize;
+        let memo_key = (key, classifier.marker);
+
+        if let Some(entry) = former.memo.get(&memo_key) {
+            let form_offset: isize = former.forms.len() as isize - entry.form_base as isize;
+            let input_offset: isize = former.consumed.len() as isize - entry.input_base as isize;
+
+            for form in &entry.forms {
+                former.forms.push(form.clone());
+            }
+
+            for input in &entry.inputs {
+                former.consumed.push(input.clone());
+            }
+
+            for &index in &entry.consumed {
+                classifier.consumed.push((index as isize + input_offset) as Identity);
+            }
+
+            for &index in &entry.stack {
+                let shifted = if index == 0 { 0 } else { (index as isize + form_offset) as Identity };
+                classifier.stack.push(shifted);
+            }
+
+            classifier.marker = classifier.marker + entry.advance;
+            classifier.position = entry.position;
+            classifier.record = entry.record;
+            classifier.form = if entry.form == 0 { 0 } else { (entry.form as isize + form_offset) as Identity };
+
+            return;
+        }
+
         let cached_order = match former.cache.iter().find(|(k, _)| *k == key) {
             Some((_, order)) => order.clone(),
             None => {
@@ -762,6 +794,12 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
                 order
             }
         };
+
+        let class_consumed = classifier.consumed.len();
+        let class_stack = classifier.stack.len();
+        let form_base = former.forms.len();
+        let input_base = former.consumed.len();
+        let origin = classifier.marker;
 
         let mut child = Classifier::create(
             cached_order,
@@ -775,6 +813,24 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         );
 
         former.build(&mut child);
+
+        let forms: Vec<_> = former.forms[form_base..].iter().cloned().collect();
+        let inputs: Vec<_> = former.consumed[input_base..].iter().cloned().collect();
+        let consumed: Vec<_> = child.consumed[class_consumed..].to_vec();
+        let stack: Vec<_> = child.stack[class_stack..].to_vec();
+
+        former.memo.insert(memo_key, Memo {
+            record: child.record,
+            advance: child.marker - origin,
+            position: child.position,
+            forms,
+            inputs,
+            consumed,
+            stack,
+            form: child.form,
+            form_base,
+            input_base,
+        });
 
         classifier.marker = child.marker;
         classifier.position = child.position;
