@@ -4,6 +4,7 @@ use {
     crate::{
         analyzer::{AnalyzeError, Analyzer},
         data::{memory::replace, *},
+        format::{Display, Show, Verbosity},
         generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
@@ -12,11 +13,12 @@ use {
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
-        reporter::Reporter,
+        reporter::Error,
         resolver::{Resolvable, ResolveError, Resolver, Scope},
         scanner::{ScanError, Scanner, Token, TokenKind},
         tracker::{self, Location, Peekable, Span, TrackError},
     },
+    broccli::{xprintln, Color},
     inkwell::context::{Context, ContextRef},
 };
 
@@ -83,7 +85,6 @@ pub enum CompileError<'error> {
 
 pub struct Session<'session> {
     pub timer: DefaultTimer,
-    pub reporter: Reporter,
     pub order: Vec<Identity>,
     pub inputs: Map<Identity, (InputKind, Location<'session>)>,
     pub modules: Map<Identity, Identity>,
@@ -138,9 +139,15 @@ impl<'session> Session<'session> {
         let mut resolver = Resolver::new();
 
         let verbose = Resolver::verbosity(&mut resolver);
-        let reporter = Reporter::new(verbose);
+        let verbosity = Verbosity::from(verbose);
 
-        reporter.start("initializing");
+        if verbosity != Verbosity::Off {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                "`initializing`" => Color::White
+            );
+            xprintln!();
+        }
 
         let mut inputs = Map::new();
         let mut errors = Vec::new();
@@ -188,18 +195,32 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
         let verbose = Resolver::verbosity(&mut resolver);
-        let reporter = Reporter::new(verbose);
+        let verbosity = Verbosity::from(verbose);
 
         let context = Context::create();
         let reference = unsafe { ContextRef::new(context.raw()) };
         let generator = Generator::new(reference);
 
         let initial = errors.len();
-        reporter.finish("initializing", duration, initial);
+
+        if verbosity != Verbosity::Off {
+            let suffix = if initial > 0 {
+                format!(" ({} errors)", initial)
+            } else {
+                String::new()
+            };
+
+            xprintln!(
+                "Finished {} {}s{}" => Color::Green,
+                "`initializing` in" => Color::White,
+                duration.as_secs_f64(),
+                suffix => Color::Red
+            );
+            xprintln!();
+        }
 
         Session {
             timer,
-            reporter,
             inputs,
             order: Vec::new(),
             modules: Map::new(),
@@ -213,6 +234,70 @@ impl<'session> Session<'session> {
             errors,
             outputs: Map::new(),
         }
+    }
+
+    pub fn get_verbosity(&self) -> Verbosity {
+        #[allow(invalid_reference_casting)]
+        let resolver = unsafe { &mut *(&self.resolver as *const _ as *mut Resolver) };
+        Verbosity::from(Resolver::verbosity(resolver))
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.get_verbosity() != Verbosity::Off
+    }
+
+    pub fn report_start(&self, stage: &str) {
+        if self.is_active() {
+            xprintln!(
+                "Started {}." => Color::Blue,
+                format!("`{}`", stage) => Color::White
+            );
+            xprintln!();
+        }
+    }
+
+    pub fn report_finish(&self, stage: &str, duration: Duration, count: usize) {
+        if self.is_active() {
+            let suffix = if count > 0 {
+                format!(" ({} errors)", count)
+            } else {
+                String::new()
+            };
+
+            xprintln!(
+                "Finished {} {}s{}" => Color::Green,
+                format!("`{}` in", stage) => Color::White,
+                duration.as_secs_f64(),
+                suffix => Color::Red
+            );
+            xprintln!();
+        }
+    }
+
+    pub fn report_section(&self, head: &str, color: Color, body: String) {
+        if self.is_active() && !body.is_empty() {
+            xprintln!(
+                "{}{}\n{}" => Color::White,
+                head => color,
+                ":" => Color::White,
+                Str::from(body).indent(self.get_verbosity().into()) => Color::White
+            );
+            xprintln!();
+        }
+    }
+
+    pub fn report_error<K, H>(&self, error: &Error<K, H>)
+    where
+        K: Clone + Display,
+        H: Clone + Display,
+    {
+        let (message, details) = error.handle();
+        xprintln!(
+            "{}\n{}" => Color::Red,
+            message => Color::White,
+            details => Color::White
+        );
+        xprintln!();
     }
 
     pub fn compile(&mut self) {
@@ -250,17 +335,17 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.stop().unwrap());
-        self.reporter.finish("compilation", duration, self.errors.len());
+        self.report_finish("compilation", duration, self.errors.len());
 
         for error in &self.errors {
             match error {
-                CompileError::Initialize(error) => self.reporter.error(error),
-                CompileError::Scan(error) => self.reporter.error(error),
-                CompileError::Parse(error) => self.reporter.error(error),
-                CompileError::Resolve(error) => self.reporter.error(error),
-                CompileError::Analyze(error) => self.reporter.error(error),
-                CompileError::Generate(error) => self.reporter.error(error),
-                CompileError::Track(error) => self.reporter.error(error),
+                CompileError::Initialize(error) => self.report_error(error),
+                CompileError::Scan(error) => self.report_error(error),
+                CompileError::Parse(error) => self.report_error(error),
+                CompileError::Resolve(error) => self.report_error(error),
+                CompileError::Analyze(error) => self.report_error(error),
+                CompileError::Generate(error) => self.report_error(error),
+                CompileError::Track(error) => self.report_error(error),
                 CompileError::Invalid(_) => {}
             }
         }
@@ -383,7 +468,15 @@ impl<'session> Session<'session> {
             .map(|key| self.inputs.get(key).unwrap().1.stem().unwrap().to_string())
             .collect();
 
-        self.reporter.order(&sequence);
+        if self.is_active() && !sequence.is_empty() {
+            xprintln!(
+                "{}{} {}" => Color::White,
+                "Order" => Color::Magenta,
+                ":" => Color::White,
+                sequence.join(" -> ") => Color::White
+            );
+            xprintln!();
+        }
     }
 
     fn dependencies(&mut self, identity: Identity) -> Set<Identity> {
@@ -402,7 +495,7 @@ impl<'session> Session<'session> {
 
     pub fn scan(&mut self) {
         let initial = self.errors.len();
-        self.reporter.start("scanning");
+        self.report_start("scanning");
 
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
         keys.sort();
@@ -416,7 +509,16 @@ impl<'session> Session<'session> {
                 scanner.prepare();
                 scanner.scan();
 
-                self.reporter.tokens(&scanner.output);
+                let verbosity = self.get_verbosity().into();
+                self.report_section(
+                    "Tokens",
+                    Color::Cyan,
+                    scanner.output
+                        .iter()
+                        .map(|token| format!("{}", token.format(verbosity)))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                );
 
                 self.errors.extend(
                     scanner
@@ -430,12 +532,12 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("scanning", duration, self.errors.len() - initial);
+        self.report_finish("scanning", duration, self.errors.len() - initial);
     }
 
     pub fn parse(&mut self) {
         let initial = self.errors.len();
-        self.reporter.start("parsing");
+        self.report_start("parsing");
 
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
         keys.sort();
@@ -450,7 +552,16 @@ impl<'session> Session<'session> {
                 parser.set_input(tokens);
                 parser.parse();
 
-                self.reporter.elements(&parser.output);
+                let verbosity = self.get_verbosity().into();
+                self.report_section(
+                    "Elements",
+                    Color::Cyan,
+                    parser.output
+                        .iter()
+                        .map(|element| format!("{}", element.format(verbosity)))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                );
 
                 self.errors.extend(
                     parser
@@ -464,12 +575,12 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("parsing", duration, self.errors.len() - initial);
+        self.report_finish("parsing", duration, self.errors.len() - initial);
     }
 
     pub fn resolve(&mut self) {
         let initial = self.errors.len();
-        self.reporter.start("resolving");
+        self.report_start("resolving");
 
         for &key in &self.order {
             let target = *self.modules.get(&key).unwrap();
@@ -491,7 +602,19 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        self.reporter.symbols(&self.resolver.collect());
+        let verbosity = self.get_verbosity().into();
+        self.report_section(
+            "Symbols",
+            Color::Blue,
+            self.resolver.collect()
+                .iter()
+                .map(|symbol| {
+                    let children = symbol.scope.symbols.iter().map(|symbol| self.resolver.get_symbol(*symbol)).collect::<Vec<_>>();
+                    format!("{}\n{}", symbol.format(verbosity), children.format(verbosity))
+                })
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
 
         for &key in &self.order {
             let target = *self.modules.get(&key).unwrap();
@@ -536,19 +659,28 @@ impl<'session> Session<'session> {
         self.errors.extend(self.resolver.errors.drain(..).map(CompileError::Resolve));
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("resolving", duration, self.errors.len() - initial);
+        self.report_finish("resolving", duration, self.errors.len() - initial);
     }
 
     pub fn analyze(&mut self) {
         for &key in &self.order {
             let initial = self.errors.len();
-            self.reporter.start("analyzing");
+            self.report_start("analyzing");
 
             let elements = self.parsers.get(&key).unwrap().output.clone();
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
 
-            self.reporter.analysis(&analyzer.output);
+            let verbosity = self.get_verbosity().into();
+            self.report_section(
+                "Analysis",
+                Color::Blue,
+                analyzer.output
+                    .iter()
+                    .map(|item| format!("{}", item.format(verbosity)))
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
 
             self.errors.extend(
                 analyzer
@@ -560,7 +692,7 @@ impl<'session> Session<'session> {
             self.analyzers.insert(key, analyzer);
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-            self.reporter.finish("analyzing", duration, self.errors.len() - initial);
+            self.report_finish("analyzing", duration, self.errors.len() - initial);
         }
     }
 
@@ -583,7 +715,7 @@ impl<'session> Session<'session> {
             let custom = Resolver::schema(&mut self.resolver, key);
             let schema = Self::schema(&base, *location, custom);
 
-            self.reporter.start("generating");
+            self.report_start("generating");
             self.generator.generate(analysis);
 
             match schema.as_path() {
@@ -613,7 +745,7 @@ impl<'session> Session<'session> {
             }
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
-            self.reporter.finish("generating", duration, self.errors.len() - initial);
+            self.report_finish("generating", duration, self.errors.len() - initial);
         }
 
         self.errors.extend(
@@ -626,7 +758,7 @@ impl<'session> Session<'session> {
 
     pub fn emit(&mut self) {
         let initial = self.errors.len();
-        self.reporter.start("emitting");
+        self.report_start("emitting");
 
         let base = self.base();
         let mut objects = Map::new();
@@ -709,7 +841,13 @@ impl<'session> Session<'session> {
             format!("{} {}", program, arguments.join(" "))
         };
 
-        self.reporter.run(execution);
+        if self.is_active() {
+            xprintln!(
+                "Running {}." => Color::Blue,
+                format!("`{}`", execution) => Color::White
+            );
+            xprintln!();
+        }
 
         let status = link.status().expect("failed");
 
@@ -718,8 +856,15 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.reporter.finish("emitting", duration, self.errors.len() - initial);
-        self.reporter.run(format!("{}", executable));
+        self.report_finish("emitting", duration, self.errors.len() - initial);
+
+        if self.is_active() {
+            xprintln!(
+                "Running {}." => Color::Blue,
+                format!("`{}`", executable) => Color::White
+            );
+            xprintln!();
+        }
 
         Command::new(executable.to_string()).status().expect("failed");
     }

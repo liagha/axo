@@ -1,12 +1,10 @@
-use {
-    crate::{
-        initializer::InitializeError,
-        parser::{Element, ElementKind, Symbol, SymbolKind, ParseError},
-        data::{Binding, Offset, Scale, Str},
-        formation::{Classifier, Form, Former},
-        scanner::{PunctuationKind, Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Position},
-    },
+use crate::{
+    data::{Offset, Scale, Str},
+    formation::{Classifier, Form, Former},
+    initializer::InitializeError,
+    parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
+    scanner::{PunctuationKind, Scanner, Token, TokenKind},
+    tracker::{Location, Peekable, Position},
 };
 
 pub struct Initializer<'initializer> {
@@ -93,29 +91,8 @@ impl<'initializer> Initializer<'initializer> {
     > {
         Classifier::repetition(
             Classifier::alternative([
-                Classifier::predicate(|token: &Token| {
-                    matches!(
-                        token.kind,
-                        TokenKind::Punctuation(PunctuationKind::Newline)
-                            | TokenKind::Punctuation(PunctuationKind::Tab)
-                            | TokenKind::Punctuation(PunctuationKind::Space)
-                            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
-                            | TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            | TokenKind::Comment(_)
-                    )
-                })
-                    .with_ignore(),
-                Classifier::predicate(|token: &Token| {
-                    !matches!(
-                        token.kind,
-                        TokenKind::Punctuation(PunctuationKind::Newline)
-                            | TokenKind::Punctuation(PunctuationKind::Tab)
-                            | TokenKind::Punctuation(PunctuationKind::Space)
-                            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
-                            | TokenKind::Punctuation(PunctuationKind::Semicolon)
-                            | TokenKind::Comment(_)
-                    )
-                }),
+                Classifier::predicate(is_ignored).with_ignore(),
+                Classifier::predicate(|token: &Token| !is_ignored(token)),
             ]),
             0,
             Some(length),
@@ -148,31 +125,25 @@ impl<'initializer> Initializer<'initializer> {
 
     pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
         let location = Location::Flag;
-
         let mut scanner = Scanner::new(location);
 
         scanner.set_location(location);
-
         scanner.prepare();
         scanner.scan();
 
         self.input = scanner.output;
 
-        let strained = {
-            let length = self.length();
-            let classifier = Self::filter(length);
-            let mut former = Former::new(self);
-            former.form(classifier).collect_inputs()
-        };
-
-        self.input = strained;
-        self.reset();
+        let length = self.length();
+        let classifier = Self::filter(length);
         let mut former = Former::new(self);
 
+        self.input = former.form(classifier).collect_inputs();
+
+        self.reset();
+
+        let mut former = Former::new(self);
         let mut configurations = Vec::new();
-
         let classifier = Self::classifier();
-
         let forms = former.form(classifier).flatten();
 
         for form in forms {
@@ -190,108 +161,53 @@ impl<'initializer> Initializer<'initializer> {
 
         let targets = configurations
             .iter()
-            .filter(|configuration| {
-                if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
-                    if let ElementKind::Literal(token) = &target.kind {
-                        if let TokenKind::Identifier(identifier) = &token.kind {
-                            return *identifier == Str::from("Input")
-                                || identifier.starts_with("Input(");
-                        }
-                    }
+            .filter_map(|symbol| {
+                let name = target_name(symbol)?;
+                if name == Str::from("Input") || name.starts_with("Input(") {
+                    let value = value_name(symbol)?;
+                    Some(Location::Entry(value))
+                } else {
+                    None
                 }
-                false
-            })
-            .filter_map(|configuration| {
-                if let SymbolKind::Binding(Binding { value, .. }) = &configuration.kind {
-                    if let Some(element) = value.as_ref() {
-                        if let ElementKind::Literal(token) = &element.kind {
-                            if let TokenKind::Identifier(value) = &token.kind {
-                                return Some(Location::Entry(*value));
-                            }
-                        }
-                    }
-                }
-                None
             })
             .collect::<Vec<_>>();
 
-        let input_indexes = configurations
+        let inputs = configurations
             .iter()
             .enumerate()
-            .filter(|(_, configuration)| {
-                if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
-                    if let ElementKind::Literal(token) = &target.kind {
-                        if let TokenKind::Identifier(identifier) = &token.kind {
-                            return *identifier == Str::from("Input");
-                        }
-                    }
+            .filter_map(|(index, symbol)| {
+                if target_name(symbol)? == Str::from("Input") {
+                    Some(index)
+                } else {
+                    None
                 }
-                false
             })
-            .map(|(index, _)| index)
             .collect::<Vec<_>>();
 
-        if input_indexes.len() > 1 {
-            for (ordinal, pref_index) in input_indexes.iter().enumerate() {
-                if let Some(configuration) = configurations.get_mut(*pref_index) {
-                    if let SymbolKind::Binding(Binding { target, .. }) = &mut configuration.kind {
-                        if let ElementKind::Literal(token) = &target.kind {
-                            let span = token.span;
-                            *target = Box::new(Element::new(
-                                ElementKind::Literal(Token::new(
-                                    TokenKind::Identifier(Str::from(format!("Input({})", ordinal))),
-                                    span,
-                                )),
-                                span,
-                            ));
-                        }
-                    }
+        if inputs.len() > 1 {
+            for (count, index) in inputs.into_iter().enumerate() {
+                if let Some(symbol) = configurations.get_mut(index) {
+                    rename_target(symbol, format!("Input({})", count));
                 }
             }
         }
 
-        for key in [
-            "Output",
-            "OutputCode",
-            "OutputBinary",
-            "OutputIR",
-            "OutputExec",
-        ] {
-            let indexes = configurations
-                .iter()
-                .enumerate()
-                .filter(|(_, configuration)| {
-                    if let SymbolKind::Binding(Binding { target, .. }) = &configuration.kind {
-                        if let ElementKind::Literal(token) = &target.kind {
-                            if let TokenKind::Identifier(identifier) = &token.kind {
-                                return *identifier == Str::from(key);
-                            }
-                        }
-                    }
-                    false
-                })
-                .map(|(index, _)| index)
-                .collect::<Vec<_>>();
+        let indexes = configurations
+            .iter()
+            .enumerate()
+            .filter_map(|(index, symbol)| {
+                if target_name(symbol)? == Str::from("Output") {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
-            if indexes.len() > 1 {
-                for (ordinal, pref_index) in indexes.iter().enumerate() {
-                    if let Some(configuration) = configurations.get_mut(*pref_index) {
-                        if let SymbolKind::Binding(Binding { target, .. }) = &mut configuration.kind {
-                            if let ElementKind::Literal(token) = &target.kind {
-                                let span = token.span;
-                                *target = Box::new(Element::new(
-                                    ElementKind::Literal(Token::new(
-                                        TokenKind::Identifier(Str::from(format!(
-                                            "{}({})",
-                                            key, ordinal
-                                        ))),
-                                        span,
-                                    )),
-                                    span,
-                                ));
-                            }
-                        }
-                    }
+        if indexes.len() > 1 {
+            for (count, index) in indexes.into_iter().enumerate() {
+                if let Some(symbol) = configurations.get_mut(index) {
+                    rename_target(symbol, format!("{}({})", "Output", count));
                 }
             }
         }
@@ -299,5 +215,56 @@ impl<'initializer> Initializer<'initializer> {
         self.output = configurations;
 
         targets
+    }
+}
+
+fn is_ignored(token: &Token) -> bool {
+    matches!(
+        token.kind,
+        TokenKind::Punctuation(PunctuationKind::Newline)
+            | TokenKind::Punctuation(PunctuationKind::Tab)
+            | TokenKind::Punctuation(PunctuationKind::Space)
+            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
+            | TokenKind::Punctuation(PunctuationKind::Semicolon)
+            | TokenKind::Comment(_)
+    )
+}
+
+fn target_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
+    if let SymbolKind::Binding(binding) = &symbol.kind {
+        if let ElementKind::Literal(token) = &binding.target.kind {
+            if let TokenKind::Identifier(name) = &token.kind {
+                return Some(name.clone());
+            }
+        }
+    }
+    None
+}
+
+fn value_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
+    if let SymbolKind::Binding(binding) = &symbol.kind {
+        if let Some(value) = &binding.value {
+            if let ElementKind::Literal(token) = &value.kind {
+                if let TokenKind::Identifier(name) = &token.kind {
+                    return Some(name.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn rename_target(symbol: &mut Symbol, name: String) {
+    if let SymbolKind::Binding(binding) = &mut symbol.kind {
+        if let ElementKind::Literal(token) = &binding.target.kind {
+            let span = token.span;
+            binding.target = Box::new(Element::new(
+                ElementKind::Literal(Token::new(
+                    TokenKind::Identifier(Str::from(name)),
+                    span,
+                )),
+                span,
+            ));
+        }
     }
 }

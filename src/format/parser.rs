@@ -50,22 +50,16 @@ impl<'symbol> Show<'symbol> for Symbol<'symbol> {
                 self.kind.format(verbosity)
             ).into(),
             Verbosity::Detailed => format!(
-                "Symbol({}. {}: {:?}){}",
+                "Symbol({}. {}: {:?})",
                 self.identity.colorize(Color::Blue),
                 self.kind.format(verbosity),
                 self.visibility,
-                if self.scope.is_empty() {
-                    "".into()
-                } else {
-                    " => Scope".to_string()
-                }
             ).into(),
             Verbosity::Debug => format!(
-                "Symbol {{\n{},\n{},\n{},\n{}\n}}",
+                "Symbol {{\n{},\n{},\n{}\n}}",
                 format!("identity: {}", self.identity.colorize(Color::Blue)).indent(verbosity),
                 format!("kind: {}", self.kind.format(verbosity)).indent(verbosity),
                 format!("visibility: {:?}", self.visibility).indent(verbosity),
-                "scope: Scope".to_string().indent(verbosity)
             ).into(),
         }
     }

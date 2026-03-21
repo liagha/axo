@@ -1,12 +1,10 @@
-use {
-    crate::{
-        initializer::{InitializeError, Initializer},
-        data::{Str, Binding, BindingKind},
-        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
-        formation::{Classifier, Form},
-        scanner::{OperatorKind, Token, TokenKind},
-        tracker::{Spanned},
-    },
+use crate::{
+    data::{Binding, BindingKind, Str},
+    formation::{Classifier, Form},
+    initializer::{InitializeError, Initializer},
+    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    scanner::{OperatorKind, Token, TokenKind},
+    tracker::Spanned,
 };
 
 impl<'initializer> Initializer<'initializer> {
@@ -78,7 +76,7 @@ impl<'initializer> Initializer<'initializer> {
                 Classifier::predicate(|token: &Token| {
                     matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
                 })
-                .with_ignore(),
+                    .with_ignore(),
                 Classifier::predicate(move |token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         matcher(identifier)
@@ -86,20 +84,15 @@ impl<'initializer> Initializer<'initializer> {
                         false
                     }
                 })
-                .with_transform(
-                    move |former, classifier| {
+                    .with_transform(move |former, classifier| {
                         let form = former.forms.get_mut(classifier.form).unwrap();
                         let identifier = form.collect_inputs()[0].clone();
                         let span = identifier.span();
 
-                        *form = Form::Input(Token::new(
-                            TokenKind::Identifier(name.clone()),
-                            span,
-                        ));
+                        *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
 
                         Ok(())
-                    },
-                ),
+                    }),
                 Self::path_value(),
             ]),
             move |former, classifier| {
@@ -110,36 +103,22 @@ impl<'initializer> Initializer<'initializer> {
                 let span = identifier.clone().span();
 
                 let target = Element::new(
-                    ElementKind::Literal(
-                        Token::new(
-                            TokenKind::Identifier(name),
-                            span,
-                        ),
-                    ),
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(name), span)),
                     span,
                 );
 
                 let value = Element::new(
-                    ElementKind::Literal(
-                        Token::new(
-                            TokenKind::Identifier(
-                                Str::from(path)
-                            ),
-                            span
-                        ),
-                    ),
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(path)), span)),
                     span,
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::Binding(
-                        Binding::new(
-                            Box::from(target),
-                            Some(Box::new(value)),
-                            None,
-                            BindingKind::Meta,
-                        )
-                    ),
+                    SymbolKind::Binding(Binding::new(
+                        Box::from(target),
+                        Some(Box::new(value)),
+                        None,
+                        BindingKind::Meta,
+                    )),
                     span,
                     Visibility::Public,
                 );
@@ -161,7 +140,7 @@ impl<'initializer> Initializer<'initializer> {
             Classifier::predicate(|token: &Token| {
                 matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
             })
-            .with_ignore(),
+                .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
                     identifier == "v" || identifier == "verbosity"
@@ -169,8 +148,7 @@ impl<'initializer> Initializer<'initializer> {
                     false
                 }
             })
-            .with_transform(
-                move |former, classifier| {
+                .with_transform(|former, classifier| {
                     let form = former.forms.get_mut(classifier.form).unwrap();
                     let identifier = form.collect_inputs()[0].clone();
                     let span = identifier.span();
@@ -181,40 +159,25 @@ impl<'initializer> Initializer<'initializer> {
                     ));
 
                     Ok(())
-                },
-            ),
+                }),
             Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
         ])
-        .with_transform(
-            move |former, classifier| {
+            .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
-                let identifier: Token<'initializer> = form.collect_inputs()[0].clone();
-                let value: Token<'initializer> = form.collect_inputs()[1].clone();
-                let span = identifier.span.merge(&value.span.clone());
+                let identifier = form.collect_inputs()[0].clone();
+                let value = form.collect_inputs()[1].clone();
+                let span = identifier.span.merge(&value.span);
 
-                let target = Element::new(
-                    ElementKind::Literal(
-                        identifier.clone(),
-                    ),
-                    identifier.span,
-                );
-
-                let value = Element::new(
-                    ElementKind::Literal(
-                        value.clone(),
-                    ),
-                    value.span,
-                );
+                let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
+                let value = Element::new(ElementKind::Literal(value.clone()), value.span);
 
                 let symbol = Symbol::new(
-                    SymbolKind::Binding(
-                        Binding::new(
-                            Box::from(target),
-                            Some(Box::new(value)),
-                            None,
-                            BindingKind::Meta,
-                        )
-                    ),
+                    SymbolKind::Binding(Binding::new(
+                        Box::from(target),
+                        Some(Box::new(value)),
+                        None,
+                        BindingKind::Meta,
+                    )),
                     span,
                     Visibility::Public,
                 );
@@ -222,8 +185,7 @@ impl<'initializer> Initializer<'initializer> {
                 *form = Form::output(symbol);
 
                 Ok(())
-            },
-        )
+            })
     }
 
     pub fn input() -> Classifier<
@@ -243,54 +205,41 @@ impl<'initializer> Initializer<'initializer> {
         Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Classifier::with_transform(
-            Self::path_value(),
-            |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let inputs = form.collect_inputs();
+        Classifier::with_transform(Self::path_value(), |former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let inputs = form.collect_inputs();
 
-                if inputs.is_empty() {
-                    *form = Form::blank();
-                }
+            if inputs.is_empty() {
+                *form = Form::blank();
+                return Ok(());
+            }
 
-                let span = inputs[0].clone().span();
+            let span = inputs[0].clone().span();
+            let value = Token::new(
+                TokenKind::Identifier(Str::from(Self::path_string(inputs))),
+                span,
+            );
 
-                let value = Token::new(TokenKind::Identifier(Str::from(Self::path_string(inputs))), span);
+            let identifier = Token::new(TokenKind::Identifier(Str::from("Input")), span);
 
-                let identifier = Token::new(TokenKind::Identifier(Str::from("Input")), span);
+            let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
+            let value = Element::new(ElementKind::Literal(value.clone()), value.span);
 
-                let target = Element::new(
-                    ElementKind::Literal(
-                        identifier.clone(),
-                    ),
-                    identifier.span,
-                );
+            let symbol = Symbol::new(
+                SymbolKind::Binding(Binding::new(
+                    Box::from(target),
+                    Some(Box::new(value)),
+                    None,
+                    BindingKind::Meta,
+                )),
+                span,
+                Visibility::Public,
+            );
 
-                let value = Element::new(
-                    ElementKind::Literal(
-                        value.clone(),
-                    ),
-                    value.span,
-                );
+            *form = Form::output(symbol);
 
-                let symbol = Symbol::new(
-                    SymbolKind::Binding(
-                        Binding::new(
-                            Box::from(target),
-                            Some(Box::new(value)),
-                            None,
-                            BindingKind::Meta,
-                        )
-                    ),
-                    span,
-                    Visibility::Public,
-                );
-
-                *form = Form::output(symbol);
-
-                Ok(())
-            },
-        )
+            Ok(())
+        })
     }
 
     pub fn output() -> Classifier<
