@@ -10,6 +10,32 @@ use {
         tracker::{Location, Position},
     },
 };
+ 
+use std::sync::OnceLock;
+
+fn static_align<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
+) -> &'a dyn Order<'a, Input, Output, Failure> {
+    static INSTANCE: Align = Align;
+    &INSTANCE
+}
+
+fn static_ignore<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
+) -> &'a dyn Order<'a, Input, Output, Failure> {
+    static INSTANCE: Ignore = Ignore;
+    &INSTANCE
+}
+
+fn static_pardon<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
+) -> &'a dyn Order<'a, Input, Output, Failure> {
+    static INSTANCE: Pardon = Pardon;
+    &INSTANCE
+}
+
+fn static_skip<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
+) -> &'a dyn Order<'a, Input, Output, Failure> {
+    static INSTANCE: Skip = Skip;
+    &INSTANCE
+}
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub order: &'a dyn Order<'a, Input, Output, Failure>,
@@ -172,8 +198,6 @@ Classifier<'a, Input, Output, Failure>
         Self::new(
             Box::leak(Box::new(Alternative {
                 patterns,
-                targets: vec![Record::Panicked, Record::Aligned],
-                rejects: vec![Record::Blank],
             })),
             0,
             Position::new(Location::Void),
@@ -259,6 +283,7 @@ Classifier<'a, Input, Output, Failure>
         Self::new(
             Box::leak(Box::new(Deferred {
                 function: Box::leak(Box::new(factory)),
+                cached: OnceLock::new(),
             })),
             0,
             Position::new(Location::Void),
@@ -287,7 +312,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_align(self) -> Self {
-        self.with_order(Box::leak(Box::new(Align)))
+        self.with_order(static_align())
     }
 
     #[inline]
@@ -314,7 +339,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_ignore(self) -> Self {
-        self.with_order(Box::leak(Box::new(Ignore)))
+        self.with_order(static_ignore())
     }
 
     #[inline]
@@ -348,7 +373,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_pardon(self) -> Self {
-        self.with_order(Box::leak(Box::new(Pardon)))
+        self.with_order(static_pardon())
     }
 
     #[inline]
@@ -361,7 +386,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn with_skip(self) -> Self {
-        self.with_order(Box::leak(Box::new(Skip)))
+        self.with_order(static_skip())
     }
 
     #[inline]
@@ -427,7 +452,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn ignore() -> &'a dyn Order<'a, Input, Output, Failure> {
-        Box::leak(Box::new(Ignore))
+        static_ignore()
     }
 
     pub fn inspect<I>(&self, inspector: I) -> Self
@@ -450,7 +475,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn pardon() -> &'a dyn Order<'a, Input, Output, Failure> {
-        Box::leak(Box::new(Pardon))
+        static_pardon()
     }
 
     #[inline]
@@ -465,7 +490,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub fn skip() -> &'a dyn Order<'a, Input, Output, Failure> {
-        Box::leak(Box::new(Skip))
+        static_skip()
     }
 
     #[inline]
@@ -607,8 +632,6 @@ pub struct Alternative<
     const SIZE: Scale,
 > {
     pub patterns: [Classifier<'a, Input, Output, Failure>; SIZE],
-    pub targets: Vec<Record>,
-    pub rejects: Vec<Record>,
 }
 
 impl<'a, Input, Output, Failure, const SIZE: Scale> Order<'a, Input, Output, Failure>
@@ -648,7 +671,7 @@ where
 
             former.build(&mut child);
 
-            if self.rejects.contains(&child.record) {
+            if matches!(child.record, Record::Blank) {
                 stack = child.stack;
                 consumed = child.consumed;
                 stack.truncate(base_stack);
@@ -693,7 +716,7 @@ where
             }
 
             if let Some(ref champion) = best {
-                if self.targets.contains(&champion.record) {
+                if matches!(champion.record, Record::Panicked | Record::Aligned) {
                     break;
                 }
             }
@@ -717,9 +740,20 @@ where
     }
 }
 
-#[derive(Clone)]
 pub struct Deferred<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub function: &'a dyn Fn() -> Classifier<'a, Input, Output, Failure>,
+    pub cached: OnceLock<Classifier<'a, Input, Output, Failure>>,
+}
+
+impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> Clone
+for Deferred<'a, Input, Output, Failure>
+{
+    fn clone(&self) -> Self {
+        Self {
+            function: self.function,
+            cached: OnceLock::new(),
+        }
+    }
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -731,7 +765,7 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let mut target = (self.function)();
+        let mut target = self.cached.get_or_init(|| (self.function)()).clone();
         target.marker = classifier.marker;
         target.position = classifier.position;
         target.depth = classifier.depth + 1;

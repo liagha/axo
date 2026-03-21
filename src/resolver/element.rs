@@ -5,7 +5,6 @@ use crate::{
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Spanned,
 };
-use crate::format::{Show, Verbosity};
 
 fn assignable(element: &Element) -> bool {
     match &element.kind {
@@ -539,7 +538,6 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
                         let mut function = Type::from(TypeKind::Function(Str::default(), members, Some(Box::new(output.clone()))));
-                        println!("Functions:\n\t{}\n\t{}", invoke.target.typing.format(Verbosity::Detailed), function.format(Verbosity::Detailed));
                         function = resolver.unify(self.span, &invoke.target.typing, &function);
 
                         match function.kind {

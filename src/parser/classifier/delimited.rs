@@ -1,10 +1,11 @@
+// src/parser/classifier/delimited.rs
 use {
     crate::{
         data::*,
-        tracker::{Span, Spanned},
         formation::{classifier::Classifier, form::Form},
-        scanner::{PunctuationKind, Token, TokenKind},
         parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
+        scanner::{PunctuationKind, Token, TokenKind},
+        tracker::Span,
     },
 };
 
@@ -23,25 +24,17 @@ impl<'parser> Parser<'parser> {
         })
             .into_optional();
 
-        Classifier::with_transform(
-            Classifier::sequence([
-                Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(open)),
-                item.clone().into_optional(),
-                Classifier::persistence(
-                    Classifier::sequence([separator, item.into_optional()]),
-                    0,
-                    None,
-                ),
-                Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)).with_panic(
-                    move |former, classifier| {
-                        let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
-                        let span = Form::multiple(stack).collect_inputs_iter().span();
-
-                        ParseError::new(ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)), span)
-                    }
-                ),
-            ]),
-            move |former, classifier| {
+        Classifier::sequence([
+            Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(open)),
+            item.clone().into_optional(),
+            Classifier::persistence(
+                Classifier::sequence([separator, item.into_optional()]),
+                0,
+                None,
+            ),
+            Classifier::predicate(move |t: &Token| t.kind == TokenKind::Punctuation(close)),
+        ])
+            .with_transform(move |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let delimiters = form.collect_inputs();
                 let elements = form.collect_outputs();
@@ -66,85 +59,29 @@ impl<'parser> Parser<'parser> {
                     None
                 };
 
-                let kind = match (open, separator_token.as_ref().map(|t| &t.kind)) {
-                    (PunctuationKind::LeftBrace, None) => {
-                        Self::delimited_kind(start, &elements, None, end)
-                    }
-                    (
-                        PunctuationKind::LeftBrace,
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-                    (
-                        PunctuationKind::LeftBrace,
-                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-
-                    (PunctuationKind::LeftParenthesis, None) => {
-                        Self::delimited_kind(start, &elements, None, end)
-                    }
-                    (
-                        PunctuationKind::LeftParenthesis,
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-                    (
-                        PunctuationKind::LeftParenthesis,
-                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-
-                    (PunctuationKind::LeftBracket, None) => {
-                        Self::delimited_kind(start, &elements, None, end)
-                    }
-                    (
-                        PunctuationKind::LeftBracket,
-                        Some(TokenKind::Punctuation(PunctuationKind::Comma)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-                    (
-                        PunctuationKind::LeftBracket,
-                        Some(TokenKind::Punctuation(PunctuationKind::Semicolon)),
-                    ) => Self::delimited_kind(start, &elements, separator_token.as_ref(), end),
-
-                    _ => unreachable!("unexpected bracket/separator combination"),
-                };
+                let kind = ElementKind::delimited(Delimited::new(
+                    start.clone(),
+                    elements,
+                    separator_token,
+                    end.clone(),
+                ));
 
                 *form = Form::output(Element::new(kind, span));
 
                 Ok(())
-            },
-        )
-    }
-
-    fn delimited_kind(
-        start: &Token<'parser>,
-        elements: &[Element<'parser>],
-        sep: Option<&Token<'parser>>,
-        end: &Token<'parser>,
-    ) -> ElementKind<'parser> {
-        ElementKind::delimited(Delimited::new(
-            start.clone(),
-            elements.to_vec(),
-            sep.cloned(),
-            end.clone(),
-        ))
+            })
     }
 
     pub fn bundle(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
-            PunctuationKind::LeftBrace,
-            PunctuationKind::RightBrace,
-            item,
-        )
+        Self::delimited_form(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
     }
 
     pub fn block(
         item: Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>,
     ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Self::delimited_form(
-            PunctuationKind::LeftBrace,
-            PunctuationKind::RightBrace,
-            item,
-        )
+        Self::delimited_form(PunctuationKind::LeftBrace, PunctuationKind::RightBrace, item)
     }
 
     pub fn group(
@@ -187,8 +124,7 @@ impl<'parser> Parser<'parser> {
         )
     }
 
-    pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>>
-    {
+    pub fn delimited() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
         Classifier::alternative([
             Self::delimited_form(
                 PunctuationKind::LeftBrace,
