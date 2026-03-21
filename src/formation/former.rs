@@ -45,10 +45,15 @@ use {
     crate::data::memory::{replace, PhantomData},
 };
 
+use crate::data::memory::Rc;
+
+pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn super::order::Order<'a, Input, Output, Failure> + 'a>)>;
+
 pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub source: &'b mut dyn Source<'a, Input>,
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
+    pub cache: Cache<'a, Input, Output, Failure>,
     pub _phantom: PhantomData<(Input, Output, Failure)>,
 }
 
@@ -66,13 +71,15 @@ Former<'b, 'a, Input, Output, Failure>
 
                 forms
             },
+            cache: Vec::with_capacity(32),
             _phantom: PhantomData,
         }
     }
 
     #[inline(always)]
     pub fn build(&mut self, classifier: &mut Classifier<'a, Input, Output, Failure>) {
-        classifier.order.order(self, classifier);
+        let order = classifier.order.clone();
+        order.order(self, classifier);
     }
 
     #[inline(always)]
@@ -81,7 +88,7 @@ Former<'b, 'a, Input, Output, Failure>
         classifier: Classifier<'a, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
         let initial = self.source.position();
-        let mut active = Classifier::new(classifier.order, 0, initial);
+        let mut active = Classifier::new(classifier.order.clone(), 0, initial);
 
         self.build(&mut active);
 

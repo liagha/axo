@@ -6,38 +6,34 @@ use {
         order::*,
     },
     crate::{
-        data::{memory::{take, replace, swap}, sync::OnceLock, Boolean, Offset, Scale, Identity},
+        data::{memory::{take, replace, swap, Rc}, Boolean, Offset, Scale, Identity},
         tracker::{Location, Position},
     },
 };
 
 fn static_align<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> &'a dyn Order<'a, Input, Output, Failure> {
-    static INSTANCE: Align = Align;
-    &INSTANCE
+) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+    Rc::new(Align)
 }
 
 fn static_ignore<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> &'a dyn Order<'a, Input, Output, Failure> {
-    static INSTANCE: Ignore = Ignore;
-    &INSTANCE
+) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+    Rc::new(Ignore)
 }
 
 fn static_pardon<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> &'a dyn Order<'a, Input, Output, Failure> {
-    static INSTANCE: Pardon = Pardon;
-    &INSTANCE
+) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+    Rc::new(Pardon)
 }
 
 fn static_skip<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>(
-) -> &'a dyn Order<'a, Input, Output, Failure> {
-    static INSTANCE: Skip = Skip;
-    &INSTANCE
+) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+    Rc::new(Skip)
 }
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub identity: Identity,
-    pub order: &'a dyn Order<'a, Input, Output, Failure>,
+    pub order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
     pub marker: Offset,
     pub position: Position<'a>,
     pub consumed: Vec<Identity>,
@@ -52,7 +48,7 @@ Classifier<'a, Input, Output, Failure>
 {
     #[inline]
     pub fn new(
-        order: &'a dyn Order<'a, Input, Output, Failure>,
+        order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
         marker: Offset,
         position: Position<'a>,
     ) -> Self {
@@ -71,7 +67,7 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     fn create(
-        order: &'a dyn Order<'a, Input, Output, Failure>,
+        order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
         marker: Offset,
         position: Position<'a>,
         consumed: Vec<Identity>,
@@ -94,7 +90,7 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    fn create_child(&mut self, order: &'a dyn Order<'a, Input, Output, Failure>) -> Self {
+    fn create_child(&mut self, order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>) -> Self {
         Self {
             identity: super::next_identity(),
             order,
@@ -166,9 +162,9 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn literal(value: impl PartialEq<Input> + 'a) -> Self {
         Self::new(
-            Box::leak(Box::new(Literal {
-                value: Box::leak(Box::new(value)),
-            })),
+            Rc::new(Literal {
+                value: Rc::new(value),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -177,9 +173,9 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn negate(classifier: Self) -> Self {
         Self::new(
-            Box::leak(Box::new(Negate {
+            Rc::new(Negate {
                 classifier: Box::new(classifier),
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -191,9 +187,9 @@ Classifier<'a, Input, Output, Failure>
         F: Fn(&Input) -> bool + 'a,
     {
         Self::new(
-            Box::leak(Box::new(Predicate::<Input> {
-                function: Box::leak(Box::new(predicate)),
-            })),
+            Rc::new(Predicate::<Input> {
+                function: Rc::new(predicate),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -202,9 +198,9 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Box::leak(Box::new(Alternative {
+            Rc::new(Alternative {
                 patterns,
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -213,7 +209,7 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Box::leak(Box::new(Sequence { patterns })),
+            Rc::new(Sequence { patterns }),
             0,
             Position::new(Location::Void),
         )
@@ -222,9 +218,9 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn optional(classifier: Self) -> Self {
         Self::new(
-            Box::leak(Box::new(Optional {
+            Rc::new(Optional {
                 classifier: Box::new(classifier),
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -233,12 +229,12 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Box::leak(Box::new(Repetition {
+            Rc::new(Repetition {
                 classifier: Box::new(classifier),
                 minimum,
                 maximum,
                 persist: true,
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -247,12 +243,12 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Box::leak(Box::new(Repetition {
+            Rc::new(Repetition {
                 classifier: Box::new(classifier),
                 minimum,
                 maximum,
                 persist: false,
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -261,9 +257,9 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn wrapper(classifier: Self) -> Self {
         Self::new(
-            Box::leak(Box::new(Wrapper {
+            Rc::new(Wrapper {
                 classifier: Box::new(classifier),
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -272,25 +268,21 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn ranked(classifier: Self, precedence: i8) -> Self {
         Self::new(
-            Box::leak(Box::new(Ranked {
+            Rc::new(Ranked {
                 classifier: Box::new(classifier),
                 precedence,
-            })),
+            }),
             0,
             Position::new(Location::Void),
         )
     }
 
     #[inline]
-    pub fn deferred<F>(factory: F) -> Self
-    where
-        F: Fn() -> Self + 'a,
-    {
+    pub fn deferred(factory: fn() -> Self) -> Self {
         Self::new(
-            Box::leak(Box::new(Deferred {
-                function: Box::leak(Box::new(factory)),
-                cached: OnceLock::new(),
-            })),
+            Rc::new(Deferred {
+                factory,
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -307,12 +299,9 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn with_order(mut self, order: &'a dyn Order<'a, Input, Output, Failure>) -> Self {
-        let orders = vec![self.order, order];
-        let multiple: &'a dyn Order<'a, Input, Output, Failure> =
-            Box::leak(Box::new(Multiple { orders }));
-
-        self.order = multiple;
+    pub fn with_order(mut self, order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>) -> Self {
+        let orders = vec![self.order.clone(), order];
+        self.order = Rc::new(Multiple { orders });
         self
     }
 
@@ -324,13 +313,10 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn with_branch(
         self,
-        found: &'a dyn Order<'a, Input, Output, Failure>,
-        missing: &'a dyn Order<'a, Input, Output, Failure>,
+        found: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+        missing: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
     ) -> Self {
-        let branch: &'a dyn Order<'a, Input, Output, Failure> =
-            Box::leak(Box::new(Branch { found, missing }));
-
-        self.with_order(branch)
+        self.with_order(Rc::new(Branch { found, missing }))
     }
 
     #[inline]
@@ -338,9 +324,9 @@ Classifier<'a, Input, Output, Failure>
     where
         F: Fn(&mut Former<'_, 'a, Input, Output, Failure>, Classifier<'a, Input, Output, Failure>) -> Failure + 'a,
     {
-        self.with_order(Box::leak(Box::new(Fail {
-            emitter: Box::leak(Box::new(emitter)),
-        })))
+        self.with_order(Rc::new(Fail {
+            emitter: Rc::new(emitter),
+        }))
     }
 
     #[inline]
@@ -356,17 +342,14 @@ Classifier<'a, Input, Output, Failure>
         ) -> &'a (dyn Order<'a, Input, Output, Failure>
         + 'a) + 'a,
     {
-        self.with_order(Box::leak(Box::new(Inspect {
-            inspector: Box::leak(Box::new(inspector)),
-        })))
+        self.with_order(Rc::new(Inspect {
+            inspector: Rc::new(inspector) as Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Order<'a, Input, Output, Failure> + 'a) + 'a>,
+        }))
     }
 
     #[inline]
-    pub fn with_multiple(self, orders: Vec<&'a dyn Order<'a, Input, Output, Failure>>) -> Self {
-        let multiple: &'a dyn Order<'a, Input, Output, Failure> =
-            Box::leak(Box::new(Multiple { orders }));
-
-        self.with_order(multiple)
+    pub fn with_multiple(self, orders: Vec<Rc<dyn Order<'a, Input, Output, Failure> + 'a>>) -> Self {
+        self.with_order(Rc::new(Multiple { orders }))
     }
 
     #[inline]
@@ -408,7 +391,7 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn with_fallback(self, order: &'a dyn Order<'a, Input, Output, Failure>) -> Self {
+    pub fn with_fallback(self, order: Rc<dyn Order<'a, Input, Output, Failure> + 'a>) -> Self {
         self.with_branch(Self::perform(|| {}), order)
     }
 
@@ -423,7 +406,7 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn transform<T>(transformer: T) -> &'a dyn Order<'a, Input, Output, Failure>
+    pub fn transform<T>(transformer: T) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a>
     where
         T: Fn(
             &mut Former<'_, 'a, Input, Output, Failure>,
@@ -431,33 +414,33 @@ Classifier<'a, Input, Output, Failure>
         ) -> Result<(), Failure>
         + 'a,
     {
-        Box::leak(Box::new(Transform {
-            transformer: Box::leak(Box::new(transformer)),
-        }))
+        Rc::new(Transform {
+            transformer: Rc::new(transformer),
+        })
     }
 
     #[inline]
-    pub fn fail<T>(emitter: T) -> &'a dyn Order<'a, Input, Output, Failure>
+    pub fn fail<T>(emitter: T) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a>
     where
         T: Fn(&mut Former<'_, 'a, Input, Output, Failure>, Classifier<'a, Input, Output, Failure>) -> Failure + 'a,
     {
-        Box::leak(Box::new(Fail {
-            emitter: Box::leak(Box::new(emitter)),
-        }))
+        Rc::new(Fail {
+            emitter: Rc::new(emitter),
+        })
     }
 
     #[inline]
-    pub fn panic<T>(emitter: T) -> &'a dyn Order<'a, Input, Output, Failure>
+    pub fn panic<T>(emitter: T) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a>
     where
         T: Fn(&mut Former<'_, 'a, Input, Output, Failure>, Classifier<'a, Input, Output, Failure>) -> Failure + 'a,
     {
-        Box::leak(Box::new(Panic {
-            emitter: Box::leak(Box::new(emitter)),
-        }))
+        Rc::new(Panic {
+            emitter: Rc::new(emitter),
+        })
     }
 
     #[inline]
-    pub fn ignore() -> &'a dyn Order<'a, Input, Output, Failure> {
+    pub fn ignore() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
         static_ignore()
     }
 
@@ -466,51 +449,51 @@ Classifier<'a, Input, Output, Failure>
         I: Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Order<'a, Input, Output, Failure> + 'a) + 'a,
     {
         let mut next = self.clone();
-        next.order = Box::leak(Box::new(Inspect {
-            inspector: Box::leak(Box::new(inspector)),
-        }));
+        next.order = Rc::new(Inspect {
+            inspector: Rc::new(inspector) as Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Order<'a, Input, Output, Failure> + 'a) + 'a>,
+        });
         next
     }
 
     #[inline]
     pub fn multiple(
-        orders: Vec<&'a dyn Order<'a, Input, Output, Failure>>,
-    ) -> &'a dyn Order<'a, Input, Output, Failure> {
-        Box::leak(Box::new(Multiple { orders }))
+        orders: Vec<Rc<dyn Order<'a, Input, Output, Failure> + 'a>>,
+    ) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+        Rc::new(Multiple { orders })
     }
 
     #[inline]
-    pub fn pardon() -> &'a dyn Order<'a, Input, Output, Failure> {
+    pub fn pardon() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
         static_pardon()
     }
 
     #[inline]
-    pub fn perform<T>(executor: T) -> &'a dyn Order<'a, Input, Output, Failure>
+    pub fn perform<T>(executor: T) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a>
     where
         T: Fn() + 'a,
     {
-        Box::leak(Box::new(Perform {
-            performer: Box::leak(Box::new(executor)),
-        }))
+        Rc::new(Perform {
+            performer: Rc::new(executor) as Rc<dyn Fn() + 'a>,
+        })
     }
 
     #[inline]
-    pub fn skip() -> &'a dyn Order<'a, Input, Output, Failure> {
+    pub fn skip() -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
         static_skip()
     }
 
     #[inline]
     pub fn branch(
-        found: &'a dyn Order<'a, Input, Output, Failure>,
-        missing: &'a dyn Order<'a, Input, Output, Failure>,
-    ) -> &'a dyn Order<'a, Input, Output, Failure> {
-        Box::leak(Box::new(Branch { found, missing }))
+        found: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+        missing: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+    ) -> Rc<dyn Order<'a, Input, Output, Failure> + 'a> {
+        Rc::new(Branch { found, missing })
     }
 }
 
 #[derive(Clone)]
 pub struct Literal<'a, Input> {
-    pub value: &'a dyn PartialEq<Input>,
+    pub value: Rc<dyn PartialEq<Input> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -566,7 +549,7 @@ Order<'a, Input, Output, Failure> for Negate<'a, Input, Output, Failure>
         let class_used = classifier.consumed.len();
         let class_stack = classifier.stack.len();
 
-        let mut child = classifier.create_child(self.classifier.order);
+        let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
         let record = child.record;
@@ -592,7 +575,7 @@ Order<'a, Input, Output, Failure> for Negate<'a, Input, Output, Failure>
 
 #[derive(Clone)]
 pub struct Predicate<'a, Input: Formable<'a>> {
-    pub function: &'a dyn Fn(&Input) -> bool,
+    pub function: Rc<dyn Fn(&Input) -> bool + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -664,8 +647,8 @@ where
         let mut form_forms = former.forms.len();
 
         for pattern in &self.patterns {
-            let mut child = Classifier::create(
-                pattern.order,
+        let mut child = Classifier::create(
+                pattern.order.clone(),
                 classifier.marker,
                 classifier.position,
                 consumed,
@@ -747,8 +730,7 @@ where
 }
 
 pub struct Deferred<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub function: &'a dyn Fn() -> Classifier<'a, Input, Output, Failure>,
-    pub cached: OnceLock<Classifier<'a, Input, Output, Failure>>,
+    pub factory: fn() -> Classifier<'a, Input, Output, Failure>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> Clone
@@ -756,8 +738,7 @@ for Deferred<'a, Input, Output, Failure>
 {
     fn clone(&self) -> Self {
         Self {
-            function: self.function,
-            cached: OnceLock::new(),
+            factory: self.factory,
         }
     }
 }
@@ -771,8 +752,16 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let cached = self.cached.get_or_init(|| (self.function)());
-        let cached_order = cached.order;
+        let key = self.factory as usize;
+        let cached_order = match former.cache.iter().find(|(k, _)| *k == key) {
+            Some((_, order)) => order.clone(),
+            None => {
+                let built = (self.factory)();
+                let order = built.order;
+                former.cache.push((key, order.clone()));
+                order
+            }
+        };
 
         let mut child = Classifier::create(
             cached_order,
@@ -815,7 +804,7 @@ Order<'a, Input, Output, Failure> for Optional<'a, Input, Output, Failure>
         let class_used = classifier.consumed.len();
         let class_stack = classifier.stack.len();
 
-        let mut child = classifier.create_child(self.classifier.order);
+        let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
         let effected = child.is_effected();
@@ -852,7 +841,7 @@ Order<'a, Input, Output, Failure> for Wrapper<'a, Input, Output, Failure>
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let mut child = classifier.create_child(self.classifier.order);
+        let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
         classifier.marker = child.marker;
@@ -879,7 +868,7 @@ Order<'a, Input, Output, Failure> for Ranked<'a, Input, Output, Failure>
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        let mut child = classifier.create_child(self.classifier.order);
+        let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
         let record = child.record;
@@ -936,7 +925,7 @@ Order<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE>
 
         for pattern in &self.patterns {
             let mut child = Classifier::create(
-                pattern.order,
+                pattern.order.clone(),
                 mark,
                 pos,
                 consumed,
@@ -1039,7 +1028,7 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
             let step_stack = stack.len();
 
             let mut child = Classifier::create(
-                self.classifier.order,
+                self.classifier.order.clone(),
                 mark,
                 pos,
                 consumed,

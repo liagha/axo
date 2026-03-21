@@ -5,6 +5,8 @@ use super::{
     helper::Formable,
 };
 
+use crate::data::memory::Rc;
+
 pub trait Order<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     fn order(
         &self,
@@ -29,8 +31,8 @@ Order<'a, Input, Output, Failure> for Align
 }
 
 pub struct Branch<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub found: &'a dyn Order<'a, Input, Output, Failure>,
-    pub missing: &'a dyn Order<'a, Input, Output, Failure>,
+    pub found: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+    pub missing: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -43,9 +45,9 @@ Order<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         let chosen = if classifier.is_aligned() {
-            self.found
+            &self.found
         } else {
-            self.missing
+            &self.missing
         };
 
         chosen.order(former, classifier);
@@ -53,10 +55,10 @@ Order<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
 }
 
 pub struct Fail<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub emitter: &'a dyn Fn(
+    pub emitter: Rc<dyn Fn(
         &mut Former<'_, 'a, Input, Output, Failure>,
         Classifier<'a, Input, Output, Failure>,
-    ) -> Failure,
+    ) -> Failure + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -99,9 +101,9 @@ Order<'a, Input, Output, Failure> for Ignore
 }
 
 pub struct Inspect<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub inspector: &'a dyn Fn(
+    pub inspector: Rc<dyn Fn(
         Classifier<'a, Input, Output, Failure>,
-    ) -> &'a dyn Order<'a, Input, Output, Failure>,
+    ) -> &'a (dyn Order<'a, Input, Output, Failure> + 'a) + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -119,7 +121,7 @@ Order<'a, Input, Output, Failure> for Inspect<'a, Input, Output, Failure>
 }
 
 pub struct Multiple<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub orders: Vec<&'a dyn Order<'a, Input, Output, Failure>>,
+    pub orders: Vec<Rc<dyn Order<'a, Input, Output, Failure> + 'a>>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -138,8 +140,8 @@ Order<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
 }
 
 pub struct Pair<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub first: &'a dyn Order<'a, Input, Output, Failure>,
-    pub second: &'a dyn Order<'a, Input, Output, Failure>,
+    pub first: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+    pub second: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -157,10 +159,10 @@ Order<'a, Input, Output, Failure> for Pair<'a, Input, Output, Failure>
 }
 
 pub struct Panic<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub emitter: &'a dyn Fn(
+    pub emitter: Rc<dyn Fn(
         &mut Former<'_, 'a, Input, Output, Failure>,
         Classifier<'a, Input, Output, Failure>,
-    ) -> Failure,
+    ) -> Failure + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -200,7 +202,7 @@ Order<'a, Input, Output, Failure> for Pardon
 }
 
 pub struct Perform<'a> {
-    pub performer: &'a dyn Fn(),
+    pub performer: Rc<dyn Fn() + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -237,10 +239,10 @@ Order<'a, Input, Output, Failure> for Skip
 }
 
 pub struct Transform<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub transformer: &'a dyn Fn(
+    pub transformer: Rc<dyn Fn(
         &mut Former<'_, 'a, Input, Output, Failure>,
         &mut Classifier<'a, Input, Output, Failure>,
-    ) -> Result<(), Failure>,
+    ) -> Result<(), Failure> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>

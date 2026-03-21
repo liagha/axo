@@ -58,7 +58,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     fn clone(&self) -> Self {
         Self {
             identity: self.identity,
-            order: self.order,
+            order: self.order.clone(),
             marker: self.marker.clone(),
             position: self.position.clone(),
             consumed: self.consumed.clone(),

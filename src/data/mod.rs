@@ -69,6 +69,7 @@ pub mod memory {
         marker::PhantomData,
         mem::{discriminant, replace, take, swap},
     };
+    pub use std::rc::Rc;
 }
 
 pub mod slice {
