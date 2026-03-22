@@ -22,7 +22,7 @@ pub struct Element<'element> {
 pub enum ElementKind<'element> {
     Literal(Token<'element>),
 
-    Delimited(Delimited<Token<'element>, Element<'element>>),
+    Delimited(Box<Delimited<Token<'element>, Element<'element>>>),
 
     Unary(Unary<Token<'element>, Box<Element<'element>>>),
 
@@ -34,13 +34,11 @@ pub enum ElementKind<'element> {
 
     Construct(Aggregate<Box<Element<'element>>, Element<'element>>),
 
-    Symbolize(Symbol<'element>),
+    Symbolize(Box<Symbol<'element>>),
 }
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        println!("{:?}", std::mem::size_of::<Element>());
-
         Element { identity: next_identity(), kind, span, reference: None, typing: Type::from(TypeKind::Unknown) }
     }
 }
@@ -53,7 +51,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     pub fn delimited(delimited: Delimited<Token<'element>, Element<'element>>) -> Self {
-        ElementKind::Delimited(delimited)
+        ElementKind::Delimited(Box::new(delimited))
     }
 
     #[inline]
@@ -85,7 +83,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     pub fn symbolize(symbol: Symbol<'element>) -> Self {
-        ElementKind::Symbolize(symbol)
+        ElementKind::Symbolize(Box::from(symbol))
     }
 
     #[inline(always)]
@@ -141,7 +139,7 @@ impl<'element> ElementKind<'element> {
     #[track_caller]
     pub fn unwrap_delimited(self) -> Delimited<Token<'element>, Element<'element>> {
         match self {
-            ElementKind::Delimited(delimited) => delimited,
+            ElementKind::Delimited(delimited) => *delimited,
             _ => panic!("called `unwrap_delimited` on non-Delimited variant."),
         }
     }
@@ -197,7 +195,7 @@ impl<'element> ElementKind<'element> {
     #[track_caller]
     pub fn unwrap_symbolize(self) -> Symbol<'element> {
         match self {
-            ElementKind::Symbolize(symbol) => symbol,
+            ElementKind::Symbolize(symbol) => *symbol,
             _ => panic!("called `unwrap_symbolize` on non-Symbolize variant."),
         }
     }

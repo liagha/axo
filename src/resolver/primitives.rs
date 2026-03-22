@@ -80,7 +80,7 @@ impl<'resolver> Resolver<'resolver> {
         );
 
         let body = Element::new(
-            ElementKind::Delimited(Delimited::new(
+            ElementKind::Delimited(Box::new(Delimited::new(
                 Token::new(
                     TokenKind::Punctuation(PunctuationKind::LeftBrace),
                     Span::void(),
@@ -91,7 +91,7 @@ impl<'resolver> Resolver<'resolver> {
                     TokenKind::Punctuation(PunctuationKind::RightBrace),
                     Span::void(),
                 ),
-            )),
+            ))),
             Span::void(),
         );
 
@@ -148,7 +148,7 @@ impl<'resolver> Resolver<'resolver> {
                 Span::void(),
             ),
             "Unit" => Element::new(
-                ElementKind::Delimited(Delimited::new(
+                ElementKind::Delimited(Box::new(Delimited::new(
                     Token::new(
                         TokenKind::Punctuation(PunctuationKind::LeftBrace),
                         Span::void(),
@@ -159,11 +159,11 @@ impl<'resolver> Resolver<'resolver> {
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                         Span::void(),
                     ),
-                )),
+                ))),
                 Span::void(),
             ),
             _ => Element::new(
-                ElementKind::Delimited(Delimited::new(
+                ElementKind::Delimited(Box::new(Delimited::new(
                     Token::new(
                         TokenKind::Punctuation(PunctuationKind::LeftBrace),
                         Span::void(),
@@ -174,7 +174,7 @@ impl<'resolver> Resolver<'resolver> {
                         TokenKind::Punctuation(PunctuationKind::RightBrace),
                         Span::void(),
                     ),
-                )),
+                ))),
                 Span::void(),
             ),
         };

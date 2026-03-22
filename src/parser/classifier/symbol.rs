@@ -136,11 +136,11 @@ impl<'parser> Parser<'parser> {
                 }
 
                 *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Symbol::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
                         SymbolKind::Binding(Binding::new(Box::new(body), value, annotation, kind)),
                         span,
                         Visibility::Private,
-                    )),
+                    ))),
                     span,
                 ));
 
@@ -191,7 +191,7 @@ impl<'parser> Parser<'parser> {
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(symbol),
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
                         ElementKind::Literal(Token {
                                                  kind: TokenKind::Identifier(identifier),
                                                  ..
@@ -217,11 +217,11 @@ impl<'parser> Parser<'parser> {
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Symbol::new(
+                    ElementKind::Symbolize(Box::new(Symbol::new(
                         SymbolKind::Structure(Aggregate::new(Box::new(name), members)),
                         span,
                         visibility,
-                    )),
+                    ))),
                     span,
                 ));
 
@@ -272,7 +272,7 @@ impl<'parser> Parser<'parser> {
                 let members: Vec<_> = Self::get_body(body.clone())
                     .into_iter()
                     .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(symbol),
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
                         ElementKind::Literal(Token {
                                                  kind: TokenKind::Identifier(identifier),
                                                  ..
@@ -298,11 +298,11 @@ impl<'parser> Parser<'parser> {
                 let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
 
                 *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Symbol::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
                         SymbolKind::Union(Aggregate::new(Box::new(name), members)),
                         span,
                         visibility,
-                    )),
+                    ))),
                     span,
                 ));
 
@@ -403,7 +403,7 @@ impl<'parser> Parser<'parser> {
                     let members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            ElementKind::Symbolize(symbol) => Some(*symbol),
                             ElementKind::Literal(Token {
                                                      kind: TokenKind::Identifier(identifier),
                                                      ..
@@ -429,7 +429,7 @@ impl<'parser> Parser<'parser> {
                     };
 
                     *form = Form::output(Element::new(
-                        ElementKind::Symbolize(Symbol::new(
+                        ElementKind::Symbolize(Box::from(Symbol::new(
                             SymbolKind::Function(Function::new(
                                 Box::new(name),
                                 members,
@@ -440,7 +440,7 @@ impl<'parser> Parser<'parser> {
                             )),
                             span,
                             visibility,
-                        )),
+                        ))),
                         span,
                     ));
                     Ok(())
@@ -496,7 +496,7 @@ impl<'parser> Parser<'parser> {
                     let members: Vec<_> = Self::get_body(invoke.clone())
                         .into_iter()
                         .filter_map(|element| match element.kind {
-                            ElementKind::Symbolize(symbol) => Some(symbol),
+                            ElementKind::Symbolize(symbol) => Some(*symbol),
                             ElementKind::Literal(Token {
                                                      kind: TokenKind::Identifier(identifier),
                                                      ..
@@ -522,7 +522,7 @@ impl<'parser> Parser<'parser> {
                     };
 
                     *form = Form::output(Element::new(
-                        ElementKind::Symbolize(Symbol::new(
+                        ElementKind::Symbolize(Box::from(Symbol::new(
                             SymbolKind::Function(Function::new(
                                 Box::new(name),
                                 members,
@@ -533,7 +533,7 @@ impl<'parser> Parser<'parser> {
                             )),
                             span,
                             visibility,
-                        )),
+                        ))),
                         span,
                     ));
                     Ok(())
@@ -578,7 +578,7 @@ impl<'parser> Parser<'parser> {
                 let symbol =
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
 
-                *form = Form::output(Element::new(ElementKind::Symbolize(symbol), span));
+                *form = Form::output(Element::new(ElementKind::Symbolize(Box::from(symbol)), span));
 
                 Ok(())
             })

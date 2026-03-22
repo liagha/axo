@@ -76,16 +76,18 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 symbol.declare(resolver);
                 self.typing = symbol.typing.clone();
             }
-            ElementKind::Delimited(
-                Delimited {
-                    start: Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. },
-                    members,
-                    separator: None | Some(Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), .. }),
-                    end: Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. },
-                }
-            ) => {
-                for member in members {
-                    member.declare(resolver);
+            ElementKind::Delimited(delimited) => {
+                if let
+                    Delimited {
+                        start: Token { kind: TokenKind::Punctuation(PunctuationKind::LeftBrace), .. },
+                        members,
+                        separator: None | Some(Token { kind: TokenKind::Punctuation(PunctuationKind::Semicolon), .. }),
+                        end: Token { kind: TokenKind::Punctuation(PunctuationKind::RightBrace), .. },
+                    } = delimited.as_mut() {
+
+                    for member in members {
+                        member.declare(resolver);
+                    }
                 }
             }
             _ => {}
