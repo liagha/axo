@@ -55,7 +55,7 @@ impl<'parser> Parser<'parser> {
                 };
 
                 let mut body = sequence[1].unwrap_output().clone();
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 let mut value = None;
                 let mut annotation = None;
@@ -108,7 +108,7 @@ impl<'parser> Parser<'parser> {
                             if let ElementKind::Binary(assigned) = &binary.left.kind {
                                 if matches!(assigned.operator.kind, TokenKind::Operator(OperatorKind::Equal)) {
                                     let merged_span =
-                                        Span::merge(&assigned.right.borrow_span(), &binary.right.borrow_span());
+                                        Span::merge(&assigned.right.span(), &binary.right.span());
                                     let merged_value = Element::new(
                                         ElementKind::Binary(Binary::new(
                                             assigned.right.clone(),
@@ -214,7 +214,7 @@ impl<'parser> Parser<'parser> {
                     })
                     .collect();
 
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::new(Symbol::new(
@@ -295,7 +295,7 @@ impl<'parser> Parser<'parser> {
                     })
                     .collect();
 
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let span = Span::merge(&keyword.span(), &body.span());
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::from(Symbol::new(
@@ -423,9 +423,9 @@ impl<'parser> Parser<'parser> {
                         .collect();
 
                     let span = if let Some(ref b) = body {
-                        Span::merge(&keyword.borrow_span(), &b.borrow_span())
+                        Span::merge(&keyword.span(), &b.span())
                     } else {
-                        Span::merge(&keyword.borrow_span(), &return_type.borrow_span())
+                        Span::merge(&keyword.span(), &return_type.span())
                     };
 
                     *form = Form::output(Element::new(
@@ -516,9 +516,9 @@ impl<'parser> Parser<'parser> {
                         .collect();
 
                     let span = if let Some(ref b) = body {
-                        Span::merge(&keyword.borrow_span(), &b.borrow_span())
+                        Span::merge(&keyword.span(), &b.span())
                     } else {
-                        Span::merge(&keyword.borrow_span(), &invoke.borrow_span())
+                        Span::merge(&keyword.span(), &invoke.span())
                     };
 
                     *form = Form::output(Element::new(
@@ -574,7 +574,7 @@ impl<'parser> Parser<'parser> {
                 let name = sequence[1].unwrap_output().clone();
                 let body = sequence[2].unwrap_output().clone();
 
-                let span = Span::merge(&keyword.borrow_span(), &body.borrow_span());
+                let span = Span::merge(&keyword.span(), &body.span());
                 let symbol =
                     Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
 

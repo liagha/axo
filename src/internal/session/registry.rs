@@ -10,12 +10,9 @@ use {
 
 impl<'registry> Resolver<'registry> {
     fn get_configuration(&mut self, key: Str<'registry>) -> Option<Token<'registry>> {
-        let config = Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("configuration")), Span::void())),
-            Span::void(),
-        );
-
-        let configuration = self.active().exact(&config, self)?;
+        let configuration = self.registry.values().find(|symbol| {
+            symbol.target() == Some(Str::from("configuration"))
+        })?.clone();
 
         let identifier = Element::new(
             ElementKind::Literal(Token::new(TokenKind::Identifier(key), Span::void())),
@@ -63,7 +60,7 @@ impl<'registry> Resolver<'registry> {
                      kind: TokenKind::Integer(value),
                      ..
                  }) => value as u8,
-            _ => 2,
+            _ => 0,
         }
     }
 

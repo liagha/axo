@@ -419,7 +419,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                     let expect = Type::from(TypeKind::Integer { size: 64, signed: true });
 
-                    resolver.unify(index.members.borrow_span(), &member, &expect);
+                    resolver.unify(index.members.span(), &member, &expect);
 
                     match target.kind {
                         TypeKind::Pointer { target: base } => {
@@ -440,7 +440,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             if value < members.len() {
                                 members[value].clone()
                             } else {
-                                resolver.errors.push(Error::new(ErrorKind::IndexOutOfBounds(value, members.len()), index.members.borrow_span()));
+                                resolver.errors.push(Error::new(ErrorKind::IndexOutOfBounds(value, members.len()), index.members.span()));
                                 resolver.fresh()
                             }
                         }
@@ -448,7 +448,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             let element = resolver.fresh();
                             let pointer = Type::new(element.identity, TypeKind::Pointer { target: Box::new(element.clone()) });
 
-                            resolver.unify(index.members.borrow_span(), &target, &pointer);
+                            resolver.unify(index.members.span(), &target, &pointer);
 
                             element
                         }

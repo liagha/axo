@@ -3,6 +3,6 @@ func main() {
     print.print_string("Hey ")
     print.print_string(name)
     print.print_string("!\n")
-}
 
-var
+    "
+}

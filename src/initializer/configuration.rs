@@ -99,17 +99,16 @@ impl<'initializer> Initializer<'initializer> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let forms = form.as_forms();
                 let identifier = forms[0].unwrap_input().clone();
-                let path = Self::path_string(forms[1].collect_inputs());
-                let span = identifier.clone().span();
+                let path = forms[1].collect_inputs();
 
                 let target = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(name), span)),
-                    span,
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(name), identifier.span().clone())),
+                    identifier.span(),
                 );
 
                 let value = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(path)), span)),
-                    span,
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(Self::path_string(path.clone()))), path.clone().span())),
+                    path.span(),
                 );
 
                 let symbol = Symbol::new(
@@ -119,7 +118,7 @@ impl<'initializer> Initializer<'initializer> {
                         None,
                         BindingKind::Meta,
                     )),
-                    span,
+                    identifier.span().merge(&path.span()),
                     Visibility::Public,
                 );
 

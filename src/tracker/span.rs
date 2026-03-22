@@ -94,10 +94,10 @@ impl<'span> Span<'span> {
     pub fn from_slice<T: Spanned<'span>>(items: &[T]) -> Self {
         match items.len() {
             0 => Span::void(),
-            1 => items[0].borrow_span(),
+            1 => items[0].span(),
             _ => {
-                let start = items.first().unwrap().borrow_span();
-                let end = items.last().unwrap().borrow_span();
+                let start = items.first().unwrap().span();
+                let end = items.last().unwrap().span();
                 start.merge(&end)
             }
         }

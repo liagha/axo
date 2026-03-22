@@ -31,7 +31,7 @@ impl<'scanner> Scanner<'scanner> {
                 move |former, classifier| {
                     let form = former.forms.get_mut(classifier.form).unwrap();
                     let inputs = form.collect_inputs();
-                    let span = inputs.borrow_span().clone();
+                    let span = inputs.span().clone();
                     let content = inputs.into_iter().collect::<Str>();
 
                     *form = Form::output(Token::new(TokenKind::String(content), span));
@@ -59,7 +59,7 @@ impl<'scanner> Scanner<'scanner> {
                 move |former, classifier| {
                     let form = former.forms.get_mut(classifier.form).unwrap();
                     let inputs = form.collect_inputs();
-                    let span = inputs.borrow_span().clone();
+                    let span = inputs.span().clone();
                     let content = inputs.into_iter().collect::<Str>();
 
                     *form = Form::output(Token::new(TokenKind::String(content), span));
@@ -109,7 +109,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
                 let token = match content.unwrap_str() {
@@ -136,7 +136,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
                 *form = Form::output(Token::new(
@@ -156,7 +156,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
                 *form = Form::output(Token::new(
@@ -180,7 +180,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
                 let kind = match content.len() {
@@ -229,7 +229,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
                 *form = Form::output(Token::new(

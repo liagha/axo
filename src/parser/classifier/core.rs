@@ -68,7 +68,7 @@ impl<'parser> Parser<'parser> {
                 let mut unary = outputs.swap_remove(0);
 
                 for prefix in prefixes {
-                    let span = Span::merge(&prefix.borrow_span(), &unary.borrow_span());
+                    let span = Span::merge(&prefix.span(), &unary.span());
                     unary = Element::new(
                         ElementKind::unary(Unary::new(prefix, Box::new(unary))),
                         span,
@@ -109,13 +109,13 @@ impl<'parser> Parser<'parser> {
 
                 for suffix in suffixes {
                     if let Some(token) = suffix.get_input() {
-                        let span = Span::merge(&unary.borrow_span(), &token.borrow_span());
+                        let span = Span::merge(&unary.span(), &token.span());
                         unary = Element::new(
                             ElementKind::Unary(Unary::new(token, Box::new(unary))),
                             span,
                         );
                     } else if let Some(element) = suffix.get_output() {
-                        let span = Span::merge(&unary.borrow_span(), &element.borrow_span());
+                        let span = Span::merge(&unary.span(), &element.span());
                         unary = Self::apply_suffix(unary, element, span);
                     }
                 }
@@ -253,8 +253,8 @@ impl<'parser> Parser<'parser> {
                 current = new_current;
             }
 
-            let start_pos = left.borrow_span().start;
-            let end_pos = right.borrow_span().end;
+            let start_pos = left.span().start;
+            let end_pos = right.span().end;
             let span = Span::new(start_pos, end_pos);
 
             left = Element::new(

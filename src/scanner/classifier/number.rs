@@ -37,7 +37,7 @@ impl<'scanner> Scanner<'scanner> {
             move |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
@@ -73,7 +73,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
@@ -109,7 +109,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
@@ -161,7 +161,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let number: Str = inputs.into_iter().collect();
 
                 if number.contains(".") || number.to_lowercase().contains('e') {

@@ -29,7 +29,7 @@ impl<'scanner> Scanner<'scanner> {
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
                 let escape = inputs[1];
 
                 let escaped = match escape.value {
@@ -75,7 +75,7 @@ impl<'scanner> Scanner<'scanner> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
                 let digits: Str = inputs.iter().skip(1).map(|c| c.value).collect();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
 
                 match parse_radix(digits, 8).map(|parsed| parsed as u32) {
                     Some(code_point) => {
@@ -123,7 +123,7 @@ impl<'scanner> Scanner<'scanner> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
                 let digits: Str = inputs.iter().skip(2).map(|c| c.value).collect();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
 
                 match parse_radix(digits, 16).map(|parsed| parsed as u32) {
                     Some(code_point) => {
@@ -178,7 +178,7 @@ impl<'scanner> Scanner<'scanner> {
                     .take(inputs.len() - 4)
                     .map(|c| c.value)
                     .collect();
-                let span = inputs.borrow_span().clone();
+                let span = inputs.span().clone();
 
                 if digits.is_empty() {
                     return Err(ScanError::new(

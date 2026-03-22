@@ -15,7 +15,7 @@ use {
         reporter::Error,
         resolver::{Resolvable, ResolveError, Resolver, Scope},
         scanner::{ScanError, Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Span, TrackError},
+        tracker::{self, Location, Peekable, Span, TrackError},
     },
     broccli::{xprintln, Color},
 };
@@ -25,7 +25,6 @@ use {
     crate::{
         generator::{Backend, GenerateError, Generator},
         internal::platform::{File, Write},
-        tracker,
     },
     inkwell::{
         context::{Context, ContextRef},
@@ -92,7 +91,6 @@ pub enum CompileError<'error> {
     #[cfg(feature = "generator")]
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
-    Invalid(Location<'error>),
 }
 
 pub struct Session<'session> {
@@ -173,13 +171,21 @@ impl<'session> Session<'session> {
             }
         }
 
-        initializer.initialize().iter().for_each(|target| {
+        initializer.initialize().iter().for_each(|(target, span)| {
             if !Self::traverse(target, &mut inputs) {
                 let string = target.to_string();
+
                 if let Some(kind) = InputKind::from_path(&string) {
                     inputs.insert(inputs.len(), (kind, target.clone()));
                 } else {
-                    errors.push(CompileError::Invalid(target.clone()));
+                    errors.push(
+                        CompileError::Track(
+                            TrackError::new(
+                                tracker::error::ErrorKind::UnSupportedInput(target.clone()),
+                                span.clone(),
+                            )
+                        )
+                    );
                 }
             }
         });
@@ -191,6 +197,10 @@ impl<'session> Session<'session> {
                 .map(|error| CompileError::Initialize(error.clone()))
                 .collect::<Vec<_>>(),
         );
+
+        for symbol in initializer.output.clone() {
+            resolver.insert(symbol);
+        }
 
         let configuration = Symbol::new(
             SymbolKind::Module(Module::new(Box::from(Element::new(
@@ -325,24 +335,28 @@ impl<'session> Session<'session> {
         'pipeline: {
             self.scan();
 
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
+
             self.parse();
+
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             self.populate();
-            if !self.errors.is_empty() {
-                break 'pipeline;
-            }
 
             self.plan();
 
             self.resolve();
+
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             self.analyze();
+
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
@@ -371,7 +385,6 @@ impl<'session> Session<'session> {
                 #[cfg(feature = "generator")]
                 CompileError::Generate(error) => self.report_error(error),
                 CompileError::Track(error) => self.report_error(error),
-                CompileError::Invalid(_) => {}
             }
         }
     }

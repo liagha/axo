@@ -4,7 +4,7 @@ use crate::{
     initializer::InitializeError,
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
     scanner::{PunctuationKind, Scanner, Token, TokenKind},
-    tracker::{Location, Peekable, Position},
+    tracker::{Location, Peekable, Position, Span},
 };
 
 pub struct Initializer<'initializer> {
@@ -123,7 +123,7 @@ impl<'initializer> Initializer<'initializer> {
         Classifier::repetition(Self::configuration(), 0, None)
     }
 
-    pub fn initialize(&mut self) -> Vec<Location<'initializer>> {
+    pub fn initialize(&mut self) -> Vec<(Location<'initializer>, Span<'initializer>)> {
         let location = Location::Flag;
         let mut scanner = Scanner::new(location);
 
@@ -165,7 +165,7 @@ impl<'initializer> Initializer<'initializer> {
                 let name = target_name(symbol)?;
                 if name == Str::from("Input") || name.starts_with("Input(") {
                     let value = value_name(symbol)?;
-                    Some(Location::Entry(value))
+                    Some((Location::Entry(value), symbol.span))
                 } else {
                     None
                 }
