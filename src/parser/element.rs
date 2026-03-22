@@ -39,6 +39,8 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
+        println!("{:?}", std::mem::size_of::<Element>());
+
         Element { identity: next_identity(), kind, span, reference: None, typing: Type::from(TypeKind::Unknown) }
     }
 }

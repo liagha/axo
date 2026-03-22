@@ -331,7 +331,7 @@ impl<'session> Session<'session> {
                 break 'pipeline;
             }
 
-            self.emit();
+            //self.emit();
         }
 
         let duration = Duration::from_nanos(self.timer.stop().unwrap());
