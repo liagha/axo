@@ -1,7 +1,7 @@
 use {
     crate::{
         internal::session::Resolver,
-        data::{Identity, Str},
+        data::Str,
         parser::{Element, ElementKind, SymbolKind},
         scanner::{Token, TokenKind},
         tracker::Span,
@@ -33,23 +33,6 @@ impl<'registry> Resolver<'registry> {
         None
     }
 
-    fn path(&mut self, key: &'registry str, index: usize) -> Option<Str<'registry>> {
-        let numbered = Str::from(format!("{}({})", key, index));
-        let plain = Str::from(key);
-
-        for candidate in [numbered, plain] {
-            if let Some(Token {
-                            kind: TokenKind::Identifier(value),
-                            ..
-                        }) = self.get_directive(candidate)
-            {
-                return Some(value);
-            }
-        }
-
-        None
-    }
-
     pub fn verbosity(&mut self) -> u8 {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
@@ -58,22 +41,5 @@ impl<'registry> Resolver<'registry> {
                  }) => value as u8,
             _ => 0,
         }
-    }
-
-    pub fn input(&mut self) -> Str<'registry> {
-        for candidate in [Str::from("Input"), Str::from("Input(0)")] {
-            if let Some(Token {
-                            kind: TokenKind::Identifier(path),
-                            ..
-                        }) = self.get_directive(candidate)
-            {
-                return path;
-            }
-        }
-        Str::default()
-    }
-
-    pub fn schema(&mut self, identity: Identity) -> Option<Str<'registry>> {
-        Self::path(self, "Output", identity)
     }
 }

@@ -756,8 +756,7 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem;
 
-            let custom = Resolver::schema(&mut self.resolver, key);
-            let schema = Self::schema(&base, *location, custom);
+            let schema = Self::schema(&base, *location);
             self.generator.generate(analysis);
 
             match schema.as_path() {
@@ -942,12 +941,8 @@ impl<'session> Session<'session> {
     }
 
     #[cfg(feature = "generator")]
-    fn schema(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(path) = custom {
-            PathBuf::from(path.to_string())
-        } else {
-            base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll")
-        };
+    fn schema(base: &PathBuf, location: Location<'session>) -> Location<'session> {
+        let target = base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll");
 
         Location::Entry(Str::from(target))
     }
