@@ -99,7 +99,7 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn configuration() -> Classifier<
+    pub fn directive() -> Classifier<
         'initializer,
         Token<'initializer>,
         Symbol<'initializer>,
@@ -120,7 +120,7 @@ impl<'initializer> Initializer<'initializer> {
         Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Classifier::repetition(Self::configuration(), 0, None)
+        Classifier::repetition(Self::directive(), 0, None)
     }
 
     pub fn initialize(&mut self) -> Vec<(Location<'initializer>, Span<'initializer>)> {
@@ -142,24 +142,24 @@ impl<'initializer> Initializer<'initializer> {
         self.reset();
 
         let mut former = Former::new(self);
-        let mut configurations = Vec::new();
+        let mut directives = Vec::new();
         let classifier = Self::classifier();
         let forms = former.form(classifier).flatten();
 
         for form in forms {
             match form {
-                Form::Output(output) => configurations.push(output),
+                Form::Output(output) => directives.push(output),
                 Form::Failure(failure) => self.errors.push(failure),
                 Form::Multiple(multiple) => {
                     for form in multiple {
-                        configurations.push(form.unwrap_output().clone());
+                        directives.push(form.unwrap_output().clone());
                     }
                 }
                 _ => {}
             }
         }
 
-        let targets = configurations
+        let targets = directives
             .iter()
             .filter_map(|symbol| {
                 let name = target_name(symbol)?;
@@ -172,7 +172,7 @@ impl<'initializer> Initializer<'initializer> {
             })
             .collect::<Vec<_>>();
 
-        let inputs = configurations
+        let inputs = directives
             .iter()
             .enumerate()
             .filter_map(|(index, symbol)| {
@@ -186,13 +186,13 @@ impl<'initializer> Initializer<'initializer> {
 
         if inputs.len() > 1 {
             for (count, index) in inputs.into_iter().enumerate() {
-                if let Some(symbol) = configurations.get_mut(index) {
+                if let Some(symbol) = directives.get_mut(index) {
                     rename_target(symbol, format!("Input({})", count));
                 }
             }
         }
 
-        let indexes = configurations
+        let indexes = directives
             .iter()
             .enumerate()
             .filter_map(|(index, symbol)| {
@@ -206,13 +206,13 @@ impl<'initializer> Initializer<'initializer> {
 
         if indexes.len() > 1 {
             for (count, index) in indexes.into_iter().enumerate() {
-                if let Some(symbol) = configurations.get_mut(index) {
+                if let Some(symbol) = directives.get_mut(index) {
                     rename_target(symbol, format!("{}({})", "Output", count));
                 }
             }
         }
 
-        self.output = configurations;
+        self.output = directives;
 
         targets
     }

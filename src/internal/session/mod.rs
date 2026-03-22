@@ -202,10 +202,10 @@ impl<'session> Session<'session> {
             resolver.insert(symbol);
         }
 
-        let configuration = Symbol::new(
+        let directive = Symbol::new(
             SymbolKind::Module(Module::new(Box::from(Element::new(
                 ElementKind::Literal(Token::new(
-                    TokenKind::Identifier(Str::from("configuration")),
+                    TokenKind::Identifier(Str::from("directive")),
                     Span::void(),
                 )),
                 Span::void(),
@@ -215,7 +215,7 @@ impl<'session> Session<'session> {
         )
             .with_members(initializer.output.clone());
 
-        resolver.insert(configuration);
+        resolver.insert(directive);
 
         let duration = Duration::from_nanos(timer.lap().unwrap());
         let verbose = Resolver::verbosity(&mut resolver);

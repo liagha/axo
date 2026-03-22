@@ -1,6 +1,6 @@
 mod error;
 mod initializer;
-mod configuration;
+mod directive;
 mod traits;
 
 pub use {initializer::Initializer};

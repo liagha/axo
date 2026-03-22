@@ -62,7 +62,7 @@ impl<'initializer> Initializer<'initializer> {
         ])
     }
 
-    fn path_configuration(
+    fn path_directive(
         name: Str<'initializer>,
         matcher: fn(&Str<'initializer>) -> bool,
     ) -> Classifier<
@@ -193,7 +193,7 @@ impl<'initializer> Initializer<'initializer> {
         Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Self::path_configuration(Str::from("Input"), |identifier| {
+        Self::path_directive(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
         })
     }
@@ -247,7 +247,7 @@ impl<'initializer> Initializer<'initializer> {
         Symbol<'initializer>,
         InitializeError<'initializer>,
     > {
-        Self::path_configuration(Str::from("Output"), |identifier| {
+        Self::path_directive(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"
         })
     }
