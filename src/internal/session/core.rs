@@ -1,7 +1,6 @@
-// src/internal/session/core.rs
 use {
     crate::{
-        analyzer::{AnalyzeError, Analyzer},
+        analyzer::{AnalyzeError},
         data::*,
         format::{Display, Show, Verbosity},
         initializer::{InitializeError, Initializer},
@@ -10,11 +9,12 @@ use {
             platform::PathBuf,
             timer::{DefaultTimer, Duration},
         },
-        parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
+        parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
         reporter::Error,
         resolver::{ResolveError, Resolver},
-        scanner::{ScanError, Scanner, Token, TokenKind},
+        scanner::{ScanError, Token, TokenKind},
         tracker::{self, Location, Span, TrackError},
+        analyzer::Analysis,
     },
     broccli::{xprintln, Color},
 };
@@ -90,9 +90,9 @@ pub struct Record<'session> {
     pub kind: InputKind,
     pub location: Location<'session>,
     pub module: Option<Identity>,
-    pub scanner: Option<Scanner<'session>>,
-    pub parser: Option<Parser<'session>>,
-    pub analyzer: Option<Analyzer<'session>>,
+    pub tokens: Option<Vec<Token<'session>>>,
+    pub elements: Option<Vec<Element<'session>>>,
+    pub analyses: Option<Vec<Analysis<'session>>>,
     pub output: Option<Location<'session>>,
     pub object: Option<Location<'session>>,
 }
@@ -103,9 +103,9 @@ impl<'session> Record<'session> {
             kind,
             location,
             module: None,
-            scanner: None,
-            parser: None,
-            analyzer: None,
+            tokens: None,
+            elements: None,
+            analyses: None,
             output: None,
             object: None,
         }

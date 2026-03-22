@@ -234,10 +234,9 @@ impl<'session> Session<'session> {
             .records
             .get(&identity)
             .unwrap()
-            .parser
+            .elements
             .as_ref()
-            .unwrap()
-            .output;
+            .unwrap();
 
         for element in elements.iter() {
             element.depending(&mut self.resolver);
@@ -285,7 +284,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Scan(error.clone())),
                 );
 
-                self.records.get_mut(&key).unwrap().scanner = Some(scanner);
+                self.records.get_mut(&key).unwrap().tokens = Some(scanner.output);
             }
         }
 
@@ -305,7 +304,7 @@ impl<'session> Session<'session> {
 
             if is_source {
                 let location = self.records.get(&key).unwrap().location;
-                let tokens = self.records.get(&key).unwrap().scanner.as_ref().unwrap().output.clone();
+                let tokens = self.records.get(&key).unwrap().tokens.as_ref().unwrap().clone();
                 let mut parser = Parser::new(location);
 
                 parser.set_input(tokens);
@@ -330,7 +329,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Parse(error.clone())),
                 );
 
-                self.records.get_mut(&key).unwrap().parser = Some(parser);
+                self.records.get_mut(&key).unwrap().elements = Some(parser.output);
             }
         }
 
@@ -353,10 +352,9 @@ impl<'session> Session<'session> {
                 .records
                 .get_mut(&key)
                 .unwrap()
-                .parser
+                .elements
                 .as_mut()
-                .unwrap()
-                .output;
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.declare(&mut self.resolver);
@@ -400,10 +398,9 @@ impl<'session> Session<'session> {
                 .records
                 .get_mut(&key)
                 .unwrap()
-                .parser
+                .elements
                 .as_mut()
-                .unwrap()
-                .output;
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
@@ -427,10 +424,9 @@ impl<'session> Session<'session> {
                 .records
                 .get_mut(&key)
                 .unwrap()
-                .parser
+                .elements
                 .as_mut()
-                .unwrap()
-                .output;
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
@@ -460,10 +456,9 @@ impl<'session> Session<'session> {
                 .records
                 .get(&key)
                 .unwrap()
-                .parser
+                .elements
                 .as_ref()
                 .unwrap()
-                .output
                 .clone();
 
             let mut analyzer = Analyzer::new(elements);
@@ -488,7 +483,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Analyze(error.clone())),
             );
 
-            self.records.get_mut(&key).unwrap().analyzer = Some(analyzer);
+            self.records.get_mut(&key).unwrap().analyses = Some(analyzer.output);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -508,7 +503,7 @@ impl<'session> Session<'session> {
             let record = self.records.get_mut(&key).unwrap();
             let location = record.location;
             let stem = Str::from(location.stem().unwrap().to_string());
-            let analysis = record.analyzer.as_ref().unwrap().output.clone();
+            let analysis = record.analyses.as_ref().unwrap().clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&triple);
