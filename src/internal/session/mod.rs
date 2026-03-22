@@ -87,20 +87,20 @@ impl<'session> Session<'session> {
     }
 
     pub fn populate(&mut self) {
-        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
         let modules: Vec<_> = keys
             .into_iter()
             .filter_map(|identity| {
-                let (kind, location) = self.inputs.get(&identity).unwrap();
+                let record = self.records.get_mut(&identity).unwrap();
 
-                if *kind != InputKind::Source {
+                if record.kind != InputKind::Source {
                     return None;
                 }
 
-                let stem = Str::from(location.stem().unwrap().to_string());
-                let span = Span::file(Str::from(location.to_string())).unwrap();
+                let stem = Str::from(record.location.stem().unwrap().to_string());
+                let span = Span::file(Str::from(record.location.to_string())).unwrap();
 
                 let head = Element::new(
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
@@ -114,7 +114,7 @@ impl<'session> Session<'session> {
                     Visibility::Public,
                 );
 
-                self.modules.insert(identity, symbol.identity);
+                record.module = Some(symbol.identity);
                 Some(symbol)
             })
             .collect();
@@ -126,9 +126,15 @@ impl<'session> Session<'session> {
 
     pub fn plan(&mut self) {
         let mut sources: Vec<_> = self
-            .inputs
+            .records
             .iter()
-            .filter_map(|(&identity, (kind, _))| if *kind == InputKind::Source { Some(identity) } else { None })
+            .filter_map(|(&identity, record)| {
+                if record.kind == InputKind::Source {
+                    Some(identity)
+                } else {
+                    None
+                }
+            })
             .collect();
 
         sources.sort();
@@ -145,8 +151,8 @@ impl<'session> Session<'session> {
             let dependencies = self.dependencies(identity);
 
             for symbol in dependencies {
-                let resolved = self.modules.iter().find_map(|(&key, &value)| {
-                    if value == symbol {
+                let resolved = self.records.iter().find_map(|(&key, record)| {
+                    if record.module == Some(symbol) {
                         Some(key)
                     } else {
                         None
@@ -201,7 +207,15 @@ impl<'session> Session<'session> {
         let sequence: Vec<String> = self
             .order
             .iter()
-            .map(|key| self.inputs.get(key).unwrap().1.stem().unwrap().to_string())
+            .map(|key| {
+                self.records
+                    .get(key)
+                    .unwrap()
+                    .location
+                    .stem()
+                    .unwrap()
+                    .to_string()
+            })
             .collect();
 
         if self.is_active() && !sequence.is_empty() {
@@ -216,7 +230,14 @@ impl<'session> Session<'session> {
     }
 
     fn dependencies(&mut self, identity: Identity) -> Set<Identity> {
-        let elements = &self.parsers.get(&identity).unwrap().output;
+        let elements = &self
+            .records
+            .get(&identity)
+            .unwrap()
+            .parser
+            .as_ref()
+            .unwrap()
+            .output;
 
         for element in elements.iter() {
             element.depending(&mut self.resolver);
@@ -232,14 +253,15 @@ impl<'session> Session<'session> {
         let initial = self.errors.len();
         self.report_start("scanning");
 
-        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
         for key in keys {
-            let (kind, location) = self.inputs.get(&key).unwrap();
+            let is_source = self.records.get(&key).unwrap().kind == InputKind::Source;
 
-            if *kind == InputKind::Source {
-                let mut scanner = Scanner::new(*location);
+            if is_source {
+                let location = self.records.get(&key).unwrap().location;
+                let mut scanner = Scanner::new(location);
 
                 scanner.prepare();
                 scanner.scan();
@@ -263,7 +285,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Scan(error.clone())),
                 );
 
-                self.scanners.insert(key, scanner);
+                self.records.get_mut(&key).unwrap().scanner = Some(scanner);
             }
         }
 
@@ -275,15 +297,16 @@ impl<'session> Session<'session> {
         let initial = self.errors.len();
         self.report_start("parsing");
 
-        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
         for key in keys {
-            let (kind, location) = self.inputs.get(&key).unwrap();
+            let is_source = self.records.get(&key).unwrap().kind == InputKind::Source;
 
-            if *kind == InputKind::Source {
-                let mut parser = Parser::new(*location);
-                let tokens = self.scanners.get(&key).unwrap().output.clone();
+            if is_source {
+                let location = self.records.get(&key).unwrap().location;
+                let tokens = self.records.get(&key).unwrap().scanner.as_ref().unwrap().output.clone();
+                let mut parser = Parser::new(location);
 
                 parser.set_input(tokens);
                 parser.parse();
@@ -307,7 +330,7 @@ impl<'session> Session<'session> {
                         .map(|error| CompileError::Parse(error.clone())),
                 );
 
-                self.parsers.insert(key, parser);
+                self.records.get_mut(&key).unwrap().parser = Some(parser);
             }
         }
 
@@ -320,13 +343,20 @@ impl<'session> Session<'session> {
         self.report_start("resolving");
 
         for &key in &self.order {
-            let target = *self.modules.get(&key).unwrap();
+            let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
+            let elements = &mut self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .parser
+                .as_mut()
+                .unwrap()
+                .output;
 
             for element in elements.iter_mut() {
                 element.declare(&mut self.resolver);
@@ -360,13 +390,20 @@ impl<'session> Session<'session> {
         );
 
         for &key in &self.order {
-            let target = *self.modules.get(&key).unwrap();
+            let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
+            let elements = &mut self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .parser
+                .as_mut()
+                .unwrap()
+                .output;
 
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
@@ -380,13 +417,20 @@ impl<'session> Session<'session> {
         }
 
         for &key in &self.order {
-            let target = *self.modules.get(&key).unwrap();
+            let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(scope);
 
-            let elements = &mut self.parsers.get_mut(&key).unwrap().output;
+            let elements = &mut self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .parser
+                .as_mut()
+                .unwrap()
+                .output;
 
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
@@ -399,7 +443,8 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        self.errors.extend(self.resolver.errors.drain(..).map(CompileError::Resolve));
+        self.errors
+            .extend(self.resolver.errors.drain(..).map(CompileError::Resolve));
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
         self.report_finish("resolving", duration, self.errors.len() - initial);
@@ -411,7 +456,16 @@ impl<'session> Session<'session> {
         self.report_start("analyzing");
 
         for &key in &self.order {
-            let elements = self.parsers.get(&key).unwrap().output.clone();
+            let elements = self
+                .records
+                .get(&key)
+                .unwrap()
+                .parser
+                .as_ref()
+                .unwrap()
+                .output
+                .clone();
+
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
 
@@ -434,7 +488,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Analyze(error.clone())),
             );
 
-            self.analyzers.insert(key, analyzer);
+            self.records.get_mut(&key).unwrap().analyzer = Some(analyzer);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -451,9 +505,10 @@ impl<'session> Session<'session> {
         self.report_start("generating");
 
         for &key in &self.order {
-            let (_, location) = self.inputs.get(&key).unwrap();
+            let record = self.records.get_mut(&key).unwrap();
+            let location = record.location;
             let stem = Str::from(location.stem().unwrap().to_string());
-            let analysis = self.analyzers.get(&key).unwrap().output.clone();
+            let analysis = record.analyzer.as_ref().unwrap().output.clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
 
             module.set_triple(&triple);
@@ -461,7 +516,7 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem;
 
-            let schema = Self::schema(&base, *location);
+            let schema = Self::schema(&base, location);
             self.generator.generate(analysis);
 
             match schema.as_path() {
@@ -479,7 +534,7 @@ impl<'session> Session<'session> {
                                 self.errors.push(CompileError::Track(track));
                                 return;
                             }
-                            self.outputs.insert(key, schema);
+                            record.output = Some(schema);
                         }
                         Err(error) => {
                             let kind = tracker::error::ErrorKind::from_io(error, schema);
@@ -507,27 +562,25 @@ impl<'session> Session<'session> {
         self.report_start("emitting");
 
         let base = self.base();
-        let mut objects = Map::new();
         let mut direct = Vec::new();
 
-        for (&key, &(ref kind, ref location)) in &self.inputs {
-            let target = match kind {
-                InputKind::Source => {
-                    if let Some(output) = self.outputs.get(&key) {
-                        Some(*output)
-                    } else {
-                        None
-                    }
-                }
-                InputKind::Schema | InputKind::C => Some(*location),
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
+        keys.sort();
+
+        for &key in &keys {
+            let record = self.records.get_mut(&key).unwrap();
+
+            let target = match record.kind {
+                InputKind::Source => record.output,
+                InputKind::Schema | InputKind::C => Some(record.location),
                 InputKind::Object => {
-                    direct.push(*location);
+                    direct.push(record.location);
                     None
                 }
             };
 
             if let Some(path) = target {
-                let object = Self::object(&base, *location, kind, None);
+                let object = Self::object(&base, record.location, &record.kind, None);
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 let _ = create_dir_all(&parent);
 
@@ -542,7 +595,7 @@ impl<'session> Session<'session> {
                 let status = command.status().expect("failed");
 
                 if status.success() {
-                    objects.insert(key, object);
+                    record.object = Some(object);
                 } else {
                     panic!("failed {}", path);
                 }
@@ -551,24 +604,20 @@ impl<'session> Session<'session> {
 
         let mut link = Command::new("clang");
 
-        for object in objects.values() {
-            link.arg(object.to_string());
+        for &key in &keys {
+            if let Some(object) = self.records.get(&key).unwrap().object {
+                link.arg(object.to_string());
+            }
         }
 
         for object in direct {
             link.arg(object.to_string());
         }
 
-        let mut keys: Vec<_> = self.inputs.keys().copied().collect();
-        keys.sort();
-
         let key = self.order.last().copied().unwrap_or_else(|| *keys.last().expect("missing"));
 
-        let location = self
-            .outputs
-            .get(&key)
-            .copied()
-            .unwrap_or_else(|| self.inputs.get(&key).unwrap().1);
+        let record = self.records.get(&key).unwrap();
+        let location = record.output.unwrap_or(record.location);
 
         let executable = Self::executable(&base, location, None);
         link.arg("-o").arg(executable.to_string());
@@ -579,7 +628,6 @@ impl<'session> Session<'session> {
             panic!("failed");
         }
 
-        self.objects = objects;
         self.target = Some(executable);
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());

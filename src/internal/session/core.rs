@@ -1,3 +1,4 @@
+// src/internal/session/core.rs
 use {
     crate::{
         analyzer::{AnalyzeError, Analyzer},
@@ -20,12 +21,8 @@ use {
 
 #[cfg(feature = "generator")]
 use {
-    crate::{
-        generator::{GenerateError, Generator}
-    },
-    inkwell::{
-        context::{Context, ContextRef}
-    },
+    crate::generator::{GenerateError, Generator},
+    inkwell::context::{Context, ContextRef},
 };
 
 pub const RUNTIME: &[&str] = &[
@@ -89,28 +86,48 @@ pub enum CompileError<'error> {
     Track(TrackError<'error>),
 }
 
+pub struct Record<'session> {
+    pub kind: InputKind,
+    pub location: Location<'session>,
+    pub module: Option<Identity>,
+    pub scanner: Option<Scanner<'session>>,
+    pub parser: Option<Parser<'session>>,
+    pub analyzer: Option<Analyzer<'session>>,
+    pub output: Option<Location<'session>>,
+    pub object: Option<Location<'session>>,
+}
+
+impl<'session> Record<'session> {
+    pub fn new(kind: InputKind, location: Location<'session>) -> Self {
+        Self {
+            kind,
+            location,
+            module: None,
+            scanner: None,
+            parser: None,
+            analyzer: None,
+            output: None,
+            object: None,
+        }
+    }
+}
+
 pub struct Session<'session> {
     pub timer: DefaultTimer,
     pub order: Vec<Identity>,
-    pub inputs: Map<Identity, (InputKind, Location<'session>)>,
-    pub modules: Map<Identity, Identity>,
+    pub records: Map<Identity, Record<'session>>,
     pub initializer: Initializer<'session>,
-    pub scanners: Map<Identity, Scanner<'session>>,
-    pub parsers: Map<Identity, Parser<'session>>,
     pub resolver: Resolver<'session>,
-    pub analyzers: Map<Identity, Analyzer<'session>>,
     #[cfg(feature = "generator")]
     pub generator: Generator<'session>,
     #[cfg(feature = "generator")]
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
-    pub outputs: Map<Identity, Location<'session>>,
-    pub objects: Map<Identity, Location<'session>>,
     pub target: Option<Location<'session>>,
 }
 
 impl<'session> Session<'session> {
-    pub fn traverse(target: &Location<'session>, inputs: &mut Map<Identity, (InputKind, Location<'session>)>) -> bool {
+    pub fn traverse(target: &Location<'session>, records: &mut Map<Identity, Record<'session>>) -> bool {
         let Ok(path) = target.to_path() else {
             return false;
         };
@@ -131,7 +148,7 @@ impl<'session> Session<'session> {
                         let string = child.to_string_lossy().into_owned();
                         if let Some(kind) = InputKind::from_path(&string) {
                             let location = Location::Entry(Str::from(string));
-                            inputs.insert(inputs.len(), (kind, location));
+                            records.insert(records.len(), Record::new(kind, location));
                         }
                     }
                 }
@@ -148,31 +165,27 @@ impl<'session> Session<'session> {
         let mut initializer = Initializer::new(Location::Flag);
         let mut resolver = Resolver::new();
 
-        let mut inputs = Map::new();
+        let mut records = Map::new();
         let mut errors = Vec::new();
 
         for path in RUNTIME {
             if let Some(kind) = InputKind::from_path(path) {
                 let location = Location::Entry(Str::from(path.to_string()));
-                inputs.insert(inputs.len(), (kind, location));
+                records.insert(records.len(), Record::new(kind, location));
             }
         }
 
         initializer.initialize().iter().for_each(|(target, span)| {
-            if !Self::traverse(target, &mut inputs) {
+            if !Self::traverse(target, &mut records) {
                 let string = target.to_string();
 
                 if let Some(kind) = InputKind::from_path(&string) {
-                    inputs.insert(inputs.len(), (kind, target.clone()));
+                    records.insert(records.len(), Record::new(kind, target.clone()));
                 } else {
-                    errors.push(
-                        CompileError::Track(
-                            TrackError::new(
-                                tracker::error::ErrorKind::UnSupportedInput(target.clone()),
-                                span.clone(),
-                            )
-                        )
-                    );
+                    errors.push(CompileError::Track(TrackError::new(
+                        tracker::error::ErrorKind::UnSupportedInput(target.clone()),
+                        span.clone(),
+                    )));
                 }
             }
         });
@@ -181,8 +194,7 @@ impl<'session> Session<'session> {
             initializer
                 .errors
                 .iter()
-                .map(|error| CompileError::Initialize(error.clone()))
-                .collect::<Vec<_>>(),
+                .map(|error| CompileError::Initialize(error.clone())),
         );
 
         for symbol in initializer.output.clone() {
@@ -217,29 +229,26 @@ impl<'session> Session<'session> {
 
         Session {
             timer,
-            inputs,
             order: Vec::new(),
-            modules: Map::new(),
+            records,
             initializer,
-            scanners: Map::new(),
-            parsers: Map::new(),
             resolver,
-            analyzers: Map::new(),
             #[cfg(feature = "generator")]
             generator,
             #[cfg(feature = "generator")]
             context,
             errors,
-            outputs: Map::new(),
-            objects: Map::new(),
             target: None,
         }
     }
 
     pub fn get_directive(&self, key: Str<'session>) -> Option<Token<'session>> {
-        let directive = self.resolver.registry.values().find(|symbol| {
-            symbol.target() == Some(Str::from("directive"))
-        })?.clone();
+        let directive = self
+            .resolver
+            .registry
+            .values()
+            .find(|symbol| symbol.target() == Some(Str::from("directive")))?
+            .clone();
 
         let identifier = Element::new(
             ElementKind::Literal(Token::new(TokenKind::Identifier(key), Span::void())),
@@ -340,7 +349,11 @@ impl<'session> Session<'session> {
     }
 
     pub fn base(&self) -> PathBuf {
-        let paths: Vec<_> = self.inputs.values().filter_map(|(_, location)| location.to_path().ok()).collect();
+        let paths: Vec<_> = self
+            .records
+            .values()
+            .filter_map(|record| record.location.to_path().ok())
+            .collect();
 
         if paths.is_empty() {
             return PathBuf::from(".");
@@ -370,11 +383,20 @@ impl<'session> Session<'session> {
 
     #[cfg(feature = "generator")]
     pub fn schema(base: &PathBuf, location: Location<'session>) -> Location<'session> {
-        let target = base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll");
+        let target = base
+            .join("build")
+            .join("schema")
+            .join(location.stem().unwrap())
+            .with_extension("ll");
         Location::Entry(Str::from(target))
     }
 
-    pub fn object(base: &PathBuf, location: Location<'session>, kind: &InputKind, custom: Option<Str<'session>>) -> Location<'session> {
+    pub fn object(
+        base: &PathBuf,
+        location: Location<'session>,
+        kind: &InputKind,
+        custom: Option<Str<'session>>,
+    ) -> Location<'session> {
         let target = if let Some(path) = custom {
             PathBuf::from(path.to_string())
         } else {
@@ -388,11 +410,17 @@ impl<'session> Session<'session> {
         Location::Entry(Str::from(target))
     }
 
-    pub fn executable(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
+    pub fn executable(
+        base: &PathBuf,
+        location: Location<'session>,
+        custom: Option<Str<'session>>,
+    ) -> Location<'session> {
         let target = if let Some(path) = custom {
             PathBuf::from(path.to_string())
         } else {
-            base.join("build").join(location.stem().unwrap()).with_extension("")
+            base.join("build")
+                .join(location.stem().unwrap())
+                .with_extension("")
         };
 
         Location::Entry(Str::from(target))
