@@ -5,6 +5,7 @@ pub use {
 };
 
 pub mod timer;
+pub mod cache;
 
 pub mod hash {
     pub use {

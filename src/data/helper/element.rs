@@ -1,6 +1,7 @@
 use {
     crate::{
         internal::{
+            cache::{Decode, Encode},
             hash::{Hash, Hasher},
         },
     },
@@ -90,6 +91,102 @@ impl<Target, Argument> Invoke<Target, Argument> {
         Invoke {
             target,
             members: arguments,
+        }
+    }
+}
+
+impl<Delimiter: Encode, Item: Encode> Encode for Delimited<Delimiter, Item> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.start.encode(buffer);
+        self.members.encode(buffer);
+        self.separator.encode(buffer);
+        self.end.encode(buffer);
+    }
+}
+
+impl<'element, Delimiter: Decode<'element>, Item: Decode<'element>> Decode<'element>
+for Delimited<Delimiter, Item>
+{
+    fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
+        Delimited {
+            start: Delimiter::decode(buffer, cursor),
+            members: Vec::decode(buffer, cursor),
+            separator: Option::decode(buffer, cursor),
+            end: Delimiter::decode(buffer, cursor),
+        }
+    }
+}
+
+impl<Left: Encode, Operator: Encode, Right: Encode> Encode for Binary<Left, Operator, Right> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.left.encode(buffer);
+        self.operator.encode(buffer);
+        self.right.encode(buffer);
+    }
+}
+
+impl<'element, Left: Decode<'element>, Operator: Decode<'element>, Right: Decode<'element>>
+Decode<'element> for Binary<Left, Operator, Right>
+{
+    fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
+        Binary {
+            left: Left::decode(buffer, cursor),
+            operator: Operator::decode(buffer, cursor),
+            right: Right::decode(buffer, cursor),
+        }
+    }
+}
+
+impl<Operator: Encode, Operand: Encode> Encode for Unary<Operator, Operand> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.operator.encode(buffer);
+        self.operand.encode(buffer);
+    }
+}
+
+impl<'element, Operator: Decode<'element>, Operand: Decode<'element>> Decode<'element>
+for Unary<Operator, Operand>
+{
+    fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
+        Unary {
+            operator: Operator::decode(buffer, cursor),
+            operand: Operand::decode(buffer, cursor),
+        }
+    }
+}
+
+impl<Target: Encode, Value: Encode> Encode for Index<Target, Value> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.target.encode(buffer);
+        self.members.encode(buffer);
+    }
+}
+
+impl<'element, Target: Decode<'element>, Value: Decode<'element>> Decode<'element>
+for Index<Target, Value>
+{
+    fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
+        Index {
+            target: Target::decode(buffer, cursor),
+            members: Vec::decode(buffer, cursor),
+        }
+    }
+}
+
+impl<Target: Encode, Argument: Encode> Encode for Invoke<Target, Argument> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.target.encode(buffer);
+        self.members.encode(buffer);
+    }
+}
+
+impl<'element, Target: Decode<'element>, Argument: Decode<'element>> Decode<'element>
+for Invoke<Target, Argument>
+{
+    fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
+        Invoke {
+            target: Target::decode(buffer, cursor),
+            members: Vec::decode(buffer, cursor),
         }
     }
 }
