@@ -23,20 +23,20 @@ use {
 };
 
 const RUNTIME: &[&str] = &[
-    "/home/ali/Projects/axo/runtime/cast.axo",
-    "/home/ali/Projects/axo/runtime/cast.c",
-    "/home/ali/Projects/axo/runtime/file.axo",
-    "/home/ali/Projects/axo/runtime/file.c",
-    "/home/ali/Projects/axo/runtime/memory.axo",
-    "/home/ali/Projects/axo/runtime/memory.c",
-    "/home/ali/Projects/axo/runtime/print.axo",
-    "/home/ali/Projects/axo/runtime/print.c",
-    "/home/ali/Projects/axo/runtime/process.axo",
-    "/home/ali/Projects/axo/runtime/process.c",
-    "/home/ali/Projects/axo/runtime/string.axo",
-    "/home/ali/Projects/axo/runtime/string.c",
-    "/home/ali/Projects/axo/runtime/input.axo",
-    "/home/ali/Projects/axo/runtime/input.c",
+    "./runtime/cast.axo",
+    "./runtime/cast.c",
+    "./runtime/file.axo",
+    "./runtime/file.c",
+    "./runtime/memory.axo",
+    "./runtime/memory.c",
+    "./runtime/print.axo",
+    "./runtime/print.c",
+    "./runtime/process.axo",
+    "./runtime/process.c",
+    "./runtime/string.axo",
+    "./runtime/string.c",
+    "./runtime/input.axo",
+    "./runtime/input.c",
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -663,10 +663,11 @@ impl<'session> Session<'session> {
     }
 
     pub fn analyze(&mut self) {
-        for &key in &self.order {
-            let initial = self.errors.len();
-            self.report_start("analyzing");
+        let initial = self.errors.len();
 
+        self.report_start("analyzing");
+
+        for &key in &self.order {
             let elements = self.parsers.get(&key).unwrap().output.clone();
             let mut analyzer = Analyzer::new(elements);
             analyzer.analyze(&mut self.resolver);
@@ -690,18 +691,22 @@ impl<'session> Session<'session> {
             );
 
             self.analyzers.insert(key, analyzer);
+        }
 
             let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
             self.report_finish("analyzing", duration, self.errors.len() - initial);
-        }
     }
 
     pub fn generate(&mut self) {
         let triple = inkwell::targets::TargetMachine::get_default_triple();
         let base = self.base();
 
+        let initial = self.errors.len();
+
+        self.report_start("generating");
+
         for &key in &self.order {
-            let initial = self.errors.len();
             let (_, location) = self.inputs.get(&key).unwrap();
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = self.analyzers.get(&key).unwrap().output.clone();
@@ -714,8 +719,6 @@ impl<'session> Session<'session> {
 
             let custom = Resolver::schema(&mut self.resolver, key);
             let schema = Self::schema(&base, *location, custom);
-
-            self.report_start("generating");
             self.generator.generate(analysis);
 
             match schema.as_path() {
@@ -743,10 +746,11 @@ impl<'session> Session<'session> {
                 }
                 Err(error) => self.errors.push(CompileError::Track(error)),
             }
-
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-            self.report_finish("generating", duration, self.errors.len() - initial);
         }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+
+        self.report_finish("generating", duration, self.errors.len() - initial);
 
         self.errors.extend(
             self.generator
