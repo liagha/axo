@@ -21,13 +21,17 @@ use {
 };
 
 #[cfg(feature = "generator")]
-use crate::generator::{Backend, GenerateError, Generator};
-#[cfg(feature = "generator")]
-use crate::tracker;
-#[cfg(feature = "generator")]
-use crate::internal::platform::{File, Write};
-#[cfg(feature = "generator")]
-use inkwell::{targets::TargetMachine, context::{Context, ContextRef}};
+use {
+    crate::{
+        generator::{Backend, GenerateError, Generator},
+        internal::platform::{File, Write},
+        tracker,
+    },
+    inkwell::{
+        context::{Context, ContextRef},
+        targets::TargetMachine,
+    },
+};
 
 const RUNTIME: &[&str] = &[
     "./runtime/cast.axo",
@@ -208,11 +212,13 @@ impl<'session> Session<'session> {
         let verbosity = Verbosity::from(verbose);
 
         #[cfg(feature = "generator")]
-        let context = Context::create();
-        #[cfg(feature = "generator")]
-        let reference = unsafe { ContextRef::new(context.raw()) };
-        #[cfg(feature = "generator")]
-        let generator = Generator::new(reference);
+        let (context, generator) = {
+            let context = Context::create();
+            let reference = unsafe { ContextRef::new(context.raw()) };
+            let generator = Generator::new(reference);
+
+            (context, generator)
+        };
 
         let initial = errors.len();
 

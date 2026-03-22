@@ -5,8 +5,8 @@ pub mod timer;
 pub mod hash {
     pub use {
         core::hash::{Hash, Hasher},
-        hashish::HashMap as Map,
-        hashish::HashSet as Set,
+        std::collections::HashMap as Map,
+        std::collections::HashSet as Set,
         std::hash::DefaultHasher,
     };
 }
