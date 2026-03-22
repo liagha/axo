@@ -1,4 +1,9 @@
-pub mod session;
+mod session;
+
+pub use {
+    session::Session
+};
+
 pub mod logger;
 pub mod timer;
 

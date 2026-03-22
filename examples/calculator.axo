@@ -72,11 +72,6 @@ func next_token(var lexer: Lexer): Token {
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
 }
 
-// 1. We define Term first (it only calls factor, so we need a trick)
-// To solve this in a single pass without circularity, we have to
-// write the logic linearly. This is extremely difficult without
-// the compiler fix.
-
 func parse_factor(var lexer: Lexer): ParseResult {
     var tok = next_token(lexer)
     lexer.position = tok.next_position
@@ -85,8 +80,6 @@ func parse_factor(var lexer: Lexer): ParseResult {
         return(ParseResult { value = tok.value, next_position = lexer.position })
     }, {
         if(tok.kind == "LPAREN", {
-            // WORKAROUND: We cannot call parse_expression here because it's defined later.
-            // In a real compiler task, you MUST implement the 2-pass system in Rust.
             return(ParseResult { value = 0.0, next_position = lexer.position })
         }, {
             return(ParseResult { value = 0.0, next_position = lexer.position })
@@ -150,11 +143,13 @@ func parse_expression(var lexer: Lexer): ParseResult {
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
-func main() {
+func main(): Integer {
     const input_text = input.get_input("Enter your calculation: ")
     var lexer = Lexer { input = input_text, position = cast.integer_uint64(0) }
     var result = parse_expression(lexer)
     print.print_string("Result: ")
     print.print_float(result.value)
     print.print_newline()
+
+    0
 }

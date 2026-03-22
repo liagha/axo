@@ -1,379 +1,75 @@
-mod registry;
+mod core;
+pub use core::*;
 
 use {
+    broccli::{xprintln, Color},
     crate::{
-        analyzer::{AnalyzeError, Analyzer},
-        data::{memory::replace, *},
-        format::{Display, Show, Verbosity},
-        initializer::{InitializeError, Initializer},
+        analyzer::Analyzer,
+        data::{memory::replace, Identity, Module, Str},
+        format::Show,
+        generator::Backend,
         internal::{
             hash::{Map, Set},
-            platform::{create_dir_all, Command, PathBuf},
-            timer::{DefaultTimer, Duration},
+            platform::{create_dir_all, Command},
+            timer::Duration,
         },
-        parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
-        reporter::Error,
-        resolver::{Resolvable, ResolveError, Resolver, Scope},
-        scanner::{ScanError, Scanner, Token, TokenKind},
-        tracker::{self, Location, Peekable, Span, TrackError},
+        parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
+        resolver::{Resolvable, Scope},
+        scanner::{Scanner, Token, TokenKind},
+        tracker::{self, Peekable, Span, TrackError},
     },
-    broccli::{xprintln, Color},
+    inkwell::targets::TargetMachine,
 };
-
-#[cfg(feature = "generator")]
-use {
-    crate::{
-        generator::{Backend, GenerateError, Generator},
-        internal::platform::{File, Write},
-    },
-    inkwell::{
-        context::{Context, ContextRef},
-        targets::TargetMachine,
-    },
-};
-
-const RUNTIME: &[&str] = &[
-    "./runtime/cast.axo",
-    "./runtime/cast.c",
-    "./runtime/file.axo",
-    "./runtime/file.c",
-    "./runtime/memory.axo",
-    "./runtime/memory.c",
-    "./runtime/print.axo",
-    "./runtime/print.c",
-    "./runtime/process.axo",
-    "./runtime/process.c",
-    "./runtime/string.axo",
-    "./runtime/string.c",
-    "./runtime/input.axo",
-    "./runtime/input.c",
-];
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum InputKind {
-    Source,
-    Schema,
-    Object,
-    C,
-}
-
-impl InputKind {
-    pub fn from_path(string: &str) -> Option<Self> {
-        if string.ends_with(".axo") {
-            Some(InputKind::Source)
-        } else if string.ends_with(".ll") {
-            Some(InputKind::Schema)
-        } else if string.ends_with(".o") {
-            Some(InputKind::Object)
-        } else if string.ends_with(".c") {
-            Some(InputKind::C)
-        } else {
-            None
-        }
-    }
-
-    pub fn extension(&self) -> &'static str {
-        match self {
-            InputKind::Source => "axo",
-            InputKind::Schema => "ll",
-            InputKind::Object => "o",
-            InputKind::C => "c",
-        }
-    }
-}
-
-pub enum CompileError<'error> {
-    Initialize(InitializeError<'error>),
-    Scan(ScanError<'error>),
-    Parse(ParseError<'error>),
-    Resolve(ResolveError<'error>),
-    Analyze(AnalyzeError<'error>),
-    #[cfg(feature = "generator")]
-    Generate(GenerateError<'error>),
-    Track(TrackError<'error>),
-}
-
-pub struct Session<'session> {
-    pub timer: DefaultTimer,
-    pub order: Vec<Identity>,
-    pub inputs: Map<Identity, (InputKind, Location<'session>)>,
-    pub modules: Map<Identity, Identity>,
-    pub initializer: Initializer<'session>,
-    pub scanners: Map<Identity, Scanner<'session>>,
-    pub parsers: Map<Identity, Parser<'session>>,
-    pub resolver: Resolver<'session>,
-    pub analyzers: Map<Identity, Analyzer<'session>>,
-    #[cfg(feature = "generator")]
-    pub generator: Generator<'session>,
-    #[cfg(feature = "generator")]
-    pub context: Context,
-    pub errors: Vec<CompileError<'session>>,
-    pub outputs: Map<Identity, Location<'session>>,
-}
 
 impl<'session> Session<'session> {
-    fn traverse(target: &Location<'session>, inputs: &mut Map<Identity, (InputKind, Location<'session>)>) -> bool {
-        let Ok(path) = target.to_path() else {
-            return false;
-        };
-
-        if !path.is_dir() {
-            return false;
-        }
-
-        let mut stack = vec![path];
-
-        while let Some(current) = stack.pop() {
-            if let Ok(entries) = std::fs::read_dir(current) {
-                for entry in entries.flatten() {
-                    let child = entry.path();
-                    if child.is_dir() {
-                        stack.push(child);
-                    } else {
-                        let string = child.to_string_lossy().into_owned();
-                        if let Some(kind) = InputKind::from_path(&string) {
-                            let location = Location::Entry(Str::from(string));
-                            inputs.insert(inputs.len(), (kind, location));
-                        }
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
-    pub fn start() -> Self {
-        let mut timer = DefaultTimer::new_default();
-        let _ = timer.start();
-
-        let mut initializer = Initializer::new(Location::Flag);
-        let mut resolver = Resolver::new();
-
-        let verbose = Resolver::verbosity(&mut resolver);
-        let verbosity = Verbosity::from(verbose);
-
-        if verbosity != Verbosity::Off {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                "`initializing`" => Color::White
-            );
-            xprintln!();
-        }
-
-        let mut inputs = Map::new();
-        let mut errors = Vec::new();
-
-        for path in RUNTIME {
-            if let Some(kind) = InputKind::from_path(path) {
-                let location = Location::Entry(Str::from(path.to_string()));
-                inputs.insert(inputs.len(), (kind, location));
-            }
-        }
-
-        initializer.initialize().iter().for_each(|(target, span)| {
-            if !Self::traverse(target, &mut inputs) {
-                let string = target.to_string();
-
-                if let Some(kind) = InputKind::from_path(&string) {
-                    inputs.insert(inputs.len(), (kind, target.clone()));
-                } else {
-                    errors.push(
-                        CompileError::Track(
-                            TrackError::new(
-                                tracker::error::ErrorKind::UnSupportedInput(target.clone()),
-                                span.clone(),
-                            )
-                        )
-                    );
-                }
-            }
-        });
-
-        errors.extend(
-            initializer
-                .errors
-                .iter()
-                .map(|error| CompileError::Initialize(error.clone()))
-                .collect::<Vec<_>>(),
-        );
-
-        for symbol in initializer.output.clone() {
-            resolver.insert(symbol);
-        }
-
-        let directive = Symbol::new(
-            SymbolKind::Module(Module::new(Box::from(Element::new(
-                ElementKind::Literal(Token::new(
-                    TokenKind::Identifier(Str::from("directive")),
-                    Span::void(),
-                )),
-                Span::void(),
-            )))),
-            Span::void(),
-            Visibility::Public,
-        )
-            .with_members(initializer.output.clone());
-
-        resolver.insert(directive);
-
-        let duration = Duration::from_nanos(timer.lap().unwrap());
-        let verbose = Resolver::verbosity(&mut resolver);
-        let verbosity = Verbosity::from(verbose);
-
-        #[cfg(feature = "generator")]
-        let (context, generator) = {
-            let context = Context::create();
-            let reference = unsafe { ContextRef::new(context.raw()) };
-            let generator = Generator::new(reference);
-
-            (context, generator)
-        };
-
-        let initial = errors.len();
-
-        if verbosity != Verbosity::Off {
-            let suffix = if initial > 0 {
-                format!(" ({} errors)", initial)
-            } else {
-                String::new()
-            };
-
-            xprintln!(
-                "Finished {} {}s{}" => Color::Green,
-                "`initializing` in" => Color::White,
-                duration.as_secs_f64(),
-                suffix => Color::Red
-            );
-            xprintln!();
-        }
-
-        Session {
-            timer,
-            inputs,
-            order: Vec::new(),
-            modules: Map::new(),
-            initializer,
-            scanners: Map::new(),
-            parsers: Map::new(),
-            resolver,
-            analyzers: Map::new(),
-            #[cfg(feature = "generator")]
-            generator,
-            #[cfg(feature = "generator")]
-            context,
-            errors,
-            outputs: Map::new(),
-        }
-    }
-
-    pub fn get_verbosity(&self) -> Verbosity {
-        #[allow(invalid_reference_casting)]
-        let resolver = unsafe { &mut *(&self.resolver as *const _ as *mut Resolver) };
-        Verbosity::from(Resolver::verbosity(resolver))
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.get_verbosity() != Verbosity::Off
-    }
-
-    pub fn report_start(&self, stage: &str) {
-        if self.is_active() {
-            xprintln!(
-                "Started {}." => Color::Blue,
-                format!("`{}`", stage) => Color::White
-            );
-            xprintln!();
-        }
-    }
-
-    pub fn report_finish(&self, stage: &str, duration: Duration, count: usize) {
-        if self.is_active() {
-            let suffix = if count > 0 {
-                format!(" ({} errors)", count)
-            } else {
-                String::new()
-            };
-
-            xprintln!(
-                "Finished {} {}s{}" => Color::Green,
-                format!("`{}` in", stage) => Color::White,
-                duration.as_secs_f64(),
-                suffix => Color::Red
-            );
-            xprintln!();
-        }
-    }
-
-    pub fn report_section(&self, head: &str, color: Color, body: String) {
-        if self.is_active() && !body.is_empty() {
-            xprintln!(
-                "{}{}\n{}" => Color::White,
-                head => color,
-                ":" => Color::White,
-                Str::from(body).indent(self.get_verbosity().into()) => Color::White
-            );
-            xprintln!();
-        }
-    }
-
-    pub fn report_error<K, H>(&self, error: &Error<K, H>)
-    where
-        K: Clone + Display,
-        H: Clone + Display,
-    {
-        let (message, details) = error.handle();
-        xprintln!(
-            "{}\n{}" => Color::Red,
-            message => Color::White,
-            details => Color::White
-        );
-        xprintln!();
-    }
-
     pub fn compile(&mut self) {
         'pipeline: {
             self.scan();
-
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             self.parse();
-
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             self.populate();
-
             self.plan();
-
             self.resolve();
-
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             self.analyze();
-
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
             #[cfg(feature = "generator")]
             self.generate();
-
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
+            _ = self.timer.lap();
+
+            let sum = self.timer.laps().iter().copied().sum::<u64>();
+            let internal = Duration::from_nanos(sum);
+
+            self.report_finish("pipeline", internal, self.errors.len());
+
             #[cfg(feature = "generator")]
             self.emit();
+            if !self.errors.is_empty() {
+                break 'pipeline;
+            }
+
+            self.run();
         }
 
-        let duration = Duration::from_nanos(self.timer.stop().unwrap());
-        self.report_finish("compilation", duration, self.errors.len());
+        let total = Duration::from_nanos(self.timer.stop().unwrap());
+        self.report_finish("compilation", total, self.errors.len());
 
         for error in &self.errors {
             match error {
@@ -408,7 +104,8 @@ impl<'session> Session<'session> {
                 let head = Element::new(
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
                     span,
-                ).into();
+                )
+                    .into();
 
                 let symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
@@ -525,7 +222,6 @@ impl<'session> Session<'session> {
         }
 
         let dependencies = self.resolver.dependencies.clone();
-
         self.resolver.dependencies.clear();
 
         dependencies
@@ -551,7 +247,8 @@ impl<'session> Session<'session> {
                 self.report_section(
                     "Tokens",
                     Color::Cyan,
-                    scanner.output
+                    scanner
+                        .output
                         .iter()
                         .map(|token| format!("{}", token.format(verbosity)))
                         .collect::<Vec<String>>()
@@ -594,7 +291,8 @@ impl<'session> Session<'session> {
                 self.report_section(
                     "Elements",
                     Color::Cyan,
-                    parser.output
+                    parser
+                        .output
                         .iter()
                         .map(|element| format!("{}", element.format(verbosity)))
                         .collect::<Vec<String>>()
@@ -644,10 +342,16 @@ impl<'session> Session<'session> {
         self.report_section(
             "Symbols",
             Color::Blue,
-            self.resolver.collect()
+            self.resolver
+                .collect()
                 .iter()
                 .map(|symbol| {
-                    let children = symbol.scope.symbols.iter().map(|symbol| self.resolver.get_symbol(*symbol)).collect::<Vec<_>>();
+                    let children = symbol
+                        .scope
+                        .symbols
+                        .iter()
+                        .map(|symbol| self.resolver.get_symbol(*symbol))
+                        .collect::<Vec<_>>();
                     format!("{}\n{}", symbol.format(verbosity), children.format(verbosity))
                 })
                 .collect::<Vec<String>>()
@@ -714,7 +418,8 @@ impl<'session> Session<'session> {
             self.report_section(
                 "Analysis",
                 Color::Blue,
-                analyzer.output
+                analyzer
+                    .output
                     .iter()
                     .map(|item| format!("{}", item.format(verbosity)))
                     .collect::<Vec<String>>()
@@ -731,9 +436,8 @@ impl<'session> Session<'session> {
             self.analyzers.insert(key, analyzer);
         }
 
-            let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
-            self.report_finish("analyzing", duration, self.errors.len() - initial);
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        self.report_finish("analyzing", duration, self.errors.len() - initial);
     }
 
     #[cfg(feature = "generator")]
@@ -764,8 +468,9 @@ impl<'session> Session<'session> {
                     let parent = path.parent().unwrap();
                     let _ = create_dir_all(parent);
 
-                    match File::create(&path) {
+                    match crate::internal::platform::File::create(&path) {
                         Ok(mut file) => {
+                            use crate::internal::platform::Write;
                             let string = self.generator.current_module().print_to_string().to_string();
                             if let Err(error) = file.write_all(string.as_bytes()) {
                                 let kind = tracker::error::ErrorKind::from_io(error, schema);
@@ -787,7 +492,6 @@ impl<'session> Session<'session> {
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-
         self.report_finish("generating", duration, self.errors.len() - initial);
 
         self.errors.extend(
@@ -799,7 +503,6 @@ impl<'session> Session<'session> {
     }
 
     pub fn emit(&mut self) {
-        let initial = self.errors.len();
         self.report_start("emitting");
 
         let base = self.base();
@@ -858,9 +561,7 @@ impl<'session> Session<'session> {
         let mut keys: Vec<_> = self.inputs.keys().copied().collect();
         keys.sort();
 
-        let key = self.order.last().copied().unwrap_or_else(|| {
-            *keys.last().expect("missing")
-        });
+        let key = self.order.last().copied().unwrap_or_else(|| *keys.last().expect("missing"));
 
         let location = self
             .outputs
@@ -871,103 +572,39 @@ impl<'session> Session<'session> {
         let executable = Self::executable(&base, location, None);
         link.arg("-o").arg(executable.to_string());
 
-        let program = link.get_program().to_string_lossy();
-        let arguments: Vec<String> = link
-            .get_args()
-            .map(|argument| argument.to_string_lossy().into_owned())
-            .collect();
-
-        let execution = if arguments.is_empty() {
-            program.into_owned()
-        } else {
-            format!("{} {}", program, arguments.join(" "))
-        };
-
-        if self.is_active() {
-            xprintln!(
-                "Running {}." => Color::Blue,
-                format!("`{}`", execution) => Color::White
-            );
-            xprintln!();
-        }
-
         let status = link.status().expect("failed");
 
         if !status.success() {
             panic!("failed");
         }
 
+        self.objects = objects;
+        self.target = Some(executable);
+
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.report_finish("emitting", duration, self.errors.len() - initial);
+        self.report_external("emitting", duration);
+    }
+
+    pub fn run(&mut self) {
+        self.report_start("running");
+
+        let executable = self.target.unwrap();
 
         if self.is_active() {
             xprintln!(
-                "Running {}." => Color::Blue,
+                "Executing {}." => Color::Blue,
                 format!("`{}`", executable) => Color::White
             );
             xprintln!();
         }
 
-        Command::new(executable.to_string()).status().expect("failed");
-    }
+        let status = Command::new(executable.to_string()).status().expect("failed");
 
-    fn base(&self) -> PathBuf {
-        let paths: Vec<_> = self.inputs.values().filter_map(|(_, location)| location.to_path().ok()).collect();
-
-        if paths.is_empty() {
-            return PathBuf::from(".");
+        if !status.success() {
+            panic!("{}", status);
         }
 
-        let mut base = paths[0].parent().unwrap().to_path_buf();
-
-        for path in &paths[1..] {
-            let parent = path.parent().unwrap();
-            let mut current = PathBuf::new();
-            let mut left = base.components();
-            let mut right = parent.components();
-
-            while let (Some(first), Some(second)) = (left.next(), right.next()) {
-                if first == second {
-                    current.push(first);
-                } else {
-                    break;
-                }
-            }
-
-            base = current;
-        }
-
-        base
-    }
-
-    #[cfg(feature = "generator")]
-    fn schema(base: &PathBuf, location: Location<'session>) -> Location<'session> {
-        let target = base.join("build").join("schema").join(location.stem().unwrap()).with_extension("ll");
-
-        Location::Entry(Str::from(target))
-    }
-
-    fn object(base: &PathBuf, location: Location<'session>, kind: &InputKind, custom: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(path) = custom {
-            PathBuf::from(path.to_string())
-        } else {
-            base.join("build")
-                .join("objects")
-                .join(kind.extension())
-                .join(location.stem().unwrap())
-                .with_extension("o")
-        };
-
-        Location::Entry(Str::from(target))
-    }
-
-    fn executable(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
-        let target = if let Some(path) = custom {
-            PathBuf::from(path.to_string())
-        } else {
-            base.join("build").join(location.stem().unwrap()).with_extension("")
-        };
-
-        Location::Entry(Str::from(target))
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        self.report_external("running", duration);
     }
 }
