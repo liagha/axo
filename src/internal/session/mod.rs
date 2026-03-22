@@ -36,6 +36,7 @@ impl<'session> Session<'session> {
 
             self.populate();
             self.plan();
+
             self.resolve();
             if !self.errors.is_empty() {
                 break 'pipeline;
