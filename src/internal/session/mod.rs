@@ -5,22 +5,29 @@ use {
         analyzer::{AnalyzeError, Analyzer},
         data::{memory::replace, *},
         format::{Display, Show, Verbosity},
-        generator::{Backend, GenerateError, Generator},
         initializer::{InitializeError, Initializer},
         internal::{
             hash::{Map, Set},
-            platform::{create_dir_all, Command, File, PathBuf, Write},
+            platform::{create_dir_all, Command, PathBuf},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
         reporter::Error,
         resolver::{Resolvable, ResolveError, Resolver, Scope},
         scanner::{ScanError, Scanner, Token, TokenKind},
-        tracker::{self, Location, Peekable, Span, TrackError},
+        tracker::{Location, Peekable, Span, TrackError},
     },
     broccli::{xprintln, Color},
-    inkwell::context::{Context, ContextRef},
 };
+
+#[cfg(feature = "generator")]
+use crate::generator::{Backend, GenerateError, Generator};
+#[cfg(feature = "generator")]
+use crate::tracker;
+#[cfg(feature = "generator")]
+use crate::internal::platform::{File, Write};
+#[cfg(feature = "generator")]
+use inkwell::{targets::TargetMachine, context::{Context, ContextRef}};
 
 const RUNTIME: &[&str] = &[
     "./runtime/cast.axo",
@@ -78,6 +85,7 @@ pub enum CompileError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Analyze(AnalyzeError<'error>),
+    #[cfg(feature = "generator")]
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
     Invalid(Location<'error>),
@@ -93,7 +101,9 @@ pub struct Session<'session> {
     pub parsers: Map<Identity, Parser<'session>>,
     pub resolver: Resolver<'session>,
     pub analyzers: Map<Identity, Analyzer<'session>>,
+    #[cfg(feature = "generator")]
     pub generator: Generator<'session>,
+    #[cfg(feature = "generator")]
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
     pub outputs: Map<Identity, Location<'session>>,
@@ -197,8 +207,11 @@ impl<'session> Session<'session> {
         let verbose = Resolver::verbosity(&mut resolver);
         let verbosity = Verbosity::from(verbose);
 
+        #[cfg(feature = "generator")]
         let context = Context::create();
+        #[cfg(feature = "generator")]
         let reference = unsafe { ContextRef::new(context.raw()) };
+        #[cfg(feature = "generator")]
         let generator = Generator::new(reference);
 
         let initial = errors.len();
@@ -229,7 +242,9 @@ impl<'session> Session<'session> {
             parsers: Map::new(),
             resolver,
             analyzers: Map::new(),
+            #[cfg(feature = "generator")]
             generator,
+            #[cfg(feature = "generator")]
             context,
             errors,
             outputs: Map::new(),
@@ -326,12 +341,15 @@ impl<'session> Session<'session> {
                 break 'pipeline;
             }
 
+            #[cfg(feature = "generator")]
             self.generate();
+
             if !self.errors.is_empty() {
                 break 'pipeline;
             }
 
-            //self.emit();
+            #[cfg(feature = "generator")]
+            self.emit();
         }
 
         let duration = Duration::from_nanos(self.timer.stop().unwrap());
@@ -344,6 +362,7 @@ impl<'session> Session<'session> {
                 CompileError::Parse(error) => self.report_error(error),
                 CompileError::Resolve(error) => self.report_error(error),
                 CompileError::Analyze(error) => self.report_error(error),
+                #[cfg(feature = "generator")]
                 CompileError::Generate(error) => self.report_error(error),
                 CompileError::Track(error) => self.report_error(error),
                 CompileError::Invalid(_) => {}
@@ -698,8 +717,9 @@ impl<'session> Session<'session> {
             self.report_finish("analyzing", duration, self.errors.len() - initial);
     }
 
+    #[cfg(feature = "generator")]
     pub fn generate(&mut self) {
-        let triple = inkwell::targets::TargetMachine::get_default_triple();
+        let triple = TargetMachine::get_default_triple();
         let base = self.base();
 
         let initial = self.errors.len();
@@ -902,6 +922,7 @@ impl<'session> Session<'session> {
         base
     }
 
+    #[cfg(feature = "generator")]
     fn schema(base: &PathBuf, location: Location<'session>, custom: Option<Str<'session>>) -> Location<'session> {
         let target = if let Some(path) = custom {
             PathBuf::from(path.to_string())

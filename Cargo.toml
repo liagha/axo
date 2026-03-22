@@ -9,14 +9,12 @@ default = [
     "formation",
     "initial", "scanner",
     "parser", "resolver",
-    "generator",
 ]
 formation = []
 internal = [
     "formation",
     "initial", "scanner",
     "parser", "resolver",
-    "generator",
 ]
 initial = ["formation", "scanner", "parser"]
 scanner = ["formation"]
