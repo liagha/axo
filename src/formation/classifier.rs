@@ -3,7 +3,7 @@ use {
         formation::{
             next_identity,
             form::Form,
-            former::{record::Record, Former, Memo},
+            former::{status::Status, Former, Memo},
             helper::Formable,
             order::*,
         },
@@ -27,7 +27,7 @@ pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Fo
     pub marker: Offset,
     pub position: Position<'a>,
     pub consumed: Vec<Identity>,
-    pub record: Record,
+    pub status: Status,
     pub form: Identity,
     pub stack: Vec<Identity>,
     pub depth: Scale,
@@ -48,7 +48,7 @@ Classifier<'a, Input, Output, Failure>
             marker,
             position,
             consumed: Vec::new(),
-            record: Record::Blank,
+            status: Status::Blank,
             form: 0,
             stack: Vec::new(),
             depth: 0,
@@ -61,7 +61,7 @@ Classifier<'a, Input, Output, Failure>
         marker: Offset,
         position: Position<'a>,
         consumed: Vec<Identity>,
-        record: Record,
+        status: Status,
         form: Identity,
         stack: Vec<Identity>,
         depth: Scale,
@@ -72,7 +72,7 @@ Classifier<'a, Input, Output, Failure>
             marker,
             position,
             consumed,
-            record,
+            status,
             form,
             stack,
             depth
@@ -87,7 +87,7 @@ Classifier<'a, Input, Output, Failure>
             marker: self.marker,
             position: self.position,
             consumed: take(&mut self.consumed),
-            record: Record::Blank,
+            status: Status::Blank,
             form: 0,
             stack: take(&mut self.stack),
             depth: self.depth + 1,
@@ -96,57 +96,57 @@ Classifier<'a, Input, Output, Failure>
 
     #[inline]
     pub const fn is_panicked(&self) -> bool {
-        matches!(self.record, Record::Panicked)
+        matches!(self.status, Status::Panicked)
     }
 
     #[inline]
     pub const fn is_aligned(&self) -> bool {
-        matches!(self.record, Record::Aligned)
+        matches!(self.status, Status::Aligned)
     }
 
     #[inline]
     pub const fn is_failed(&self) -> bool {
-        matches!(self.record, Record::Failed)
+        matches!(self.status, Status::Failed)
     }
 
     #[inline]
     pub const fn is_effected(&self) -> bool {
-        matches!(self.record, Record::Aligned | Record::Failed)
+        matches!(self.status, Status::Aligned | Status::Failed)
     }
 
     #[inline]
     pub const fn is_blank(&self) -> bool {
-        matches!(self.record, Record::Blank)
+        matches!(self.status, Status::Blank)
     }
 
     #[inline]
     pub const fn is_ignored(&self) -> bool {
-        matches!(self.record, Record::Ignored)
+        matches!(self.status, Status::Ignored)
     }
 
     #[inline]
     pub fn set_panic(&mut self) {
-        self.record = Record::Panicked;
+        self.status = Status::Panicked;
     }
 
     #[inline]
     pub fn set_align(&mut self) {
-        self.record = Record::Aligned;
+        self.status = Status::Aligned;
     }
 
     #[inline]
     pub fn set_fail(&mut self) {
-        self.record = Record::Failed;
+        self.status = Status::Failed;
     }
 
     #[inline]
     pub fn set_empty(&mut self) {
-        self.record = Record::Blank;
+        self.status = Status::Blank;
     }
 
     #[inline]
     pub fn set_ignore(&mut self) {
-        self.record = Record::Ignored;
+        self.status = Status::Ignored;
     }
 
     #[inline]
@@ -542,7 +542,7 @@ Order<'a, Input, Output, Failure> for Negate<'a, Input, Output, Failure>
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
-        let record = child.record;
+        let status = child.status;
 
         classifier.consumed = child.consumed;
         classifier.stack = child.stack;
@@ -552,9 +552,9 @@ Order<'a, Input, Output, Failure> for Negate<'a, Input, Output, Failure>
         former.consumed.truncate(form_used);
         former.forms.truncate(form_forms);
 
-        if record == Record::Aligned {
+        if status == Status::Aligned {
             classifier.set_empty();
-        } else if record == Record::Failed {
+        } else if status == Status::Failed {
             classifier.set_align();
             classifier.form = 0;
         } else {
@@ -638,19 +638,19 @@ where
 
         for pattern in &self.patterns {
         let mut child = Classifier::create(
-                pattern.order.clone(),
-                classifier.marker,
-                classifier.position,
-                consumed,
-                Record::Blank,
-                0,
-                stack,
-                classifier.depth + 1,
+            pattern.order.clone(),
+            classifier.marker,
+            classifier.position,
+            consumed,
+            Status::Blank,
+            0,
+            stack,
+            classifier.depth + 1,
             );
 
             former.build(&mut child);
 
-            if matches!(child.record, Record::Blank) {
+            if matches!(child.status, Status::Blank) {
                 stack = child.stack;
                 consumed = child.consumed;
                 stack.truncate(base_stack);
@@ -695,7 +695,7 @@ where
             }
 
             if let Some(ref champion) = best {
-                if matches!(champion.record, Record::Panicked | Record::Aligned) {
+                if matches!(champion.status, Status::Panicked | Status::Aligned) {
                     break;
                 }
             }
@@ -703,7 +703,7 @@ where
 
         match best {
             Some(mut champion) => {
-                classifier.record = champion.record;
+                classifier.status = champion.status;
                 classifier.marker = champion.marker;
                 classifier.position = champion.position;
                 classifier.consumed = take(&mut champion.consumed);
@@ -768,7 +768,7 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
 
             classifier.marker = classifier.marker + entry.advance;
             classifier.position = entry.position;
-            classifier.record = entry.record;
+            classifier.status = entry.status;
             classifier.form = if entry.form == 0 { 0 } else { (entry.form as isize + form_offset) as Identity };
 
             return;
@@ -795,7 +795,7 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
             classifier.marker,
             classifier.position,
             take(&mut classifier.consumed),
-            Record::Blank,
+            Status::Blank,
             0,
             take(&mut classifier.stack),
             classifier.depth + 1,
@@ -809,7 +809,7 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         let stack: Vec<_> = child.stack[class_stack..].to_vec();
 
         former.memo.insert(memo_key, Memo {
-            record: child.record,
+            status: child.status,
             advance: child.marker - origin,
             position: child.position,
             forms,
@@ -824,7 +824,7 @@ Order<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         classifier.marker = child.marker;
         classifier.position = child.position;
         classifier.consumed = child.consumed;
-        classifier.record = child.record;
+        classifier.status = child.status;
         classifier.form = child.form;
         classifier.stack = child.stack;
     }
@@ -892,7 +892,7 @@ Order<'a, Input, Output, Failure> for Wrapper<'a, Input, Output, Failure>
         classifier.marker = child.marker;
         classifier.position = child.position;
         classifier.consumed = child.consumed;
-        classifier.record = child.record;
+        classifier.status = child.status;
         classifier.form = child.form;
         classifier.stack = child.stack;
     }
@@ -916,7 +916,7 @@ Order<'a, Input, Output, Failure> for Ranked<'a, Input, Output, Failure>
         let mut child = classifier.create_child(self.classifier.order.clone());
         former.build(&mut child);
 
-        let record = child.record;
+        let status = child.status;
 
         classifier.marker = child.marker;
         classifier.position = child.position;
@@ -924,12 +924,12 @@ Order<'a, Input, Output, Failure> for Ranked<'a, Input, Output, Failure>
         classifier.form = child.form;
         classifier.stack = child.stack;
 
-        if record == Record::Aligned {
-            classifier.record = self.precedence.max(Record::Aligned.into()).into();
-        } else if record == Record::Failed {
-            classifier.record = self.precedence.min(Record::Failed.into()).into();
+        if status == Status::Aligned {
+            classifier.status = self.precedence.max(Status::Aligned.into()).into();
+        } else if status == Status::Failed {
+            classifier.status = self.precedence.min(Status::Failed.into()).into();
         } else {
-            classifier.record = child.record;
+            classifier.status = child.status;
         }
     }
 }
@@ -974,7 +974,7 @@ Order<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE>
                 mark,
                 pos,
                 consumed,
-                Record::Blank,
+                Status::Blank,
                 0,
                 stack,
                 classifier.depth + 1,
@@ -985,26 +985,26 @@ Order<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE>
             consumed = child.consumed;
             stack = child.stack;
 
-            match child.record {
-                Record::Aligned => {
-                    classifier.record = child.record;
+            match child.status {
+                Status::Aligned => {
+                    classifier.status = child.status;
                     mark = child.marker;
                     pos = child.position;
                     forms.push(child.form);
                 }
-                Record::Panicked | Record::Failed => {
-                    classifier.record = child.record;
+                Status::Panicked | Status::Failed => {
+                    classifier.status = child.status;
                     mark = child.marker;
                     pos = child.position;
                     forms.push(child.form);
                     break;
                 }
-                Record::Ignored => {
+                Status::Ignored => {
                     mark = child.marker;
                     pos = child.position;
                 }
                 _ => {
-                    classifier.record = child.record;
+                    classifier.status = child.status;
                     broke = true;
                     break;
                 }
@@ -1077,7 +1077,7 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
                 mark,
                 pos,
                 consumed,
-                Record::Blank,
+                Status::Blank,
                 0,
                 stack,
                 classifier.depth + 1,
@@ -1097,13 +1097,13 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
             }
 
             if self.persist {
-                match child.record {
-                    Record::Panicked | Record::Aligned | Record::Failed => {
+                match child.status {
+                    Status::Panicked | Status::Aligned | Status::Failed => {
                         mark = child.marker;
                         pos = child.position;
                         forms.push(child.form);
                     }
-                    Record::Ignored => {
+                    Status::Ignored => {
                         former.consumed.truncate(step_used);
                         former.forms.truncate(step_forms);
                         consumed.truncate(step_consumed);
@@ -1119,21 +1119,21 @@ Order<'a, Input, Output, Failure> for Repetition<'a, Input, Output, Failure>
                     }
                 }
             } else {
-                match child.record {
-                    Record::Panicked | Record::Failed => {
-                        classifier.record = child.record;
+                match child.status {
+                    Status::Panicked | Status::Failed => {
+                        classifier.status = child.status;
                         mark = child.marker;
                         pos = child.position;
                         forms.push(child.form);
                         break;
                     }
-                    Record::Aligned => {
-                        classifier.record = child.record;
+                    Status::Aligned => {
+                        classifier.status = child.status;
                         mark = child.marker;
                         pos = child.position;
                         forms.push(child.form);
                     }
-                    Record::Ignored => {
+                    Status::Ignored => {
                         former.consumed.truncate(step_used);
                         former.forms.truncate(step_forms);
                         consumed.truncate(step_consumed);

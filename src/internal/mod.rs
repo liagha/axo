@@ -4,7 +4,6 @@ pub use {
     session::Session
 };
 
-pub mod logger;
 pub mod timer;
 
 pub mod hash {

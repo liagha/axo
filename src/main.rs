@@ -34,23 +34,10 @@ fn main() {
     #[cfg(feature = "internal")]
     {
         use {
-            data::Str,
             internal::{
                 Session,
-                logger::{LogInfo, LogPlan, Logger},
             },
-            log::Level,
         };
-
-        let plan = LogPlan::new(vec![LogInfo::Time, LogInfo::Level, LogInfo::Message])
-            .with_separator(Str::from(" "));
-
-        let logger = Logger::new(Level::max(), plan);
-
-        if let Err(error) = logger.init() {
-            eprintln!("error: failed to initialize logger: {}", error);
-            return;
-        }
 
         let mut compiler = Session::start();
 

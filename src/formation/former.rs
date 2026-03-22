@@ -1,6 +1,6 @@
-pub mod record {
+pub mod status {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum Record {
+    pub enum Status {
         Panicked,
         Aligned,
         Failed,
@@ -9,28 +9,28 @@ pub mod record {
         Custom(i8),
     }
 
-    impl Into<i8> for Record {
+    impl Into<i8> for Status {
         fn into(self) -> i8 {
             match self {
-                Record::Panicked => 127,
-                Record::Aligned => 1,
-                Record::Failed => 0,
-                Record::Blank => -1,
-                Record::Ignored => -2,
-                Record::Custom(value) => value,
+                Status::Panicked => 127,
+                Status::Aligned => 1,
+                Status::Failed => 0,
+                Status::Blank => -1,
+                Status::Ignored => -2,
+                Status::Custom(value) => value,
             }
         }
     }
 
-    impl From<i8> for Record {
-        fn from(value: i8) -> Record {
+    impl From<i8> for Status {
+        fn from(value: i8) -> Status {
             match value {
-                127 => Record::Panicked,
-                1 => Record::Aligned,
-                0 => Record::Failed,
-                -1 => Record::Blank,
-                -2 => Record::Ignored,
-                value => Record::Custom(value),
+                127 => Status::Panicked,
+                1 => Status::Aligned,
+                0 => Status::Failed,
+                -1 => Status::Blank,
+                -2 => Status::Ignored,
+                value => Status::Custom(value),
             }
         }
     }
@@ -58,7 +58,7 @@ use {
 pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Order<'a, Input, Output, Failure> + 'a>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub record: record::Record,
+    pub status: status::Status,
     pub advance: Offset,
     pub position: Position<'a>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,

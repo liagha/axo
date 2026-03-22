@@ -24,7 +24,6 @@ generator = ["resolver", "inkwell"]
 
 [dependencies]
 broccli = { version = "0.0.22" }
-log = { version = "0.4.27"}
 inkwell = { version = "0.8.0", features = ["llvm19-1"], optional = true }
 
 [workspace]

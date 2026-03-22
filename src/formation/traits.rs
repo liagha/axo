@@ -39,7 +39,7 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
             marker: self.marker.clone(),
             position: self.position.clone(),
             consumed: self.consumed.clone(),
-            record: self.record.clone(),
+            status: self.status.clone(),
             form: self.form.clone(),
             stack: self.stack.clone(),
             depth: self.depth,
