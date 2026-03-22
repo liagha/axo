@@ -17,20 +17,20 @@ impl CharRange {
 
     pub fn open_right(start: char, stop: char) -> CharRange {
         let mut iter = CharRange::closed(start, stop).iter();
-        let _ = iter.next_back();
+        _ = iter.next_back();
         iter.into()
     }
 
     pub fn open_left(start: char, stop: char) -> CharRange {
         let mut iter = CharRange::closed(start, stop).iter();
-        let _ = iter.next();
+        _ = iter.next();
         iter.into()
     }
 
     pub fn open(start: char, stop: char) -> CharRange {
         let mut iter = CharRange::closed(start, stop).iter();
-        let _ = iter.next();
-        let _ = iter.next_back();
+        _ = iter.next();
+        _ = iter.next_back();
         iter.into()
     }
 

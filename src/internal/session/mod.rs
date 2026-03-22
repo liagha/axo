@@ -1,6 +1,5 @@
-// src/internal/session/mod.rs
-
 mod core;
+
 pub use core::*;
 
 use {
@@ -12,20 +11,17 @@ use {
         generator::Backend,
         internal::{
             cache::{Decode, Encode},
-            hash::{Map, Set},
-            platform::{create_dir_all, Command},
+            hash::{Map, Set, Hash, Hasher, DefaultHasher},
+            platform::{create_dir_all, write, read, read_to_string, Command},
             timer::Duration,
         },
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},
         scanner::{Scanner, Token, TokenKind},
-        tracker::{self, Location, Peekable, Span, TrackError},
+        tracker::{self, Peekable, Span, TrackError},
+        analyzer::Analysis,
     },
     inkwell::targets::TargetMachine,
-    std::{
-        fs,
-        hash::{DefaultHasher, Hash, Hasher},
-    },
 };
 
 impl<'session> Session<'session> {
@@ -103,23 +99,35 @@ impl<'session> Session<'session> {
         self.report_start("loading");
 
         let base = self.base();
-        let cache = base.join("build").join(".cache").join("hashes");
+        let cache = base.join("build").join(".cache").join("records");
 
         if create_dir_all(&cache).is_ok() {
-            if let Ok(entries) = fs::read_dir(cache) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        if let Ok(data) = fs::read(&path) {
-                            if data.len() >= 8 {
-                                let mut cursor = 0;
-                                let hash = u64::decode(&data, &mut cursor);
-                                let stem = path.file_stem().unwrap().to_string_lossy().to_string();
-                                let location = Location::Entry(Str::from(stem));
-                                self.cache.insert(location, hash);
-                            }
-                        }
-                    }
+            let keys: Vec<_> = self.records.keys().copied().collect();
+
+            for key in keys {
+                let record = self.records.get_mut(&key).unwrap();
+
+                if record.kind != InputKind::Source {
+                    continue;
+                }
+
+                let mut hasher = DefaultHasher::new();
+                record.location.to_string().hash(&mut hasher);
+                let file_name = format!("{:016x}", hasher.finish());
+                let file = cache.join(file_name);
+
+                if let Ok(data) = read(&file) {
+                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
+
+                    let mut cursor = 0;
+                    let hash = u64::decode(data, &mut cursor);
+
+                    self.cache.insert(record.location, hash);
+
+                    record.tokens = Option::<Vec<Token>>::decode(data, &mut cursor);
+                    record.elements = Option::<Vec<Element>>::decode(data, &mut cursor);
+                    record.analyses = Option::<Vec<Analysis>>::decode(data, &mut cursor);
+                    record.hash = hash;
                 }
             }
         }
@@ -133,14 +141,27 @@ impl<'session> Session<'session> {
         self.report_start("saving");
 
         let base = self.base();
-        let cache = base.join("build").join(".cache").join("hashes");
-        let _ = create_dir_all(&cache);
+        let cache = base.join("build").join(".cache").join("records");
+        _ = create_dir_all(&cache);
 
-        for (location, hash) in &self.cache {
-            let file = cache.join(location.to_string().replace('/', "_").replace('\\', "_"));
+        for record in self.records.values() {
+            if record.kind != InputKind::Source {
+                continue;
+            }
+
+            let mut hasher = DefaultHasher::new();
+            record.location.to_string().hash(&mut hasher);
+            let file_name = format!("{:016x}", hasher.finish());
+
+            let file = cache.join(file_name);
             let mut buffer = Vec::new();
-            hash.encode(&mut buffer);
-            let _ = fs::write(file, buffer);
+
+            record.hash.encode(&mut buffer);
+            record.tokens.encode(&mut buffer);
+            record.elements.encode(&mut buffer);
+            record.analyses.encode(&mut buffer);
+
+            _ = write(file, buffer);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -158,7 +179,7 @@ impl<'session> Session<'session> {
                 let location = record.location;
                 let path = location.to_string();
 
-                if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(content) = read_to_string(&path) {
                     let mut hasher = DefaultHasher::new();
                     content.hash(&mut hasher);
                     let hash = hasher.finish();
@@ -231,10 +252,12 @@ impl<'session> Session<'session> {
         sources.sort();
 
         let mut graph = Map::new();
+        let mut reverse = Map::new();
         let mut degrees = Map::new();
 
         for &identity in &sources {
             graph.insert(identity, Vec::new());
+            reverse.insert(identity, Vec::new());
             degrees.insert(identity, 0);
         }
 
@@ -253,7 +276,28 @@ impl<'session> Session<'session> {
                 if let Some(dependency) = resolved {
                     if graph.contains_key(&dependency) {
                         graph.get_mut(&dependency).unwrap().push(identity);
+                        reverse.get_mut(&identity).unwrap().push(dependency);
                         *degrees.get_mut(&identity).unwrap() += 1;
+                    }
+                }
+            }
+        }
+
+        let mut dirty = Vec::new();
+
+        for &identity in &sources {
+            if self.records.get(&identity).unwrap().dirty {
+                dirty.push(identity);
+            }
+        }
+
+        while let Some(current) = dirty.pop() {
+            if let Some(neighbors) = graph.get(&current) {
+                for &neighbor in neighbors {
+                    let record = self.records.get_mut(&neighbor).unwrap();
+                    if !record.dirty {
+                        record.dirty = true;
+                        dirty.push(neighbor);
                     }
                 }
             }
@@ -272,14 +316,8 @@ impl<'session> Session<'session> {
             let identity = queue.remove(0);
             order.push(identity);
 
-            let is_dirty = self.records.get(&identity).unwrap().dirty;
-
             if let Some(neighbors) = graph.get(&identity) {
                 for &neighbor in neighbors {
-                    if is_dirty {
-                        self.records.get_mut(&neighbor).unwrap().dirty = true;
-                    }
-
                     let degree = degrees.get_mut(&neighbor).unwrap();
                     *degree -= 1;
 
@@ -357,6 +395,10 @@ impl<'session> Session<'session> {
             let is_source = record.kind == InputKind::Source;
 
             if is_source {
+                if !record.dirty && record.tokens.is_some() {
+                    continue;
+                }
+
                 let location = record.location;
                 let mut scanner = Scanner::new(location);
 
@@ -402,6 +444,10 @@ impl<'session> Session<'session> {
             let is_source = record.kind == InputKind::Source;
 
             if is_source {
+                if !record.dirty && record.elements.is_some() {
+                    continue;
+                }
+
                 let location = record.location;
                 let tokens = record.tokens.as_ref().unwrap().clone();
                 let mut parser = Parser::new(location);
@@ -441,6 +487,12 @@ impl<'session> Session<'session> {
         self.report_start("resolving");
 
         for &key in &self.order {
+            let record = self.records.get_mut(&key).unwrap();
+
+            if !record.dirty && record.analyses.is_some() {
+                continue;
+            }
+
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -487,6 +539,15 @@ impl<'session> Session<'session> {
         );
 
         for &key in &self.order {
+            let is_cached = {
+                let record = self.records.get(&key).unwrap();
+                !record.dirty && record.analyses.is_some()
+            };
+
+            if is_cached {
+                continue;
+            }
+
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -513,6 +574,15 @@ impl<'session> Session<'session> {
         }
 
         for &key in &self.order {
+            let is_cached = {
+                let record = self.records.get(&key).unwrap();
+                !record.dirty && record.analyses.is_some()
+            };
+
+            if is_cached {
+                continue;
+            }
+
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -551,6 +621,15 @@ impl<'session> Session<'session> {
         self.report_start("analyzing");
 
         for &key in &self.order {
+            let is_cached = {
+                let record = self.records.get(&key).unwrap();
+                !record.dirty && record.analyses.is_some()
+            };
+
+            if is_cached {
+                continue;
+            }
+
             let elements = self
                 .records
                 .get(&key)
@@ -622,7 +701,7 @@ impl<'session> Session<'session> {
             match schema.as_path() {
                 Ok(path) => {
                     let parent = path.parent().unwrap();
-                    let _ = create_dir_all(parent);
+                    _ = create_dir_all(parent);
 
                     match crate::internal::platform::File::create(&path) {
                         Ok(mut file) => {
@@ -682,7 +761,7 @@ impl<'session> Session<'session> {
             if let Some(path) = target {
                 let object = Self::object(&base, record.location, &record.kind, None);
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
-                let _ = create_dir_all(&parent);
+                _ = create_dir_all(&parent);
 
                 record.object = Some(object);
 

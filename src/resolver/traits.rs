@@ -1,5 +1,3 @@
-// src/resolver/typing.rs
-
 use crate::data::{Aggregate, Boolean, Identity, Scale, Str};
 use crate::internal::cache::{Encode, Decode};
 use crate::internal::hash::Set;

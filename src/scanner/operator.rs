@@ -3,6 +3,8 @@ use {
         scanner::Character,
         data::{slice, Str},
         format::{Debug, Display, Formatter, Result},
+        internal::cache::{Encode, Decode},
+
     },
     OperatorKind::*,
 };
@@ -385,10 +387,6 @@ impl Operator for str {
         }
     }
 }
-
-// src/scanner/operator.rs
-
-use crate::internal::cache::{Encode, Decode};
 
 impl Encode for OperatorKind {
     fn encode(&self, buffer: &mut Vec<u8>) {

@@ -1,10 +1,11 @@
 use {
     crate::{
-        scanner::{Character, Token},
         tracker::{Span, Spanned},
+        internal::cache::{Encode, Decode},
+        scanner::{Token, Character, OperatorKind, PunctuationKind, TokenKind},
+        data::{Boolean, Char, Float, Integer, Str},
     },
 };
-use crate::data::{Boolean, Char, Float, Integer, Str};
 
 impl<'token> PartialEq for Token<'token> {
     fn eq(&self, other: &Self) -> bool {
@@ -27,11 +28,6 @@ impl<'token> Spanned<'token> for Token<'token> {
         self.span
     }
 }
-
-// src/scanner/token.rs
-
-use crate::internal::cache::{Encode, Decode};
-use crate::scanner::{OperatorKind, PunctuationKind, TokenKind};
 
 impl<'token> Encode for Token<'token> {
     fn encode(&self, buffer: &mut Vec<u8>) {

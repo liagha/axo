@@ -33,7 +33,7 @@ impl<'analysis> Encode for AnalysisKind<'analysis> {
             }
             AnalysisKind::Float { value, size } => {
                 buffer.push(1);
-                value.encode(buffer);
+                value.0.encode(buffer);
                 size.encode(buffer);
             }
             AnalysisKind::Boolean { value } => {

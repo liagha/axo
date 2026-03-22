@@ -423,7 +423,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                         )
                     );
                 }
-                let _ = self.builder.build_unreachable();
+                _ = self.builder.build_unreachable();
             }
         }
 

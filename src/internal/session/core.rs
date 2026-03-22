@@ -1,5 +1,3 @@
-// src/internal/session/core.rs
-
 use {
     crate::{
         analyzer::{Analysis, AnalyzeError},
@@ -7,8 +5,8 @@ use {
         format::{Display, Show, Verbosity},
         initializer::{InitializeError, Initializer},
         internal::{
-            hash::Map,
-            platform::PathBuf,
+            hash::{Map, DefaultHasher, Hash, Hasher},
+            platform::{read_dir, PathBuf},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
@@ -148,16 +146,21 @@ impl<'session> Session<'session> {
         let mut stack = vec![path];
 
         while let Some(current) = stack.pop() {
-            if let Ok(entries) = std::fs::read_dir(current) {
+            if let Ok(entries) = read_dir(current) {
                 for entry in entries.flatten() {
                     let child = entry.path();
                     if child.is_dir() {
                         stack.push(child);
                     } else {
                         let string = child.to_string_lossy().into_owned();
+
                         if let Some(kind) = InputKind::from_path(&string) {
-                            let location = Location::Entry(Str::from(string));
-                            records.insert(records.len(), Record::new(kind, location));
+                            let location = Location::Entry(Str::from(string.clone()));
+                            let mut hasher = DefaultHasher::new();
+                            Hash::hash(&string, &mut hasher);
+
+                            let identity = (hasher.finish() as Identity) | 0x40000000;
+                            records.insert(identity, Record::new(kind, location));
                         }
                     }
                 }
@@ -180,8 +183,14 @@ impl<'session> Session<'session> {
 
         for path in RUNTIME {
             if let Some(kind) = InputKind::from_path(path) {
-                let location = Location::Entry(Str::from(path.to_string()));
-                records.insert(records.len(), Record::new(kind, location));
+                let string = path.to_string();
+                let location = Location::Entry(Str::from(string.clone()));
+
+                let mut hasher = DefaultHasher::new();
+                Hash::hash(&string, &mut hasher);
+
+                let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
+                records.insert(identity, Record::new(kind, location));
             }
         }
 
@@ -190,7 +199,11 @@ impl<'session> Session<'session> {
                 let string = target.to_string();
 
                 if let Some(kind) = InputKind::from_path(&string) {
-                    records.insert(records.len(), Record::new(kind, target.clone()));
+                    let mut hasher = DefaultHasher::new();
+                    Hash::hash(&string, &mut hasher);
+
+                    let identity = (hasher.finish() as Identity) | 0x40000000;
+                    records.insert(identity, Record::new(kind, target.clone()));
                 } else {
                     errors.push(CompileError::Track(TrackError::new(
                         tracker::error::ErrorKind::UnSupportedInput(target.clone()),

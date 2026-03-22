@@ -33,7 +33,7 @@ pub mod platform {
         env::{
             args, current_dir, current_exe, var},
         ffi::{OsStr, OsString},
-        fs::{canonicalize, create_dir_all, read_dir, read_to_string, File},
+        fs::{canonicalize, create_dir_all, read_dir, write, read, read_to_string, File},
         io::{
             stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
             StdoutLock, Write,
