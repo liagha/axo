@@ -1,3 +1,5 @@
+// src/internal/session/mod.rs
+
 mod core;
 pub use core::*;
 
@@ -9,6 +11,7 @@ use {
         format::Show,
         generator::Backend,
         internal::{
+            cache::{Decode, Encode},
             hash::{Map, Set},
             platform::{create_dir_all, Command},
             timer::Duration,
@@ -16,14 +19,22 @@ use {
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},
         scanner::{Scanner, Token, TokenKind},
-        tracker::{self, Peekable, Span, TrackError},
+        tracker::{self, Location, Peekable, Span, TrackError},
     },
     inkwell::targets::TargetMachine,
+    std::{
+        fs,
+        hash::{DefaultHasher, Hash, Hasher},
+    },
 };
 
 impl<'session> Session<'session> {
     pub fn compile(&mut self) {
+        self.load();
+
         'pipeline: {
+            self.prepare();
+
             self.scan();
             if !self.errors.is_empty() {
                 break 'pipeline;
@@ -66,6 +77,7 @@ impl<'session> Session<'session> {
                 break 'pipeline;
             }
 
+            self.save();
             self.run();
         }
 
@@ -82,6 +94,85 @@ impl<'session> Session<'session> {
                 #[cfg(feature = "generator")]
                 CompileError::Generate(error) => self.report_error(error),
                 CompileError::Track(error) => self.report_error(error),
+            }
+        }
+    }
+
+    pub fn load(&mut self) {
+        let initial = self.errors.len();
+        self.report_start("loading");
+
+        let base = self.base();
+        let cache = base.join("build").join(".cache").join("hashes");
+
+        if create_dir_all(&cache).is_ok() {
+            if let Ok(entries) = fs::read_dir(cache) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Ok(data) = fs::read(&path) {
+                            if data.len() >= 8 {
+                                let mut cursor = 0;
+                                let hash = u64::decode(&data, &mut cursor);
+                                let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+                                let location = Location::Entry(Str::from(stem));
+                                self.cache.insert(location, hash);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        self.report_finish("loading", duration, self.errors.len() - initial);
+    }
+
+    pub fn save(&mut self) {
+        let initial = self.errors.len();
+        self.report_start("saving");
+
+        let base = self.base();
+        let cache = base.join("build").join(".cache").join("hashes");
+        let _ = create_dir_all(&cache);
+
+        for (location, hash) in &self.cache {
+            let file = cache.join(location.to_string().replace('/', "_").replace('\\', "_"));
+            let mut buffer = Vec::new();
+            hash.encode(&mut buffer);
+            let _ = fs::write(file, buffer);
+        }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        self.report_finish("saving", duration, self.errors.len() - initial);
+    }
+
+    pub fn prepare(&mut self) {
+        let mut keys: Vec<_> = self.records.keys().copied().collect();
+        keys.sort();
+
+        for key in keys {
+            let record = self.records.get_mut(&key).unwrap();
+
+            if record.kind == InputKind::Source {
+                let location = record.location;
+                let path = location.to_string();
+
+                if let Ok(content) = fs::read_to_string(&path) {
+                    let mut hasher = DefaultHasher::new();
+                    content.hash(&mut hasher);
+                    let hash = hasher.finish();
+
+                    record.hash = hash;
+
+                    if let Some(&prior) = self.cache.get(&location) {
+                        record.dirty = prior != hash;
+                    } else {
+                        record.dirty = true;
+                    }
+
+                    self.cache.insert(location, hash);
+                }
             }
         }
     }
@@ -181,8 +272,14 @@ impl<'session> Session<'session> {
             let identity = queue.remove(0);
             order.push(identity);
 
+            let is_dirty = self.records.get(&identity).unwrap().dirty;
+
             if let Some(neighbors) = graph.get(&identity) {
                 for &neighbor in neighbors {
+                    if is_dirty {
+                        self.records.get_mut(&neighbor).unwrap().dirty = true;
+                    }
+
                     let degree = degrees.get_mut(&neighbor).unwrap();
                     *degree -= 1;
 
@@ -256,10 +353,11 @@ impl<'session> Session<'session> {
         keys.sort();
 
         for key in keys {
-            let is_source = self.records.get(&key).unwrap().kind == InputKind::Source;
+            let record = self.records.get(&key).unwrap();
+            let is_source = record.kind == InputKind::Source;
 
             if is_source {
-                let location = self.records.get(&key).unwrap().location;
+                let location = record.location;
                 let mut scanner = Scanner::new(location);
 
                 scanner.prepare();
@@ -300,11 +398,12 @@ impl<'session> Session<'session> {
         keys.sort();
 
         for key in keys {
-            let is_source = self.records.get(&key).unwrap().kind == InputKind::Source;
+            let record = self.records.get(&key).unwrap();
+            let is_source = record.kind == InputKind::Source;
 
             if is_source {
-                let location = self.records.get(&key).unwrap().location;
-                let tokens = self.records.get(&key).unwrap().tokens.as_ref().unwrap().clone();
+                let location = record.location;
+                let tokens = record.tokens.as_ref().unwrap().clone();
                 let mut parser = Parser::new(location);
 
                 parser.set_input(tokens);
@@ -502,6 +601,13 @@ impl<'session> Session<'session> {
         for &key in &self.order {
             let record = self.records.get_mut(&key).unwrap();
             let location = record.location;
+            let schema = Self::schema(&base, location);
+
+            if !record.dirty {
+                record.output = Some(schema);
+                continue;
+            }
+
             let stem = Str::from(location.stem().unwrap().to_string());
             let analysis = record.analyses.as_ref().unwrap().clone();
             let module = self.generator.context.create_module(stem.as_str().unwrap());
@@ -511,7 +617,6 @@ impl<'session> Session<'session> {
             self.generator.modules.insert(stem, module);
             self.generator.current_module = stem;
 
-            let schema = Self::schema(&base, location);
             self.generator.generate(analysis);
 
             match schema.as_path() {
@@ -579,6 +684,12 @@ impl<'session> Session<'session> {
                 let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
                 let _ = create_dir_all(&parent);
 
+                record.object = Some(object);
+
+                if !record.dirty && object.to_path().map(|p| p.exists()).unwrap_or(false) {
+                    continue;
+                }
+
                 let mut command = Command::new("clang");
 
                 command
@@ -589,9 +700,7 @@ impl<'session> Session<'session> {
 
                 let status = command.status().expect("failed");
 
-                if status.success() {
-                    record.object = Some(object);
-                } else {
+                if !status.success() {
                     panic!("failed {}", path);
                 }
             }

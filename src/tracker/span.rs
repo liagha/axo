@@ -124,3 +124,22 @@ impl<'span> Span<'span> {
         Span::new(start, end)
     }
 }
+
+
+use crate::internal::cache::{Encode, Decode};
+
+impl<'span> Encode for Span<'span> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.start.encode(buffer);
+        self.end.encode(buffer);
+    }
+}
+
+impl<'span> Decode<'span> for Span<'span> {
+    fn decode(buffer: &'span [u8], cursor: &mut usize) -> Self {
+        Span {
+            start: Position::decode(buffer, cursor),
+            end: Position::decode(buffer, cursor),
+        }
+    }
+}

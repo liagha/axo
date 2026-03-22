@@ -1,6 +1,8 @@
+// src/internal/session/core.rs
+
 use {
     crate::{
-        analyzer::{AnalyzeError},
+        analyzer::{Analysis, AnalyzeError},
         data::*,
         format::{Display, Show, Verbosity},
         initializer::{InitializeError, Initializer},
@@ -14,7 +16,6 @@ use {
         resolver::{ResolveError, Resolver},
         scanner::{ScanError, Token, TokenKind},
         tracker::{self, Location, Span, TrackError},
-        analyzer::Analysis,
     },
     broccli::{xprintln, Color},
 };
@@ -95,6 +96,8 @@ pub struct Record<'session> {
     pub analyses: Option<Vec<Analysis<'session>>>,
     pub output: Option<Location<'session>>,
     pub object: Option<Location<'session>>,
+    pub hash: u64,
+    pub dirty: bool,
 }
 
 impl<'session> Record<'session> {
@@ -108,6 +111,8 @@ impl<'session> Record<'session> {
             analyses: None,
             output: None,
             object: None,
+            hash: 0,
+            dirty: true,
         }
     }
 }
@@ -124,10 +129,14 @@ pub struct Session<'session> {
     pub context: Context,
     pub errors: Vec<CompileError<'session>>,
     pub target: Option<Location<'session>>,
+    pub cache: Map<Location<'session>, u64>,
 }
 
 impl<'session> Session<'session> {
-    pub fn traverse(target: &Location<'session>, records: &mut Map<Identity, Record<'session>>) -> bool {
+    pub fn traverse(
+        target: &Location<'session>,
+        records: &mut Map<Identity, Record<'session>>,
+    ) -> bool {
         let Ok(path) = target.to_path() else {
             return false;
         };
@@ -167,6 +176,7 @@ impl<'session> Session<'session> {
 
         let mut records = Map::new();
         let mut errors = Vec::new();
+        let cache = Map::new();
 
         for path in RUNTIME {
             if let Some(kind) = InputKind::from_path(path) {
@@ -239,6 +249,7 @@ impl<'session> Session<'session> {
             context,
             errors,
             target: None,
+            cache,
         }
     }
 

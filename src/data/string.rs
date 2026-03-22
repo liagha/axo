@@ -477,3 +477,21 @@ impl<'string> TryFrom<Vec<u8>> for Str<'string> {
         Ok(Str(bytes.leak()))
     }
 }
+
+use crate::internal::cache::{Encode, Decode};
+
+impl<'string> Encode for Str<'string> {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        self.0.len().encode(buffer);
+        buffer.extend_from_slice(self.0);
+    }
+}
+
+impl<'string> Decode<'string> for Str<'string> {
+    fn decode(buffer: &'string [u8], cursor: &mut usize) -> Self {
+        let len = usize::decode(buffer, cursor);
+        let slice = &buffer[*cursor..*cursor + len];
+        *cursor += len;
+        Str(slice)
+    }
+}

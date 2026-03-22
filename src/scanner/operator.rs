@@ -385,3 +385,75 @@ impl Operator for str {
         }
     }
 }
+
+// src/scanner/operator.rs
+
+use crate::internal::cache::{Encode, Decode};
+
+impl Encode for OperatorKind {
+    fn encode(&self, buffer: &mut Vec<u8>) {
+        match self {
+            At => buffer.push(0),
+            Ampersand => buffer.push(1),
+            Backslash => buffer.push(2),
+            Caret => buffer.push(3),
+            Colon => buffer.push(4),
+            Dollar => buffer.push(5),
+            Dot => buffer.push(6),
+            DoubleQuote => buffer.push(7),
+            Equal => buffer.push(8),
+            Exclamation => buffer.push(9),
+            RightAngle => buffer.push(10),
+            Hash => buffer.push(11),
+            LeftAngle => buffer.push(12),
+            Minus => buffer.push(13),
+            Percent => buffer.push(14),
+            Pipe => buffer.push(15),
+            Plus => buffer.push(16),
+            QuestionMark => buffer.push(17),
+            SingleQuote => buffer.push(18),
+            Slash => buffer.push(19),
+            Star => buffer.push(20),
+            Tilde => buffer.push(21),
+            Backtick => buffer.push(22),
+            Composite(ops) => {
+                buffer.push(23);
+                ops.encode(buffer);
+            }
+        }
+    }
+}
+
+impl<'a> Decode<'a> for OperatorKind {
+    fn decode(buffer: &'a [u8], cursor: &mut usize) -> Self {
+        let tag = buffer[*cursor];
+        *cursor += 1;
+        match tag {
+            0 => At,
+            1 => Ampersand,
+            2 => Backslash,
+            3 => Caret,
+            4 => Colon,
+            5 => Dollar,
+            6 => Dot,
+            7 => DoubleQuote,
+            8 => Equal,
+            9 => Exclamation,
+            10 => RightAngle,
+            11 => Hash,
+            12 => LeftAngle,
+            13 => Minus,
+            14 => Percent,
+            15 => Pipe,
+            16 => Plus,
+            17 => QuestionMark,
+            18 => SingleQuote,
+            19 => Slash,
+            20 => Star,
+            21 => Tilde,
+            22 => Backtick,
+            23 => Composite(Vec::decode(buffer, cursor)),
+            _ => panic!(),
+        }
+    }
+}
