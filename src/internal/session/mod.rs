@@ -105,7 +105,7 @@ impl<'session> Session<'session> {
         self.report_start("loading");
 
         let base = self.base();
-        let cache = base.join("build").join(".cache").join("records");
+        let cache = base.join("build").join("cache").join("records");
 
         if create_dir_all(&cache).is_ok() {
             let keys: Vec<_> = self.records.keys().copied().collect();
@@ -147,7 +147,7 @@ impl<'session> Session<'session> {
         self.report_start("saving");
 
         let base = self.base();
-        let cache = base.join("build").join(".cache").join("records");
+        let cache = base.join("build").join("cache").join("records");
         _ = create_dir_all(&cache);
 
         for record in self.records.values() {
