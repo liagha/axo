@@ -8,7 +8,6 @@ use {
         analyzer::Analyzer,
         data::{memory::replace, Identity, Module, Str},
         format::Show,
-        generator::Backend,
         internal::{
             cache::{Decode, Encode},
             hash::{Map, Set, Hash, Hasher, DefaultHasher},
@@ -21,6 +20,11 @@ use {
         tracker::{self, Peekable, Span, TrackError},
         analyzer::Analysis,
     },
+};
+
+#[cfg(feature="generator")]
+use {
+    crate::generator::Backend,
     inkwell::targets::TargetMachine,
 };
 
@@ -74,6 +78,8 @@ impl<'session> Session<'session> {
             }
 
             self.save();
+
+            #[cfg(feature = "generator")]
             self.run();
         }
 
