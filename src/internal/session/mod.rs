@@ -687,42 +687,45 @@ impl<'session> Session<'session> {
             }
 
             let stem = Str::from(location.stem().unwrap().to_string());
-            let analysis = record.analyses.as_ref().unwrap().clone();
-            let module = self.generator.context.create_module(stem.as_str().unwrap());
 
-            module.set_triple(&triple);
+            if let Some(analysis) = record.analyses.clone() {
+                let module = self.generator.context.create_module(stem.as_str().unwrap());
 
-            self.generator.modules.insert(stem, module);
-            self.generator.current_module = stem;
+                module.set_triple(&triple);
 
-            self.generator.generate(analysis);
+                self.generator.modules.insert(stem, module);
+                self.generator.current_module = stem;
 
-            match schema.as_path() {
-                Ok(path) => {
-                    let parent = path.parent().unwrap();
-                    _ = create_dir_all(parent);
+                self.generator.generate(analysis);
 
-                    match crate::internal::platform::File::create(&path) {
-                        Ok(mut file) => {
-                            use crate::internal::platform::Write;
-                            let string = self.generator.current_module().print_to_string().to_string();
-                            if let Err(error) = file.write_all(string.as_bytes()) {
+                match schema.as_path() {
+                    Ok(path) => {
+                        let parent = path.parent().unwrap();
+                        _ = create_dir_all(parent);
+
+                        match crate::internal::platform::File::create(&path) {
+                            Ok(mut file) => {
+                                use crate::internal::platform::Write;
+                                let string = self.generator.current_module().print_to_string().to_string();
+                                if let Err(error) = file.write_all(string.as_bytes()) {
+                                    let kind = tracker::error::ErrorKind::from_io(error, schema);
+                                    let track = TrackError::new(kind, Span::void());
+                                    self.errors.push(CompileError::Track(track));
+                                    return;
+                                }
+                                record.output = Some(schema);
+                            }
+                            Err(error) => {
                                 let kind = tracker::error::ErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
                                 self.errors.push(CompileError::Track(track));
-                                return;
                             }
-                            record.output = Some(schema);
-                        }
-                        Err(error) => {
-                            let kind = tracker::error::ErrorKind::from_io(error, schema);
-                            let track = TrackError::new(kind, Span::void());
-                            self.errors.push(CompileError::Track(track));
                         }
                     }
+                    Err(error) => self.errors.push(CompileError::Track(error)),
                 }
-                Err(error) => self.errors.push(CompileError::Track(error)),
             }
+
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());

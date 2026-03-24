@@ -9,6 +9,58 @@ pub mod status {
         Custom(i8),
     }
 
+    impl Status {
+        #[inline]
+        pub const fn priority(self) -> i8 {
+            match self {
+                Status::Panicked => 4,
+                Status::Failed => 3,
+                Status::Aligned => 2,
+                Status::Ignored => 1,
+                Status::Blank => 0,
+                Status::Custom(v) => v,
+            }
+        }
+
+        #[inline]
+        pub const fn is_productive(self) -> bool {
+            matches!(self, Status::Aligned | Status::Failed)
+        }
+
+        #[inline]
+        pub const fn is_terminal(self) -> bool {
+            matches!(self, Status::Panicked | Status::Failed)
+        }
+
+        #[inline]
+        pub const fn is_neutral(self) -> bool {
+            matches!(self, Status::Blank | Status::Ignored)
+        }
+
+        #[inline]
+        pub const fn is_success(self) -> bool {
+            matches!(self, Status::Aligned)
+        }
+
+        #[inline]
+        pub fn escalate(self, other: Status) -> Status {
+            if other.priority() > self.priority() {
+                other
+            } else {
+                self
+            }
+        }
+
+        #[inline]
+        pub fn demote(self) -> Status {
+            match self {
+                Status::Panicked => Status::Failed,
+                Status::Aligned => Status::Ignored,
+                other => other,
+            }
+        }
+    }
+
     impl Into<i8> for Status {
         fn into(self) -> i8 {
             match self {

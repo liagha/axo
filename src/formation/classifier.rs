@@ -125,6 +125,16 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
+    pub const fn is_terminal(&self) -> bool {
+        self.status.is_terminal()
+    }
+
+    #[inline]
+    pub const fn is_neutral(&self) -> bool {
+        self.status.is_neutral()
+    }
+
+    #[inline]
     pub fn set_panic(&mut self) {
         self.status = Status::Panicked;
     }
@@ -147,6 +157,11 @@ Classifier<'a, Input, Output, Failure>
     #[inline]
     pub fn set_ignore(&mut self) {
         self.status = Status::Ignored;
+    }
+
+    #[inline]
+    pub fn escalate(&mut self, other: Status) {
+        self.status = self.status.escalate(other);
     }
 
     #[inline]
