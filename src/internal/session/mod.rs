@@ -529,9 +529,12 @@ impl<'session> Session<'session> {
                         .scope
                         .symbols
                         .iter()
-                        .map(|symbol| self.resolver.get_symbol(*symbol))
-                        .collect::<Vec<_>>();
-                    format!("{}\n{}", symbol.format(verbosity), children.format(verbosity))
+                        .filter_map(|identity| self.resolver.get_symbol(*identity))
+                        .map(|symbol| symbol.format(verbosity))
+                        .collect::<Vec<_>>()
+                        .join(",\n");
+
+                    format!("{}\n{}\n", symbol.format(verbosity), children.indent(verbosity))
                 })
                 .collect::<Vec<String>>()
                 .join("\n"),

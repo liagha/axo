@@ -1,3 +1,5 @@
-func main() {
+func main(): Integer {
     print.print_string("test")
+
+    0
 }

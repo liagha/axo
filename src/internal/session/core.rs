@@ -221,7 +221,7 @@ impl<'session> Session<'session> {
         );
 
         for symbol in initializer.output.clone() {
-            resolver.insert(symbol);
+            resolver.registry.insert(symbol.identity, symbol);
         }
 
         let directive = Symbol::new(
@@ -375,19 +375,21 @@ impl<'session> Session<'session> {
     pub fn base(&self) -> PathBuf {
         let paths: Vec<_> = self
             .records
-            .values()
-            .filter_map(|record| record.location.to_path().ok())
+            .iter()
+            .filter(|(&id, _)| (id & 0x40000000) != 0)
+            .filter_map(|(_, record)| record.location.to_path().ok())
             .collect();
 
         if paths.is_empty() {
             return PathBuf::from(".");
         }
 
-        let mut base = paths[0].parent().unwrap().to_path_buf();
+        let mut base = paths[0].parent().unwrap_or(&paths[0]).to_path_buf();
 
         for path in &paths[1..] {
-            let parent = path.parent().unwrap();
+            let parent = path.parent().unwrap_or(path);
             let mut current = PathBuf::new();
+
             let mut left = base.components();
             let mut right = parent.components();
 
@@ -402,7 +404,11 @@ impl<'session> Session<'session> {
             base = current;
         }
 
-        base
+        if base.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            base
+        }
     }
 
     #[cfg(feature = "generator")]
