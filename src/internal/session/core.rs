@@ -1,3 +1,4 @@
+use std::fs::create_dir_all;
 use {
     crate::{
         analyzer::{Analysis, AnalyzeError},
@@ -409,6 +410,21 @@ impl<'session> Session<'session> {
         } else {
             base
         }
+    }
+
+    pub fn cache(&self, name: &str, hash: u64) -> PathBuf {
+        let base = self.base();
+        let cache = base.join("build").join("records").join(name);
+        _ = create_dir_all(&cache);
+        cache.join(format!("{:016x}", hash))
+    }
+
+
+    pub fn manifest(&self) -> PathBuf {
+        let base = self.base();
+        let cache_dir = base.join("build").join("records");
+        _ = create_dir_all(&cache_dir);
+        cache_dir.join("manifest")
     }
 
     #[cfg(feature = "generator")]

@@ -5,27 +5,36 @@ pub use core::*;
 use {
     broccli::{xprintln, Color},
     crate::{
-        analyzer::Analyzer,
+        analyzer::{Analysis, Analyzer},
         data::{memory::replace, Identity, Module, Str},
         format::Show,
         internal::{
             cache::{Decode, Encode},
-            hash::{Map, Set, Hash, Hasher, DefaultHasher},
-            platform::{create_dir_all, write, read, read_to_string, Command},
+            hash::{DefaultHasher, Hash, Hasher, Map, Set},
+            platform::{read, read_to_string, write},
             timer::Duration,
         },
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},
         scanner::{Scanner, Token, TokenKind},
-        tracker::{self, Peekable, Span, TrackError},
-        analyzer::Analysis,
+        tracker::{
+            Peekable, Span,
+            Location,
+        },
     },
 };
 
-#[cfg(feature="generator")]
+#[cfg(feature = "generator")]
 use {
-    crate::generator::Backend,
-    inkwell::targets::TargetMachine,
+    crate::{
+        generator::Backend,
+        internal::platform::{create_dir_all, Command},
+        tracker::{
+            TrackError,
+            error::ErrorKind as TrackErrorKind
+        },
+    },
+    inkwell::targets::TargetMachine
 };
 
 impl<'session> Session<'session> {
@@ -40,14 +49,12 @@ impl<'session> Session<'session> {
     ];
 
     pub fn compile(&mut self) {
-        self.load();
-
         'pipeline: {
             for stage in Self::PIPELINE {
                 stage(self);
 
                 if !self.errors.is_empty() {
-                    break;
+                    break 'pipeline;
                 }
             }
 
@@ -70,8 +77,6 @@ impl<'session> Session<'session> {
                 break 'pipeline;
             }
 
-            self.save();
-
             #[cfg(feature = "generator")]
             self.run();
         }
@@ -93,81 +98,19 @@ impl<'session> Session<'session> {
         }
     }
 
-    pub fn load(&mut self) {
-        let initial = self.errors.len();
-        self.report_start("loading");
-
-        let base = self.base();
-        let cache = base.join("build").join("records");
-
-        if create_dir_all(&cache).is_ok() {
-            let keys: Vec<_> = self.records.keys().copied().collect();
-
-            for key in keys {
-                let record = self.records.get_mut(&key).unwrap();
-
-                if record.kind != InputKind::Source {
-                    continue;
-                }
-
-                let mut hasher = DefaultHasher::new();
-                record.location.to_string().hash(&mut hasher);
-                let file_name = format!("{:016x}", hasher.finish());
-                let file = cache.join(file_name);
-
-                if let Ok(data) = read(&file) {
-                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
-
-                    let mut cursor = 0;
-                    let hash = u64::decode(data, &mut cursor);
-
-                    self.cache.insert(record.location, hash);
-
-                    record.tokens = Option::<Vec<Token>>::decode(data, &mut cursor);
-                    record.elements = Option::<Vec<Element>>::decode(data, &mut cursor);
-                    record.analyses = Option::<Vec<Analysis>>::decode(data, &mut cursor);
-                    record.hash = hash;
-                }
-            }
-        }
-
-        let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.report_finish("loading", duration, self.errors.len() - initial);
-    }
-
-    pub fn save(&mut self) {
-        let initial = self.errors.len();
-        self.report_start("saving");
-
-        let base = self.base();
-        let cache = base.join("build").join("records");
-        _ = create_dir_all(&cache);
-
-        for record in self.records.values() {
-            if record.kind != InputKind::Source {
-                continue;
-            }
-
-            let mut hasher = DefaultHasher::new();
-            record.location.to_string().hash(&mut hasher);
-            let file_name = format!("{:016x}", hasher.finish());
-
-            let file = cache.join(file_name);
-            let mut buffer = Vec::new();
-
-            record.hash.encode(&mut buffer);
-            record.tokens.encode(&mut buffer);
-            record.elements.encode(&mut buffer);
-            record.analyses.encode(&mut buffer);
-
-            _ = write(file, buffer);
-        }
-
-        let duration = Duration::from_nanos(self.timer.lap().unwrap());
-        self.report_finish("saving", duration, self.errors.len() - initial);
-    }
-
     pub fn prepare(&mut self) {
+        let manifest_file = self.manifest();
+        if self.cache.is_empty() {
+            if let Ok(data) = read(&manifest_file) {
+                let data: &'static [u8] = Box::leak(data.into_boxed_slice());
+                let mut cursor = 0;
+
+                if let Some(loaded_cache) = Option::<Map<Location<'session>, u64>>::decode(data, &mut cursor) {
+                    self.cache = loaded_cache;
+                }
+            }
+        }
+
         let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
@@ -185,16 +128,22 @@ impl<'session> Session<'session> {
 
                     record.hash = hash;
 
+                    // 2. Now self.cache actually contains data from the previous run!
                     if let Some(&prior) = self.cache.get(&location) {
                         record.dirty = prior != hash;
                     } else {
                         record.dirty = true;
                     }
 
+                    // Update the cache with the new hash
                     self.cache.insert(location, hash);
                 }
             }
         }
+
+        let mut buffer = Vec::new();
+        Some(self.cache.clone()).encode(&mut buffer);
+        _ = write(manifest_file, buffer);
     }
 
     pub fn populate(&mut self) {
@@ -219,11 +168,13 @@ impl<'session> Session<'session> {
                 )
                     .into();
 
-                let symbol = Symbol::new(
+                let mut symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
                     span,
                     Visibility::Public,
                 );
+
+                symbol.identity = identity;
 
                 record.module = Some(symbol.identity);
                 Some(symbol)
@@ -390,41 +341,60 @@ impl<'session> Session<'session> {
         keys.sort();
 
         for key in keys {
-            let record = self.records.get(&key).unwrap();
-            let is_source = record.kind == InputKind::Source;
+            let (kind, hash, dirty, location) = {
+                let record = self.records.get(&key).unwrap();
+                (
+                    record.kind.clone(),
+                    record.hash,
+                    record.dirty,
+                    record.location,
+                )
+            };
 
-            if is_source {
-                if !record.dirty && record.tokens.is_some() {
+            if kind != InputKind::Source {
+                continue;
+            }
+
+            let file = self.cache("tokens", hash);
+
+            if !dirty {
+                if let Ok(data) = read(&file) {
+                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
+                    let mut cursor = 0;
+                    let tokens = Option::<Vec<Token>>::decode(data, &mut cursor);
+                    self.records.get_mut(&key).unwrap().tokens = tokens;
                     continue;
                 }
-
-                let location = record.location;
-                let mut scanner = Scanner::new(location);
-
-                scanner.prepare();
-                scanner.scan();
-
-                let verbosity = self.get_verbosity().into();
-                self.report_section(
-                    "Tokens",
-                    Color::Cyan,
-                    scanner
-                        .output
-                        .iter()
-                        .map(|token| format!("{}", token.format(verbosity)))
-                        .collect::<Vec<String>>()
-                        .join(", "),
-                );
-
-                self.errors.extend(
-                    scanner
-                        .errors
-                        .iter()
-                        .map(|error| CompileError::Scan(error.clone())),
-                );
-
-                self.records.get_mut(&key).unwrap().tokens = Some(scanner.output);
             }
+
+            let mut scanner = Scanner::new(location);
+            scanner.prepare();
+            scanner.scan();
+
+            let verbosity = self.get_verbosity().into();
+            self.report_section(
+                "Tokens",
+                Color::Cyan,
+                scanner
+                    .output
+                    .iter()
+                    .map(|token| format!("{}", token.format(verbosity)))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+            );
+
+            self.errors.extend(
+                scanner
+                    .errors
+                    .iter()
+                    .map(|error| CompileError::Scan(error.clone())),
+            );
+
+            let mut buffer = Vec::new();
+            Some(scanner.output.clone()).encode(&mut buffer);
+            _ = write(file, buffer);
+
+            self.records.get_mut(&key).unwrap().tokens = Some(scanner.output);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -439,42 +409,61 @@ impl<'session> Session<'session> {
         keys.sort();
 
         for key in keys {
-            let record = self.records.get(&key).unwrap();
-            let is_source = record.kind == InputKind::Source;
+            let (kind, hash, dirty, location, tokens) = {
+                let record = self.records.get(&key).unwrap();
+                (
+                    record.kind.clone(),
+                    record.hash,
+                    record.dirty,
+                    record.location,
+                    record.tokens.clone(),
+                )
+            };
 
-            if is_source {
-                if !record.dirty && record.elements.is_some() {
+            if kind != InputKind::Source {
+                continue;
+            }
+
+            let file = self.cache("elements", hash);
+
+            if !dirty {
+                if let Ok(data) = read(&file) {
+                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
+                    let mut cursor = 0;
+                    let elements = Option::<Vec<Element>>::decode(data, &mut cursor);
+                    self.records.get_mut(&key).unwrap().elements = elements;
                     continue;
                 }
-
-                let location = record.location;
-                let tokens = record.tokens.as_ref().unwrap().clone();
-                let mut parser = Parser::new(location);
-
-                parser.set_input(tokens);
-                parser.parse();
-
-                let verbosity = self.get_verbosity().into();
-                self.report_section(
-                    "Elements",
-                    Color::Cyan,
-                    parser
-                        .output
-                        .iter()
-                        .map(|element| format!("{}", element.format(verbosity)))
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                );
-
-                self.errors.extend(
-                    parser
-                        .errors
-                        .iter()
-                        .map(|error| CompileError::Parse(error.clone())),
-                );
-
-                self.records.get_mut(&key).unwrap().elements = Some(parser.output);
             }
+
+            let mut parser = Parser::new(location);
+            parser.set_input(tokens.unwrap());
+            parser.parse();
+
+            let verbosity = self.get_verbosity().into();
+            self.report_section(
+                "Elements",
+                Color::Cyan,
+                parser
+                    .output
+                    .iter()
+                    .map(|element| format!("{}", element.format(verbosity)))
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
+
+            self.errors.extend(
+                parser
+                    .errors
+                    .iter()
+                    .map(|error| CompileError::Parse(error.clone())),
+            );
+
+            let mut buffer = Vec::new();
+            Some(parser.output.clone()).encode(&mut buffer);
+            _ = write(file, buffer);
+
+            self.records.get_mut(&key).unwrap().elements = Some(parser.output);
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -486,12 +475,6 @@ impl<'session> Session<'session> {
         self.report_start("resolving");
 
         for &key in &self.order {
-            let record = self.records.get_mut(&key).unwrap();
-
-            if !record.dirty && record.analyses.is_some() {
-                continue;
-            }
-
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -541,15 +524,6 @@ impl<'session> Session<'session> {
         );
 
         for &key in &self.order {
-            let is_cached = {
-                let record = self.records.get(&key).unwrap();
-                !record.dirty && record.analyses.is_some()
-            };
-
-            if is_cached {
-                continue;
-            }
-
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -576,15 +550,6 @@ impl<'session> Session<'session> {
         }
 
         for &key in &self.order {
-            let is_cached = {
-                let record = self.records.get(&key).unwrap();
-                !record.dirty && record.analyses.is_some()
-            };
-
-            if is_cached {
-                continue;
-            }
-
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -623,25 +588,24 @@ impl<'session> Session<'session> {
         self.report_start("analyzing");
 
         for &key in &self.order {
-            let is_cached = {
+            let (hash, dirty, elements) = {
                 let record = self.records.get(&key).unwrap();
-                !record.dirty && record.analyses.is_some()
+                (record.hash, record.dirty, record.elements.clone())
             };
 
-            if is_cached {
-                continue;
+            let file = self.cache("analyses", hash);
+
+            if !dirty {
+                if let Ok(data) = read(&file) {
+                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
+                    let mut cursor = 0;
+                    let analyses = Option::<Vec<Analysis>>::decode(data, &mut cursor);
+                    self.records.get_mut(&key).unwrap().analyses = analyses;
+                    continue;
+                }
             }
 
-            let elements = self
-                .records
-                .get(&key)
-                .unwrap()
-                .elements
-                .as_ref()
-                .unwrap()
-                .clone();
-
-            let mut analyzer = Analyzer::new(elements);
+            let mut analyzer = Analyzer::new(elements.unwrap());
             analyzer.analyze(&mut self.resolver);
 
             let verbosity = self.get_verbosity().into();
@@ -662,6 +626,10 @@ impl<'session> Session<'session> {
                     .iter()
                     .map(|error| CompileError::Analyze(error.clone())),
             );
+
+            let mut buffer = Vec::new();
+            Some(analyzer.output.clone()).encode(&mut buffer);
+            _ = write(file, buffer);
 
             self.records.get_mut(&key).unwrap().analyses = Some(analyzer.output);
         }
@@ -684,7 +652,7 @@ impl<'session> Session<'session> {
             let location = record.location;
             let schema = Self::schema(&base, location);
 
-            if !record.dirty {
+            if !record.dirty && schema.to_path().map(|p| p.exists()).unwrap_or(false) {
                 record.output = Some(schema);
                 continue;
             }
@@ -709,9 +677,13 @@ impl<'session> Session<'session> {
                         match crate::internal::platform::File::create(&path) {
                             Ok(mut file) => {
                                 use crate::internal::platform::Write;
-                                let string = self.generator.current_module().print_to_string().to_string();
+                                let string = self
+                                    .generator
+                                    .current_module()
+                                    .print_to_string()
+                                    .to_string();
                                 if let Err(error) = file.write_all(string.as_bytes()) {
-                                    let kind = tracker::error::ErrorKind::from_io(error, schema);
+                                    let kind = TrackErrorKind::from_io(error, schema);
                                     let track = TrackError::new(kind, Span::void());
                                     self.errors.push(CompileError::Track(track));
                                     return;
@@ -719,7 +691,7 @@ impl<'session> Session<'session> {
                                 record.output = Some(schema);
                             }
                             Err(error) => {
-                                let kind = tracker::error::ErrorKind::from_io(error, schema);
+                                let kind = TrackErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
                                 self.errors.push(CompileError::Track(track));
                             }
@@ -728,7 +700,6 @@ impl<'session> Session<'session> {
                     Err(error) => self.errors.push(CompileError::Track(error)),
                 }
             }
-
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -742,6 +713,7 @@ impl<'session> Session<'session> {
         );
     }
 
+    #[cfg(feature = "generator")]
     pub fn emit(&mut self) {
         self.report_start("emitting");
 
@@ -802,7 +774,11 @@ impl<'session> Session<'session> {
             link.arg(object.to_string());
         }
 
-        let key = self.order.last().copied().unwrap_or_else(|| *keys.last().expect("missing"));
+        let key = self
+            .order
+            .last()
+            .copied()
+            .unwrap_or_else(|| *keys.last().expect("missing"));
 
         let record = self.records.get(&key).unwrap();
         let location = record.output.unwrap_or(record.location);
@@ -822,6 +798,7 @@ impl<'session> Session<'session> {
         self.report_external("emitting", duration);
     }
 
+    #[cfg(feature = "generator")]
     pub fn run(&mut self) {
         self.report_start("running");
 
@@ -835,7 +812,9 @@ impl<'session> Session<'session> {
             xprintln!();
         }
 
-        let status = Command::new(executable.to_string()).status().expect("failed");
+        let status = Command::new(executable.to_string())
+            .status()
+            .expect("failed");
 
         if !status.success() {
             panic!("{}", status);
