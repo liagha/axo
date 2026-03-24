@@ -128,14 +128,12 @@ impl<'session> Session<'session> {
 
                     record.hash = hash;
 
-                    // 2. Now self.cache actually contains data from the previous run!
                     if let Some(&prior) = self.cache.get(&location) {
                         record.dirty = prior != hash;
                     } else {
                         record.dirty = true;
                     }
 
-                    // Update the cache with the new hash
                     self.cache.insert(location, hash);
                 }
             }
