@@ -1,13 +1,11 @@
 use {
     crate::{
         format::{
-            Show,
-            Verbosity,
+            Show, Stencil,
             Display,
             Formatter,
             Result
         },
-        data::Str,
         scanner::Token
     },
 };
@@ -28,45 +26,31 @@ pub enum ErrorKind<'error> {
     },
 }
 
-impl<'error> Show<'error> for ErrorKind<'error> {
-    fn format(&self, verbosity: Verbosity) -> Str<'error> {
-        match verbosity {
-            Verbosity::Minimal => {
-                match self {
-                    ErrorKind::InvalidOperation(token) => {
-                        format!("invalid operation token: {}.", token.format(verbosity))
-                    }
-                    ErrorKind::InvalidType => {
-                        "invalid type.".to_string()
-                    }
-                    ErrorKind::InvalidTarget => {
-                        "invalid target.".to_string()
-                    }
-                    ErrorKind::InvalidPrimitiveArity {
-                        name,
-                        expected,
-                        found,
-                    } => {
-                        format!(
-                            "invalid '{}' arity: expected {}, found {}.",
-                            name, expected, found,
-                        )
-                    }
-                    ErrorKind::InvalidPrimitiveContext { name, expected } => {
-                        format!("invalid '{}' usage: expected {}.", name, expected)
-                    }
-                }
-            }
-
-            _ => {
-                self.format(verbosity.fallback()).to_string()
-            }
-        }.into()
-    }
-}
-
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Detailed))
+        match self {
+            ErrorKind::InvalidOperation(token) => {
+                write!(f, "invalid operation token: {}.", token.format(Stencil::default()))
+            }
+            ErrorKind::InvalidType => {
+                write!(f, "invalid type.")
+            }
+            ErrorKind::InvalidTarget => {
+                write!(f, "invalid target.")
+            }
+            ErrorKind::InvalidPrimitiveArity {
+                name,
+                expected,
+                found,
+            } => {
+                write!(f, 
+                    "invalid '{}' arity: expected {}, found {}.",
+                    name, expected, found,
+                )
+            }
+            ErrorKind::InvalidPrimitiveContext { name, expected } => {
+                write!(f, "invalid '{}' usage: expected {}.", name, expected)
+            }
+        }
     }
 }

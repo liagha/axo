@@ -1,9 +1,6 @@
-use {
-    crate::{
-        data::Str,
-        reporter::Error,
-        format::{Show, Verbosity, Debug, Display, Formatter, Result}
-    }
+use crate::{
+    reporter::Error,
+    format::{Show, Stencil, Debug, Display, Formatter, Result}
 };
 
 impl<'error, K, H> Show<'error> for Error<'error, K, H>
@@ -11,26 +8,11 @@ where
     K: Clone + Display,
     H: Clone + Display,
 {
-    fn format(&self, verbosity: Verbosity) -> Str<'error> {
-        match verbosity {
-            Verbosity::Off => "".into(),
-            Verbosity::Minimal => {
-                let (msg, _) = self.handle();
-                format!("{}", msg).into()
-            }
-            Verbosity::Detailed => {
-                let (msg, details) = self.handle();
-                format!("Error({} | {})", msg, details).into()
-            }
-            Verbosity::Debug => {
-                let (msg, details) = self.handle();
-                format!(
-                    "Error {{\n{},\n{}\n}}",
-                    format!("message: {}", msg).indent(verbosity),
-                    format!("details: {}", details).indent(verbosity)
-                ).into()
-            }
-        }
+    fn format(&self, config: Stencil) -> Stencil {
+        let (msg, details) = self.handle();
+        config.clone().new("Error")
+            .field("message", msg.to_string())
+            .field("details", details.to_string())
     }
 }
 
@@ -40,7 +22,7 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Minimal))
+        write!(f, "{}", self.format(Stencil::default()))
     }
 }
 
@@ -50,6 +32,6 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Detailed))
+        write!(f, "{}", self.format(Stencil::default()))
     }
 }

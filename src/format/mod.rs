@@ -6,8 +6,10 @@ mod data;
 mod analyzer;
 mod resolver;
 mod scanner;
+mod stencil;
 
 pub use {
     core::fmt::{Debug, Display, Formatter, Result},
-    show::{Show, Verbosity},
+    show::{Show},
+    stencil::Stencil,
 };

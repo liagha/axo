@@ -1,6 +1,6 @@
 use {
     crate::{
-        format::{Show, Display, Formatter, Result, Verbosity},
+        format::{Show, Display, Formatter, Result, Stencil},
         resolver::{Type},
         parser::Element,
         scanner::Token,
@@ -37,55 +37,49 @@ pub enum ErrorKind<'error> {
     },
 }
 
-impl<'error> Show<'error> for ErrorKind<'error> {
-    fn format(&self, verbosity: Verbosity) -> Str<'error> {
-        match self {
+impl<'error> Display for ErrorKind<'error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+                match self {
             ErrorKind::Mismatch(left, right) => {
-                format!("expected `{}` but got `{}`.", left.format(verbosity), right.format(verbosity)).into()
+                write!(f, "expected `{}` but got `{}`.", left.format(Stencil::default()), right.format(Stencil::default())).into()
             }
             ErrorKind::EmptyIndex => {
-                "the index was empty!".to_string().into()
+                write!(f, "the index was empty.")
             }
             ErrorKind::IndexOutOfBounds(index, len) => {
-                format!("index `{}` out of bounds of `{}`.", index, len).into()
+                write!(f, "index `{}` out of bounds of `{}`.", index, len).into()
             }
             ErrorKind::UnIndexable => {
-                "the index target is unindexable.".to_string().into()
+                write!(f, "unindexable indexing target.")
             }
             ErrorKind::InvalidOperation(token) => {
-                format!("invalid operation for operand types: `{}`.", token.format(verbosity)).into()
+                write!(f, "invalid operation for operand types: `{}`.", token.format(Stencil::default())).into()
             }
             ErrorKind::InvalidAnnotation(element) => {
-                format!("invalid type annotation: `{}`.", element.format(verbosity)).into()
+                write!(f, "invalid type annotation: `{}`.", element.format(Stencil::default())).into()
             }
             ErrorKind::UndefinedSymbol { query } => {
-                format!("undefined symbol: `{}`.", query.format(verbosity))
+                write!(f, "undefined symbol: `{}`.", query.format(Stencil::default()))
             }
 
             ErrorKind::MissingMember { target, member } => {
-                format!("the member `{}` is missing from `{}`.", member.format(verbosity), target.format(verbosity))
+                write!(f, "the member `{}` is missing from `{}`.", member.format(Stencil::default()), target.format(Stencil::default()))
             }
 
             ErrorKind::UndefinedMember { target, member } => {
-                format!("the member `{}` doesn't exist in `{}`.", member.format(verbosity), target.format(verbosity))
+                write!(f, "the member `{}` doesn't exist in `{}`.", member.format(Stencil::default()), target.format(Stencil::default()))
             }
 
             ErrorKind::DefinedMember { target, member } => {
-                format!("the member `{}` is already defined in `{}`.", member.format(verbosity), target.format(verbosity))
+                write!(f, "the member `{}` is already defined in `{}`.", member.format(Stencil::default()), target.format(Stencil::default()))
             }
             ErrorKind::ExcessiveUnionMembers { target, members } => {
-                format!(
+                write!(f, 
                     "union `{}` can only have one member initialized, but {} were provided.",
-                    target.format(verbosity),
+                    target.format(Stencil::default()),
                     members.len()
                 ).into()
             }
-        }.into()
-    }
-}
-
-impl<'error> Display for ErrorKind<'error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Minimal))
+        }
     }
 }

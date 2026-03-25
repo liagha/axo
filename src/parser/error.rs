@@ -1,8 +1,8 @@
 use crate::{
-    data::Str,
     format::{
-        Show, Verbosity,
-        Debug, Display,
+        Show,
+        Display,
+        Stencil,
         Formatter, Result
     },
     scanner::TokenKind,
@@ -16,39 +16,33 @@ pub enum ErrorKind<'error> {
     ExpectedAnnotation,
     MissingSeparator(TokenKind<'error>),
     UnclosedDelimiter(TokenKind<'error>),
-    UnexpectedPunctuation,
     UnexpectedToken(TokenKind<'error>),
-}
-
-impl<'error> Show<'error> for ErrorKind<'error> {
-    fn format(&self, verbosity: Verbosity) -> Str<'error> {
-        match self {
-            ErrorKind::ExpectedName => "expected name.".to_string(),
-            ErrorKind::ExpectedHead => "expected head.".to_string(),
-            ErrorKind::ExpectedBody => "expected body.".to_string(),
-            ErrorKind::ExpectedAnnotation => "expected annotation.".to_string(),
-            ErrorKind::UnexpectedPunctuation => "unexpected punctuation.".to_string(),
-            ErrorKind::MissingSeparator(kind) => {
-                format!("expected separator `{}`.", kind.format(verbosity))
-            }
-            ErrorKind::UnclosedDelimiter(delimiter) => {
-                format!("unclosed delimiter `{}`.", delimiter.format(verbosity))
-            }
-            ErrorKind::UnexpectedToken(token) => {
-                format!("unexpected token `{}`.", token.format(verbosity))
-            }
-        }.into()
-    }
 }
 
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Minimal))
-    }
-}
-
-impl<'error> Debug for ErrorKind<'error> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Verbosity::Minimal))
+        match self {
+            ErrorKind::ExpectedName => {
+                write!(f, "expected a name.")
+            },
+            ErrorKind::ExpectedHead => {
+                write!(f, "expected a head.")
+            },
+            ErrorKind::ExpectedBody => {
+                write!(f, "expected a body.")
+            },
+            ErrorKind::ExpectedAnnotation => {
+                write!(f, "expected an annotation.")
+            },
+            ErrorKind::MissingSeparator(kind) => {
+                write!(f, "expected separator `{}`.", kind.format(Stencil::default()))
+            }
+            ErrorKind::UnclosedDelimiter(delimiter) => {
+                write!(f, "unclosed delimiter `{}`.", delimiter.format(Stencil::default()))
+            }
+            ErrorKind::UnexpectedToken(token) => {
+                write!(f, "unexpected token `{}`.", token.format(Stencil::default()))
+            }
+        }
     }
 }

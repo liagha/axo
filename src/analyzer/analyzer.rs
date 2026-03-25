@@ -1,11 +1,12 @@
 use crate::{
     data::*,
     analyzer::{Analysis, AnalyzeError},
-    format::{Show, Verbosity},
+    format::Show,
     parser::{Element, Symbol, SymbolKind},
     resolver::{Resolver},
     analyzer::AnalysisKind,
 };
+use crate::format::Stencil;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -77,7 +78,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(structure.target.target().unwrap().format(Verbosity::Minimal)),
+                    Str::from(structure.target.target().unwrap().format(Stencil::default())),
                     members?,
                 );
 
@@ -91,7 +92,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(union.target.target().unwrap().format(Verbosity::Minimal)),
+                    Str::from(union.target.target().unwrap().format(Stencil::default())),
                     members?,
                 );
 
@@ -109,7 +110,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let output = function.output.clone().map(|output| output.typing);
 
                 let analyzed = Function::new(
-                    Str::from(function.target.target().unwrap().format(Verbosity::Minimal)),
+                    Str::from(function.target.target().unwrap().format(Stencil::default())),
                     members?,
                     body,
                     output,

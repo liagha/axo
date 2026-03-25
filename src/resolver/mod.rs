@@ -1,6 +1,5 @@
 mod element;
 mod error;
-mod hint;
 mod resolver;
 pub mod scope;
 mod symbol;
@@ -13,14 +12,14 @@ pub use {
     scope::*,
 };
 
-pub(super) use {error::*, hint::*, typing::*};
+pub(super) use {error::*, typing::*};
 
 use crate::{
     data::{
         sync::{AtomicUsize, Ordering},
         Identity,
     },
-    reporter::{Error, Hint},
+    reporter::{Error},
 };
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -29,5 +28,4 @@ pub fn next_identity() -> Identity {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-pub type ResolveError<'error> = Error<'error, ErrorKind<'error>, HintKind<'error>>;
-pub type ResolveHint<'hint> = Hint<HintKind<'hint>>;
+pub type ResolveError<'error> = Error<'error, ErrorKind<'error>>;

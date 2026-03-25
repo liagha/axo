@@ -369,17 +369,18 @@ impl<'session> Session<'session> {
             scanner.prepare();
             scanner.scan();
 
-            let verbosity = self.get_verbosity().into();
-            self.report_section(
-                "Tokens",
-                Color::Cyan,
-                scanner
-                    .output
-                    .iter()
-                    .map(|token| format!("{}", token.format(verbosity)))
-                    .collect::<Vec<String>>()
-                    .join(", "),
-            );
+            if let Some(stencil) = self.get_stencil() {
+                self.report_section(
+                    "Tokens",
+                    Color::Cyan,
+                    scanner
+                        .output
+                        .iter()
+                        .map(|token| format!("{}", token.format(stencil.clone())))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                );
+            }
 
             self.errors.extend(
                 scanner
@@ -438,17 +439,18 @@ impl<'session> Session<'session> {
             parser.set_input(tokens.unwrap());
             parser.parse();
 
-            let verbosity = self.get_verbosity().into();
-            self.report_section(
-                "Elements",
-                Color::Cyan,
-                parser
-                    .output
-                    .iter()
-                    .map(|element| format!("{}", element.format(verbosity)))
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
+            if let Some(stencil) = self.get_stencil() {
+                self.report_section(
+                    "Elements",
+                    Color::Cyan,
+                    parser
+                        .output
+                        .iter()
+                        .map(|element| format!("{}", element.format(stencil.clone())))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                );
+            }
 
             self.errors.extend(
                 parser
@@ -498,28 +500,29 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        let verbosity = self.get_verbosity().into();
-        self.report_section(
-            "Symbols",
-            Color::Blue,
-            self.resolver
-                .collect()
-                .iter()
-                .map(|symbol| {
-                    let children = symbol
-                        .scope
-                        .symbols
-                        .iter()
-                        .filter_map(|identity| self.resolver.get_symbol(*identity))
-                        .map(|symbol| symbol.format(verbosity))
-                        .collect::<Vec<_>>()
-                        .join(",\n");
+        if let Some(stencil) = self.get_stencil() {
+            self.report_section(
+                "Symbols",
+                Color::Blue,
+                self.resolver
+                    .collect()
+                    .iter()
+                    .map(|symbol| {
+                        let children = symbol
+                            .scope
+                            .symbols
+                            .iter()
+                            .filter_map(|identity| self.resolver.get_symbol(*identity))
+                            .map(|symbol| symbol.format(stencil.clone()).to_string())
+                            .collect::<Vec<_>>()
+                            .join(",\n");
 
-                    format!("{}\n{}\n", symbol.format(verbosity), children.indent(verbosity))
-                })
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
+                        format!("{}\n{}\n", symbol.format(stencil.clone()), children.indent(stencil.clone()))
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            )
+        }
 
         for &key in &self.order {
             let target = self.records.get(&key).unwrap().module.unwrap();
@@ -606,17 +609,18 @@ impl<'session> Session<'session> {
             let mut analyzer = Analyzer::new(elements.unwrap());
             analyzer.analyze(&mut self.resolver);
 
-            let verbosity = self.get_verbosity().into();
-            self.report_section(
-                "Analysis",
-                Color::Blue,
-                analyzer
-                    .output
-                    .iter()
-                    .map(|item| format!("{}", item.format(verbosity)))
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
+            if let Some(stencil) = self.get_stencil() {
+                self.report_section(
+                    "Analysis",
+                    Color::Blue,
+                    analyzer
+                        .output
+                        .iter()
+                        .map(|item| format!("{}", item.format(stencil.clone())))
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                );
+            }
 
             self.errors.extend(
                 analyzer

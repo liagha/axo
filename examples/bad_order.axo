@@ -1,0 +1,7 @@
+func main() {
+    print_test()
+}
+
+func print_test() {
+    print.print_string("test")
+}

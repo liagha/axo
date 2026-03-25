@@ -1,11 +1,12 @@
 use crate::{
     data::*,
     analyzer::{Analyzable, Analysis, AnalysisKind, AnalyzeError, ErrorKind},
-    format::{Show, Verbosity},
+    format::Show,
     parser::{Element, ElementKind},
     scanner::{OperatorKind, PunctuationKind, TokenKind, Token},
     resolver::{Resolver, TypeKind},
 };
+use crate::format::Stencil;
 
 fn mutate<'element>(
     target: Analysis<'element>,
@@ -380,7 +381,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 let target = constructor
                     .target
                     .target()
-                    .map(|s| s.format(Verbosity::Minimal))
+                    .map(|s| s.format(Stencil::default()))
                     .unwrap_or_default();
 
                 let members: Vec<Analysis<'element>> = constructor

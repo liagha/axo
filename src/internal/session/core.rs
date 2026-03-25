@@ -1,13 +1,12 @@
-use std::fs::create_dir_all;
 use {
     crate::{
         analyzer::{Analysis, AnalyzeError},
         data::*,
-        format::{Display, Show, Verbosity},
+        format::{Display, Show, Stencil},
         initializer::{InitializeError, Initializer},
         internal::{
             hash::{Map, DefaultHasher, Hash, Hasher},
-            platform::{read_dir, PathBuf},
+            platform::{read_dir, create_dir_all, PathBuf},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
@@ -294,18 +293,18 @@ impl<'session> Session<'session> {
         None
     }
 
-    pub fn get_verbosity(&self) -> Verbosity {
+    pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                     kind: TokenKind::Integer(value),
+                     kind: TokenKind::Integer(_),
                      ..
-                 }) => Verbosity::from(value as u8),
-            _ => Verbosity::Off,
+                 }) => Some(Stencil::default()),
+            _ => None,
         }
     }
 
     pub fn is_active(&self) -> bool {
-        self.get_verbosity() != Verbosity::Off
+        self.get_stencil().is_some()
     }
 
     pub fn report_start(&self, stage: &str) {
@@ -348,12 +347,12 @@ impl<'session> Session<'session> {
     }
 
     pub fn report_section(&self, head: &str, color: Color, body: String) {
-        if self.is_active() && !body.is_empty() {
+        if let Some(stencil) = self.get_stencil() {
             xprintln!(
                 "{}{}\n{}" => Color::White,
                 head => color,
                 ":" => Color::White,
-                Str::from(body).indent(self.get_verbosity().into()) => Color::White
+                Str::from(body).indent(stencil) => Color::White
             );
             xprintln!();
         }

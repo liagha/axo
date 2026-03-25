@@ -1,41 +1,11 @@
-use crate::{data::Str, internal::hash::Set};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum Verbosity {
-    Off,
-    #[default]
-    Minimal,  
-    Detailed,
-    Debug,
-}
-
-impl From<u8> for Verbosity {
-    fn from(level: u8) -> Self {
-        match level {
-            0 => Self::Off,
-            1 => Self::Minimal,
-            2 => Self::Detailed,
-            _ => Self::Debug,
-        }
-    }
-}
-
-impl Verbosity {
-    pub fn fallback(self) -> Self {
-        match self {
-            Self::Off => Self::Off,
-            Self::Debug => Self::Detailed,
-            Self::Detailed => Self::Minimal,
-            Self::Minimal => Self::Minimal,
-        }
-    }
-}
+use crate::{data::Str, format::Stencil, internal::hash::Set};
 
 pub trait Show<'show> {
-    fn format(&self, verbosity: Verbosity) -> Str<'show>;
-    fn indent(&self, verbosity: Verbosity) -> Str<'show> {
+    fn format(&self, config: Stencil) -> Stencil;
+    fn indent(&self, stencil: Stencil) -> Str<'show> {
         Str::from(
-            self.format(verbosity)
+            self.format(stencil)
+                .to_string()
                 .lines()
                 .into_iter()
                 .map(|line| format!("    {}", line))
@@ -46,101 +16,65 @@ pub trait Show<'show> {
 }
 
 impl<'show, T: Show<'show>> Show<'show> for &T {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        (*self).format(verbosity)
+    fn format(&self, config: Stencil) -> Stencil {
+        (*self).format(config)
     }
 }
 
 impl<'show, T: Show<'show>> Show<'show> for Box<T> {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        (**self).format(verbosity)
+    fn format(&self, config: Stencil) -> Stencil {
+        (**self).format(config)
     }
 }
 
 impl<'show, T: Show<'show>> Show<'show> for Option<T> {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        match verbosity {
-            Verbosity::Off => "".into(),
-            Verbosity::Minimal => match self {
-                Some(value) => value.format(verbosity),
-                None => "".into(),
-            },
-            Verbosity::Detailed => match self {
-                Some(value) => format!("Some({})", value.format(verbosity)).into(),
-                None => "None".into(),
-            },
-            Verbosity::Debug => match self {
-                Some(value) => format!(
-                    "Some(\n{}\n)",
-                    value.format(verbosity).indent(verbosity)
-                ).into(),
-                None => "None".into(),
-            },
+    fn format(&self, config: Stencil) -> Stencil {
+        match self {
+            Some(value) => config.clone().new("Some").field("", value.format(config)),
+            None => Stencil::from("None"),
         }
     }
 }
 
 impl<'show, Item: Show<'show>> Show<'show> for [Item] {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        match verbosity {
-            Verbosity::Off => "".into(),
-            Verbosity::Minimal => Str::from(
-                self.iter()
-                    .map(|form| form.format(verbosity).to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
-            ),
-            Verbosity::Detailed => Str::from(
-                format!(
-                    "[{}]",
-                    self.iter()
-                        .map(|form| form.format(verbosity).to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-            ),
-            Verbosity::Debug => {
-                if self.is_empty() {
-                    return "[]".into();
-                }
-                Str::from(format!(
-                    "[\n{}\n]",
-                    self.iter()
-                        .map(|form| form.format(verbosity).indent(verbosity).to_string())
-                        .collect::<Vec<String>>()
-                        .join(",\n")
-                ))
-            }
+    fn format(&self, config: Stencil) -> Stencil {
+        if self.is_empty() {
+            return Stencil::from("[]");
         }
+        let mut stencil = config.clone();
+        for item in self {
+            stencil = stencil.field("", item.format(config.clone()));
+        }
+        stencil
     }
 }
 
 impl<'show, Item: Show<'show>> Show<'show> for Vec<Item> {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        (&self.as_slice()).format(verbosity)
+    fn format(&self, config: Stencil) -> Stencil {
+        self.as_slice().format(config)
     }
 }
 
 impl<'show, Item: Show<'show>> Show<'show> for Set<Item> {
-    fn format(&self, verbosity: Verbosity) -> Str<'show> {
-        self.iter().collect::<Vec<&Item>>().format(verbosity)
+    fn format(&self, config: Stencil) -> Stencil {
+        self.iter().collect::<Vec<&Item>>().format(config)
     }
 }
 
 impl<'show> Show<'show> for String {
-    fn format(&self, _verbosity: Verbosity) -> Str<'show> {
-        Str::from(self.clone())
+    fn format(&self, _config: Stencil) -> Stencil {
+        Stencil::from(self.clone())
     }
 }
 
-impl<'show> Show<'show> for &'show str {
-    fn format(&self, _verbosity: Verbosity) -> Str<'show> {
-        Str::from(*self)
+impl<'show> Show<'show> for &str {
+    fn format(&self, _config: Stencil) -> Stencil {
+        Stencil::from(*self)
     }
 }
 
 impl<'show> Show<'show> for Str<'show> {
-    fn format(&self, _verbosity: Verbosity) -> Str<'show> {
-        *self
+    fn format(&self, _config: Stencil) -> Stencil {
+        Stencil::from(self.to_string())
     }
 }

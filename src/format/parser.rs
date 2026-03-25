@@ -1,91 +1,56 @@
 use {
-    broccli::{Color, TextStyle},
     crate::{
-        data::Str,
-        format::{Show, Verbosity},
+        format::{Show, Stencil},
         parser::{Element, ElementKind, Symbol, SymbolKind},
     },
 };
 
 impl<'element> Show<'element> for Element<'element> {
-    fn format(&self, verbosity: Verbosity) -> Str<'element> {
-        self.kind.format(verbosity)
+    fn format(&self, config: Stencil) -> Stencil {
+        self.kind.format(config)
     }
 }
 
 impl<'element> Show<'element> for ElementKind<'element> {
-    fn format(&self, verbosity: Verbosity) -> Str<'element> {
-        if verbosity == Verbosity::Off {
-            return "".into();
-        }
-
+    fn format(&self, config: Stencil) -> Stencil {
         match self {
-            ElementKind::Literal(literal) => literal.format(verbosity),
-            ElementKind::Delimited(delimited) => delimited.format(verbosity),
-            ElementKind::Binary(binary) => binary.format(verbosity),
-            ElementKind::Unary(unary) => unary.format(verbosity),
-            ElementKind::Index(index) => index.format(verbosity),
-            ElementKind::Invoke(invoke) => invoke.format(verbosity),
-            ElementKind::Symbolize(symbol) => symbol.format(verbosity),
-            ElementKind::Construct(construct) => match verbosity {
-                Verbosity::Minimal => construct.format(verbosity),
-                Verbosity::Detailed => format!("Construct({})", construct.format(verbosity)).into(),
-                Verbosity::Debug => format!(
-                    "Construct {{\n{}\n}}",
-                    construct.format(verbosity).indent(verbosity)
-                ).into(),
-                _ => "".into(),
-            },
+            ElementKind::Literal(literal) => literal.format(config),
+            ElementKind::Delimited(delimited) => delimited.format(config),
+            ElementKind::Binary(binary) => binary.format(config),
+            ElementKind::Unary(unary) => unary.format(config),
+            ElementKind::Index(index) => index.format(config),
+            ElementKind::Invoke(invoke) => invoke.format(config),
+            ElementKind::Symbolize(symbol) => symbol.format(config),
+            ElementKind::Construct(construct) => config.clone().new("ElementKind").variant("Construct").field("value", construct.format(config.clone())),
         }
     }
 }
 
 impl<'symbol> Show<'symbol> for Symbol<'symbol> {
-    fn format(&self, verbosity: Verbosity) -> Str<'symbol> {
-        match verbosity {
-            Verbosity::Off => "".into(),
-            Verbosity::Minimal => format!(
-                "{} {}",
-                self.identity.colorize(Color::Blue),
-                self.kind.format(verbosity)
-            ).into(),
-            Verbosity::Detailed => format!(
-                "Symbol({}. {}: {:?})",
-                self.identity.colorize(Color::Blue),
-                self.kind.format(verbosity),
-                self.visibility,
-            ).into(),
-            Verbosity::Debug => format!(
-                "Symbol {{\n{},\n{},\n{}\n}}",
-                format!("identity: {}", self.identity.colorize(Color::Blue)).indent(verbosity),
-                format!("kind: {}", self.kind.format(verbosity)).indent(verbosity),
-                format!("visibility: {:?}", self.visibility).indent(verbosity),
-            ).into(),
-        }
+    fn format(&self, config: Stencil) -> Stencil {
+        config.clone().new("Symbol")
+            .field("kind", self.kind.format(config.clone()))
+            .field("visibility", format!("{:?}", self.visibility))
     }
 }
 
 impl<'symbol> Show<'symbol> for SymbolKind<'symbol> {
-    fn format(&self, verbosity: Verbosity) -> Str<'symbol> {
-        if verbosity == Verbosity::Off {
-            return "".into();
-        }
-
+    fn format(&self, config: Stencil) -> Stencil {
         match self {
-            SymbolKind::Binding(binding) => binding.format(verbosity),
-            SymbolKind::Function(function) => function.format(verbosity),
-            SymbolKind::Module(module) => module.format(verbosity),
-            SymbolKind::Structure(structure) => match verbosity {
-                Verbosity::Minimal => format!("struct {}", structure.format(verbosity)).into(),
-                Verbosity::Detailed => format!("Structure({})", structure.format(verbosity)).into(),
-                Verbosity::Debug => format!("Structure {{\n{}\n}}", structure.format(verbosity).indent(verbosity)).into(),
-                _ => "".into()
+            SymbolKind::Binding(binding) => {
+                config.clone().new("SymbolKind").variant("Binding").field("binding", binding.format(config.clone()))
             },
-            SymbolKind::Union(union) => match verbosity {
-                Verbosity::Minimal => format!("union {}", union.format(verbosity)).into(),
-                Verbosity::Detailed => format!("Union({})", union.format(verbosity)).into(),
-                Verbosity::Debug => format!("Union {{\n{}\n}}", union.format(verbosity).indent(verbosity)).into(),
-                _ => "".into()
+            SymbolKind::Function(function) => {
+                config.clone().new("SymbolKind").variant("Function").field("function", function.format(config.clone()))
+            },
+            SymbolKind::Module(module) => {
+                config.clone().new("SymbolKind").variant("Module").field("module", module.format(config.clone()))
+            },
+            SymbolKind::Structure(structure) => {
+                config.clone().new("SymbolKind").variant("Structure").field("structure", structure.format(config.clone()))
+            },
+            SymbolKind::Union(union) => {
+                config.clone().new("SymbolKind").variant("Union").field("union", union.format(config.clone()))
             },
         }
     }
