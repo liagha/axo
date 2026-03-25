@@ -359,15 +359,23 @@ impl<'backend> Generator<'backend> {
 
 impl<'backend> Backend<'backend> for Generator<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
+        // PASS 1: Declarations (Signatures, Opaque Structs, Global Bindings)
         for analysis in &analyses {
             match &analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    if let Err(error) = self.structure(structure.clone(), analysis.span.clone()) {
+                    // Register opaque struct/union types here
+                    if let Err(error) = self.declare_structure(structure.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
                 }
                 AnalysisKind::Union(union) => {
-                    if let Err(error) = self.union(union.clone(), analysis.span.clone()) {
+                    if let Err(error) = self.declare_union(union.clone(), analysis.span.clone()) {
+                        self.errors.push(error);
+                    }
+                }
+                AnalysisKind::Function(function) => {
+                    // Register function signatures and external linkages
+                    if let Err(error) = self.declare_function(function.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
                 }
@@ -375,44 +383,50 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             }
         }
 
-        for analysis in &analyses {
-            if let AnalysisKind::Binding(_) = &analysis.kind {
-                self.builder.clear_insertion_position();
-                if let Err(error) = self.analysis(analysis.clone()) {
-                    self.errors.push(error);
-                }
-            }
-        }
-
+        // PASS 2: Definitions (Bodies, Struct Members, Expressions)
         let mut entry = None;
 
         for analysis in &analyses {
-            if let AnalysisKind::Function(function) = &analysis.kind {
-                if function.entry {
-                    if entry.is_none() {
+            match &analysis.kind {
+                AnalysisKind::Structure(structure) => {
+                    if let Err(error) = self.define_structure(structure.clone(), analysis.span.clone()) {
+                        self.errors.push(error);
+                    }
+                }
+                AnalysisKind::Union(union) => {
+                    if let Err(error) = self.define_union(union.clone(), analysis.span.clone()) {
+                        self.errors.push(error);
+                    }
+                }
+                AnalysisKind::Function(function) => {
+                    if function.entry {
                         entry = Some((function, analysis.span.clone()));
                     } else {
                         self.builder.clear_insertion_position();
-                        if let Err(error) = self.analysis(analysis.clone()) {
+                        if let Err(error) = self.define_function(function.clone(), analysis.span.clone()) {
                             self.errors.push(error);
                         }
                     }
-                } else {
+                }
+                AnalysisKind::Binding(_) => {
                     self.builder.clear_insertion_position();
                     if let Err(error) = self.analysis(analysis.clone()) {
                         self.errors.push(error);
                     }
                 }
+                _ => {}
             }
         }
 
+        // Handle the entry function last
         if let Some((entry_func, span)) = entry {
             self.builder.clear_insertion_position();
-            if let Err(error) = self.function(entry_func.clone(), span) {
+            if let Err(error) = self.define_function(entry_func.clone(), span) {
                 self.errors.push(error);
             }
         }
 
+        // Sanity check and Verification
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
                 if self.errors.is_empty() {
@@ -441,6 +455,10 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
 
     fn analysis(&mut self, analysis: Analysis<'backend>) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         match analysis.kind {
+            AnalysisKind::Structure(structure) => self.define_structure(structure, analysis.span),
+            AnalysisKind::Union(structure) => self.define_union(structure, analysis.span),
+            AnalysisKind::Function(function) => self.define_function(function, analysis.span),
+
             AnalysisKind::Integer { value, size, signed, } => Ok(self.integer(value, size, signed)),
             AnalysisKind::Float { value, size } => self.float(value, size, analysis.span),
             AnalysisKind::Boolean { value } => Ok(self.boolean(value)),
@@ -483,10 +501,7 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::Block(analyses) => self.block(analyses, analysis.span),
             AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(*condition, *then, otherwise.map(|value| *value), analysis.span, false),
             AnalysisKind::While(condition, body) => self.r#while(condition, body, analysis.span),
-            AnalysisKind::Structure(structure) => self.structure(structure, analysis.span),
-            AnalysisKind::Union(structure) => self.union(structure, analysis.span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, analysis.span),
-            AnalysisKind::Function(function) => self.function(function, analysis.span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, analysis.span),
             AnalysisKind::Return(value) => self.r#return(value, analysis.span),
             AnalysisKind::Break(value) => self.r#break(value, analysis.span),

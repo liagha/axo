@@ -109,16 +109,12 @@ impl<'backend> Generator<'backend> {
         Ok(self.context.i64_type().const_zero().into())
     }
 
-    pub fn function(
+
+    pub fn declare_function(
         &mut self,
-        routine: Function<
-            Str<'backend>,
-            Analysis<'backend>,
-            Option<Box<Analysis<'backend>>>,
-            Option<Type<'backend>>,
-        >,
+        routine: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
         span: Span<'backend>,
-    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+    ) -> Result<(), GenerateError<'backend>> {
         let mut params = vec![];
 
         for member in &routine.members {
@@ -138,7 +134,6 @@ impl<'backend> Generator<'backend> {
                         layout
                     }
                 };
-
                 params.push(layout.into());
             }
         }
@@ -154,103 +149,104 @@ impl<'backend> Generator<'backend> {
         };
 
         let name = routine.target.as_str().unwrap_or("function");
+        let module = self.current_module();
 
-        let function = if matches!(routine.interface, Interface::C) {
-            let module = self.current_module();
-            let external = if let Some(existing) = module.get_function(name) {
-                existing
-            } else {
-                let func = module.add_function(
-                    name,
-                    signature,
-                    Some(inkwell::module::Linkage::External),
-                );
-                func.set_section(Some("text"));
-                func
-            };
-
-            self.insert_entity(routine.target.clone(), Entity::Function(external));
-            external
+        let linkage = if matches!(routine.interface, Interface::C) || routine.entry {
+            Some(inkwell::module::Linkage::External)
         } else {
-            let linkage = if routine.entry {
-                Some(inkwell::module::Linkage::External)
-            } else {
-                Some(inkwell::module::Linkage::External)
-            };
-
-            let module = self.current_module();
-            let internal = if let Some(existing) = module.get_function(name) {
-                existing
-            } else {
-                module.add_function(name, signature, linkage)
-            };
-
-            self.insert_entity(routine.target.clone(), Entity::Function(internal));
-
-            if internal.get_basic_blocks().is_empty() {
-                let entry = self.context.append_basic_block(internal, "entry");
-                self.builder.position_at_end(entry);
-            } else if let Some(last_block) = internal.get_last_basic_block() {
-                self.builder.position_at_end(last_block);
-            }
-
-            internal
+            Some(inkwell::module::Linkage::External) // Or Internal depending on your needs
         };
 
-        if !matches!(routine.interface, Interface::C) {
-            for (param, member) in function.get_param_iter().zip(routine.members.iter()) {
-                if let AnalysisKind::Binding(binding) = &member.kind {
-                    if let AnalysisKind::Usage(target) = binding.target.kind {
-                        let pointer = self.build_entry(function, param.get_type(), target.clone());
-                        let align = self.align(param.get_type());
+        let func = if let Some(existing) = module.get_function(name) {
+            existing
+        } else {
+            module.add_function(name, signature, linkage)
+        };
 
-                        self.builder
-                            .build_store(pointer, param)
-                            .and_then(|inst| {
-                                inst.set_alignment(align).ok();
-                                Ok(inst)
-                            })
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+        if matches!(routine.interface, Interface::C) {
+            func.set_section(Some("text"));
+        }
 
-                        self.insert_entity(
-                            target.clone(),
-                            Entity::Variable {
-                                pointer,
-                                typing: binding.annotation.clone(),
-                            },
-                        );
-                    }
+        self.insert_entity(routine.target.clone(), Entity::Function(func));
+        Ok(())
+    }
+
+    pub fn define_function(
+        &mut self,
+        routine: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
+        span: Span<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+        // Skip definition for C (external) functions
+        if matches!(routine.interface, Interface::C) {
+            return Ok(self.context.i64_type().const_zero().into());
+        }
+
+        let name = routine.target.as_str().unwrap_or("function");
+        let function = self.current_module().get_function(name).unwrap();
+
+        // Setup Entry Block
+        if function.get_basic_blocks().is_empty() {
+            let entry = self.context.append_basic_block(function, "entry");
+            self.builder.position_at_end(entry);
+        } else if let Some(last_block) = function.get_last_basic_block() {
+            self.builder.position_at_end(last_block);
+        }
+
+        // Setup Parameters
+        for (param, member) in function.get_param_iter().zip(routine.members.iter()) {
+            if let AnalysisKind::Binding(binding) = &member.kind {
+                if let AnalysisKind::Usage(target) = binding.target.kind {
+                    let pointer = self.build_entry(function, param.get_type(), target.clone());
+                    let align = self.align(param.get_type());
+
+                    self.builder
+                        .build_store(pointer, param)
+                        .and_then(|inst| {
+                            inst.set_alignment(align).ok();
+                            Ok(inst)
+                        })
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                    self.insert_entity(
+                        target.clone(),
+                        Entity::Variable {
+                            pointer,
+                            typing: binding.annotation.clone(),
+                        },
+                    );
                 }
             }
+        }
 
-            self.clear_loops();
+        self.clear_loops();
 
-            let result = if let Some(body) = routine.body {
-                Some(self.analysis(*body.clone())?)
+        // Generate Body
+        let result = if let Some(body) = routine.body {
+            Some(self.analysis(*body.clone())?)
+        } else {
+            None
+        };
+
+        // Handle Return
+        if !self.terminated() {
+            if routine.output.is_none() {
+                self.builder
+                    .build_return(None)
+                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else {
-                None
-            };
+                let expected = function.get_type().get_return_type().unwrap();
 
-            if !self.terminated() {
-                if output.is_none() {
-                    self.builder
-                        .build_return(None)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                } else {
-                    let expected = function.get_type().get_return_type().unwrap();
-
-                    if let Some(result) = result {
-                        if result.get_type() != expected {
-                            return Err(GenerateError::new(
-                                ErrorKind::Function(FunctionError::IncompatibleReturnType),
-                                span,
-                            ));
-                        }
-
-                        self.builder
-                            .build_return(Some(&result))
-                            .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                if let Some(res) = result {
+                    if res.get_type() != expected {
+                        return Err(GenerateError::new(
+                            ErrorKind::Function(FunctionError::IncompatibleReturnType),
+                            span,
+                        ));
                     }
+
+                    self.builder
+                        .build_return(Some(&res))
+                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
                 }
             }
         }

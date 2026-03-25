@@ -320,12 +320,17 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     Some("if") => {
                         let condition = invoke.members[0].analyze(resolver)?;
                         let then = invoke.members[1].analyze(resolver)?;
-                        let otherwise = invoke.members[2].analyze(resolver)?;
+
+                        let otherwise = if invoke.members.len() == 3 {
+                            Some(Box::new(invoke.members[2].analyze(resolver)?))
+                        } else {
+                            None
+                        };
 
                         AnalysisKind::Conditional(
                             Box::new(condition),
                             Box::new(then),
-                            Some(Box::new(otherwise)),
+                            otherwise,
                         )
                     }
                     Some("while") => {

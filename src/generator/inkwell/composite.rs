@@ -92,7 +92,25 @@ impl<'backend> Generator<'backend> {
         }
     }
 
-    pub fn structure(
+    pub fn declare_structure(
+        &mut self,
+        structure: Aggregate<Str<'backend>, Analysis<'backend>>,
+        _span: Span<'backend>,
+    ) -> Result<(), GenerateError<'backend>> {
+        let identifier = structure.target.clone();
+        let name = identifier.as_str().unwrap_or("structure");
+
+        let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
+            self.context.opaque_struct_type(name)
+        });
+
+        // Insert as an opaque type initially
+        self.insert_entity(identifier, Entity::Structure { shape, members: vec![] });
+
+        Ok(())
+    }
+
+    pub fn define_structure(
         &mut self,
         structure: Aggregate<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
@@ -100,9 +118,8 @@ impl<'backend> Generator<'backend> {
         let identifier = structure.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
 
-        let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
-            self.context.opaque_struct_type(name)
-        });
+        // The structure was created in pass 1
+        let shape = self.context.get_struct_type(name).unwrap();
 
         let mut types = Vec::with_capacity(structure.members.len());
         let mut members = Vec::with_capacity(structure.members.len());
@@ -124,12 +141,30 @@ impl<'backend> Generator<'backend> {
             shape.set_body(&types, false);
         }
 
-        self.insert_entity(identifier, Entity::Structure { shape, members });
+        self.update_entity(&identifier, Entity::Structure { shape, members });
 
         Ok(self.context.i64_type().const_zero().into())
     }
 
-    pub fn union(
+    pub fn declare_union(
+        &mut self,
+        union: Aggregate<Str<'backend>, Analysis<'backend>>,
+        _span: Span<'backend>,
+    ) -> Result<(), GenerateError<'backend>> {
+        let identifier = union.target.clone();
+        let name = identifier.as_str().unwrap_or("union");
+
+        let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
+            self.context.opaque_struct_type(name)
+        });
+
+        // Insert as an opaque type initially
+        self.insert_entity(identifier, Entity::Union { shape, members: vec![] });
+
+        Ok(())
+    }
+
+    pub fn define_union(
         &mut self,
         union: Aggregate<Str<'backend>, Analysis<'backend>>,
         _span: Span<'backend>,
@@ -137,9 +172,8 @@ impl<'backend> Generator<'backend> {
         let identifier = union.target.clone();
         let name = identifier.as_str().unwrap_or("union");
 
-        let shape = self.context.get_struct_type(name).unwrap_or_else(|| {
-            self.context.opaque_struct_type(name)
-        });
+        // The union was created in pass 1
+        let shape = self.context.get_struct_type(name).unwrap();
 
         let mut members = Vec::with_capacity(union.members.len());
         let mut maximum = 0;
@@ -173,11 +207,10 @@ impl<'backend> Generator<'backend> {
             }
         }
 
-        self.insert_entity(identifier, Entity::Union { shape, members });
+        self.update_entity(&identifier, Entity::Union { shape, members });
 
         Ok(self.context.i64_type().const_zero().into())
     }
-
 
     pub fn constructor(
         &mut self,
