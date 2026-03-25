@@ -13,6 +13,7 @@ use {
         tracker::Span,
     },
     inkwell::{
+        module::Linkage,
         basic_block::BasicBlock,
         types::{BasicType, BasicTypeEnum},
         values::{BasicValue, BasicValueEnum, FunctionValue, IntValue},
@@ -112,17 +113,17 @@ impl<'backend> Generator<'backend> {
 
     pub fn declare_function(
         &mut self,
-        routine: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
+        function: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
         span: Span<'backend>,
     ) -> Result<(), GenerateError<'backend>> {
-        let mut params = vec![];
+        let mut parameters = vec![];
 
-        for member in &routine.members {
+        for member in &function.members {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 let layout = {
                     let layout = self.to_basic_type(&binding.annotation, member.span)?;
 
-                    if matches!(routine.interface, Interface::C) {
+                    if matches!(function.interface, Interface::C) {
                         if let TypeKind::String = &binding.annotation.kind {
                             self.context.ptr_type(inkwell::AddressSpace::default()).into()
                         } else if let TypeKind::Character = &binding.annotation.kind {
@@ -134,73 +135,68 @@ impl<'backend> Generator<'backend> {
                         layout
                     }
                 };
-                params.push(layout.into());
+
+                parameters.push(layout.into());
             }
         }
 
-        let output = match &routine.output {
+        let output = match &function.output {
             Some(annotation) => Some(self.to_basic_type(annotation, span)?),
             None => None,
         };
 
         let signature = match output {
-            Some(layout) => layout.fn_type(&params, false),
-            None => self.context.void_type().fn_type(&params, false),
+            Some(layout) => layout.fn_type(&parameters, false),
+            None => self.context.void_type().fn_type(&parameters, false),
         };
 
-        let name = routine.target.as_str().unwrap_or("function");
+        let name = function.target.as_str().unwrap_or("function");
         let module = self.current_module();
 
-        let linkage = if matches!(routine.interface, Interface::C) || routine.entry {
-            Some(inkwell::module::Linkage::External)
+        let linkage = if matches!(function.interface, Interface::C) || function.entry {
+            Some(Linkage::External)
         } else {
-            Some(inkwell::module::Linkage::External) // Or Internal depending on your needs
+            Some(Linkage::External)
         };
 
-        let func = if let Some(existing) = module.get_function(name) {
+        let value = if let Some(existing) = module.get_function(name) {
             existing
         } else {
             module.add_function(name, signature, linkage)
         };
 
-        if matches!(routine.interface, Interface::C) {
-            func.set_section(Some("text"));
-        }
+        self.insert_entity(function.target.clone(), Entity::Function(value));
 
-        self.insert_entity(routine.target.clone(), Entity::Function(func));
         Ok(())
     }
 
     pub fn define_function(
         &mut self,
-        routine: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
+        function: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        // Skip definition for C (external) functions
-        if matches!(routine.interface, Interface::C) {
+        if matches!(function.interface, Interface::C) {
             return Ok(self.context.i64_type().const_zero().into());
         }
 
-        let name = routine.target.as_str().unwrap_or("function");
-        let function = self.current_module().get_function(name).unwrap();
+        let name = function.target.as_str().unwrap_or("function");
+        let value = self.current_module().get_function(name).unwrap();
 
-        // Setup Entry Block
-        if function.get_basic_blocks().is_empty() {
-            let entry = self.context.append_basic_block(function, "entry");
+        if value.get_basic_blocks().is_empty() {
+            let entry = self.context.append_basic_block(value, "entry");
             self.builder.position_at_end(entry);
-        } else if let Some(last_block) = function.get_last_basic_block() {
+        } else if let Some(last_block) = value.get_last_basic_block() {
             self.builder.position_at_end(last_block);
         }
 
-        // Setup Parameters
-        for (param, member) in function.get_param_iter().zip(routine.members.iter()) {
+        for (parameter, member) in value.get_param_iter().zip(function.members.iter()) {
             if let AnalysisKind::Binding(binding) = &member.kind {
                 if let AnalysisKind::Usage(target) = binding.target.kind {
-                    let pointer = self.build_entry(function, param.get_type(), target.clone());
-                    let align = self.align(param.get_type());
+                    let pointer = self.build_entry(value, parameter.get_type(), target.clone());
+                    let align = self.align(parameter.get_type());
 
                     self.builder
-                        .build_store(pointer, param)
+                        .build_store(pointer, parameter)
                         .and_then(|inst| {
                             inst.set_alignment(align).ok();
                             Ok(inst)
@@ -220,21 +216,19 @@ impl<'backend> Generator<'backend> {
 
         self.clear_loops();
 
-        // Generate Body
-        let result = if let Some(body) = routine.body {
+        let result = if let Some(body) = function.body {
             Some(self.analysis(*body.clone())?)
         } else {
             None
         };
 
-        // Handle Return
         if !self.terminated() {
-            if routine.output.is_none() {
+            if function.output.is_none() {
                 self.builder
                     .build_return(None)
                     .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
             } else {
-                let expected = function.get_type().get_return_type().unwrap();
+                let expected = value.get_type().get_return_type().unwrap();
 
                 if let Some(res) = result {
                     if res.get_type() != expected {
@@ -453,7 +447,7 @@ impl<'backend> Generator<'backend> {
                     let external = module.add_function(
                         identifier,
                         layout,
-                        Some(inkwell::module::Linkage::External),
+                        Some(Linkage::External),
                     );
                     Some(external)
                 }

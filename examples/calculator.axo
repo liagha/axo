@@ -21,37 +21,37 @@ func next_token(var lexer: Lexer): Token {
         if(string.is_whitespace(current_char), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             continue()
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8('+'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "PLUS", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8('-'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "MINUS", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8('*'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "MULTIPLY", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8('/'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "DIVIDE", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8('('), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "LPAREN", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(current_char == cast.character_uint8(')'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
             return(Token { kind = "RPAREN", value = 0.0, next_position = lexer.position })
-        }, 0)
+        })
 
         if(string.is_digit(current_char), {
             const start = lexer.position
@@ -63,7 +63,7 @@ func next_token(var lexer: Lexer): Token {
             const num_str = string.string_substring(lexer.input, start, lexer.position)
 
             return(Token { kind = "NUMBER", value = string.parse_float(num_str), next_position = lexer.position })
-        }, 0)
+        })
 
         lexer.position = lexer.position + cast.integer_uint64(1)
         return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })

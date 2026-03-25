@@ -451,81 +451,118 @@ impl<'backend> Generator<'backend> {
 
     pub fn binding(
         &mut self,
-        bind: Binding<Box<Analysis<'backend>>, Box<Analysis<'backend>>, Type<'backend>>,
+        binding: Binding<Box<Analysis<'backend>>, Box<Analysis<'backend>>, Type<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        match bind.target.kind { 
+        match binding.target.kind {
             AnalysisKind::Usage(target) => {
-                let expression = bind.value.ok_or_else(|| {
-                    GenerateError::new(
-                        ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                            name: target.to_string(),
-                        }),
-                        span,
-                    )
-                })?;
+                match binding.kind {
+                    BindingKind::Static => {
+                        let expression = binding.value.ok_or_else(|| {
+                            GenerateError::new(
+                                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                    name: target.to_string(),
+                                }),
+                                span,
+                            )
+                        })?;
 
-                let typing = bind.annotation.clone();
-                let global = self.builder.get_insert_block().is_none();
+                        let result = self.analysis(*expression)?;
 
-                let scope = if global {
-                    let void = self.context.void_type();
-                    let signature = void.fn_type(&[], false);
-                    let function = self.current_module().add_function("init", signature, None);
-                    let block = self.context.append_basic_block(function, "entry");
+                        let declared = result.get_type();
 
-                    self.builder.position_at_end(block);
-                    Some(function)
-                } else {
-                    None
-                };
+                        let variable = self.current_module().add_global(declared, None, &target);
+                        variable.set_initializer(&result);
+                        variable.set_alignment(self.align(declared));
 
-                let result = self.analysis(*expression)?;
+                        let pointer = variable.as_pointer_value();
 
-                if let Some(function) = scope {
-                    self.builder.clear_insertion_position();
-                    unsafe {
-                        function.delete();
+                        let typing = binding.annotation.clone();
+
+                        self.insert_entity(
+                            target.clone(),
+                            Entity::Variable {
+                                pointer,
+                                typing,
+                            },
+                        );
+
+                        Ok(result)
+                    }
+
+                    _ => {
+                        let expression = binding.value.ok_or_else(|| {
+                            GenerateError::new(
+                                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                    name: target.to_string(),
+                                }),
+                                span,
+                            )
+                        })?;
+
+                        let typing = binding.annotation.clone();
+                        let global = self.builder.get_insert_block().is_none();
+
+                        let scope = if global {
+                            let void = self.context.void_type();
+                            let signature = void.fn_type(&[], false);
+                            let function = self.current_module().add_function("init", signature, None);
+                            let block = self.context.append_basic_block(function, "entry");
+
+                            self.builder.position_at_end(block);
+                            Some(function)
+                        } else {
+                            None
+                        };
+
+                        let result = self.analysis(*expression)?;
+
+                        if let Some(function) = scope {
+                            self.builder.clear_insertion_position();
+                            unsafe {
+                                function.delete();
+                            }
+                        }
+
+                        let declared = result.get_type();
+
+                        let pointer = if global {
+                            let variable = self.current_module().add_global(declared, None, &target);
+                            variable.set_initializer(&result);
+                            variable.set_alignment(self.align(declared));
+                            variable.as_pointer_value()
+                        } else {
+                            let allocate = self
+                                .builder
+                                .build_alloca(declared, &target)
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+
+                            if let Some(instruction) = allocate.as_instruction_value() {
+                                instruction.set_alignment(self.align(declared)).ok();
+                            }
+
+                            let store = self
+                                .builder
+                                .build_store(allocate, result)
+                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                            store.set_alignment(self.align(declared)).ok();
+
+                            allocate
+                        };
+
+                        self.insert_entity(
+                            target.clone(),
+                            Entity::Variable {
+                                pointer,
+                                typing,
+                            },
+                        );
+
+                        Ok(result)
                     }
                 }
+            }
 
-                let declared = result.get_type();
-
-                let pointer = if global {
-                    let variable = self.current_module().add_global(declared, None, &target);
-                    variable.set_initializer(&result);
-                    variable.set_alignment(self.align(declared));
-                    variable.as_pointer_value()
-                } else {
-                    let allocate = self
-                        .builder
-                        .build_alloca(declared, &target)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                    if let Some(instruction) = allocate.as_instruction_value() {
-                        instruction.set_alignment(self.align(declared)).ok();
-                    }
-
-                    let store = self
-                        .builder
-                        .build_store(allocate, result)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                    store.set_alignment(self.align(declared)).ok();
-
-                    allocate
-                };
-
-                self.insert_entity(
-                    target.clone(),
-                    Entity::Variable {
-                        pointer,
-                        typing,
-                    },
-                );
-
-                Ok(result)
-            } 
-            
             _ => {
                 unimplemented!("destruction isn't implemented yet!");
             }
