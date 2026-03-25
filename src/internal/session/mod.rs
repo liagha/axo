@@ -38,7 +38,7 @@ use {
 };
 
 impl<'session> Session<'session> {
-    const PIPELINE: [fn(&mut Session<'session>); 2] = [
+    const PIPELINE: [fn(&mut Session<'session>); 3] = [
         Self::prepare,
         Self::scan,
         Self::parse,
