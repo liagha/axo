@@ -158,12 +158,10 @@ impl Stencil {
             flat.push_str(&self.close);
         }
 
-        // If it fits entirely on one line, and no parts of it are multiline, return it inline.
         if self.inline || (!self.block && !joined.contains('\n') && flat.len() <= self.maximum) {
             return flat;
         }
 
-        // Return immediately if it is a transparent wrapper (prevents ghost lines and indent bumps)
         if !show_delimiters {
             return items[0].clone();
         }
@@ -180,7 +178,6 @@ impl Stencil {
         }
         tree.push('\n');
 
-        // --- LINE WRAPPING LOGIC ---
         let mut current_line = inner.clone();
 
         for (i, item) in items.iter().enumerate() {
@@ -193,7 +190,6 @@ impl Stencil {
             let is_multiline = item.contains('\n');
             let exceeds_max = current_line.len() + chunk.len() > self.maximum;
 
-            // Only wrap and flush a line if we genuinely accumulated content (prevents pure blank indentation lines)
             if (is_multiline || exceeds_max) && current_line.len() > inner.len() {
                 tree.push_str(&current_line);
                 tree.push('\n');
@@ -202,7 +198,6 @@ impl Stencil {
 
             current_line.push_str(&chunk);
 
-            // If the item itself was multiline, flush it immediately so the next item starts on a new line correctly
             if is_multiline {
                 tree.push_str(&current_line);
                 tree.push('\n');
@@ -210,12 +205,10 @@ impl Stencil {
             }
         }
 
-        // Push any remaining text in the buffer
         if current_line.len() > inner.len() {
             tree.push_str(&current_line);
             tree.push('\n');
         }
-        // ---------------------------
 
         tree.push_str(&pad);
         tree.push_str(&self.close);

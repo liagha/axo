@@ -1,6 +1,6 @@
 use crate::{
     data::Identity,
-    internal::hash::{Map, Set},
+    internal::hash::{Map},
     parser::{Element, Symbol},
     resolver::{
         next_identity,
@@ -19,7 +19,6 @@ pub struct Resolver<'a> {
     pub errors: Vec<ResolveError<'a>>,
     pub variables: Vec<Option<Type<'a>>>,
     pub returns: Vec<Type<'a>>,
-    pub dependencies: Set<Identity>,
 }
 
 impl Clone for Resolver<'_> {
@@ -32,13 +31,11 @@ impl Clone for Resolver<'_> {
             errors: self.errors.clone(),
             variables: self.variables.clone(),
             returns: self.returns.clone(),
-            dependencies: self.dependencies.clone(),
         }
     }
 }
 
 pub trait Resolvable<'a> {
-    fn depending(&self, resolver: &mut Resolver<'a>);
     fn declare(&mut self, resolver: &mut Resolver<'a>);
     fn resolve(&mut self, resolver: &mut Resolver<'a>);
     fn reify(&mut self, resolver: &mut Resolver<'a>);
@@ -60,7 +57,6 @@ impl<'a> Resolver<'a> {
             errors: Vec::new(),
             variables: Vec::new(),
             returns: Vec::new(),
-            dependencies: Set::new(),
         }
     }
 

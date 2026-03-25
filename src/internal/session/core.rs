@@ -117,7 +117,6 @@ impl<'session> Record<'session> {
 
 pub struct Session<'session> {
     pub timer: DefaultTimer,
-    pub order: Vec<Identity>,
     pub records: Map<Identity, Record<'session>>,
     pub initializer: Initializer<'session>,
     pub resolver: Resolver<'session>,
@@ -252,7 +251,6 @@ impl<'session> Session<'session> {
 
         Session {
             timer,
-            order: Vec::new(),
             records,
             initializer,
             resolver,
@@ -312,6 +310,16 @@ impl<'session> Session<'session> {
             xprintln!(
                 "Started {}." => Color::Blue,
                 format!("`{}`", stage) => Color::White
+            );
+            xprintln!();
+        }
+    }
+
+    pub fn report_execute(&self, executable: &str) {
+        if self.is_active() {
+            xprintln!(
+                "Executing {}." => Color::Blue,
+                format!("`{}`", executable) => Color::White
             );
             xprintln!();
         }

@@ -22,54 +22,6 @@ fn assignable(element: &Element) -> bool {
 }
 
 impl<'element> Resolvable<'element> for Element<'element> {
-    fn depending(&self, resolver: &mut Resolver<'element>) {
-        match &self.kind {
-            ElementKind::Literal(literal) => {
-                match &literal.kind {
-                    TokenKind::Identifier(_) => {
-                        if let Some(symbol) = resolver.exact(self) {
-                            resolver.dependencies.insert(symbol.identity);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            ElementKind::Delimited(delimited) => {
-                for member in &delimited.members {
-                    member.depending(resolver);
-                }
-            }
-            ElementKind::Unary(unary) => {
-                unary.operand.depending(resolver);
-            }
-            ElementKind::Binary(binary) => {
-                binary.left.depending(resolver);
-                binary.right.depending(resolver);
-            }
-            ElementKind::Index(index) => {
-                index.target.depending(resolver);
-                for member in &index.members {
-                    member.depending(resolver);
-                }
-            }
-            ElementKind::Invoke(invoke) => {
-                invoke.target.depending(resolver);
-                for member in &invoke.members {
-                    member.depending(resolver);
-                }
-            }
-            ElementKind::Construct(construct) => {
-                construct.target.depending(resolver);
-                for member in &construct.members {
-                    member.depending(resolver);
-                }
-            }
-            ElementKind::Symbolize(symbol) => {
-                symbol.depending(resolver);
-            }
-        }
-    }
-
     fn declare(&mut self, resolver: &mut Resolver<'element>) {
         match &mut self.kind {
             ElementKind::Symbolize(symbol) => {

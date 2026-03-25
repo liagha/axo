@@ -3,7 +3,7 @@ mod core;
 pub use core::*;
 
 use {
-    broccli::{xprintln, Color},
+    broccli::{Color},
     crate::{
         analyzer::{Analysis, Analyzer},
         data::{memory::replace, Module, Str},
@@ -38,13 +38,13 @@ use {
 };
 
 impl<'session> Session<'session> {
-    const PIPELINE: [fn(&mut Session<'session>); 3] = [
+    const PIPELINE: [fn(&mut Session<'session>); 6] = [
         Self::prepare,
         Self::scan,
         Self::parse,
-        //Self::populate,
-        //Self::resolve,
-        //Self::analyze,
+        Self::populate,
+        Self::resolve,
+        Self::analyze,
     ];
 
     pub fn compile(&mut self) {
@@ -320,7 +320,6 @@ impl<'session> Session<'session> {
         let initial = self.errors.len();
         self.report_start("resolving");
 
-        // Get all source module keys (unordered or simply sorted by ID)
         let mut keys: Vec<_> = self.records
             .iter()
             .filter_map(|(&key, record)| {
@@ -333,8 +332,6 @@ impl<'session> Session<'session> {
             .collect();
         keys.sort();
 
-        // --- PASS 1: DECLARE ---
-        // Declare all symbols globally across all modules first.
         for &key in &keys {
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
@@ -355,7 +352,6 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
-        // Optional: Reporting symbols after declaration pass
         if let Some(stencil) = self.get_stencil() {
             self.report_section(
                 "Symbols",
@@ -379,8 +375,6 @@ impl<'session> Session<'session> {
             )
         }
 
-        // --- PASS 2: RESOLVE & REIFY ---
-        // Now that all symbols are declared, resolve the bodies and types.
         for &key in &keys {
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
@@ -390,12 +384,26 @@ impl<'session> Session<'session> {
 
             let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
 
-            // Resolve references
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
             }
 
-            // Reify (instantiate/finalize types)
+            let active = self.resolver.active;
+            self.resolver.exit();
+
+            module.scope = self.resolver.scopes.remove(&active).unwrap();
+            self.resolver.insert(module);
+        }
+
+        for &key in &keys {
+            let target = self.records.get(&key).unwrap().module.unwrap();
+            let mut module = self.resolver.get_symbol(target).unwrap().clone();
+            let scope = replace(&mut module.scope, Scope::new(None));
+
+            self.resolver.enter_scope(scope);
+
+            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
+
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
             }
@@ -419,7 +427,19 @@ impl<'session> Session<'session> {
 
         self.report_start("analyzing");
 
-        for &key in &self.order {
+        let mut keys: Vec<_> = self.records
+            .iter()
+            .filter_map(|(&key, record)| {
+                if record.kind == InputKind::Source && record.module.is_some() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        keys.sort();
+
+        for &key in &keys {
             let (hash, dirty, elements) = {
                 let record = self.records.get(&key).unwrap();
                 (record.hash, record.dirty, record.elements.clone())
@@ -477,7 +497,19 @@ impl<'session> Session<'session> {
 
         self.report_start("generating");
 
-        for &key in &self.order {
+        let mut keys: Vec<_> = self.records
+            .iter()
+            .filter_map(|(&key, record)| {
+                if record.kind == InputKind::Source && record.module.is_some() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        keys.sort();
+
+        for &key in &keys {
             let record = self.records.get_mut(&key).unwrap();
             let location = record.location;
             let schema = Self::schema(&base, location);
@@ -604,11 +636,7 @@ impl<'session> Session<'session> {
             link.arg(object.to_string());
         }
 
-        let key = self
-            .order
-            .last()
-            .copied()
-            .unwrap_or_else(|| *keys.last().expect("missing"));
+        let key = *keys.last().expect("missing");
 
         let record = self.records.get(&key).unwrap();
         let location = record.output.unwrap_or(record.location);
@@ -619,7 +647,7 @@ impl<'session> Session<'session> {
         let status = link.status().expect("failed");
 
         if !status.success() {
-            panic!("failed");
+            panic!("emitter failed: {}", status);
         }
 
         self.target = Some(executable);
@@ -634,13 +662,7 @@ impl<'session> Session<'session> {
 
         let executable = self.target.unwrap();
 
-        if self.is_active() {
-            xprintln!(
-                "Executing {}." => Color::Blue,
-                format!("`{}`", executable) => Color::White
-            );
-            xprintln!();
-        }
+        self.report_execute(&executable.to_string());
 
         let status = Command::new(executable.to_string())
             .status()
