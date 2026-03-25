@@ -15,7 +15,6 @@ impl<'parser> Parser<'parser> {
             Classifier::deferred(Self::structure),
             Classifier::deferred(Self::union),
             Classifier::deferred(Self::function),
-            Classifier::deferred(Self::module),
         ])
     }
 
@@ -539,48 +538,5 @@ impl<'parser> Parser<'parser> {
                     Ok(())
                 }),
         ])
-    }
-
-    pub fn module() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
-        Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
-                if let TokenKind::Identifier(id) = &token.kind {
-                    id.as_str() == Some("module")
-                } else {
-                    false
-                }
-            }),
-            Classifier::deferred(Self::literal).with_panic(
-                |former, classifier| {
-                    let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
-                    let span = stack.span();
-
-                    ParseError::new(ErrorKind::ExpectedName, span)
-                }
-            ),
-            Classifier::deferred(Self::expression).with_panic(
-                |former, classifier| {
-                    let stack = classifier.stack.iter().map(|index| former.forms.get(*index).unwrap().clone()).collect::<Vec<_>>();
-                    let span = stack.span();
-
-                    ParseError::new(ErrorKind::ExpectedBody, span)
-                }
-            ),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input().clone();
-                let name = sequence[1].unwrap_output().clone();
-                let body = sequence[2].unwrap_output().clone();
-
-                let span = Span::merge(&keyword.span(), &body.span());
-                let symbol =
-                    Symbol::new(SymbolKind::Module(Module::new(Box::new(name))), span, Visibility::Private);
-
-                *form = Form::output(Element::new(ElementKind::Symbolize(Box::from(symbol)), span));
-
-                Ok(())
-            })
     }
 }

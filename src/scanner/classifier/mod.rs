@@ -212,13 +212,7 @@ impl<'scanner> Scanner<'scanner> {
                     Classifier::sequence([Classifier::literal('/'), Classifier::literal('*')])
                         .with_ignore(),
                     Classifier::persistence(
-                        Classifier::negate(
-                            Classifier::sequence([
-                                Classifier::literal('*'),
-                                Classifier::literal('/'),
-                            ])
-                                .with_ignore(),
-                        ),
+                        Classifier::predicate(|c: &Character| *c != '*'),
                         0,
                         None,
                     ),

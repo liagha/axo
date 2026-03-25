@@ -4,5 +4,12 @@ func main() {
     print.print_string(name)
     print.print_string("!\n")
 
-    "
+    `
+     	test for a multiline string
+    `
+
+    /*
+	multiline comment
+	which works
+    */
 }

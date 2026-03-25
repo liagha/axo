@@ -38,14 +38,14 @@ use {
 };
 
 impl<'session> Session<'session> {
-    const PIPELINE: [fn(&mut Session<'session>); 7] = [
+    const PIPELINE: [fn(&mut Session<'session>); 2] = [
         Self::prepare,
         Self::scan,
         Self::parse,
-        Self::populate,
-        Self::plan,
-        Self::resolve,
-        Self::analyze,
+        //Self::populate,
+        //Self::plan,
+        //Self::resolve,
+        //Self::analyze,
     ];
 
     pub fn compile(&mut self) {
