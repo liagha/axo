@@ -6,11 +6,11 @@ use {
     broccli::{xprintln, Color},
     crate::{
         analyzer::{Analysis, Analyzer},
-        data::{memory::replace, Identity, Module, Str},
+        data::{memory::replace, Module, Str},
         format::Show,
         internal::{
             cache::{Decode, Encode},
-            hash::{DefaultHasher, Hash, Hasher, Map, Set},
+            hash::{DefaultHasher, Hash, Hasher, Map},
             platform::{read, read_to_string, write},
             timer::Duration,
         },
@@ -43,7 +43,6 @@ impl<'session> Session<'session> {
         Self::scan,
         Self::parse,
         //Self::populate,
-        //Self::plan,
         //Self::resolve,
         //Self::analyze,
     ];
@@ -184,153 +183,6 @@ impl<'session> Session<'session> {
         }
     }
 
-    pub fn plan(&mut self) {
-        let mut sources: Vec<_> = self
-            .records
-            .iter()
-            .filter_map(|(&identity, record)| {
-                if record.kind == InputKind::Source {
-                    Some(identity)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        sources.sort();
-
-        let mut graph = Map::new();
-        let mut reverse = Map::new();
-        let mut degrees = Map::new();
-
-        for &identity in &sources {
-            graph.insert(identity, Vec::new());
-            reverse.insert(identity, Vec::new());
-            degrees.insert(identity, 0);
-        }
-
-        for &identity in &sources {
-            let dependencies = self.dependencies(identity);
-
-            for symbol in dependencies {
-                let resolved = self.records.iter().find_map(|(&key, record)| {
-                    if record.module == Some(symbol) {
-                        Some(key)
-                    } else {
-                        None
-                    }
-                });
-
-                if let Some(dependency) = resolved {
-                    if graph.contains_key(&dependency) {
-                        graph.get_mut(&dependency).unwrap().push(identity);
-                        reverse.get_mut(&identity).unwrap().push(dependency);
-                        *degrees.get_mut(&identity).unwrap() += 1;
-                    }
-                }
-            }
-        }
-
-        let mut dirty = Vec::new();
-
-        for &identity in &sources {
-            if self.records.get(&identity).unwrap().dirty {
-                dirty.push(identity);
-            }
-        }
-
-        while let Some(current) = dirty.pop() {
-            if let Some(neighbors) = graph.get(&current) {
-                for &neighbor in neighbors {
-                    let record = self.records.get_mut(&neighbor).unwrap();
-                    if !record.dirty {
-                        record.dirty = true;
-                        dirty.push(neighbor);
-                    }
-                }
-            }
-        }
-
-        let mut queue: Vec<_> = degrees
-            .iter()
-            .filter_map(|(&identity, &degree)| if degree == 0 { Some(identity) } else { None })
-            .collect();
-
-        queue.sort();
-
-        let mut order = Vec::new();
-
-        while !queue.is_empty() {
-            let identity = queue.remove(0);
-            order.push(identity);
-
-            if let Some(neighbors) = graph.get(&identity) {
-                for &neighbor in neighbors {
-                    let degree = degrees.get_mut(&neighbor).unwrap();
-                    *degree -= 1;
-
-                    if *degree == 0 {
-                        queue.push(neighbor);
-                    }
-                }
-                queue.sort();
-            }
-        }
-
-        if order.len() != sources.len() {
-            for &identity in &sources {
-                if !order.contains(&identity) {
-                    order.push(identity);
-                }
-            }
-        }
-
-        self.order = order;
-
-        let sequence: Vec<String> = self
-            .order
-            .iter()
-            .map(|key| {
-                self.records
-                    .get(key)
-                    .unwrap()
-                    .location
-                    .stem()
-                    .unwrap()
-                    .to_string()
-            })
-            .collect();
-
-        if self.is_active() && !sequence.is_empty() {
-            xprintln!(
-                "{}{} {}" => Color::White,
-                "Order" => Color::Magenta,
-                ":" => Color::White,
-                sequence.join(" -> ") => Color::White
-            );
-            xprintln!();
-        }
-    }
-
-    fn dependencies(&mut self, identity: Identity) -> Set<Identity> {
-        let elements = &self
-            .records
-            .get(&identity)
-            .unwrap()
-            .elements
-            .as_ref()
-            .unwrap();
-
-        for element in elements.iter() {
-            element.depending(&mut self.resolver);
-        }
-
-        let dependencies = self.resolver.dependencies.clone();
-        self.resolver.dependencies.clear();
-
-        dependencies
-    }
-
     pub fn scan(&mut self) {
         let initial = self.errors.len();
         self.report_start("scanning");
@@ -468,20 +320,29 @@ impl<'session> Session<'session> {
         let initial = self.errors.len();
         self.report_start("resolving");
 
-        for &key in &self.order {
+        // Get all source module keys (unordered or simply sorted by ID)
+        let mut keys: Vec<_> = self.records
+            .iter()
+            .filter_map(|(&key, record)| {
+                if record.kind == InputKind::Source && record.module.is_some() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        keys.sort();
+
+        // --- PASS 1: DECLARE ---
+        // Declare all symbols globally across all modules first.
+        for &key in &keys {
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(scope);
 
-            let elements = &mut self
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
+            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
 
             for element in elements.iter_mut() {
                 element.declare(&mut self.resolver);
@@ -494,6 +355,7 @@ impl<'session> Session<'session> {
             self.resolver.insert(module);
         }
 
+        // Optional: Reporting symbols after declaration pass
         if let Some(stencil) = self.get_stencil() {
             self.report_section(
                 "Symbols",
@@ -517,47 +379,23 @@ impl<'session> Session<'session> {
             )
         }
 
-        for &key in &self.order {
+        // --- PASS 2: RESOLVE & REIFY ---
+        // Now that all symbols are declared, resolve the bodies and types.
+        for &key in &keys {
             let target = self.records.get(&key).unwrap().module.unwrap();
             let mut module = self.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
 
             self.resolver.enter_scope(scope);
 
-            let elements = &mut self
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
+            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
 
+            // Resolve references
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
             }
 
-            let active = self.resolver.active;
-            self.resolver.exit();
-
-            module.scope = self.resolver.scopes.remove(&active).unwrap();
-            self.resolver.insert(module);
-        }
-
-        for &key in &self.order {
-            let target = self.records.get(&key).unwrap().module.unwrap();
-            let mut module = self.resolver.get_symbol(target).unwrap().clone();
-            let scope = replace(&mut module.scope, Scope::new(None));
-
-            self.resolver.enter_scope(scope);
-
-            let elements = &mut self
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
-
+            // Reify (instantiate/finalize types)
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
             }
