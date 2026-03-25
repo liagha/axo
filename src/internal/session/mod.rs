@@ -375,10 +375,7 @@ impl<'session> Session<'session> {
                     Color::Cyan,
                     scanner
                         .output
-                        .iter()
-                        .map(|token| format!("{}", token.format(stencil.clone())))
-                        .collect::<Vec<String>>()
-                        .join(", "),
+                        .format(stencil).to_string()
                 );
             }
 
@@ -445,10 +442,7 @@ impl<'session> Session<'session> {
                     Color::Cyan,
                     parser
                         .output
-                        .iter()
-                        .map(|element| format!("{}", element.format(stencil.clone())))
-                        .collect::<Vec<String>>()
-                        .join("\n"),
+                        .format(stencil).to_string()
                 );
             }
 
@@ -513,9 +507,8 @@ impl<'session> Session<'session> {
                             .symbols
                             .iter()
                             .filter_map(|identity| self.resolver.get_symbol(*identity))
-                            .map(|symbol| symbol.format(stencil.clone()).to_string())
                             .collect::<Vec<_>>()
-                            .join(",\n");
+                            .format(stencil.clone()).to_string();
 
                         format!("{}\n{}\n", symbol.format(stencil.clone()), children.indent(stencil.clone()))
                     })
@@ -615,10 +608,7 @@ impl<'session> Session<'session> {
                     Color::Blue,
                     analyzer
                         .output
-                        .iter()
-                        .map(|item| format!("{}", item.format(stencil.clone())))
-                        .collect::<Vec<String>>()
-                        .join("\n"),
+                        .format(stencil).to_string()
                 );
             }
 

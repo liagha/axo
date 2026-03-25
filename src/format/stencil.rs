@@ -37,12 +37,12 @@ impl Default for Stencil {
             close: ")".to_string(),
             separator: ", ".to_string(),
             variant_separator: ".".to_string(),
-            maximum: 10,
+            maximum: 200,
             indent: 4,
             show_head: false,
             show_variant: true,
             show_name: false,
-            inline: true,
+            inline: false,
             block: false,
             trailing: false,
             space: false,
@@ -125,9 +125,12 @@ impl Stencil {
             }
         }
 
+        let show_delimiters = !head.is_empty() || self.fields.len() != 1;
+        let child_depth = if show_delimiters { depth + 1 } else { depth };
+
         let mut items = Vec::new();
         for (key, val) in &self.fields {
-            let out = val.build(depth + 1);
+            let out = val.build(child_depth);
             if self.show_name && !key.is_empty() {
                 items.push(format!("{}: {}", key, out));
             } else {
@@ -137,8 +140,6 @@ impl Stencil {
 
         let joined = items.join(&self.separator);
         let mut flat = head.clone();
-
-        let show_delimiters = !head.is_empty() || items.len() != 1;
 
         if show_delimiters {
             flat.push_str(&self.open);
@@ -157,15 +158,21 @@ impl Stencil {
             flat.push_str(&self.close);
         }
 
-        if self.inline || (!self.block && flat.len() <= self.maximum) {
+        // If it fits entirely on one line, and no parts of it are multiline, return it inline.
+        if self.inline || (!self.block && !joined.contains('\n') && flat.len() <= self.maximum) {
             return flat;
         }
 
+        // Return immediately if it is a transparent wrapper (prevents ghost lines and indent bumps)
+        if !show_delimiters {
+            return items[0].clone();
+        }
+
         let pad = " ".repeat(depth * self.indent);
-        let inner = " ".repeat((depth + 1) * self.indent);
+        let inner = " ".repeat(child_depth * self.indent);
         let mut tree = head;
 
-        if show_delimiters && !self.open.is_empty() {
+        if !self.open.is_empty() {
             if !tree.is_empty() {
                 tree.push(' ');
             }
@@ -173,19 +180,45 @@ impl Stencil {
         }
         tree.push('\n');
 
+        // --- LINE WRAPPING LOGIC ---
+        let mut current_line = inner.clone();
+
         for (i, item) in items.iter().enumerate() {
-            tree.push_str(&inner);
-            tree.push_str(item);
+            let mut chunk = String::new();
+            chunk.push_str(item);
             if i < items.len() - 1 || self.trailing {
-                tree.push_str(&self.separator);
+                chunk.push_str(&self.separator);
             }
-            tree.push('\n');
+
+            let is_multiline = item.contains('\n');
+            let exceeds_max = current_line.len() + chunk.len() > self.maximum;
+
+            // Only wrap and flush a line if we genuinely accumulated content (prevents pure blank indentation lines)
+            if (is_multiline || exceeds_max) && current_line.len() > inner.len() {
+                tree.push_str(&current_line);
+                tree.push('\n');
+                current_line = inner.clone();
+            }
+
+            current_line.push_str(&chunk);
+
+            // If the item itself was multiline, flush it immediately so the next item starts on a new line correctly
+            if is_multiline {
+                tree.push_str(&current_line);
+                tree.push('\n');
+                current_line = inner.clone();
+            }
         }
 
-        tree.push_str(&pad);
-        if show_delimiters {
-            tree.push_str(&self.close);
+        // Push any remaining text in the buffer
+        if current_line.len() > inner.len() {
+            tree.push_str(&current_line);
+            tree.push('\n');
         }
+        // ---------------------------
+
+        tree.push_str(&pad);
+        tree.push_str(&self.close);
 
         tree
     }
