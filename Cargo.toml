@@ -6,19 +6,19 @@ edition = "2021"
 [features]
 default = [
     "internal",
-    "formation",
+    "combinator",
     "initial", "scanner",
     "parser", "resolver",
 ]
-formation = []
+combinator = []
 internal = [
-    "formation",
+    "combinator",
     "initial", "scanner",
     "parser", "resolver",
 ]
-initial = ["formation", "scanner", "parser"]
-scanner = ["formation"]
-parser = ["formation", "scanner"]
+initial = ["combinator", "scanner", "parser"]
+scanner = ["combinator"]
+parser = ["combinator", "scanner"]
 resolver = ["scanner", "parser"]
 generator = ["resolver", "inkwell"]
 

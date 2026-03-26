@@ -1,7 +1,7 @@
 use {
     crate::{
         data::*,
-        formation::{Classifier, Form},
+        combinator::{Classifier, Form},
         scanner::{OperatorKind, Token, TokenKind},
         tracker::{Span, Spanned},
         parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility, ErrorKind},

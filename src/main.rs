@@ -1,5 +1,5 @@
-#[cfg(feature = "formation")]
-pub mod formation;
+#[cfg(feature = "combinator")]
+pub mod combinator;
 #[cfg(feature = "generator")]
 pub mod generator;
 #[cfg(feature = "initial")]

@@ -1,7 +1,7 @@
 use {
     crate::{
         data::memory::Rc,
-        formation::{
+        combinator::{
             Classifier,
             Form,
             Former,

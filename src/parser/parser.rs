@@ -2,7 +2,7 @@ use {
     crate::{
         parser::{Element, ParseError},
         data::{Offset, Scale},
-        formation::{Classifier, Form, Former},
+        combinator::{Classifier, Form, Former},
         scanner::{PunctuationKind, Token, TokenKind},
         tracker::{Location, Peekable, Position},
     },

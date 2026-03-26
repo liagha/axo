@@ -25,20 +25,20 @@ use {
 };
 
 pub const RUNTIME: &[&str] = &[
-    "./runtime/cast.axo",
-    "./runtime/cast.c",
-    "./runtime/file.axo",
-    "./runtime/file.c",
-    "./runtime/memory.axo",
-    "./runtime/memory.c",
-    "./runtime/print.axo",
-    "./runtime/print.c",
-    "./runtime/process.axo",
-    "./runtime/process.c",
-    "./runtime/string.axo",
-    "./runtime/string.c",
-    "./runtime/input.axo",
-    "./runtime/input.c",
+    "./base/cast.axo",
+    "./base/cast.c",
+    "./base/file.axo",
+    "./base/file.c",
+    "./base/memory.axo",
+    "./base/memory.c",
+    "./base/print.axo",
+    "./base/print.c",
+    "./base/process.axo",
+    "./base/process.c",
+    "./base/string.axo",
+    "./base/string.c",
+    "./base/input.axo",
+    "./base/input.c",
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]

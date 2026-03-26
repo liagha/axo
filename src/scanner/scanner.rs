@@ -2,7 +2,7 @@ use {
     crate::{
         scanner::{Character, ScanError, Token, ErrorKind},
         data::{Str, Offset, Scale},
-        formation::{Form, Former},
+        combinator::{Form, Former},
         tracker::{Location, Peekable, Position},
     },
 };

@@ -9,7 +9,7 @@ use {
             character::{from_u32, parse_radix},
             Str,
         },
-        formation::{Classifier, Form},
+        combinator::{Classifier, Form},
         tracker::Spanned,
     },
 };

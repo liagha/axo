@@ -90,7 +90,7 @@ pub mod outcome {
 
 use {
     crate::{
-        formation::{
+        combinator::{
             Classifier,
             Form,
             Action,

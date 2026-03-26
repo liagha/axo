@@ -1,6 +1,6 @@
 use {
     crate::{
-        formation::{
+        combinator::{
             next_identity,
             form::Form,
             former::{outcome::Outcome, Former, Memo},

@@ -8,7 +8,7 @@ use {
             ScanError, Scanner, Token, TokenKind,
         },
         data::Str,
-        formation::{Classifier, Form},
+        combinator::{Classifier, Form},
         tracker::Spanned,
     },
 };

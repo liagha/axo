@@ -2,7 +2,7 @@ use {
     crate::{
         scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
         data::{Float, Str},
-        formation::{Classifier, Form},
+        combinator::{Classifier, Form},
         text::parser,
         tracker::Spanned,
     },

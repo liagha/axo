@@ -1,6 +1,6 @@
 use crate::{
     format::{Show, Stencil},
-    formation::{
+    combinator::{
         Form,
         helper::Formable,
     },

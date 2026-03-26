@@ -3,7 +3,7 @@ mod symbol;
 
 use crate::{
     data::*,
-    formation::{Classifier, Form},
+    combinator::{Classifier, Form},
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Span, Spanned},

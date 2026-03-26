@@ -1,6 +1,6 @@
 use crate::{
     data::{Binding, BindingKind, Str},
-    formation::{Classifier, Form},
+    combinator::{Classifier, Form},
     initializer::{InitializeError, Initializer},
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     scanner::{OperatorKind, Token, TokenKind},
