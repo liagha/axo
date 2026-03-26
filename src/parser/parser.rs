@@ -69,7 +69,7 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
     }
 }
 
-impl<'a: 'src, 'src> Parser<'a> {
+impl<'a: 'source, 'source> Parser<'a> {
     pub fn new(location: Location<'a>) -> Self {
         Parser {
             index: 0,
@@ -82,7 +82,7 @@ impl<'a: 'src, 'src> Parser<'a> {
 
     pub fn filter(
         length: Scale,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {

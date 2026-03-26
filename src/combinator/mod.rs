@@ -32,15 +32,15 @@ pub trait Action<'a, Host, State> {
     );
 }
 
-pub struct Multiple<'a, 'src, Host, State> {
-    pub actions: Vec<Rc<dyn Action<'a, Host, State> + 'src>>,
+pub struct Multiple<'a, 'source, Host, State> {
+    pub actions: Vec<Rc<dyn Action<'a, Host, State> + 'source>>,
 }
 
 pub struct Ignore;
 
 pub struct Skip;
 
-pub struct Transform<'a, 'src, Source, Input, Output, Failure>
+pub struct Transform<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -48,12 +48,12 @@ where
     Failure: Formable<'a>,
 {
     pub transformer: Rc<dyn Fn(
-        &mut Former<'a, 'src, Source, Input, Output, Failure>,
-        &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
-    ) -> Result<(), Failure> + 'src>,
+        &mut Former<'a, 'source, Source, Input, Output, Failure>,
+        &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+    ) -> Result<(), Failure> + 'source>,
 }
 
-pub struct Fail<'a, 'src, Source, Input, Output, Failure>
+pub struct Fail<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -61,12 +61,12 @@ where
     Failure: Formable<'a>,
 {
     pub emitter: Rc<dyn Fn(
-        &mut Former<'a, 'src, Source, Input, Output, Failure>,
-        Classifier<'a, 'src, Source, Input, Output, Failure>,
-    ) -> Failure + 'src>,
+        &mut Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    ) -> Failure + 'source>,
 }
 
-pub struct Panic<'a, 'src, Source, Input, Output, Failure>
+pub struct Panic<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -74,52 +74,52 @@ where
     Failure: Formable<'a>,
 {
     pub emitter: Rc<dyn Fn(
-        &mut Former<'a, 'src, Source, Input, Output, Failure>,
-        Classifier<'a, 'src, Source, Input, Output, Failure>,
-    ) -> Failure + 'src>,
+        &mut Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    ) -> Failure + 'source>,
 }
 
 #[derive(Clone)]
-pub struct Literal<'a, 'src, Input>
+pub struct Literal<'a, 'source, Input>
 where
     Input: Formable<'a>,
 {
-    pub value: Rc<dyn PartialEq<Input> + 'src>,
+    pub value: Rc<dyn PartialEq<Input> + 'source>,
     pub _marker: PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
-pub struct Predicate<'a, 'src, Input>
+pub struct Predicate<'a, 'source, Input>
 where
     Input: Formable<'a>,
 {
-    pub function: Rc<dyn Fn(&Input) -> bool + 'src>,
+    pub function: Rc<dyn Fn(&Input) -> bool + 'source>,
     pub _marker: PhantomData<&'a ()>, 
 }
 
-pub struct Deferred<'a, 'src, Source, Input, Output, Failure>
+pub struct Deferred<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub factory: fn() -> Classifier<'a, 'src, Source, Input, Output, Failure>,
+    pub factory: fn() -> Classifier<'a, 'source, Source, Input, Output, Failure>,
 }
 
-pub struct Optional<'a, 'src, Source, Input, Output, Failure>
+pub struct Optional<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub classifier: Box<Classifier<'a, 'src, Source, Input, Output, Failure>>,
+    pub classifier: Box<Classifier<'a, 'source, Source, Input, Output, Failure>>,
 }
 
 pub struct Alternative<
     'a,
-    'src,
+    'source,
     Source,
     Input,
     Output,
@@ -132,12 +132,12 @@ where
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub patterns: [Classifier<'a, 'src, Source, Input, Output, Failure>; SIZE],
+    pub patterns: [Classifier<'a, 'source, Source, Input, Output, Failure>; SIZE],
 }
 
 pub struct Sequence<
     'a,
-    'src,
+    'source,
     Source,
     Input,
     Output,
@@ -150,17 +150,17 @@ where
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub patterns: [Classifier<'a, 'src, Source, Input, Output, Failure>; SIZE],
+    pub patterns: [Classifier<'a, 'source, Source, Input, Output, Failure>; SIZE],
 }
 
-pub struct Repetition<'a, 'src, Source, Input, Output, Failure>
+pub struct Repetition<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub classifier: Box<Classifier<'a, 'src, Source, Input, Output, Failure>>,
+    pub classifier: Box<Classifier<'a, 'source, Source, Input, Output, Failure>>,
     pub minimum: Scale,
     pub maximum: Option<Scale>,
     pub persist: Boolean,

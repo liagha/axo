@@ -25,8 +25,8 @@ impl<'a> Initializer<'a> {
         result
     }
 
-    fn path_value<'src>() -> Classifier<
-        'a, 'src,
+    fn path_value<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -63,11 +63,11 @@ impl<'a> Initializer<'a> {
         ])
     }
 
-    fn path_directive<'src>(
+    fn path_directive<'source>(
         name: Str<'a>,
         matcher: fn(&Str<'a>) -> bool,
     ) -> Classifier<
-        'a, 'src,
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -131,8 +131,8 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn verbosity<'src>() -> Classifier<
-        'a, 'src,
+    pub fn verbosity<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -190,8 +190,8 @@ impl<'a> Initializer<'a> {
             })
     }
 
-    pub fn input<'src>() -> Classifier<
-        'a, 'src,
+    pub fn input<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -202,8 +202,8 @@ impl<'a> Initializer<'a> {
         })
     }
 
-    pub fn implicit_input<'src>() -> Classifier<
-        'a, 'src,
+    pub fn implicit_input<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -246,8 +246,8 @@ impl<'a> Initializer<'a> {
         })
     }
 
-    pub fn output<'src>() -> Classifier<
-        'a, 'src,
+    pub fn output<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,

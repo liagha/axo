@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<'a, 'src, Source, Input, Output, Failure> Clone for Classifier<'a, 'src, Source, Input, Output, Failure>
+impl<'a, 'source, Source, Input, Output, Failure> Clone for Classifier<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,

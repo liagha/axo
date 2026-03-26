@@ -9,9 +9,9 @@ use {
 };
 
 impl<'a> Parser<'a> {
-    pub fn bundle<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn bundle<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
@@ -83,9 +83,9 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn block<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn block<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
@@ -157,9 +157,9 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn group<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn group<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
@@ -231,9 +231,9 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn sequence<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn sequence<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
@@ -305,9 +305,9 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn collection<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn collection<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
@@ -379,9 +379,9 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn series<'src>(
-        item: Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>>,
-    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn series<'source>(
+        item: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
@@ -453,7 +453,7 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn delimited<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn delimited<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let item = Classifier::deferred(Self::element);
 
         Classifier::alternative([

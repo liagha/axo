@@ -9,7 +9,7 @@ use {
 };
 
 impl<'a> Parser<'a> {
-    pub fn symbolization<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn symbolization<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::binding),
             Classifier::deferred(Self::structure),
@@ -18,7 +18,7 @@ impl<'a> Parser<'a> {
         ])
     }
 
-    pub fn binding<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn binding<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(id) = &token.kind {
@@ -147,7 +147,7 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn structure<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn structure<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -228,7 +228,7 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn union<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn union<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -309,7 +309,7 @@ impl<'a> Parser<'a> {
             })
     }
 
-    pub fn function<'src>() -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn function<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {

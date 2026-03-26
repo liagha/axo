@@ -81,10 +81,10 @@ impl<'a> Initializer<'a> {
         }
     }
 
-    pub fn filter<'src>(
+    pub fn filter<'source>(
         length: Scale,
     ) -> Classifier<
-        'a, 'src,
+        'a, 'source,
         Self,
         Token<'a>,
         Element<'a>,
@@ -100,8 +100,8 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn directive<'src>() -> Classifier<
-        'a, 'src,
+    pub fn directive<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,
@@ -116,8 +116,8 @@ impl<'a> Initializer<'a> {
         ])
     }
 
-    pub fn classifier<'src>() -> Classifier<
-        'a, 'src,
+    pub fn classifier<'source>() -> Classifier<
+        'a, 'source,
         Self,
         Token<'a>,
         Symbol<'a>,

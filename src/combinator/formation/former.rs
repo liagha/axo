@@ -110,7 +110,7 @@ use {
     },
 };
 
-pub type Stash<'a, 'src, Source, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> + 'src>)>;
+pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> + 'source>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub outcome: outcome::Outcome,
@@ -125,22 +125,22 @@ pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable
     pub input_base: Offset,
 }
 
-pub struct Former<'a, 'src, Source, Input, Output, Failure>
+pub struct Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub source: &'src mut Source,
+    pub source: &'source mut Source,
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
-    pub stash: Stash<'a, 'src, Source, Input, Output, Failure>,
+    pub stash: Stash<'a, 'source, Source, Input, Output, Failure>,
     pub memo: Map<(usize, Offset), Memo<'a, Input, Output, Failure>>,
 }
 
-impl<'a, 'src, Source, Input, Output, Failure>
-Former<'a, 'src, Source, Input, Output, Failure>
+impl<'a, 'source, Source, Input, Output, Failure>
+Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -149,7 +149,7 @@ where
 {
     #[inline(always)]
     pub fn new(
-        source: &'src mut Source,
+        source: &'source mut Source,
     ) -> Self {
         Self {
             source,
@@ -161,7 +161,7 @@ where
     }
 
     #[inline(always)]
-    pub fn build(&mut self, classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>) {
+    pub fn build(&mut self, classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>) {
         let action = classifier.action.clone();
         action.action(self, classifier);
     }
@@ -169,7 +169,7 @@ where
     #[inline(always)]
     pub fn form(
         &mut self,
-        classifier: Classifier<'a, 'src, Source, Input, Output, Failure>,
+        classifier: Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
         let initial = self.source.position();
         let mut active = Classifier::new(classifier.action.clone(), 0, initial);
