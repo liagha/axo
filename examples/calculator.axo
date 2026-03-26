@@ -14,7 +14,6 @@ struct ParseResult {
     const next_position: UInt64
 }
 
-// Helper function to compute base ^ exp (assumes exp is a positive whole number represented as a Float)
 func compute_power(const base: Float, const exp: Float): Float {
     var result = 1.0
     var count = exp
@@ -25,11 +24,10 @@ func compute_power(const base: Float, const exp: Float): Float {
     return(result)
 }
 
-// Helper function to compute a % b using repeated subtraction
 func compute_modulo(const a: Float, const b: Float): Float {
     var result = a
     if(b == 0.0, {
-        return(0.0) // Avoid infinite loop on division by zero
+        return(0.0)
     })
     while(result >= b, {
         result = result - b
@@ -105,7 +103,6 @@ func next_token(var lexer: Lexer): Token {
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
 }
 
-// Forward declaration needed for parentheses evaluation
 func parse_expression(var lexer: Lexer): ParseResult
 
 func parse_factor(var lexer: Lexer): ParseResult {
@@ -116,17 +113,14 @@ func parse_factor(var lexer: Lexer): ParseResult {
         return(ParseResult { value = tok.value, next_position = lexer.position })
     }, {
         if(tok.kind == "LPAREN", {
-            // Evaluate inner expression
             var inner_res = parse_expression(lexer)
             lexer.position = inner_res.next_position
 
-            // Consume RPAREN
             var next_tok = next_token(lexer)
             if(next_tok.kind == "RPAREN", {
                 lexer.position = next_tok.next_position
                 return(ParseResult { value = inner_res.value, next_position = lexer.position })
             }, {
-                // Unclosed parenthesis fallback
                 return(ParseResult { value = inner_res.value, next_position = lexer.position })
             })
         }, {
@@ -148,7 +142,6 @@ func parse_power(var lexer: Lexer): ParseResult {
             lexer.position = tok.next_position
             var right_res = parse_factor(lexer)
             lexer.position = right_res.next_position
-            // Use custom compute_power function
             current_value = compute_power(current_value, right_res.value)
         }, {
             loop = cast.integer_uint8(0)
@@ -183,7 +176,6 @@ func parse_term(var lexer: Lexer): ParseResult {
                     lexer.position = tok.next_position
                     var right_res = parse_power(lexer)
                     lexer.position = right_res.next_position
-                    // Use custom compute_modulo function
                     current_value = compute_modulo(current_value, right_res.value)
                 }, {
                     loop = cast.integer_uint8(0)
