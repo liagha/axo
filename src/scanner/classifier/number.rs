@@ -9,8 +9,8 @@ use {
 };
 
 impl<'a> Scanner<'a> {
-    pub fn number(
-    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    pub fn number<'src>(
+    ) -> Classifier<'a, 'src, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::alternative([
             Self::hexadecimal(),
             Self::binary(),
@@ -19,8 +19,8 @@ impl<'a> Scanner<'a> {
         ])
     }
 
-    fn hexadecimal(
-    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn hexadecimal<'src>(
+    ) -> Classifier<'a, 'src, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -56,7 +56,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn binary() -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn binary<'src>() -> Classifier<'a, 'src, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -92,7 +92,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn octal() -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn octal<'src>() -> Classifier<'a, 'src, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -128,7 +128,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn decimal() -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn decimal<'src>() -> Classifier<'a, 'src, Self, Character<'a>, Token<'a>, ScanError<'a>>
     {
         Classifier::with_transform(
             Classifier::sequence([

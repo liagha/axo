@@ -104,7 +104,6 @@ impl<'backend> Generator<'backend> {
             self.context.opaque_struct_type(name)
         });
 
-        // Insert as an opaque type initially
         self.insert_entity(identifier, Entity::Structure { shape, members: vec![] });
 
         Ok(())
@@ -118,7 +117,6 @@ impl<'backend> Generator<'backend> {
         let identifier = structure.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
 
-        // The structure was created in pass 1
         let shape = self.context.get_struct_type(name).unwrap();
 
         let mut types = Vec::with_capacity(structure.members.len());
@@ -158,7 +156,6 @@ impl<'backend> Generator<'backend> {
             self.context.opaque_struct_type(name)
         });
 
-        // Insert as an opaque type initially
         self.insert_entity(identifier, Entity::Union { shape, members: vec![] });
 
         Ok(())
@@ -172,7 +169,6 @@ impl<'backend> Generator<'backend> {
         let identifier = union.target.clone();
         let name = identifier.as_str().unwrap_or("union");
 
-        // The union was created in pass 1
         let shape = self.context.get_struct_type(name).unwrap();
 
         let mut members = Vec::with_capacity(union.members.len());

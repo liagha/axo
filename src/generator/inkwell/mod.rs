@@ -359,11 +359,9 @@ impl<'backend> Generator<'backend> {
 
 impl<'backend> Backend<'backend> for Generator<'backend> {
     fn generate(&mut self, analyses: Vec<Analysis<'backend>>) {
-        // PASS 1: Declarations (Signatures, Opaque Structs, Global Bindings)
         for analysis in &analyses {
             match &analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    // Register opaque struct/union types here
                     if let Err(error) = self.declare_structure(structure.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
@@ -374,7 +372,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                     }
                 }
                 AnalysisKind::Function(function) => {
-                    // Register function signatures and external linkages
                     if let Err(error) = self.declare_function(function.clone(), analysis.span.clone()) {
                         self.errors.push(error);
                     }
@@ -383,7 +380,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             }
         }
 
-        // PASS 2: Definitions (Bodies, Struct Members, Expressions)
         let mut entry = None;
 
         for analysis in &analyses {
@@ -418,7 +414,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             }
         }
 
-        // Handle the entry function last
         if let Some((entry_func, span)) = entry {
             self.builder.clear_insertion_position();
             if let Err(error) = self.define_function(entry_func.clone(), span) {
@@ -426,7 +421,6 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             }
         }
 
-        // Sanity check and Verification
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
                 if self.errors.is_empty() {

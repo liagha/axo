@@ -69,7 +69,7 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
     }
 }
 
-impl<'a> Parser<'a> {
+impl<'a: 'src, 'src> Parser<'a> {
     pub fn new(location: Location<'a>) -> Self {
         Parser {
             index: 0,
@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
 
     pub fn filter(
         length: Scale,
-    ) -> Classifier<'a, 'a, Token<'a>, Element<'a>, ParseError<'a>> {
+    ) -> Classifier<'a, 'src, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {
@@ -123,9 +123,10 @@ impl<'a> Parser<'a> {
         self.set_input(strained);
         self.reset();
 
-        let mut former = Former::new(self);
-
-        let forms = former.form(Self::parser()).flatten();
+        let forms = {
+            let mut former = Former::new(self);
+            former.form(Self::parser()).flatten()
+        };
 
         for form in forms {
             match form {
