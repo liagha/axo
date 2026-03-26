@@ -1,22 +1,14 @@
-use crate::{
-    data::{
-        Identity,
-        sync::{AtomicUsize, Ordering},
-    },
+use crate::data::{
+    sync::{AtomicUsize, Ordering},
+    Identity,
 };
 
-mod classifier;
-mod form;
-mod former;
-mod action;
-mod traits;
+mod formation;
 
-pub use {
-    classifier::*,
-    former::*,
-    form::*,
-    action::*,
-};
+pub use formation::action::*;
+pub use formation::classifier::*;
+pub use formation::form::*;
+pub use formation::former::*;
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -25,12 +17,10 @@ pub(super) fn next_identity() -> Identity {
 }
 
 pub(super) mod helper {
-    use {
-        crate::{
-            format::Show,
-            internal::hash::Hash,
-            tracker::{Peekable, Spanned},
-        },
+    use crate::{
+        format::Show,
+        internal::hash::Hash,
+        tracker::{Peekable, Spanned},
     };
 
     pub trait Formable<'a>:

@@ -1,25 +1,23 @@
-use {
-    crate::{
-        combinator::{
-            next_identity,
-            form::Form,
-            former::{outcome::Outcome, Former, Memo},
-            helper::Formable,
-            action::*,
-        },
-        data::{
-            memory::{
-                take, replace, swap,
-                Rc
-            },
-            Boolean,
-            Offset,
-            Scale,
-            Identity
-        },
-        tracker::{Location, Position},
+use crate::{
+    combinator::{
+        helper::Formable,
+        next_identity,
     },
+    data::{
+        memory::{
+            replace, swap, take,
+            Rc
+        },
+        Boolean,
+        Identity,
+        Offset,
+        Scale
+    },
+    tracker::{Location, Position},
 };
+use crate::combinator::formation::action::*;
+use crate::combinator::formation::form::Form;
+use crate::combinator::formation::former::{outcome::Outcome, Former, Memo};
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub identity: Identity,

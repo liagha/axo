@@ -1,10 +1,9 @@
-use {
-    crate::{
-        combinator::{classifier::Classifier, form::Form, helper::Formable},
-        tracker::{Span, Spanned},
-    },
+use crate::{
+    combinator::helper::Formable,
+    tracker::{Span, Spanned},
 };
-
+use crate::combinator::formation::classifier::Classifier;
+use crate::combinator::formation::form::Form;
 
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Spanned<'form> for Form<'form, Input, Output, Failure> {
     fn span(&self) -> Span<'form> {
