@@ -43,11 +43,7 @@ where
         let mut messages = String::new();
         let mut details = String::new();
 
-        messages.push_str(&format!(
-            "{} {}",
-            "error:".colorize(Color::Crimson).bold(),
-            self.kind
-        ));
+        messages.push_str(&self.kind.to_string());
 
         match self.span.start.location.get_value() { 
             Ok(content) => {

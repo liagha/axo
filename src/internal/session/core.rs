@@ -371,11 +371,9 @@ impl<'session> Session<'session> {
         K: Clone + Display,
         H: Clone + Display,
     {
-        let (message, details) = error.handle();
         xprintln!(
-            "{}\n{}" => Color::Red,
-            message => Color::White,
-            details => Color::White
+            "{}",
+            error
         );
         xprintln!();
     }

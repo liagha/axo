@@ -1,6 +1,9 @@
-use crate::{
-    reporter::Error,
-    format::{Show, Stencil, Debug, Display, Formatter, Result}
+use {
+    crate::{
+        reporter::Error,
+        format::{Show, Stencil, Debug, Display, Formatter, Result}
+    },
+    broccli::{Color, TextStyle},
 };
 
 impl<'error, K, H> Show<'error> for Error<'error, K, H>
@@ -9,9 +12,10 @@ where
     H: Clone + Display,
 {
     fn format(&self, config: Stencil) -> Stencil {
-        let (msg, details) = self.handle();
+        let (message, details) = self.handle();
+
         config.clone().new("Error")
-            .field("message", msg.to_string())
+            .field("message", message.to_string())
             .field("details", details.to_string())
     }
 }
@@ -22,7 +26,15 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Stencil::default()))
+        let (message, details) = self.handle();
+
+        write!(
+            f,
+            "{}{}\n{}",
+            "error:".colorize(Color::Crimson).bold(),
+            message,
+            details
+        )
     }
 }
 
@@ -32,6 +44,14 @@ where
     H: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.format(Stencil::default()))
+        let (message, details) = self.handle();
+
+        write!(
+            f,
+            "{}{}\n{}",
+            "error:".colorize(Color::Crimson).bold(),
+            message,
+            details
+        )
     }
 }

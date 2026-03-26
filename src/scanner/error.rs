@@ -34,7 +34,7 @@ pub enum EscapeError {
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ErrorKind::Tracking(tracker) => write!(f, "{}", tracker),
+            ErrorKind::Tracking(tracker) => write!(f, "{}", tracker.handle().0),
             ErrorKind::InvalidCharacter(e) => match e {
                 CharacterError::Unexpected(ch) => write!(f, "unexpected character `{}`.", ch.value),
                 CharacterError::OutOfRange => write!(f, "character code point out of range."),
