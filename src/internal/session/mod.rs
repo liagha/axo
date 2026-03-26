@@ -353,26 +353,7 @@ impl<'session> Session<'session> {
         }
 
         if let Some(stencil) = self.get_stencil() {
-            self.report_section(
-                "Symbols",
-                Color::Blue,
-                self.resolver
-                    .collect()
-                    .iter()
-                    .map(|symbol| {
-                        let children = symbol
-                            .scope
-                            .symbols
-                            .iter()
-                            .filter_map(|identity| self.resolver.get_symbol(*identity))
-                            .collect::<Vec<_>>()
-                            .format(stencil.clone()).to_string();
 
-                        format!("{}\n{}\n", symbol.format(stencil.clone()), children.indent(stencil.clone()))
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            )
         }
 
         for &key in &keys {
