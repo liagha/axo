@@ -1,14 +1,14 @@
 use crate::{
     combinator::{
-        Formable,
+        Action, Multiple, Ignore, Skip, Transform, Fail, Panic,
+        Literal, Predicate, Deferred, Optional, Alternative, Sequence, Repetition,
+        Formable, Form,
         next_identity,
-        formation::action::*,
-        formation::form::Form,
         formation::former::{outcome::Outcome, Former, Memo},
     },
     data::{
         memory::{replace, swap, take, Rc},
-        Boolean, Identity, Offset, Scale
+        Identity, Offset, Scale
     },
     tracker::{Location, Position},
 };
@@ -168,17 +168,6 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn negate(classifier: Self) -> Self {
-        Self::new(
-            Rc::new(Negate {
-                classifier: Box::new(classifier),
-            }),
-            0,
-            Position::new(Location::Void),
-        )
-    }
-
-    #[inline]
     pub fn predicate<F>(predicate: F) -> Self
     where
         F: Fn(&Input) -> bool + 'a,
@@ -252,29 +241,6 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn wrapper(classifier: Self) -> Self {
-        Self::new(
-            Rc::new(Wrapper {
-                classifier: Box::new(classifier),
-            }),
-            0,
-            Position::new(Location::Void),
-        )
-    }
-
-    #[inline]
-    pub fn ranked(classifier: Self, precedence: i8) -> Self {
-        Self::new(
-            Rc::new(Ranked {
-                classifier: Box::new(classifier),
-                precedence,
-            }),
-            0,
-            Position::new(Location::Void),
-        )
-    }
-
-    #[inline]
     pub fn deferred(factory: fn() -> Self) -> Self {
         Self::new(
             Rc::new(Deferred {
@@ -303,20 +269,6 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn with_align(self) -> Self {
-        self.with_action(Rc::new(Align))
-    }
-
-    #[inline]
-    pub fn with_branch(
-        self,
-        found: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
-        missing: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
-    ) -> Self {
-        self.with_action(Rc::new(Branch { found, missing }))
-    }
-
-    #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
         F: Fn(&mut Former<'_, 'a, Input, Output, Failure>, Classifier<'a, Input, Output, Failure>) -> Failure + 'a,
@@ -332,19 +284,6 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn with_inspect<I>(self, inspector: I) -> Self
-    where
-        I: Fn(
-            Classifier<'a, Input, Output, Failure>,
-        ) -> &'a (dyn Action<'a, Input, Output, Failure>
-        + 'a) + 'a,
-    {
-        self.with_action(Rc::new(Inspect {
-            inspector: Rc::new(inspector) as Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Action<'a, Input, Output, Failure> + 'a) + 'a>,
-        }))
-    }
-
-    #[inline]
     pub fn with_multiple(self, actions: Vec<Rc<dyn Action<'a, Input, Output, Failure> + 'a>>) -> Self {
         self.with_action(Rc::new(Multiple { actions }))
     }
@@ -355,19 +294,6 @@ Classifier<'a, Input, Output, Failure>
         F: Fn(&mut Former<'_, 'a, Input, Output, Failure>, Classifier<'a, Input, Output, Failure>) -> Failure + 'a,
     {
         self.with_action(Self::panic(emitter))
-    }
-
-    #[inline]
-    pub fn with_pardon(self) -> Self {
-        self.with_action(Rc::new(Pardon))
-    }
-
-    #[inline]
-    pub fn with_perform<F>(self, executor: F) -> Self
-    where
-        F: Fn() + 'a,
-    {
-        self.with_action(Self::perform(executor))
     }
 
     #[inline]
@@ -385,11 +311,6 @@ Classifier<'a, Input, Output, Failure>
         + 'a,
     {
         self.with_action(Self::transform(transform))
-    }
-
-    #[inline]
-    pub fn with_fallback(self, action: Rc<dyn Action<'a, Input, Output, Failure> + 'a>) -> Self {
-        self.with_branch(Self::perform(|| {}), action)
     }
 
     #[inline]
@@ -441,17 +362,6 @@ Classifier<'a, Input, Output, Failure>
         Rc::new(Ignore)
     }
 
-    pub fn inspect<I>(&self, inspector: I) -> Self
-    where
-        I: Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Action<'a, Input, Output, Failure> + 'a) + 'a,
-    {
-        let mut next = self.clone();
-        next.action = Rc::new(Inspect {
-            inspector: Rc::new(inspector) as Rc<dyn Fn(Classifier<'a, Input, Output, Failure>) -> &'a (dyn Action<'a, Input, Output, Failure> + 'a) + 'a>,
-        });
-        next
-    }
-
     #[inline]
     pub fn multiple(
         actions: Vec<Rc<dyn Action<'a, Input, Output, Failure> + 'a>>,
@@ -460,37 +370,9 @@ Classifier<'a, Input, Output, Failure>
     }
 
     #[inline]
-    pub fn pardon() -> Rc<dyn Action<'a, Input, Output, Failure> + 'a> {
-        Rc::new(Pardon)
-    }
-
-    #[inline]
-    pub fn perform<T>(executor: T) -> Rc<dyn Action<'a, Input, Output, Failure> + 'a>
-    where
-        T: Fn() + 'a,
-    {
-        Rc::new(Perform {
-            performer: Rc::new(executor) as Rc<dyn Fn() + 'a>,
-        })
-    }
-
-    #[inline]
     pub fn skip() -> Rc<dyn Action<'a, Input, Output, Failure> + 'a> {
         Rc::new(Skip)
     }
-
-    #[inline]
-    pub fn branch(
-        found: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
-        missing: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
-    ) -> Rc<dyn Action<'a, Input, Output, Failure> + 'a> {
-        Rc::new(Branch { found, missing })
-    }
-}
-
-#[derive(Clone)]
-pub struct Literal<'a, Input> {
-    pub value: Rc<dyn PartialEq<Input> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
@@ -527,54 +409,6 @@ Action<'a, Input, Output, Failure> for Literal<'a, Input>
     }
 }
 
-#[derive(Clone)]
-pub struct Negate<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
-}
-
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Negate<'a, Input, Output, Failure>
-{
-    #[inline]
-    fn action(
-        &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
-    ) {
-        let form_used = former.consumed.len();
-        let form_forms = former.forms.len();
-        let class_used = classifier.consumed.len();
-        let class_stack = classifier.stack.len();
-
-        let mut child = classifier.create_child(self.classifier.action.clone());
-        former.build(&mut child);
-
-        let outcome = child.outcome;
-
-        classifier.consumed = child.consumed;
-        classifier.stack = child.stack;
-        classifier.consumed.truncate(class_used);
-        classifier.stack.truncate(class_stack);
-
-        former.consumed.truncate(form_used);
-        former.forms.truncate(form_forms);
-
-        if outcome == Outcome::Aligned {
-            classifier.set_empty();
-        } else if outcome == Outcome::Failed {
-            classifier.set_align();
-            classifier.form = 0;
-        } else {
-            classifier.set_empty();
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Predicate<'a, Input: Formable<'a>> {
-    pub function: Rc<dyn Fn(&Input) -> bool + 'a>,
-}
-
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
 Action<'a, Input, Output, Failure> for Predicate<'a, Input>
 {
@@ -607,17 +441,6 @@ Action<'a, Input, Output, Failure> for Predicate<'a, Input>
             classifier.set_empty();
         }
     }
-}
-
-#[derive(Clone)]
-pub struct Alternative<
-    'a,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-    const SIZE: Scale,
-> {
-    pub patterns: [Classifier<'a, Input, Output, Failure>; SIZE],
 }
 
 impl<'a, Input, Output, Failure, const SIZE: Scale> Action<'a, Input, Output, Failure>
@@ -724,10 +547,6 @@ where
             }
         }
     }
-}
-
-pub struct Deferred<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub factory: fn() -> Classifier<'a, Input, Output, Failure>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> Clone
@@ -837,11 +656,6 @@ Action<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
     }
 }
 
-#[derive(Clone)]
-pub struct Optional<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
-}
-
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
 Action<'a, Input, Output, Failure> for Optional<'a, Input, Output, Failure>
 {
@@ -877,79 +691,6 @@ Action<'a, Input, Output, Failure> for Optional<'a, Input, Output, Failure>
             classifier.set_ignore();
         }
     }
-}
-
-#[derive(Clone)]
-pub struct Wrapper<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
-}
-
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Wrapper<'a, Input, Output, Failure>
-{
-    #[inline]
-    fn action(
-        &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
-    ) {
-        let mut child = classifier.create_child(self.classifier.action.clone());
-        former.build(&mut child);
-
-        classifier.marker = child.marker;
-        classifier.position = child.position;
-        classifier.consumed = child.consumed;
-        classifier.outcome = child.outcome;
-        classifier.form = child.form;
-        classifier.stack = child.stack;
-    }
-}
-
-#[derive(Clone)]
-pub struct Ranked<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
-    pub precedence: i8,
-}
-
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Ranked<'a, Input, Output, Failure>
-{
-    #[inline]
-    fn action(
-        &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
-    ) {
-        let mut child = classifier.create_child(self.classifier.action.clone());
-        former.build(&mut child);
-
-        let outcome = child.outcome;
-
-        classifier.marker = child.marker;
-        classifier.position = child.position;
-        classifier.consumed = child.consumed;
-        classifier.form = child.form;
-        classifier.stack = child.stack;
-
-        if outcome == Outcome::Aligned {
-            classifier.outcome = self.precedence.max(Outcome::Aligned.into()).into();
-        } else if outcome == Outcome::Failed {
-            classifier.outcome = self.precedence.min(Outcome::Failed.into()).into();
-        } else {
-            classifier.outcome = child.outcome;
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Sequence<
-    'a,
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-    const SIZE: Scale,
-> {
-    pub patterns: [Classifier<'a, Input, Output, Failure>; SIZE],
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>, const SIZE: Scale>
@@ -1042,14 +783,6 @@ Action<'a, Input, Output, Failure> for Sequence<'a, Input, Output, Failure, SIZE
             classifier.form = form_id;
         }
     }
-}
-
-#[derive(Clone)]
-pub struct Repetition<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
-    pub minimum: Scale,
-    pub maximum: Option<Scale>,
-    pub persist: Boolean,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
