@@ -71,7 +71,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Transform<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Transform<'a, 'source, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -96,7 +96,7 @@ where
     }
 }
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Fail<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Fail<'a, 'source, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -122,7 +122,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Panic<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Panic<'a, 'source, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -146,3 +146,4 @@ where
         }
     }
 }
+

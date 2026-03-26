@@ -288,6 +288,7 @@ where
     {
         self.with_action(Rc::new(Fail {
             emitter: Rc::new(emitter),
+            _marker: Default::default(),
         }))
     }
 
@@ -347,6 +348,7 @@ where
     {
         Rc::new(Transform {
             transformer: Rc::new(transformer),
+            _marker: Default::default(),
         })
     }
 
@@ -357,6 +359,7 @@ where
     {
         Rc::new(Fail {
             emitter: Rc::new(emitter),
+            _marker: Default::default(),
         })
     }
 
@@ -367,6 +370,7 @@ where
     {
         Rc::new(Panic {
             emitter: Rc::new(emitter),
+            _marker: Default::default(),
         })
     }
 
@@ -467,7 +471,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale> Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>>
-for Alternative<'a, 'source, Source, Input, Output, Failure, SIZE>
+for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -574,7 +578,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-for Deferred<'a, 'source, Source, Input, Output, Failure>
+for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -589,7 +593,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Deferred<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -691,7 +695,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Optional<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -733,7 +737,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Sequence<'a, 'source, Source, Input, Output, Failure, SIZE>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -830,7 +834,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Repetition<'a, 'source, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -978,4 +982,3 @@ where
         }
     }
 }
-
