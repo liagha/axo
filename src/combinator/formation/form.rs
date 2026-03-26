@@ -3,7 +3,7 @@ use {
         data::slice,
         format::Debug,
         internal::hash::Hash,
-        combinator::helper::Formable,
+        combinator::Formable,
     },
 };
 

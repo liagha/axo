@@ -1,8 +1,7 @@
 use crate::{
     format::{Show, Stencil},
     combinator::{
-        Form,
-        helper::Formable,
+        Form, Formable,
     },
 };
 

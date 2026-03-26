@@ -94,7 +94,7 @@ use {
             Classifier,
             Form,
             Action,
-            helper::{Formable, Source},
+            {Formable, Source},
         },
         data::{
             memory::{
@@ -107,7 +107,7 @@ use {
     },
 };
 
-pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Input, Output, Failure> + 'a>)>;
+pub type Stash<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Input, Output, Failure> + 'a>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub outcome: outcome::Outcome,
@@ -126,7 +126,7 @@ pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Fo
     pub source: &'b mut dyn Source<'a, Input>,
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
-    pub cache: Cache<'a, Input, Output, Failure>,
+    pub stash: Stash<'a, Input, Output, Failure>,
     pub memo: Map<(usize, Offset), Memo<'a, Input, Output, Failure>>,
 }
 
@@ -144,7 +144,7 @@ Former<'b, 'a, Input, Output, Failure>
 
                 forms
             },
-            cache: Vec::with_capacity(32),
+            stash: Vec::with_capacity(32),
             memo: Map::with_capacity(512),
         }
     }

@@ -1,5 +1,10 @@
-pub mod classifier;
-pub mod form;
-pub mod former;
+mod classifier;
+mod form;
+mod former;
 mod traits;
-pub mod action;
+mod action;
+
+pub use form::*;
+pub use former::*;
+pub use action::*;
+pub use classifier::*;

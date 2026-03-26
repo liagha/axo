@@ -1,23 +1,17 @@
 use crate::{
     combinator::{
-        helper::Formable,
+        Formable,
         next_identity,
+        formation::action::*,
+        formation::form::Form,
+        formation::former::{outcome::Outcome, Former, Memo},
     },
     data::{
-        memory::{
-            replace, swap, take,
-            Rc
-        },
-        Boolean,
-        Identity,
-        Offset,
-        Scale
+        memory::{replace, swap, take, Rc},
+        Boolean, Identity, Offset, Scale
     },
     tracker::{Location, Position},
 };
-use crate::combinator::formation::action::*;
-use crate::combinator::formation::form::Form;
-use crate::combinator::formation::former::{outcome::Outcome, Former, Memo};
 
 pub struct Classifier<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub identity: Identity,
@@ -787,12 +781,12 @@ Action<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
             return;
         }
 
-        let cached_action = match former.cache.iter().find(|(k, _)| *k == key) {
+        let stashed = match former.stash.iter().find(|(k, _)| *k == key) {
             Some((_, action)) => action.clone(),
             None => {
                 let built = (self.factory)();
                 let action = built.action;
-                former.cache.push((key, action.clone()));
+                former.stash.push((key, action.clone()));
                 action
             }
         };
@@ -804,7 +798,7 @@ Action<'a, Input, Output, Failure> for Deferred<'a, Input, Output, Failure>
         let origin = classifier.marker;
 
         let mut child = Classifier::create(
-            cached_action,
+            stashed,
             classifier.marker,
             classifier.position,
             take(&mut classifier.consumed),

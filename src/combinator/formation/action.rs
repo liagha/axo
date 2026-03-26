@@ -5,7 +5,7 @@ use {
             Classifier,
             Form,
             Former,
-            helper::Formable,
+            Formable,
         },
     },
 };
