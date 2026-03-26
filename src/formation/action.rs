@@ -11,8 +11,8 @@ use {
 };
 
 
-pub trait Order<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    fn order(
+pub trait Action<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -22,10 +22,10 @@ pub trait Order<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable
 pub struct Align;
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Align
+Action<'a, Input, Output, Failure> for Align
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         _former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -35,15 +35,15 @@ Order<'a, Input, Output, Failure> for Align
 }
 
 pub struct Branch<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub found: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
-    pub missing: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+    pub found: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
+    pub missing: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -54,7 +54,7 @@ Order<'a, Input, Output, Failure> for Branch<'a, Input, Output, Failure>
             &self.missing
         };
 
-        chosen.order(former, classifier);
+        chosen.action(former, classifier);
     }
 }
 
@@ -66,10 +66,10 @@ pub struct Fail<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -89,10 +89,10 @@ Order<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
 pub struct Ignore;
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Ignore
+Action<'a, Input, Output, Failure> for Ignore
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         _former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -107,58 +107,58 @@ Order<'a, Input, Output, Failure> for Ignore
 pub struct Inspect<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub inspector: Rc<dyn Fn(
         Classifier<'a, Input, Output, Failure>,
-    ) -> &'a (dyn Order<'a, Input, Output, Failure> + 'a) + 'a>,
+    ) -> &'a (dyn Action<'a, Input, Output, Failure> + 'a) + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Inspect<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Inspect<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
         let target = (self.inspector)(classifier.clone());
-        target.order(former, classifier);
+        target.action(former, classifier);
     }
 }
 
 pub struct Multiple<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub orders: Vec<Rc<dyn Order<'a, Input, Output, Failure> + 'a>>,
+    pub actions: Vec<Rc<dyn Action<'a, Input, Output, Failure> + 'a>>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        for order in self.orders.iter() {
-            order.order(former, classifier);
+        for action in self.actions.iter() {
+            action.action(former, classifier);
         }
     }
 }
 
 pub struct Pair<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub first: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
-    pub second: Rc<dyn Order<'a, Input, Output, Failure> + 'a>,
+    pub first: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
+    pub second: Rc<dyn Action<'a, Input, Output, Failure> + 'a>,
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Pair<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Pair<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
     ) {
-        self.first.order(former, classifier);
-        self.second.order(former, classifier);
+        self.first.action(former, classifier);
+        self.second.action(former, classifier);
     }
 }
 
@@ -170,10 +170,10 @@ pub struct Panic<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formabl
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Panic<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Panic<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -193,10 +193,10 @@ Order<'a, Input, Output, Failure> for Panic<'a, Input, Output, Failure>
 pub struct Pardon;
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Pardon
+Action<'a, Input, Output, Failure> for Pardon
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         _former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -210,10 +210,10 @@ pub struct Perform<'a> {
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Perform<'a>
+Action<'a, Input, Output, Failure> for Perform<'a>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         _former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -227,10 +227,10 @@ Order<'a, Input, Output, Failure> for Perform<'a>
 pub struct Skip;
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Skip
+Action<'a, Input, Output, Failure> for Skip
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         _former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,
@@ -250,10 +250,10 @@ pub struct Transform<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: For
 }
 
 impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Order<'a, Input, Output, Failure> for Transform<'a, Input, Output, Failure>
+Action<'a, Input, Output, Failure> for Transform<'a, Input, Output, Failure>
 {
     #[inline]
-    fn order(
+    fn action(
         &self,
         former: &mut Former<'_, 'a, Input, Output, Failure>,
         classifier: &mut Classifier<'a, Input, Output, Failure>,

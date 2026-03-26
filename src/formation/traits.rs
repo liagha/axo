@@ -35,11 +35,11 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     fn clone(&self) -> Self {
         Self {
             identity: self.identity,
-            order: self.order.clone(),
+            action: self.action.clone(),
             marker: self.marker.clone(),
             position: self.position.clone(),
             consumed: self.consumed.clone(),
-            status: self.status.clone(),
+            outcome: self.outcome.clone(),
             form: self.form.clone(),
             stack: self.stack.clone(),
             depth: self.depth,

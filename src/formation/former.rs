@@ -1,6 +1,6 @@
-pub mod status {
+pub mod outcome {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum Status {
+    pub enum Outcome {
         Panicked,
         Aligned,
         Failed,
@@ -9,41 +9,41 @@ pub mod status {
         Custom(i8),
     }
 
-    impl Status {
+    impl Outcome {
         #[inline]
         pub const fn priority(self) -> i8 {
             match self {
-                Status::Panicked => 4,
-                Status::Failed => 3,
-                Status::Aligned => 2,
-                Status::Ignored => 1,
-                Status::Blank => 0,
-                Status::Custom(v) => v,
+                Outcome::Panicked => 4,
+                Outcome::Failed => 3,
+                Outcome::Aligned => 2,
+                Outcome::Ignored => 1,
+                Outcome::Blank => 0,
+                Outcome::Custom(v) => v,
             }
         }
 
         #[inline]
         pub const fn is_productive(self) -> bool {
-            matches!(self, Status::Aligned | Status::Failed)
+            matches!(self, Outcome::Aligned | Outcome::Failed)
         }
 
         #[inline]
         pub const fn is_terminal(self) -> bool {
-            matches!(self, Status::Panicked | Status::Failed)
+            matches!(self, Outcome::Panicked | Outcome::Failed)
         }
 
         #[inline]
         pub const fn is_neutral(self) -> bool {
-            matches!(self, Status::Blank | Status::Ignored)
+            matches!(self, Outcome::Blank | Outcome::Ignored)
         }
 
         #[inline]
         pub const fn is_success(self) -> bool {
-            matches!(self, Status::Aligned)
+            matches!(self, Outcome::Aligned)
         }
 
         #[inline]
-        pub fn escalate(self, other: Status) -> Status {
+        pub fn escalate(self, other: Outcome) -> Outcome {
             if other.priority() > self.priority() {
                 other
             } else {
@@ -52,37 +52,37 @@ pub mod status {
         }
 
         #[inline]
-        pub fn demote(self) -> Status {
+        pub fn demote(self) -> Outcome {
             match self {
-                Status::Panicked => Status::Failed,
-                Status::Aligned => Status::Ignored,
+                Outcome::Panicked => Outcome::Failed,
+                Outcome::Aligned => Outcome::Ignored,
                 other => other,
             }
         }
     }
 
-    impl Into<i8> for Status {
+    impl Into<i8> for Outcome {
         fn into(self) -> i8 {
             match self {
-                Status::Panicked => 127,
-                Status::Aligned => 1,
-                Status::Failed => 0,
-                Status::Blank => -1,
-                Status::Ignored => -2,
-                Status::Custom(value) => value,
+                Outcome::Panicked => 127,
+                Outcome::Aligned => 1,
+                Outcome::Failed => 0,
+                Outcome::Blank => -1,
+                Outcome::Ignored => -2,
+                Outcome::Custom(value) => value,
             }
         }
     }
 
-    impl From<i8> for Status {
-        fn from(value: i8) -> Status {
+    impl From<i8> for Outcome {
+        fn from(value: i8) -> Outcome {
             match value {
-                127 => Status::Panicked,
-                1 => Status::Aligned,
-                0 => Status::Failed,
-                -1 => Status::Blank,
-                -2 => Status::Ignored,
-                value => Status::Custom(value),
+                127 => Outcome::Panicked,
+                1 => Outcome::Aligned,
+                0 => Outcome::Failed,
+                -1 => Outcome::Blank,
+                -2 => Outcome::Ignored,
+                value => Outcome::Custom(value),
             }
         }
     }
@@ -93,7 +93,7 @@ use {
         formation::{
             Classifier,
             Form,
-            Order,
+            Action,
             helper::{Formable, Source},
         },
         data::{
@@ -107,10 +107,10 @@ use {
     },
 };
 
-pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Order<'a, Input, Output, Failure> + 'a>)>;
+pub type Cache<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Input, Output, Failure> + 'a>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub status: status::Status,
+    pub outcome: outcome::Outcome,
     pub advance: Offset,
     pub position: Position<'a>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
@@ -151,8 +151,8 @@ Former<'b, 'a, Input, Output, Failure>
 
     #[inline(always)]
     pub fn build(&mut self, classifier: &mut Classifier<'a, Input, Output, Failure>) {
-        let order = classifier.order.clone();
-        order.order(self, classifier);
+        let action = classifier.action.clone();
+        action.action(self, classifier);
     }
 
     #[inline(always)]
@@ -161,7 +161,7 @@ Former<'b, 'a, Input, Output, Failure>
         classifier: Classifier<'a, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
         let initial = self.source.position();
-        let mut active = Classifier::new(classifier.order.clone(), 0, initial);
+        let mut active = Classifier::new(classifier.action.clone(), 0, initial);
 
         self.build(&mut active);
 

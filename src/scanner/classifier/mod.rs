@@ -238,7 +238,7 @@ impl<'scanner> Scanner<'scanner> {
 
     fn fallback() -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>>
     {
-        Classifier::with_order(
+        Classifier::with_action(
             Classifier::anything(),
             Classifier::fail(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
