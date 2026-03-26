@@ -94,7 +94,7 @@ use {
             Classifier,
             Form,
             Action,
-            {Formable, Source},
+            Formable,
         },
         data::{
             memory::{
@@ -103,11 +103,14 @@ use {
             Identity, Offset
         },
         internal::hash::Map,
-        tracker::Position,
+        tracker::{
+            Position,
+            Peekable,
+        },
     },
 };
 
-pub type Stash<'a, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Input, Output, Failure> + 'a>)>;
+pub type Stash<'a, 'src, Source, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> + 'src>)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub outcome: outcome::Outcome,
@@ -122,35 +125,43 @@ pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable
     pub input_base: Offset,
 }
 
-pub struct Former<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub source: &'b mut dyn Source<'a, Input>,
+pub struct Former<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    pub source: &'src mut Source,
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
-    pub stash: Stash<'a, Input, Output, Failure>,
+    pub stash: Stash<'a, 'src, Source, Input, Output, Failure>,
     pub memo: Map<(usize, Offset), Memo<'a, Input, Output, Failure>>,
 }
 
-impl<'b, 'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Former<'b, 'a, Input, Output, Failure>
+impl<'a, 'src, Source, Input, Output, Failure>
+Former<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline(always)]
-    pub fn new(source: &'b mut dyn Source<'a, Input>) -> Self {
+    pub fn new(
+        source: &'src mut Source,
+    ) -> Self {
         Self {
             source,
-            consumed: Vec::with_capacity(2048),
-            forms: {
-                let mut forms = Vec::with_capacity(2048);
-                forms.push(Form::Blank);
-
-                forms
-            },
-            stash: Vec::with_capacity(32),
-            memo: Map::with_capacity(512),
+            consumed: Vec::new(),
+            forms: Vec::new(),
+            stash: Stash::new(),
+            memo: Map::new(),
         }
     }
 
     #[inline(always)]
-    pub fn build(&mut self, classifier: &mut Classifier<'a, Input, Output, Failure>) {
+    pub fn build(&mut self, classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>) {
         let action = classifier.action.clone();
         action.action(self, classifier);
     }
@@ -158,7 +169,7 @@ Former<'b, 'a, Input, Output, Failure>
     #[inline(always)]
     pub fn form(
         &mut self,
-        classifier: Classifier<'a, Input, Output, Failure>,
+        classifier: Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
         let initial = self.source.position();
         let mut active = Classifier::new(classifier.action.clone(), 0, initial);

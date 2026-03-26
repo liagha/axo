@@ -7,26 +7,26 @@ use crate::{
     tracker::{Location, Peekable, Position, Span},
 };
 
-pub struct Initializer<'initializer> {
+pub struct Initializer<'a> {
     pub index: Offset,
-    pub position: Position<'initializer>,
-    pub input: Vec<Token<'initializer>>,
-    pub output: Vec<Symbol<'initializer>>,
-    pub errors: Vec<InitializeError<'initializer>>,
+    pub position: Position<'a>,
+    pub input: Vec<Token<'a>>,
+    pub output: Vec<Symbol<'a>>,
+    pub errors: Vec<InitializeError<'a>>,
 }
 
-impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'initializer> {
+impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
     #[inline]
     fn length(&self) -> Scale {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: Offset) -> Option<&Token<'initializer>> {
+    fn peek_ahead(&self, n: Offset) -> Option<&Token<'a>> {
         let current = self.index + n;
         self.get(current)
     }
 
-    fn peek_behind(&self, n: Offset) -> Option<&Token<'initializer>> {
+    fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
         self.index
             .checked_sub(n)
             .and_then(|current| self.get(current))
@@ -35,8 +35,8 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
     fn next(
         &self,
         index: &mut Offset,
-        position: &mut Position<'initializer>,
-    ) -> Option<Token<'initializer>> {
+        position: &mut Position<'a>,
+    ) -> Option<Token<'a>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
             *index += 1;
@@ -45,19 +45,19 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
         None
     }
 
-    fn input(&self) -> &Vec<Token<'initializer>> {
+    fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Vec<Token<'initializer>> {
+    fn input_mut(&mut self) -> &mut Vec<Token<'a>> {
         &mut self.input
     }
 
-    fn position(&self) -> Position<'initializer> {
+    fn position(&self) -> Position<'a> {
         self.position.clone()
     }
 
-    fn position_mut(&mut self) -> &mut Position<'initializer> {
+    fn position_mut(&mut self) -> &mut Position<'a> {
         &mut self.position
     }
 
@@ -70,8 +70,8 @@ impl<'initializer> Peekable<'initializer, Token<'initializer>> for Initializer<'
     }
 }
 
-impl<'initializer> Initializer<'initializer> {
-    pub fn new(location: Location<'initializer>) -> Self {
+impl<'a> Initializer<'a> {
+    pub fn new(location: Location<'a>) -> Self {
         Initializer {
             index: 0,
             position: Position::new(location),
@@ -81,13 +81,14 @@ impl<'initializer> Initializer<'initializer> {
         }
     }
 
-    pub fn filter(
+    pub fn filter<'src>(
         length: Scale,
     ) -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Element<'initializer>,
-        ParseError<'initializer>,
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Element<'a>,
+        ParseError<'a>,
     > {
         Classifier::repetition(
             Classifier::alternative([
@@ -99,11 +100,12 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn directive() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn directive<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::alternative([
             Self::verbosity(),
@@ -114,16 +116,17 @@ impl<'initializer> Initializer<'initializer> {
         ])
     }
 
-    pub fn classifier() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn classifier<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::repetition(Self::directive(), 0, None)
     }
 
-    pub fn initialize(&mut self) -> Vec<(Location<'initializer>, Span<'initializer>)> {
+    pub fn initialize(&mut self) -> Vec<(Location<'a>, Span<'a>)> {
         let location = Location::Flag;
         let mut scanner = Scanner::new(location);
 
@@ -135,16 +138,22 @@ impl<'initializer> Initializer<'initializer> {
 
         let length = self.length();
         let classifier = Self::filter(length);
-        let mut former = Former::new(self);
 
-        self.input = former.form(classifier).collect_inputs();
+        let inputs = {
+            let mut former = Former::new(self);
+            former.form(classifier).collect_inputs()
+        };
 
+        self.input = inputs;
         self.reset();
 
-        let mut former = Former::new(self);
         let mut directives = Vec::new();
         let classifier = Self::classifier();
-        let forms = former.form(classifier).flatten();
+
+        let forms = {
+            let mut former = Former::new(self);
+            former.form(classifier).flatten()
+        };
 
         for form in forms {
             match form {

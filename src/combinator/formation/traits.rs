@@ -4,11 +4,16 @@ use crate::{
         formation::classifier::Classifier,
         formation::form::Form,
     },
-    tracker::{Span, Spanned},
+    tracker::{Span, Spanned, Peekable},
 };
 
-impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Spanned<'form> for Form<'form, Input, Output, Failure> {
-    fn span(&self) -> Span<'form> {
+impl<'a, Input, Output, Failure> Spanned<'a> for Form<'a, Input, Output, Failure>
+where
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    fn span(&self) -> Span<'a> {
         match self {
             Form::Blank => {
                 Span::void()
@@ -32,7 +37,13 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
     }
 }
 
-impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Clone for Classifier<'form, Input, Output, Failure> {
+impl<'a, 'src, Source, Input, Output, Failure> Clone for Classifier<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
     fn clone(&self) -> Self {
         Self {
             identity: self.identity,
@@ -47,3 +58,4 @@ impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'
         }
     }
 }
+

@@ -8,8 +8,8 @@ use {
     },
 };
 
-impl<'parser> Parser<'parser> {
-    pub fn symbolization() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+impl<'a> Parser<'a> {
+    pub fn symbolization() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::binding),
             Classifier::deferred(Self::structure),
@@ -18,7 +18,7 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    pub fn binding() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn binding() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(id) = &token.kind {
@@ -147,7 +147,7 @@ impl<'parser> Parser<'parser> {
             })
     }
 
-    pub fn structure() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn structure() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -228,7 +228,7 @@ impl<'parser> Parser<'parser> {
             })
     }
 
-    pub fn union() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn union() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -309,7 +309,7 @@ impl<'parser> Parser<'parser> {
             })
     }
 
-    pub fn function() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn function() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
@@ -526,7 +526,7 @@ impl<'parser> Parser<'parser> {
                                 Box::new(name),
                                 members,
                                 body,
-                                None::<Box<Element<'parser>>>,
+                                None::<Box<Element<'a>>>,
                                 interface,
                                 entry,
                             )),

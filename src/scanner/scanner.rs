@@ -106,7 +106,7 @@ impl<'scanner> Scanner<'scanner> {
 
     pub fn scan(&mut self) {
         let classifier = Self::classifier();
-        let mut former = Former::new(self);
+        let mut former = Former::new(&mut *self);
 
         let forms = former.form(classifier.clone()).flatten();
 

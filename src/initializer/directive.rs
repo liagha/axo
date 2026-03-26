@@ -7,8 +7,8 @@ use crate::{
     tracker::Spanned,
 };
 
-impl<'initializer> Initializer<'initializer> {
-    fn path_string(tokens: Vec<Token<'initializer>>) -> String {
+impl<'a> Initializer<'a> {
+    fn path_string(tokens: Vec<Token<'a>>) -> String {
         let mut result = String::new();
         for input in tokens {
             match input.kind {
@@ -25,11 +25,12 @@ impl<'initializer> Initializer<'initializer> {
         result
     }
 
-    fn path_value() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    fn path_value<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -62,14 +63,15 @@ impl<'initializer> Initializer<'initializer> {
         ])
     }
 
-    fn path_directive(
-        name: Str<'initializer>,
-        matcher: fn(&Str<'initializer>) -> bool,
+    fn path_directive<'src>(
+        name: Str<'a>,
+        matcher: fn(&Str<'a>) -> bool,
     ) -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::with_transform(
             Classifier::sequence([
@@ -129,11 +131,12 @@ impl<'initializer> Initializer<'initializer> {
         )
     }
 
-    pub fn verbosity() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn verbosity<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
@@ -187,22 +190,24 @@ impl<'initializer> Initializer<'initializer> {
             })
     }
 
-    pub fn input() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn input<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Self::path_directive(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
         })
     }
 
-    pub fn implicit_input() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn implicit_input<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Classifier::with_transform(Self::path_value(), |former, classifier| {
             let form = former.forms.get_mut(classifier.form).unwrap();
@@ -241,11 +246,12 @@ impl<'initializer> Initializer<'initializer> {
         })
     }
 
-    pub fn output() -> Classifier<
-        'initializer,
-        Token<'initializer>,
-        Symbol<'initializer>,
-        InitializeError<'initializer>,
+    pub fn output<'src>() -> Classifier<
+        'a, 'src,
+        Self,
+        Token<'a>,
+        Symbol<'a>,
+        InitializeError<'a>,
     > {
         Self::path_directive(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"

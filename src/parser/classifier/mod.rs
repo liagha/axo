@@ -9,15 +9,15 @@ use crate::{
     tracker::{Span, Spanned},
 };
 
-impl<'parser> Parser<'parser> {
-    pub fn get_body(element: Element<'parser>) -> Vec<Element<'parser>> {
+impl<'a> Parser<'a> {
+    pub fn get_body(element: Element<'a>) -> Vec<Element<'a>> {
         match element.kind {
             ElementKind::Delimited(delimited) => delimited.members,
             _ => vec![element],
         }
     }
 
-    pub fn literal() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn literal() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::predicate(|token: &Token| {
             match &token.kind {
                 TokenKind::String(_)
@@ -46,14 +46,14 @@ impl<'parser> Parser<'parser> {
             })
     }
 
-    pub fn primary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn primary() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::delimited),
             Classifier::deferred(Self::literal),
         ])
     }
 
-    pub fn prefixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn prefixed() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -83,7 +83,7 @@ impl<'parser> Parser<'parser> {
             })
     }
 
-    pub fn suffixed() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn suffixed() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::deferred(Self::primary),
             Classifier::repetition(
@@ -129,10 +129,10 @@ impl<'parser> Parser<'parser> {
     }
 
     fn apply_suffix(
-        target: Element<'parser>,
-        suffix: Element<'parser>,
-        span: Span<'parser>,
-    ) -> Element<'parser> {
+        target: Element<'a>,
+        suffix: Element<'a>,
+        span: Span<'a>,
+    ) -> Element<'a> {
         let ElementKind::Delimited(delimited) = suffix.kind else {
             return target;
         };
@@ -173,7 +173,7 @@ impl<'parser> Parser<'parser> {
         }
     }
 
-    pub fn unary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn unary() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::prefixed),
             Classifier::deferred(Self::suffixed),
@@ -181,7 +181,7 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    pub fn binary() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn binary() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([Classifier::with_transform(
             Classifier::sequence([
                 Classifier::deferred(Self::unary),
@@ -231,11 +231,11 @@ impl<'parser> Parser<'parser> {
     }
 
     fn climb(
-        mut left: Element<'parser>,
-        pairs: &[(Token<'parser>, Element<'parser>, u8)],
+        mut left: Element<'a>,
+        pairs: &[(Token<'a>, Element<'a>, u8)],
         threshold: u8,
         start: usize,
-    ) -> (Element<'parser>, usize) {
+    ) -> (Element<'a>, usize) {
         let mut current = start;
 
         while current < pairs.len() {
@@ -273,7 +273,7 @@ impl<'parser> Parser<'parser> {
         (left, current)
     }
 
-    pub fn expression() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn expression() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::binary),
             Classifier::deferred(Self::unary),
@@ -281,14 +281,14 @@ impl<'parser> Parser<'parser> {
         ])
     }
 
-    pub fn element() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn element() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::symbolization),
             Classifier::deferred(Self::expression),
         ])
     }
 
-    pub fn fallback() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn fallback() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::with_fail(Classifier::anything(), |former, classifier| {
             let form = former.forms.get_mut(classifier.form).unwrap();
             let token = form.unwrap_input();
@@ -300,7 +300,7 @@ impl<'parser> Parser<'parser> {
         })
     }
 
-    pub fn parser() -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    pub fn parser() -> Classifier<'a, 'a, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::deferred(Self::element),

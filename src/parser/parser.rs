@@ -8,31 +8,31 @@ use {
     },
 };
 
-pub struct Parser<'parser> {
+pub struct Parser<'a> {
     pub index: Offset,
-    pub position: Position<'parser>,
-    pub input: Vec<Token<'parser>>,
-    pub output: Vec<Element<'parser>>,
-    pub errors: Vec<ParseError<'parser>>,
+    pub position: Position<'a>,
+    pub input: Vec<Token<'a>>,
+    pub output: Vec<Element<'a>>,
+    pub errors: Vec<ParseError<'a>>,
 }
 
-impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
+impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
     #[inline]
     fn length(&self) -> Scale {
         self.input.len()
     }
 
-    fn peek_ahead(&self, n: Offset) -> Option<&Token<'parser>> {
+    fn peek_ahead(&self, n: Offset) -> Option<&Token<'a>> {
         let current = self.index + n;
 
         self.get(current)
     }
 
-    fn peek_behind(&self, n: Offset) -> Option<&Token<'parser>> {
+    fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
         self.index.checked_sub(n).and_then(|current| self.get(current))
     }
 
-    fn next(&self, index: &mut Offset, position: &mut Position<'parser>) -> Option<Token<'parser>> {
+    fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
 
@@ -44,19 +44,19 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
         None
     }
 
-    fn input(&self) -> &Vec<Token<'parser>> {
+    fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Vec<Token<'parser>> {
+    fn input_mut(&mut self) -> &mut Vec<Token<'a>> {
         &mut self.input
     }
 
-    fn position(&self) -> Position<'parser> {
+    fn position(&self) -> Position<'a> {
         self.position.clone()
     }
 
-    fn position_mut(&mut self) -> &mut Position<'parser> {
+    fn position_mut(&mut self) -> &mut Position<'a> {
         &mut self.position
     }
 
@@ -69,8 +69,8 @@ impl<'parser> Peekable<'parser, Token<'parser>> for Parser<'parser> {
     }
 }
 
-impl<'parser> Parser<'parser> {
-    pub fn new(location: Location<'parser>) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(location: Location<'a>) -> Self {
         Parser {
             index: 0,
             position: Position::new(location),
@@ -82,7 +82,7 @@ impl<'parser> Parser<'parser> {
 
     pub fn filter(
         length: Scale,
-    ) -> Classifier<'parser, Token<'parser>, Element<'parser>, ParseError<'parser>> {
+    ) -> Classifier<'a, 'a, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {

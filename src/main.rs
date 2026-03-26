@@ -1,3 +1,5 @@
+extern crate core;
+
 #[cfg(feature = "combinator")]
 pub mod combinator;
 #[cfg(feature = "generator")]

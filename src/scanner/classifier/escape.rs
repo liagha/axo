@@ -14,9 +14,9 @@ use {
     },
 };
 
-impl<'scanner> Scanner<'scanner> {
+impl<'a> Scanner<'a> {
     pub fn simple_escape(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::predicate(|c: &Character| match c.value {
@@ -61,7 +61,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn octal_escape(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::persistence(
@@ -108,7 +108,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn hex_escape(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([Classifier::literal('x'), Classifier::literal('X')]),
@@ -156,7 +156,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn unicode_escape(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([Classifier::literal('u'), Classifier::literal('U')]),
@@ -215,7 +215,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn unicode_escape_simple(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('\\'),
             Classifier::alternative([Classifier::literal('u'), Classifier::literal('U')]),
@@ -258,7 +258,7 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     pub fn escape_sequence(
-    ) -> Classifier<'scanner, Character<'scanner>, Token<'scanner>, ScanError<'scanner>> {
+    ) -> Classifier<'a, 'a, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::alternative([
             Self::unicode_escape(),
             Self::unicode_escape_simple(),

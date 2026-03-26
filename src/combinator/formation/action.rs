@@ -6,15 +6,21 @@ use {
         },
     },
 };
+use crate::tracker::Peekable;
 
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Multiple<'a, 'src, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         for action in self.actions.iter() {
             action.action(former, classifier);
@@ -22,14 +28,19 @@ Action<'a, Input, Output, Failure> for Multiple<'a, Input, Output, Failure>
     }
 }
 
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Ignore
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Ignore
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        _former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        _former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_ignore();
@@ -38,14 +49,19 @@ Action<'a, Input, Output, Failure> for Ignore
     }
 }
 
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Skip
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Skip
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        _former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        _former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             classifier.set_empty();
@@ -54,14 +70,19 @@ Action<'a, Input, Output, Failure> for Skip
     }
 }
 
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Transform<'a, Input, Output, Failure>
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Transform<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         if classifier.is_aligned() {
             if let Err(error) = (self.transformer)(former, classifier) {
@@ -74,14 +95,19 @@ Action<'a, Input, Output, Failure> for Transform<'a, Input, Output, Failure>
         }
     }
 }
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Fail<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
             let failure = (self.emitter)(former, classifier.clone());
@@ -95,14 +121,19 @@ Action<'a, Input, Output, Failure> for Fail<'a, Input, Output, Failure>
     }
 }
 
-impl<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>>
-Action<'a, Input, Output, Failure> for Panic<'a, Input, Output, Failure>
+impl<'a, 'src, Source, Input, Output, Failure>
+Action<'a, Former<'a, 'src, Source, Input, Output, Failure>, Classifier<'a, 'src, Source, Input, Output, Failure>> for Panic<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        former: &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        classifier: &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
     ) {
         if !classifier.is_aligned() {
             let failure = (self.emitter)(former, classifier.clone());

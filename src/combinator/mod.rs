@@ -14,7 +14,8 @@ pub(super) fn next_identity() -> Identity {
 use crate::{
     format::Show,
     internal::hash::Hash,
-    tracker::{Peekable, Spanned},
+    data::memory::PhantomData,
+    tracker::{Spanned, Peekable},
 };
 
 pub trait Formable<'a>:
@@ -23,96 +24,143 @@ Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
 impl<'a, T> Formable<'a> for T where
     T: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
 
-pub trait Source<'a, Input>: Peekable<'a, Input>
-where
-    Input: Formable<'a> {}
-
-impl<'a, Target, Input> Source<'a, Input> for Target
-where
-    Target: Peekable<'a, Input>,
-    Input: Formable<'a> {}
-
-pub trait Action<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+pub trait Action<'a, Host, State> {
     fn action(
         &self,
-        former: &mut Former<'_, 'a, Input, Output, Failure>,
-        classifier: &mut Classifier<'a, Input, Output, Failure>,
+        host: &mut Host,
+        state: &mut State,
     );
 }
 
-pub struct Multiple<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub actions: Vec<Rc<dyn Action<'a, Input, Output, Failure> + 'a>>,
+pub struct Multiple<'a, 'src, Host, State> {
+    pub actions: Vec<Rc<dyn Action<'a, Host, State> + 'src>>,
 }
 
 pub struct Ignore;
 
 pub struct Skip;
 
-pub struct Transform<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+pub struct Transform<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
     pub transformer: Rc<dyn Fn(
-        &mut Former<'_, 'a, Input, Output, Failure>,
-        &mut Classifier<'a, Input, Output, Failure>,
-    ) -> Result<(), Failure> + 'a>,
+        &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        &mut Classifier<'a, 'src, Source, Input, Output, Failure>,
+    ) -> Result<(), Failure> + 'src>,
 }
 
-pub struct Fail<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+pub struct Fail<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
     pub emitter: Rc<dyn Fn(
-        &mut Former<'_, 'a, Input, Output, Failure>,
-        Classifier<'a, Input, Output, Failure>,
-    ) -> Failure + 'a>,
+        &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        Classifier<'a, 'src, Source, Input, Output, Failure>,
+    ) -> Failure + 'src>,
 }
 
-pub struct Panic<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+pub struct Panic<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
     pub emitter: Rc<dyn Fn(
-        &mut Former<'_, 'a, Input, Output, Failure>,
-        Classifier<'a, Input, Output, Failure>,
-    ) -> Failure + 'a>,
+        &mut Former<'a, 'src, Source, Input, Output, Failure>,
+        Classifier<'a, 'src, Source, Input, Output, Failure>,
+    ) -> Failure + 'src>,
 }
 
 #[derive(Clone)]
-pub struct Literal<'a, Input> {
-    pub value: Rc<dyn PartialEq<Input> + 'a>,
+pub struct Literal<'a, 'src, Input>
+where
+    Input: Formable<'a>,
+{
+    pub value: Rc<dyn PartialEq<Input> + 'src>,
+    pub _marker: PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
-pub struct Predicate<'a, Input: Formable<'a>> {
-    pub function: Rc<dyn Fn(&Input) -> bool + 'a>,
+pub struct Predicate<'a, 'src, Input>
+where
+    Input: Formable<'a>,
+{
+    pub function: Rc<dyn Fn(&Input) -> bool + 'src>,
+    pub _marker: PhantomData<&'a ()>, 
 }
 
-pub struct Deferred<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub factory: fn() -> Classifier<'a, Input, Output, Failure>,
+pub struct Deferred<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    pub factory: fn() -> Classifier<'a, 'src, Source, Input, Output, Failure>,
 }
 
-#[derive(Clone)]
-pub struct Optional<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
+pub struct Optional<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    pub classifier: Box<Classifier<'a, 'src, Source, Input, Output, Failure>>,
 }
 
-#[derive(Clone)]
 pub struct Alternative<
     'a,
+    'src,
+    Source,
+    Input,
+    Output,
+    Failure,
+    const SIZE: Scale,
+>
+where
+    Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
-    const SIZE: Scale,
-> {
-    pub patterns: [Classifier<'a, Input, Output, Failure>; SIZE],
+{
+    pub patterns: [Classifier<'a, 'src, Source, Input, Output, Failure>; SIZE],
 }
 
-#[derive(Clone)]
 pub struct Sequence<
     'a,
+    'src,
+    Source,
+    Input,
+    Output,
+    Failure,
+    const SIZE: Scale,
+>
+where
+    Source: Peekable<'a, Input>,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
-    const SIZE: Scale,
-> {
-    pub patterns: [Classifier<'a, Input, Output, Failure>; SIZE],
+{
+    pub patterns: [Classifier<'a, 'src, Source, Input, Output, Failure>; SIZE],
 }
 
-#[derive(Clone)]
-pub struct Repetition<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub classifier: Box<Classifier<'a, Input, Output, Failure>>,
+pub struct Repetition<'a, 'src, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    pub classifier: Box<Classifier<'a, 'src, Source, Input, Output, Failure>>,
     pub minimum: Scale,
     pub maximum: Option<Scale>,
     pub persist: Boolean,
