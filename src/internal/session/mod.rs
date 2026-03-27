@@ -33,13 +33,14 @@ use {
 };
 
 impl<'session> Session<'session> {
-    const PIPELINE: [fn(&mut Session<'session>); 5] = [
+    const PIPELINE: [fn(&mut Session<'session>); 6] = [
         Self::prepare,
         Self::scan,
         Self::parse,
         Self::populate,
-        //Self::resolve,
+        Self::resolve,
         Self::analyze,
+        //Self::interpret,
     ];
 
     pub fn cache<T: Decode<'session> + Encode + Clone>(&self, name: &str, hash: u64, data: Option<T>) -> Option<T> {
@@ -75,8 +76,6 @@ impl<'session> Session<'session> {
                     break 'pipeline;
                 }
             }
-
-            self.interpret();
 
             #[cfg(feature = "generator")]
             self.generate();

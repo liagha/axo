@@ -257,46 +257,44 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         [OperatorKind::Dot] => {
                             let mut left = resolver.reify(&binary.left.typing);
 
-                            if matches!(left.kind, TypeKind::Unknown) {
-                                resolver.fresh()
-                            } else {
-                                while let TypeKind::Pointer { target } = left.kind {
-                                    left = resolver.reify(&target);
-                                }
+                            while let TypeKind::Pointer { target } = left.kind {
+                                left = resolver.reify(&target);
+                            }
 
-                                let mut scope = None;
+                            let mut scope = None;
 
-                                if let Some(reference) = binary.left.reference {
-                                    if let Some(symbol) = resolver.get_symbol(reference).cloned() {
-                                        if !symbol.is_instance() {
-                                            scope = Some(symbol.scope);
-                                        }
-                                    }
-                                }
-
-                                if scope.is_none() {
-                                    if let Some(symbol) = resolver.get_symbol(left.identity).cloned() {
+                            if let Some(reference) = binary.left.reference {
+                                if let Some(symbol) = resolver.get_symbol(reference).cloned() {
+                                    if !symbol.is_instance() {
                                         scope = Some(symbol.scope);
                                     }
                                 }
+                            }
 
-                                if let Some(scope) = scope {
-                                    resolver.enter_scope(scope);
-                                    binary.right.resolve(resolver);
-                                    resolver.exit();
+                            if scope.is_none() {
+                                if let Some(symbol) = resolver.get_symbol(left.identity).cloned() {
+                                    scope = Some(symbol.scope);
+                                }
+                            }
 
-                                    self.reference = binary.right.reference;
-                                    binary.right.typing.clone()
-                                } else {
+                            if let Some(scope) = scope {
+                                resolver.enter_scope(scope);
+                                binary.right.resolve(resolver);
+                                resolver.exit();
+
+                                self.reference = binary.right.reference;
+                                binary.right.typing.clone()
+                            } else {
+                                if !matches!(left.kind, TypeKind::Unknown) {
                                     resolver.errors.push(Error::new(
                                         ErrorKind::InvalidOperation(binary.operator.clone()),
                                         binary.operator.span,
                                     ));
-                                    resolver.fresh()
                                 }
+
+                                resolver.fresh()
                             }
                         }
-
                         [OperatorKind::Equal] => {
                             binary.right.resolve(resolver);
 
