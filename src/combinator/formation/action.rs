@@ -4,17 +4,17 @@ use crate::combinator::{
 use crate::tracker::Peekable;
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Multiple<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    >
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+>
+for Multiple<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -34,11 +34,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Ignore
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Ignore
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -59,11 +59,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Skip
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Skip
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -84,18 +84,18 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Transform<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+>
+for Transform<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -119,19 +119,20 @@ where
         }
     }
 }
+
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Fail<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+>
+for Fail<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -157,18 +158,18 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    >
-    for Panic<
-        'a,
-        'source,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-        Failure,
-    >
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+>
+for Panic<
+    'a,
+    'source,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+    Failure,
+>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,

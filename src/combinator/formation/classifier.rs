@@ -5,7 +5,7 @@ use crate::{
         Multiple, Optional, Panic, Predicate, Repetition, Sequence, Skip, Transform,
     },
     data::{
-        memory::{replace, swap, take, Rc},
+        memory::{replace, take, Rc},
         Identity, Offset, Scale,
     },
     tracker::{Location, Peekable, Position},
@@ -31,7 +31,7 @@ where
 }
 
 impl<'a: 'source, 'source, Source, Input, Output, Failure>
-    Classifier<'a, 'source, Source, Input, Output, Failure>
+Classifier<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -294,10 +294,10 @@ where
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
         F: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Failure
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + 'source,
     {
         self.with_action(Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -324,10 +324,10 @@ where
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
         F: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Failure
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + 'source,
     {
         self.with_action(Self::panic(emitter))
     }
@@ -341,10 +341,10 @@ where
     pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Result<(), Failure>
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Result<(), Failure>
+        + 'source,
     {
         self.with_action(Self::transform(transform))
     }
@@ -365,10 +365,10 @@ where
     ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
         T: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Result<(), Failure>
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Result<(), Failure>
+        + 'source,
     {
         Rc::new(Transform {
             transformer: Rc::new(transformer),
@@ -382,10 +382,10 @@ where
     ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
         T: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Failure
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + 'source,
     {
         Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -399,10 +399,10 @@ where
     ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
         T: Fn(
-                &mut Former<'a, 'source, Source, Input, Output, Failure>,
-                Classifier<'a, 'source, Source, Input, Output, Failure>,
-            ) -> Failure
-            + 'source,
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + 'source,
     {
         Rc::new(Panic {
             emitter: Rc::new(emitter),
@@ -436,11 +436,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Literal<'a, 'source, Input>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Literal<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -461,9 +461,9 @@ where
                     .next(&mut classifier.marker, &mut classifier.position);
 
                 let val = peek.clone();
-                let use_id = former.consumed.len();
+                let input_id = former.consumed.len();
                 former.consumed.push(val.clone());
-                classifier.consumed.push(use_id);
+                classifier.consumed.push(input_id);
 
                 let form_id = former.forms.len();
                 former.forms.push(Form::input(val));
@@ -479,11 +479,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Predicate<'a, 'source, Input>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Predicate<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -504,9 +504,9 @@ where
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
 
-                let use_id = former.consumed.len();
+                let input_id = former.consumed.len();
                 former.consumed.push(val.clone());
-                classifier.consumed.push(use_id);
+                classifier.consumed.push(input_id);
 
                 let form_id = former.forms.len();
                 former.forms.push(Form::input(val));
@@ -522,11 +522,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -540,75 +540,70 @@ where
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
         let mut best: Option<Classifier<'a, 'source, Source, Input, Output, Failure>> = None;
+        let mut best_input = former.consumed.len();
+        let mut best_form = former.forms.len();
 
-        let mut stack = take(&mut classifier.stack);
-        let mut consumed = take(&mut classifier.consumed);
-        let base_stack = stack.len();
-        let base_consumed = consumed.len();
-
-        let mut form_used = former.consumed.len();
-        let mut form_forms = former.forms.len();
+        let mut current_consumed = take(&mut classifier.consumed);
+        let mut current_stack = take(&mut classifier.stack);
+        let base_consumed = current_consumed.len();
+        let base_stack = current_stack.len();
 
         for pattern in &self.states {
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 classifier.marker,
                 classifier.position,
-                consumed,
+                current_consumed,
                 Outcome::Blank,
                 0,
-                stack,
+                current_stack,
                 classifier.depth + 1,
             );
 
             former.build(&mut child);
 
-            if matches!(child.outcome, Outcome::Blank) {
-                stack = child.stack;
-                consumed = child.consumed;
-                stack.truncate(base_stack);
-                consumed.truncate(base_consumed);
-                former.consumed.truncate(form_used);
-                former.forms.truncate(form_forms);
+            if child.is_blank() {
+                current_consumed = child.consumed;
+                current_stack = child.stack;
+                current_consumed.truncate(base_consumed);
+                current_stack.truncate(base_stack);
+                former.consumed.truncate(best_input);
+                former.forms.truncate(best_form);
                 continue;
             }
 
-            if let Some(ref mut champion) = best {
-                if child.is_aligned() && (champion.is_failed() || child.marker > champion.marker) {
-                    swap(champion, &mut child);
-                    stack = child.stack;
-                    consumed = child.consumed;
-                    stack.truncate(base_stack);
-                    consumed.truncate(base_consumed);
-
-                    form_used = former.consumed.len();
-                    form_forms = former.forms.len();
-                } else {
-                    stack = child.stack;
-                    consumed = child.consumed;
-                    stack.truncate(base_stack);
-                    consumed.truncate(base_consumed);
-
-                    former.consumed.truncate(form_used);
-                    former.forms.truncate(form_forms);
+            let is_better = match &best {
+                Some(champion) => {
+                    child.is_aligned() && (champion.is_failed() || child.marker > champion.marker)
                 }
-            } else {
-                let mut next_stack = Vec::with_capacity(child.stack.capacity());
-                next_stack.extend_from_slice(&child.stack[..base_stack]);
-                stack = next_stack;
+                None => true,
+            };
 
-                let mut next_consumed = Vec::with_capacity(child.consumed.capacity());
-                next_consumed.extend_from_slice(&child.consumed[..base_consumed]);
-                consumed = next_consumed;
+            if is_better {
+                if let Some(champion) = best.take() {
+                    current_consumed = champion.consumed;
+                    current_stack = champion.stack;
+                    current_consumed.truncate(base_consumed);
+                    current_stack.truncate(base_stack);
+                } else {
+                    current_consumed = child.consumed[..base_consumed].to_vec();
+                    current_stack = child.stack[..base_stack].to_vec();
+                }
 
+                best_input = former.consumed.len();
+                best_form = former.forms.len();
                 best = Some(child);
-
-                form_used = former.consumed.len();
-                form_forms = former.forms.len();
+            } else {
+                current_consumed = child.consumed;
+                current_stack = child.stack;
+                current_consumed.truncate(base_consumed);
+                current_stack.truncate(base_stack);
+                former.consumed.truncate(best_input);
+                former.forms.truncate(best_form);
             }
 
             if let Some(ref champion) = best {
-                if matches!(champion.outcome, Outcome::Panicked | Outcome::Aligned) {
+                if champion.is_panicked() || champion.is_aligned() {
                     break;
                 }
             }
@@ -625,15 +620,15 @@ where
             }
             None => {
                 classifier.set_empty();
-                classifier.consumed = consumed;
-                classifier.stack = stack;
+                classifier.consumed = current_consumed;
+                classifier.stack = current_stack;
             }
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-    for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -648,11 +643,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -717,11 +712,11 @@ where
             }
         };
 
-        let class_consumed = classifier.consumed.len();
-        let class_stack = classifier.stack.len();
-        let form_base = former.forms.len();
-        let input_base = former.consumed.len();
-        let origin = classifier.marker;
+        let base_consumed = classifier.consumed.len();
+        let base_stack = classifier.stack.len();
+        let base_form = former.forms.len();
+        let base_input = former.consumed.len();
+        let origin_marker = classifier.marker;
 
         let mut child = Classifier::create(
             stashed,
@@ -736,24 +731,24 @@ where
 
         former.build(&mut child);
 
-        let forms: Vec<_> = former.forms[form_base..].iter().cloned().collect();
-        let inputs: Vec<_> = former.consumed[input_base..].iter().cloned().collect();
-        let consumed: Vec<_> = child.consumed[class_consumed..].to_vec();
-        let stack: Vec<_> = child.stack[class_stack..].to_vec();
+        let forms: Vec<_> = former.forms[base_form..].to_vec();
+        let inputs: Vec<_> = former.consumed[base_input..].to_vec();
+        let consumed: Vec<_> = child.consumed[base_consumed..].to_vec();
+        let stack: Vec<_> = child.stack[base_stack..].to_vec();
 
         former.memo.insert(
             memo_key,
             Memo {
                 outcome: child.outcome,
-                advance: child.marker - origin,
+                advance: child.marker - origin_marker,
                 position: child.position,
                 forms,
                 inputs,
                 consumed,
                 stack,
                 form: child.form,
-                form_base,
-                input_base,
+                form_base: base_form,
+                input_base: base_input,
             },
         );
 
@@ -767,11 +762,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -784,10 +779,10 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let form_used = former.consumed.len();
-        let form_forms = former.forms.len();
-        let class_used = classifier.consumed.len();
-        let class_stack = classifier.stack.len();
+        let base_input = former.consumed.len();
+        let base_form = former.forms.len();
+        let base_consumed = classifier.consumed.len();
+        let base_stack = classifier.stack.len();
 
         let mut child = classifier.create_child(self.state.action.clone());
         former.build(&mut child);
@@ -803,21 +798,21 @@ where
             classifier.form = child.form;
             classifier.set_align();
         } else {
-            former.consumed.truncate(form_used);
-            former.forms.truncate(form_forms);
-            classifier.consumed.truncate(class_used);
-            classifier.stack.truncate(class_stack);
+            former.consumed.truncate(base_input);
+            former.forms.truncate(base_form);
+            classifier.consumed.truncate(base_consumed);
+            classifier.stack.truncate(base_stack);
             classifier.set_ignore();
         }
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -830,16 +825,15 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let mut mark = classifier.marker;
-        let mut pos = classifier.position;
+        let origin_marker = classifier.marker;
+        let origin_position = classifier.position;
+        let origin_input = former.consumed.len();
+        let origin_form = former.forms.len();
 
-        let form_used = former.consumed.len();
-        let form_forms = former.forms.len();
-
-        let mut consumed = take(&mut classifier.consumed);
-        let mut stack = take(&mut classifier.stack);
-        let class_used = consumed.len();
-        let class_stack = stack.len();
+        let mut current_consumed = take(&mut classifier.consumed);
+        let mut current_stack = take(&mut classifier.stack);
+        let base_consumed = current_consumed.len();
+        let base_stack = current_stack.len();
 
         let mut forms = Vec::with_capacity(SIZE);
         let mut broke = false;
@@ -847,37 +841,38 @@ where
         for pattern in &self.states {
             let mut child = Classifier::create(
                 pattern.action.clone(),
-                mark,
-                pos,
-                consumed,
+                classifier.marker,
+                classifier.position,
+                current_consumed,
                 Outcome::Blank,
                 0,
-                stack,
+                current_stack,
                 classifier.depth + 1,
             );
 
             former.build(&mut child);
 
-            consumed = child.consumed;
-            stack = child.stack;
+            current_consumed = child.consumed;
+            current_stack = child.stack;
 
             match child.outcome {
                 Outcome::Aligned => {
                     classifier.outcome = child.outcome;
-                    mark = child.marker;
-                    pos = child.position;
+                    classifier.marker = child.marker;
+                    classifier.position = child.position;
                     forms.push(child.form);
                 }
                 Outcome::Panicked | Outcome::Failed => {
                     classifier.outcome = child.outcome;
-                    mark = child.marker;
-                    pos = child.position;
+                    classifier.marker = child.marker;
+                    classifier.position = child.position;
                     forms.push(child.form);
+                    broke = true;
                     break;
                 }
                 Outcome::Ignored => {
-                    mark = child.marker;
-                    pos = child.position;
+                    classifier.marker = child.marker;
+                    classifier.position = child.position;
                 }
                 _ => {
                     classifier.outcome = child.outcome;
@@ -887,18 +882,17 @@ where
             }
         }
 
-        classifier.consumed = consumed;
-        classifier.stack = stack;
+        classifier.consumed = current_consumed;
+        classifier.stack = current_stack;
 
         if broke {
-            former.consumed.truncate(form_used);
-            former.forms.truncate(form_forms);
-            classifier.consumed.truncate(class_used);
-            classifier.stack.truncate(class_stack);
+            classifier.marker = origin_marker;
+            classifier.position = origin_position;
+            former.consumed.truncate(origin_input);
+            former.forms.truncate(origin_form);
+            classifier.consumed.truncate(base_consumed);
+            classifier.stack.truncate(base_stack);
         } else {
-            classifier.marker = mark;
-            classifier.position = pos;
-
             let group = Form::multiple(
                 forms
                     .into_iter()
@@ -914,11 +908,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Action<
-        'a,
-        Former<'a, 'source, Source, Input, Output, Failure>,
-        Classifier<'a, 'source, Source, Input, Output, Failure>,
-    > for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
+Action<
+    'a,
+    Former<'a, 'source, Source, Input, Output, Failure>,
+    Classifier<'a, 'source, Source, Input, Output, Failure>,
+> for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -931,98 +925,98 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let mut mark = classifier.marker;
-        let mut pos = classifier.position;
+        let origin_marker = classifier.marker;
+        let origin_position = classifier.position;
+        let origin_input = former.consumed.len();
+        let origin_form = former.forms.len();
+
+        let mut current_consumed = take(&mut classifier.consumed);
+        let mut current_stack = take(&mut classifier.stack);
+        let base_consumed = current_consumed.len();
+        let base_stack = current_stack.len();
+
         let mut forms = Vec::new();
 
-        let form_used = former.consumed.len();
-        let form_forms = former.forms.len();
-
-        let mut consumed = take(&mut classifier.consumed);
-        let mut stack = take(&mut classifier.stack);
-        let class_used = consumed.len();
-        let class_stack = stack.len();
-
-        while former.source.peek_ahead(mark).is_some() {
-            let step_used = former.consumed.len();
-            let step_forms = former.forms.len();
-            let step_consumed = consumed.len();
-            let step_stack = stack.len();
+        while former.source.peek_ahead(classifier.marker).is_some() {
+            let step_input = former.consumed.len();
+            let step_form = former.forms.len();
+            let step_consumed = current_consumed.len();
+            let step_stack = current_stack.len();
 
             let mut child = Classifier::create(
                 self.state.action.clone(),
-                mark,
-                pos,
-                consumed,
+                classifier.marker,
+                classifier.position,
+                current_consumed,
                 Outcome::Blank,
                 0,
-                stack,
+                current_stack,
                 classifier.depth + 1,
             );
 
             former.build(&mut child);
 
-            consumed = child.consumed;
-            stack = child.stack;
+            current_consumed = child.consumed;
+            current_stack = child.stack;
 
-            if child.marker == mark {
-                former.consumed.truncate(step_used);
-                former.forms.truncate(step_forms);
-                consumed.truncate(step_consumed);
-                stack.truncate(step_stack);
+            if child.marker == classifier.marker {
+                former.consumed.truncate(step_input);
+                former.forms.truncate(step_form);
+                current_consumed.truncate(step_consumed);
+                current_stack.truncate(step_stack);
                 break;
             }
 
             if self.persist {
                 match child.outcome {
                     Outcome::Panicked | Outcome::Aligned | Outcome::Failed => {
-                        mark = child.marker;
-                        pos = child.position;
+                        classifier.marker = child.marker;
+                        classifier.position = child.position;
                         forms.push(child.form);
                     }
                     Outcome::Ignored => {
-                        former.consumed.truncate(step_used);
-                        former.forms.truncate(step_forms);
-                        consumed.truncate(step_consumed);
-                        stack.truncate(step_stack);
-                        mark = child.marker;
-                        pos = child.position;
+                        former.consumed.truncate(step_input);
+                        former.forms.truncate(step_form);
+                        current_consumed.truncate(step_consumed);
+                        current_stack.truncate(step_stack);
+                        classifier.marker = child.marker;
+                        classifier.position = child.position;
                     }
                     _ => {
-                        former.consumed.truncate(step_used);
-                        former.forms.truncate(step_forms);
-                        consumed.truncate(step_consumed);
-                        stack.truncate(step_stack);
+                        former.consumed.truncate(step_input);
+                        former.forms.truncate(step_form);
+                        current_consumed.truncate(step_consumed);
+                        current_stack.truncate(step_stack);
                     }
                 }
             } else {
                 match child.outcome {
                     Outcome::Panicked | Outcome::Failed => {
                         classifier.outcome = child.outcome;
-                        mark = child.marker;
-                        pos = child.position;
+                        classifier.marker = child.marker;
+                        classifier.position = child.position;
                         forms.push(child.form);
                         break;
                     }
                     Outcome::Aligned => {
                         classifier.outcome = child.outcome;
-                        mark = child.marker;
-                        pos = child.position;
+                        classifier.marker = child.marker;
+                        classifier.position = child.position;
                         forms.push(child.form);
                     }
                     Outcome::Ignored => {
-                        former.consumed.truncate(step_used);
-                        former.forms.truncate(step_forms);
-                        consumed.truncate(step_consumed);
-                        stack.truncate(step_stack);
-                        mark = child.marker;
-                        pos = child.position;
+                        former.consumed.truncate(step_input);
+                        former.forms.truncate(step_form);
+                        current_consumed.truncate(step_consumed);
+                        current_stack.truncate(step_stack);
+                        classifier.marker = child.marker;
+                        classifier.position = child.position;
                     }
                     _ => {
-                        former.consumed.truncate(step_used);
-                        former.forms.truncate(step_forms);
-                        consumed.truncate(step_consumed);
-                        stack.truncate(step_stack);
+                        former.consumed.truncate(step_input);
+                        former.forms.truncate(step_form);
+                        current_consumed.truncate(step_consumed);
+                        current_stack.truncate(step_stack);
                     }
                 }
             }
@@ -1034,15 +1028,13 @@ where
             }
         }
 
-        classifier.consumed = consumed;
-        classifier.stack = stack;
+        classifier.consumed = current_consumed;
+        classifier.stack = current_stack;
 
         if forms.len() >= self.minimum as Identity {
             if self.persist {
                 classifier.set_align();
             }
-            classifier.marker = mark;
-            classifier.position = pos;
 
             let group = Form::multiple(
                 forms
@@ -1055,10 +1047,12 @@ where
             former.forms.push(group);
             classifier.form = form_id;
         } else {
-            former.consumed.truncate(form_used);
-            former.forms.truncate(form_forms);
-            classifier.consumed.truncate(class_used);
-            classifier.stack.truncate(class_stack);
+            classifier.marker = origin_marker;
+            classifier.position = origin_position;
+            former.consumed.truncate(origin_input);
+            former.forms.truncate(origin_form);
+            classifier.consumed.truncate(base_consumed);
+            classifier.stack.truncate(base_stack);
 
             if self.persist {
                 classifier.set_empty();
