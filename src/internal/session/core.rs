@@ -1,7 +1,9 @@
 use {
     crate::{
         analyzer::{Analysis, AnalyzeError},
-        data::*,
+        data::{
+            *,
+        },
         format::{Display, Show, Stencil},
         initializer::{InitializeError, Initializer},
         internal::{
@@ -20,10 +22,7 @@ use {
 };
 
 #[cfg(feature = "generator")]
-use {
-    crate::generator::{GenerateError, Generator},
-    inkwell::context::{Context, ContextRef},
-};
+use crate::generator::GenerateError;
 
 pub const BASE: &[&str] = &[
     "./base/cast.axo",
@@ -122,10 +121,6 @@ pub struct Session<'session> {
     pub records: Map<Identity, Record<'session>>,
     pub initializer: Initializer<'session>,
     pub resolver: Resolver<'session>,
-    #[cfg(feature = "generator")]
-    pub generator: Generator<'session>,
-    #[cfg(feature = "generator")]
-    pub context: Context,
     pub errors: Vec<CompileError<'session>>,
     pub target: Option<Location<'session>>,
     pub cache: Map<Location<'session>, u64>,
@@ -257,24 +252,11 @@ impl<'session> Session<'session> {
 
         _ = timer.lap();
 
-        #[cfg(feature = "generator")]
-        let (context, generator) = {
-            let context = Context::create();
-            let reference = unsafe { ContextRef::new(context.raw()) };
-            let generator = Generator::new(reference);
-
-            (context, generator)
-        };
-
         Session {
             timer,
             records,
             initializer,
             resolver,
-            #[cfg(feature = "generator")]
-            generator,
-            #[cfg(feature = "generator")]
-            context,
             errors,
             target: None,
             cache,

@@ -38,7 +38,7 @@ fn main() {
     {
         use internal::Session;
 
-        let mut compiler = Session::start();
+        let compiler = Session::start();
 
         compiler.compile();
     }
