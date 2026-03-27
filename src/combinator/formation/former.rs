@@ -97,6 +97,7 @@ use crate::{
     internal::hash::Map,
     tracker::{Peekable, Position},
 };
+use crate::combinator::outcome::Outcome;
 
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
@@ -110,7 +111,7 @@ pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
 )>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
-    pub outcome: outcome::Outcome,
+    pub outcome: Outcome,
     pub advance: Offset,
     pub position: Position<'a>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
@@ -174,7 +175,7 @@ where
 
         self.build(&mut active);
 
-        if active.is_effected() {
+        if matches!(active.outcome, Outcome::Aligned | Outcome::Failed) {
             self.source.set_index(active.marker);
             self.source.set_position(active.position);
         }
