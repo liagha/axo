@@ -1,14 +1,11 @@
 mod float;
-mod string;
 mod helper;
+mod string;
 
 pub use {
     float::Float,
+    helper::{element::*, symbol::*},
     string::{from_utf8, FromStr, Str, Utf8Error},
-    helper::{
-        element::*,
-        symbol::*,
-    },
 };
 
 pub type Identity = usize;
@@ -67,7 +64,7 @@ pub mod memory {
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, take, swap},
+        mem::{discriminant, replace, swap, take},
     };
     pub use std::rc::Rc;
 }
@@ -77,27 +74,27 @@ pub mod slice {
 }
 
 pub mod sync {
-    pub use std::sync::OnceLock;
     pub use core::sync::atomic::{AtomicUsize, Ordering};
+    pub use std::sync::OnceLock;
 }
 
 use crate::internal::operation::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
 
 pub trait Number:
-Copy
-+ Default
-+ PartialEq
-+ PartialOrd
-+ Add<Output=Self>
-+ Sub<Output=Self>
-+ Mul<Output=Self>
-+ Div<Output=Self>
-+ Rem<Output=Self>
-+ BitAnd<Output=Self>
-+ BitOr<Output=Self>
-+ BitXor<Output=Self>
-+ Shl<u32, Output=Self>
-+ Shr<u32, Output=Self>
+    Copy
+    + Default
+    + PartialEq
+    + PartialOrd
+    + Add<Output = Self>
+    + Sub<Output = Self>
+    + Mul<Output = Self>
+    + Div<Output = Self>
+    + Rem<Output = Self>
+    + BitAnd<Output = Self>
+    + BitOr<Output = Self>
+    + BitXor<Output = Self>
+    + Shl<u32, Output = Self>
+    + Shr<u32, Output = Self>
 {
     fn zero() -> Self;
     fn one() -> Self;

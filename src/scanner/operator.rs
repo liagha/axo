@@ -1,10 +1,9 @@
 use {
     crate::{
-        scanner::Character,
         data::{slice, Str},
         format::{Debug, Display, Formatter, Result},
-        internal::cache::{Encode, Decode},
-
+        internal::cache::{Decode, Encode},
+        scanner::Character,
     },
     OperatorKind::*,
 };

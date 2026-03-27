@@ -1,9 +1,7 @@
-use {
-    crate::{
-        tracker::{Location, Position, Spanned, TrackError},
-        data::{Boolean, Offset, Str},
-        internal::{hash::Hash, operation::Ordering},
-    },
+use crate::{
+    data::{Boolean, Offset, Str},
+    internal::{hash::Hash, operation::Ordering},
+    tracker::{Location, Position, Spanned, TrackError},
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -54,9 +52,7 @@ impl<'span> Span<'span> {
                 Ok(Self::new(start, end))
             }
 
-            Err(error) => {
-                Err(error)
-            }
+            Err(error) => Err(error),
         }
     }
 
@@ -125,8 +121,7 @@ impl<'span> Span<'span> {
     }
 }
 
-
-use crate::internal::cache::{Encode, Decode};
+use crate::internal::cache::{Decode, Encode};
 
 impl<'span> Encode for Span<'span> {
     fn encode(&self, buffer: &mut Vec<u8>) {

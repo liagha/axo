@@ -1,10 +1,8 @@
-use {
-    crate::{
-        scanner::Character,
-        format::{Debug, Display, Formatter, Result},
-        tracker::TrackError,
-        text::numeral::ParseNumberError,
-    }
+use crate::{
+    format::{Debug, Display, Formatter, Result},
+    scanner::Character,
+    text::numeral::ParseNumberError,
+    tracker::TrackError,
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]

@@ -1,23 +1,18 @@
-use {
-    crate::{
-        parser::{Element, ElementKind, Symbol},
-        data::{
-            memory::discriminant,
-        },
-        internal::{
-            cache::{Encode, Decode},
-            hash::{Hash, Hasher},
-            operation::Ordering,
-        },
-        tracker::{Span, Spanned},
-    },
-};
 use crate::data::{Aggregate, Binary, Binding, Function, Identity, Index, Invoke, Module, Unary};
 use crate::internal::hash::Set;
 use crate::parser::{SymbolKind, Visibility};
 use crate::resolver::{Scope, Type};
 use crate::scanner::Token;
-
+use crate::{
+    data::memory::discriminant,
+    internal::{
+        cache::{Decode, Encode},
+        hash::{Hash, Hasher},
+        operation::Ordering,
+    },
+    parser::{Element, ElementKind, Symbol},
+    tracker::{Span, Spanned},
+};
 
 impl<'element> Hash for Element<'element> {
     fn hash<H: Hasher>(&self, state: &mut H) {

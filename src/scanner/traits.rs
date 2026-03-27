@@ -1,10 +1,8 @@
-use {
-    crate::{
-        tracker::{Span, Spanned},
-        internal::cache::{Encode, Decode},
-        scanner::{Token, Character, OperatorKind, PunctuationKind, TokenKind},
-        data::{Boolean, Char, Float, Integer, Str},
-    },
+use crate::{
+    data::{Boolean, Char, Float, Integer, Str},
+    internal::cache::{Decode, Encode},
+    scanner::{Character, OperatorKind, PunctuationKind, Token, TokenKind},
+    tracker::{Span, Spanned},
 };
 
 impl<'token> PartialEq for Token<'token> {

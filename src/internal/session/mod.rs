@@ -3,7 +3,6 @@ mod core;
 pub use core::*;
 
 use {
-    broccli::{Color},
     crate::{
         analyzer::{Analysis, Analyzer},
         data::{memory::replace, Module, Str},
@@ -17,11 +16,9 @@ use {
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},
         scanner::{Scanner, Token, TokenKind},
-        tracker::{
-            Peekable, Span,
-            Location,
-        },
+        tracker::{Location, Peekable, Span},
     },
+    broccli::Color,
 };
 
 #[cfg(feature = "generator")]
@@ -29,12 +26,9 @@ use {
     crate::{
         generator::Backend,
         internal::platform::{create_dir_all, Command},
-        tracker::{
-            TrackError,
-            error::ErrorKind as TrackErrorKind
-        },
+        tracker::{error::ErrorKind as TrackErrorKind, TrackError},
     },
-    inkwell::targets::TargetMachine
+    inkwell::targets::TargetMachine,
 };
 
 impl<'session> Session<'session> {
@@ -104,7 +98,9 @@ impl<'session> Session<'session> {
                 let data: &'static [u8] = Box::leak(data.into_boxed_slice());
                 let mut cursor = 0;
 
-                if let Some(loaded_cache) = Option::<Map<Location<'session>, u64>>::decode(data, &mut cursor) {
+                if let Some(loaded_cache) =
+                    Option::<Map<Location<'session>, u64>>::decode(data, &mut cursor)
+                {
                     self.cache = loaded_cache;
                 }
             }
@@ -163,7 +159,7 @@ impl<'session> Session<'session> {
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
                     span,
                 )
-                    .into();
+                .into();
 
                 let mut symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
@@ -225,9 +221,7 @@ impl<'session> Session<'session> {
                 self.report_section(
                     "Tokens",
                     Color::Cyan,
-                    scanner
-                        .output
-                        .format(stencil).to_string()
+                    scanner.output.format(stencil).to_string(),
                 );
             }
 
@@ -292,9 +286,7 @@ impl<'session> Session<'session> {
                 self.report_section(
                     "Elements",
                     Color::Cyan,
-                    parser
-                        .output
-                        .format(stencil).to_string()
+                    parser.output.format(stencil).to_string(),
                 );
             }
 
@@ -320,7 +312,8 @@ impl<'session> Session<'session> {
         let initial = self.errors.len();
         self.report_start("resolving");
 
-        let mut keys: Vec<_> = self.records
+        let mut keys: Vec<_> = self
+            .records
             .iter()
             .filter_map(|(&key, record)| {
                 if record.kind == InputKind::Source && record.module.is_some() {
@@ -339,7 +332,13 @@ impl<'session> Session<'session> {
 
             self.resolver.enter_scope(scope);
 
-            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
+            let elements = self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .elements
+                .as_mut()
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.declare(&mut self.resolver);
@@ -366,9 +365,14 @@ impl<'session> Session<'session> {
                             .iter()
                             .filter_map(|identity| self.resolver.get_symbol(*identity))
                             .collect::<Vec<_>>()
-                            .format(stencil.clone()).to_string();
+                            .format(stencil.clone())
+                            .to_string();
 
-                        format!("{}\n{}\n", symbol.format(stencil.clone()), children.indent(stencil.clone()))
+                        format!(
+                            "{}\n{}\n",
+                            symbol.format(stencil.clone()),
+                            children.indent(stencil.clone())
+                        )
                     })
                     .collect::<Vec<String>>()
                     .join("\n"),
@@ -382,7 +386,13 @@ impl<'session> Session<'session> {
 
             self.resolver.enter_scope(scope);
 
-            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
+            let elements = self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .elements
+                .as_mut()
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.resolve(&mut self.resolver);
@@ -402,7 +412,13 @@ impl<'session> Session<'session> {
 
             self.resolver.enter_scope(scope);
 
-            let elements = self.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
+            let elements = self
+                .records
+                .get_mut(&key)
+                .unwrap()
+                .elements
+                .as_mut()
+                .unwrap();
 
             for element in elements.iter_mut() {
                 element.reify(&mut self.resolver);
@@ -427,7 +443,8 @@ impl<'session> Session<'session> {
 
         self.report_start("analyzing");
 
-        let mut keys: Vec<_> = self.records
+        let mut keys: Vec<_> = self
+            .records
             .iter()
             .filter_map(|(&key, record)| {
                 if record.kind == InputKind::Source && record.module.is_some() {
@@ -464,9 +481,7 @@ impl<'session> Session<'session> {
                 self.report_section(
                     "Analysis",
                     Color::Blue,
-                    analyzer
-                        .output
-                        .format(stencil).to_string()
+                    analyzer.output.format(stencil).to_string(),
                 );
             }
 
@@ -497,7 +512,8 @@ impl<'session> Session<'session> {
 
         self.report_start("generating");
 
-        let mut keys: Vec<_> = self.records
+        let mut keys: Vec<_> = self
+            .records
             .iter()
             .filter_map(|(&key, record)| {
                 if record.kind == InputKind::Source && record.module.is_some() {

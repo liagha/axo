@@ -88,29 +88,26 @@ pub mod outcome {
     }
 }
 
-use {
-    crate::{
-        combinator::{
-            Classifier,
-            Form,
-            Action,
-            Formable,
-        },
-        data::{
-            memory::{
-                replace, Rc
-            },
-            Identity, Offset
-        },
-        internal::hash::Map,
-        tracker::{
-            Position,
-            Peekable,
-        },
+use crate::{
+    combinator::{Action, Classifier, Form, Formable},
+    data::{
+        memory::{replace, Rc},
+        Identity, Offset,
     },
+    internal::hash::Map,
+    tracker::{Peekable, Position},
 };
 
-pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(usize, Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> + 'source>)>;
+pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
+    usize,
+    Rc<
+        dyn Action<
+                'a,
+                Former<'a, 'source, Source, Input, Output, Failure>,
+                Classifier<'a, 'source, Source, Input, Output, Failure>,
+            > + 'source,
+    >,
+)>;
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub outcome: outcome::Outcome,
@@ -140,7 +137,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Former<'a, 'source, Source, Input, Output, Failure>
+    Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -148,9 +145,7 @@ where
     Failure: Formable<'a>,
 {
     #[inline(always)]
-    pub fn new(
-        source: &'source mut Source,
-    ) -> Self {
+    pub fn new(source: &'source mut Source) -> Self {
         Self {
             source,
             consumed: Vec::new(),
@@ -161,7 +156,10 @@ where
     }
 
     #[inline(always)]
-    pub fn build(&mut self, classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>) {
+    pub fn build(
+        &mut self,
+        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+    ) {
         let action = classifier.action.clone();
         action.action(self, classifier);
     }

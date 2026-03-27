@@ -1,11 +1,9 @@
 use crate::{
     combinator::{
-        Action, Operator, Command, Formable, next_identity, Multiple, Sequence, Alternative,
+        next_identity, Action, Alternative, Formable, Multiple, Operator, Sequence, Task,
+        Workflow,
     },
-    data::{
-        memory::{Rc},
-        Identity, Scale,
-    },
+    data::{memory::Rc, Identity, Scale},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,14 +63,18 @@ where
     }
 
     #[inline]
-    pub fn command<F>(runner: F) -> Self
-    where
-        F: Fn(&mut Operator<'a, Data, Output, Failure>, &mut Self) + 'source,
-    {
-        Self::new(Rc::new(Command {
-            runner: Rc::new(runner),
-            phantom: Default::default(),
-        }))
+    pub fn task(task: Task<'a, 'source, Data, Output, Failure>) -> Self {
+        Self::new(Rc::new(task))
+    }
+
+    #[inline]
+    pub fn workflow(tasks: Vec<Task<'a, 'source, Data, Output, Failure>>) -> Self {
+        Self::new(Rc::new(Workflow::new(tasks)))
+    }
+
+    #[inline]
+    pub fn automation(workflow: Workflow<'a, 'source, Data, Output, Failure>) -> Self {
+        Self::new(Rc::new(workflow))
     }
 
     #[inline]

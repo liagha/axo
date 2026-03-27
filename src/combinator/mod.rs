@@ -1,5 +1,9 @@
 // src/combinator/mod.rs
-use crate::data::{sync::{AtomicUsize, Ordering}, memory::Rc, Identity, Scale, Boolean};
+use crate::data::{
+    memory::Rc,
+    sync::{AtomicUsize, Ordering},
+    Boolean, Identity, Scale,
+};
 
 mod formation;
 mod operation;
@@ -13,25 +17,14 @@ pub(super) fn next_identity() -> Identity {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-use crate::{
-    format::Show,
-    internal::hash::Hash,
-    data::memory::PhantomData,
-    tracker::{Spanned},
-};
+use crate::{data::memory::PhantomData, format::Show, internal::hash::Hash, tracker::Spanned};
 
-pub trait Formable<'a>:
-Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
+pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
 
-impl<'a, T> Formable<'a> for T where
-    T: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
+impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
 
 pub trait Action<'a, Host, State> {
-    fn action(
-        &self,
-        host: &mut Host,
-        state: &mut State,
-    );
+    fn action(&self, host: &mut Host, state: &mut State);
 }
 
 pub struct Multiple<'a, 'source, Host, State> {
@@ -43,26 +36,17 @@ pub struct Ignore;
 pub struct Skip;
 
 pub struct Transform<'a, 'source, Host, State, Failure> {
-    pub transformer: Rc<dyn Fn(
-        &mut Host,
-        &mut State,
-    ) -> Result<(), Failure> + 'source>,
+    pub transformer: Rc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Fail<'a, 'source, Host, State, Failure> {
-    pub emitter: Rc<dyn Fn(
-        &mut Host,
-        State,
-    ) -> Failure + 'source>,
+    pub emitter: Rc<dyn Fn(&mut Host, State) -> Failure + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Panic<'a, 'source, Host, State, Failure> {
-    pub emitter: Rc<dyn Fn(
-        &mut Host,
-        State,
-    ) -> Failure + 'source>,
+    pub emitter: Rc<dyn Fn(&mut Host, State) -> Failure + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
@@ -105,9 +89,4 @@ pub struct Repetition<State> {
     pub minimum: Scale,
     pub maximum: Option<Scale>,
     pub persist: Boolean,
-}
-
-pub struct Command<'a, 'source, Host, State> {
-    pub runner: Rc<dyn Fn(&mut Host, &mut State) + 'source>,
-    pub phantom: PhantomData<&'a ()>,
 }

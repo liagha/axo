@@ -1,16 +1,14 @@
 mod escape;
 mod number;
 
-use {
-    crate::{
-        scanner::{
-            Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind,
-            ScanError, Scanner, Token, TokenKind,
-        },
-        data::Str,
-        combinator::{Classifier, Form},
-        tracker::Spanned,
+use crate::{
+    combinator::{Classifier, Form},
+    data::Str,
+    scanner::{
+        Character, CharacterError, ErrorKind, Operator, Punctuation, PunctuationKind, ScanError,
+        Scanner, Token, TokenKind,
     },
+    tracker::Spanned,
 };
 
 impl<'a> Scanner<'a> {
@@ -27,18 +25,16 @@ impl<'a> Scanner<'a> {
             ),
             Classifier::literal('"').with_ignore(),
         ])
-            .with_transform(
-                move |former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let inputs = form.collect_inputs();
-                    let span = inputs.span().clone();
-                    let content = inputs.into_iter().collect::<Str>();
+        .with_transform(move |former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            let content = inputs.into_iter().collect::<Str>();
 
-                    *form = Form::output(Token::new(TokenKind::String(content), span));
+            *form = Form::output(Token::new(TokenKind::String(content), span));
 
-                    Ok(())
-                },
-            )
+            Ok(())
+        })
     }
 
     fn backtick<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
@@ -55,18 +51,16 @@ impl<'a> Scanner<'a> {
             ),
             Classifier::literal('`').with_ignore(),
         ])
-            .with_transform(
-                move |former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let inputs = form.collect_inputs();
-                    let span = inputs.span().clone();
-                    let content = inputs.into_iter().collect::<Str>();
+        .with_transform(move |former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let inputs = form.collect_inputs();
+            let span = inputs.span().clone();
+            let content = inputs.into_iter().collect::<Str>();
 
-                    *form = Form::output(Token::new(TokenKind::String(content), span));
+            *form = Form::output(Token::new(TokenKind::String(content), span));
 
-                    Ok(())
-                },
-            )
+            Ok(())
+        })
     }
 
     fn character<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
@@ -79,20 +73,18 @@ impl<'a> Scanner<'a> {
             ]),
             Classifier::literal('\''),
         ])
-            .with_transform(
-                |former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let inputs = form.collect_inputs();
-                    let character = inputs[1];
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let inputs = form.collect_inputs();
+            let character = inputs[1];
 
-                    *form = Form::output(Token::new(
-                        TokenKind::Character(character.value),
-                        character.span,
-                    ));
-                    
-                    Ok(())
-                },
-            )
+            *form = Form::output(Token::new(
+                TokenKind::Character(character.value),
+                character.span,
+            ));
+
+            Ok(())
+        })
     }
 
     fn identifier<'source>(
@@ -117,7 +109,7 @@ impl<'a> Scanner<'a> {
                     "false" => TokenKind::Boolean(false),
                     _ => TokenKind::Identifier(content),
                 };
-                
+
                 *form = Form::output(Token::new(token, span));
 
                 Ok(())
@@ -139,11 +131,8 @@ impl<'a> Scanner<'a> {
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(
-                    TokenKind::Operator(content.to_operator()),
-                    span,
-                ));
-                
+                *form = Form::output(Token::new(TokenKind::Operator(content.to_operator()), span));
+
                 Ok(())
             },
         )
@@ -163,7 +152,7 @@ impl<'a> Scanner<'a> {
                     TokenKind::Punctuation(content.to_punctuation()),
                     span,
                 ));
-                
+
                 Ok(())
             },
         )
@@ -189,7 +178,7 @@ impl<'a> Scanner<'a> {
                 };
 
                 *form = Form::output(Token::new(kind, span));
-                
+
                 Ok(())
             },
         )
@@ -226,11 +215,8 @@ impl<'a> Scanner<'a> {
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(
-                    TokenKind::Comment(content),
-                    span,
-                ));
-                
+                *form = Form::output(Token::new(TokenKind::Comment(content), span));
+
                 Ok(())
             },
         )

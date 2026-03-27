@@ -7,14 +7,14 @@ use {
                 error::{ControlFlowError, FunctionError},
                 Entity,
             },
-            Generator, Backend, ErrorKind, GenerateError,
+            Backend, ErrorKind, GenerateError, Generator,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
     },
     inkwell::{
-        module::Linkage,
         basic_block::BasicBlock,
+        module::Linkage,
         types::{BasicType, BasicTypeEnum},
         values::{BasicValue, BasicValueEnum, FunctionValue, IntValue},
         FloatPredicate, IntPredicate,
@@ -59,7 +59,9 @@ impl<'backend> Generator<'backend> {
                             integer.get_type().const_zero(),
                             "condition",
                         )
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })
                 }
             }
             BasicValueEnum::FloatValue(float) => self
@@ -86,7 +88,8 @@ impl<'backend> Generator<'backend> {
         _span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let name = target.as_str().unwrap_or("module");
-        self.modules.insert(target, self.context.create_module(name));
+        self.modules
+            .insert(target, self.context.create_module(name));
 
         let caller = self.builder.get_insert_block();
 
@@ -110,10 +113,14 @@ impl<'backend> Generator<'backend> {
         Ok(self.context.i64_type().const_zero().into())
     }
 
-
     pub fn declare_function(
         &mut self,
-        function: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
+        function: Function<
+            Str<'backend>,
+            Analysis<'backend>,
+            Option<Box<Analysis<'backend>>>,
+            Option<Type<'backend>>,
+        >,
         span: Span<'backend>,
     ) -> Result<(), GenerateError<'backend>> {
         let mut parameters = vec![];
@@ -125,7 +132,9 @@ impl<'backend> Generator<'backend> {
 
                     if matches!(function.interface, Interface::C) {
                         if let TypeKind::String = &binding.annotation.kind {
-                            self.context.ptr_type(inkwell::AddressSpace::default()).into()
+                            self.context
+                                .ptr_type(inkwell::AddressSpace::default())
+                                .into()
                         } else if let TypeKind::Character = &binding.annotation.kind {
                             self.context.i8_type().into()
                         } else {
@@ -172,7 +181,12 @@ impl<'backend> Generator<'backend> {
 
     pub fn define_function(
         &mut self,
-        function: Function<Str<'backend>, Analysis<'backend>, Option<Box<Analysis<'backend>>>, Option<Type<'backend>>>,
+        function: Function<
+            Str<'backend>,
+            Analysis<'backend>,
+            Option<Box<Analysis<'backend>>>,
+            Option<Type<'backend>>,
+        >,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if matches!(function.interface, Interface::C) {
@@ -201,7 +215,9 @@ impl<'backend> Generator<'backend> {
                             inst.set_alignment(align).ok();
                             Ok(inst)
                         })
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                        .map_err(|error| {
+                            GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                        })?;
 
                     self.insert_entity(
                         target.clone(),
@@ -224,9 +240,9 @@ impl<'backend> Generator<'backend> {
 
         if !self.terminated() {
             if function.output.is_none() {
-                self.builder
-                    .build_return(None)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                self.builder.build_return(None).map_err(|error| {
+                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                })?;
             } else {
                 let expected = value.get_type().get_return_type().unwrap();
 
@@ -238,9 +254,9 @@ impl<'backend> Generator<'backend> {
                         ));
                     }
 
-                    self.builder
-                        .build_return(Some(&res))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    self.builder.build_return(Some(&res)).map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
                 }
             }
         }
@@ -276,14 +292,19 @@ impl<'backend> Generator<'backend> {
         let check = self.analysis(condition)?;
         let flag = self.truth(check, span)?;
 
-        let current = self
-            .builder
-            .get_insert_block()
-            .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
+        let current = self.builder.get_insert_block().ok_or_else(|| {
+            GenerateError::new(
+                ErrorKind::Function(FunctionError::NotInFunctionContext),
+                span,
+            )
+        })?;
 
-        let parent = current
-            .get_parent()
-            .ok_or_else(|| GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span))?;
+        let parent = current.get_parent().ok_or_else(|| {
+            GenerateError::new(
+                ErrorKind::Function(FunctionError::NotInFunctionContext),
+                span,
+            )
+        })?;
 
         let pass = self.context.append_basic_block(parent, "pass");
         let fail = self.context.append_basic_block(parent, "fail");
@@ -348,7 +369,9 @@ impl<'backend> Generator<'backend> {
         }
 
         let first = edges[0].0.as_basic_value_enum();
-        let identical = edges.iter().all(|(val, _)| val.as_basic_value_enum() == first);
+        let identical = edges
+            .iter()
+            .all(|(val, _)| val.as_basic_value_enum() == first);
 
         if identical {
             return Ok(first);
@@ -415,7 +438,8 @@ impl<'backend> Generator<'backend> {
         }
 
         self.builder.position_at_end(exit);
-        let completed = self.builder
+        let completed = self
+            .builder
             .build_load(self.context.i64_type(), pointer, "load")
             .and_then(|value| {
                 if let Some(inst) = value.as_instruction_value() {
@@ -444,11 +468,7 @@ impl<'backend> Generator<'backend> {
                     Some(existing)
                 } else {
                     let layout = function.get_type();
-                    let external = module.add_function(
-                        identifier,
-                        layout,
-                        Some(Linkage::External),
-                    );
+                    let external = module.add_function(identifier, layout, Some(Linkage::External));
                     Some(external)
                 }
             } else {
@@ -467,7 +487,8 @@ impl<'backend> Generator<'backend> {
                     if let Ok(expected) = BasicTypeEnum::try_from(*layout) {
                         if value.get_type() != expected && value.is_pointer_value() {
                             let align = self.align(expected);
-                            value = self.builder
+                            value = self
+                                .builder
                                 .build_load(expected, value.into_pointer_value(), "load")
                                 .and_then(|inst| {
                                     if let Some(instruction) = inst.as_instruction_value() {
@@ -475,7 +496,9 @@ impl<'backend> Generator<'backend> {
                                     }
                                     Ok(inst)
                                 })
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
                         }
                     }
                 }
@@ -483,7 +506,8 @@ impl<'backend> Generator<'backend> {
                 arguments.push(value.into());
             }
 
-            let result = self.builder
+            let result = self
+                .builder
                 .build_call(function, &arguments, "call")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -523,21 +547,21 @@ impl<'backend> Generator<'backend> {
                             span,
                         ));
                     }
-                    self.builder
-                        .build_return(Some(&check))
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    self.builder.build_return(Some(&check)).map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
                     Ok(check)
                 } else {
-                    self.builder
-                        .build_return(None)
-                        .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    self.builder.build_return(None).map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
                     Ok(self.context.i64_type().const_zero().into())
                 }
             }
             None => {
-                self.builder
-                    .build_return(None)
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                self.builder.build_return(None).map_err(|error| {
+                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                })?;
                 Ok(self.context.i64_type().const_zero().into())
             }
         }
@@ -558,7 +582,9 @@ impl<'backend> Generator<'backend> {
                         inst.set_alignment(align).ok();
                         Ok(inst)
                     })
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
             }
         }
 
@@ -595,7 +621,9 @@ impl<'backend> Generator<'backend> {
                         inst.set_alignment(align).ok();
                         Ok(inst)
                     })
-                    .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
+                    .map_err(|error| {
+                        GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                    })?;
             }
         }
 
@@ -625,7 +653,10 @@ impl<'backend> Generator<'backend> {
             .get_insert_block()
             .and_then(|block| block.get_parent())
             .ok_or_else(|| {
-                GenerateError::new(ErrorKind::Function(FunctionError::NotInFunctionContext), span)
+                GenerateError::new(
+                    ErrorKind::Function(FunctionError::NotInFunctionContext),
+                    span,
+                )
             })
     }
 

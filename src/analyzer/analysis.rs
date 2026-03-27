@@ -1,10 +1,4 @@
-use {
-    crate::{
-        data::*,
-        resolver::Type,
-        tracker::Span,
-    }
-};
+use crate::{data::*, resolver::Type, tracker::Span};
 
 #[derive(Clone, Debug)]
 pub struct Analysis<'analysis> {
@@ -14,7 +8,11 @@ pub struct Analysis<'analysis> {
 }
 
 impl<'analysis> Analysis<'analysis> {
-    pub fn new(kind: AnalysisKind<'analysis>, span: Span<'analysis>, typing: Type<'analysis>) -> Self {
+    pub fn new(
+        kind: AnalysisKind<'analysis>,
+        span: Span<'analysis>,
+        typing: Type<'analysis>,
+    ) -> Self {
         Self { kind, span, typing }
     }
 }

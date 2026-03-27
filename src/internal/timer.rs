@@ -496,7 +496,6 @@ where
     }
 
     pub fn start(&mut self) -> TimerResult<()> {
-
         if self.state == TimerState::Running {
             return Err(TimerError::AlreadyRunning);
         }
@@ -587,7 +586,10 @@ where
 
     pub fn is_expired(&self) -> bool {
         self.target_duration
-            .map(|duration| self.elapsed(self.start_time).map_or(false, |elapsed| elapsed >= duration))
+            .map(|duration| {
+                self.elapsed(self.start_time)
+                    .map_or(false, |elapsed| elapsed >= duration)
+            })
             .unwrap_or(false)
     }
 

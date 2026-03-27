@@ -1,10 +1,5 @@
 use crate::{
-    format::{
-        Show,
-        Display,
-        Stencil,
-        Formatter, Result
-    },
+    format::{Display, Formatter, Result, Show, Stencil},
     scanner::TokenKind,
 };
 
@@ -24,24 +19,36 @@ impl<'error> Display for ErrorKind<'error> {
         match self {
             ErrorKind::ExpectedName => {
                 write!(f, "expected a name.")
-            },
+            }
             ErrorKind::ExpectedHead => {
                 write!(f, "expected a head.")
-            },
+            }
             ErrorKind::ExpectedBody => {
                 write!(f, "expected a body.")
-            },
+            }
             ErrorKind::ExpectedAnnotation => {
                 write!(f, "expected an annotation.")
-            },
+            }
             ErrorKind::MissingSeparator(kind) => {
-                write!(f, "expected separator `{}`.", kind.format(Stencil::default()))
+                write!(
+                    f,
+                    "expected separator `{}`.",
+                    kind.format(Stencil::default())
+                )
             }
             ErrorKind::UnclosedDelimiter(delimiter) => {
-                write!(f, "unclosed delimiter `{}`.", delimiter.format(Stencil::default()))
+                write!(
+                    f,
+                    "unclosed delimiter `{}`.",
+                    delimiter.format(Stencil::default())
+                )
             }
             ErrorKind::UnexpectedToken(token) => {
-                write!(f, "unexpected token `{}`.", token.format(Stencil::default()))
+                write!(
+                    f,
+                    "unexpected token `{}`.",
+                    token.format(Stencil::default())
+                )
             }
         }
     }

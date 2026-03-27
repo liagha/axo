@@ -11,4 +11,3 @@ char_property! {
 
     pub fn is_whitespace(char) -> bool;
 }
-

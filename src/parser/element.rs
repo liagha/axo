@@ -1,14 +1,9 @@
-use {
-    crate::{
-        data::*,
-        scanner::Token,
-        tracker::Span,
-        parser::Symbol,
-        resolver::{
-            Type, TypeKind,
-            next_identity,
-        },
-    },
+use crate::{
+    data::*,
+    parser::Symbol,
+    resolver::{next_identity, Type, TypeKind},
+    scanner::Token,
+    tracker::Span,
 };
 
 pub struct Element<'element> {
@@ -39,7 +34,13 @@ pub enum ElementKind<'element> {
 
 impl<'element> Element<'element> {
     pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Element<'element> {
-        Element { identity: next_identity(), kind, span, reference: None, typing: Type::from(TypeKind::Unknown) }
+        Element {
+            identity: next_identity(),
+            kind,
+            span,
+            reference: None,
+            typing: Type::from(TypeKind::Unknown),
+        }
     }
 }
 

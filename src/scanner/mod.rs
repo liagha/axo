@@ -9,10 +9,6 @@ mod traits;
 
 pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*};
 
-
-use {
-    crate::reporter::Error,
-    error::*,
-};
+use {crate::reporter::Error, error::*};
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;

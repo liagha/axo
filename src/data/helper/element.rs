@@ -1,10 +1,6 @@
-use {
-    crate::{
-        internal::{
-            cache::{Decode, Encode},
-            hash::{Hash, Hasher},
-        },
-    },
+use crate::internal::{
+    cache::{Decode, Encode},
+    hash::{Hash, Hasher},
 };
 
 #[derive(Debug, Eq)]
@@ -105,7 +101,7 @@ impl<Delimiter: Encode, Item: Encode> Encode for Delimited<Delimiter, Item> {
 }
 
 impl<'element, Delimiter: Decode<'element>, Item: Decode<'element>> Decode<'element>
-for Delimited<Delimiter, Item>
+    for Delimited<Delimiter, Item>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Delimited {
@@ -126,7 +122,7 @@ impl<Left: Encode, Operator: Encode, Right: Encode> Encode for Binary<Left, Oper
 }
 
 impl<'element, Left: Decode<'element>, Operator: Decode<'element>, Right: Decode<'element>>
-Decode<'element> for Binary<Left, Operator, Right>
+    Decode<'element> for Binary<Left, Operator, Right>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Binary {
@@ -145,7 +141,7 @@ impl<Operator: Encode, Operand: Encode> Encode for Unary<Operator, Operand> {
 }
 
 impl<'element, Operator: Decode<'element>, Operand: Decode<'element>> Decode<'element>
-for Unary<Operator, Operand>
+    for Unary<Operator, Operand>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Unary {
@@ -163,7 +159,7 @@ impl<Target: Encode, Value: Encode> Encode for Index<Target, Value> {
 }
 
 impl<'element, Target: Decode<'element>, Value: Decode<'element>> Decode<'element>
-for Index<Target, Value>
+    for Index<Target, Value>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Index {
@@ -181,7 +177,7 @@ impl<Target: Encode, Argument: Encode> Encode for Invoke<Target, Argument> {
 }
 
 impl<'element, Target: Decode<'element>, Argument: Decode<'element>> Decode<'element>
-for Invoke<Target, Argument>
+    for Invoke<Target, Argument>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Invoke {
@@ -239,7 +235,7 @@ impl<Delimiter: PartialEq, Item: PartialEq> PartialEq for Delimited<Delimiter, I
 }
 
 impl<Left: PartialEq, Operator: PartialEq, Right: PartialEq> PartialEq
-for Binary<Left, Operator, Right>
+    for Binary<Left, Operator, Right>
 {
     fn eq(&self, other: &Self) -> bool {
         self.left == other.left && self.operator == other.operator && self.right == other.right

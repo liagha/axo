@@ -1,5 +1,5 @@
 use crate::data::{Aggregate, Boolean, Identity, Scale, Str};
-use crate::internal::cache::{Encode, Decode};
+use crate::internal::cache::{Decode, Encode};
 use crate::internal::hash::Set;
 use crate::resolver::{Scope, Type, TypeKind};
 

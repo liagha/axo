@@ -1,11 +1,4 @@
-use {
-    crate::{
-        data::slice,
-        format::Debug,
-        internal::hash::Hash,
-        combinator::Formable,
-    },
-};
+use crate::{combinator::Formable, data::slice, format::Debug, internal::hash::Hash};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Form<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> {
@@ -17,8 +10,8 @@ pub enum Form<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: F
     _Phantom(&'form ()),
 }
 
-impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>>
-Default for Form<'form, Input, Output, Failure>
+impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>> Default
+    for Form<'form, Input, Output, Failure>
 {
     fn default() -> Self {
         Self::Blank
@@ -26,7 +19,7 @@ Default for Form<'form, Input, Output, Failure>
 }
 
 impl<'form, Input: Formable<'form>, Output: Formable<'form>, Failure: Formable<'form>>
-Form<'form, Input, Output, Failure>
+    Form<'form, Input, Output, Failure>
 {
     #[inline(always)]
     pub fn blank() -> Self {

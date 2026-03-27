@@ -1,11 +1,11 @@
+use crate::resolver::{ErrorKind, ResolveError};
 use crate::{
     data::Identity,
     internal::hash::Set,
     parser::{Element, ElementKind, Symbol, SymbolKind},
-    resolver::{Resolver, Resolvable},
+    resolver::{Resolvable, Resolver},
     scanner::{Token, TokenKind},
 };
-use crate::resolver::{ErrorKind, ResolveError};
 
 #[derive(Clone)]
 pub struct Scope {
@@ -52,9 +52,9 @@ impl Scope {
         match (&query.kind, &symbol.kind) {
             (
                 ElementKind::Literal(Token {
-                                         kind: TokenKind::Identifier(_),
-                                         ..
-                                     }),
+                    kind: TokenKind::Identifier(_),
+                    ..
+                }),
                 _,
             ) => true,
             (ElementKind::Invoke(invoke), SymbolKind::Function(function)) => {
@@ -118,7 +118,11 @@ impl Scope {
         None
     }
 
-    pub fn lookup<'a>(&self, target: &Element<'a>, resolver: &Resolver<'a>) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
+    pub fn lookup<'a>(
+        &self,
+        target: &Element<'a>,
+        resolver: &Resolver<'a>,
+    ) -> Result<Symbol<'a>, Vec<ResolveError<'a>>> {
         if let Some(symbol) = Resolver::builtin(target) {
             return Ok(symbol);
         }

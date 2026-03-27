@@ -1,19 +1,19 @@
-mod composite;
 mod arithmetic;
 mod bitwise;
 mod comparison;
+mod composite;
+pub mod error;
 mod functions;
 mod logical;
 mod primitives;
 mod variables;
-pub mod error;
 
 use {
     crate::{
-        data::{Str},
-        generator::{GenerateError, ErrorKind, Backend},
-        internal::hash::Map,
         analyzer::{Analysis, AnalysisKind},
+        data::Str,
+        generator::{Backend, ErrorKind, GenerateError},
+        internal::hash::Map,
         resolver::{Type, TypeKind},
         tracker::Span,
     },
@@ -128,43 +128,38 @@ impl<'backend> Generator<'backend> {
         self.modules.contains_key(name)
     }
 
-    pub fn to_basic_type(&self, typing: &Type<'backend>, span: Span<'backend>) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
+    pub fn to_basic_type(
+        &self,
+        typing: &Type<'backend>,
+        span: Span<'backend>,
+    ) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let typing = match &typing.kind {
-            TypeKind::Integer { size: bits, .. } => {
-                match bits {
-                    1 => self.context.bool_type().into(),
-                    8 => self.context.i8_type().into(),
-                    16 => self.context.i16_type().into(),
-                    32 => self.context.i32_type().into(),
-                    64 => self.context.i64_type().into(),
-                    128 => self.context.i128_type().into(),
-                    size => self.context.custom_width_int_type(*size as u32).into(),
-                }
+            TypeKind::Integer { size: bits, .. } => match bits {
+                1 => self.context.bool_type().into(),
+                8 => self.context.i8_type().into(),
+                16 => self.context.i16_type().into(),
+                32 => self.context.i32_type().into(),
+                64 => self.context.i64_type().into(),
+                128 => self.context.i128_type().into(),
+                size => self.context.custom_width_int_type(*size as u32).into(),
             },
-            TypeKind::Float { size: bits } => {
-                match bits {
-                    16 => self.context.f16_type().into(),
-                    32 => self.context.f32_type().into(),
-                    64 => self.context.f64_type().into(),
-                    128 => self.context.f128_type().into(),
-                    _ => self.context.f64_type().into(),
-                }
+            TypeKind::Float { size: bits } => match bits {
+                16 => self.context.f16_type().into(),
+                32 => self.context.f32_type().into(),
+                64 => self.context.f64_type().into(),
+                128 => self.context.f128_type().into(),
+                _ => self.context.f64_type().into(),
             },
-            TypeKind::Boolean => {
-                self.context.bool_type().into()
-            },
-            TypeKind::Character => {
-                self.context.i32_type().into()
-            },
-            TypeKind::String => {
-                self.context.ptr_type(inkwell::AddressSpace::default()).into()
-            }
-            TypeKind::Pointer { .. } => {
-                self
-                    .context
-                    .ptr_type(inkwell::AddressSpace::default())
-                    .into()
-            },
+            TypeKind::Boolean => self.context.bool_type().into(),
+            TypeKind::Character => self.context.i32_type().into(),
+            TypeKind::String => self
+                .context
+                .ptr_type(inkwell::AddressSpace::default())
+                .into(),
+            TypeKind::Pointer { .. } => self
+                .context
+                .ptr_type(inkwell::AddressSpace::default())
+                .into(),
             TypeKind::Array { member, size } => {
                 let typing = self.to_basic_type(member, span.clone())?;
                 typing.array_type(*size as u32).into()
@@ -177,17 +172,18 @@ impl<'backend> Generator<'backend> {
                 self.context.struct_type(&typings, false).into()
             }
             TypeKind::Structure(structure) => {
-                if let Some(typing) = self
-                    .get_entity(&structure.target)
-                    .and_then(
-                        |entity| {
-                            match entity {
-                                Entity::Structure { shape: struct_type, .. } => Some((*struct_type).into()),
-                                Entity::Union { shape: struct_type, .. } => Some((*struct_type).into()),
-                                _ => None,
-                            }
-                        }
-                    ) {
+                if let Some(typing) =
+                    self.get_entity(&structure.target)
+                        .and_then(|entity| match entity {
+                            Entity::Structure {
+                                shape: struct_type, ..
+                            } => Some((*struct_type).into()),
+                            Entity::Union {
+                                shape: struct_type, ..
+                            } => Some((*struct_type).into()),
+                            _ => None,
+                        })
+                {
                     typing
                 } else {
                     let name = structure.target.clone();
@@ -199,9 +195,10 @@ impl<'backend> Generator<'backend> {
                         }
                         self.context.struct_type(&members, false).into()
                     } else {
-                        let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
-                            self.context.opaque_struct_type(&name)
-                        });
+                        let shape = self
+                            .context
+                            .get_struct_type(&name)
+                            .unwrap_or_else(|| self.context.opaque_struct_type(&name));
 
                         if shape.is_opaque() {
                             let mut members = Vec::new();
@@ -214,14 +211,17 @@ impl<'backend> Generator<'backend> {
                         shape.into()
                     }
                 }
-            },
+            }
             TypeKind::Union(union) => {
-                if let Some(typing) = self.get_entity(&union.target).and_then(|entity| {
-                    match entity {
-                        Entity::Union { shape: structure, .. } => Some((*structure).into()),
+                if let Some(typing) = self
+                    .get_entity(&union.target)
+                    .and_then(|entity| match entity {
+                        Entity::Union {
+                            shape: structure, ..
+                        } => Some((*structure).into()),
                         _ => None,
-                    }
-                }) {
+                    })
+                {
                     typing
                 } else {
                     let name = union.target.clone();
@@ -246,9 +246,10 @@ impl<'backend> Generator<'backend> {
                             self.context.struct_type(&[], false).into()
                         }
                     } else {
-                        let shape = self.context.get_struct_type(&name).unwrap_or_else(|| {
-                            self.context.opaque_struct_type(&name)
-                        });
+                        let shape = self
+                            .context
+                            .get_struct_type(&name)
+                            .unwrap_or_else(|| self.context.opaque_struct_type(&name));
 
                         if shape.is_opaque() {
                             let mut largest: Option<BasicTypeEnum> = None;
@@ -274,15 +275,13 @@ impl<'backend> Generator<'backend> {
                         shape.into()
                     }
                 }
-            },
+            }
             _ => {
-                return Err(
-                    GenerateError::new(
-                        ErrorKind::InvalidType(typing.clone()),
-                        span
-                    )
-                );
-            },
+                return Err(GenerateError::new(
+                    ErrorKind::InvalidType(typing.clone()),
+                    span,
+                ));
+            }
         };
 
         Ok(typing)
@@ -316,7 +315,7 @@ impl<'backend> Generator<'backend> {
                     } else {
                         None
                     }
-                },
+                }
                 _ => None,
             },
             AnalysisKind::Assign(_, value) => self.infer_signedness(value),
@@ -350,10 +349,7 @@ impl<'backend> Generator<'backend> {
     }
 
     pub fn current_module(&self) -> &Module<'backend> {
-        self
-            .modules
-            .get(&self.current_module)
-            .unwrap()
+        self.modules.get(&self.current_module).unwrap()
     }
 }
 
@@ -362,7 +358,9 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
         for analysis in &analyses {
             match &analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    if let Err(error) = self.declare_structure(structure.clone(), analysis.span.clone()) {
+                    if let Err(error) =
+                        self.declare_structure(structure.clone(), analysis.span.clone())
+                    {
                         self.errors.push(error);
                     }
                 }
@@ -372,7 +370,9 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                     }
                 }
                 AnalysisKind::Function(function) => {
-                    if let Err(error) = self.declare_function(function.clone(), analysis.span.clone()) {
+                    if let Err(error) =
+                        self.declare_function(function.clone(), analysis.span.clone())
+                    {
                         self.errors.push(error);
                     }
                 }
@@ -385,7 +385,9 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
         for analysis in &analyses {
             match &analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    if let Err(error) = self.define_structure(structure.clone(), analysis.span.clone()) {
+                    if let Err(error) =
+                        self.define_structure(structure.clone(), analysis.span.clone())
+                    {
                         self.errors.push(error);
                     }
                 }
@@ -399,7 +401,9 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
                         entry = Some((function, analysis.span.clone()));
                     } else {
                         self.builder.clear_insertion_position();
-                        if let Err(error) = self.define_function(function.clone(), analysis.span.clone()) {
+                        if let Err(error) =
+                            self.define_function(function.clone(), analysis.span.clone())
+                        {
                             self.errors.push(error);
                         }
                     }
@@ -424,12 +428,10 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
         if let Some(block) = self.builder.get_insert_block() {
             if block.get_terminator().is_none() {
                 if self.errors.is_empty() {
-                    self.errors.push(
-                        GenerateError::new(
-                            ErrorKind::Function(error::FunctionError::MissingReturn),
-                            Span::void()
-                        )
-                    );
+                    self.errors.push(GenerateError::new(
+                        ErrorKind::Function(error::FunctionError::MissingReturn),
+                        Span::void(),
+                    ));
                 }
                 _ = self.builder.build_unreachable();
             }
@@ -437,23 +439,28 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
 
         if self.errors.is_empty() {
             if let Err(error) = self.modules.get(&self.current_module).unwrap().verify() {
-                self.errors.push(
-                    GenerateError::new(
-                        ErrorKind::Verification(error.to_string()),
-                        Span::void()
-                    )
-                )
+                self.errors.push(GenerateError::new(
+                    ErrorKind::Verification(error.to_string()),
+                    Span::void(),
+                ))
             }
         }
     }
 
-    fn analysis(&mut self, analysis: Analysis<'backend>) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
+    fn analysis(
+        &mut self,
+        analysis: Analysis<'backend>,
+    ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         match analysis.kind {
             AnalysisKind::Structure(structure) => self.define_structure(structure, analysis.span),
             AnalysisKind::Union(structure) => self.define_union(structure, analysis.span),
             AnalysisKind::Function(function) => self.define_function(function, analysis.span),
 
-            AnalysisKind::Integer { value, size, signed, } => Ok(self.integer(value, size, signed)),
+            AnalysisKind::Integer {
+                value,
+                size,
+                signed,
+            } => Ok(self.integer(value, size, signed)),
             AnalysisKind::Float { value, size } => self.float(value, size, analysis.span),
             AnalysisKind::Boolean { value } => Ok(self.boolean(value)),
             AnalysisKind::Character { value } => Ok(self.character(value)),
@@ -482,9 +489,13 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::Equal(left, right) => self.equal(left, right, analysis.span),
             AnalysisKind::NotEqual(left, right) => self.not_equal(left, right, analysis.span),
             AnalysisKind::Less(left, right) => self.less(left, right, analysis.span),
-            AnalysisKind::LessOrEqual(left, right) => self.less_or_equal(left, right, analysis.span),
+            AnalysisKind::LessOrEqual(left, right) => {
+                self.less_or_equal(left, right, analysis.span)
+            }
             AnalysisKind::Greater(left, right) => self.greater(left, right, analysis.span),
-            AnalysisKind::GreaterOrEqual(left, right) => self.greater_or_equal(left, right, analysis.span),
+            AnalysisKind::GreaterOrEqual(left, right) => {
+                self.greater_or_equal(left, right, analysis.span)
+            }
             AnalysisKind::Index(index) => self.index(index, analysis.span),
             AnalysisKind::Usage(identifier) => self.usage(identifier, analysis.span),
             AnalysisKind::Access(target, member) => self.access(target, member, analysis.span),
@@ -493,7 +504,13 @@ impl<'backend> Backend<'backend> for Generator<'backend> {
             AnalysisKind::Store(target, value) => self.store(target, value, analysis.span),
             AnalysisKind::Binding(binding) => self.binding(binding, analysis.span),
             AnalysisKind::Block(analyses) => self.block(analyses, analysis.span),
-            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(*condition, *then, otherwise.map(|value| *value), analysis.span, false),
+            AnalysisKind::Conditional(condition, then, otherwise) => self.conditional(
+                *condition,
+                *then,
+                otherwise.map(|value| *value),
+                analysis.span,
+                false,
+            ),
             AnalysisKind::While(condition, body) => self.r#while(condition, body, analysis.span),
             AnalysisKind::Module(name, analyses) => self.module(name, analyses, analysis.span),
             AnalysisKind::Invoke(invoke) => self.invoke(invoke, analysis.span),

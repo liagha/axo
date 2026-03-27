@@ -90,7 +90,7 @@ impl<'string> Str<'string> {
     }
 
     #[inline]
-    pub fn join<S: AsRef<str>>(self, sep: &str, iter: impl IntoIterator<Item=S>) -> Str<'string> {
+    pub fn join<S: AsRef<str>>(self, sep: &str, iter: impl IntoIterator<Item = S>) -> Str<'string> {
         let s = iter
             .into_iter()
             .map(|s| s.as_ref().to_string())
@@ -149,7 +149,7 @@ impl<'string> Deref for Str<'string> {
 
 impl<'string, I> Index<I> for Str<'string>
 where
-    I: SliceIndex<str, Output=str>,
+    I: SliceIndex<str, Output = str>,
 {
     type Output = str;
 
@@ -435,35 +435,35 @@ impl<'string> IntoIterator for &Str<'string> {
 }
 
 impl<'string> FromIterator<char> for Str<'string> {
-    fn from_iter<T: IntoIterator<Item=char>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
         let s: String = iter.into_iter().collect();
         Str(s.leak().as_bytes())
     }
 }
 
 impl<'string> FromIterator<u8> for Str<'string> {
-    fn from_iter<T: IntoIterator<Item=u8>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
         let bytes: Vec<u8> = iter.into_iter().collect();
         Str(bytes.leak())
     }
 }
 
 impl<'string> FromIterator<&'string u8> for Str<'string> {
-    fn from_iter<T: IntoIterator<Item=&'string u8>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = &'string u8>>(iter: T) -> Self {
         let bytes: Vec<u8> = iter.into_iter().copied().collect();
         Str(bytes.leak())
     }
 }
 
 impl<'string> FromIterator<String> for Str<'string> {
-    fn from_iter<T: IntoIterator<Item=String>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let s: String = iter.into_iter().collect();
         Str(s.leak().as_bytes())
     }
 }
 
 impl<'string> FromIterator<&'string str> for Str<'string> {
-    fn from_iter<T: IntoIterator<Item=&'string str>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = &'string str>>(iter: T) -> Self {
         let s: String = iter.into_iter().collect();
         Str(s.leak().as_bytes())
     }
@@ -478,7 +478,7 @@ impl<'string> TryFrom<Vec<u8>> for Str<'string> {
     }
 }
 
-use crate::internal::cache::{Encode, Decode};
+use crate::internal::cache::{Decode, Encode};
 
 impl<'string> Encode for Str<'string> {
     fn encode(&self, buffer: &mut Vec<u8>) {

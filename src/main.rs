@@ -35,11 +35,7 @@ pub mod analyzer;
 fn main() {
     #[cfg(feature = "internal")]
     {
-        use {
-            internal::{
-                Session,
-            },
-        };
+        use internal::Session;
 
         let mut compiler = Session::start();
 

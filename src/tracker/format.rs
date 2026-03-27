@@ -1,8 +1,6 @@
-use {
-    crate::{
-        tracker::{Position, Span, Location},
-        format::{Debug, Display, Formatter, Result},
-    },
+use crate::{
+    format::{Debug, Display, Formatter, Result},
+    tracker::{Location, Position, Span},
 };
 
 impl Debug for Location<'_> {

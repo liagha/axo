@@ -1,10 +1,6 @@
 use crate::{
-    combinator::{
-        Formable,
-        formation::classifier::Classifier,
-        formation::form::Form,
-    },
-    tracker::{Span, Spanned, Peekable},
+    combinator::{formation::classifier::Classifier, formation::form::Form, Formable},
+    tracker::{Peekable, Span, Spanned},
 };
 
 impl<'a, Input, Output, Failure> Spanned<'a> for Form<'a, Input, Output, Failure>
@@ -15,21 +11,11 @@ where
 {
     fn span(&self) -> Span<'a> {
         match self {
-            Form::Blank => {
-                Span::void()
-            }
-            Form::Input(input) => {
-                input.span()
-            }
-            Form::Output(output) => {
-                output.span()
-            }
-            Form::Multiple(multiple) => {
-                multiple.span()
-            }
-            Form::Failure(failure) => {
-                failure.span()
-            }
+            Form::Blank => Span::void(),
+            Form::Input(input) => input.span(),
+            Form::Output(output) => output.span(),
+            Form::Multiple(multiple) => multiple.span(),
+            Form::Failure(failure) => failure.span(),
             Form::_Phantom(_) => {
                 unreachable!()
             }
@@ -37,7 +23,8 @@ where
     }
 }
 
-impl<'a, 'source, Source, Input, Output, Failure> Clone for Classifier<'a, 'source, Source, Input, Output, Failure>
+impl<'a, 'source, Source, Input, Output, Failure> Clone
+    for Classifier<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -58,4 +45,3 @@ where
         }
     }
 }
-

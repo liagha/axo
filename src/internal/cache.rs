@@ -1,14 +1,4 @@
-use {
-    crate::{
-        internal::{
-            hash::{
-                Hash,
-                Set,
-                Map
-            }
-        }
-    }  
-};
+use crate::internal::hash::{Hash, Map, Set};
 
 pub trait Encode {
     fn encode(&self, buffer: &mut Vec<u8>);

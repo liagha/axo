@@ -1,12 +1,12 @@
+use crate::format::Stencil;
 use crate::{
-    data::*,
+    analyzer::AnalysisKind,
     analyzer::{Analysis, AnalyzeError},
+    data::*,
     format::Show,
     parser::{Element, Symbol, SymbolKind},
-    resolver::{Resolver},
-    analyzer::AnalysisKind,
+    resolver::Resolver,
 };
-use crate::format::Stencil;
 
 pub struct Analyzer<'analyzer> {
     pub input: Vec<Element<'analyzer>>,
@@ -44,7 +44,6 @@ pub trait Analyzable<'analyzable> {
     ) -> Result<Analysis<'analyzable>, AnalyzeError<'analyzable>>;
 }
 
-
 impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
     fn analyze(
         &self,
@@ -58,8 +57,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|value| value.analyze(resolver))
                     .transpose()?;
 
-                let head = binding
-                    .target.analyze(resolver)?;
+                let head = binding.target.analyze(resolver)?;
 
                 let analyzed = Binding::new(
                     Box::new(head),
@@ -78,7 +76,13 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .collect();
 
                 let analyzed = Aggregate::new(
-                    Str::from(structure.target.target().unwrap().format(Stencil::default())),
+                    Str::from(
+                        structure
+                            .target
+                            .target()
+                            .unwrap()
+                            .format(Stencil::default()),
+                    ),
                     members?,
                 );
 
@@ -105,7 +109,11 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|member| member.analyze(resolver))
                     .collect();
 
-                let body = function.body.clone().map(|body| body.analyze(resolver).ok().map(Box::new)).flatten();
+                let body = function
+                    .body
+                    .clone()
+                    .map(|body| body.analyze(resolver).ok().map(Box::new))
+                    .flatten();
 
                 let output = function.output.clone().map(|output| output.typing);
 

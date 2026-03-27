@@ -1,8 +1,6 @@
-use {
-    crate::{
-        scanner::Character,
-        format::{self, Debug, Display, Formatter}
-    },
+use crate::{
+    format::{self, Debug, Display, Formatter},
+    scanner::Character,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -130,7 +128,7 @@ impl Display for PunctuationKind {
     }
 }
 
-use crate::internal::cache::{Encode, Decode};
+use crate::internal::cache::{Decode, Encode};
 
 impl Encode for PunctuationKind {
     fn encode(&self, buffer: &mut Vec<u8>) {

@@ -1,16 +1,14 @@
 use crate::{
     combinator::{
-        Action, Multiple, Ignore, Skip, Transform, Fail, Panic,
-        Literal, Predicate, Deferred, Optional, Alternative, Sequence, Repetition,
-        Formable, Form,
-        next_identity,
         formation::former::{outcome::Outcome, Former, Memo},
+        next_identity, Action, Alternative, Deferred, Fail, Form, Formable, Ignore, Literal,
+        Multiple, Optional, Panic, Predicate, Repetition, Sequence, Skip, Transform,
     },
     data::{
         memory::{replace, swap, take, Rc},
-        Identity, Offset, Scale
+        Identity, Offset, Scale,
     },
-    tracker::{Location, Position, Peekable},
+    tracker::{Location, Peekable, Position},
 };
 
 pub struct Classifier<'a: 'source, 'source, Source, Input, Output, Failure>
@@ -21,7 +19,8 @@ where
     Failure: Formable<'a>,
 {
     pub identity: Identity,
-    pub action: Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+    pub action:
+        Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
     pub marker: Offset,
     pub position: Position<'a>,
     pub consumed: Vec<Identity>,
@@ -32,7 +31,7 @@ where
 }
 
 impl<'a: 'source, 'source, Source, Input, Output, Failure>
-Classifier<'a, 'source, Source, Input, Output, Failure>
+    Classifier<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -41,7 +40,9 @@ where
 {
     #[inline]
     pub fn new(
-        action: Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+        action: Rc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        >,
         marker: Offset,
         position: Position<'a>,
     ) -> Self {
@@ -60,7 +61,9 @@ where
 
     #[inline]
     fn create(
-        action: Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+        action: Rc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        >,
         marker: Offset,
         position: Position<'a>,
         consumed: Vec<Identity>,
@@ -78,12 +81,17 @@ where
             outcome,
             form,
             stack,
-            depth
+            depth,
         }
     }
 
     #[inline]
-    fn create_child(&mut self, action: Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>) -> Self {
+    fn create_child(
+        &mut self,
+        action: Rc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        >,
+    ) -> Self {
         Self {
             identity: next_identity(),
             action,
@@ -197,9 +205,7 @@ where
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Alternative {
-                states: patterns,
-            }),
+            Rc::new(Alternative { states: patterns }),
             0,
             Position::new(Location::Void),
         )
@@ -256,9 +262,7 @@ where
     #[inline]
     pub fn deferred(factory: fn() -> Self) -> Self {
         Self::new(
-            Rc::new(Deferred {
-                factory,
-            }),
+            Rc::new(Deferred { factory }),
             0,
             Position::new(Location::Void),
         )
@@ -275,7 +279,12 @@ where
     }
 
     #[inline]
-    pub fn with_action(mut self, action: Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>) -> Self {
+    pub fn with_action(
+        mut self,
+        action: Rc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        >,
+    ) -> Self {
         let actions = vec![self.action.clone(), action];
         self.action = Rc::new(Multiple { actions });
         self
@@ -284,7 +293,11 @@ where
     #[inline]
     pub fn with_fail<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>) -> Failure + 'source,
+        F: Fn(
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + 'source,
     {
         self.with_action(Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -298,14 +311,23 @@ where
     }
 
     #[inline]
-    pub fn with_multiple(self, actions: Vec<Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>>) -> Self {
+    pub fn with_multiple(
+        self,
+        actions: Vec<
+            Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+        >,
+    ) -> Self {
         self.with_action(Rc::new(Multiple { actions }))
     }
 
     #[inline]
     pub fn with_panic<F>(self, emitter: F) -> Self
     where
-        F: Fn(&mut Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>) -> Failure + 'source,
+        F: Fn(
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + 'source,
     {
         self.with_action(Self::panic(emitter))
     }
@@ -319,10 +341,10 @@ where
     pub fn with_transform<T>(self, transform: T) -> Self
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Result<(), Failure>
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Result<(), Failure>
+            + 'source,
     {
         self.with_action(Self::transform(transform))
     }
@@ -338,13 +360,15 @@ where
     }
 
     #[inline]
-    pub fn transform<T>(transformer: T) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    pub fn transform<T>(
+        transformer: T,
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
         T: Fn(
-            &mut Former<'a, 'source, Source, Input, Output, Failure>,
-            &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
-        ) -> Result<(), Failure>
-        + 'source,
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Result<(), Failure>
+            + 'source,
     {
         Rc::new(Transform {
             transformer: Rc::new(transformer),
@@ -353,9 +377,15 @@ where
     }
 
     #[inline]
-    pub fn fail<T>(emitter: T) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    pub fn fail<T>(
+        emitter: T,
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
-        T: Fn(&mut Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>) -> Failure + 'source,
+        T: Fn(
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + 'source,
     {
         Rc::new(Fail {
             emitter: Rc::new(emitter),
@@ -364,9 +394,15 @@ where
     }
 
     #[inline]
-    pub fn panic<T>(emitter: T) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    pub fn panic<T>(
+        emitter: T,
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
     where
-        T: Fn(&mut Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>) -> Failure + 'source,
+        T: Fn(
+                &mut Former<'a, 'source, Source, Input, Output, Failure>,
+                Classifier<'a, 'source, Source, Input, Output, Failure>,
+            ) -> Failure
+            + 'source,
     {
         Rc::new(Panic {
             emitter: Rc::new(emitter),
@@ -375,25 +411,36 @@ where
     }
 
     #[inline]
-    pub fn ignore() -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source> {
+    pub fn ignore(
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    {
         Rc::new(Ignore)
     }
 
     #[inline]
     pub fn multiple(
-        actions: Vec<Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>>,
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source> {
+        actions: Vec<
+            Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+        >,
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    {
         Rc::new(Multiple { actions })
     }
 
     #[inline]
-    pub fn skip() -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source> {
+    pub fn skip(
+    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    {
         Rc::new(Skip)
     }
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Literal<'a, 'source, Input>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Literal<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -432,7 +479,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Predicate<'a, 'source, Input>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Predicate<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -470,8 +521,12 @@ where
     }
 }
 
-impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale> Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>>
-for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -578,7 +633,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure> Clone
-for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -593,7 +648,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -622,18 +681,28 @@ where
             }
 
             for &index in &entry.consumed {
-                classifier.consumed.push((index as isize + input_offset) as Identity);
+                classifier
+                    .consumed
+                    .push((index as isize + input_offset) as Identity);
             }
 
             for &index in &entry.stack {
-                let shifted = if index == 0 { 0 } else { (index as isize + form_offset) as Identity };
+                let shifted = if index == 0 {
+                    0
+                } else {
+                    (index as isize + form_offset) as Identity
+                };
                 classifier.stack.push(shifted);
             }
 
             classifier.marker = classifier.marker + entry.advance;
             classifier.position = entry.position;
             classifier.outcome = entry.outcome;
-            classifier.form = if entry.form == 0 { 0 } else { (entry.form as isize + form_offset) as Identity };
+            classifier.form = if entry.form == 0 {
+                0
+            } else {
+                (entry.form as isize + form_offset) as Identity
+            };
 
             return;
         }
@@ -672,18 +741,21 @@ where
         let consumed: Vec<_> = child.consumed[class_consumed..].to_vec();
         let stack: Vec<_> = child.stack[class_stack..].to_vec();
 
-        former.memo.insert(memo_key, Memo {
-            outcome: child.outcome,
-            advance: child.marker - origin,
-            position: child.position,
-            forms,
-            inputs,
-            consumed,
-            stack,
-            form: child.form,
-            form_base,
-            input_base,
-        });
+        former.memo.insert(
+            memo_key,
+            Memo {
+                outcome: child.outcome,
+                advance: child.marker - origin,
+                position: child.position,
+                forms,
+                inputs,
+                consumed,
+                stack,
+                form: child.form,
+                form_base,
+                input_base,
+            },
+        );
 
         classifier.marker = child.marker;
         classifier.position = child.position;
@@ -695,7 +767,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -737,7 +813,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure, const SIZE: Scale>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,
@@ -834,7 +914,11 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Classifier<'a, 'source, Source, Input, Output, Failure>> for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
+    Action<
+        'a,
+        Former<'a, 'source, Source, Input, Output, Failure>,
+        Classifier<'a, 'source, Source, Input, Output, Failure>,
+    > for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,

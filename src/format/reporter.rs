@@ -1,7 +1,7 @@
 use {
     crate::{
+        format::{Debug, Display, Formatter, Result, Show, Stencil},
         reporter::Error,
-        format::{Show, Stencil, Debug, Display, Formatter, Result}
     },
     broccli::{Color, TextStyle},
 };
@@ -14,7 +14,9 @@ where
     fn format(&self, config: Stencil) -> Stencil {
         let (message, details) = self.handle();
 
-        config.clone().new("Error")
+        config
+            .clone()
+            .new("Error")
             .field("message", message.to_string())
             .field("details", details.to_string())
     }

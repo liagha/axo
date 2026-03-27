@@ -1,8 +1,6 @@
-use {
-    crate::{
-        data::Str,
-        format::{Result as FormatResult, Formatter, Display}
-    }
+use crate::{
+    data::Str,
+    format::{Display, Formatter, Result as FormatResult},
 };
 
 #[derive(Clone)]

@@ -1,11 +1,9 @@
-use {
-    crate::{
-        data::{Str, Delimited, Interface, Function},
-        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
-        resolver::{Resolver},
-        scanner::{PunctuationKind, Token, TokenKind},
-        tracker::Span,
-    },
+use crate::{
+    data::{Delimited, Function, Interface, Str},
+    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    resolver::Resolver,
+    scanner::{PunctuationKind, Token, TokenKind},
+    tracker::Span,
 };
 
 #[allow(dead_code)]
@@ -33,9 +31,7 @@ pub enum Primitive {
 }
 
 impl<'resolver> Resolver<'resolver> {
-    pub fn builtin(
-        target: &Element<'resolver>,
-    ) -> Option<Symbol<'resolver>> {
+    pub fn builtin(target: &Element<'resolver>) -> Option<Symbol<'resolver>> {
         let name = target.target()?;
 
         match name.as_str()? {

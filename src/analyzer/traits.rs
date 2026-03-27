@@ -1,6 +1,8 @@
 use crate::analyzer::{Analysis, AnalysisKind};
-use crate::data::{Aggregate, Binding, Boolean, Char, Float, Function, Index, Integer, Invoke, Scale, Str};
-use crate::internal::cache::{Encode, Decode};
+use crate::data::{
+    Aggregate, Binding, Boolean, Char, Float, Function, Index, Integer, Invoke, Scale, Str,
+};
+use crate::internal::cache::{Decode, Encode};
 use crate::resolver::Type;
 use crate::tracker::Span;
 
@@ -25,7 +27,11 @@ impl<'analysis> Decode<'analysis> for Analysis<'analysis> {
 impl<'analysis> Encode for AnalysisKind<'analysis> {
     fn encode(&self, buffer: &mut Vec<u8>) {
         match self {
-            AnalysisKind::Integer { value, size, signed } => {
+            AnalysisKind::Integer {
+                value,
+                size,
+                signed,
+            } => {
                 buffer.push(0);
                 value.encode(buffer);
                 size.encode(buffer);
@@ -290,24 +296,39 @@ impl<'analysis> Decode<'analysis> for AnalysisKind<'analysis> {
             11 => AnalysisKind::Multiply(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             12 => AnalysisKind::Divide(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             13 => AnalysisKind::Modulus(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
-            14 => AnalysisKind::LogicalAnd(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            14 => {
+                AnalysisKind::LogicalAnd(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
             15 => AnalysisKind::LogicalOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             16 => AnalysisKind::LogicalNot(Box::decode(buffer, cursor)),
-            17 => AnalysisKind::LogicalXOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
-            18 => AnalysisKind::BitwiseAnd(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            17 => {
+                AnalysisKind::LogicalXOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
+            18 => {
+                AnalysisKind::BitwiseAnd(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
             19 => AnalysisKind::BitwiseOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             20 => AnalysisKind::BitwiseNot(Box::decode(buffer, cursor)),
-            21 => AnalysisKind::BitwiseXOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            21 => {
+                AnalysisKind::BitwiseXOr(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
             22 => AnalysisKind::ShiftLeft(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
-            23 => AnalysisKind::ShiftRight(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            23 => {
+                AnalysisKind::ShiftRight(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
             24 => AnalysisKind::AddressOf(Box::decode(buffer, cursor)),
             25 => AnalysisKind::Dereference(Box::decode(buffer, cursor)),
             26 => AnalysisKind::Equal(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             27 => AnalysisKind::NotEqual(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
             28 => AnalysisKind::Less(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
-            29 => AnalysisKind::LessOrEqual(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            29 => {
+                AnalysisKind::LessOrEqual(Box::decode(buffer, cursor), Box::decode(buffer, cursor))
+            }
             30 => AnalysisKind::Greater(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
-            31 => AnalysisKind::GreaterOrEqual(Box::decode(buffer, cursor), Box::decode(buffer, cursor)),
+            31 => AnalysisKind::GreaterOrEqual(
+                Box::decode(buffer, cursor),
+                Box::decode(buffer, cursor),
+            ),
             32 => AnalysisKind::Index(Index::decode(buffer, cursor)),
             33 => AnalysisKind::Invoke(Invoke::decode(buffer, cursor)),
             34 => AnalysisKind::Block(Vec::decode(buffer, cursor)),

@@ -4,12 +4,8 @@ use {
         data::Str,
         data::*,
         generator::{
-            inkwell::{
-                error::VariableError,
-                Backend, Entity,
-            },
-            Generator,
-            ErrorKind, GenerateError,
+            inkwell::{error::VariableError, Backend, Entity},
+            ErrorKind, GenerateError, Generator,
         },
         resolver::{Type, TypeKind},
         tracker::Span,
@@ -41,7 +37,8 @@ impl<'backend> Generator<'backend> {
     fn lvalue(
         &mut self,
         analysis: &Analysis<'backend>,
-    ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>> {
+    ) -> Result<Option<(PointerValue<'backend>, BasicTypeEnum<'backend>)>, GenerateError<'backend>>
+    {
         match &analysis.kind {
             AnalysisKind::Usage(identifier) => {
                 if let Some(entity) = self.get_entity(identifier) {
@@ -90,7 +87,10 @@ impl<'backend> Generator<'backend> {
                             matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
                         });
 
-                        if let Some(Entity::Structure { members: fields, .. }) = found {
+                        if let Some(Entity::Structure {
+                            members: fields, ..
+                        }) = found
+                        {
                             if let Some(index) = fields.iter().position(|item| item == &field) {
                                 let slot = self
                                     .builder
@@ -110,15 +110,14 @@ impl<'backend> Generator<'backend> {
                         if let Some(resolved) = self.pointee(target) {
                             if resolved.is_struct_type() {
                                 let shape = resolved.into_struct_type();
-                                let load = self
-                                    .builder
-                                    .build_load(kind, base, "load")
-                                    .map_err(|error| {
+                                let load = self.builder.build_load(kind, base, "load").map_err(
+                                    |error| {
                                         GenerateError::new(
                                             ErrorKind::BuilderError(error.into()),
                                             analysis.span,
                                         )
-                                    })?;
+                                    },
+                                )?;
 
                                 if let Some(instruction) = load.as_instruction_value() {
                                     instruction.set_alignment(self.align(kind)).ok();
@@ -129,7 +128,10 @@ impl<'backend> Generator<'backend> {
                                     matches!(entity, Entity::Structure { shape: defined, .. } if defined.as_basic_type_enum() == shape.as_basic_type_enum())
                                 });
 
-                                if let Some(Entity::Structure { members: fields, .. }) = found {
+                                if let Some(Entity::Structure {
+                                    members: fields, ..
+                                }) = found
+                                {
                                     if let Some(index) =
                                         fields.iter().position(|item| item == &field)
                                     {
@@ -218,12 +220,7 @@ impl<'backend> Generator<'backend> {
                             let zero = self.context.i32_type().const_zero();
                             let slot = unsafe {
                                 self.builder
-                                    .build_in_bounds_gep(
-                                        shape,
-                                        base,
-                                        &[zero, integer],
-                                        "index",
-                                    )
+                                    .build_in_bounds_gep(shape, base, &[zero, integer], "index")
                                     .map_err(|error| {
                                         GenerateError::new(
                                             ErrorKind::BuilderError(error.into()),
@@ -237,15 +234,14 @@ impl<'backend> Generator<'backend> {
                     } else if kind.is_pointer_type() {
                         if let BasicValueEnum::IntValue(integer) = offset {
                             if let Some(element) = self.pointee(&index.target) {
-                                let load = self
-                                    .builder
-                                    .build_load(kind, base, "load")
-                                    .map_err(|error| {
+                                let load = self.builder.build_load(kind, base, "load").map_err(
+                                    |error| {
                                         GenerateError::new(
                                             ErrorKind::BuilderError(error.into()),
                                             analysis.span,
                                         )
-                                    })?;
+                                    },
+                                )?;
 
                                 if let Some(instruction) = load.as_instruction_value() {
                                     instruction.set_alignment(self.align(kind)).ok();
@@ -327,9 +323,9 @@ impl<'backend> Generator<'backend> {
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
-                Entity::Function(function) => {
-                    Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()))
-                }
+                Entity::Function(function) => Ok(BasicValueEnum::from(
+                    function.as_global_value().as_pointer_value(),
+                )),
                 Entity::Variable { pointer, typing } => {
                     let kind = self.to_basic_type(typing, span)?;
 
@@ -384,9 +380,7 @@ impl<'backend> Generator<'backend> {
             let load = self
                 .builder
                 .build_load(kind, global.as_pointer_value(), &identifier)
-                .map_err(|error| {
-                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
-                })?;
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             if let Some(instruction) = load.as_instruction_value() {
                 instruction.set_alignment(self.align(kind)).ok();
@@ -396,7 +390,9 @@ impl<'backend> Generator<'backend> {
         }
 
         if let Some(function) = module.get_function(&identifier) {
-            return Ok(BasicValueEnum::from(function.as_global_value().as_pointer_value()));
+            return Ok(BasicValueEnum::from(
+                function.as_global_value().as_pointer_value(),
+            ));
         }
 
         Err(GenerateError::new(
@@ -455,113 +451,103 @@ impl<'backend> Generator<'backend> {
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         match binding.target.kind {
-            AnalysisKind::Usage(target) => {
-                match binding.kind {
-                    BindingKind::Static => {
-                        let expression = binding.value.ok_or_else(|| {
-                            GenerateError::new(
-                                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                    name: target.to_string(),
-                                }),
-                                span,
-                            )
-                        })?;
+            AnalysisKind::Usage(target) => match binding.kind {
+                BindingKind::Static => {
+                    let expression = binding.value.ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                name: target.to_string(),
+                            }),
+                            span,
+                        )
+                    })?;
 
-                        let result = self.analysis(*expression)?;
+                    let result = self.analysis(*expression)?;
 
-                        let declared = result.get_type();
+                    let declared = result.get_type();
 
+                    let variable = self.current_module().add_global(declared, None, &target);
+                    variable.set_initializer(&result);
+                    variable.set_alignment(self.align(declared));
+
+                    let pointer = variable.as_pointer_value();
+
+                    let typing = binding.annotation.clone();
+
+                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
+
+                    Ok(result)
+                }
+
+                _ => {
+                    let expression = binding.value.ok_or_else(|| {
+                        GenerateError::new(
+                            ErrorKind::Variable(VariableError::BindingWithoutInitializer {
+                                name: target.to_string(),
+                            }),
+                            span,
+                        )
+                    })?;
+
+                    let typing = binding.annotation.clone();
+                    let global = self.builder.get_insert_block().is_none();
+
+                    let scope = if global {
+                        let void = self.context.void_type();
+                        let signature = void.fn_type(&[], false);
+                        let function = self.current_module().add_function("init", signature, None);
+                        let block = self.context.append_basic_block(function, "entry");
+
+                        self.builder.position_at_end(block);
+                        Some(function)
+                    } else {
+                        None
+                    };
+
+                    let result = self.analysis(*expression)?;
+
+                    if let Some(function) = scope {
+                        self.builder.clear_insertion_position();
+                        unsafe {
+                            function.delete();
+                        }
+                    }
+
+                    let declared = result.get_type();
+
+                    let pointer = if global {
                         let variable = self.current_module().add_global(declared, None, &target);
                         variable.set_initializer(&result);
                         variable.set_alignment(self.align(declared));
+                        variable.as_pointer_value()
+                    } else {
+                        let allocate =
+                            self.builder
+                                .build_alloca(declared, &target)
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
 
-                        let pointer = variable.as_pointer_value();
-
-                        let typing = binding.annotation.clone();
-
-                        self.insert_entity(
-                            target.clone(),
-                            Entity::Variable {
-                                pointer,
-                                typing,
-                            },
-                        );
-
-                        Ok(result)
-                    }
-
-                    _ => {
-                        let expression = binding.value.ok_or_else(|| {
-                            GenerateError::new(
-                                ErrorKind::Variable(VariableError::BindingWithoutInitializer {
-                                    name: target.to_string(),
-                                }),
-                                span,
-                            )
-                        })?;
-
-                        let typing = binding.annotation.clone();
-                        let global = self.builder.get_insert_block().is_none();
-
-                        let scope = if global {
-                            let void = self.context.void_type();
-                            let signature = void.fn_type(&[], false);
-                            let function = self.current_module().add_function("init", signature, None);
-                            let block = self.context.append_basic_block(function, "entry");
-
-                            self.builder.position_at_end(block);
-                            Some(function)
-                        } else {
-                            None
-                        };
-
-                        let result = self.analysis(*expression)?;
-
-                        if let Some(function) = scope {
-                            self.builder.clear_insertion_position();
-                            unsafe {
-                                function.delete();
-                            }
+                        if let Some(instruction) = allocate.as_instruction_value() {
+                            instruction.set_alignment(self.align(declared)).ok();
                         }
 
-                        let declared = result.get_type();
-
-                        let pointer = if global {
-                            let variable = self.current_module().add_global(declared, None, &target);
-                            variable.set_initializer(&result);
-                            variable.set_alignment(self.align(declared));
-                            variable.as_pointer_value()
-                        } else {
-                            let allocate = self
-                                .builder
-                                .build_alloca(declared, &target)
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-
-                            if let Some(instruction) = allocate.as_instruction_value() {
-                                instruction.set_alignment(self.align(declared)).ok();
-                            }
-
-                            let store = self
-                                .builder
+                        let store =
+                            self.builder
                                 .build_store(allocate, result)
-                                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
-                            store.set_alignment(self.align(declared)).ok();
+                                .map_err(|error| {
+                                    GenerateError::new(ErrorKind::BuilderError(error.into()), span)
+                                })?;
+                        store.set_alignment(self.align(declared)).ok();
 
-                            allocate
-                        };
+                        allocate
+                    };
 
-                        self.insert_entity(
-                            target.clone(),
-                            Entity::Variable {
-                                pointer,
-                                typing,
-                            },
-                        );
+                    self.insert_entity(target.clone(), Entity::Variable { pointer, typing });
 
-                        Ok(result)
-                    }
+                    Ok(result)
                 }
-            }
+            },
 
             _ => {
                 unimplemented!("destruction isn't implemented yet!");

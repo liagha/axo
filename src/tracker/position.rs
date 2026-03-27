@@ -1,17 +1,10 @@
-use {
-    crate::{
-        data::{Offset, Str},
-        internal::{
-            operation::Ordering,
-            platform::{
-                args,
-                read_to_string,
-                Path,
-                PathBuf
-            },
-        },
-        tracker::{ErrorKind, Span, TrackError}
-    }
+use crate::{
+    data::{Offset, Str},
+    internal::{
+        operation::Ordering,
+        platform::{args, read_to_string, Path, PathBuf},
+    },
+    tracker::{ErrorKind, Span, TrackError},
 };
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -32,12 +25,7 @@ impl<'location> Location<'location> {
             _ => {
                 let kind = ErrorKind::NotAnEntry(*self);
 
-                Err(
-                    TrackError::new(
-                        kind,
-                        Span::void(),
-                    )
-                )
+                Err(TrackError::new(kind, Span::void()))
             }
         }
     }
@@ -52,12 +40,7 @@ impl<'location> Location<'location> {
             _ => {
                 let kind = ErrorKind::NotAnEntry(*self);
 
-                Err(
-                    TrackError::new(
-                        kind,
-                        Span::void(),
-                    )
-                )
+                Err(TrackError::new(kind, Span::void()))
             }
         }
     }
@@ -250,7 +233,7 @@ impl<'a> Ord for Position<'a> {
     }
 }
 
-use crate::internal::cache::{Encode, Decode};
+use crate::internal::cache::{Decode, Encode};
 
 impl<'location> Encode for Location<'location> {
     fn encode(&self, buffer: &mut Vec<u8>) {

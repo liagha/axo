@@ -1,11 +1,9 @@
-use {
-    crate::{
-        parser::{Element, ParseError},
-        data::{Offset, Scale},
-        combinator::{Classifier, Form, Former},
-        scanner::{PunctuationKind, Token, TokenKind},
-        tracker::{Location, Peekable, Position},
-    },
+use crate::{
+    combinator::{Classifier, Form, Former},
+    data::{Offset, Scale},
+    parser::{Element, ParseError},
+    scanner::{PunctuationKind, Token, TokenKind},
+    tracker::{Location, Peekable, Position},
 };
 
 pub struct Parser<'a> {
@@ -29,7 +27,9 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
-        self.index.checked_sub(n).and_then(|current| self.get(current))
+        self.index
+            .checked_sub(n)
+            .and_then(|current| self.get(current))
     }
 
     fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
@@ -95,7 +95,7 @@ impl<'a: 'source, 'source> Parser<'a> {
                             | TokenKind::Comment(_)
                     )
                 })
-                    .with_ignore(),
+                .with_ignore(),
                 Classifier::predicate(|token: &Token| {
                     !matches!(
                         token.kind,

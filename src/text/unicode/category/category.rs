@@ -262,4 +262,3 @@ impl GeneralCategory {
         matches!(*self, Cc | Cf | Cs | Co | Cn)
     }
 }
-

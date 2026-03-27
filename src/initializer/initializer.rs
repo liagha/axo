@@ -1,6 +1,6 @@
 use crate::{
-    data::{Offset, Scale, Str},
     combinator::{Classifier, Form, Former},
+    data::{Offset, Scale, Str},
     initializer::InitializeError,
     parser::{Element, ElementKind, ParseError, Symbol, SymbolKind},
     scanner::{PunctuationKind, Scanner, Token, TokenKind},
@@ -32,11 +32,7 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
             .and_then(|current| self.get(current))
     }
 
-    fn next(
-        &self,
-        index: &mut Offset,
-        position: &mut Position<'a>,
-    ) -> Option<Token<'a>> {
+    fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
         if let Some(token) = self.get(*index) {
             *position = token.span.end;
             *index += 1;
@@ -83,13 +79,7 @@ impl<'a> Initializer<'a> {
 
     pub fn filter<'source>(
         length: Scale,
-    ) -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Element<'a>,
-        ParseError<'a>,
-    > {
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(is_ignored).with_ignore(),
@@ -100,13 +90,8 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn directive<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn directive<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::alternative([
             Self::verbosity(),
             Self::input(),
@@ -116,13 +101,8 @@ impl<'a> Initializer<'a> {
         ])
     }
 
-    pub fn classifier<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn classifier<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::repetition(Self::directive(), 0, None)
     }
 
@@ -268,10 +248,7 @@ fn rename_target(symbol: &mut Symbol, name: String) {
         if let ElementKind::Literal(token) = &binding.target.kind {
             let span = token.span;
             binding.target = Box::new(Element::new(
-                ElementKind::Literal(Token::new(
-                    TokenKind::Identifier(Str::from(name)),
-                    span,
-                )),
+                ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(name)), span)),
                 span,
             ));
         }

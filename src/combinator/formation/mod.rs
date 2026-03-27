@@ -1,9 +1,9 @@
+mod action;
 mod classifier;
 mod form;
 mod former;
 mod traits;
-mod action;
 
+pub use classifier::*;
 pub use form::*;
 pub use former::*;
-pub use classifier::*;

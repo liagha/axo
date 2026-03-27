@@ -1,10 +1,8 @@
-use {
-    crate::{
-        scanner::Scanner,
-        data::{Char, Str},
-        text::{is_alphabetic, is_alphanumeric, is_numeric, is_whitespace},
-        tracker::{Position, Span},
-    },
+use crate::{
+    data::{Char, Str},
+    scanner::Scanner,
+    text::{is_alphabetic, is_alphanumeric, is_numeric, is_whitespace},
+    tracker::{Position, Span},
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

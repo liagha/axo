@@ -1,11 +1,9 @@
-use {
-    crate::{
-        scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
-        data::{Float, Str},
-        combinator::{Classifier, Form},
-        text::parser,
-        tracker::Spanned,
-    },
+use crate::{
+    combinator::{Classifier, Form},
+    data::{Float, Str},
+    scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
+    text::parser,
+    tracker::Spanned,
 };
 
 impl<'a> Scanner<'a> {
@@ -41,16 +39,14 @@ impl<'a> Scanner<'a> {
                 let parser = parser::<i128>();
                 let number: Str = inputs.into_iter().collect();
 
-                match parser.parse(&number) { 
+                match parser.parse(&number) {
                     Ok(number) => {
                         *form = Form::output(Token::new(TokenKind::Integer(number), span));
-                        
+
                         Ok(())
                     }
-                    
-                    Err(error) => {
-                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
-                    }
+
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                 }
             },
         )
@@ -84,9 +80,7 @@ impl<'a> Scanner<'a> {
                         Ok(())
                     }
 
-                    Err(error) => {
-                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
-                    }
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                 }
             },
         )
@@ -120,9 +114,7 @@ impl<'a> Scanner<'a> {
                         Ok(())
                     }
 
-                    Err(error) => {
-                        Err(ScanError::new(ErrorKind::NumberParse(error), span))
-                    }
+                    Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                 }
             },
         )
@@ -141,22 +133,19 @@ impl<'a> Scanner<'a> {
                     ]),
                     0,
                     None,
-                ).into_optional(),
-                Classifier::optional(
-                    Classifier::sequence([
-                        Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
-                        Classifier::optional(
-                            Classifier::predicate(|c: &Character| {
-                                matches!(c.value, '+' | '-')
-                            })
-                        ),
-                        Classifier::persistence(
-                            Classifier::predicate(|c: &Character| c.is_numeric()),
-                            1,
-                            None,
-                        ),
-                    ])
-                ),
+                )
+                .into_optional(),
+                Classifier::optional(Classifier::sequence([
+                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
+                    Classifier::optional(Classifier::predicate(|c: &Character| {
+                        matches!(c.value, '+' | '-')
+                    })),
+                    Classifier::persistence(
+                        Classifier::predicate(|c: &Character| c.is_numeric()),
+                        1,
+                        None,
+                    ),
+                ])),
             ]),
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -166,21 +155,22 @@ impl<'a> Scanner<'a> {
 
                 if number.contains(".") || number.to_lowercase().contains('e') {
                     let parser = parser::<f64>();
-                    
+
                     match parser.parse(&number) {
                         Ok(number) => {
-                            *form = Form::output(Token::new(TokenKind::Float(Float::from(number)), span));
+                            *form = Form::output(Token::new(
+                                TokenKind::Float(Float::from(number)),
+                                span,
+                            ));
 
                             Ok(())
                         }
 
-                        Err(error) => {
-                            Err(ScanError::new(ErrorKind::NumberParse(error), span))
-                        }
+                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                     }
                 } else {
                     let parser = parser::<i128>();
-                    
+
                     match parser.parse(&number) {
                         Ok(number) => {
                             *form = Form::output(Token::new(TokenKind::Integer(number), span));
@@ -188,9 +178,7 @@ impl<'a> Scanner<'a> {
                             Ok(())
                         }
 
-                        Err(error) => {
-                            Err(ScanError::new(ErrorKind::NumberParse(error), span))
-                        }
+                        Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                     }
                 }
             },

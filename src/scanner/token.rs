@@ -1,9 +1,7 @@
-use {
-    crate::{
-        scanner::{OperatorKind, PunctuationKind},
-        data::{Boolean, Char, Float, Integer, Str},
-        tracker::Span,
-    },
+use crate::{
+    data::{Boolean, Char, Float, Integer, Str},
+    scanner::{OperatorKind, PunctuationKind},
+    tracker::Span,
 };
 
 #[derive(Clone, Hash)]

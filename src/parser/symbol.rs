@@ -1,17 +1,11 @@
-use {
-    crate::{
-        data::*,
-        format::Debug,
-        internal::hash::{Hash, Set},
-        parser::{Element, ElementKind},
-        resolver::{
-            next_identity,
-            scope::Scope,
-            Type, TypeKind,
-        },
-        scanner::{OperatorKind, TokenKind},
-        tracker::Span,
-    },
+use crate::{
+    data::*,
+    format::Debug,
+    internal::hash::{Hash, Set},
+    parser::{Element, ElementKind},
+    resolver::{next_identity, scope::Scope, Type, TypeKind},
+    scanner::{OperatorKind, TokenKind},
+    tracker::Span,
 };
 
 pub struct Symbol<'symbol> {
@@ -71,7 +65,9 @@ impl<'symbol> Symbol<'symbol> {
     }
 
     pub fn set_members(&mut self, members: Vec<Symbol<'symbol>>) {
-        self.scope.symbols.extend(members.into_iter().map(|member| member.identity));
+        self.scope
+            .symbols
+            .extend(members.into_iter().map(|member| member.identity));
     }
 
     pub fn with_scope(self, scope: Scope) -> Self {
@@ -114,10 +110,10 @@ impl<'symbol> Element<'symbol> {
             ElementKind::Binary(binary) => match binary.operator.kind {
                 TokenKind::Operator(OperatorKind::Colon) => binary.left.target(),
                 TokenKind::Operator(OperatorKind::Composite(ref operators))
-                if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
-                    {
-                        binary.right.target()
-                    }
+                    if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
+                {
+                    binary.right.target()
+                }
                 TokenKind::Operator(OperatorKind::Equal) => binary.left.target(),
                 TokenKind::Operator(OperatorKind::Dot) => binary.right.target(),
                 _ => None,

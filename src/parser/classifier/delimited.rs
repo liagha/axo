@@ -1,11 +1,9 @@
-use {
-    crate::{
-        data::*,
-        combinator::{Classifier, Form},
-        parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
-        scanner::{PunctuationKind, Token, TokenKind},
-        tracker::{Span, Spanned},
-    },
+use crate::{
+    combinator::{Classifier, Form},
+    data::*,
+    parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
+    scanner::{PunctuationKind, Token, TokenKind},
+    tracker::{Span, Spanned},
 };
 
 impl<'a> Parser<'a> {
@@ -15,72 +13,82 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
     pub fn block<'source>(
@@ -89,72 +97,82 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftBrace)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBrace)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightBrace)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBrace,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
     pub fn group<'source>(
@@ -163,72 +181,82 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
     pub fn sequence<'source>(
@@ -237,72 +265,82 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftParenthesis)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftParenthesis)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightParenthesis)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftParenthesis,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
     pub fn collection<'source>(
@@ -311,72 +349,82 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Comma)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
     pub fn series<'source>(
@@ -385,75 +433,86 @@ impl<'a> Parser<'a> {
         let separator = Classifier::predicate(|token: &Token| {
             token.kind == TokenKind::Punctuation(PunctuationKind::Semicolon)
         })
-            .into_optional();
+        .into_optional();
 
         Classifier::sequence([
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)),
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::LeftBracket)
+            }),
             item.clone().into_optional(),
             Classifier::persistence(
                 Classifier::sequence([separator, item.into_optional()]),
                 0,
                 None,
             ),
-            Classifier::predicate(|t: &Token| t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket))
-                .with_panic(|former, classifier| {
-                    let consumed: Vec<Token> = classifier
-                        .consumed
-                        .iter()
-                        .filter_map(|index| former.consumed.get(*index).cloned())
-                        .collect();
-
-                    let span = if consumed.is_empty() {
-                        Span::point(classifier.position)
-                    } else {
-                        consumed.span()
-                    };
-
-                    ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        span,
-                    )
-                }),
-        ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let delimiters = form.collect_inputs();
-                let elements = form.collect_outputs();
-
-                let Some(start) = delimiters.first() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        Span::point(classifier.position),
-                    ));
-                };
-                let Some(end) = delimiters.last() else {
-                    return Err(ParseError::new(
-                        ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(PunctuationKind::LeftBracket)),
-                        start.span,
-                    ));
-                };
-                let span = Span::merge(&start.span, &end.span);
-
-                let separator_token = if delimiters.len() > 2 {
-                    Some(delimiters[1].clone())
-                } else {
-                    None
-                };
-
-                let kind = ElementKind::delimited(Delimited::new(
-                    start.clone(),
-                    elements,
-                    separator_token,
-                    end.clone(),
-                ));
-
-                *form = Form::output(Element::new(kind, span));
-
-                Ok(())
+            Classifier::predicate(|t: &Token| {
+                t.kind == TokenKind::Punctuation(PunctuationKind::RightBracket)
             })
+            .with_panic(|former, classifier| {
+                let consumed: Vec<Token> = classifier
+                    .consumed
+                    .iter()
+                    .filter_map(|index| former.consumed.get(*index).cloned())
+                    .collect();
+
+                let span = if consumed.is_empty() {
+                    Span::point(classifier.position)
+                } else {
+                    consumed.span()
+                };
+
+                ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    span,
+                )
+            }),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let delimiters = form.collect_inputs();
+            let elements = form.collect_outputs();
+
+            let Some(start) = delimiters.first() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    Span::point(classifier.position),
+                ));
+            };
+            let Some(end) = delimiters.last() else {
+                return Err(ParseError::new(
+                    ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
+                        PunctuationKind::LeftBracket,
+                    )),
+                    start.span,
+                ));
+            };
+            let span = Span::merge(&start.span, &end.span);
+
+            let separator_token = if delimiters.len() > 2 {
+                Some(delimiters[1].clone())
+            } else {
+                None
+            };
+
+            let kind = ElementKind::delimited(Delimited::new(
+                start.clone(),
+                elements,
+                separator_token,
+                end.clone(),
+            ));
+
+            *form = Form::output(Element::new(kind, span));
+
+            Ok(())
+        })
     }
 
-    pub fn delimited<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn delimited<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let item = Classifier::deferred(Self::element);
 
         Classifier::alternative([

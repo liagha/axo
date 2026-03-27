@@ -1,11 +1,6 @@
 use {
-    inkwell::{
-        values::{BasicValueEnum}
-    },
-    crate::{
-        analyzer::{Analysis},
-        generator::GenerateError,
-    }
+    crate::{analyzer::Analysis, generator::GenerateError},
+    inkwell::values::BasicValueEnum,
 };
 
 pub trait Backend<'backend> {

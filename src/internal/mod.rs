@@ -1,11 +1,9 @@
 mod session;
 
-pub use {
-    session::Session
-};
+pub use session::Session;
 
-pub mod timer;
 pub mod cache;
+pub mod timer;
 
 pub mod hash {
     pub use {
@@ -30,10 +28,9 @@ pub mod operation {
 pub mod platform {
     pub use std::{
         alloc::{alloc, dealloc, realloc, Layout},
-        env::{
-            args, current_dir, current_exe, var},
+        env::{args, current_dir, current_exe, var},
         ffi::{OsStr, OsString},
-        fs::{canonicalize, create_dir_all, read_dir, write, read, read_to_string, File},
+        fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, File},
         io::{
             stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
             StdoutLock, Write,

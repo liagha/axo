@@ -4,10 +4,7 @@ use {
         generator::{Backend, ErrorKind, GenerateError, Generator},
         tracker::Span,
     },
-    inkwell::{
-        values::BasicValueEnum,
-        IntPredicate,
-    },
+    inkwell::{values::BasicValueEnum, IntPredicate},
 };
 
 impl<'backend> Generator<'backend> {
@@ -16,7 +13,8 @@ impl<'backend> Generator<'backend> {
         left: BasicValueEnum<'backend>,
         right: BasicValueEnum<'backend>,
         span: Span<'backend>,
-    ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, bool), GenerateError<'backend>> {
+    ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, bool), GenerateError<'backend>>
+    {
         if left.get_type() != right.get_type() {
             return Err(GenerateError::new(ErrorKind::Normalize, span));
         }
@@ -25,18 +23,20 @@ impl<'backend> Generator<'backend> {
             Ok((left, right, true))
         } else if left.is_int_value() && right.is_int_value() {
             Ok((left, right, false))
-        }  else if left.is_pointer_value() && right.is_pointer_value() {
+        } else if left.is_pointer_value() && right.is_pointer_value() {
             let left = left.into_pointer_value();
             let right = right.into_pointer_value();
 
             let context = left.get_type().get_context();
             let integer = context.i64_type();
 
-            let left = self.builder
+            let left = self
+                .builder
                 .build_ptr_to_int(left, integer, "left_cast")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let right = self.builder
+            let right = self
+                .builder
                 .build_ptr_to_int(right, integer, "right_cast")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -58,14 +58,20 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
-            let result = self.builder
-                .build_float_add(primary.into_float_value(), secondary.into_float_value(), "add")
+            let result = self
+                .builder
+                .build_float_add(
+                    primary.into_float_value(),
+                    secondary.into_float_value(),
+                    "add",
+                )
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return Ok(result.into());
         }
 
-        let result = self.builder
+        let result = self
+            .builder
             .build_int_add(primary.into_int_value(), secondary.into_int_value(), "add")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -84,15 +90,25 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
-            let result = self.builder
-                .build_float_sub(primary.into_float_value(), secondary.into_float_value(), "subtract")
+            let result = self
+                .builder
+                .build_float_sub(
+                    primary.into_float_value(),
+                    secondary.into_float_value(),
+                    "subtract",
+                )
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return Ok(result.into());
         }
 
-        let result = self.builder
-            .build_int_sub(primary.into_int_value(), secondary.into_int_value(), "subtract")
+        let result = self
+            .builder
+            .build_int_sub(
+                primary.into_int_value(),
+                secondary.into_int_value(),
+                "subtract",
+            )
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         Ok(result.into())
@@ -110,15 +126,25 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
-            let result = self.builder
-                .build_float_mul(primary.into_float_value(), secondary.into_float_value(), "multiply")
+            let result = self
+                .builder
+                .build_float_mul(
+                    primary.into_float_value(),
+                    secondary.into_float_value(),
+                    "multiply",
+                )
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return Ok(result.into());
         }
 
-        let result = self.builder
-            .build_int_mul(primary.into_int_value(), secondary.into_int_value(), "multiply")
+        let result = self
+            .builder
+            .build_int_mul(
+                primary.into_int_value(),
+                secondary.into_int_value(),
+                "multiply",
+            )
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         Ok(result.into())
@@ -139,8 +165,13 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
-            let result = self.builder
-                .build_float_div(primary.into_float_value(), secondary.into_float_value(), "divide")
+            let result = self
+                .builder
+                .build_float_div(
+                    primary.into_float_value(),
+                    secondary.into_float_value(),
+                    "divide",
+                )
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return Ok(result.into());
@@ -150,37 +181,46 @@ impl<'backend> Generator<'backend> {
         let divisor = secondary.into_int_value();
         let zero = divisor.get_type().const_zero();
 
-        let is_zero = self.builder
+        let is_zero = self
+            .builder
             .build_int_compare(IntPredicate::EQ, divisor, zero, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         if left_sign && right_sign {
             let negative_one = divisor.get_type().const_all_ones();
-            let is_negative = self.builder
+            let is_negative = self
+                .builder
                 .build_int_compare(IntPredicate::EQ, divisor, negative_one, "check")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             let one = divisor.get_type().const_int(1, false);
-            let shift = divisor.get_type().const_int((divisor.get_type().get_bit_width() - 1) as u64, false);
-            let minimum = self.builder
+            let shift = divisor
+                .get_type()
+                .const_int((divisor.get_type().get_bit_width() - 1) as u64, false);
+            let minimum = self
+                .builder
                 .build_left_shift(one, shift, "minimum")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let is_minimum = self.builder
+            let is_minimum = self
+                .builder
                 .build_int_compare(IntPredicate::EQ, dividend, minimum, "check")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let is_overflow = self.builder
+            let is_overflow = self
+                .builder
                 .build_and(is_negative, is_minimum, "overflow")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let condition = self.builder
+            let condition = self
+                .builder
                 .build_or(is_zero, is_overflow, "condition")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             self.trap(Some(condition), span)?;
 
-            let result = self.builder
+            let result = self
+                .builder
                 .build_int_signed_div(dividend, divisor, "divide")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -188,7 +228,8 @@ impl<'backend> Generator<'backend> {
         } else {
             self.trap(Some(is_zero), span)?;
 
-            let result = self.builder
+            let result = self
+                .builder
                 .build_int_unsigned_div(dividend, divisor, "divide")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -211,8 +252,13 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(left_value, right_value, span)?;
 
         if floating {
-            let result = self.builder
-                .build_float_rem(primary.into_float_value(), secondary.into_float_value(), "modulus")
+            let result = self
+                .builder
+                .build_float_rem(
+                    primary.into_float_value(),
+                    secondary.into_float_value(),
+                    "modulus",
+                )
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             return Ok(result.into());
@@ -222,37 +268,46 @@ impl<'backend> Generator<'backend> {
         let divisor = secondary.into_int_value();
         let zero = divisor.get_type().const_zero();
 
-        let is_zero = self.builder
+        let is_zero = self
+            .builder
             .build_int_compare(IntPredicate::EQ, divisor, zero, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         if left_sign && right_sign {
             let negative_one = divisor.get_type().const_all_ones();
-            let is_negative = self.builder
+            let is_negative = self
+                .builder
                 .build_int_compare(IntPredicate::EQ, divisor, negative_one, "check")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             let one = divisor.get_type().const_int(1, false);
-            let shift = divisor.get_type().const_int((divisor.get_type().get_bit_width() - 1) as u64, false);
-            let minimum = self.builder
+            let shift = divisor
+                .get_type()
+                .const_int((divisor.get_type().get_bit_width() - 1) as u64, false);
+            let minimum = self
+                .builder
                 .build_left_shift(one, shift, "minimum")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let is_minimum = self.builder
+            let is_minimum = self
+                .builder
                 .build_int_compare(IntPredicate::EQ, dividend, minimum, "check")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let is_overflow = self.builder
+            let is_overflow = self
+                .builder
                 .build_and(is_negative, is_minimum, "overflow")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
-            let condition = self.builder
+            let condition = self
+                .builder
                 .build_or(is_zero, is_overflow, "condition")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
             self.trap(Some(condition), span)?;
 
-            let result = self.builder
+            let result = self
+                .builder
                 .build_int_signed_rem(dividend, divisor, "modulus")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
@@ -260,7 +315,8 @@ impl<'backend> Generator<'backend> {
         } else {
             self.trap(Some(is_zero), span)?;
 
-            let result = self.builder
+            let result = self
+                .builder
                 .build_int_unsigned_rem(dividend, divisor, "modulus")
                 .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 

@@ -1,29 +1,10 @@
 use {
     crate::{
-        analyzer::{
-            Analysis,
-        },
-        generator::{
-            Generator,
-            Backend,
-            ErrorKind,
-            GenerateError,
-            inkwell::{
-                error::{
-                    BitwiseError,
-                },
-            },
-        },
-        tracker::{
-            Span,
-        },
+        analyzer::Analysis,
+        generator::{inkwell::error::BitwiseError, Backend, ErrorKind, GenerateError, Generator},
+        tracker::Span,
     },
-    inkwell::{
-        values::{
-            BasicValueEnum,
-        },
-        IntPredicate,
-    },
+    inkwell::{values::BasicValueEnum, IntPredicate},
 };
 
 impl<'backend> Generator<'backend> {
@@ -39,12 +20,18 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("and") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("and"),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder.build_and(primary.into_int_value(), secondary.into_int_value(), "and")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_and(primary.into_int_value(), secondary.into_int_value(), "and")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 
@@ -60,12 +47,18 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("or") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("or"),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder.build_or(primary.into_int_value(), secondary.into_int_value(), "or")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_or(primary.into_int_value(), secondary.into_int_value(), "or")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 
@@ -77,12 +70,18 @@ impl<'backend> Generator<'backend> {
         let alpha = self.analysis(*operand)?;
 
         if !alpha.is_int_value() {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("not") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("not"),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder.build_not(alpha.into_int_value(), "not")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_not(alpha.into_int_value(), "not")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 
@@ -98,12 +97,18 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("xor") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("xor"),
+                }),
+                span,
+            ));
         }
 
         Ok(BasicValueEnum::from(
-            self.builder.build_xor(primary.into_int_value(), secondary.into_int_value(), "xor")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_xor(primary.into_int_value(), secondary.into_int_value(), "xor")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 
@@ -119,7 +124,12 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("shift"),
+                }),
+                span,
+            ));
         }
 
         let base = primary.into_int_value();
@@ -128,14 +138,17 @@ impl<'backend> Generator<'backend> {
         let width = base.get_type().get_bit_width() as u64;
         let limit = amount.get_type().const_int(width, false);
 
-        let condition = self.builder.build_int_compare(IntPredicate::UGE, amount, limit, "check")
+        let condition = self
+            .builder
+            .build_int_compare(IntPredicate::UGE, amount, limit, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.trap(Some(condition), span)?;
 
         Ok(BasicValueEnum::from(
-            self.builder.build_left_shift(base, amount, "shift")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_left_shift(base, amount, "shift")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 
@@ -155,7 +168,12 @@ impl<'backend> Generator<'backend> {
         let (primary, secondary, floating) = self.normalize(alpha, beta, span)?;
 
         if floating {
-            return Err(GenerateError::new(ErrorKind::Bitwise(BitwiseError::InvalidOperandType { instruction: String::from("shift") }), span));
+            return Err(GenerateError::new(
+                ErrorKind::Bitwise(BitwiseError::InvalidOperandType {
+                    instruction: String::from("shift"),
+                }),
+                span,
+            ));
         }
 
         let base = primary.into_int_value();
@@ -164,14 +182,17 @@ impl<'backend> Generator<'backend> {
         let width = base.get_type().get_bit_width() as u64;
         let limit = amount.get_type().const_int(width, false);
 
-        let condition = self.builder.build_int_compare(IntPredicate::UGE, amount, limit, "check")
+        let condition = self
+            .builder
+            .build_int_compare(IntPredicate::UGE, amount, limit, "check")
             .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?;
 
         self.trap(Some(condition), span)?;
 
         Ok(BasicValueEnum::from(
-            self.builder.build_right_shift(base, amount, signed, "shift")
-                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?
+            self.builder
+                .build_right_shift(base, amount, signed, "shift")
+                .map_err(|error| GenerateError::new(ErrorKind::BuilderError(error.into()), span))?,
         ))
     }
 }

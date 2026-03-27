@@ -1,13 +1,6 @@
-use {
-    crate::{
-        format::{
-            Show, Stencil,
-            Display,
-            Formatter,
-            Result
-        },
-        scanner::Token
-    },
+use crate::{
+    format::{Display, Formatter, Result, Show, Stencil},
+    scanner::Token,
 };
 
 #[derive(Clone)]
@@ -30,7 +23,11 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::InvalidOperation(token) => {
-                write!(f, "invalid operation token: {}.", token.format(Stencil::default()))
+                write!(
+                    f,
+                    "invalid operation token: {}.",
+                    token.format(Stencil::default())
+                )
             }
             ErrorKind::InvalidType => {
                 write!(f, "invalid type.")
@@ -43,7 +40,8 @@ impl<'error> Display for ErrorKind<'error> {
                 expected,
                 found,
             } => {
-                write!(f, 
+                write!(
+                    f,
                     "invalid '{}' arity: expected {}, found {}.",
                     name, expected, found,
                 )

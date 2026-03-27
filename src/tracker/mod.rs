@@ -1,8 +1,8 @@
+pub mod error;
 mod format;
 mod peekable;
 mod position;
 mod span;
-pub mod error;
 
 use {
     crate::{data::Scale, format::Display, reporter::Error},
@@ -55,4 +55,3 @@ impl<'item, T: Spanned<'item>, const N: Scale> Spanned<'item> for [T; N] {
 }
 
 pub type TrackError<'error> = Error<'error, ErrorKind<'error>>;
-

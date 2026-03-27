@@ -1,8 +1,6 @@
-use {
-    crate::{
-        combinator::{Processor, Formable},
-        data::memory::PhantomData,
-    },
+use crate::{
+    combinator::{Formable, Processor},
+    data::memory::PhantomData,
 };
 
 pub struct Operator<'a, Data, Output, Failure>
@@ -34,7 +32,10 @@ where
     }
 
     #[inline(always)]
-    pub fn build<'source>(&mut self, processor: &mut Processor<'a, 'source, Data, Output, Failure>) {
+    pub fn build<'source>(
+        &mut self,
+        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+    ) {
         let action = processor.action.clone();
         action.action(self, processor);
     }

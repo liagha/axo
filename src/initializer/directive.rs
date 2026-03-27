@@ -1,6 +1,6 @@
 use crate::{
-    data::{Binding, BindingKind, Str},
     combinator::{Classifier, Form},
+    data::{Binding, BindingKind, Str},
     initializer::{InitializeError, Initializer},
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     scanner::{OperatorKind, Token, TokenKind},
@@ -25,13 +25,8 @@ impl<'a> Initializer<'a> {
         result
     }
 
-    fn path_value<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    fn path_value<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 matches!(
@@ -66,19 +61,13 @@ impl<'a> Initializer<'a> {
     fn path_directive<'source>(
         name: Str<'a>,
         matcher: fn(&Str<'a>) -> bool,
-    ) -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
                 })
-                    .with_ignore(),
+                .with_ignore(),
                 Classifier::predicate(move |token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         matcher(identifier)
@@ -86,15 +75,15 @@ impl<'a> Initializer<'a> {
                         false
                     }
                 })
-                    .with_transform(move |former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
-                        let identifier = form.collect_inputs()[0].clone();
-                        let span = identifier.span();
+                .with_transform(move |former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let identifier = form.collect_inputs()[0].clone();
+                    let span = identifier.span();
 
-                        *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
+                    *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
 
-                        Ok(())
-                    }),
+                    Ok(())
+                }),
                 Self::path_value(),
             ]),
             move |former, classifier| {
@@ -104,12 +93,18 @@ impl<'a> Initializer<'a> {
                 let path = forms[1].collect_inputs();
 
                 let target = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(name), identifier.span().clone())),
+                    ElementKind::Literal(Token::new(
+                        TokenKind::Identifier(name),
+                        identifier.span().clone(),
+                    )),
                     identifier.span(),
                 );
 
                 let value = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(Self::path_string(path.clone()))), path.clone().span())),
+                    ElementKind::Literal(Token::new(
+                        TokenKind::Identifier(Str::from(Self::path_string(path.clone()))),
+                        path.clone().span(),
+                    )),
                     path.span(),
                 );
 
@@ -131,18 +126,13 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn verbosity<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn verbosity<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
             })
-                .with_ignore(),
+            .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
                     identifier == "v" || identifier == "verbosity"
@@ -150,65 +140,55 @@ impl<'a> Initializer<'a> {
                     false
                 }
             })
-                .with_transform(|former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let identifier = form.collect_inputs()[0].clone();
-                    let span = identifier.span();
-
-                    *form = Form::Input(Token::new(
-                        TokenKind::Identifier(Str::from("Verbosity")),
-                        span,
-                    ));
-
-                    Ok(())
-                }),
-            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
-        ])
             .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let identifier = form.collect_inputs()[0].clone();
-                let value = form.collect_inputs()[1].clone();
-                let span = identifier.span.merge(&value.span);
+                let span = identifier.span();
 
-                let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
-                let value = Element::new(ElementKind::Literal(value.clone()), value.span);
-
-                let symbol = Symbol::new(
-                    SymbolKind::Binding(Binding::new(
-                        Box::from(target),
-                        Some(Box::new(value)),
-                        None,
-                        BindingKind::Meta,
-                    )),
+                *form = Form::Input(Token::new(
+                    TokenKind::Identifier(Str::from("Verbosity")),
                     span,
-                    Visibility::Public,
-                );
-
-                *form = Form::output(symbol);
+                ));
 
                 Ok(())
-            })
+            }),
+            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
+        ])
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let identifier = form.collect_inputs()[0].clone();
+            let value = form.collect_inputs()[1].clone();
+            let span = identifier.span.merge(&value.span);
+
+            let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
+            let value = Element::new(ElementKind::Literal(value.clone()), value.span);
+
+            let symbol = Symbol::new(
+                SymbolKind::Binding(Binding::new(
+                    Box::from(target),
+                    Some(Box::new(value)),
+                    None,
+                    BindingKind::Meta,
+                )),
+                span,
+                Visibility::Public,
+            );
+
+            *form = Form::output(symbol);
+
+            Ok(())
+        })
     }
 
-    pub fn input<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn input<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
         })
     }
 
-    pub fn implicit_input<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn implicit_input<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::with_transform(Self::path_value(), |former, classifier| {
             let form = former.forms.get_mut(classifier.form).unwrap();
             let inputs = form.collect_inputs();
@@ -246,13 +226,8 @@ impl<'a> Initializer<'a> {
         })
     }
 
-    pub fn output<'source>() -> Classifier<
-        'a, 'source,
-        Self,
-        Token<'a>,
-        Symbol<'a>,
-        InitializeError<'a>,
-    > {
+    pub fn output<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Output"), |identifier| {
             identifier == "o" || identifier == "output"
         })

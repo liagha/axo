@@ -5,8 +5,8 @@ use {
         format::{Display, Show, Stencil},
         initializer::{InitializeError, Initializer},
         internal::{
-            hash::{Map, DefaultHasher, Hash, Hasher},
-            platform::{read_dir, create_dir_all, PathBuf},
+            hash::{DefaultHasher, Hash, Hasher, Map},
+            platform::{create_dir_all, read_dir, PathBuf},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
@@ -234,7 +234,7 @@ impl<'session> Session<'session> {
             Span::void(),
             Visibility::Public,
         )
-            .with_members(initializer.output.clone());
+        .with_members(initializer.output.clone());
 
         resolver.insert(directive);
 
@@ -294,9 +294,9 @@ impl<'session> Session<'session> {
     pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                     kind: TokenKind::Integer(_),
-                     ..
-                 }) => Some(Stencil::default()),
+                kind: TokenKind::Integer(_),
+                ..
+            }) => Some(Stencil::default()),
             _ => None,
         }
     }
@@ -371,10 +371,7 @@ impl<'session> Session<'session> {
         K: Clone + Display,
         H: Clone + Display,
     {
-        xprintln!(
-            "{}",
-            error
-        );
+        xprintln!("{}", error);
         xprintln!();
     }
 
@@ -423,7 +420,6 @@ impl<'session> Session<'session> {
         _ = create_dir_all(&cache);
         cache.join(format!("{:016x}", hash))
     }
-
 
     pub fn manifest(&self) -> PathBuf {
         let base = self.base();

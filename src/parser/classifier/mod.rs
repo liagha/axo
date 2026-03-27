@@ -2,8 +2,8 @@ mod delimited;
 mod symbol;
 
 use crate::{
-    data::*,
     combinator::{Classifier, Form},
+    data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Span, Spanned},
@@ -17,43 +17,42 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn literal<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::predicate(|token: &Token| {
-            match &token.kind {
-                TokenKind::String(_)
-                | TokenKind::Character(_)
-                | TokenKind::Boolean(_)
-                | TokenKind::Float(_)
-                | TokenKind::Integer(_) => true,
-                | TokenKind::Identifier(identifier) => {
-                    !matches!(
-                        identifier.unwrap_str(),
-                        "static" | "var" | "const" | "struct" | "union" | "func" | "module"
-                    )
-                }
-                _ => false,
-            }
+    pub fn literal<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Classifier::predicate(|token: &Token| match &token.kind {
+            TokenKind::String(_)
+            | TokenKind::Character(_)
+            | TokenKind::Boolean(_)
+            | TokenKind::Float(_)
+            | TokenKind::Integer(_) => true,
+            TokenKind::Identifier(identifier) => !matches!(
+                identifier.unwrap_str(),
+                "static" | "var" | "const" | "struct" | "union" | "func" | "module"
+            ),
+            _ => false,
         })
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let inputs = form.collect_inputs();
-                let input = inputs.into_iter().next().unwrap();
-                let span = input.span;
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let inputs = form.collect_inputs();
+            let input = inputs.into_iter().next().unwrap();
+            let span = input.span;
 
-                *form = Form::output(Element::new(ElementKind::literal(input), span));
+            *form = Form::output(Element::new(ElementKind::literal(input), span));
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 
-    pub fn primary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn primary<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::delimited),
             Classifier::deferred(Self::literal),
         ])
     }
 
-    pub fn prefixed<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn prefixed<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Operator(operator) = &token.kind {
@@ -64,26 +63,27 @@ impl<'a> Parser<'a> {
             }),
             Classifier::deferred(Self::primary),
         ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let prefixes = form.collect_inputs();
-                let mut outputs = form.collect_outputs();
-                let mut unary = outputs.swap_remove(0);
+        .with_transform(|former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let prefixes = form.collect_inputs();
+            let mut outputs = form.collect_outputs();
+            let mut unary = outputs.swap_remove(0);
 
-                for prefix in prefixes {
-                    let span = Span::merge(&prefix.span(), &unary.span());
-                    unary = Element::new(
-                        ElementKind::unary(Unary::new(prefix, Box::new(unary))),
-                        span,
-                    );
-                }
+            for prefix in prefixes {
+                let span = Span::merge(&prefix.span(), &unary.span());
+                unary = Element::new(
+                    ElementKind::unary(Unary::new(prefix, Box::new(unary))),
+                    span,
+                );
+            }
 
-                *form = Form::output(unary);
-                Ok(())
-            })
+            *form = Form::output(unary);
+            Ok(())
+        })
     }
 
-    pub fn suffixed<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn suffixed<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::deferred(Self::primary),
             Classifier::repetition(
@@ -103,36 +103,30 @@ impl<'a> Parser<'a> {
                 None,
             ),
         ])
-            .with_transform(move |former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let sequence = form.as_forms();
-                let operand = sequence[0].unwrap_output();
-                let suffixes = sequence[1].as_forms();
-                let mut unary = operand.clone();
+        .with_transform(move |former, classifier| {
+            let form = former.forms.get_mut(classifier.form).unwrap();
+            let sequence = form.as_forms();
+            let operand = sequence[0].unwrap_output();
+            let suffixes = sequence[1].as_forms();
+            let mut unary = operand.clone();
 
-                for suffix in suffixes {
-                    if let Some(token) = suffix.get_input() {
-                        let span = Span::merge(&unary.span(), &token.span());
-                        unary = Element::new(
-                            ElementKind::Unary(Unary::new(token, Box::new(unary))),
-                            span,
-                        );
-                    } else if let Some(element) = suffix.get_output() {
-                        let span = Span::merge(&unary.span(), &element.span());
-                        unary = Self::apply_suffix(unary, element, span);
-                    }
+            for suffix in suffixes {
+                if let Some(token) = suffix.get_input() {
+                    let span = Span::merge(&unary.span(), &token.span());
+                    unary =
+                        Element::new(ElementKind::Unary(Unary::new(token, Box::new(unary))), span);
+                } else if let Some(element) = suffix.get_output() {
+                    let span = Span::merge(&unary.span(), &element.span());
+                    unary = Self::apply_suffix(unary, element, span);
                 }
+            }
 
-                *form = Form::output(unary);
-                Ok(())
-            })
+            *form = Form::output(unary);
+            Ok(())
+        })
     }
 
-    fn apply_suffix(
-        target: Element<'a>,
-        suffix: Element<'a>,
-        span: Span<'a>,
-    ) -> Element<'a> {
+    fn apply_suffix(target: Element<'a>, suffix: Element<'a>, span: Span<'a>) -> Element<'a> {
         let ElementKind::Delimited(delimited) = suffix.kind else {
             return target;
         };
@@ -173,7 +167,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn unary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn unary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Classifier::alternative([
             Classifier::deferred(Self::prefixed),
             Classifier::deferred(Self::suffixed),
@@ -181,7 +176,8 @@ impl<'a> Parser<'a> {
         ])
     }
 
-    pub fn binary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn binary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Classifier::alternative([Classifier::with_transform(
             Classifier::sequence([
                 Classifier::deferred(Self::unary),
@@ -261,11 +257,7 @@ impl<'a> Parser<'a> {
             let span = Span::new(start_pos, end_pos);
 
             left = Element::new(
-                ElementKind::Binary(Binary::new(
-                    Box::new(left),
-                    op_token,
-                    Box::new(right),
-                )),
+                ElementKind::Binary(Binary::new(Box::new(left), op_token, Box::new(right))),
                 span,
             );
         }
@@ -273,7 +265,8 @@ impl<'a> Parser<'a> {
         (left, current)
     }
 
-    pub fn expression<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn expression<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::binary),
             Classifier::deferred(Self::unary),
@@ -281,14 +274,16 @@ impl<'a> Parser<'a> {
         ])
     }
 
-    pub fn element<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn element<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::alternative([
             Classifier::deferred(Self::symbolization),
             Classifier::deferred(Self::expression),
         ])
     }
 
-    pub fn fallback<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn fallback<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::with_fail(Classifier::anything(), |former, classifier| {
             let form = former.forms.get_mut(classifier.form).unwrap();
             let token = form.unwrap_input();
@@ -300,7 +295,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parser<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn parser<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
+    {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::deferred(Self::element),

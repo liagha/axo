@@ -1,10 +1,8 @@
-use {
-    crate::{
-        data::Boolean,
-        internal::{
-            cache::{Decode, Encode},
-            hash::{Hash, Hasher},
-        },
+use crate::{
+    data::Boolean,
+    internal::{
+        cache::{Decode, Encode},
+        hash::{Hash, Hasher},
     },
 };
 
@@ -55,12 +53,7 @@ pub enum Interface {
 
 impl<Target, Value, Type> Binding<Target, Value, Type> {
     #[inline]
-    pub fn new(
-        target: Target,
-        value: Option<Value>,
-        annotation: Type,
-        kind: BindingKind,
-    ) -> Self {
+    pub fn new(target: Target, value: Option<Value>, annotation: Type, kind: BindingKind) -> Self {
         Binding {
             target,
             value,
@@ -118,7 +111,7 @@ impl<Target: Encode, Value: Encode, Type: Encode> Encode for Binding<Target, Val
 }
 
 impl<'element, Target: Decode<'element>, Value: Decode<'element>, Type: Decode<'element>>
-Decode<'element> for Binding<Target, Value, Type>
+    Decode<'element> for Binding<Target, Value, Type>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Binding {
@@ -163,7 +156,7 @@ impl<Target: Encode, Field: Encode> Encode for Aggregate<Target, Field> {
 }
 
 impl<'element, Target: Decode<'element>, Field: Decode<'element>> Decode<'element>
-for Aggregate<Target, Field>
+    for Aggregate<Target, Field>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Aggregate {
@@ -188,7 +181,7 @@ impl<'element, Target: Decode<'element>> Decode<'element> for Module<Target> {
 }
 
 impl<Target: Encode, Parameter: Encode, Body: Encode, Output: Encode> Encode
-for Function<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn encode(&self, buffer: &mut Vec<u8>) {
         self.target.encode(buffer);
@@ -201,12 +194,12 @@ for Function<Target, Parameter, Body, Output>
 }
 
 impl<
-    'element,
-    Target: Decode<'element>,
-    Parameter: Decode<'element>,
-    Body: Decode<'element>,
-    Output: Decode<'element>,
-> Decode<'element> for Function<Target, Parameter, Body, Output>
+        'element,
+        Target: Decode<'element>,
+        Parameter: Decode<'element>,
+        Body: Decode<'element>,
+        Output: Decode<'element>,
+    > Decode<'element> for Function<Target, Parameter, Body, Output>
 {
     fn decode(buffer: &'element [u8], cursor: &mut usize) -> Self {
         Function {
@@ -262,7 +255,7 @@ impl<Target: Hash, Field: Hash> Hash for Aggregate<Target, Field> {
 }
 
 impl<Target: Hash, Parameter: Hash, Body: Hash, Output: Hash> Hash
-for Function<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.target.hash(state);
@@ -279,7 +272,7 @@ impl<Target: Hash> Hash for Module<Target> {
 }
 
 impl<Target: PartialEq, Value: PartialEq, Type: PartialEq> PartialEq
-for Binding<Target, Value, Type>
+    for Binding<Target, Value, Type>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -296,7 +289,7 @@ impl<Target: PartialEq, Field: PartialEq> PartialEq for Aggregate<Target, Field>
 }
 
 impl<Target: PartialEq, Parameter: PartialEq, Body: PartialEq, Output: PartialEq> PartialEq
-for Function<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target
@@ -330,7 +323,7 @@ impl<Target: Clone, Field: Clone> Clone for Aggregate<Target, Field> {
 }
 
 impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
-for Function<Target, Parameter, Body, Output>
+    for Function<Target, Parameter, Body, Output>
 {
     fn clone(&self) -> Self {
         Function::new(

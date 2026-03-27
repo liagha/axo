@@ -1,8 +1,8 @@
 use {
     crate::{
-        reporter::{Hint, Failure},
         data::{Number, Str},
-        format::{Display},
+        format::Display,
+        reporter::{Failure, Hint},
         tracker::Span,
     },
     broccli::{Color, TextStyle},
@@ -45,7 +45,7 @@ where
 
         messages.push_str(&self.kind.to_string());
 
-        match self.span.start.location.get_value() { 
+        match self.span.start.location.get_value() {
             Ok(content) => {
                 let lines: Vec<Str> = content.lines();
 
@@ -74,14 +74,22 @@ where
                                 if start.column == end.column {
                                     let highlight =
                                         format!("{}{}", " ".repeat(start.column - 1), highlighter);
-                                    details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                                    details.push_str(&format!(
+                                        "{}|  {}\n",
+                                        " ".repeat(max),
+                                        highlight
+                                    ));
                                 } else {
                                     let highlight = format!(
                                         "{}{}",
                                         " ".repeat(start.column - 1),
                                         highlighter.repeat(end.column - start.column)
                                     );
-                                    details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
+                                    details.push_str(&format!(
+                                        "{}|  {}\n",
+                                        " ".repeat(max),
+                                        highlight
+                                    ));
                                 }
                             }
                         } else {
@@ -109,16 +117,15 @@ where
                 }
 
                 for hint in &self.hints {
-                    details
-                        .push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
+                    details.push_str(
+                        format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str(),
+                    );
                 }
 
                 (Str::from(messages), Str::from(details))
             }
-            
-            Err(_error) => {
-                (Str::from(messages), Str::from(""))
-            }
+
+            Err(_error) => (Str::from(messages), Str::from("")),
         }
     }
 }

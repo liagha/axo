@@ -1,14 +1,8 @@
 use crate::{
     data::Identity,
-    internal::hash::{Map},
+    internal::hash::Map,
     parser::{Element, Symbol},
-    resolver::{
-        next_identity,
-        scope::Scope,
-        ErrorKind,
-        ResolveError,
-        Type,
-    },
+    resolver::{next_identity, scope::Scope, ErrorKind, ResolveError, Type},
 };
 
 pub struct Resolver<'a> {

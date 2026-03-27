@@ -589,4 +589,3 @@ impl AutoNumberParser {
 pub fn auto_parser() -> AutoNumberParser {
     AutoNumberParser::new()
 }
-

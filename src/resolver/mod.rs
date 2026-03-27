@@ -1,16 +1,13 @@
 mod element;
 mod error;
+mod primitives;
 mod resolver;
 pub mod scope;
 mod symbol;
 mod traits;
-mod primitives;
 mod typing;
 
-pub use {
-    resolver::*,
-    scope::*,
-};
+pub use {resolver::*, scope::*};
 
 pub(super) use {error::*, typing::*};
 
@@ -19,7 +16,7 @@ use crate::{
         sync::{AtomicUsize, Ordering},
         Identity,
     },
-    reporter::{Error},
+    reporter::Error,
 };
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);

@@ -1,9 +1,7 @@
-use {
-    crate::{
-        resolver::Type,
-        data::Scale,
-        format::{Display, Stencil, Formatter, Result, Show},
-    }
+use crate::{
+    data::Scale,
+    format::{Display, Formatter, Result, Show, Stencil},
+    resolver::Type,
 };
 
 #[derive(Clone, Debug)]
@@ -57,7 +55,6 @@ pub enum BuilderError {
     GEPIndex,
 }
 
-
 #[derive(Clone, Debug)]
 pub enum BitwiseError {
     InvalidOperandType { instruction: String },
@@ -91,18 +88,40 @@ pub enum ControlFlowError {
 
 #[derive(Clone, Debug)]
 pub enum DataStructureError {
-    FieldMissingAnnotation { struct_name: String, field_name: String },
-    NotAStructType { name: String },
-    UnknownStructType { name: String },
-    ConstructorFieldTypeMismatch { struct_name: String, field_name: String },
-    UnknownField { target: String, member: String },
-    TooManyInitializers { target: String },
-    ConstructorPositionalArgTypeMismatch { struct_name: String, index: usize },
+    FieldMissingAnnotation {
+        struct_name: String,
+        field_name: String,
+    },
+    NotAStructType {
+        name: String,
+    },
+    UnknownStructType {
+        name: String,
+    },
+    ConstructorFieldTypeMismatch {
+        struct_name: String,
+        field_name: String,
+    },
+    UnknownField {
+        target: String,
+        member: String,
+    },
+    TooManyInitializers {
+        target: String,
+    },
+    ConstructorPositionalArgTypeMismatch {
+        struct_name: String,
+        index: usize,
+    },
     InvalidModuleAccess,
     InvalidMemberAccessExpression,
-    AccessOnNonStructType { field_name: String },
+    AccessOnNonStructType {
+        field_name: String,
+    },
     EmptyArray,
-    ArrayLiteralTypeMismatch { index: usize },
+    ArrayLiteralTypeMismatch {
+        index: usize,
+    },
     IndexMissingArgument,
     TupleIndexNotConstant,
     ArrayIndexNotConstant,
@@ -128,7 +147,9 @@ impl<'error> Display for ErrorKind<'error> {
             ErrorKind::BuilderError(error) => write!(f, "builder error: {}", error),
             ErrorKind::Cast => write!(f, "Unsupported or incompatible cast operation"),
             ErrorKind::SizeOf => write!(f, "Cannot compute the byte size of the provided type"),
-            ErrorKind::Negate => write!(f, "Operand cannot be negated (must be an Integer or Float)"),
+            ErrorKind::Negate => {
+                write!(f, "Operand cannot be negated (must be an Integer or Float)")
+            }
             ErrorKind::Boolean => write!(f, "not a Boolean"),
         }
     }
@@ -138,7 +159,11 @@ impl Display for AlignmentError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             AlignmentError::NonPowerOfTwo(v) => {
-                write!(f, "{} is not a power of two and cannot be used for alignment", v)
+                write!(
+                    f,
+                    "{} is not a power of two and cannot be used for alignment",
+                    v
+                )
             }
             AlignmentError::SrcNonPowerOfTwo(_v) => {
                 write!(f, "The src_align_bytes argument was not a power of two.")
@@ -163,7 +188,10 @@ impl Display for OrderingError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             OrderingError::WeakerThanMonotic => {
-                write!(f, "Both success and failure orderings must be monotonic or stronger.")
+                write!(
+                    f,
+                    "Both success and failure orderings must be monotonic or stronger."
+                )
             }
             OrderingError::WeakerSuccessOrdering => {
                 write!(
@@ -250,7 +278,10 @@ impl Display for FunctionError {
                 write!(f, "undefined function or primitive cast '{}'", name)
             }
             FunctionError::NotInFunctionContext => {
-                write!(f, "operation cannot be performed outside of a function context")
+                write!(
+                    f,
+                    "operation cannot be performed outside of a function context"
+                )
             }
             FunctionError::MissingReturn => {
                 write!(f, "missing return value")
@@ -263,7 +294,10 @@ impl Display for VariableError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             VariableError::AddressOfRValue => {
-                write!(f, "cannot take the address of an rvalue or non-existent entity")
+                write!(
+                    f,
+                    "cannot take the address of an rvalue or non-existent entity"
+                )
             }
             VariableError::DereferenceNonPointer => {
                 write!(f, "cannot dereference a non-pointer value")
@@ -306,8 +340,15 @@ impl Display for ControlFlowError {
 impl Display for DataStructureError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            DataStructureError::FieldMissingAnnotation { struct_name, field_name } => {
-                write!(f, "struct field '{}' in '{}' is missing a type annotation", field_name, struct_name)
+            DataStructureError::FieldMissingAnnotation {
+                struct_name,
+                field_name,
+            } => {
+                write!(
+                    f,
+                    "struct field '{}' in '{}' is missing a type annotation",
+                    field_name, struct_name
+                )
             }
             DataStructureError::NotAStructType { name } => {
                 write!(f, "'{}' is not a struct type", name)
@@ -315,31 +356,75 @@ impl Display for DataStructureError {
             DataStructureError::UnknownStructType { name } => {
                 write!(f, "unknown struct type '{}'", name)
             }
-            DataStructureError::ConstructorFieldTypeMismatch { struct_name, field_name } => {
-                write!(f, "type mismatch for field '{}' in constructor for '{}'", field_name, struct_name)
+            DataStructureError::ConstructorFieldTypeMismatch {
+                struct_name,
+                field_name,
+            } => {
+                write!(
+                    f,
+                    "type mismatch for field '{}' in constructor for '{}'",
+                    field_name, struct_name
+                )
             }
-            DataStructureError::UnknownField { target: struct_name, member: field_name } => {
-                write!(f, "struct '{}' has no field named '{}'", struct_name, field_name)
+            DataStructureError::UnknownField {
+                target: struct_name,
+                member: field_name,
+            } => {
+                write!(
+                    f,
+                    "struct '{}' has no field named '{}'",
+                    struct_name, field_name
+                )
             }
-            DataStructureError::TooManyInitializers { target: struct_name } => {
-                write!(f, "too many positional initializers for struct '{}'", struct_name)
+            DataStructureError::TooManyInitializers {
+                target: struct_name,
+            } => {
+                write!(
+                    f,
+                    "too many positional initializers for struct '{}'",
+                    struct_name
+                )
             }
             DataStructureError::ConstructorPositionalArgTypeMismatch { struct_name, index } => {
-                write!(f, "type mismatch for positional argument {} in constructor for '{}'", index, struct_name)
+                write!(
+                    f,
+                    "type mismatch for positional argument {} in constructor for '{}'",
+                    index, struct_name
+                )
             }
             DataStructureError::InvalidModuleAccess => write!(f, "invalid module access"),
-            DataStructureError::InvalidMemberAccessExpression => write!(f, "struct member access must use a simple name"),
+            DataStructureError::InvalidMemberAccessExpression => {
+                write!(f, "struct member access must use a simple name")
+            }
             DataStructureError::AccessOnNonStructType { field_name } => {
-                write!(f, "attempted to access field '{}' on a non-struct type or value", field_name)
+                write!(
+                    f,
+                    "attempted to access field '{}' on a non-struct type or value",
+                    field_name
+                )
             }
-            DataStructureError::EmptyArray => write!(f, "cannot create an empty array without a type annotation"),
+            DataStructureError::EmptyArray => {
+                write!(f, "cannot create an empty array without a type annotation")
+            }
             DataStructureError::ArrayLiteralTypeMismatch { index } => {
-                write!(f, "type mismatch in array literal: element {} has an incompatible type", index)
+                write!(
+                    f,
+                    "type mismatch in array literal: element {} has an incompatible type",
+                    index
+                )
             }
-            DataStructureError::IndexMissingArgument => write!(f, "index operation requires at least one index argument"),
-            DataStructureError::TupleIndexNotConstant => write!(f, "tuple index must be a compile-time constant"),
-            DataStructureError::ArrayIndexNotConstant => write!(f, "array value index must be a compile-time constant"),
-            DataStructureError::NotIndexable => write!(f, "type cannot be indexed or invalid index provided"),
+            DataStructureError::IndexMissingArgument => {
+                write!(f, "index operation requires at least one index argument")
+            }
+            DataStructureError::TupleIndexNotConstant => {
+                write!(f, "tuple index must be a compile-time constant")
+            }
+            DataStructureError::ArrayIndexNotConstant => {
+                write!(f, "array value index must be a compile-time constant")
+            }
+            DataStructureError::NotIndexable => {
+                write!(f, "type cannot be indexed or invalid index provided")
+            }
         }
     }
 }
@@ -348,13 +433,21 @@ impl From<inkwell::builder::BuilderError> for BuilderError {
     fn from(error: inkwell::builder::BuilderError) -> Self {
         match error {
             inkwell::builder::BuilderError::UnsetPosition => BuilderError::UnsetPosition,
-            inkwell::builder::BuilderError::AlignmentError(error) => BuilderError::AlignmentError(error.into()),
+            inkwell::builder::BuilderError::AlignmentError(error) => {
+                BuilderError::AlignmentError(error.into())
+            }
             inkwell::builder::BuilderError::ExtractOutOfRange => BuilderError::ExtractOutOfRange,
             inkwell::builder::BuilderError::BitwidthError => BuilderError::BitwidthError,
-            inkwell::builder::BuilderError::PointeeTypeMismatch => BuilderError::PointeeTypeMismatch,
+            inkwell::builder::BuilderError::PointeeTypeMismatch => {
+                BuilderError::PointeeTypeMismatch
+            }
             inkwell::builder::BuilderError::NotSameType => BuilderError::NotSameType,
-            inkwell::builder::BuilderError::NotPointerOrInteger => BuilderError::NotPointerOrInteger,
-            inkwell::builder::BuilderError::OrderingError(error) => BuilderError::OrderingError(error.into()),
+            inkwell::builder::BuilderError::NotPointerOrInteger => {
+                BuilderError::NotPointerOrInteger
+            }
+            inkwell::builder::BuilderError::OrderingError(error) => {
+                BuilderError::OrderingError(error.into())
+            }
             inkwell::builder::BuilderError::GEPPointee => BuilderError::GEPPointee,
             inkwell::builder::BuilderError::GEPIndex => BuilderError::GEPIndex,
         }
@@ -364,11 +457,19 @@ impl From<inkwell::builder::BuilderError> for BuilderError {
 impl From<inkwell::error::AlignmentError> for AlignmentError {
     fn from(error: inkwell::error::AlignmentError) -> Self {
         match error {
-            inkwell::error::AlignmentError::NonPowerOfTwo(value) => AlignmentError::NonPowerOfTwo(value.into()),
-            inkwell::error::AlignmentError::SrcNonPowerOfTwo(value) => AlignmentError::SrcNonPowerOfTwo(value.into()),
-            inkwell::error::AlignmentError::DestNonPowerOfTwo(value) => AlignmentError::DestNonPowerOfTwo(value.into()),
+            inkwell::error::AlignmentError::NonPowerOfTwo(value) => {
+                AlignmentError::NonPowerOfTwo(value.into())
+            }
+            inkwell::error::AlignmentError::SrcNonPowerOfTwo(value) => {
+                AlignmentError::SrcNonPowerOfTwo(value.into())
+            }
+            inkwell::error::AlignmentError::DestNonPowerOfTwo(value) => {
+                AlignmentError::DestNonPowerOfTwo(value.into())
+            }
             inkwell::error::AlignmentError::Unsized => AlignmentError::Unsized,
-            inkwell::error::AlignmentError::UnalignedInstruction => AlignmentError::UnalignedInstruction,
+            inkwell::error::AlignmentError::UnalignedInstruction => {
+                AlignmentError::UnalignedInstruction
+            }
         }
     }
 }
@@ -377,7 +478,9 @@ impl From<inkwell::builder::OrderingError> for OrderingError {
     fn from(error: inkwell::builder::OrderingError) -> Self {
         match error {
             inkwell::builder::OrderingError::WeakerThanMonotic => OrderingError::WeakerThanMonotic,
-            inkwell::builder::OrderingError::WeakerSuccessOrdering => OrderingError::WeakerSuccessOrdering,
+            inkwell::builder::OrderingError::WeakerSuccessOrdering => {
+                OrderingError::WeakerSuccessOrdering
+            }
             inkwell::builder::OrderingError::ReleaseOrAcqRel => OrderingError::ReleaseOrAcqRel,
         }
     }

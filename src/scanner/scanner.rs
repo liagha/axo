@@ -1,10 +1,8 @@
-use {
-    crate::{
-        scanner::{Character, ScanError, Token, ErrorKind},
-        data::{Str, Offset, Scale},
-        combinator::{Form, Former},
-        tracker::{Location, Peekable, Position},
-    },
+use crate::{
+    combinator::{Form, Former},
+    data::{Offset, Scale, Str},
+    scanner::{Character, ErrorKind, ScanError, Token},
+    tracker::{Location, Peekable, Position},
 };
 
 pub struct Scanner<'scanner> {
@@ -101,7 +99,6 @@ impl<'scanner> Scanner<'scanner> {
                 self.errors.push(error);
             }
         }
-
     }
 
     pub fn scan(&mut self) {
@@ -126,7 +123,9 @@ impl<'scanner> Scanner<'scanner> {
     }
 
     #[inline]
-    pub fn scan_string(string: Str<'scanner>) -> Result<Vec<Token<'scanner>>, Vec<ScanError<'scanner>>> {
+    pub fn scan_string(
+        string: Str<'scanner>,
+    ) -> Result<Vec<Token<'scanner>>, Vec<ScanError<'scanner>>> {
         let location = Location::Entry(Str::from(file!()));
         let mut scanner = Scanner::new(location);
 

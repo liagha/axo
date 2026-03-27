@@ -1,10 +1,8 @@
-use {
-    crate::{
-        format::{Result, Display, Formatter},
-        internal::platform::{Error as IOError, ErrorKind as IOKind},
-    }
-};
 use crate::tracker::Location;
+use crate::{
+    format::{Display, Formatter, Result},
+    internal::platform::{Error as IOError, ErrorKind as IOKind},
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
