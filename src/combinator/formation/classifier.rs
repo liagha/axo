@@ -674,40 +674,32 @@ where
         let memo_key = (key, classifier.marker);
 
         if let Some(entry) = former.memo.get(&memo_key) {
-            let form_offset: isize = former.forms.len() as isize - entry.form_base as isize;
-            let input_offset: isize = former.consumed.len() as isize - entry.input_base as isize;
+            let form_offset = former.forms.len() as isize - entry.form_base as isize;
+            let input_offset = former.consumed.len() as isize - entry.input_base as isize;
 
-            for form in &entry.forms {
-                former.forms.push(form.clone());
-            }
+            former.forms.extend(entry.forms.iter().cloned());
+            former.consumed.extend(entry.inputs.iter().cloned());
 
-            for input in &entry.inputs {
-                former.consumed.push(input.clone());
-            }
+            classifier.consumed.extend(
+                entry.consumed.iter().map(|&i| (i as isize + input_offset) as Identity)
+            );
 
-            for &index in &entry.consumed {
-                classifier
-                    .consumed
-                    .push((index as isize + input_offset) as Identity);
-            }
+            classifier.stack.extend(
+                entry.stack.iter().map(|&i| {
+                    if i == 0 {
+                        0
+                    } else {
+                        (i as isize + form_offset) as Identity
+                    }
+                })
+            );
 
-            for &index in &entry.stack {
-                let shifted = if index == 0 {
-                    0
-                } else {
-                    (index as isize + form_offset) as Identity
-                };
-                classifier.stack.push(shifted);
-            }
-
-            classifier.marker = classifier.marker + entry.advance;
-            classifier.position = entry.position;
-            classifier.outcome = entry.outcome;
-            classifier.form = if entry.form == 0 {
-                0
-            } else {
-                (entry.form as isize + form_offset) as Identity
-            };
+            (classifier.marker, classifier.position, classifier.outcome, classifier.form) = (
+                classifier.marker + entry.advance,
+                entry.position,
+                entry.outcome,
+                if entry.form == 0 { 0 } else { (entry.form as isize + form_offset) as Identity },
+            );
 
             return;
         }
@@ -716,58 +708,55 @@ where
             Some((_, action)) => action.clone(),
             None => {
                 let built = (self.factory)();
-                let action = built.action;
-                former.stash.push((key, action.clone()));
-                action
+                former.stash.push((key, built.action.clone()));
+                built.action
             }
         };
 
-        let base_consumed = classifier.consumed.len();
-        let base_stack = classifier.stack.len();
-        let base_form = former.forms.len();
-        let base_input = former.consumed.len();
-        let origin_marker = classifier.marker;
+        let consumed = take(&mut classifier.consumed);
+        let stack = take(&mut classifier.stack);
+
+        let base = (
+            consumed.len(),
+            stack.len(),
+            former.forms.len(),
+            former.consumed.len(),
+            classifier.marker,
+        );
 
         let mut child = Classifier::create(
             stashed,
             classifier.marker,
             classifier.position,
-            take(&mut classifier.consumed),
+            consumed,
             Outcome::Blank,
             0,
-            take(&mut classifier.stack),
+            stack,
             classifier.depth + 1,
         );
 
         former.build(&mut child);
 
-        let forms: Vec<_> = former.forms[base_form..].to_vec();
-        let inputs: Vec<_> = former.consumed[base_input..].to_vec();
-        let consumed: Vec<_> = child.consumed[base_consumed..].to_vec();
-        let stack: Vec<_> = child.stack[base_stack..].to_vec();
-
         former.memo.insert(
             memo_key,
             Memo {
                 outcome: child.outcome,
-                advance: child.marker - origin_marker,
+                advance: child.marker - base.4,
                 position: child.position,
-                forms,
-                inputs,
-                consumed,
-                stack,
+                forms: former.forms[base.2..].to_vec(),
+                inputs: former.consumed[base.3..].to_vec(),
+                consumed: child.consumed[base.0..].to_vec(),
+                stack: child.stack[base.1..].to_vec(),
                 form: child.form,
-                form_base: base_form,
-                input_base: base_input,
+                form_base: base.2,
+                input_base: base.3,
             },
         );
 
-        classifier.marker = child.marker;
-        classifier.position = child.position;
-        classifier.consumed = child.consumed;
-        classifier.outcome = child.outcome;
-        classifier.form = child.form;
-        classifier.stack = child.stack;
+        (classifier.marker, classifier.position, classifier.outcome, classifier.form) =
+            (child.marker, child.position, child.outcome, child.form);
+
+        (classifier.consumed, classifier.stack) = (child.consumed, child.stack);
     }
 }
 
@@ -789,10 +778,12 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let base_input = former.consumed.len();
-        let base_form = former.forms.len();
-        let base_consumed = classifier.consumed.len();
-        let base_stack = classifier.stack.len();
+        let base = (
+            former.consumed.len(),
+            former.forms.len(),
+            classifier.consumed.len(),
+            classifier.stack.len(),
+        );
 
         let mut child = classifier.create_child(self.state.action.clone());
         former.build(&mut child);
@@ -803,15 +794,14 @@ where
         classifier.stack = child.stack;
 
         if effected {
-            classifier.marker = child.marker;
-            classifier.position = child.position;
-            classifier.form = child.form;
+            (classifier.marker, classifier.position, classifier.form) =
+                (child.marker, child.position, child.form);
             classifier.set_align();
         } else {
-            former.consumed.truncate(base_input);
-            former.forms.truncate(base_form);
-            classifier.consumed.truncate(base_consumed);
-            classifier.stack.truncate(base_stack);
+            former.consumed.truncate(base.0);
+            former.forms.truncate(base.1);
+            classifier.consumed.truncate(base.2);
+            classifier.stack.truncate(base.3);
             classifier.set_ignore();
         }
     }
@@ -835,15 +825,17 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let origin_marker = classifier.marker;
-        let origin_position = classifier.position;
-        let origin_input = former.consumed.len();
-        let origin_form = former.forms.len();
+        let mut consumed = take(&mut classifier.consumed);
+        let mut stack = take(&mut classifier.stack);
 
-        let mut current_consumed = take(&mut classifier.consumed);
-        let mut current_stack = take(&mut classifier.stack);
-        let base_consumed = current_consumed.len();
-        let base_stack = current_stack.len();
+        let origin = (
+            classifier.marker,
+            classifier.position,
+            former.consumed.len(),
+            former.forms.len(),
+            consumed.len(),
+            stack.len(),
+        );
 
         let mut forms = Vec::with_capacity(SIZE);
         let mut broke = false;
@@ -853,10 +845,10 @@ where
                 pattern.action.clone(),
                 classifier.marker,
                 classifier.position,
-                current_consumed,
+                consumed,
                 Outcome::Blank,
                 0,
-                current_stack,
+                stack,
                 classifier.depth + 1,
             );
 
@@ -865,13 +857,11 @@ where
             let halted = (self.halt)(&child);
             let kept = (self.keep)(&child);
 
-            current_consumed = take(&mut child.consumed);
-            current_stack = take(&mut child.stack);
+            (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
             if halted {
-                classifier.outcome = child.outcome; // Restore conditional assignment
-                classifier.marker = child.marker;
-                classifier.position = child.position;
+                (classifier.outcome, classifier.marker, classifier.position) =
+                    (child.outcome, child.marker, child.position);
 
                 if child.is_panicked() || child.is_failed() {
                     forms.push(child.form);
@@ -882,25 +872,23 @@ where
             }
 
             if kept {
-                classifier.outcome = child.outcome; // Restore conditional assignment
+                classifier.outcome = child.outcome;
                 forms.push(child.form);
             }
 
-            // Unconditional position/marker update (but NO unconditional outcome update)
-            classifier.marker = child.marker;
-            classifier.position = child.position;
+            (classifier.marker, classifier.position) = (child.marker, child.position);
         }
 
-        classifier.consumed = current_consumed;
-        classifier.stack = current_stack;
+        classifier.consumed = consumed;
+        classifier.stack = stack;
 
         if broke {
-            classifier.marker = origin_marker;
-            classifier.position = origin_position;
-            former.consumed.truncate(origin_input);
-            former.forms.truncate(origin_form);
-            classifier.consumed.truncate(base_consumed);
-            classifier.stack.truncate(base_stack);
+            (classifier.marker, classifier.position) = (origin.0, origin.1);
+
+            former.consumed.truncate(origin.2);
+            former.forms.truncate(origin.3);
+            classifier.consumed.truncate(origin.4);
+            classifier.stack.truncate(origin.5);
         } else {
             let group = Form::multiple(
                 forms
@@ -934,80 +922,83 @@ where
         former: &mut Former<'a, 'source, Source, Input, Output, Failure>,
         classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) {
-        let origin_marker = classifier.marker;
-        let origin_position = classifier.position;
-        let origin_input = former.consumed.len();
-        let origin_form = former.forms.len();
+        let mut consumed = take(&mut classifier.consumed);
+        let mut stack = take(&mut classifier.stack);
 
-        let mut current_consumed = take(&mut classifier.consumed);
-        let mut current_stack = take(&mut classifier.stack);
-        let base_consumed = current_consumed.len();
-        let base_stack = current_stack.len();
+        let origin = (
+            classifier.marker,
+            classifier.position,
+            former.consumed.len(),
+            former.forms.len(),
+            consumed.len(),
+            stack.len(),
+        );
 
         let mut forms = Vec::new();
 
         while former.source.peek_ahead(classifier.marker).is_some() {
-            let step_input = former.consumed.len();
-            let step_form = former.forms.len();
-            let step_consumed = current_consumed.len();
-            let step_stack = current_stack.len();
+            let step = (
+                former.consumed.len(),
+                former.forms.len(),
+                consumed.len(),
+                stack.len(),
+            );
 
             let mut child = Classifier::create(
                 self.state.action.clone(),
                 classifier.marker,
                 classifier.position,
-                current_consumed,
+                consumed,
                 Outcome::Blank,
                 0,
-                current_stack,
+                stack,
                 classifier.depth + 1,
             );
 
             former.build(&mut child);
 
             if child.marker == classifier.marker {
-                current_consumed = take(&mut child.consumed);
-                current_stack = take(&mut child.stack);
-                former.consumed.truncate(step_input);
-                former.forms.truncate(step_form);
-                current_consumed.truncate(step_consumed);
-                current_stack.truncate(step_stack);
+                (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
+
+                former.consumed.truncate(step.0);
+                former.forms.truncate(step.1);
+                consumed.truncate(step.2);
+                stack.truncate(step.3);
                 break;
             }
 
             let halted = (self.halt)(&child);
             let kept = (self.keep)(&child);
 
-            current_consumed = take(&mut child.consumed);
-            current_stack = take(&mut child.stack);
+            (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
             if halted {
-                classifier.outcome = child.outcome;
-                classifier.marker = child.marker;
-                classifier.position = child.position;
+                (classifier.outcome, classifier.marker, classifier.position) =
+                    (child.outcome, child.marker, child.position);
+
                 if kept {
                     forms.push(child.form);
                 } else {
-                    former.consumed.truncate(step_input);
-                    former.forms.truncate(step_form);
-                    current_consumed.truncate(step_consumed);
-                    current_stack.truncate(step_stack);
+                    former.consumed.truncate(step.0);
+                    former.forms.truncate(step.1);
+                    consumed.truncate(step.2);
+                    stack.truncate(step.3);
                 }
                 break;
             }
 
             if kept {
-                classifier.outcome = child.outcome;
-                classifier.marker = child.marker;
-                classifier.position = child.position;
+                (classifier.outcome, classifier.marker, classifier.position) =
+                    (child.outcome, child.marker, child.position);
+
                 forms.push(child.form);
             } else {
-                former.consumed.truncate(step_input);
-                former.forms.truncate(step_form);
-                current_consumed.truncate(step_consumed);
-                current_stack.truncate(step_stack);
-                classifier.marker = child.marker;
-                classifier.position = child.position;
+                former.consumed.truncate(step.0);
+                former.forms.truncate(step.1);
+                consumed.truncate(step.2);
+                stack.truncate(step.3);
+
+                (classifier.marker, classifier.position) = (child.marker, child.position);
             }
 
             if let Some(max) = self.maximum {
@@ -1017,8 +1008,8 @@ where
             }
         }
 
-        classifier.consumed = current_consumed;
-        classifier.stack = current_stack;
+        classifier.consumed = consumed;
+        classifier.stack = stack;
 
         if forms.len() >= self.minimum as Identity {
             if !classifier.is_failed() && !classifier.is_panicked() {
@@ -1036,12 +1027,12 @@ where
             former.forms.push(group);
             classifier.form = form_id;
         } else {
-            classifier.marker = origin_marker;
-            classifier.position = origin_position;
-            former.consumed.truncate(origin_input);
-            former.forms.truncate(origin_form);
-            classifier.consumed.truncate(base_consumed);
-            classifier.stack.truncate(base_stack);
+            (classifier.marker, classifier.position) = (origin.0, origin.1);
+
+            former.consumed.truncate(origin.2);
+            former.forms.truncate(origin.3);
+            classifier.consumed.truncate(origin.4);
+            classifier.stack.truncate(origin.5);
 
             if !classifier.is_failed() && !classifier.is_panicked() {
                 classifier.set_empty();
