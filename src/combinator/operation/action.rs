@@ -2,11 +2,20 @@ use {
     crate::{
         combinator::{
             Action, Alternative, Command, Condition, Multiple, Operation, Operator, Repetition,
-            Sequence, Status, Trigger,
+            Sequence, Status, Transform, Trigger,
         },
         data::{memory::take, Identity, Scale},
+        internal::{
+            time::{
+                SystemTime,
+            },
+            platform::{
+                Write,
+                Stdio,
+                Command as Terminal,
+            },
+        },
     },
-    std::{process::Command as Terminal, time::SystemTime},
 };
 
 impl<'source> Action<'static, Operator, Operation<'source>> for Command {
@@ -14,24 +23,43 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Command {
     fn action(&self, _operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
+
         if let Some(dir) = self.directory.as_deref() {
             terminal.current_dir(dir);
         }
 
-        match terminal.status() {
-            Ok(status) if status.success() => operation.set_resolve(),
-            _ => operation.set_reject(),
+        if !operation.payload.is_empty() {
+            terminal.stdin(Stdio::piped());
         }
+
+        terminal.stdout(Stdio::piped());
+
+        if let Ok(mut child) = terminal.spawn() {
+            if !operation.payload.is_empty() {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(&operation.payload);
+                }
+            }
+
+            if let Ok(output) = child.wait_with_output() {
+                if output.status.success() {
+                    operation.set_resolve(output.stdout);
+                    return;
+                }
+            }
+        }
+
+        operation.set_reject();
     }
 }
 
 impl<'source> Action<'static, Operator, Operation<'source>> for Trigger<'source> {
     #[inline]
     fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
-        match self.condition {
+        match &self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
-                if SystemTime::now() < time {
+                if SystemTime::now() < *time {
                     operation.set_pending();
                     return;
                 }
@@ -39,6 +67,29 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Trigger<'source>
             Condition::Evaluate(function) => {
                 if !function() {
                     operation.set_pending();
+                    return;
+                }
+            }
+            Condition::Outdated(source, target) => {
+                let source_meta = std::fs::metadata(source).and_then(|m| m.modified());
+                let target_meta = std::fs::metadata(target).and_then(|m| m.modified());
+
+                match (source_meta, target_meta) {
+                    (Ok(s), Ok(t)) if s > t => {}
+                    (Ok(_), Err(_)) => {}
+                    (Err(_), _) => {
+                        operation.set_reject();
+                        return;
+                    }
+                    _ => {
+                        operation.set_resolve(Vec::new());
+                        return;
+                    }
+                }
+            }
+            Condition::Missing(path) => {
+                if std::fs::metadata(path).is_ok() {
+                    operation.set_resolve(Vec::new());
                     return;
                 }
             }
@@ -65,15 +116,19 @@ for Sequence<Operation<'source>, SIZE>
     #[inline]
     fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut current_stack = take(&mut operation.stack);
+        let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
         let mut broke = false;
 
-        for pattern in &self.states {
+        for state in &self.states {
             let mut child = Operation::create(
-                pattern.action.clone(),
+                state.identity,
+                state.action.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack,
+                current_payload,
+                state.depends.clone(),
             );
 
             operator.build(&mut child);
@@ -82,16 +137,23 @@ for Sequence<Operation<'source>, SIZE>
 
             current_stack = take(&mut child.stack);
 
+            if let Status::Resolved(data) = &child.status {
+                current_payload = data.clone();
+            } else {
+                current_payload = Vec::new();
+            }
+
             if halted {
-                operation.status = child.status;
+                operation.status = child.status.clone();
                 broke = true;
                 break;
             }
 
-            operation.status = child.status;
+            operation.status = child.status.clone();
         }
 
         operation.stack = current_stack;
+        operation.payload = current_payload;
 
         if broke {
             operation.stack.truncate(base_stack);
@@ -106,13 +168,17 @@ for Alternative<Operation<'source>, SIZE>
     fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut best: Option<Operation<'source>> = None;
         let current_stack = take(&mut operation.stack);
+        let current_payload = take(&mut operation.payload);
 
-        for pattern in &self.states {
+        for state in &self.states {
             let mut child = Operation::create(
-                pattern.action.clone(),
+                state.identity,
+                state.action.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack.clone(),
+                current_payload.clone(),
+                state.depends.clone(),
             );
 
             operator.build(&mut child);
@@ -140,12 +206,14 @@ for Alternative<Operation<'source>, SIZE>
 
         match best {
             Some(mut champion) => {
-                operation.status = champion.status;
+                operation.status = champion.status.clone();
                 operation.stack = take(&mut champion.stack);
+                operation.payload = take(&mut champion.payload);
             }
             None => {
                 operation.set_reject();
                 operation.stack = current_stack;
+                operation.payload = current_payload;
             }
         }
     }
@@ -155,6 +223,7 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Opera
     #[inline]
     fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut current_stack = take(&mut operation.stack);
+        let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
         let mut count: Identity = 0;
 
@@ -162,10 +231,13 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Opera
             let step_stack = current_stack.len();
 
             let mut child = Operation::create(
+                crate::combinator::next_identity(),
                 self.state.action.clone(),
                 Status::Pending,
                 operation.depth + 1,
                 current_stack,
+                current_payload.clone(),
+                self.state.depends.clone(),
             );
 
             operator.build(&mut child);
@@ -175,11 +247,16 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Opera
 
             current_stack = take(&mut child.stack);
 
+            if let Status::Resolved(data) = &child.status {
+                current_payload = data.clone();
+            }
+
             if halted {
                 if child.is_pending() {
-                    operation.status = child.status;
+                    operation.status = child.status.clone();
                     current_stack.truncate(step_stack);
                     operation.stack = current_stack;
+                    operation.payload = current_payload;
                     return;
                 }
                 if kept {
@@ -206,10 +283,19 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Opera
         operation.stack = current_stack;
 
         if count >= self.minimum as Identity {
-            operation.set_resolve();
+            operation.set_resolve(current_payload);
         } else {
             operation.stack.truncate(base_stack);
             operation.set_reject();
         }
+    }
+}
+
+impl<'source, Failure> Action<'static, Operator, Operation<'source>>
+for Transform<'static, 'source, Operator, Operation<'source>, Failure>
+{
+    #[inline]
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+        let _ = (self.transformer)(operator, operation);
     }
 }

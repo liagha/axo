@@ -11,7 +11,7 @@ use {
             cache::{Decode, Encode},
             hash::{DefaultHasher, Hash, Hasher, Map},
             platform::{read, read_to_string, write, create_dir_all},
-            timer::Duration,
+            time::Duration,
         },
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},

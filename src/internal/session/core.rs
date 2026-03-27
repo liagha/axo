@@ -7,7 +7,7 @@ use {
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
             platform::{read_dir, PathBuf},
-            timer::{DefaultTimer, Duration},
+            time::{DefaultTimer, Duration},
         },
         interpreter::InterpretError,
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},

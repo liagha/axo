@@ -1,6 +1,13 @@
 use crate::{format::Debug, internal::operation::asm};
 
-pub use core::time::Duration;
+pub use {
+    core::time::{
+        Duration,
+    },
+    std::{
+        time::SystemTime,
+    }
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimerError {

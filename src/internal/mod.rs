@@ -3,7 +3,7 @@ mod session;
 pub use session::Session;
 
 pub mod cache;
-pub mod timer;
+pub mod time;
 
 pub mod hash {
     pub use {
@@ -36,8 +36,11 @@ pub mod platform {
             StdoutLock, Write,
         },
         path::{Path, PathBuf},
-        process::Command,
+        process::{
+            Command, Stdio,
+        },
         ptr::{null, NonNull},
+        thread::sleep,
         sync::OnceLock,
     };
 }

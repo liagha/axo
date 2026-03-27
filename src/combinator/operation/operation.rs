@@ -1,18 +1,18 @@
 use {
     crate::{
         combinator::{
-            next_identity, Action, Alternative, Command, Condition, Multiple, Operator, Repetition,
-            Sequence, Trigger,
+            next_identity, Action, Alternative, Command, Condition, Plan, Multiple, Operator,
+            Repetition, Sequence, Transform, Trigger,
         },
-        data::{memory::Rc, Identity, Scale},
+        data::{memory::PhantomData, memory::Rc, Identity, Scale},
+        internal::time::{Duration, SystemTime},
     },
-    std::time::{Duration, SystemTime},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
     Pending,
-    Resolved,
+    Resolved(Vec<u8>),
     Rejected,
 }
 
@@ -22,6 +22,8 @@ pub struct Operation<'source> {
     pub status: Status,
     pub depth: Scale,
     pub stack: Vec<Identity>,
+    pub payload: Vec<u8>,
+    pub depends: Vec<Identity>,
 }
 
 impl<'source> Operation<'source> {
@@ -33,22 +35,29 @@ impl<'source> Operation<'source> {
             status: Status::Pending,
             depth: 0,
             stack: Vec::new(),
+            payload: Vec::new(),
+            depends: Vec::new(),
         }
     }
 
     #[inline]
     pub fn create(
+        identity: Identity,
         action: Rc<dyn Action<'static, Operator, Self> + 'source>,
         status: Status,
         depth: Scale,
         stack: Vec<Identity>,
+        payload: Vec<u8>,
+        depends: Vec<Identity>,
     ) -> Self {
         Self {
-            identity: next_identity(),
+            identity,
             action,
             status,
             depth,
             stack,
+            payload,
+            depends,
         }
     }
 
@@ -64,7 +73,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub const fn is_resolved(&self) -> bool {
-        matches!(self.status, Status::Resolved)
+        matches!(self.status, Status::Resolved(_))
     }
 
     #[inline]
@@ -78,13 +87,19 @@ impl<'source> Operation<'source> {
     }
 
     #[inline]
-    pub fn set_resolve(&mut self) {
-        self.status = Status::Resolved;
+    pub fn set_resolve(&mut self, payload: Vec<u8>) {
+        self.status = Status::Resolved(payload);
     }
 
     #[inline]
     pub fn set_reject(&mut self) {
         self.status = Status::Rejected;
+    }
+
+    #[inline]
+    pub fn depend(mut self, identity: Identity) -> Self {
+        self.depends.push(identity);
+        self
     }
 
     #[inline]
@@ -120,27 +135,27 @@ impl<'source> Operation<'source> {
     }
 
     #[inline]
-    pub fn sequence<const SIZE: Scale>(nodes: [Self; SIZE]) -> Self {
+    pub fn sequence<const SIZE: Scale>(states: [Self; SIZE]) -> Self {
         Self::new(Rc::new(Sequence {
-            states: nodes,
+            states,
             halt: |state| state.is_rejected() || state.is_pending(),
             keep: |state| state.is_resolved(),
         }))
     }
 
     #[inline]
-    pub fn alternative<const SIZE: Scale>(nodes: [Self; SIZE]) -> Self {
+    pub fn alternative<const SIZE: Scale>(states: [Self; SIZE]) -> Self {
         Self::new(Rc::new(Alternative {
-            states: nodes,
+            states,
             halt: |state| state.is_resolved() || state.is_pending(),
             compare: |new, old| new.is_resolved() && old.is_rejected(),
         }))
     }
 
     #[inline]
-    pub fn repetition(node: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
+    pub fn repetition(state: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(Rc::new(Repetition {
-            state: Box::new(node),
+            state: Box::new(state),
             minimum,
             maximum,
             halt: |state| state.is_rejected() || state.is_pending(),
@@ -151,5 +166,26 @@ impl<'source> Operation<'source> {
     #[inline]
     pub fn multiple(actions: Vec<Rc<dyn Action<'static, Operator, Self> + 'source>>) -> Self {
         Self::new(Rc::new(Multiple { actions }))
+    }
+
+    #[inline]
+    pub fn plan(states: Vec<Self>) -> Self {
+        Self::new(Rc::new(Plan { states }))
+    }
+
+    #[inline]
+    pub fn map(mut state: Self, transform: fn(Vec<u8>) -> Vec<u8>) -> Self {
+        let action = state.action.clone();
+        state.action = Rc::new(Transform::<'static, 'source, Operator, Self, ()> {
+            transformer: Rc::new(move |operator, operation| {
+                action.action(operator, operation);
+                if let Status::Resolved(data) = &operation.status {
+                    operation.status = Status::Resolved(transform(data.clone()));
+                }
+                Ok(())
+            }),
+            phantom: PhantomData,
+        });
+        state
     }
 }
