@@ -64,10 +64,14 @@ impl<'a> Initializer<'a> {
     ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
-                })
-                .with_ignore(),
+                Classifier::repetition(
+                    Classifier::predicate(|token: &Token| {
+                        matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                    }),
+                    1,
+                    Some(2),
+                )
+                    .with_ignore(),
                 Classifier::predicate(move |token: &Token| {
                     if let TokenKind::Identifier(identifier) = &token.kind {
                         matcher(identifier)
@@ -75,15 +79,15 @@ impl<'a> Initializer<'a> {
                         false
                     }
                 })
-                .with_transform(move |former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let identifier = form.collect_inputs()[0].clone();
-                    let span = identifier.span();
+                    .with_transform(move |former, classifier| {
+                        let form = former.forms.get_mut(classifier.form).unwrap();
+                        let identifier = form.collect_inputs()[0].clone();
+                        let span = identifier.span();
 
-                    *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
+                        *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
 
-                    Ok(())
-                }),
+                        Ok(())
+                    }),
                 Self::path_value(),
             ]),
             move |former, classifier| {
@@ -119,20 +123,82 @@ impl<'a> Initializer<'a> {
                     Visibility::Public,
                 );
 
-                *form = Form::output(symbol);
+                *form = Form::Output(symbol);
 
                 Ok(())
             },
         )
     }
 
+    fn boolean_directive<'source>(
+        name: Str<'a>,
+        matcher: fn(&Str<'a>) -> bool,
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Classifier::sequence([
+            Classifier::alternative([
+                Classifier::repetition(
+                    Classifier::predicate(|token: &Token| {
+                        matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                    }),
+                    1,
+                    Some(2),
+                )
+                    .with_ignore(),
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Operator(ref operator) if operator.as_slice() == [OperatorKind::Minus, OperatorKind::Minus])
+                }).with_ignore(),
+            ]),
+            Classifier::predicate(move |token: &Token| {
+                if let TokenKind::Identifier(identifier) = &token.kind {
+                    matcher(identifier)
+                } else {
+                    false
+                }
+            }),
+        ])
+            .with_transform(move |former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let identifier = form.collect_inputs()[0].clone();
+                let span = identifier.span;
+
+                let target = Element::new(
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(name.clone()), span)),
+                    span,
+                );
+
+                let value = Element::new(
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("true")), span)),
+                    span,
+                );
+
+                let symbol = Symbol::new(
+                    SymbolKind::Binding(Binding::new(
+                        Box::from(target),
+                        Some(Box::new(value)),
+                        None,
+                        BindingKind::Meta,
+                    )),
+                    span,
+                    Visibility::Public,
+                );
+
+                *form = Form::Output(symbol);
+
+                Ok(())
+            })
+    }
+
     pub fn verbosity<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
-            Classifier::predicate(|token: &Token| {
-                matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
-            })
-            .with_ignore(),
+            Classifier::repetition(
+                Classifier::predicate(|token: &Token| {
+                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                }),
+                1,
+                Some(2),
+            )
+                .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
                     identifier == "v" || identifier == "verbosity"
@@ -140,50 +206,71 @@ impl<'a> Initializer<'a> {
                     false
                 }
             })
+                .with_transform(|former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let identifier = form.collect_inputs()[0].clone();
+                    let span = identifier.span();
+
+                    *form = Form::Input(Token::new(
+                        TokenKind::Identifier(Str::from("Verbosity")),
+                        span,
+                    ));
+
+                    Ok(())
+                }),
+            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
+        ])
             .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let identifier = form.collect_inputs()[0].clone();
-                let span = identifier.span();
+                let value = form.collect_inputs()[1].clone();
+                let span = identifier.span.merge(&value.span);
 
-                *form = Form::Input(Token::new(
-                    TokenKind::Identifier(Str::from("Verbosity")),
+                let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
+                let value = Element::new(ElementKind::Literal(value.clone()), value.span);
+
+                let symbol = Symbol::new(
+                    SymbolKind::Binding(Binding::new(
+                        Box::from(target),
+                        Some(Box::new(value)),
+                        None,
+                        BindingKind::Meta,
+                    )),
                     span,
-                ));
+                    Visibility::Public,
+                );
+
+                *form = Form::Output(symbol);
 
                 Ok(())
-            }),
-            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
-        ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
-            let identifier = form.collect_inputs()[0].clone();
-            let value = form.collect_inputs()[1].clone();
-            let span = identifier.span.merge(&value.span);
-
-            let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
-            let value = Element::new(ElementKind::Literal(value.clone()), value.span);
-
-            let symbol = Symbol::new(
-                SymbolKind::Binding(Binding::new(
-                    Box::from(target),
-                    Some(Box::new(value)),
-                    None,
-                    BindingKind::Meta,
-                )),
-                span,
-                Visibility::Public,
-            );
-
-            *form = Form::output(symbol);
-
-            Ok(())
-        })
+            })
     }
 
     pub fn input<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Self::path_directive(Str::from("Input"), |identifier| {
             identifier == "i" || identifier == "input"
+        })
+    }
+
+    pub fn output<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::path_directive(Str::from("Output"), |identifier| {
+            identifier == "o" || identifier == "output"
+        })
+    }
+
+    pub fn discard<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Discard"), |identifier| {
+            identifier == "discard"
+        })
+    }
+
+    pub fn bare<'source>(
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+        Self::boolean_directive(Str::from("Bare"), |identifier| {
+            identifier == "bare"
         })
     }
 
@@ -220,16 +307,9 @@ impl<'a> Initializer<'a> {
                 Visibility::Public,
             );
 
-            *form = Form::output(symbol);
+            *form = Form::Output(symbol);
 
             Ok(())
-        })
-    }
-
-    pub fn output<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
-        Self::path_directive(Str::from("Output"), |identifier| {
-            identifier == "o" || identifier == "output"
         })
     }
 }

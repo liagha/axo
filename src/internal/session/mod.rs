@@ -41,6 +41,30 @@ impl<'session> Session<'session> {
         Self::analyze,
     ];
 
+    pub fn cache<T: Decode<'session> + Encode + Clone>(&self, name: &str, hash: u64, data: Option<T>) -> Option<T> {
+        if self.get_directive(Str::from("Discard")).is_some() {
+            return data;
+        }
+
+        let base = self.base();
+        let cache = base.join("build").join("records").join(name);
+        _ = create_dir_all(&cache);
+        let path = cache.join(format!("{:016x}", hash));
+
+        if let Some(value) = data {
+            let mut buffer = Vec::new();
+            Some(value.clone()).encode(&mut buffer);
+            _ = write(path, buffer);
+            Some(value)
+        } else if let Ok(bytes) = read(&path) {
+            let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+            let mut cursor = 0;
+            Option::<T>::decode(bytes, &mut cursor)
+        } else {
+            None
+        }
+    }
+
     pub fn compile(&mut self) {
         'pipeline: {
             for stage in Self::PIPELINE {
@@ -92,16 +116,14 @@ impl<'session> Session<'session> {
     }
 
     pub fn prepare(&mut self) {
-        let manifest_file = self.manifest();
-        if self.cache.is_empty() {
-            if let Ok(data) = read(&manifest_file) {
+        let manifest = self.manifest();
+        if self.cache.is_empty() && self.get_directive(Str::from("Discard")).is_none() {
+            if let Ok(data) = read(&manifest) {
                 let data: &'static [u8] = Box::leak(data.into_boxed_slice());
                 let mut cursor = 0;
 
-                if let Some(loaded_cache) =
-                    Option::<Map<Location<'session>, u64>>::decode(data, &mut cursor)
-                {
-                    self.cache = loaded_cache;
+                if let Some(cache) = Option::<Map<Location<'session>, u64>>::decode(data, &mut cursor) {
+                    self.cache = cache;
                 }
             }
         }
@@ -134,9 +156,14 @@ impl<'session> Session<'session> {
             }
         }
 
-        let mut buffer = Vec::new();
-        Some(self.cache.clone()).encode(&mut buffer);
-        _ = write(manifest_file, buffer);
+        if self.get_directive(Str::from("Discard")).is_none() {
+            if let Some(parent) = manifest.parent() {
+                _ = create_dir_all(parent);
+            }
+            let mut buffer = Vec::new();
+            Some(self.cache.clone()).encode(&mut buffer);
+            _ = write(manifest, buffer);
+        }
     }
 
     pub fn populate(&mut self) {
@@ -159,7 +186,7 @@ impl<'session> Session<'session> {
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
                     span,
                 )
-                .into();
+                    .into();
 
                 let mut symbol = Symbol::new(
                     SymbolKind::Module(Module::new(head)),
@@ -201,14 +228,9 @@ impl<'session> Session<'session> {
                 continue;
             }
 
-            let file = self.cache("tokens", hash);
-
             if !dirty {
-                if let Ok(data) = read(&file) {
-                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
-                    let mut cursor = 0;
-                    let tokens = Option::<Vec<Token>>::decode(data, &mut cursor);
-                    self.records.get_mut(&key).unwrap().tokens = tokens;
+                if let Some(tokens) = self.cache::<Vec<Token>>("tokens", hash, None) {
+                    self.records.get_mut(&key).unwrap().tokens = Some(tokens);
                     continue;
                 }
             }
@@ -232,11 +254,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Scan(error.clone())),
             );
 
-            let mut buffer = Vec::new();
-            Some(scanner.output.clone()).encode(&mut buffer);
-            _ = write(file, buffer);
-
-            self.records.get_mut(&key).unwrap().tokens = Some(scanner.output);
+            self.records.get_mut(&key).unwrap().tokens = self.cache("tokens", hash, Some(scanner.output));
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -266,14 +284,9 @@ impl<'session> Session<'session> {
                 continue;
             }
 
-            let file = self.cache("elements", hash);
-
             if !dirty {
-                if let Ok(data) = read(&file) {
-                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
-                    let mut cursor = 0;
-                    let elements = Option::<Vec<Element>>::decode(data, &mut cursor);
-                    self.records.get_mut(&key).unwrap().elements = elements;
+                if let Some(elements) = self.cache::<Vec<Element>>("elements", hash, None) {
+                    self.records.get_mut(&key).unwrap().elements = Some(elements);
                     continue;
                 }
             }
@@ -297,11 +310,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Parse(error.clone())),
             );
 
-            let mut buffer = Vec::new();
-            Some(parser.output.clone()).encode(&mut buffer);
-            _ = write(file, buffer);
-
-            self.records.get_mut(&key).unwrap().elements = Some(parser.output);
+            self.records.get_mut(&key).unwrap().elements = self.cache("elements", hash, Some(parser.output));
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -462,14 +471,9 @@ impl<'session> Session<'session> {
                 (record.hash, record.dirty, record.elements.clone())
             };
 
-            let file = self.cache("analyses", hash);
-
             if !dirty {
-                if let Ok(data) = read(&file) {
-                    let data: &'static [u8] = Box::leak(data.into_boxed_slice());
-                    let mut cursor = 0;
-                    let analyses = Option::<Vec<Analysis>>::decode(data, &mut cursor);
-                    self.records.get_mut(&key).unwrap().analyses = analyses;
+                if let Some(analyses) = self.cache::<Vec<Analysis>>("analyses", hash, None) {
+                    self.records.get_mut(&key).unwrap().analyses = Some(analyses);
                     continue;
                 }
             }
@@ -492,11 +496,7 @@ impl<'session> Session<'session> {
                     .map(|error| CompileError::Analyze(error.clone())),
             );
 
-            let mut buffer = Vec::new();
-            Some(analyzer.output.clone()).encode(&mut buffer);
-            _ = write(file, buffer);
-
-            self.records.get_mut(&key).unwrap().analyses = Some(analyzer.output);
+            self.records.get_mut(&key).unwrap().analyses = self.cache("analyses", hash, Some(analyzer.output));
         }
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
@@ -525,6 +525,8 @@ impl<'session> Session<'session> {
             .collect();
         keys.sort();
 
+        let discard = self.get_directive(Str::from("Discard")).is_some();
+
         for &key in &keys {
             let record = self.records.get_mut(&key).unwrap();
             let location = record.location;
@@ -546,6 +548,10 @@ impl<'session> Session<'session> {
                 self.generator.current_module = stem;
 
                 self.generator.generate(analysis);
+
+                if discard {
+                    continue;
+                }
 
                 match schema.as_path() {
                     Ok(path) => {
@@ -593,6 +599,10 @@ impl<'session> Session<'session> {
 
     #[cfg(feature = "generator")]
     pub fn emit(&mut self) {
+        if self.get_directive(Str::from("Discard")).is_some() {
+            return;
+        }
+
         self.report_start("emitting");
 
         let base = self.base();
@@ -674,6 +684,10 @@ impl<'session> Session<'session> {
 
     #[cfg(feature = "generator")]
     pub fn run(&mut self) {
+        if self.get_directive(Str::from("Discard")).is_some() {
+            return;
+        }
+
         self.report_start("running");
 
         let executable = self.target.unwrap();

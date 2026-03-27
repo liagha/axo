@@ -96,6 +96,8 @@ impl<'a> Initializer<'a> {
             Self::verbosity(),
             Self::input(),
             Self::output(),
+            Self::discard(),
+            Self::bare(),
             Self::implicit_input(),
             Classifier::anything().with_ignore(),
         ])

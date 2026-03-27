@@ -180,20 +180,35 @@ impl<'session> Session<'session> {
         let mut errors = Vec::new();
         let cache = Map::new();
 
-        for path in RUNTIME {
-            if let Some(kind) = InputKind::from_path(path) {
-                let string = path.to_string();
-                let location = Location::Entry(Str::from(string.clone()));
+        let targets = initializer.initialize();
 
-                let mut hasher = DefaultHasher::new();
-                Hash::hash(&string, &mut hasher);
+        let bare = initializer.output.iter().any(|symbol| {
+            if let SymbolKind::Binding(binding) = &symbol.kind {
+                if let ElementKind::Literal(token) = &binding.target.kind {
+                    if let TokenKind::Identifier(name) = &token.kind {
+                        return name == "Bare";
+                    }
+                }
+            }
+            false
+        });
 
-                let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
-                records.insert(identity, Record::new(kind, location));
+        if !bare {
+            for path in RUNTIME {
+                if let Some(kind) = InputKind::from_path(path) {
+                    let string = path.to_string();
+                    let location = Location::Entry(Str::from(string.clone()));
+
+                    let mut hasher = DefaultHasher::new();
+                    Hash::hash(&string, &mut hasher);
+
+                    let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
+                    records.insert(identity, Record::new(kind, location));
+                }
             }
         }
 
-        initializer.initialize().iter().for_each(|(target, span)| {
+        targets.iter().for_each(|(target, span)| {
             if !Self::traverse(target, &mut records) {
                 let string = target.to_string();
 
@@ -234,7 +249,7 @@ impl<'session> Session<'session> {
             Span::void(),
             Visibility::Public,
         )
-        .with_members(initializer.output.clone());
+            .with_members(initializer.output.clone());
 
         resolver.insert(directive);
 
@@ -294,9 +309,9 @@ impl<'session> Session<'session> {
     pub fn get_stencil(&self) -> Option<Stencil> {
         match self.get_directive(Str::from("Verbosity")) {
             Some(Token {
-                kind: TokenKind::Integer(_),
-                ..
-            }) => Some(Stencil::default()),
+                     kind: TokenKind::Integer(_),
+                     ..
+                 }) => Some(Stencil::default()),
             _ => None,
         }
     }
@@ -414,18 +429,9 @@ impl<'session> Session<'session> {
         }
     }
 
-    pub fn cache(&self, name: &str, hash: u64) -> PathBuf {
-        let base = self.base();
-        let cache = base.join("build").join("records").join(name);
-        _ = create_dir_all(&cache);
-        cache.join(format!("{:016x}", hash))
-    }
-
     pub fn manifest(&self) -> PathBuf {
         let base = self.base();
-        let cache_dir = base.join("build").join("records");
-        _ = create_dir_all(&cache_dir);
-        cache_dir.join("manifest")
+        base.join("build").join("records").join("manifest")
     }
 
     #[cfg(feature = "generator")]

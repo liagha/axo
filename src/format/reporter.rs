@@ -33,7 +33,7 @@ where
         write!(
             f,
             "{}{}\n{}",
-            "error:".colorize(Color::Crimson).bold(),
+            "error: ".colorize(Color::Crimson).bold(),
             message,
             details
         )
@@ -51,7 +51,7 @@ where
         write!(
             f,
             "{}{}\n{}",
-            "error:".colorize(Color::Crimson).bold(),
+            "error: ".colorize(Color::Crimson).bold(),
             message,
             details
         )
