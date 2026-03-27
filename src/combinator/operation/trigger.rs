@@ -15,7 +15,7 @@ pub enum Condition {
     Missing(String),
 }
 
-pub struct Trigger<'source> {
+pub struct Trigger<'source, Store = ()> {
     pub condition: Condition,
-    pub action: Arc<dyn Action<'static, Operator, Operation<'source>> + Send + Sync + 'source>,
+    pub action: Arc<dyn Action<'static, Operator<Store>, Operation<'source, Store>> + Send + Sync + 'source>,
 }

@@ -4,13 +4,13 @@ use crate::{
     internal::platform::scope,
 };
 
-pub struct Plan<'source> {
-    pub states: Vec<Operation<'source>>,
+pub struct Plan<'source, Store = ()> {
+    pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source> Action<'static, Operator, Operation<'source>> for Plan<'source> {
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Plan<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -50,13 +50,13 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Plan<'source> {
     }
 }
 
-pub struct Parallel<'source> {
-    pub states: Vec<Operation<'source>>,
+pub struct Parallel<'source, Store = ()> {
+    pub states: Vec<Operation<'source, Store>>,
 }
 
-impl<'source> Action<'static, Operator, Operation<'source>> for Parallel<'source> {
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Parallel<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut all_resolved = true;
         let mut any_rejected = false;
         let mut final_payload = take(&mut operation.payload);
@@ -77,9 +77,10 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Parallel<'source
                 );
 
                 let cache = operator.cache.clone();
+                let store = operator.store.clone();
 
                 handles.push(scope.spawn(move || {
-                    let mut local_operator = Operator { cache };
+                    let mut local_operator = Operator { cache, store };
                     local_operator.build(&mut child);
                     child
                 }));

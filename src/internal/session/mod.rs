@@ -4,32 +4,23 @@ pub use core::*;
 
 use {
     crate::{
-        analyzer::{Analysis, Analyzer},
-        data::{memory::replace, Module, Str},
+        data::Str,
         format::Show,
         internal::{
             cache::{Decode, Encode},
-            hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::{read, read_to_string, write, create_dir_all},
+            platform::{create_dir_all, read, write},
             time::Duration,
         },
-        parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
-        resolver::{Resolvable, Scope},
-        interpreter::{Machine, Translator},
-        scanner::{Scanner, Token, TokenKind},
-        tracker::{Location, Peekable, Span},
+        parser::Element,
+        scanner::Token,
+        tracker::{Peekable, Span},
     },
     broccli::Color,
 };
 
 #[cfg(feature = "generator")]
-use {
-    crate::{
-        generator::Backend,
-        internal::platform::{Command},
-        tracker::{error::ErrorKind as TrackErrorKind, TrackError},
-    },
-    inkwell::targets::TargetMachine,
+use crate::{
+    internal::platform::Command,
 };
 
 impl<'session> Session<'session> {
@@ -119,6 +110,14 @@ impl<'session> Session<'session> {
     }
 
     pub fn prepare(&mut self) {
+        use crate::{
+            internal::{
+                hash::{DefaultHasher, Hash, Hasher, Map},
+                platform::read_to_string,
+            },
+            tracker::Location,
+        };
+
         let manifest = self.manifest();
         if self.cache.is_empty() && self.get_directive(Str::from("Discard")).is_none() {
             if let Ok(data) = read(&manifest) {
@@ -170,6 +169,12 @@ impl<'session> Session<'session> {
     }
 
     pub fn populate(&mut self) {
+        use crate::{
+            data::Module,
+            parser::{ElementKind, Symbol, SymbolKind, Visibility},
+            scanner::TokenKind,
+        };
+
         let mut keys: Vec<_> = self.records.keys().copied().collect();
         keys.sort();
 
@@ -210,6 +215,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn scan(&mut self) {
+        use crate::scanner::Scanner;
+
         let initial = self.errors.len();
         self.report_start("scanning");
 
@@ -265,6 +272,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn parse(&mut self) {
+        use crate::parser::Parser;
+
         let initial = self.errors.len();
         self.report_start("parsing");
 
@@ -321,6 +330,11 @@ impl<'session> Session<'session> {
     }
 
     pub fn resolve(&mut self) {
+        use crate::{
+            data::memory::replace,
+            resolver::{Resolvable, Scope},
+        };
+
         let initial = self.errors.len();
         self.report_start("resolving");
 
@@ -451,6 +465,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn analyze(&mut self) {
+        use crate::analyzer::{Analysis, Analyzer};
+
         let initial = self.errors.len();
 
         self.report_start("analyzing");
@@ -507,6 +523,8 @@ impl<'session> Session<'session> {
     }
 
     pub fn interpret(&mut self) {
+        use crate::interpreter::{Machine, Translator};
+
         let initial = self.errors.len();
 
         self.report_start("interpreting");
@@ -548,6 +566,14 @@ impl<'session> Session<'session> {
 
     #[cfg(feature = "generator")]
     pub fn generate(&mut self) {
+        use {
+            crate::{
+                tracker::{error::ErrorKind as TrackErrorKind, TrackError},
+                generator::Backend,
+            },
+            inkwell::targets::TargetMachine,
+        };
+
         let triple = TargetMachine::get_default_triple();
         let base = self.base();
 

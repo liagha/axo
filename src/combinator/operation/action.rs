@@ -6,21 +6,15 @@ use {
         },
         data::{memory::take, Identity, Scale},
         internal::{
-            time::{
-                SystemTime,
-            },
-            platform::{
-                Write,
-                Stdio,
-                Command as Terminal,
-            },
+            time::SystemTime,
+            platform::{Write, Stdio, Command as Terminal},
         },
     },
 };
 
-impl<'source> Action<'static, Operator, Operation<'source>> for Command {
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Command {
     #[inline]
-    fn action(&self, _operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, _operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
 
@@ -53,9 +47,9 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Command {
     }
 }
 
-impl<'source> Action<'static, Operator, Operation<'source>> for Trigger<'source> {
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Trigger<'source, Store> {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         match &self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
@@ -99,22 +93,22 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Trigger<'source>
     }
 }
 
-impl<'source> Action<'static, Operator, Operation<'source>>
-for Multiple<'static, 'source, Operator, Operation<'source>>
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>>
+for Multiple<'static, 'source, Operator<Store>, Operation<'source, Store>>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         for step in self.actions.iter() {
             step.action(operator, operation);
         }
     }
 }
 
-impl<'source, const SIZE: Scale> Action<'static, Operator, Operation<'source>>
-for Sequence<Operation<'source>, SIZE>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Action<'static, Operator<Store>, Operation<'source, Store>>
+for Sequence<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -161,12 +155,12 @@ for Sequence<Operation<'source>, SIZE>
     }
 }
 
-impl<'source, const SIZE: Scale> Action<'static, Operator, Operation<'source>>
-for Alternative<Operation<'source>, SIZE>
+impl<'source, Store: Clone + Send + Sync + 'source, const SIZE: Scale> Action<'static, Operator<Store>, Operation<'source, Store>>
+for Alternative<Operation<'source, Store>, SIZE>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
-        let mut best: Option<Operation<'source>> = None;
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
+        let mut best: Option<Operation<'source, Store>> = None;
         let current_stack = take(&mut operation.stack);
         let current_payload = take(&mut operation.payload);
 
@@ -219,9 +213,9 @@ for Alternative<Operation<'source>, SIZE>
     }
 }
 
-impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Operation<'source>> {
+impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Store>, Operation<'source, Store>> for Repetition<Operation<'source, Store>> {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let mut current_stack = take(&mut operation.stack);
         let mut current_payload = take(&mut operation.payload);
         let base_stack = current_stack.len();
@@ -291,11 +285,11 @@ impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Opera
     }
 }
 
-impl<'source, Failure> Action<'static, Operator, Operation<'source>>
-for Transform<'static, 'source, Operator, Operation<'source>, Failure>
+impl<'source, Store: Clone + Send + Sync + 'source, Failure> Action<'static, Operator<Store>, Operation<'source, Store>>
+for Transform<'static, 'source, Operator<Store>, Operation<'source, Store>, Failure>
 {
     #[inline]
-    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+    fn action(&self, operator: &mut Operator<Store>, operation: &mut Operation<'source, Store>) {
         let _ = (self.transformer)(operator, operation);
     }
 }

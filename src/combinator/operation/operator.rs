@@ -6,20 +6,26 @@ use {
     },
 };
 
-pub struct Operator {
+pub struct Operator<Store = ()> {
     pub cache: Map<Identity, Status>,
+    pub store: Store,
 }
 
-impl Operator {
+// Added Send + Sync constraints here to match the Action trait requirements
+impl<Store: Clone + Send + Sync> Operator<Store> {
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(store: Store) -> Self {
         Self {
             cache: Map::new(),
+            store,
         }
     }
 
     #[inline]
-    pub fn build<'source>(&mut self, operation: &mut Operation<'source>) {
+    pub fn build<'source>(&mut self, operation: &mut Operation<'source, Store>)
+    where
+        Store: 'source
+    {
         if let Some(status) = self.cache.get(&operation.identity) {
             operation.status = status.clone();
             return;
@@ -46,7 +52,10 @@ impl Operator {
     }
 
     #[inline]
-    pub fn execute<'source>(&mut self, operation: &mut Operation<'source>) -> Status {
+    pub fn execute<'source>(&mut self, operation: &mut Operation<'source, Store>) -> Status
+    where
+        Store: 'source
+    {
         loop {
             self.build(operation);
 
@@ -60,7 +69,10 @@ impl Operator {
     }
 
     #[inline]
-    pub fn watch<'source>(&mut self, operation: &mut Operation<'source>, paths: &[&str]) {
+    pub fn watch<'source>(&mut self, operation: &mut Operation<'source, Store>, paths: &[&str])
+    where
+        Store: 'source
+    {
         let mut last: Vec<_> = paths
             .iter()
             .map(|path| std::fs::metadata(path).and_then(|m| m.modified()).ok())
@@ -73,7 +85,7 @@ impl Operator {
 
             loop {
                 sleep(Duration::from_millis(500));
-                
+
                 let current: Vec<_> = paths
                     .iter()
                     .map(|path| std::fs::metadata(path).and_then(|m| m.modified()).ok())

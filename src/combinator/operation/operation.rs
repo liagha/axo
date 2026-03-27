@@ -1,10 +1,10 @@
 use {
     crate::{
         combinator::{
-            next_identity, Action, Alternative, Command, Condition, Plan, Multiple, Operator,
+            next_identity, Action, Alternative, Command, Condition, Multiple, Operator, Plan,
             Repetition, Sequence, Transform, Trigger,
         },
-        data::{memory::PhantomData, memory::Arc, Identity, Scale},
+        data::{memory::Arc, memory::PhantomData, Identity, Scale},
         internal::time::{Duration, SystemTime},
     },
 };
@@ -16,9 +16,9 @@ pub enum Status {
     Rejected,
 }
 
-pub struct Operation<'source> {
+pub struct Operation<'source, Store = ()> {
     pub identity: Identity,
-    pub action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>,
+    pub action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
     pub status: Status,
     pub depth: Scale,
     pub stack: Vec<Identity>,
@@ -26,46 +26,8 @@ pub struct Operation<'source> {
     pub depends: Vec<Identity>,
 }
 
-impl<'source> Operation<'source> {
-    #[inline]
-    pub fn new(action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>) -> Self {
-        Self {
-            identity: next_identity(),
-            action,
-            status: Status::Pending,
-            depth: 0,
-            stack: Vec::new(),
-            payload: Vec::new(),
-            depends: Vec::new(),
-        }
-    }
-
-    #[inline]
-    pub fn create(
-        identity: Identity,
-        action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>,
-        status: Status,
-        depth: Scale,
-        stack: Vec<Identity>,
-        payload: Vec<u8>,
-        depends: Vec<Identity>,
-    ) -> Self {
-        Self {
-            identity,
-            action,
-            status,
-            depth,
-            stack,
-            payload,
-            depends,
-        }
-    }
-
-    #[inline]
-    pub fn execute(&mut self, operator: &mut Operator) -> Status {
-        operator.execute(self)
-    }
-
+// Basic methods that do NOT require strict bounds on Store
+impl<'source, Store> Operation<'source, Store> {
     #[inline]
     pub const fn is_pending(&self) -> bool {
         matches!(self.status, Status::Pending)
@@ -100,6 +62,50 @@ impl<'source> Operation<'source> {
     pub fn depend(mut self, identity: Identity) -> Self {
         self.depends.push(identity);
         self
+    }
+}
+
+// Combinator methods that DO require the Store to be thread-safe (Clone + Send + Sync)
+impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
+    #[inline]
+    pub fn new(
+        action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+    ) -> Self {
+        Self {
+            identity: next_identity(),
+            action,
+            status: Status::Pending,
+            depth: 0,
+            stack: Vec::new(),
+            payload: Vec::new(),
+            depends: Vec::new(),
+        }
+    }
+
+    #[inline]
+    pub fn create(
+        identity: Identity,
+        action: Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>,
+        status: Status,
+        depth: Scale,
+        stack: Vec<Identity>,
+        payload: Vec<u8>,
+        depends: Vec<Identity>,
+    ) -> Self {
+        Self {
+            identity,
+            action,
+            status,
+            depth,
+            stack,
+            payload,
+            depends,
+        }
+    }
+
+    #[inline]
+    pub fn execute(&mut self, operator: &mut Operator<Store>) -> Status {
+        operator.execute(self)
     }
 
     #[inline]
@@ -164,7 +170,9 @@ impl<'source> Operation<'source> {
     }
 
     #[inline]
-    pub fn multiple(actions: Vec<Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>>) -> Self {
+    pub fn multiple(
+        actions: Vec<Arc<dyn Action<'static, Operator<Store>, Self> + Send + Sync + 'source>>,
+    ) -> Self {
         Self::new(Arc::new(Multiple { actions }))
     }
 
@@ -176,7 +184,7 @@ impl<'source> Operation<'source> {
     #[inline]
     pub fn map(mut state: Self, transform: fn(Vec<u8>) -> Vec<u8>) -> Self {
         let action = state.action.clone();
-        state.action = Arc::new(Transform::<'static, 'source, Operator, Self, ()> {
+        state.action = Arc::new(Transform::<'static, 'source, Operator<Store>, Self, ()> {
             transformer: Arc::new(move |operator, operation| {
                 action.action(operator, operation);
                 if let Status::Resolved(data) = &operation.status {
