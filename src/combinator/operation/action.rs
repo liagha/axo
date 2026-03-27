@@ -25,7 +25,7 @@ where
     ) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
-        if let Some(dir) = self.dir.as_deref() {
+        if let Some(dir) = self.directory.as_deref() {
             terminal.current_dir(dir);
         }
 

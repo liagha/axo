@@ -1,7 +1,7 @@
 pub struct Command {
     pub program: String,
     pub arguments: Vec<String>,
-    pub dir: Option<String>,
+    pub directory: Option<String>,
 }
 
 impl Command {
@@ -10,25 +10,25 @@ impl Command {
         Self {
             program: program.into(),
             arguments: Vec::new(),
-            dir: None,
+            directory: None,
         }
     }
 
     #[inline]
-    pub fn arg(mut self, argument: impl Into<String>) -> Self {
+    pub fn argument(mut self, argument: impl Into<String>) -> Self {
         self.arguments.push(argument.into());
         self
     }
 
     #[inline]
-    pub fn args(mut self, arguments: impl IntoIterator<Item = impl Into<String>>) -> Self {
+    pub fn arguments(mut self, arguments: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.arguments.extend(arguments.into_iter().map(Into::into));
         self
     }
 
     #[inline]
-    pub fn current_dir(mut self, dir: impl Into<String>) -> Self {
-        self.dir = Some(dir.into());
+    pub fn current_directory(mut self, dir: impl Into<String>) -> Self {
+        self.directory = Some(dir.into());
         self
     }
 }

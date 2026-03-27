@@ -65,6 +65,14 @@ where
     }
 
     #[inline]
+    pub fn execute(
+        &mut self,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+    ) -> Status {
+        operator.execute(self)
+    }
+
+    #[inline]
     pub const fn is_pending(&self) -> bool {
         matches!(self.status, Status::Pending)
     }

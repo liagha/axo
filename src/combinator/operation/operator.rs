@@ -1,6 +1,6 @@
 use {
-    crate::combinator::{Formable, Operation},
-    std::marker::PhantomData,
+    crate::combinator::{Formable, Operation, Status},
+    std::{marker::PhantomData, thread, time::Duration},
 };
 
 pub struct Operator<'a, Input, Output, Failure>
@@ -12,7 +12,7 @@ where
     pub inputs: Input,
     pub outputs: Output,
     pub failures: Failure,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 impl<'a, Input, Output, Failure> Operator<'a, Input, Output, Failure>
@@ -27,7 +27,7 @@ where
             inputs,
             outputs,
             failures,
-            _marker: PhantomData,
+            phantom: PhantomData,
         }
     }
 
@@ -38,5 +38,22 @@ where
     ) {
         let action = operation.action.clone();
         action.action(self, operation);
+    }
+
+    #[inline]
+    pub fn execute<'source>(
+        &mut self,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
+    ) -> Status {
+        loop {
+            self.build(operation);
+
+            match operation.status {
+                Status::Pending => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Status::Resolved | Status::Rejected => break operation.status,
+            }
+        }
     }
 }
