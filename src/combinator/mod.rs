@@ -1,9 +1,11 @@
+// src/combinator/mod.rs
 use crate::data::{sync::{AtomicUsize, Ordering}, memory::Rc, Identity, Scale, Boolean};
 
 mod formation;
 mod operation;
 
 pub use formation::*;
+pub use operation::*;
 
 pub static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -45,7 +47,7 @@ pub struct Transform<'a, 'source, Host, State, Failure> {
         &mut Host,
         &mut State,
     ) -> Result<(), Failure> + 'source>,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Fail<'a, 'source, Host, State, Failure> {
@@ -53,7 +55,7 @@ pub struct Fail<'a, 'source, Host, State, Failure> {
         &mut Host,
         State,
     ) -> Failure + 'source>,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Panic<'a, 'source, Host, State, Failure> {
@@ -61,7 +63,7 @@ pub struct Panic<'a, 'source, Host, State, Failure> {
         &mut Host,
         State,
     ) -> Failure + 'source>,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
@@ -70,7 +72,7 @@ where
     Input: Formable<'a>,
 {
     pub value: Rc<dyn PartialEq<Input> + 'source>,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 #[derive(Clone)]
@@ -79,7 +81,7 @@ where
     Input: Formable<'a>,
 {
     pub function: Rc<dyn Fn(&Input) -> bool + 'source>,
-    pub _marker: PhantomData<&'a ()>,
+    pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Deferred<State> {
@@ -87,20 +89,25 @@ pub struct Deferred<State> {
 }
 
 pub struct Optional<State> {
-    pub classifier: Box<State>,
+    pub state: Box<State>,
 }
 
 pub struct Alternative<State, const SIZE: Scale> {
-    pub patterns: [State; SIZE],
+    pub states: [State; SIZE],
 }
 
 pub struct Sequence<State, const SIZE: Scale> {
-    pub patterns: [State; SIZE],
+    pub states: [State; SIZE],
 }
 
 pub struct Repetition<State> {
-    pub classifier: Box<State>,
+    pub state: Box<State>,
     pub minimum: Scale,
     pub maximum: Option<Scale>,
     pub persist: Boolean,
+}
+
+pub struct Command<'a, 'source, Host, State> {
+    pub runner: Rc<dyn Fn(&mut Host, &mut State) + 'source>,
+    pub phantom: PhantomData<&'a ()>,
 }

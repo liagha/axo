@@ -172,7 +172,7 @@ where
         Self::new(
             Rc::new(Literal {
                 value: Rc::new(value),
-                _marker: Default::default(),
+                phantom: Default::default(),
             }),
             0,
             Position::new(Location::Void),
@@ -187,7 +187,7 @@ where
         Self::new(
             Rc::new(Predicate::<Input> {
                 function: Rc::new(predicate),
-                _marker: Default::default(),
+                phantom: Default::default(),
             }),
             0,
             Position::new(Location::Void),
@@ -198,7 +198,7 @@ where
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
             Rc::new(Alternative {
-                patterns,
+                states: patterns,
             }),
             0,
             Position::new(Location::Void),
@@ -208,7 +208,7 @@ where
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Sequence { patterns }),
+            Rc::new(Sequence { states: patterns }),
             0,
             Position::new(Location::Void),
         )
@@ -218,7 +218,7 @@ where
     pub fn optional(classifier: Self) -> Self {
         Self::new(
             Rc::new(Optional {
-                classifier: Box::new(classifier),
+                state: Box::new(classifier),
             }),
             0,
             Position::new(Location::Void),
@@ -229,7 +229,7 @@ where
     pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
             Rc::new(Repetition {
-                classifier: Box::new(classifier),
+                state: Box::new(classifier),
                 minimum,
                 maximum,
                 persist: true,
@@ -243,7 +243,7 @@ where
     pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
             Rc::new(Repetition {
-                classifier: Box::new(classifier),
+                state: Box::new(classifier),
                 minimum,
                 maximum,
                 persist: false,
@@ -288,7 +288,7 @@ where
     {
         self.with_action(Rc::new(Fail {
             emitter: Rc::new(emitter),
-            _marker: Default::default(),
+            phantom: Default::default(),
         }))
     }
 
@@ -348,7 +348,7 @@ where
     {
         Rc::new(Transform {
             transformer: Rc::new(transformer),
-            _marker: Default::default(),
+            phantom: Default::default(),
         })
     }
 
@@ -359,7 +359,7 @@ where
     {
         Rc::new(Fail {
             emitter: Rc::new(emitter),
-            _marker: Default::default(),
+            phantom: Default::default(),
         })
     }
 
@@ -370,7 +370,7 @@ where
     {
         Rc::new(Panic {
             emitter: Rc::new(emitter),
-            _marker: Default::default(),
+            phantom: Default::default(),
         })
     }
 
@@ -494,7 +494,7 @@ where
         let mut form_used = former.consumed.len();
         let mut form_forms = former.forms.len();
 
-        for pattern in &self.patterns {
+        for pattern in &self.states {
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 classifier.marker,
@@ -713,7 +713,7 @@ where
         let class_used = classifier.consumed.len();
         let class_stack = classifier.stack.len();
 
-        let mut child = classifier.create_child(self.classifier.action.clone());
+        let mut child = classifier.create_child(self.state.action.clone());
         former.build(&mut child);
 
         let effected = child.is_effected();
@@ -764,7 +764,7 @@ where
         let mut forms = Vec::with_capacity(SIZE);
         let mut broke = false;
 
-        for pattern in &self.patterns {
+        for pattern in &self.states {
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 mark,
@@ -866,7 +866,7 @@ where
             let step_stack = stack.len();
 
             let mut child = Classifier::create(
-                self.classifier.action.clone(),
+                self.state.action.clone(),
                 mark,
                 pos,
                 consumed,

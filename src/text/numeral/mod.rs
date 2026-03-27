@@ -289,13 +289,13 @@ impl_numeric_parser_for_float!(f32, "Implementation for f32");
 impl_numeric_parser_for_float!(f64, "Implementation for f64");
 
 pub struct NumberParser<T> {
-    _marker: PhantomData<T>,
+    phantom: PhantomData<T>,
 }
 
 impl<T: NumericParser> NumberParser<T> {
     pub fn new() -> Self {
         Self {
-            _marker: PhantomData,
+            phantom: PhantomData,
         }
     }
 
