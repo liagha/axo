@@ -1,7 +1,7 @@
 use crate::data::{
     memory::Rc,
     sync::{AtomicUsize, Ordering},
-    Boolean, Identity, Scale,
+    Identity, Scale,
 };
 
 mod formation;
@@ -77,15 +77,20 @@ pub struct Optional<State> {
 
 pub struct Alternative<State, const SIZE: Scale> {
     pub states: [State; SIZE],
+    pub halt: fn(&State) -> bool,
+    pub compare: fn(new: &State, old: &State) -> bool,
 }
 
 pub struct Sequence<State, const SIZE: Scale> {
     pub states: [State; SIZE],
+    pub halt: fn(&State) -> bool,
+    pub keep: fn(&State) -> bool,
 }
 
 pub struct Repetition<State> {
     pub state: Box<State>,
     pub minimum: Scale,
     pub maximum: Option<Scale>,
-    pub persist: Boolean,
+    pub halt: fn(&State) -> bool,
+    pub keep: fn(&State) -> bool,
 }

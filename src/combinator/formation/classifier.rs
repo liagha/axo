@@ -205,7 +205,11 @@ where
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Alternative { states: patterns }),
+            Rc::new(Alternative {
+                states: patterns,
+                halt: |state| state.is_aligned() || state.is_panicked(),
+                compare: |new, old| new.is_aligned() && (old.is_failed() || new.marker > old.marker),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -214,7 +218,11 @@ where
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Sequence { states: patterns }),
+            Rc::new(Sequence {
+                states: patterns,
+                halt: |state| !(state.is_aligned() || state.is_ignored()),
+                keep: |state| state.is_aligned(),
+            }),
             0,
             Position::new(Location::Void),
         )
@@ -238,7 +246,8 @@ where
                 state: Box::new(classifier),
                 minimum,
                 maximum,
-                persist: true,
+                halt: |state| state.is_blank() || state.is_ignored(),
+                keep: |state| state.is_effected() || state.is_panicked(),
             }),
             0,
             Position::new(Location::Void),
@@ -252,7 +261,8 @@ where
                 state: Box::new(classifier),
                 minimum,
                 maximum,
-                persist: false,
+                halt: |state| state.is_failed() || state.is_panicked() || state.is_blank(),
+                keep: |state| state.is_aligned(),
             }),
             0,
             Position::new(Location::Void),
@@ -572,14 +582,12 @@ where
                 continue;
             }
 
-            let is_better = match &best {
-                Some(champion) => {
-                    child.is_aligned() && (champion.is_failed() || child.marker > champion.marker)
-                }
+            let better = match &best {
+                Some(champion) => (self.compare)(&child, champion),
                 None => true,
             };
 
-            if is_better {
+            if better {
                 if let Some(champion) = best.take() {
                     current_consumed = champion.consumed;
                     current_stack = champion.stack;
@@ -603,7 +611,7 @@ where
             }
 
             if let Some(ref champion) = best {
-                if champion.is_panicked() || champion.is_aligned() {
+                if (self.halt)(champion) {
                     break;
                 }
             }
@@ -852,34 +860,30 @@ where
 
             former.build(&mut child);
 
-            current_consumed = child.consumed;
-            current_stack = child.stack;
+            let halted = (self.halt)(&child);
+            let kept = (self.keep)(&child);
 
-            match child.outcome {
-                Outcome::Aligned => {
-                    classifier.outcome = child.outcome;
-                    classifier.marker = child.marker;
-                    classifier.position = child.position;
+            current_consumed = take(&mut child.consumed);
+            current_stack = take(&mut child.stack);
+
+            if halted {
+                classifier.outcome = child.outcome;
+                classifier.marker = child.marker;
+                classifier.position = child.position;
+                if kept {
                     forms.push(child.form);
                 }
-                Outcome::Panicked | Outcome::Failed => {
-                    classifier.outcome = child.outcome;
-                    classifier.marker = child.marker;
-                    classifier.position = child.position;
-                    forms.push(child.form);
-                    broke = true;
-                    break;
-                }
-                Outcome::Ignored => {
-                    classifier.marker = child.marker;
-                    classifier.position = child.position;
-                }
-                _ => {
-                    classifier.outcome = child.outcome;
-                    broke = true;
-                    break;
-                }
+                broke = true;
+                break;
             }
+
+            if kept {
+                forms.push(child.form);
+            }
+
+            classifier.outcome = child.outcome;
+            classifier.marker = child.marker;
+            classifier.position = child.position;
         }
 
         classifier.consumed = current_consumed;
@@ -956,10 +960,9 @@ where
 
             former.build(&mut child);
 
-            current_consumed = child.consumed;
-            current_stack = child.stack;
-
             if child.marker == classifier.marker {
+                current_consumed = take(&mut child.consumed);
+                current_stack = take(&mut child.stack);
                 former.consumed.truncate(step_input);
                 former.forms.truncate(step_form);
                 current_consumed.truncate(step_consumed);
@@ -967,58 +970,38 @@ where
                 break;
             }
 
-            if self.persist {
-                match child.outcome {
-                    Outcome::Panicked | Outcome::Aligned | Outcome::Failed => {
-                        classifier.marker = child.marker;
-                        classifier.position = child.position;
-                        forms.push(child.form);
-                    }
-                    Outcome::Ignored => {
-                        former.consumed.truncate(step_input);
-                        former.forms.truncate(step_form);
-                        current_consumed.truncate(step_consumed);
-                        current_stack.truncate(step_stack);
-                        classifier.marker = child.marker;
-                        classifier.position = child.position;
-                    }
-                    _ => {
-                        former.consumed.truncate(step_input);
-                        former.forms.truncate(step_form);
-                        current_consumed.truncate(step_consumed);
-                        current_stack.truncate(step_stack);
-                    }
+            let halted = (self.halt)(&child);
+            let kept = (self.keep)(&child);
+
+            current_consumed = take(&mut child.consumed);
+            current_stack = take(&mut child.stack);
+
+            if halted {
+                classifier.outcome = child.outcome;
+                classifier.marker = child.marker;
+                classifier.position = child.position;
+                if kept {
+                    forms.push(child.form);
+                } else {
+                    former.consumed.truncate(step_input);
+                    former.forms.truncate(step_form);
+                    current_consumed.truncate(step_consumed);
+                    current_stack.truncate(step_stack);
                 }
+                break;
+            }
+
+            if kept {
+                classifier.marker = child.marker;
+                classifier.position = child.position;
+                forms.push(child.form);
             } else {
-                match child.outcome {
-                    Outcome::Panicked | Outcome::Failed => {
-                        classifier.outcome = child.outcome;
-                        classifier.marker = child.marker;
-                        classifier.position = child.position;
-                        forms.push(child.form);
-                        break;
-                    }
-                    Outcome::Aligned => {
-                        classifier.outcome = child.outcome;
-                        classifier.marker = child.marker;
-                        classifier.position = child.position;
-                        forms.push(child.form);
-                    }
-                    Outcome::Ignored => {
-                        former.consumed.truncate(step_input);
-                        former.forms.truncate(step_form);
-                        current_consumed.truncate(step_consumed);
-                        current_stack.truncate(step_stack);
-                        classifier.marker = child.marker;
-                        classifier.position = child.position;
-                    }
-                    _ => {
-                        former.consumed.truncate(step_input);
-                        former.forms.truncate(step_form);
-                        current_consumed.truncate(step_consumed);
-                        current_stack.truncate(step_stack);
-                    }
-                }
+                former.consumed.truncate(step_input);
+                former.forms.truncate(step_form);
+                current_consumed.truncate(step_consumed);
+                current_stack.truncate(step_stack);
+                classifier.marker = child.marker;
+                classifier.position = child.position;
             }
 
             if let Some(max) = self.maximum {
@@ -1032,10 +1015,7 @@ where
         classifier.stack = current_stack;
 
         if forms.len() >= self.minimum as Identity {
-            if self.persist {
-                classifier.set_align();
-            }
-
+            classifier.set_align();
             let group = Form::multiple(
                 forms
                     .into_iter()
@@ -1053,10 +1033,7 @@ where
             former.forms.truncate(origin_form);
             classifier.consumed.truncate(base_consumed);
             classifier.stack.truncate(base_stack);
-
-            if self.persist {
-                classifier.set_empty();
-            }
+            classifier.set_empty();
         }
     }
 }

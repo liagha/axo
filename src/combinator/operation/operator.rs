@@ -1,42 +1,42 @@
-use crate::{
-    combinator::{Formable, Processor},
-    data::memory::PhantomData,
+use {
+    crate::combinator::{Formable, Operation},
+    std::marker::PhantomData,
 };
 
-pub struct Operator<'a, Data, Output, Failure>
+pub struct Operator<'a, Input, Output, Failure>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    pub data: Vec<Data>,
-    pub outputs: Vec<Output>,
-    pub failures: Vec<Failure>,
-    pub phantom: PhantomData<&'a Data>,
+    pub inputs: Input,
+    pub outputs: Output,
+    pub failures: Failure,
+    pub _marker: PhantomData<&'a ()>,
 }
 
-impl<'a, Data, Output, Failure> Operator<'a, Data, Output, Failure>
+impl<'a, Input, Output, Failure> Operator<'a, Input, Output, Failure>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
-    #[inline(always)]
-    pub fn new() -> Self {
+    #[inline]
+    pub const fn new(inputs: Input, outputs: Output, failures: Failure) -> Self {
         Self {
-            data: Vec::new(),
-            outputs: Vec::new(),
-            failures: Vec::new(),
-            phantom: PhantomData,
+            inputs,
+            outputs,
+            failures,
+            _marker: PhantomData,
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn build<'source>(
         &mut self,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
-        let action = processor.action.clone();
-        action.action(self, processor);
+        let action = operation.action.clone();
+        action.action(self, operation);
     }
 }

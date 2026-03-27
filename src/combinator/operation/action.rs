@@ -1,247 +1,280 @@
 use {
     crate::{
         combinator::{
-            Action, Alternative, Formable, Multiple, Operator,
-            Processor, Sequence, Status, Task, Workflow,
+            Action, Alternative, Command, Condition, Formable, Multiple, Operation, Operator,
+            Repetition, Sequence, Status, Trigger,
         },
-        data::{memory::take, Scale},
+        data::{memory::take, Identity, Scale},
     },
-    std::{collections::HashMap, time::SystemTime},
+    std::{process::Command as Terminal, time::SystemTime},
 };
 
-impl<'a, 'source, Data, Output, Failure>
-    Action<'a, Operator<'a, Data, Output, Failure>, Processor<'a, 'source, Data, Output, Failure>>
-    for Task<'a, 'source, Data, Output, Failure>
+impl<'a, 'source, Input, Output, Failure>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Command
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        operator: &mut Operator<'a, Data, Output, Failure>,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        _operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
-        processor.status = Status::Active;
-
-        let run = self.ready(SystemTime::now());
-        if !run {
-            processor.status = Status::Pending;
-            return;
+        let mut terminal = Terminal::new(&self.program);
+        terminal.args(&self.arguments);
+        if let Some(dir) = self.dir.as_deref() {
+            terminal.current_dir(dir);
         }
 
-        let result = self.execute(operator, processor);
-        if result.succeeded() {
-            processor.resolve();
-        } else {
-            processor.reject();
+        match terminal.output() {
+            Ok(outcome) if outcome.status.success() => operation.set_resolve(),
+            _ => operation.set_reject(),
         }
     }
 }
 
-impl<'a, 'source, Data, Output, Failure>
-    Action<'a, Operator<'a, Data, Output, Failure>, Processor<'a, 'source, Data, Output, Failure>>
-    for Workflow<'a, 'source, Data, Output, Failure>
+impl<'a, 'source, Input, Output, Failure>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Trigger<'a, 'source, Input, Output, Failure>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        operator: &mut Operator<'a, Data, Output, Failure>,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
-        processor.status = Status::Active;
-
-        if self.tasks.is_empty() {
-            processor.resolve();
-            return;
-        }
-
-        let mut index_by_id = HashMap::with_capacity(self.tasks.len());
-
-        for (index, task) in self.tasks.iter().enumerate() {
-            if !index_by_id.insert(task.id.clone(), index).is_none() {
-                processor.reject();
-                return;
+        match self.condition {
+            Condition::Always => {}
+            Condition::Time(time) => {
+                if SystemTime::now() < time {
+                    operation.set_pending();
+                    return;
+                }
             }
-        }
-
-        for task in &self.tasks {
-            for dep in &task.depends {
-                if dep == &task.id || !index_by_id.contains_key(dep) {
-                    processor.reject();
+            Condition::Evaluate(function) => {
+                if !function() {
+                    operation.set_pending();
                     return;
                 }
             }
         }
 
-        let mut done = vec![false; self.tasks.len()];
-        let mut success = vec![false; self.tasks.len()];
-        let now = SystemTime::now();
-
-        loop {
-            let mut changed = false;
-
-            for index in 0..self.tasks.len() {
-                if done[index] {
-                    continue;
-                }
-
-                let task = &self.tasks[index];
-
-                if !task.ready(now) {
-                    continue;
-                }
-
-                if !task.depends.iter().all(|dep| {
-                    let dep_index = index_by_id[dep];
-                    success[dep_index]
-                }) {
-                    continue;
-                }
-
-                let result = task.execute(operator, processor);
-                done[index] = true;
-                success[index] = result.succeeded();
-                changed = true;
-
-                if !result.succeeded() && self.fail_fast {
-                    processor.reject();
-                    return;
-                }
-            }
-
-            if !changed {
-                break;
-            }
-        }
-
-        if done.iter().all(|done| *done) {
-            processor.resolve();
-            return;
-        }
-
-        let has_wait = (0..self.tasks.len()).any(|index| {
-            if done[index] {
-                false
-            } else {
-                !self.tasks[index].ready(now)
-            }
-        });
-
-        if has_wait {
-            processor.status = Status::Pending;
-            return;
-        }
-
-        processor.reject();
+        self.action.action(operator, operation);
     }
 }
 
-impl<'a, 'source, Data, Output, Failure>
-    Action<'a, Operator<'a, Data, Output, Failure>, Processor<'a, 'source, Data, Output, Failure>>
-    for Multiple<
-        'a,
-        'source,
-        Operator<'a, Data, Output, Failure>,
-        Processor<'a, 'source, Data, Output, Failure>,
-    >
+impl<'a, 'source, Input, Output, Failure>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Multiple<
+    'a,
+    'source,
+    Operator<'a, Input, Output, Failure>,
+    Operation<'a, 'source, Input, Output, Failure>,
+>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        operator: &mut Operator<'a, Data, Output, Failure>,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
         for step in self.actions.iter() {
-            step.action(operator, processor);
+            step.action(operator, operation);
         }
     }
 }
 
-impl<'a, 'source, Data, Output, Failure, const SIZE: Scale>
-    Action<'a, Operator<'a, Data, Output, Failure>, Processor<'a, 'source, Data, Output, Failure>>
-    for Sequence<Processor<'a, 'source, Data, Output, Failure>, SIZE>
+impl<'a, 'source, Input, Output, Failure, const SIZE: Scale>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Sequence<Operation<'a, 'source, Input, Output, Failure>, SIZE>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        operator: &mut Operator<'a, Data, Output, Failure>,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
-        let mut stack = take(&mut processor.stack);
-        processor.status = Status::Active;
+        let mut current_stack = take(&mut operation.stack);
+        let base_stack = current_stack.len();
+        let mut broke = false;
 
-        for node in &self.states {
-            let mut child = Processor::create(
-                node.action.clone(),
+        for pattern in &self.states {
+            let mut child = Operation::create(
+                pattern.action.clone(),
                 Status::Pending,
-                processor.depth + 1,
-                stack,
+                operation.depth + 1,
+                current_stack,
             );
 
             operator.build(&mut child);
-            stack = child.stack;
 
-            if child.status == Status::Rejected {
-                processor.reject();
-                processor.stack = stack;
-                return;
+            let halted = (self.halt)(&child);
+
+            current_stack = take(&mut child.stack);
+
+            if halted {
+                operation.status = child.status;
+                broke = true;
+                break;
             }
+
+            operation.status = child.status;
         }
 
-        processor.resolve();
-        processor.stack = stack;
+        operation.stack = current_stack;
+
+        if broke {
+            operation.stack.truncate(base_stack);
+        }
     }
 }
 
-impl<'a, 'source, Data, Output, Failure, const SIZE: Scale>
-    Action<'a, Operator<'a, Data, Output, Failure>, Processor<'a, 'source, Data, Output, Failure>>
-    for Alternative<Processor<'a, 'source, Data, Output, Failure>, SIZE>
+impl<'a, 'source, Input, Output, Failure, const SIZE: Scale>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Alternative<Operation<'a, 'source, Input, Output, Failure>, SIZE>
 where
-    Data: Formable<'a>,
+    Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
 {
     #[inline]
     fn action(
         &self,
-        operator: &mut Operator<'a, Data, Output, Failure>,
-        processor: &mut Processor<'a, 'source, Data, Output, Failure>,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
     ) {
-        let stack = take(&mut processor.stack);
-        processor.status = Status::Active;
+        let mut best: Option<Operation<'a, 'source, Input, Output, Failure>> = None;
+        let current_stack = take(&mut operation.stack);
 
-        for node in &self.states {
-            let mut child = Processor::create(
-                node.action.clone(),
+        for pattern in &self.states {
+            let mut child = Operation::create(
+                pattern.action.clone(),
                 Status::Pending,
-                processor.depth + 1,
-                stack.clone(),
+                operation.depth + 1,
+                current_stack.clone(),
             );
 
             operator.build(&mut child);
 
-            if child.status == Status::Resolved {
-                processor.resolve();
-                processor.stack = child.stack;
-                return;
+            if child.is_pending() {
+                best = Some(child);
+                break;
+            }
+
+            let better = match &best {
+                Some(champion) => (self.compare)(&child, champion),
+                None => true,
+            };
+
+            if better {
+                best = Some(child);
+            }
+
+            if let Some(ref champion) = best {
+                if (self.halt)(champion) {
+                    break;
+                }
             }
         }
 
-        processor.reject();
-        processor.stack = stack;
+        match best {
+            Some(mut champion) => {
+                operation.status = champion.status;
+                operation.stack = take(&mut champion.stack);
+            }
+            None => {
+                operation.set_reject();
+                operation.stack = current_stack;
+            }
+        }
+    }
+}
+
+impl<'a, 'source, Input, Output, Failure>
+Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
+for Repetition<Operation<'a, 'source, Input, Output, Failure>>
+where
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
+    #[inline]
+    fn action(
+        &self,
+        operator: &mut Operator<'a, Input, Output, Failure>,
+        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
+    ) {
+        let mut current_stack = take(&mut operation.stack);
+        let base_stack = current_stack.len();
+        let mut count: Identity = 0;
+
+        loop {
+            let step_stack = current_stack.len();
+
+            let mut child = Operation::create(
+                self.state.action.clone(),
+                Status::Pending,
+                operation.depth + 1,
+                current_stack,
+            );
+
+            operator.build(&mut child);
+
+            let halted = (self.halt)(&child);
+            let kept = (self.keep)(&child);
+
+            current_stack = take(&mut child.stack);
+
+            if halted {
+                if child.is_pending() {
+                    operation.status = child.status;
+                    current_stack.truncate(step_stack);
+                    operation.stack = current_stack;
+                    return;
+                }
+                if kept {
+                    count += 1;
+                } else {
+                    current_stack.truncate(step_stack);
+                }
+                break;
+            }
+
+            if kept {
+                count += 1;
+            } else {
+                current_stack.truncate(step_stack);
+            }
+
+            if let Some(max) = self.maximum {
+                if count >= max as Identity {
+                    break;
+                }
+            }
+        }
+
+        operation.stack = current_stack;
+
+        if count >= self.minimum as Identity {
+            operation.set_resolve();
+        } else {
+            operation.stack.truncate(base_stack);
+            operation.set_reject();
+        }
     }
 }
