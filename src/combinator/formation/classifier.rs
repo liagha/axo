@@ -246,7 +246,7 @@ where
                 state: Box::new(classifier),
                 minimum,
                 maximum,
-                halt: |state| state.is_blank() || state.is_ignored(),
+                halt: |state| state.is_blank(),
                 keep: |state| state.is_effected() || state.is_panicked(),
             }),
             0,
@@ -262,7 +262,7 @@ where
                 minimum,
                 maximum,
                 halt: |state| state.is_failed() || state.is_panicked() || state.is_blank(),
-                keep: |state| state.is_aligned(),
+                keep: |state| state.is_aligned() || state.is_failed() || state.is_panicked(),
             }),
             0,
             Position::new(Location::Void),
@@ -869,21 +869,24 @@ where
             current_stack = take(&mut child.stack);
 
             if halted {
-                classifier.outcome = child.outcome;
+                classifier.outcome = child.outcome; // Restore conditional assignment
                 classifier.marker = child.marker;
                 classifier.position = child.position;
-                if kept {
+
+                if child.is_panicked() || child.is_failed() {
                     forms.push(child.form);
                 }
+
                 broke = true;
                 break;
             }
 
             if kept {
+                classifier.outcome = child.outcome; // Restore conditional assignment
                 forms.push(child.form);
             }
 
-            classifier.outcome = child.outcome;
+            // Unconditional position/marker update (but NO unconditional outcome update)
             classifier.marker = child.marker;
             classifier.position = child.position;
         }
@@ -994,6 +997,7 @@ where
             }
 
             if kept {
+                classifier.outcome = child.outcome;
                 classifier.marker = child.marker;
                 classifier.position = child.position;
                 forms.push(child.form);
@@ -1017,7 +1021,10 @@ where
         classifier.stack = current_stack;
 
         if forms.len() >= self.minimum as Identity {
-            classifier.set_align();
+            if !classifier.is_failed() && !classifier.is_panicked() {
+                classifier.set_align();
+            }
+
             let group = Form::multiple(
                 forms
                     .into_iter()
@@ -1035,7 +1042,10 @@ where
             former.forms.truncate(origin_form);
             classifier.consumed.truncate(base_consumed);
             classifier.stack.truncate(base_stack);
-            classifier.set_empty();
+
+            if !classifier.is_failed() && !classifier.is_panicked() {
+                classifier.set_empty();
+            }
         }
     }
 }

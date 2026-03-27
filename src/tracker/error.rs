@@ -64,7 +64,7 @@ impl<'a> Display for ErrorKind<'a> {
             ErrorKind::Unsupported(location) => write!(f, "`{}`, the operation was unsupported.", location),
             ErrorKind::UnExpectedEOF(location) => write!(f, "`{}`, the operation could not be completed because an `end of file` was reached prematurely.", location),
             ErrorKind::OutOfMemory(location) => write!(f, "`{}`, the operation could not be completed, because it failed to allocate enough memory.", location),
-            ErrorKind::UnSupportedInput(location) => write!(f, "the given input `{}` is unsupported.", location),
+            ErrorKind::UnSupportedInput(location) => write!(f, "the given input `{}` isn't supported.", location),
         }
     }
 }
