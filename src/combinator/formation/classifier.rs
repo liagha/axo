@@ -5,7 +5,7 @@ use crate::{
         Multiple, Optional, Panic, Predicate, Repetition, Sequence, Skip, Transform,
     },
     data::{
-        memory::{replace, take, Rc},
+        memory::{replace, take, Arc},
         Identity, Offset, Scale,
     },
     tracker::{Location, Peekable, Position},
@@ -20,7 +20,7 @@ where
 {
     pub identity: Identity,
     pub action:
-        Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+        Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
     pub marker: Offset,
     pub position: Position<'a>,
     pub consumed: Vec<Identity>,
@@ -40,8 +40,8 @@ where
 {
     #[inline]
     pub fn new(
-        action: Rc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        action: Arc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
         position: Position<'a>,
@@ -61,8 +61,8 @@ where
 
     #[inline]
     fn create(
-        action: Rc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        action: Arc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
         position: Position<'a>,
@@ -88,8 +88,8 @@ where
     #[inline]
     fn create_child(
         &mut self,
-        action: Rc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        action: Arc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
     ) -> Self {
         Self {
@@ -176,10 +176,10 @@ where
     }
 
     #[inline]
-    pub fn literal(value: impl PartialEq<Input> + 'source + 'a) -> Self {
+    pub fn literal(value: impl PartialEq<Input> + Send + Sync + 'source + 'a) -> Self {
         Self::new(
-            Rc::new(Literal {
-                value: Rc::new(value),
+            Arc::new(Literal {
+                value: Arc::new(value),
                 phantom: Default::default(),
             }),
             0,
@@ -190,11 +190,11 @@ where
     #[inline]
     pub fn predicate<F>(predicate: F) -> Self
     where
-        F: Fn(&Input) -> bool + 'source + 'a,
+        F: Fn(&Input) -> bool + Send + Sync + 'source + 'a,
     {
         Self::new(
-            Rc::new(Predicate::<Input> {
-                function: Rc::new(predicate),
+            Arc::new(Predicate::<Input> {
+                function: Arc::new(predicate),
                 phantom: Default::default(),
             }),
             0,
@@ -205,7 +205,7 @@ where
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Alternative {
+            Arc::new(Alternative {
                 states: patterns,
                 halt: |state| state.is_aligned() || state.is_panicked(),
                 compare: |new, old| new.is_aligned() && (old.is_failed() || new.marker > old.marker),
@@ -218,7 +218,7 @@ where
     #[inline]
     pub fn sequence<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
         Self::new(
-            Rc::new(Sequence {
+            Arc::new(Sequence {
                 states: patterns,
                 halt: |state| !(state.is_aligned() || state.is_ignored()),
                 keep: |state| state.is_aligned(),
@@ -231,7 +231,7 @@ where
     #[inline]
     pub fn optional(classifier: Self) -> Self {
         Self::new(
-            Rc::new(Optional {
+            Arc::new(Optional {
                 state: Box::new(classifier),
             }),
             0,
@@ -242,7 +242,7 @@ where
     #[inline]
     pub fn persistence(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Rc::new(Repetition {
+            Arc::new(Repetition {
                 state: Box::new(classifier),
                 minimum,
                 maximum,
@@ -257,7 +257,7 @@ where
     #[inline]
     pub fn repetition(classifier: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
         Self::new(
-            Rc::new(Repetition {
+            Arc::new(Repetition {
                 state: Box::new(classifier),
                 minimum,
                 maximum,
@@ -272,7 +272,7 @@ where
     #[inline]
     pub fn deferred(factory: fn() -> Self) -> Self {
         Self::new(
-            Rc::new(Deferred { factory }),
+            Arc::new(Deferred { factory }),
             0,
             Position::new(Location::Void),
         )
@@ -291,12 +291,12 @@ where
     #[inline]
     pub fn with_action(
         mut self,
-        action: Rc<
-            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source,
+        action: Arc<
+            dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
     ) -> Self {
         let actions = vec![self.action.clone(), action];
-        self.action = Rc::new(Multiple { actions });
+        self.action = Arc::new(Multiple { actions });
         self
     }
 
@@ -307,27 +307,27 @@ where
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
-        + 'source,
+        + Send + Sync + 'source,
     {
-        self.with_action(Rc::new(Fail {
-            emitter: Rc::new(emitter),
+        self.with_action(Arc::new(Fail {
+            emitter: Arc::new(emitter),
             phantom: Default::default(),
         }))
     }
 
     #[inline]
     pub fn with_ignore(self) -> Self {
-        self.with_action(Rc::new(Ignore))
+        self.with_action(Arc::new(Ignore))
     }
 
     #[inline]
     pub fn with_multiple(
         self,
         actions: Vec<
-            Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+            Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
         >,
     ) -> Self {
-        self.with_action(Rc::new(Multiple { actions }))
+        self.with_action(Arc::new(Multiple { actions }))
     }
 
     #[inline]
@@ -337,6 +337,8 @@ where
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
+        + Send
+        + Sync
         + 'source,
     {
         self.with_action(Self::panic(emitter))
@@ -344,7 +346,7 @@ where
 
     #[inline]
     pub fn with_skip(self) -> Self {
-        self.with_action(Rc::new(Skip))
+        self.with_action(Arc::new(Skip))
     }
 
     #[inline]
@@ -354,7 +356,7 @@ where
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Result<(), Failure>
-        + 'source,
+        + Send + Sync + 'source,
     {
         self.with_action(Self::transform(transform))
     }
@@ -372,16 +374,16 @@ where
     #[inline]
     pub fn transform<T>(
         transformer: T,
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Result<(), Failure>
-        + 'source,
+        + Send + Sync + 'source,
     {
-        Rc::new(Transform {
-            transformer: Rc::new(transformer),
+        Arc::new(Transform {
+            transformer: Arc::new(transformer),
             phantom: Default::default(),
         })
     }
@@ -389,16 +391,16 @@ where
     #[inline]
     pub fn fail<T>(
         emitter: T,
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
-        + 'source,
+        + Send + Sync + 'source,
     {
-        Rc::new(Fail {
-            emitter: Rc::new(emitter),
+        Arc::new(Fail {
+            emitter: Arc::new(emitter),
             phantom: Default::default(),
         })
     }
@@ -406,42 +408,42 @@ where
     #[inline]
     pub fn panic<T>(
         emitter: T,
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     where
         T: Fn(
             &mut Former<'a, 'source, Source, Input, Output, Failure>,
             Classifier<'a, 'source, Source, Input, Output, Failure>,
         ) -> Failure
-        + 'source,
+        + Send + Sync + 'source,
     {
-        Rc::new(Panic {
-            emitter: Rc::new(emitter),
+        Arc::new(Panic {
+            emitter: Arc::new(emitter),
             phantom: Default::default(),
         })
     }
 
     #[inline]
     pub fn ignore(
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
-        Rc::new(Ignore)
+        Arc::new(Ignore)
     }
 
     #[inline]
     pub fn multiple(
         actions: Vec<
-            Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>,
+            Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
         >,
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
-        Rc::new(Multiple { actions })
+        Arc::new(Multiple { actions })
     }
 
     #[inline]
     pub fn skip(
-    ) -> Rc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + 'source>
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
     {
-        Rc::new(Skip)
+        Arc::new(Skip)
     }
 }
 

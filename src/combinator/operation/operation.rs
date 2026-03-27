@@ -4,7 +4,7 @@ use {
             next_identity, Action, Alternative, Command, Condition, Plan, Multiple, Operator,
             Repetition, Sequence, Transform, Trigger,
         },
-        data::{memory::PhantomData, memory::Rc, Identity, Scale},
+        data::{memory::PhantomData, memory::Arc, Identity, Scale},
         internal::time::{Duration, SystemTime},
     },
 };
@@ -18,7 +18,7 @@ pub enum Status {
 
 pub struct Operation<'source> {
     pub identity: Identity,
-    pub action: Rc<dyn Action<'static, Operator, Self> + 'source>,
+    pub action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>,
     pub status: Status,
     pub depth: Scale,
     pub stack: Vec<Identity>,
@@ -28,7 +28,7 @@ pub struct Operation<'source> {
 
 impl<'source> Operation<'source> {
     #[inline]
-    pub fn new(action: Rc<dyn Action<'static, Operator, Self> + 'source>) -> Self {
+    pub fn new(action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>) -> Self {
         Self {
             identity: next_identity(),
             action,
@@ -43,7 +43,7 @@ impl<'source> Operation<'source> {
     #[inline]
     pub fn create(
         identity: Identity,
-        action: Rc<dyn Action<'static, Operator, Self> + 'source>,
+        action: Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>,
         status: Status,
         depth: Scale,
         stack: Vec<Identity>,
@@ -104,7 +104,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn delay(mut self, duration: Duration) -> Self {
-        self.action = Rc::new(Trigger {
+        self.action = Arc::new(Trigger {
             condition: Condition::Time(SystemTime::now() + duration),
             action: self.action.clone(),
         });
@@ -113,7 +113,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn wait(mut self, time: SystemTime) -> Self {
-        self.action = Rc::new(Trigger {
+        self.action = Arc::new(Trigger {
             condition: Condition::Time(time),
             action: self.action.clone(),
         });
@@ -122,7 +122,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn trigger(mut self, condition: Condition) -> Self {
-        self.action = Rc::new(Trigger {
+        self.action = Arc::new(Trigger {
             condition,
             action: self.action.clone(),
         });
@@ -131,12 +131,12 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn command(command: Command) -> Self {
-        Self::new(Rc::new(command))
+        Self::new(Arc::new(command))
     }
 
     #[inline]
     pub fn sequence<const SIZE: Scale>(states: [Self; SIZE]) -> Self {
-        Self::new(Rc::new(Sequence {
+        Self::new(Arc::new(Sequence {
             states,
             halt: |state| state.is_rejected() || state.is_pending(),
             keep: |state| state.is_resolved(),
@@ -145,7 +145,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn alternative<const SIZE: Scale>(states: [Self; SIZE]) -> Self {
-        Self::new(Rc::new(Alternative {
+        Self::new(Arc::new(Alternative {
             states,
             halt: |state| state.is_resolved() || state.is_pending(),
             compare: |new, old| new.is_resolved() && old.is_rejected(),
@@ -154,7 +154,7 @@ impl<'source> Operation<'source> {
 
     #[inline]
     pub fn repetition(state: Self, minimum: Scale, maximum: Option<Scale>) -> Self {
-        Self::new(Rc::new(Repetition {
+        Self::new(Arc::new(Repetition {
             state: Box::new(state),
             minimum,
             maximum,
@@ -164,20 +164,20 @@ impl<'source> Operation<'source> {
     }
 
     #[inline]
-    pub fn multiple(actions: Vec<Rc<dyn Action<'static, Operator, Self> + 'source>>) -> Self {
-        Self::new(Rc::new(Multiple { actions }))
+    pub fn multiple(actions: Vec<Arc<dyn Action<'static, Operator, Self> + Send + Sync + 'source>>) -> Self {
+        Self::new(Arc::new(Multiple { actions }))
     }
 
     #[inline]
     pub fn plan(states: Vec<Self>) -> Self {
-        Self::new(Rc::new(Plan { states }))
+        Self::new(Arc::new(Plan { states }))
     }
 
     #[inline]
     pub fn map(mut state: Self, transform: fn(Vec<u8>) -> Vec<u8>) -> Self {
         let action = state.action.clone();
-        state.action = Rc::new(Transform::<'static, 'source, Operator, Self, ()> {
-            transformer: Rc::new(move |operator, operation| {
+        state.action = Arc::new(Transform::<'static, 'source, Operator, Self, ()> {
+            transformer: Arc::new(move |operator, operation| {
                 action.action(operator, operation);
                 if let Status::Resolved(data) = &operation.status {
                     operation.status = Status::Resolved(transform(data.clone()));

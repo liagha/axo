@@ -1,5 +1,5 @@
 use crate::data::{
-    memory::Rc,
+    memory::Arc,
     sync::{AtomicUsize, Ordering},
     Identity, Scale,
 };
@@ -22,12 +22,12 @@ pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> +
 
 impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
 
-pub trait Action<'a, Host, State> {
+pub trait Action<'a, Host, State>: Send + Sync {
     fn action(&self, host: &mut Host, state: &mut State);
 }
 
 pub struct Multiple<'a, 'source, Host, State> {
-    pub actions: Vec<Rc<dyn Action<'a, Host, State> + 'source>>,
+    pub actions: Vec<Arc<dyn Action<'a, Host, State> + Send + Sync + 'source>>,
 }
 
 pub struct Ignore;
@@ -35,17 +35,17 @@ pub struct Ignore;
 pub struct Skip;
 
 pub struct Transform<'a, 'source, Host, State, Failure> {
-    pub transformer: Rc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + 'source>,
+    pub transformer: Arc<dyn Fn(&mut Host, &mut State) -> Result<(), Failure> + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Fail<'a, 'source, Host, State, Failure> {
-    pub emitter: Rc<dyn Fn(&mut Host, State) -> Failure + 'source>,
+    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
 pub struct Panic<'a, 'source, Host, State, Failure> {
-    pub emitter: Rc<dyn Fn(&mut Host, State) -> Failure + 'source>,
+    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
@@ -54,7 +54,7 @@ pub struct Literal<'a, 'source, Input>
 where
     Input: Formable<'a>,
 {
-    pub value: Rc<dyn PartialEq<Input> + 'source>,
+    pub value: Arc<dyn PartialEq<Input> + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 
@@ -63,7 +63,7 @@ pub struct Predicate<'a, 'source, Input>
 where
     Input: Formable<'a>,
 {
-    pub function: Rc<dyn Fn(&Input) -> bool + 'source>,
+    pub function: Arc<dyn Fn(&Input) -> bool + Send + Sync + 'source>,
     pub phantom: PhantomData<&'a ()>,
 }
 

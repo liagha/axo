@@ -314,7 +314,7 @@ impl<'session> Session<'session> {
                      kind: TokenKind::Integer(_),
                      ..
                  }) => Some(Stencil::default()),
-            _ => None,
+            _ => Some(Stencil::default()),
         }
     }
 

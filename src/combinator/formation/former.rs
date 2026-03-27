@@ -91,7 +91,7 @@ pub mod outcome {
 use crate::{
     combinator::{Action, Classifier, Form, Formable},
     data::{
-        memory::{replace, Rc},
+        memory::{replace, Arc},
         Identity, Offset,
     },
     internal::hash::Map,
@@ -100,12 +100,12 @@ use crate::{
 
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
-    Rc<
+    Arc<
         dyn Action<
                 'a,
                 Former<'a, 'source, Source, Input, Output, Failure>,
                 Classifier<'a, 'source, Source, Input, Output, Failure>,
-            > + 'source,
+            > + Send + Sync + 'source,
     >,
 )>;
 

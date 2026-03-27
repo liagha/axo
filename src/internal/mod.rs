@@ -40,7 +40,7 @@ pub mod platform {
             Command, Stdio,
         },
         ptr::{null, NonNull},
-        thread::sleep,
+        thread::{sleep, scope},
         sync::OnceLock,
     };
 }

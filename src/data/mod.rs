@@ -66,7 +66,7 @@ pub mod memory {
         marker::PhantomData,
         mem::{discriminant, replace, swap, take},
     };
-    pub use std::rc::Rc;
+    pub use std::sync::Arc;
 }
 
 pub mod slice {
