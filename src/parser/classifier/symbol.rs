@@ -347,6 +347,29 @@ impl<'a> Parser<'a> {
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
+                        matches!(
+                            token.kind, 
+                            TokenKind::Operator(
+                                OperatorKind::Composite(ref operator)
+                            ) if operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        )
+                    }).with_transform(|former, classifier| {
+                        let form = former.forms.get_mut(classifier.form).unwrap();
+                        let span = form.unwrap_input().span();
+                        
+                        *form = Form::output(Element::new(
+                            ElementKind::literal(
+                                Token::new(
+                                    TokenKind::Identifier(Str::from("Variadic")),
+                                    span
+                                )
+                            ),
+                            span,
+                        ));
+                        
+                        Ok(())
+                    }),
+                    Classifier::predicate(|token: &Token| {
                         matches!(token.kind, TokenKind::Identifier(_))
                     })
                     .with_transform(|former, classifier| {
@@ -408,7 +431,7 @@ impl<'a> Parser<'a> {
                 let keyword = sequence[0].unwrap_input().clone();
                 let name = sequence[1].unwrap_output().clone();
                 let invoke = sequence[2].unwrap_output().clone();
-                let return_type = sequence[3].unwrap_output().clone();
+                let output = sequence[3].unwrap_output().clone();
 
                 let body = if sequence.len() > 4 {
                     Some(Box::new(sequence[4].unwrap_output().clone()))
@@ -428,6 +451,7 @@ impl<'a> Parser<'a> {
 
                 let mut visibility = Visibility::Private;
                 let mut interface = Interface::Axo;
+                let mut variadic = false;
 
                 let members: Vec<_> = Self::get_body(invoke.clone())
                     .into_iter()
@@ -443,6 +467,7 @@ impl<'a> Parser<'a> {
                                 "C" => interface = Interface::C,
                                 "Axo" => interface = Interface::Axo,
                                 "Compiler" => interface = Interface::Compiler,
+                                "Variadic" => variadic = true,
                                 _ => {}
                             }
                             None
@@ -454,7 +479,7 @@ impl<'a> Parser<'a> {
                 let span = if let Some(ref b) = body {
                     Span::merge(&keyword.span(), &b.span())
                 } else {
-                    Span::merge(&keyword.span(), &return_type.span())
+                    Span::merge(&keyword.span(), &output.span())
                 };
 
                 *form = Form::output(Element::new(
@@ -463,9 +488,10 @@ impl<'a> Parser<'a> {
                             Box::new(name),
                             members,
                             body,
-                            Some(Box::new(return_type)),
+                            Some(Box::new(output)),
                             interface,
                             entry,
+                            variadic,
                         )),
                         span,
                         visibility,
@@ -481,6 +507,29 @@ impl<'a> Parser<'a> {
                 Classifier::deferred(Self::literal),
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
+                    Classifier::predicate(|token: &Token| {
+                        matches!(
+                            token.kind, 
+                            TokenKind::Operator(
+                                OperatorKind::Composite(ref operator)
+                            ) if operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        )
+                    }).with_transform(|former, classifier| {
+                        let form = former.forms.get_mut(classifier.form).unwrap();
+                        let span = form.unwrap_input().span();
+
+                        *form = Form::output(Element::new(
+                            ElementKind::literal(
+                                Token::new(
+                                    TokenKind::Identifier(Str::from("Variadic")),
+                                    span
+                                )
+                            ),
+                            span,
+                        ));
+
+                        Ok(())
+                    }),
                     Classifier::predicate(|token: &Token| {
                         matches!(token.kind, TokenKind::Identifier(_))
                     })
@@ -523,6 +572,7 @@ impl<'a> Parser<'a> {
 
                 let mut visibility = Visibility::Private;
                 let mut interface = Interface::Axo;
+                let mut variadic = false;
 
                 let members: Vec<_> = Self::get_body(invoke.clone())
                     .into_iter()
@@ -538,6 +588,7 @@ impl<'a> Parser<'a> {
                                 "C" => interface = Interface::C,
                                 "Axo" => interface = Interface::Axo,
                                 "Compiler" => interface = Interface::Compiler,
+                                "Variadic" => variadic = true,
                                 _ => {}
                             }
                             None
@@ -561,6 +612,7 @@ impl<'a> Parser<'a> {
                             None::<Box<Element<'a>>>,
                             interface,
                             entry,
+                            variadic,
                         )),
                         span,
                         visibility,

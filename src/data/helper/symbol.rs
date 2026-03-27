@@ -41,6 +41,7 @@ pub struct Function<Target, Parameter, Body, Output> {
     pub output: Output,
     pub interface: Interface,
     pub entry: Boolean,
+    pub variadic: Boolean,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -82,6 +83,7 @@ impl<Target, Parameter, Body, Output> Function<Target, Parameter, Body, Output> 
         output: Output,
         interface: Interface,
         entry: Boolean,
+        variadic: Boolean,
     ) -> Self {
         Function {
             target,
@@ -90,6 +92,7 @@ impl<Target, Parameter, Body, Output> Function<Target, Parameter, Body, Output> 
             output,
             interface,
             entry,
+            variadic,
         }
     }
 }
@@ -190,6 +193,7 @@ impl<Target: Encode, Parameter: Encode, Body: Encode, Output: Encode> Encode
         self.output.encode(buffer);
         self.interface.encode(buffer);
         self.entry.encode(buffer);
+        self.variadic.encode(buffer);
     }
 }
 
@@ -209,6 +213,7 @@ impl<
             output: Output::decode(buffer, cursor),
             interface: Interface::decode(buffer, cursor),
             entry: Boolean::decode(buffer, cursor),
+            variadic: Boolean::decode(buffer, cursor),
         }
     }
 }
@@ -333,6 +338,7 @@ impl<Target: Clone, Parameter: Clone, Body: Clone, Output: Clone> Clone
             self.output.clone(),
             self.interface.clone(),
             self.entry.clone(),
+            self.variadic.clone(),
         )
     }
 }

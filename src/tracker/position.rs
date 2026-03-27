@@ -252,6 +252,7 @@ impl<'location> Decode<'location> for Location<'location> {
     fn decode(buffer: &'location [u8], cursor: &mut usize) -> Self {
         let tag = buffer[*cursor];
         *cursor += 1;
+
         match tag {
             0 => Location::Entry(Str::decode(buffer, cursor)),
             1 => Location::Void,

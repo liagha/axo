@@ -124,6 +124,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     output,
                     function.interface,
                     function.entry,
+                    function.variadic,
                 );
 
                 AnalysisKind::Function(analyzed)

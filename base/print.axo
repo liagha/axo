@@ -6,4 +6,3 @@ func print_character(C, const character: UInt8)
 func print_newline(C)
 func print_hexadecimal(C, const value: Int64)
 func print_pointer(C, const pointer: *UInt8)
-

@@ -155,8 +155,8 @@ impl<'backend> Generator<'backend> {
         };
 
         let signature = match output {
-            Some(layout) => layout.fn_type(&parameters, false),
-            None => self.context.void_type().fn_type(&parameters, false),
+            Some(layout) => layout.fn_type(&parameters, function.variadic),
+            None => self.context.void_type().fn_type(&parameters, function.variadic),
         };
 
         let name = function.target.as_str().unwrap_or("function");
