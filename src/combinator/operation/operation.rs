@@ -1,8 +1,8 @@
 use {
     crate::{
         combinator::{
-            next_identity, Action, Alternative, Command, Condition, Formable, Multiple, Operator,
-            Repetition, Sequence, Trigger,
+            next_identity, Action, Alternative, Command, Condition, Multiple, Operator, Repetition,
+            Sequence, Trigger,
         },
         data::{memory::Rc, Identity, Scale},
     },
@@ -16,29 +16,17 @@ pub enum Status {
     Rejected,
 }
 
-pub struct Operation<'a: 'source, 'source, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+pub struct Operation<'source> {
     pub identity: Identity,
-    pub action: Rc<dyn Action<'a, Operator<'a, Input, Output, Failure>, Self> + 'source>,
+    pub action: Rc<dyn Action<'static, Operator, Self> + 'source>,
     pub status: Status,
     pub depth: Scale,
     pub stack: Vec<Identity>,
 }
 
-impl<'a: 'source, 'source, Input, Output, Failure> Operation<'a, 'source, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+impl<'source> Operation<'source> {
     #[inline]
-    pub fn new(
-        action: Rc<dyn Action<'a, Operator<'a, Input, Output, Failure>, Self> + 'source>,
-    ) -> Self {
+    pub fn new(action: Rc<dyn Action<'static, Operator, Self> + 'source>) -> Self {
         Self {
             identity: next_identity(),
             action,
@@ -50,7 +38,7 @@ where
 
     #[inline]
     pub fn create(
-        action: Rc<dyn Action<'a, Operator<'a, Input, Output, Failure>, Self> + 'source>,
+        action: Rc<dyn Action<'static, Operator, Self> + 'source>,
         status: Status,
         depth: Scale,
         stack: Vec<Identity>,
@@ -65,10 +53,7 @@ where
     }
 
     #[inline]
-    pub fn execute(
-        &mut self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-    ) -> Status {
+    pub fn execute(&mut self, operator: &mut Operator) -> Status {
         operator.execute(self)
     }
 
@@ -164,9 +149,7 @@ where
     }
 
     #[inline]
-    pub fn multiple(
-        actions: Vec<Rc<dyn Action<'a, Operator<'a, Input, Output, Failure>, Self> + 'source>>,
-    ) -> Self {
+    pub fn multiple(actions: Vec<Rc<dyn Action<'static, Operator, Self> + 'source>>) -> Self {
         Self::new(Rc::new(Multiple { actions }))
     }
 }

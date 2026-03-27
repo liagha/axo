@@ -1,50 +1,24 @@
 use {
-    crate::combinator::{Formable, Operation, Status},
-    std::{marker::PhantomData, thread, time::Duration},
+    crate::combinator::{Operation, Status},
+    std::{thread, time::Duration},
 };
 
-pub struct Operator<'a, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
-    pub inputs: Input,
-    pub outputs: Output,
-    pub failures: Failure,
-    pub phantom: PhantomData<&'a ()>,
-}
+pub struct Operator;
 
-impl<'a, Input, Output, Failure> Operator<'a, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+impl Operator {
     #[inline]
-    pub const fn new(inputs: Input, outputs: Output, failures: Failure) -> Self {
-        Self {
-            inputs,
-            outputs,
-            failures,
-            phantom: PhantomData,
-        }
+    pub const fn new() -> Self {
+        Self {}
     }
 
     #[inline]
-    pub fn build<'source>(
-        &mut self,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    pub fn build<'source>(&mut self, operation: &mut Operation<'source>) {
         let action = operation.action.clone();
         action.action(self, operation);
     }
 
     #[inline]
-    pub fn execute<'source>(
-        &mut self,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) -> Status {
+    pub fn execute<'source>(&mut self, operation: &mut Operation<'source>) -> Status {
         loop {
             self.build(operation);
 

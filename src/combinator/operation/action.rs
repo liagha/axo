@@ -1,55 +1,33 @@
 use {
     crate::{
         combinator::{
-            Action, Alternative, Command, Condition, Formable, Multiple, Operation, Operator,
-            Repetition, Sequence, Status, Trigger,
+            Action, Alternative, Command, Condition, Multiple, Operation, Operator, Repetition,
+            Sequence, Status, Trigger,
         },
         data::{memory::take, Identity, Scale},
     },
     std::{process::Command as Terminal, time::SystemTime},
 };
 
-impl<'a, 'source, Input, Output, Failure>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Command
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+impl<'source> Action<'static, Operator, Operation<'source>> for Command {
     #[inline]
-    fn action(
-        &self,
-        _operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    fn action(&self, _operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut terminal = Terminal::new(&self.program);
         terminal.args(&self.arguments);
         if let Some(dir) = self.directory.as_deref() {
             terminal.current_dir(dir);
         }
 
-        match terminal.output() {
-            Ok(outcome) if outcome.status.success() => operation.set_resolve(),
+        match terminal.status() {
+            Ok(status) if status.success() => operation.set_resolve(),
             _ => operation.set_reject(),
         }
     }
 }
 
-impl<'a, 'source, Input, Output, Failure>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Trigger<'a, 'source, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+impl<'source> Action<'static, Operator, Operation<'source>> for Trigger<'source> {
     #[inline]
-    fn action(
-        &self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         match self.condition {
             Condition::Always => {}
             Condition::Time(time) => {
@@ -70,45 +48,22 @@ where
     }
 }
 
-impl<'a, 'source, Input, Output, Failure>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Multiple<
-    'a,
-    'source,
-    Operator<'a, Input, Output, Failure>,
-    Operation<'a, 'source, Input, Output, Failure>,
->
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
+impl<'source> Action<'static, Operator, Operation<'source>>
+for Multiple<'static, 'source, Operator, Operation<'source>>
 {
     #[inline]
-    fn action(
-        &self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         for step in self.actions.iter() {
             step.action(operator, operation);
         }
     }
 }
 
-impl<'a, 'source, Input, Output, Failure, const SIZE: Scale>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Sequence<Operation<'a, 'source, Input, Output, Failure>, SIZE>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
+impl<'source, const SIZE: Scale> Action<'static, Operator, Operation<'source>>
+for Sequence<Operation<'source>, SIZE>
 {
     #[inline]
-    fn action(
-        &self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut current_stack = take(&mut operation.stack);
         let base_stack = current_stack.len();
         let mut broke = false;
@@ -144,21 +99,12 @@ where
     }
 }
 
-impl<'a, 'source, Input, Output, Failure, const SIZE: Scale>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Alternative<Operation<'a, 'source, Input, Output, Failure>, SIZE>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
+impl<'source, const SIZE: Scale> Action<'static, Operator, Operation<'source>>
+for Alternative<Operation<'source>, SIZE>
 {
     #[inline]
-    fn action(
-        &self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
-        let mut best: Option<Operation<'a, 'source, Input, Output, Failure>> = None;
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
+        let mut best: Option<Operation<'source>> = None;
         let current_stack = take(&mut operation.stack);
 
         for pattern in &self.states {
@@ -205,20 +151,9 @@ where
     }
 }
 
-impl<'a, 'source, Input, Output, Failure>
-Action<'a, Operator<'a, Input, Output, Failure>, Operation<'a, 'source, Input, Output, Failure>>
-for Repetition<Operation<'a, 'source, Input, Output, Failure>>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+impl<'source> Action<'static, Operator, Operation<'source>> for Repetition<Operation<'source>> {
     #[inline]
-    fn action(
-        &self,
-        operator: &mut Operator<'a, Input, Output, Failure>,
-        operation: &mut Operation<'a, 'source, Input, Output, Failure>,
-    ) {
+    fn action(&self, operator: &mut Operator, operation: &mut Operation<'source>) {
         let mut current_stack = take(&mut operation.stack);
         let base_stack = current_stack.len();
         let mut count: Identity = 0;

@@ -1,5 +1,8 @@
 extern crate core;
 
+use std::time::{Duration, SystemTime};
+use crate::combinator::Condition;
+
 #[cfg(feature = "combinator")]
 pub mod combinator;
 #[cfg(feature = "generator")]

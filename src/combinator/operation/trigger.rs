@@ -1,6 +1,6 @@
 use {
     crate::{
-        combinator::{Action, Formable, Operation, Operator},
+        combinator::{Action, Operation, Operator},
         data::memory::Rc,
     },
     std::time::SystemTime,
@@ -13,18 +13,7 @@ pub enum Condition {
     Evaluate(fn() -> bool),
 }
 
-pub struct Trigger<'a, 'source, Input, Output, Failure>
-where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
-{
+pub struct Trigger<'source> {
     pub condition: Condition,
-    pub action: Rc<
-        dyn Action<
-            'a,
-            Operator<'a, Input, Output, Failure>,
-            Operation<'a, 'source, Input, Output, Failure>,
-        > + 'source,
-    >,
+    pub action: Rc<dyn Action<'static, Operator, Operation<'source>> + 'source>,
 }
