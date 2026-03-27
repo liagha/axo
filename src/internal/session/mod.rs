@@ -10,11 +10,12 @@ use {
         internal::{
             cache::{Decode, Encode},
             hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::{read, read_to_string, write},
+            platform::{read, read_to_string, write, create_dir_all},
             timer::Duration,
         },
         parser::{Element, ElementKind, Parser, Symbol, SymbolKind, Visibility},
         resolver::{Resolvable, Scope},
+        interpreter::{Machine, Translator},
         scanner::{Scanner, Token, TokenKind},
         tracker::{Location, Peekable, Span},
     },
@@ -25,19 +26,19 @@ use {
 use {
     crate::{
         generator::Backend,
-        internal::platform::{create_dir_all, Command},
+        internal::platform::{Command},
         tracker::{error::ErrorKind as TrackErrorKind, TrackError},
     },
     inkwell::targets::TargetMachine,
 };
 
 impl<'session> Session<'session> {
-    const PIPELINE: [fn(&mut Session<'session>); 6] = [
+    const PIPELINE: [fn(&mut Session<'session>); 5] = [
         Self::prepare,
         Self::scan,
         Self::parse,
         Self::populate,
-        Self::resolve,
+        //Self::resolve,
         Self::analyze,
     ];
 
@@ -75,6 +76,8 @@ impl<'session> Session<'session> {
                 }
             }
 
+            self.interpret();
+
             #[cfg(feature = "generator")]
             self.generate();
             if !self.errors.is_empty() {
@@ -108,6 +111,7 @@ impl<'session> Session<'session> {
                 CompileError::Parse(error) => self.report_error(error),
                 CompileError::Resolve(error) => self.report_error(error),
                 CompileError::Analyze(error) => self.report_error(error),
+                CompileError::Interpret(error) => self.report_error(error),
                 #[cfg(feature = "generator")]
                 CompileError::Generate(error) => self.report_error(error),
                 CompileError::Track(error) => self.report_error(error),
@@ -501,6 +505,46 @@ impl<'session> Session<'session> {
 
         let duration = Duration::from_nanos(self.timer.lap().unwrap());
         self.report_finish("analyzing", duration, self.errors.len() - initial);
+    }
+
+    pub fn interpret(&mut self) {
+        let initial = self.errors.len();
+
+        self.report_start("interpreting");
+
+        let mut keys: Vec<_> = self
+            .records
+            .iter()
+            .filter_map(|(&key, record)| {
+                if record.kind == InputKind::Source && record.module.is_some() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        keys.sort();
+
+        let mut translator = Translator::new();
+
+        for &key in &keys {
+            if let Some(analyses) = self.records.get(&key).unwrap().analyses.clone() {
+                for analysis in analyses {
+                    translator.walk(analysis);
+                }
+            }
+        }
+
+        let mut machine = Machine::new(translator.code, 1024, vec![]);
+
+        if let Err(error) = machine.run() {
+            self.errors.push(
+                CompileError::Interpret(error.clone())
+            );
+        }
+
+        let duration = Duration::from_nanos(self.timer.lap().unwrap());
+        self.report_finish("interpreting", duration, self.errors.len() - initial);
     }
 
     #[cfg(feature = "generator")]

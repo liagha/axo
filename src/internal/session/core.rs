@@ -9,6 +9,7 @@ use {
             platform::{read_dir, PathBuf},
             timer::{DefaultTimer, Duration},
         },
+        interpreter::InterpretError,
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
         reporter::Error,
         resolver::{ResolveError, Resolver},
@@ -24,7 +25,7 @@ use {
     inkwell::context::{Context, ContextRef},
 };
 
-pub const RUNTIME: &[&str] = &[
+pub const BASE: &[&str] = &[
     "./base/cast.axo",
     "./base/cast.c",
     "./base/file.axo",
@@ -80,6 +81,7 @@ pub enum CompileError<'error> {
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Analyze(AnalyzeError<'error>),
+    Interpret(InterpretError<'error>),
     #[cfg(feature = "generator")]
     Generate(GenerateError<'error>),
     Track(TrackError<'error>),
@@ -194,7 +196,7 @@ impl<'session> Session<'session> {
         });
 
         if !bare {
-            for path in RUNTIME {
+            for path in BASE {
                 if let Some(kind) = InputKind::from_path(path) {
                     let string = path.to_string();
                     let location = Location::Entry(Str::from(string.clone()));
