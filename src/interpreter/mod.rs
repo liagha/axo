@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::{
     analyzer::{Analysis, AnalysisKind},
-    data::Str,
 };
 
 #[derive(Clone, PartialEq, Debug)]

@@ -6,7 +6,7 @@ use {
         initializer::{InitializeError, Initializer},
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
-            platform::{create_dir_all, read_dir, PathBuf},
+            platform::{read_dir, PathBuf},
             timer::{DefaultTimer, Duration},
         },
         parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
