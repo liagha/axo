@@ -1,6 +1,16 @@
 mod session;
 
 pub use session::Session;
+use crate::analyzer::AnalyzeError;
+use crate::generator::GenerateError;
+use crate::initializer::InitializeError;
+use crate::interpreter::InterpretError;
+use crate::parser::ParseError;
+use crate::resolver::ResolveError;
+use crate::scanner::ScanError;
+use crate::tracker::TrackError;
+
+pub use session::InputKind;
 
 pub mod cache;
 pub mod time;
@@ -41,6 +51,18 @@ pub mod platform {
         },
         ptr::{null, NonNull},
         thread::{sleep, scope},
-        sync::OnceLock,
+        sync::{RwLock as Lock},
     };
+}
+
+pub enum CompileError<'error> {
+    Initialize(InitializeError<'error>),
+    Scan(ScanError<'error>),
+    Parse(ParseError<'error>),
+    Resolve(ResolveError<'error>),
+    Analyze(AnalyzeError<'error>),
+    Interpret(InterpretError<'error>),
+    #[cfg(feature = "generator")]
+    Generate(GenerateError<'error>),
+    Track(TrackError<'error>),
 }

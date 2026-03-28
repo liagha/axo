@@ -1,28 +1,25 @@
 use {
     crate::{
-        analyzer::{Analysis, AnalyzeError},
+        analyzer::{Analysis},
         data::{
             *,
         },
         format::{Display, Show, Stencil},
-        initializer::{InitializeError, Initializer},
+        initializer::{Initializer},
         internal::{
             hash::{DefaultHasher, Hash, Hasher, Map},
             platform::{read_dir, PathBuf},
             time::{DefaultTimer, Duration},
         },
-        interpreter::InterpretError,
-        parser::{Element, ElementKind, ParseError, Symbol, SymbolKind, Visibility},
+        parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
         reporter::Error,
-        resolver::{ResolveError, Resolver},
-        scanner::{ScanError, Token, TokenKind},
+        resolver::{Resolver},
+        scanner::{Token, TokenKind},
         tracker::{self, Location, Span, TrackError},
     },
     broccli::{xprintln, Color},
 };
-
-#[cfg(feature = "generator")]
-use crate::generator::GenerateError;
+use crate::internal::CompileError;
 
 pub const BASE: &[&str] = &[
     "./base/cast.axo",
@@ -72,18 +69,6 @@ impl InputKind {
             InputKind::C => "c",
         }
     }
-}
-
-pub enum CompileError<'error> {
-    Initialize(InitializeError<'error>),
-    Scan(ScanError<'error>),
-    Parse(ParseError<'error>),
-    Resolve(ResolveError<'error>),
-    Analyze(AnalyzeError<'error>),
-    Interpret(InterpretError<'error>),
-    #[cfg(feature = "generator")]
-    Generate(GenerateError<'error>),
-    Track(TrackError<'error>),
 }
 
 pub struct Record<'session> {

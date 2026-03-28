@@ -9,36 +9,37 @@ use {
             memory::Arc,
             Str,
         },
-        format::Show,
         internal::{
             cache::{Decode, Encode},
-            platform::{create_dir_all, read, write},
+            platform::{create_dir_all, read, write, Lock},
             time::Duration,
         },
         parser::Element,
         scanner::Token,
         tracker::{Peekable, Span},
     },
-    broccli::Color,
-    std::sync::RwLock,
 };
-
+use crate::analyzer::AnalyzeAction;
+use crate::internal::CompileError;
 #[cfg(feature = "generator")]
 use crate::internal::platform::Command;
+use crate::parser::ParseAction;
+use crate::resolver::ResolveAction;
+use crate::scanner::ScanAction;
 
 pub struct PrepareAction;
 
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for PrepareAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
@@ -116,14 +117,14 @@ pub struct PopulateAction;
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for PopulateAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
         use crate::{
@@ -179,417 +180,19 @@ Action<
     }
 }
 
-pub struct ScanAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
-> for ScanAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
-    ) -> () {
-        let mut session = operator.store.write().unwrap();
-        use crate::scanner::Scanner;
-
-        let initial = session.errors.len();
-        session.report_start("scanning");
-
-        let mut keys: Vec<_> = session.records.keys().copied().collect();
-        keys.sort();
-
-        for key in keys {
-            let (kind, hash, dirty, location) = {
-                let record = session.records.get(&key).unwrap();
-                (
-                    record.kind.clone(),
-                    record.hash,
-                    record.dirty,
-                    record.location,
-                )
-            };
-
-            if kind != InputKind::Source {
-                continue;
-            }
-
-            if !dirty {
-                if let Some(tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
-                    session.records.get_mut(&key).unwrap().tokens = Some(tokens);
-                    continue;
-                }
-            }
-
-            let mut scanner = Scanner::new(location);
-            scanner.prepare();
-            scanner.scan();
-
-            if let Some(stencil) = session.get_stencil() {
-                session.report_section(
-                    "Tokens",
-                    Color::Cyan,
-                    scanner.output.format(stencil).to_string(),
-                );
-            }
-
-            session.errors.extend(
-                scanner
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Scan(error.clone())),
-            );
-
-            session.records.get_mut(&key).unwrap().tokens =
-                session.cache("tokens", hash, Some(scanner.output));
-        }
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
-        session.report_finish("scanning", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
-pub struct ParseAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
-> for ParseAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
-    ) -> () {
-        let mut session = operator.store.write().unwrap();
-        use crate::parser::Parser;
-
-        let initial = session.errors.len();
-        session.report_start("parsing");
-
-        let mut keys: Vec<_> = session.records.keys().copied().collect();
-        keys.sort();
-
-        for key in keys {
-            let (kind, hash, dirty, location, tokens) = {
-                let record = session.records.get(&key).unwrap();
-                (
-                    record.kind.clone(),
-                    record.hash,
-                    record.dirty,
-                    record.location,
-                    record.tokens.clone(),
-                )
-            };
-
-            if kind != InputKind::Source {
-                continue;
-            }
-
-            if !dirty {
-                if let Some(elements) = session.cache::<Vec<Element>>("elements", hash, None) {
-                    session.records.get_mut(&key).unwrap().elements = Some(elements);
-                    continue;
-                }
-            }
-
-            let mut parser = Parser::new(location);
-            parser.set_input(tokens.unwrap());
-            parser.parse();
-
-            if let Some(stencil) = session.get_stencil() {
-                session.report_section(
-                    "Elements",
-                    Color::Cyan,
-                    parser.output.format(stencil).to_string(),
-                );
-            }
-
-            session.errors.extend(
-                parser
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Parse(error.clone())),
-            );
-
-            session.records.get_mut(&key).unwrap().elements =
-                session.cache("elements", hash, Some(parser.output));
-        }
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
-        session.report_finish("parsing", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
-pub struct ResolveAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
-> for ResolveAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
-    ) -> () {
-        let mut guard = operator.store.write().unwrap();
-        let session = &mut *guard;
-
-        use crate::{
-            data::memory::replace,
-            resolver::{Resolvable, Scope},
-        };
-
-        let initial = session.errors.len();
-        session.report_start("resolving");
-
-        let mut keys: Vec<_> = session
-            .records
-            .iter()
-            .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        keys.sort();
-
-        for &key in &keys {
-            let target = session.records.get(&key).unwrap().module.unwrap();
-            let mut module = session.resolver.get_symbol(target).unwrap().clone();
-            let scope = replace(&mut module.scope, Scope::new(None));
-
-            session.resolver.enter_scope(scope);
-
-            let elements = session
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
-
-            for element in elements.iter_mut() {
-                element.declare(&mut session.resolver);
-            }
-
-            let active = session.resolver.active;
-            session.resolver.exit();
-
-            module.scope = session.resolver.scopes.remove(&active).unwrap();
-            session.resolver.insert(module);
-        }
-
-        if let Some(stencil) = session.get_stencil() {
-            session.report_section(
-                "Symbols",
-                Color::Blue,
-                session
-                    .resolver
-                    .collect()
-                    .iter()
-                    .map(|symbol| {
-                        let children = symbol
-                            .scope
-                            .symbols
-                            .iter()
-                            .filter_map(|identity| session.resolver.get_symbol(*identity))
-                            .collect::<Vec<_>>()
-                            .format(stencil.clone())
-                            .to_string();
-
-                        format!(
-                            "{}\n{}\n",
-                            symbol.format(stencil.clone()),
-                            children.indent(stencil.clone())
-                        )
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            )
-        }
-
-        for &key in &keys {
-            let target = session.records.get(&key).unwrap().module.unwrap();
-            let mut module = session.resolver.get_symbol(target).unwrap().clone();
-            let scope = replace(&mut module.scope, Scope::new(None));
-
-            session.resolver.enter_scope(scope);
-
-            let elements = session
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
-
-            for element in elements.iter_mut() {
-                element.resolve(&mut session.resolver);
-            }
-
-            let active = session.resolver.active;
-            session.resolver.exit();
-
-            module.scope = session.resolver.scopes.remove(&active).unwrap();
-            session.resolver.insert(module);
-        }
-
-        for &key in &keys {
-            let target = session.records.get(&key).unwrap().module.unwrap();
-            let mut module = session.resolver.get_symbol(target).unwrap().clone();
-            let scope = replace(&mut module.scope, Scope::new(None));
-
-            session.resolver.enter_scope(scope);
-
-            let elements = session
-                .records
-                .get_mut(&key)
-                .unwrap()
-                .elements
-                .as_mut()
-                .unwrap();
-
-            for element in elements.iter_mut() {
-                element.reify(&mut session.resolver);
-            }
-
-            let active = session.resolver.active;
-            session.resolver.exit();
-
-            module.scope = session.resolver.scopes.remove(&active).unwrap();
-            session.resolver.insert(module);
-        }
-
-        session
-            .errors
-            .extend(session.resolver.errors.drain(..).map(CompileError::Resolve));
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
-        session.report_finish("resolving", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
-pub struct AnalyzeAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
-> for AnalyzeAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
-    ) -> () {
-        let mut session = operator.store.write().unwrap();
-        use crate::analyzer::{Analysis, Analyzer};
-
-        let initial = session.errors.len();
-
-        session.report_start("analyzing");
-
-        let mut keys: Vec<_> = session
-            .records
-            .iter()
-            .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        keys.sort();
-
-        for &key in &keys {
-            let (hash, dirty, elements) = {
-                let record = session.records.get(&key).unwrap();
-                (record.hash, record.dirty, record.elements.clone())
-            };
-
-            if !dirty {
-                if let Some(analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
-                    session.records.get_mut(&key).unwrap().analyses = Some(analyses);
-                    continue;
-                }
-            }
-
-            let mut analyzer = Analyzer::new(elements.unwrap());
-            analyzer.analyze(&mut session.resolver);
-
-            if let Some(stencil) = session.get_stencil() {
-                session.report_section(
-                    "Analysis",
-                    Color::Blue,
-                    analyzer.output.format(stencil).to_string(),
-                );
-            }
-
-            session.errors.extend(
-                analyzer
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Analyze(error.clone())),
-            );
-
-            session.records.get_mut(&key).unwrap().analyses =
-                session.cache("analyses", hash, Some(analyzer.output));
-        }
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
-        session.report_finish("analyzing", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
+#[allow(unused)]
 pub struct InterpretAction;
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for InterpretAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
         use crate::interpreter::{Machine, Translator};
@@ -639,21 +242,19 @@ Action<
     }
 }
 
-#[cfg(feature = "generator")]
 pub struct GenerateAction;
 
-#[cfg(feature = "generator")]
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for GenerateAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
@@ -779,14 +380,14 @@ pub struct EmitAction;
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for EmitAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
@@ -892,14 +493,14 @@ pub struct RunAction;
 impl<'source>
 Action<
     'static,
-    Operator<Arc<RwLock<Session<'source>>>>,
-    Operation<'source, Arc<RwLock<Session<'source>>>>,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
 > for RunAction
 {
     fn action(
         &self,
-        operator: &mut Operator<Arc<RwLock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<RwLock<Session<'source>>>>,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
         if session.get_directive(Str::from("Discard")).is_some() {
@@ -985,18 +586,8 @@ impl<'session> Session<'session> {
             return;
         }
 
-        let store = Arc::new(RwLock::new(self));
+        let store = Arc::new(Lock::new(self));
         let mut operator = Operator::new(store.clone());
-
-        #[cfg(not(feature = "generator"))]
-        let mut pipeline = Operation::sequence([
-            Operation::new(Arc::new(PrepareAction)),
-            Operation::new(Arc::new(ScanAction)),
-            Operation::new(Arc::new(ParseAction)),
-            Operation::new(Arc::new(PopulateAction)),
-            Operation::new(Arc::new(ResolveAction)),
-            Operation::new(Arc::new(AnalyzeAction)),
-        ]);
 
         #[cfg(feature = "generator")]
         let mut pipeline = Operation::sequence([
@@ -1006,8 +597,11 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(PopulateAction)),
             Operation::new(Arc::new(ResolveAction)),
             Operation::new(Arc::new(AnalyzeAction)),
+            #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),
+            #[cfg(feature = "generator")]
             Operation::new(Arc::new(EmitAction)),
+            #[cfg(feature = "generator")]
             Operation::new(Arc::new(RunAction)),
         ]);
 

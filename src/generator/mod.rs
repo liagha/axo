@@ -8,3 +8,4 @@ pub use self::inkwell::error::*;
 use crate::reporter::Error;
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
+
