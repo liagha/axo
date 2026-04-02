@@ -11,7 +11,6 @@ pub struct Operator<Store = ()> {
     pub store: Store,
 }
 
-// Added Send + Sync constraints here to match the Action trait requirements
 impl<Store: Clone + Send + Sync> Operator<Store> {
     #[inline]
     pub fn new(store: Store) -> Self {

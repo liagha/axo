@@ -26,7 +26,6 @@ pub struct Operation<'source, Store = ()> {
     pub depends: Vec<Identity>,
 }
 
-// Basic methods that do NOT require strict bounds on Store
 impl<'source, Store> Operation<'source, Store> {
     #[inline]
     pub const fn is_pending(&self) -> bool {
@@ -65,7 +64,6 @@ impl<'source, Store> Operation<'source, Store> {
     }
 }
 
-// Combinator methods that DO require the Store to be thread-safe (Clone + Send + Sync)
 impl<'source, Store: Clone + Send + Sync + 'source> Operation<'source, Store> {
     #[inline]
     pub fn new(
