@@ -403,7 +403,6 @@ impl<'session> Session<'session> {
         base.join("build").join("records").join("manifest")
     }
 
-    #[cfg(feature = "generator")]
     pub fn schema(base: &PathBuf, location: Location<'session>) -> Location<'session> {
         let target = base
             .join("build")

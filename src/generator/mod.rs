@@ -2,10 +2,313 @@ mod backend;
 mod generator;
 mod inkwell;
 
-pub use {backend::Backend, inkwell::Generator};
+use {
+    crate::{
+        internal::{
+            platform::{
+                create_dir_all,
+                Lock,
+                Command,
+            },
+            time::Duration,
+            CompileError, InputKind, Session,
+        },
+        data::{
+            Str,
+            memory::Arc,
+        },
+        combinator::{Action, Operation, Operator},
+        generator::inkwell::error::*,
+        reporter::Error,
+        tracker::{Span, error::ErrorKind as TrackErrorKind, TrackError},
+    },
+    inkwell::{
+        Context, ContextRef, TargetMachine,
+    },
+};
 
-pub use self::inkwell::error::*;
-use crate::reporter::Error;
+pub use {backend::Backend, inkwell::Generator};
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
 
+
+pub struct GenerateAction;
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for GenerateAction
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) -> () {
+        let mut guard = operator.store.write().unwrap();
+        let session = &mut *guard;
+
+        let context = Context::create();
+        let reference = unsafe { ContextRef::new(context.raw()) };
+        let mut generator = Generator::new(reference);
+
+        let triple = TargetMachine::get_default_triple();
+        let base = session.base();
+
+        let initial = session.errors.len();
+
+        session.report_start("generating");
+
+        let mut keys: Vec<_> = session
+            .records
+            .iter()
+            .filter_map(|(&key, record)| {
+                if record.kind == InputKind::Source && record.module.is_some() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        keys.sort();
+
+        let discard = session.get_directive(Str::from("Discard")).is_some();
+
+        for &key in &keys {
+            let record = session.records.get_mut(&key).unwrap();
+            let location = record.location;
+            let schema = Session::schema(&base, location);
+
+            if !record.dirty && schema.to_path().map(|p| p.exists()).unwrap_or(false) {
+                record.output = Some(schema);
+                continue;
+            }
+
+            let stem = Str::from(location.stem().unwrap().to_string());
+
+            if let Some(analysis) = record.analyses.clone() {
+                let module = generator.context.create_module(stem.as_str().unwrap());
+
+                module.set_triple(&triple);
+
+                generator.modules.insert(stem, module);
+                generator.current_module = stem;
+
+                generator.generate(analysis);
+
+                if discard {
+                    continue;
+                }
+
+                match schema.as_path() {
+                    Ok(path) => {
+                        let parent = path.parent().unwrap();
+                        _ = create_dir_all(parent);
+
+                        match crate::internal::platform::File::create(&path) {
+                            Ok(mut file) => {
+                                use crate::internal::platform::Write;
+                                let string = generator
+                                    .current_module()
+                                    .print_to_string()
+                                    .to_string();
+                                if let Err(error) = file.write_all(string.as_bytes()) {
+                                    let kind = TrackErrorKind::from_io(error, schema);
+                                    let track = TrackError::new(kind, Span::void());
+                                    session.errors.push(CompileError::Track(track));
+                                    operation.set_reject();
+                                    return ();
+                                }
+                                record.output = Some(schema);
+                            }
+                            Err(error) => {
+                                let kind = TrackErrorKind::from_io(error, schema);
+                                let track = TrackError::new(kind, Span::void());
+                                session.errors.push(CompileError::Track(track));
+                            }
+                        }
+                    }
+                    Err(error) => session.errors.push(CompileError::Track(error)),
+                }
+            }
+        }
+
+        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        session.report_finish("generating", duration, session.errors.len() - initial);
+
+        session.errors.extend(generator
+                                  .errors
+                                  .iter()
+                                  .map(|error| CompileError::Generate(error.clone())),
+        );
+
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
+        ()
+    }
+}
+
+pub struct EmitAction;
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for EmitAction
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) -> () {
+        let mut session = operator.store.write().unwrap();
+        if session.get_directive(Str::from("Discard")).is_some() {
+            if session.errors.is_empty() {
+                operation.set_resolve(Vec::new());
+            } else {
+                operation.set_reject();
+            }
+            return ();
+        }
+
+        session.report_start("emitting");
+
+        let base = session.base();
+        let mut direct = Vec::new();
+
+        let mut keys: Vec<_> = session.records.keys().copied().collect();
+        keys.sort();
+
+        for &key in &keys {
+            let record = session.records.get_mut(&key).unwrap();
+
+            let target = match record.kind {
+                InputKind::Source => record.output,
+                InputKind::Schema | InputKind::C => Some(record.location),
+                InputKind::Object => {
+                    direct.push(record.location);
+                    None
+                }
+            };
+
+            if let Some(path) = target {
+                let object = Session::object(&base, record.location, &record.kind, None);
+                let parent = object.to_path().unwrap().parent().unwrap().to_path_buf();
+                _ = create_dir_all(&parent);
+
+                record.object = Some(object);
+
+                if !record.dirty && object.to_path().map(|p| p.exists()).unwrap_or(false) {
+                    continue;
+                }
+
+                let mut command = Command::new("clang");
+
+                command
+                    .arg("-c")
+                    .arg(path.to_string())
+                    .arg("-o")
+                    .arg(object.to_string());
+
+                let status = command.status().expect("failed");
+
+                if !status.success() {
+                    panic!("failed {}", path);
+                }
+            }
+        }
+
+        let mut link = Command::new("clang");
+
+        for &key in &keys {
+            if let Some(object) = session.records.get(&key).unwrap().object {
+                link.arg(object.to_string());
+            }
+        }
+
+        for object in direct {
+            link.arg(object.to_string());
+        }
+
+        let key = *keys.last().expect("missing");
+
+        let record = session.records.get(&key).unwrap();
+        let location = record.output.unwrap_or(record.location);
+
+        let executable = Session::executable(&base, location, None);
+        link.arg("-o").arg(executable.to_string());
+
+        let status = link.status().expect("failed");
+
+        if !status.success() {
+            panic!("emitter failed: {}", status);
+        }
+
+        session.target = Some(executable);
+
+        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        session.report_external("emitting", duration);
+
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
+        ()
+    }
+}
+
+pub struct RunAction;
+
+impl<'source>
+Action<
+    'static,
+    Operator<Arc<Lock<Session<'source>>>>,
+    Operation<'source, Arc<Lock<Session<'source>>>>,
+> for RunAction
+{
+    fn action(
+        &self,
+        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
+        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
+    ) -> () {
+        let mut session = operator.store.write().unwrap();
+        if session.get_directive(Str::from("Discard")).is_some() {
+            if session.errors.is_empty() {
+                operation.set_resolve(Vec::new());
+            } else {
+                operation.set_reject();
+            }
+            return ();
+        }
+
+        session.report_start("running");
+
+        let executable = session.target.unwrap();
+
+        session.report_execute(&executable.to_string());
+
+        let status = Command::new(executable.to_string())
+            .status()
+            .expect("failed");
+
+        if !status.success() {
+            panic!("{}", status);
+        }
+
+        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        session.report_external("running", duration);
+
+        if session.errors.is_empty() {
+            operation.set_resolve(Vec::new());
+        } else {
+            operation.set_reject();
+        }
+        ()
+    }
+}

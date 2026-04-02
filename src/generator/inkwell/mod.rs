@@ -8,6 +8,11 @@ mod logical;
 mod primitives;
 mod variables;
 
+pub use inkwell::{
+    context::{Context, ContextRef},
+    targets::TargetMachine,
+};
+
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
@@ -20,7 +25,6 @@ use {
     inkwell::{
         basic_block::BasicBlock,
         builder::Builder,
-        context::ContextRef,
         module::Module,
         types::{BasicType, BasicTypeEnum, StructType},
         values::{BasicValueEnum, FunctionValue, PointerValue},
