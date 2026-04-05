@@ -39,13 +39,17 @@ impl<'error> Translator<'error> {
     pub fn native(&mut self, identifier: &str, index: usize) {
         self.foreign.insert(identifier.to_string(), index);
 
-        if let Some(prefix) = identifier.split('_').next() {
+        if let Some((prefix, _)) = identifier.split_once('_') {
             self.foreign.insert(format!("{}.{}", prefix, identifier), index);
         }
     }
 
     fn emit(&mut self, opcode: Opcode, span: Span<'error>) {
         self.code.push(Instruction { opcode, span });
+    }
+
+    pub fn address(&self, identifier: &str) -> Option<usize> {
+        self.functions.get(identifier).copied()
     }
 
     fn patch(&mut self, position: usize, opcode: Opcode) {
@@ -66,7 +70,7 @@ impl<'error> Translator<'error> {
         }
     }
 
-    pub fn compile(mut self, nodes: Vec<Analysis<'error>>) -> Vec<Instruction<'error>> {
+    pub fn compile(&mut self, nodes: Vec<Analysis<'error>>) -> Vec<Instruction<'error>> {
         for node in nodes {
             self.walk(node);
         }
@@ -75,13 +79,14 @@ impl<'error> Translator<'error> {
             self.emit(Opcode::Halt, span);
         }
 
-        for (position, target) in self.calls {
+        let calls = std::mem::take(&mut self.calls);
+        for (position, target) in calls {
             if let Some(&address) = self.functions.get(&target) {
                 self.code[position].opcode = Opcode::Call(address);
             }
         }
 
-        self.code
+        std::mem::take(&mut self.code)
     }
 
     pub fn walk(&mut self, node: Analysis<'error>) {
@@ -323,6 +328,16 @@ impl<'error> Translator<'error> {
 
                 let address = self.code.len();
                 self.functions.insert(function.target.to_string(), address);
+
+                for member in &function.members {
+                    if let AnalysisKind::Usage(target) = member.kind {
+                        let address = self.memory;
+                        self.memory += 1;
+                        self.bindings.insert(target.to_string(), address);
+
+                        self.emit(Opcode::Store(address), span);
+                    }
+                }
 
                 if let Some(body) = function.body {
                     self.walk(*body);

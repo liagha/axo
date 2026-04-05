@@ -74,7 +74,7 @@ pub trait Wrap {
 impl Cast for i64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Integer(v)) => Ok(*v),
+            Some(Value::Integer(value)) => Ok(*value),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -83,7 +83,7 @@ impl Cast for i64 {
 impl Cast for i32 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Integer(v)) => Ok(*v as i32),
+            Some(Value::Integer(value)) => Ok(*value as i32),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -92,7 +92,7 @@ impl Cast for i32 {
 impl Cast for u64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Integer(v)) => Ok(*v as u64),
+            Some(Value::Integer(value)) => Ok(*value as u64),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -101,7 +101,7 @@ impl Cast for u64 {
 impl Cast for u8 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Integer(v)) => Ok(*v as u8),
+            Some(Value::Integer(value)) => Ok(*value as u8),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -110,7 +110,7 @@ impl Cast for u8 {
 impl Cast for f64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Float(v)) => Ok(*v),
+            Some(Value::Float(value)) => Ok(*value),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -119,8 +119,8 @@ impl Cast for f64 {
 impl Cast for bool {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Boolean(v)) => Ok(*v),
-            Some(Value::Integer(v)) => Ok(*v != 0),
+            Some(Value::Boolean(value)) => Ok(*value),
+            Some(Value::Integer(value)) => Ok(*value != 0),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -129,7 +129,7 @@ impl Cast for bool {
 impl Cast for *mut u8 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
-            Some(Value::Pointer(v)) => Ok(*v as *mut u8),
+            Some(Value::Pointer(value)) => Ok(*value as *mut u8),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -170,20 +170,20 @@ impl Wrap for *mut u8 {
 macro_rules! bind {
     ($instance:expr, $store:expr, $translator:expr, $name:expr, $ret:ty $(, $arg:ty)*) => {
         if let Some(pointer) = $instance.symbol($name) {
-            struct UnsafeWrapper<T>(T);
-            unsafe impl<T> Send for UnsafeWrapper<T> {}
-            unsafe impl<T> Sync for UnsafeWrapper<T> {}
-            let safe_instance = UnsafeWrapper(instance);
+            struct UnsafeWrap<T>(T);
+            unsafe impl<T> Send for UnsafeWrap<T> {}
+            unsafe impl<T> Sync for UnsafeWrap<T> {}
+            let safe = UnsafeWrap(instance);
 
-            let execute = Arc::new(move |args: &[Value]| -> Result<Value, ErrorKind> {
-                let instance = &safe_instance.0;
-                let mut _index = 0;
+            let execute = Arc::new(move |arguments: &[Value]| -> Result<Value, ErrorKind> {
+                let instance = &safe.0;
+                let mut index = 0;
                 let function: extern "C" fn($($arg),*) -> $ret = unsafe { std::mem::transmute(pointer) };
                 let result = function($(
                     {
-                        let val = <$arg as Cast>::cast(args.get(_index))?;
-                        _index += 1;
-                        val
+                        let value = <$arg as Cast>::cast(arguments.get(index))?;
+                        index += 1;
+                        value
                     }
                 ),*);
                 Ok(result.wrap())
@@ -950,66 +950,66 @@ impl<'source> Action<
                 if matches!(function.interface, Interface::C) {
                     let name = function.target.as_str().unwrap_or_default();
 
-                    let c_name = CString::new(name).unwrap();
+                    let string = CString::new(name).unwrap();
                     let pointer = unsafe {
-                        libc::dlsym(libc::RTLD_DEFAULT, c_name.as_ptr())
+                        libc::dlsym(libc::RTLD_DEFAULT, string.as_ptr())
                     };
 
                     if !pointer.is_null() {
                         let arity = function.members.len();
-                        let ptr_addr = pointer as usize;
+                        let address = pointer as usize;
 
-                        let execute = Arc::new(move |args: &[Value]| -> Result<Value, ErrorKind> {
+                        let execute = Arc::new(move |arguments: &[Value]| -> Result<Value, ErrorKind> {
                             unsafe {
                                 match arity {
                                     0 => {
-                                        let func: extern "C" fn() -> i64 = std::mem::transmute(ptr_addr);
-                                        Ok(Value::Integer(func()))
+                                        let function: extern "C" fn() -> i64 = std::mem::transmute(address);
+                                        Ok(Value::Integer(function()))
                                     }
                                     1 => {
-                                        let func: extern "C" fn(i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        Ok(Value::Integer(func(arg0)))
+                                        let function: extern "C" fn(i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        Ok(Value::Integer(function(a)))
                                     }
                                     2 => {
-                                        let func: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        let arg1 = i64::cast(args.get(1))?;
-                                        Ok(Value::Integer(func(arg0, arg1)))
+                                        let function: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        let b = i64::cast(arguments.get(1))?;
+                                        Ok(Value::Integer(function(a, b)))
                                     }
                                     3 => {
-                                        let func: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        let arg1 = i64::cast(args.get(1))?;
-                                        let arg2 = i64::cast(args.get(2))?;
-                                        Ok(Value::Integer(func(arg0, arg1, arg2)))
+                                        let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        let b = i64::cast(arguments.get(1))?;
+                                        let c = i64::cast(arguments.get(2))?;
+                                        Ok(Value::Integer(function(a, b, c)))
                                     }
                                     4 => {
-                                        let func: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        let arg1 = i64::cast(args.get(1))?;
-                                        let arg2 = i64::cast(args.get(2))?;
-                                        let arg3 = i64::cast(args.get(3))?;
-                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3)))
+                                        let function: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        let b = i64::cast(arguments.get(1))?;
+                                        let c = i64::cast(arguments.get(2))?;
+                                        let d = i64::cast(arguments.get(3))?;
+                                        Ok(Value::Integer(function(a, b, c, d)))
                                     }
                                     5 => {
-                                        let func: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        let arg1 = i64::cast(args.get(1))?;
-                                        let arg2 = i64::cast(args.get(2))?;
-                                        let arg3 = i64::cast(args.get(3))?;
-                                        let arg4 = i64::cast(args.get(4))?;
-                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3, arg4)))
+                                        let function: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        let b = i64::cast(arguments.get(1))?;
+                                        let c = i64::cast(arguments.get(2))?;
+                                        let d = i64::cast(arguments.get(3))?;
+                                        let e = i64::cast(arguments.get(4))?;
+                                        Ok(Value::Integer(function(a, b, c, d, e)))
                                     }
                                     6 => {
-                                        let func: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
-                                        let arg0 = i64::cast(args.get(0))?;
-                                        let arg1 = i64::cast(args.get(1))?;
-                                        let arg2 = i64::cast(args.get(2))?;
-                                        let arg3 = i64::cast(args.get(3))?;
-                                        let arg4 = i64::cast(args.get(4))?;
-                                        let arg5 = i64::cast(args.get(5))?;
-                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3, arg4, arg5)))
+                                        let function: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                        let a = i64::cast(arguments.get(0))?;
+                                        let b = i64::cast(arguments.get(1))?;
+                                        let c = i64::cast(arguments.get(2))?;
+                                        let d = i64::cast(arguments.get(3))?;
+                                        let e = i64::cast(arguments.get(4))?;
+                                        let f = i64::cast(arguments.get(5))?;
+                                        Ok(Value::Integer(function(a, b, c, d, e, f)))
                                     }
                                     _ => Err(ErrorKind::TypeMismatch),
                                 }
@@ -1026,10 +1026,22 @@ impl<'source> Action<
         }
 
         let code = translator.compile(all);
+        let entry = translator.address("main");
+
         let mut machine = Machine::new(code, 1024, dynamic);
 
-        if let Err(error) = machine.run() {
-            session.errors.push(CompileError::Interpret(error.clone()));
+        if session.errors.is_empty() {
+            if let Some(main_ptr) = entry {
+                machine.pointer = main_ptr;
+            }
+
+            machine.frames.clear();
+
+            if let Err(error) = machine.run() {
+                if !matches!(error.kind, ErrorKind::InvalidFrame) {
+                    session.errors.push(CompileError::Interpret(error.clone()));
+                }
+            }
         }
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap());

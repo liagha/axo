@@ -24,9 +24,11 @@ use crate::{
     },
     resolver::ResolveAction,
     analyzer::AnalyzeAction,
-    interpreter::InterpretAction,
     tracker::Span,
 };
+
+#[cfg(not(feature = "generator"))]
+use crate::interpreter::InterpretAction;
 
 #[cfg(feature = "generator")]
 use crate::generator::{EmitAction, GenerateAction, RunAction};
