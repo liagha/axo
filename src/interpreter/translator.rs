@@ -1,15 +1,19 @@
-use crate::analyzer::{Analysis, AnalysisKind};
-use crate::data::Str;
-use crate::internal::hash::Map;
-use crate::interpreter::{Instruction, Opcode, Value};
-use crate::tracker::Span;
+use {
+    crate::{
+        analyzer::{Analysis, AnalysisKind},
+        data::Str,
+        internal::hash::Map,
+        interpreter::{Instruction, Opcode, Value},
+        tracker::Span,
+    },
+};
 
 pub struct Translator<'error> {
     pub code: Vec<Instruction<'error>>,
     pub current_module: Str<'error>,
     memory: usize,
     bindings: Map<String, usize>,
-    natives: Map<String, usize>,
+    foreign: Map<String, usize>,
     loops: Vec<(usize, Vec<usize>)>,
     functions: Map<String, usize>,
     calls: Vec<(usize, String)>,
@@ -17,15 +21,15 @@ pub struct Translator<'error> {
 
 impl<'error> Translator<'error> {
     pub fn new() -> Self {
-        let mut natives = Map::new();
-        natives.insert("print".to_string(), 0);
+        let mut foreign = Map::new();
+        foreign.insert("print".to_string(), 0);
 
         Self {
             code: Vec::new(),
             current_module: Str::default(),
             memory: 0,
             bindings: Map::new(),
-            natives,
+            foreign,
             loops: Vec::new(),
             functions: Map::new(),
             calls: Vec::new(),
@@ -33,10 +37,10 @@ impl<'error> Translator<'error> {
     }
 
     pub fn native(&mut self, identifier: &str, index: usize) {
-        self.natives.insert(identifier.to_string(), index);
+        self.foreign.insert(identifier.to_string(), index);
 
         if let Some(prefix) = identifier.split('_').next() {
-            self.natives.insert(format!("{}.{}", prefix, identifier), index);
+            self.foreign.insert(format!("{}.{}", prefix, identifier), index);
         }
     }
 
@@ -48,11 +52,17 @@ impl<'error> Translator<'error> {
         self.code[position].opcode = opcode;
     }
 
-    fn namespaced(&self, target: &str) -> String {
+    fn namespace(&self, target: &str) -> String {
         if target.contains('.') {
             target.to_string()
+        } else if let Some(prefix) = self.current_module.as_str() {
+            if prefix.is_empty() {
+                target.to_string()
+            } else {
+                format!("{}.{}", prefix, target)
+            }
         } else {
-            format!("{}.{}", self.current_module.as_str().unwrap_or(""), target)
+            target.to_string()
         }
     }
 
@@ -66,8 +76,8 @@ impl<'error> Translator<'error> {
         }
 
         for (position, target) in self.calls {
-            if let Some(address) = self.functions.get(&target) {
-                self.code[position].opcode = Opcode::Call(*address);
+            if let Some(&address) = self.functions.get(&target) {
+                self.code[position].opcode = Opcode::Call(address);
             }
         }
 
@@ -77,21 +87,11 @@ impl<'error> Translator<'error> {
     pub fn walk(&mut self, node: Analysis<'error>) {
         let span = node.span;
         match node.kind {
-            AnalysisKind::Integer { value, .. } => {
-                self.emit(Opcode::Push(Value::Integer(value as i64)), span);
-            }
-            AnalysisKind::Float { value, .. } => {
-                self.emit(Opcode::Push(Value::Float(f64::from(value))), span);
-            }
-            AnalysisKind::Boolean { value } => {
-                self.emit(Opcode::Push(Value::Boolean(value)), span);
-            }
-            AnalysisKind::Character { value } => {
-                self.emit(Opcode::Push(Value::Character(value as char)), span);
-            }
-            AnalysisKind::String { value } => {
-                self.emit(Opcode::Push(Value::Text(value.to_string())), span);
-            }
+            AnalysisKind::Integer { value, .. } => self.emit(Opcode::Push(Value::Integer(value as i64)), span),
+            AnalysisKind::Float { value, .. } => self.emit(Opcode::Push(Value::Float(f64::from(value))), span),
+            AnalysisKind::Boolean { value } => self.emit(Opcode::Push(Value::Boolean(value)), span),
+            AnalysisKind::Character { value } => self.emit(Opcode::Push(Value::Character(value as char)), span),
+            AnalysisKind::String { value } => self.emit(Opcode::Push(Value::Text(value.to_string())), span),
             AnalysisKind::Array(elements) => {
                 let size = elements.len();
                 for element in elements {
@@ -104,7 +104,7 @@ impl<'error> Translator<'error> {
                 for element in elements {
                     self.walk(element);
                 }
-                self.emit(Opcode::MakeSequence(size), span);
+                self.emit(Opcode::MakeStructure(size), span);
             }
             AnalysisKind::Negate(value) => {
                 self.walk(*value);
@@ -227,45 +227,43 @@ impl<'error> Translator<'error> {
                 }
 
                 let target = invoke.target.to_string();
-                let namespaced_target = self.namespaced(&target);
+                let identifier = self.namespace(&target);
 
-                println!("DEBUG INVOKE: target='{}', namespaced='{}'", target, namespaced_target);
-                println!("DEBUG NATIVES MAP: {:?}", self.natives);
-
-                if let Some(position) = self.natives.get(&namespaced_target).or_else(|| self.natives.get(&target)) {
-                    self.emit(Opcode::NativeCall(*position, count), span);
-                } else if let Some(address) = self.functions.get(&namespaced_target) {
-                    self.emit(Opcode::Call(*address), span);
+                if let Some(&position) = self.foreign.get(&identifier).or_else(|| self.foreign.get(&target)) {
+                    self.emit(Opcode::ForeignCall(position, count), span);
+                } else if let Some(&address) = self.functions.get(&identifier) {
+                    self.emit(Opcode::Call(address), span);
                 } else {
                     let position = self.code.len();
                     self.emit(Opcode::Call(0), span);
-                    self.calls.push((position, namespaced_target));
+                    self.calls.push((position, identifier));
                 }
-            }            AnalysisKind::Block(statements) => {
+            }
+            AnalysisKind::Block(statements) => {
                 for statement in statements {
                     self.walk(statement);
                 }
             }
             AnalysisKind::Conditional(condition, truthy, falsy) => {
                 self.walk(*condition);
-                let position = self.code.len();
+                let check = self.code.len();
                 self.emit(Opcode::JumpFalse(0), span);
                 self.walk(*truthy);
 
                 if let Some(alternative) = falsy {
                     let bypass = self.code.len();
                     self.emit(Opcode::Jump(0), span);
-                    self.patch(position, Opcode::JumpFalse(self.code.len()));
+                    self.patch(check, Opcode::JumpFalse(self.code.len()));
                     self.walk(*alternative);
                     self.patch(bypass, Opcode::Jump(self.code.len()));
                 } else {
-                    self.patch(position, Opcode::JumpFalse(self.code.len()));
+                    self.patch(check, Opcode::JumpFalse(self.code.len()));
                 }
             }
             AnalysisKind::While(condition, body) => {
                 let start = self.code.len();
                 self.walk(*condition);
-                let position = self.code.len();
+                let check = self.code.len();
                 self.emit(Opcode::JumpFalse(0), span);
 
                 self.loops.push((start, Vec::new()));
@@ -274,21 +272,20 @@ impl<'error> Translator<'error> {
 
                 let (_, breaks) = self.loops.pop().unwrap();
                 let end = self.code.len();
-                self.patch(position, Opcode::JumpFalse(end));
+                self.patch(check, Opcode::JumpFalse(end));
 
-                for index in breaks {
-                    self.patch(index, Opcode::Jump(end));
+                for position in breaks {
+                    self.patch(position, Opcode::Jump(end));
                 }
             }
             AnalysisKind::Break(operand) => {
                 if let Some(value) = operand {
                     self.walk(*value);
                 }
-                let length = self.loops.len();
-                if length > 0 {
-                    let index = self.code.len();
+                let position = self.code.len();
+                if !self.loops.is_empty() {
                     self.emit(Opcode::Jump(0), span);
-                    self.loops[length - 1].1.push(index);
+                    self.loops.last_mut().unwrap().1.push(position);
                 }
             }
             AnalysisKind::Continue(_) => {
@@ -309,15 +306,15 @@ impl<'error> Translator<'error> {
             }
             AnalysisKind::Usage(identifier) => {
                 let target = identifier.to_string();
-                if let Some(address) = self.bindings.get(&target) {
-                    self.emit(Opcode::Load(*address), span);
+                if let Some(&address) = self.bindings.get(&target) {
+                    self.emit(Opcode::Load(address), span);
                 }
             }
             AnalysisKind::Assign(identifier, value) => {
                 self.walk(*value);
                 let target = identifier.to_string();
-                if let Some(address) = self.bindings.get(&target) {
-                    self.emit(Opcode::Store(*address), span);
+                if let Some(&address) = self.bindings.get(&target) {
+                    self.emit(Opcode::Store(address), span);
                 }
             }
             AnalysisKind::Function(function) => {
@@ -332,9 +329,7 @@ impl<'error> Translator<'error> {
                 }
 
                 self.emit(Opcode::Return, span);
-
-                let end = self.code.len();
-                self.patch(bypass, Opcode::Jump(end));
+                self.patch(bypass, Opcode::Jump(self.code.len()));
             }
             AnalysisKind::Return(operand) => {
                 if let Some(value) = operand {
@@ -343,45 +338,37 @@ impl<'error> Translator<'error> {
                 self.emit(Opcode::Return, span);
             }
             AnalysisKind::Module(stem, analyses) => {
-                let previous_module = self.current_module;
+                let previous = self.current_module;
                 self.current_module = stem;
 
                 for analysis in analyses {
                     self.walk(analysis);
                 }
 
-                self.current_module = previous_module;
+                self.current_module = previous;
             }
-            AnalysisKind::Access(lhs, rhs) => {
-                if let AnalysisKind::Invoke(invoke) = rhs.kind {
+            AnalysisKind::Access(left, right) => {
+                if let AnalysisKind::Invoke(invoke) = right.kind {
                     let count = invoke.members.len();
                     for member in invoke.members {
                         self.walk(member);
                     }
 
-                    let lhs_name = match lhs.kind {
-                        AnalysisKind::Usage(name) => name,
-                        _ => {
-                            println!("WARNING: Complex access patterns not yet supported: {:?}", lhs.kind);
-                            return;
+                    if let AnalysisKind::Usage(name) = left.kind {
+                        let target = format!("{}.{}", name, invoke.target);
+                        if let Some(&position) = self.foreign.get(&target) {
+                            self.emit(Opcode::ForeignCall(position, count), span);
+                        } else if let Some(&address) = self.functions.get(&target) {
+                            self.emit(Opcode::Call(address), span);
+                        } else {
+                            let position = self.code.len();
+                            self.emit(Opcode::Call(0), span);
+                            self.calls.push((position, target));
                         }
-                    };
-
-                    let target = format!("{}.{}", lhs_name, invoke.target);
-
-                    if let Some(position) = self.natives.get(&target) {
-                        self.emit(Opcode::NativeCall(*position, count), span);
-                    } else {
-                        let position = self.code.len();
-                        self.emit(Opcode::Call(0), span);
-                        self.calls.push((position, target));
                     }
                 }
             }
-            _ => {
-                println!("WARNING: Unhandled AST node: {:?}", node.kind);
-            }
+            _ => {}
         }
     }
 }
-

@@ -33,6 +33,7 @@ use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct PrepareAction;
 
+
 impl<'source>
 Action<
     'static,
@@ -73,8 +74,8 @@ Action<
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
 
-        for key in keys {
-            let record = session.records.get_mut(&key).unwrap();
+        for key in &keys {
+            let record = session.records.get_mut(key).unwrap();
 
             if record.kind == InputKind::Source {
                 let location = record.location;
@@ -94,6 +95,48 @@ Action<
                     }
 
                     session.cache.insert(location, hash);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "generator"))]
+        {
+            use std::ffi::CString;
+            use std::process::Command;
+
+            let mut sources = Vec::new();
+            for key in &keys {
+                let record = session.records.get(key).unwrap();
+                if record.kind == InputKind::C {
+                    if let Ok(path) = record.location.to_path() {
+                        sources.push(path);
+                    }
+                }
+            }
+
+            if !sources.is_empty() {
+                let base = session.base();
+                let build = base.join("build");
+                _ = create_dir_all(&build);
+
+                let library = build.join("lib_axo.so");
+                let mut command = Command::new("cc");
+
+                command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+                for source in sources {
+                    command.arg(source);
+                }
+
+                if command.status().unwrap().success() {
+                    let string = library.to_str().unwrap();
+                    let path = CString::new(string).unwrap();
+                    unsafe {
+                        if libc::dlopen(path.as_ptr(), 258).is_null() {
+                            panic!();
+                        }
+                    }
+                } else {
+                    panic!();
                 }
             }
         }
@@ -242,6 +285,7 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(PopulateAction)),
             Operation::new(Arc::new(ResolveAction)),
             Operation::new(Arc::new(AnalyzeAction)),
+            #[cfg(not(feature = "generator"))]
             Operation::new(Arc::new(InterpretAction)),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),

@@ -7,7 +7,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         combinator::{Action, Operation, Operator},
-        data::memory::Arc,
+        data::{memory::Arc, Str, CString, Interface},
         internal::{
             hash::Map,
             platform::{create_dir_all, Command, Lock},
@@ -19,7 +19,6 @@ use {
         tracker::Span,
     },
 };
-use crate::data::Str;
 
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
 
@@ -52,76 +51,153 @@ pub struct Library {
 
 impl Library {
     pub fn load(path: &str) -> Option<Self> {
-        let string = std::ffi::CString::new(path).ok()?;
+        let string = CString::new(path).ok()?;
         let handle = unsafe { sys::dlopen(string.as_ptr(), sys::RTLD_LAZY) };
-        if handle.is_null() {
-            None
-        } else {
-            Some(Self { handle })
-        }
+        (!handle.is_null()).then_some(Self { handle })
     }
 
     pub fn symbol(&self, name: &str) -> Option<*mut sys::c_void> {
-        let string = std::ffi::CString::new(name).ok()?;
+        let string = CString::new(name).ok()?;
         let pointer = unsafe { sys::dlsym(self.handle, string.as_ptr()) };
-        if pointer.is_null() {
-            None
-        } else {
-            Some(pointer)
+        (!pointer.is_null()).then_some(pointer)
+    }
+}
+
+pub trait Cast: Sized {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind>;
+}
+
+pub trait Wrap {
+    fn wrap(self) -> Value;
+}
+
+impl Cast for i64 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Integer(v)) => Ok(*v),
+            _ => Err(ErrorKind::TypeMismatch),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Signature {
-    VoidVoid,
-    VoidInt64,
-    VoidFloat64,
-    VoidInt32,
-    VoidPtr,
-    VoidUint8,
-    Int64Int64,
-    Int64Int64PtrInt64,
-    PtrUint64,
-    PtrPtr,
-    PtrInt64,
-    Int64Ptr,
-    Uint64Int64,
-    Uint8Int64,
-    Int32Uint8,
-    Uint8Int32,
-    Int64Int32,
-    PtrPtrUint64,
-    PtrPtrUint64Int64Int64Int64Int64,
-    Int64PtrUint64,
-    Int64Int64PtrUint64,
-    Uint64Int64PtrUint64,
-    Int64PtrInt64Int64,
-    Int64Int64Int64Int64,
-    Uint64Ptr,
-    Uint8PtrUint64,
-    BoolUint8,
-    PtrPtrUint64Uint64,
-    Float64Ptr,
-    PtrVoid,
-    BoolPtrPtr,
-    BoolPtrUint64Ptr,
-    BoolPtrUint64,
+impl Cast for i32 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Integer(v)) => Ok(*v as i32),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Cast for u64 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Integer(v)) => Ok(*v as u64),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Cast for u8 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Integer(v)) => Ok(*v as u8),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Cast for f64 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Float(v)) => Ok(*v),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Cast for bool {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Boolean(v)) => Ok(*v),
+            Some(Value::Integer(v)) => Ok(*v != 0),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Cast for *mut u8 {
+    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
+        match value {
+            Some(Value::Pointer(v)) => Ok(*v as *mut u8),
+            _ => Err(ErrorKind::TypeMismatch),
+        }
+    }
+}
+
+impl Wrap for () {
+    fn wrap(self) -> Value { Value::Empty }
+}
+
+impl Wrap for i64 {
+    fn wrap(self) -> Value { Value::Integer(self) }
+}
+
+impl Wrap for i32 {
+    fn wrap(self) -> Value { Value::Integer(self as i64) }
+}
+
+impl Wrap for u64 {
+    fn wrap(self) -> Value { Value::Integer(self as i64) }
+}
+
+impl Wrap for u8 {
+    fn wrap(self) -> Value { Value::Integer(self as i64) }
+}
+
+impl Wrap for f64 {
+    fn wrap(self) -> Value { Value::Float(self) }
+}
+
+impl Wrap for bool {
+    fn wrap(self) -> Value { Value::Boolean(self) }
+}
+
+impl Wrap for *mut u8 {
+    fn wrap(self) -> Value { Value::Pointer(self as usize) }
+}
+
+macro_rules! bind {
+    ($instance:expr, $store:expr, $translator:expr, $name:expr, $ret:ty $(, $arg:ty)*) => {
+        if let Some(pointer) = $instance.symbol($name) {
+            struct UnsafeWrapper<T>(T);
+            unsafe impl<T> Send for UnsafeWrapper<T> {}
+            unsafe impl<T> Sync for UnsafeWrapper<T> {}
+            let safe_instance = UnsafeWrapper(instance);
+
+            let execute = Arc::new(move |args: &[Value]| -> Result<Value, ErrorKind> {
+                let instance = &safe_instance.0;
+                let mut _index = 0;
+                let function: extern "C" fn($($arg),*) -> $ret = unsafe { std::mem::transmute(pointer) };
+                let result = function($(
+                    {
+                        let val = <$arg as Cast>::cast(args.get(_index))?;
+                        _index += 1;
+                        val
+                    }
+                ),*);
+                Ok(result.wrap())
+            });
+            $store.push(Foreign::Dynamic(execute));
+            $translator.native($name, $store.len() - 1);
+        }
+    };
 }
 
 #[derive(Clone)]
-pub struct Dynamic {
-    pub pointer: *mut sys::c_void,
-    pub signature: Signature,
-}
-
-unsafe impl Send for Dynamic {}
-unsafe impl Sync for Dynamic {}
-
-#[derive(Clone)]
-pub enum NativeFunction<'error> {
+pub enum Foreign<'error> {
     Rust(Native<'error>),
-    Dynamic(Dynamic),
+    Dynamic(Arc<dyn Fn(&[Value]) -> Result<Value, ErrorKind> + Send + Sync>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -132,6 +208,8 @@ pub enum Value {
     Character(char),
     Text(String),
     Sequence(Vec<Value>),
+    Structure(Vec<Value>),
+    Variant(usize, Box<Value>),
     Pointer(usize),
     Empty,
 }
@@ -168,11 +246,18 @@ pub enum Opcode {
     Load(usize),
     Store(usize),
     Call(usize),
-    NativeCall(usize, usize),
+    ForeignCall(usize, usize),
     Return,
     Halt,
     MakeSequence(usize),
+    MakeStructure(usize),
+    MakeVariant(usize),
+    ExtractField(usize),
+    ExtractVariant(usize),
     Index,
+    Trap,
+    CastInteger,
+    CastFloat,
 }
 
 #[derive(Clone, Debug)]
@@ -186,7 +271,7 @@ pub struct Machine<'error> {
     frames: Vec<usize>,
     memory: Vec<Value>,
     code: Vec<Instruction<'error>>,
-    natives: Vec<NativeFunction<'error>>,
+    foreign: Vec<Foreign<'error>>,
     pointer: usize,
     running: bool,
 }
@@ -203,27 +288,27 @@ pub fn print<'error>(arguments: &[Value], _span: Span<'error>) -> Result<Value, 
             Value::Character(value) => std::print!("{}", value),
             Value::Text(value) => std::print!("{}", value),
             Value::Sequence(value) => std::print!("{:?}", value),
+            Value::Structure(value) => std::print!("{:?}", value),
+            Value::Variant(tag, value) => std::print!("{}: {:?}", tag, value),
             Value::Pointer(value) => std::print!("{:#x}", value),
             Value::Empty => std::print!("empty"),
         }
     }
-
     println!();
-
     Ok(Value::Empty)
 }
 
 impl<'error> Machine<'error> {
-    pub fn new(code: Vec<Instruction<'error>>, capacity: usize, natives: Vec<NativeFunction<'error>>) -> Self {
-        let mut bundled: Vec<NativeFunction<'error>> = vec![NativeFunction::Rust(print)];
-        bundled.extend(natives);
+    pub fn new(code: Vec<Instruction<'error>>, capacity: usize, foreign: Vec<Foreign<'error>>) -> Self {
+        let mut base = vec![Foreign::Rust(print)];
+        base.extend(foreign);
 
         Self {
             stack: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
             code,
-            natives: bundled,
+            foreign: base,
             pointer: 0,
             running: false,
         }
@@ -251,9 +336,7 @@ impl<'error> Machine<'error> {
 
         match instruction.opcode {
             Opcode::Push(value) => self.stack.push(value),
-            Opcode::Pop => {
-                self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, instruction.span))?;
-            }
+            Opcode::Pop => self.pop()?,
             Opcode::Add => self.add()?,
             Opcode::Subtract => self.subtract()?,
             Opcode::Multiply => self.multiply()?,
@@ -282,13 +365,26 @@ impl<'error> Machine<'error> {
             Opcode::Load(address) => self.load(address)?,
             Opcode::Store(address) => self.store(address)?,
             Opcode::Call(target) => self.call(target)?,
-            Opcode::NativeCall(target, count) => self.native_call(target, count)?,
+            Opcode::ForeignCall(target, count) => self.foreign_call(target, count)?,
             Opcode::Return => self.finish()?,
             Opcode::Halt => self.running = false,
             Opcode::MakeSequence(size) => self.make_sequence(size)?,
+            Opcode::MakeStructure(size) => self.make_structure(size)?,
+            Opcode::MakeVariant(tag) => self.make_variant(tag)?,
+            Opcode::ExtractField(index) => self.extract_field(index)?,
+            Opcode::ExtractVariant(tag) => self.extract_variant(tag)?,
             Opcode::Index => self.index()?,
+            Opcode::Trap => return Err(self.error(ErrorKind::OutOfBounds, instruction.span)),
+            Opcode::CastInteger => self.cast_integer()?,
+            Opcode::CastFloat => self.cast_float()?,
         }
 
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         Ok(())
     }
 
@@ -660,241 +756,9 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn integer(&self, args: &[Value], index: usize, span: Span<'error>) -> Result<i64, InterpretError<'error>> {
-        if let Some(Value::Integer(value)) = args.get(index) {
-            Ok(*value)
-        } else {
-            Err(self.error(ErrorKind::TypeMismatch, span))
-        }
-    }
-
-    fn pointer(&self, args: &[Value], index: usize, span: Span<'error>) -> Result<usize, InterpretError<'error>> {
-        if let Some(Value::Pointer(value)) = args.get(index) {
-            Ok(*value)
-        } else {
-            Err(self.error(ErrorKind::TypeMismatch, span))
-        }
-    }
-
-    fn float(&self, args: &[Value], index: usize, span: Span<'error>) -> Result<f64, InterpretError<'error>> {
-        if let Some(Value::Float(value)) = args.get(index) {
-            Ok(*value)
-        } else {
-            Err(self.error(ErrorKind::TypeMismatch, span))
-        }
-    }
-
-    fn boolean(&self, args: &[Value], index: usize, span: Span<'error>) -> Result<bool, InterpretError<'error>> {
-        if let Some(Value::Boolean(value)) = args.get(index) {
-            Ok(*value)
-        } else {
-            Err(self.error(ErrorKind::TypeMismatch, span))
-        }
-    }
-
-    fn invoke(&self, dynamic: &Dynamic, args: &[Value], span: Span<'error>) -> Result<Value, InterpretError<'error>> {
-        unsafe {
-            match dynamic.signature {
-                Signature::VoidVoid => {
-                    let function: extern "C" fn() = std::mem::transmute(dynamic.pointer);
-                    function();
-                    Ok(Value::Empty)
-                }
-                Signature::VoidInt64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let function: extern "C" fn(i64) = std::mem::transmute(dynamic.pointer);
-                    function(a0);
-                    Ok(Value::Empty)
-                }
-                Signature::VoidFloat64 => {
-                    let a0 = self.float(args, 0, span)?;
-                    let function: extern "C" fn(f64) = std::mem::transmute(dynamic.pointer);
-                    function(a0);
-                    Ok(Value::Empty)
-                }
-                Signature::VoidInt32 => {
-                    let a0 = self.integer(args, 0, span)? as i32;
-                    let function: extern "C" fn(i32) = std::mem::transmute(dynamic.pointer);
-                    function(a0);
-                    Ok(Value::Empty)
-                }
-                Signature::VoidPtr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let function: extern "C" fn(*mut u8) = std::mem::transmute(dynamic.pointer);
-                    function(a0 as *mut u8);
-                    Ok(Value::Empty)
-                }
-                Signature::VoidUint8 => {
-                    let a0 = self.integer(args, 0, span)? as u8;
-                    let function: extern "C" fn(u8) = std::mem::transmute(dynamic.pointer);
-                    function(a0);
-                    Ok(Value::Empty)
-                }
-                Signature::Int64Int64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let function: extern "C" fn(i64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0)))
-                }
-                Signature::Int64Int64PtrInt64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let a1 = self.pointer(args, 1, span)?;
-                    let a2 = self.integer(args, 2, span)?;
-                    let function: extern "C" fn(i64, *mut u8, i64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0, a1 as *mut u8, a2)))
-                }
-                Signature::PtrUint64 => {
-                    let a0 = self.integer(args, 0, span)? as u64;
-                    let function: extern "C" fn(u64) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0) as usize))
-                }
-                Signature::PtrPtr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let function: extern "C" fn(*mut u8) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0 as *mut u8) as usize))
-                }
-                Signature::PtrInt64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let function: extern "C" fn(i64) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0) as usize))
-                }
-                Signature::Int64Ptr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let function: extern "C" fn(*mut u8) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0 as *mut u8)))
-                }
-                Signature::Uint64Int64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let function: extern "C" fn(i64) -> u64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0) as i64))
-                }
-                Signature::Uint8Int64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let function: extern "C" fn(i64) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0) as i64))
-                }
-                Signature::Int32Uint8 => {
-                    let a0 = self.integer(args, 0, span)? as u8;
-                    let function: extern "C" fn(u8) -> i32 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0) as i64))
-                }
-                Signature::Uint8Int32 => {
-                    let a0 = self.integer(args, 0, span)? as i32;
-                    let function: extern "C" fn(i32) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0) as i64))
-                }
-                Signature::Int64Int32 => {
-                    let a0 = self.integer(args, 0, span)? as i32;
-                    let function: extern "C" fn(i32) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0)))
-                }
-                Signature::PtrPtrUint64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let function: extern "C" fn(*mut u8, u64) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0 as *mut u8, a1) as usize))
-                }
-                Signature::PtrPtrUint64Int64Int64Int64Int64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let a2 = self.integer(args, 2, span)?;
-                    let a3 = self.integer(args, 3, span)?;
-                    let a4 = self.integer(args, 4, span)?;
-                    let a5 = self.integer(args, 5, span)?;
-                    let function: extern "C" fn(*mut u8, u64, i64, i64, i64, i64) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0 as *mut u8, a1, a2, a3, a4, a5) as usize))
-                }
-                Signature::Int64PtrUint64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let function: extern "C" fn(*mut u8, u64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0 as *mut u8, a1)))
-                }
-                Signature::Int64Int64PtrUint64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let a1 = self.pointer(args, 1, span)?;
-                    let a2 = self.integer(args, 2, span)? as u64;
-                    let function: extern "C" fn(i64, *mut u8, u64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0, a1 as *mut u8, a2)))
-                }
-                Signature::Uint64Int64PtrUint64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let a1 = self.pointer(args, 1, span)?;
-                    let a2 = self.integer(args, 2, span)? as u64;
-                    let function: extern "C" fn(i64, *mut u8, u64) -> u64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0, a1 as *mut u8, a2) as i64))
-                }
-                Signature::Int64PtrInt64Int64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)?;
-                    let a2 = self.integer(args, 2, span)?;
-                    let function: extern "C" fn(*mut u8, i64, i64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0 as *mut u8, a1, a2)))
-                }
-                Signature::Int64Int64Int64Int64 => {
-                    let a0 = self.integer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)?;
-                    let a2 = self.integer(args, 2, span)?;
-                    let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0, a1, a2)))
-                }
-                Signature::Uint64Ptr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let function: extern "C" fn(*mut u8) -> u64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0 as *mut u8) as i64))
-                }
-                Signature::Uint8PtrUint64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let function: extern "C" fn(*mut u8, u64) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Integer(function(a0 as *mut u8, a1) as i64))
-                }
-                Signature::BoolUint8 => {
-                    let a0 = self.integer(args, 0, span)? as u8;
-                    let function: extern "C" fn(u8) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Boolean(function(a0) != 0))
-                }
-                Signature::PtrPtrUint64Uint64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let a2 = self.integer(args, 2, span)? as u64;
-                    let function: extern "C" fn(*mut u8, u64, u64) -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function(a0 as *mut u8, a1, a2) as usize))
-                }
-                Signature::Float64Ptr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let function: extern "C" fn(*mut u8) -> f64 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Float(function(a0 as *mut u8)))
-                }
-                Signature::PtrVoid => {
-                    let function: extern "C" fn() -> *mut u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Pointer(function() as usize))
-                }
-                Signature::BoolPtrPtr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.pointer(args, 1, span)?;
-                    let function: extern "C" fn(*mut u8, *mut u8) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Boolean(function(a0 as *mut u8, a1 as *mut u8) != 0))
-                }
-                Signature::BoolPtrUint64Ptr => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let a2 = self.pointer(args, 2, span)?;
-                    let function: extern "C" fn(*mut u8, u64, *mut u8) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Boolean(function(a0 as *mut u8, a1, a2 as *mut u8) != 0))
-                }
-                Signature::BoolPtrUint64 => {
-                    let a0 = self.pointer(args, 0, span)?;
-                    let a1 = self.integer(args, 1, span)? as u64;
-                    let function: extern "C" fn(*mut u8, u64) -> u8 = std::mem::transmute(dynamic.pointer);
-                    Ok(Value::Boolean(function(a0 as *mut u8, a1) != 0))
-                }
-            }
-        }
-    }
-
-    fn native_call(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
+    fn foreign_call(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
         let span = self.current();
-        let function = self.natives.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
+        let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
 
         if self.stack.len() < count {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -903,9 +767,9 @@ impl<'error> Machine<'error> {
         let start = self.stack.len() - count;
         let arguments = &self.stack[start..];
 
-        let result = match function {
-            NativeFunction::Rust(function) => function(arguments, span)?,
-            NativeFunction::Dynamic(dynamic) => self.invoke(&dynamic, arguments, span)?,
+        let result = match routine {
+            Foreign::Rust(function) => function(arguments, span)?,
+            Foreign::Dynamic(dynamic) => dynamic(arguments).map_err(|kind| self.error(kind, span))?,
         };
 
         self.stack.truncate(start);
@@ -941,6 +805,52 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
+    fn make_structure(&mut self, size: usize) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        if self.stack.len() < size {
+            return Err(self.error(ErrorKind::StackUnderflow, span));
+        }
+        let start = self.stack.len() - size;
+        let fields = self.stack.drain(start..).collect();
+        self.stack.push(Value::Structure(fields));
+        Ok(())
+    }
+
+    fn make_variant(&mut self, tag: usize) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+        self.stack.push(Value::Variant(tag, Box::new(value)));
+        Ok(())
+    }
+
+    fn extract_field(&mut self, index: usize) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+
+        match target {
+            Value::Structure(fields) => {
+                let value = fields.get(index).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
+                self.stack.push(value);
+            }
+            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+        }
+        Ok(())
+    }
+
+    fn extract_variant(&mut self, tag: usize) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+
+        match target {
+            Value::Variant(active, value) if active == tag => {
+                self.stack.push(*value);
+            }
+            Value::Variant(..) => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+        }
+        Ok(())
+    }
+
     fn index(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let position = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -956,6 +866,32 @@ impl<'error> Machine<'error> {
             }
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         }
+        Ok(())
+    }
+
+    fn cast_integer(&mut self) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+        let result = match value {
+            Value::Float(v) => Value::Integer(v as i64),
+            Value::Boolean(v) => Value::Integer(v as i64),
+            Value::Character(v) => Value::Integer(v as i64),
+            v @ Value::Integer(_) => v,
+            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+        };
+        self.stack.push(result);
+        Ok(())
+    }
+
+    fn cast_float(&mut self) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+        let result = match value {
+            Value::Integer(v) => Value::Float(v as f64),
+            v @ Value::Float(_) => v,
+            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
+        };
+        self.stack.push(result);
         Ok(())
     }
 
@@ -984,19 +920,16 @@ impl<'source> Action<
         session.report_start("interpreting");
 
         let mut sources = Vec::new();
-        let mut headers = Vec::new();
 
         for (&key, record) in session.records.iter() {
             if record.kind == InputKind::Source && record.module.is_some() {
                 sources.push(key);
-            } else if record.kind == InputKind::C {
-                headers.push(record.location.to_string());
             }
         }
         sources.sort();
 
         let mut translator = translator::Translator::new();
-        let mut all_analyses = Vec::new();
+        let mut all = Vec::new();
 
         for &key in &sources {
             let record = session.records.get(&key).unwrap();
@@ -1006,69 +939,93 @@ impl<'source> Action<
             translator.current_module = stem;
 
             if let Some(analyses) = record.analyses.clone() {
-                all_analyses.extend(analyses);
+                all.extend(analyses);
             }
         }
 
         let mut dynamic = Vec::new();
 
-        if !headers.is_empty() {
-            session.report_execute("compiling dynamic base");
+        for analysis in &all {
+            if let AnalysisKind::Function(function) = &analysis.kind {
+                if matches!(function.interface, Interface::C) {
+                    let name = function.target.as_str().unwrap_or_default();
 
-            let base = session.base();
-            let build = base.join("build");
-            _ = create_dir_all(&build);
+                    let c_name = CString::new(name).unwrap();
+                    let pointer = unsafe {
+                        libc::dlsym(libc::RTLD_DEFAULT, c_name.as_ptr())
+                    };
 
-            let extension = if cfg!(target_os = "windows") {
-                "dll"
-            } else if cfg!(target_os = "macos") {
-                "dylib"
-            } else {
-                "so"
-            };
+                    if !pointer.is_null() {
+                        let arity = function.members.len();
+                        let ptr_addr = pointer as usize;
 
-            let library = build.join(format!("lib_base.{}", extension));
+                        let execute = Arc::new(move |args: &[Value]| -> Result<Value, ErrorKind> {
+                            unsafe {
+                                match arity {
+                                    0 => {
+                                        let func: extern "C" fn() -> i64 = std::mem::transmute(ptr_addr);
+                                        Ok(Value::Integer(func()))
+                                    }
+                                    1 => {
+                                        let func: extern "C" fn(i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        Ok(Value::Integer(func(arg0)))
+                                    }
+                                    2 => {
+                                        let func: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        let arg1 = i64::cast(args.get(1))?;
+                                        Ok(Value::Integer(func(arg0, arg1)))
+                                    }
+                                    3 => {
+                                        let func: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        let arg1 = i64::cast(args.get(1))?;
+                                        let arg2 = i64::cast(args.get(2))?;
+                                        Ok(Value::Integer(func(arg0, arg1, arg2)))
+                                    }
+                                    4 => {
+                                        let func: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        let arg1 = i64::cast(args.get(1))?;
+                                        let arg2 = i64::cast(args.get(2))?;
+                                        let arg3 = i64::cast(args.get(3))?;
+                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3)))
+                                    }
+                                    5 => {
+                                        let func: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        let arg1 = i64::cast(args.get(1))?;
+                                        let arg2 = i64::cast(args.get(2))?;
+                                        let arg3 = i64::cast(args.get(3))?;
+                                        let arg4 = i64::cast(args.get(4))?;
+                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3, arg4)))
+                                    }
+                                    6 => {
+                                        let func: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(ptr_addr);
+                                        let arg0 = i64::cast(args.get(0))?;
+                                        let arg1 = i64::cast(args.get(1))?;
+                                        let arg2 = i64::cast(args.get(2))?;
+                                        let arg3 = i64::cast(args.get(3))?;
+                                        let arg4 = i64::cast(args.get(4))?;
+                                        let arg5 = i64::cast(args.get(5))?;
+                                        Ok(Value::Integer(func(arg0, arg1, arg2, arg3, arg4, arg5)))
+                                    }
+                                    _ => Err(ErrorKind::TypeMismatch),
+                                }
+                            }
+                        });
 
-            let mut command = Command::new("clang");
-            command.arg("-shared").arg("-fPIC").arg("-o").arg(library.to_str().unwrap());
-
-            for header in headers {
-                command.arg(header);
-            }
-
-            let status = command.status().expect("failed to compile dynamic library");
-
-            if status.success() {
-                if let Some(instance) = Library::load(library.to_str().unwrap()) {
-                    let mappings = [
-                        // ... (Keep all your existing Signature mappings here)
-                        ("print_integer", Signature::VoidInt64),
-                        ("print_newline", Signature::VoidVoid),
-                        // ...
-                    ];
-
-                    for (name, signature) in mappings {
-                        if let Some(pointer) = instance.symbol(name) {
-                            dynamic.push(NativeFunction::Dynamic(Dynamic {
-                                pointer,
-                                signature,
-                            }));
-
-                            // FIX: use dynamic.len() - 1 because Vec is 0-indexed
-                            translator.native(name, dynamic.len() - 1);
-                        }
+                        dynamic.push(Foreign::Dynamic(execute));
+                        translator.native(name, dynamic.len());
+                    } else {
+                        panic!("Could not resolve C function symbol: {}. Please ensure C libraries are dynamically loaded/linked into the interpreter executable.", name);
                     }
-
-                    std::mem::forget(instance);
-                } else {
-                    panic!("failed to load compiled dynamic library: {}", library.to_str().unwrap());
                 }
-            } else {
-                panic!("clang failed to compile dynamic library.");
             }
         }
 
-        let code = translator.compile(all_analyses);
+        let code = translator.compile(all);
         let mut machine = Machine::new(code, 1024, dynamic);
 
         if let Err(error) = machine.run() {
@@ -1083,7 +1040,5 @@ impl<'source> Action<
         } else {
             operation.set_reject();
         }
-
-        ()
     }
 }
