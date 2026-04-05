@@ -25,6 +25,7 @@ generator = ["resolver", "inkwell"]
 [dependencies]
 broccli = { version = "0.0.22" }
 inkwell = { version = "0.8.0", features = ["llvm19-1-prefer-dynamic"], optional = true }
+libc = "0.2.182"
 
 [workspace]
 members = [

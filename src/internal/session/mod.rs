@@ -24,6 +24,7 @@ use crate::{
     },
     resolver::ResolveAction,
     analyzer::AnalyzeAction,
+    interpreter::InterpretAction,
     tracker::Span,
 };
 
@@ -183,68 +184,6 @@ Action<
     }
 }
 
-#[allow(unused)]
-pub struct InterpretAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for InterpretAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
-        let mut session = operator.store.write().unwrap();
-        use crate::interpreter::{Machine, Translator};
-
-        let initial = session.errors.len();
-
-        session.report_start("interpreting");
-
-        let mut keys: Vec<_> = session
-            .records
-            .iter()
-            .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        keys.sort();
-
-        let mut translator = Translator::new();
-
-        for &key in &keys {
-            if let Some(analyses) = session.records.get(&key).unwrap().analyses.clone() {
-                for analysis in analyses {
-                    translator.walk(analysis);
-                }
-            }
-        }
-
-        let mut machine = Machine::new(translator.code, 1024, vec![]);
-
-        if let Err(error) = machine.run() {
-            session.errors.push(CompileError::Interpret(error.clone()));
-        }
-
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
-        session.report_finish("interpreting", duration, session.errors.len() - initial);
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
 impl<'session> Session<'session> {
     pub fn cache<T: Decode<'session> + Encode + Clone>(
         &self,
@@ -303,6 +242,7 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(PopulateAction)),
             Operation::new(Arc::new(ResolveAction)),
             Operation::new(Arc::new(AnalyzeAction)),
+            Operation::new(Arc::new(InterpretAction)),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),
             #[cfg(feature = "generator")]
