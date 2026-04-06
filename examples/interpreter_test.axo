@@ -1,3 +1,5 @@
-const x = 2 + 3
+func main() {
+    const x = 2 + 3
 
-print.print_integer(x)
+    print.print_integer(x)
+}
