@@ -174,7 +174,11 @@ impl<'error> Machine<'error> {
         let saved_bindings = self.bindings.clone();
         let saved_memory = self.memory_top;
 
-        for member in &function.members {
+        // FIXED: Reverse parameter binding order to correctly map stack pops
+        let mut members = function.members.clone();
+        members.reverse();
+
+        for member in members {
             if let AnalysisKind::Usage(target) = member.kind {
                 let address = self.memory_top;
                 self.memory_top += 1;
@@ -492,13 +496,18 @@ impl<'error> Machine<'error> {
                     let target_field = field_name.to_string();
                     let mut found_index = None;
 
+                    let mut possible_indices = Vec::new();
                     for entity in self.entities.values() {
                         if let Entity::Structure(members) = entity {
                             if let Some(index) = members.iter().position(|m| m == &target_field) {
-                                found_index = Some(index);
-                                break;
+                                possible_indices.push(index);
                             }
                         }
+                    }
+
+                    if !possible_indices.is_empty() {
+                        possible_indices.sort();
+                        found_index = Some(possible_indices[0]);
                     }
 
                     if let Some(index) = found_index {
