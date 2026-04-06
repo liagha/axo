@@ -1,3 +1,4 @@
+// src/interpreter/translator.rs
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
@@ -61,7 +62,12 @@ impl<'error> Machine<'error> {
         }
     }
 
-    fn scoped_module(&mut self, stem: Str<'error>, action: fn(&mut Self, Vec<Analysis<'error>>), analyses: Vec<Analysis<'error>>) {
+    fn scoped_module(
+        &mut self,
+        stem: Str<'error>,
+        action: fn(&mut Self, Vec<Analysis<'error>>),
+        analyses: Vec<Analysis<'error>>,
+    ) {
         let previous = self.current_module;
         self.current_module = Str::from(self.namespace(&stem.to_string()));
         action(self, analyses);
@@ -140,6 +146,9 @@ impl<'error> Machine<'error> {
                 AnalysisKind::Function(function) if function.entry => {
                     entry = Some((function.clone(), analysis.span.clone()));
                 }
+                AnalysisKind::Function(function) => {
+                    self.define_function(function.clone(), analysis.span.clone());
+                }
                 AnalysisKind::Module(stem, inner) => {
                     self.scoped_module(stem.clone(), Self::generate, inner.clone());
                 }
@@ -174,7 +183,6 @@ impl<'error> Machine<'error> {
         let saved_bindings = self.bindings.clone();
         let saved_memory = self.memory_top;
 
-        // FIXED: Reverse parameter binding order to correctly map stack pops
         let mut members = function.members.clone();
         members.reverse();
 
@@ -338,7 +346,7 @@ impl<'error> Machine<'error> {
                 self.walk(*index.target);
                 for member in index.members {
                     self.walk(member);
-                    self.emit(Opcode::Index, span);
+                    self.emit(Opcode::Index, span.clone());
                 }
             }
             AnalysisKind::Invoke(invoke) => {
@@ -400,12 +408,15 @@ impl<'error> Machine<'error> {
                 self.walk(*body);
                 self.emit(Opcode::Jump(start), span.clone());
 
-                let (_, breaks) = self.loops.pop().unwrap();
-                let end = self.code.len();
-                self.patch(check, Opcode::JumpFalse(end));
+                if let Some((_, breaks)) = self.loops.pop() {
+                    let end = self.code.len();
+                    self.patch(check, Opcode::JumpFalse(end));
 
-                for position in breaks {
-                    self.patch(position, Opcode::Jump(end));
+                    for position in breaks {
+                        self.patch(position, Opcode::Jump(end));
+                    }
+                } else {
+                    self.emit(Opcode::Trap, span);
                 }
             }
             AnalysisKind::Break(operand) => {
@@ -413,14 +424,21 @@ impl<'error> Machine<'error> {
                     self.walk(*value);
                 }
                 let position = self.code.len();
-                if !self.loops.is_empty() {
+                if self.loops.is_empty() {
+                    self.emit(Opcode::Trap, span);
+                } else {
                     self.emit(Opcode::Jump(0), span);
-                    self.loops.last_mut().unwrap().1.push(position);
+                    if let Some(state) = self.loops.last_mut() {
+                        state.1.push(position);
+                    }
                 }
             }
             AnalysisKind::Continue(_) => {
-                if let Some(state) = self.loops.last() {
-                    self.emit(Opcode::Jump(state.0), span);
+                let target = self.loops.last().map(|state| state.0);
+                if let Some(position) = target {
+                    self.emit(Opcode::Jump(position), span);
+                } else {
+                    self.emit(Opcode::Trap, span);
                 }
             }
             AnalysisKind::Binding(binding) => {
@@ -438,6 +456,8 @@ impl<'error> Machine<'error> {
                 let target = identifier.to_string();
                 if let Some(&address) = self.bindings.get(&target) {
                     self.emit(Opcode::Load(address), span);
+                } else {
+                    self.emit(Opcode::Trap, span);
                 }
             }
             AnalysisKind::Assign(identifier, value) => {
@@ -445,6 +465,8 @@ impl<'error> Machine<'error> {
                 let target = identifier.to_string();
                 if let Some(&address) = self.bindings.get(&target) {
                     self.emit(Opcode::Store(address), span);
+                } else {
+                    self.emit(Opcode::Trap, span);
                 }
             }
             AnalysisKind::Function(function) => self.define_function(function, span),
@@ -541,14 +563,22 @@ impl<'error> Machine<'error> {
     }
 }
 
+use crate::format::{Show, Stencil};
+
 impl Machine<'_> {
+    fn extract_name(analysis: &Analysis<'_>) -> Option<String> {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => Some(name.to_string()),
+            AnalysisKind::Assign(name, _) => Some(name.to_string()),
+            AnalysisKind::Binding(binding) => Self::extract_name(binding.target.as_ref()),
+            _ => None,
+        }
+    }
+
     fn member_names(analyses: Vec<Analysis<'_>>) -> Vec<String> {
         analyses
-            .into_iter()
-            .filter_map(|analysis| match analysis.kind {
-                AnalysisKind::Assign(name, _) | AnalysisKind::Usage(name) => Some(name.to_string()),
-                _ => None,
-            })
+            .iter()
+            .filter_map(|analysis| Self::extract_name(analysis))
             .collect()
     }
 }

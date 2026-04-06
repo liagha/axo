@@ -1,3 +1,4 @@
+// src/interpreter/mod.rs
 #![allow(unused)]
 
 mod error;
@@ -963,12 +964,14 @@ impl<'source> Action<
         let mut vm = Machine::new(1024, Vec::new());
 
         for &key in &sources {
-            let record = session.records.get(&key).unwrap();
-            let location = record.location;
-            let stem = Str::from(location.stem().unwrap().to_string());
-
-            if let Some(analyses) = record.analyses.clone() {
-                vm.modules.insert(stem, analyses);
+            if let Some(record) = session.records.get(&key) {
+                let location = record.location;
+                if let Some(stem) = location.stem() {
+                    let text = Str::from(stem.to_string());
+                    if let Some(analyses) = record.analyses.clone() {
+                        vm.modules.insert(text, analyses);
+                    }
+                }
             }
         }
 
@@ -979,114 +982,124 @@ impl<'source> Action<
                 if matches!(function.interface, Interface::C) {
                     let name = function.target.as_str().unwrap_or_default();
 
-                    let string = CString::new(name).unwrap();
-                    let pointer = unsafe {
-                        libc::dlsym(libc::RTLD_DEFAULT, string.as_ptr())
-                    };
+                    if let Ok(string) = CString::new(name) {
+                        let pointer = unsafe {
+                            libc::dlsym(libc::RTLD_DEFAULT, string.as_ptr())
+                        };
 
-                    if !pointer.is_null() {
-                        let arity = function.members.len();
-                        let address = pointer as usize;
-                        let name_str = name.to_string();
+                        if !pointer.is_null() {
+                            let arity = function.members.len();
+                            let address = pointer as usize;
+                            let name_str = name.to_string();
 
-                        let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
-                            unsafe {
-                                // Provide explicit bindings for functions returning non-64-bit lengths or floating point registers.
-                                if name_str == "parse_float" {
-                                    let function: extern "C" fn(i64) -> f64 = std::mem::transmute(address);
-                                    let a = i64::cast(inputs.get(0))?;
-                                    return Ok(Value::Float(function(a)));
-                                }
-                                if name_str == "print_float" {
-                                    let function: extern "C" fn(f64) -> i64 = std::mem::transmute(address);
-                                    let a = match inputs.get(0) {
-                                        Some(Value::Float(v)) => *v,
-                                        _ => return Err(ErrorKind::TypeMismatch),
-                                    };
-                                    function(a);
-                                    return Ok(Value::Integer(0));
-                                }
-                                if name_str == "is_whitespace" || name_str == "is_digit" {
-                                    let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
-                                    let a = i64::cast(inputs.get(0))?;
-                                    return Ok(Value::Boolean(function(a) != 0));
-                                }
-                                if name_str == "character_at" {
-                                    let function: extern "C" fn(i64, i64) -> u8 = std::mem::transmute(address);
-                                    let a = i64::cast(inputs.get(0))?;
-                                    let b = i64::cast(inputs.get(1))?;
-                                    return Ok(Value::Integer(function(a, b) as i64));
-                                }
-                                if name_str == "integer_uint8" || name_str == "character_uint8" {
-                                    let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
-                                    let a = i64::cast(inputs.get(0))?;
-                                    return Ok(Value::Integer(function(a) as i64));
-                                }
-                                if name_str == "uint8_character" {
-                                    let function: extern "C" fn(i64) -> i32 = std::mem::transmute(address);
-                                    let a = i64::cast(inputs.get(0))?;
-                                    return Ok(Value::Integer(function(a) as i64));
-                                }
+                            let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
+                                unsafe {
+                                    if name_str == "parse_float" {
+                                        let function: extern "C" fn(i64) -> f64 = std::mem::transmute(address);
+                                        let a = i64::cast(inputs.get(0))?;
+                                        return Ok(Value::Float(function(a)));
+                                    }
+                                    if name_str == "print_float" {
+                                        let function: extern "C" fn(f64) -> i64 = std::mem::transmute(address);
+                                        let a = match inputs.get(0) {
+                                            Some(Value::Float(v)) => *v,
+                                            _ => return Err(ErrorKind::TypeMismatch),
+                                        };
+                                        function(a);
+                                        return Ok(Value::Integer(0));
+                                    }
+                                    if name_str == "is_whitespace" || name_str == "is_digit" {
+                                        let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
+                                        let a = i64::cast(inputs.get(0))?;
+                                        return Ok(Value::Boolean(function(a) != 0));
+                                    }
+                                    if name_str == "character_at" {
+                                        let function: extern "C" fn(i64, i64) -> u8 = std::mem::transmute(address);
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
+                                        return Ok(Value::Integer(function(a, b) as i64));
+                                    }
+                                    if name_str == "integer_uint8" || name_str == "character_uint8" {
+                                        let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
+                                        let a = i64::cast(inputs.get(0))?;
+                                        return Ok(Value::Integer(function(a) as i64));
+                                    }
+                                    if name_str == "uint8_character" {
+                                        let function: extern "C" fn(i64) -> i32 = std::mem::transmute(address);
+                                        let a = i64::cast(inputs.get(0))?;
+                                        return Ok(Value::Integer(function(a) as i64));
+                                    }
 
-                                match arity {
-                                    0 => {
-                                        let function: extern "C" fn() -> i64 = std::mem::transmute(address);
-                                        Ok(Value::Integer(function()))
+                                    match arity {
+                                        0 => {
+                                            let function: extern "C" fn() -> i64 = std::mem::transmute(address);
+                                            Ok(Value::Integer(function()))
+                                        }
+                                        1 => {
+                                            let function: extern "C" fn(i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            Ok(Value::Integer(function(a)))
+                                        }
+                                        2 => {
+                                            let function: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            let b = i64::cast(inputs.get(1))?;
+                                            Ok(Value::Integer(function(a, b)))
+                                        }
+                                        3 => {
+                                            let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            let b = i64::cast(inputs.get(1))?;
+                                            let c = i64::cast(inputs.get(2))?;
+                                            Ok(Value::Integer(function(a, b, c)))
+                                        }
+                                        4 => {
+                                            let function: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            let b = i64::cast(inputs.get(1))?;
+                                            let c = i64::cast(inputs.get(2))?;
+                                            let d = i64::cast(inputs.get(3))?;
+                                            Ok(Value::Integer(function(a, b, c, d)))
+                                        }
+                                        5 => {
+                                            let function: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            let b = i64::cast(inputs.get(1))?;
+                                            let c = i64::cast(inputs.get(2))?;
+                                            let d = i64::cast(inputs.get(3))?;
+                                            let e = i64::cast(inputs.get(4))?;
+                                            Ok(Value::Integer(function(a, b, c, d, e)))
+                                        }
+                                        6 => {
+                                            let function: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
+                                            let a = i64::cast(inputs.get(0))?;
+                                            let b = i64::cast(inputs.get(1))?;
+                                            let c = i64::cast(inputs.get(2))?;
+                                            let d = i64::cast(inputs.get(3))?;
+                                            let e = i64::cast(inputs.get(4))?;
+                                            let f = i64::cast(inputs.get(5))?;
+                                            Ok(Value::Integer(function(a, b, c, d, e, f)))
+                                        }
+                                        _ => Err(ErrorKind::TypeMismatch),
                                     }
-                                    1 => {
-                                        let function: extern "C" fn(i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        Ok(Value::Integer(function(a)))
-                                    }
-                                    2 => {
-                                        let function: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        Ok(Value::Integer(function(a, b)))
-                                    }
-                                    3 => {
-                                        let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        let c = i64::cast(inputs.get(2))?;
-                                        Ok(Value::Integer(function(a, b, c)))
-                                    }
-                                    4 => {
-                                        let function: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        let c = i64::cast(inputs.get(2))?;
-                                        let d = i64::cast(inputs.get(3))?;
-                                        Ok(Value::Integer(function(a, b, c, d)))
-                                    }
-                                    5 => {
-                                        let function: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        let c = i64::cast(inputs.get(2))?;
-                                        let d = i64::cast(inputs.get(3))?;
-                                        let e = i64::cast(inputs.get(4))?;
-                                        Ok(Value::Integer(function(a, b, c, d, e)))
-                                    }
-                                    6 => {
-                                        let function: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        let c = i64::cast(inputs.get(2))?;
-                                        let d = i64::cast(inputs.get(3))?;
-                                        let e = i64::cast(inputs.get(4))?;
-                                        let f = i64::cast(inputs.get(5))?;
-                                        Ok(Value::Integer(function(a, b, c, d, e, f)))
-                                    }
-                                    _ => Err(ErrorKind::TypeMismatch),
                                 }
-                            }
+                            });
+
+                            vm.foreign.push(Foreign::Dynamic(execute));
+                            vm.native(name, vm.foreign.len() - 1);
+                        } else {
+                            let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
+                                Err(ErrorKind::OutOfBounds)
+                            });
+                            vm.foreign.push(Foreign::Dynamic(execute));
+                            vm.native(name, vm.foreign.len() - 1);
+                        }
+                    } else {
+                        let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
+                            Err(ErrorKind::OutOfBounds)
                         });
-
                         vm.foreign.push(Foreign::Dynamic(execute));
                         vm.native(name, vm.foreign.len() - 1);
-                    } else {
-                        panic!("Could not resolve C function symbol: {}. Please ensure C libraries are dynamically loaded/linked into the interpreter executable.", name);
                     }
                 }
             }
@@ -1096,8 +1109,8 @@ impl<'source> Action<
         let entry = vm.address("main");
 
         if session.errors.is_empty() {
-            if let Some(main_ptr) = entry {
-                vm.pointer = main_ptr;
+            if let Some(address) = entry {
+                vm.pointer = address;
             }
 
             vm.frames.clear();
@@ -1109,7 +1122,7 @@ impl<'source> Action<
             }
         }
 
-        let duration = Duration::from_nanos(session.timer.lap().unwrap());
+        let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
         session.report_finish("interpreting", duration, session.errors.len() - initial);
 
         if session.errors.is_empty() {
