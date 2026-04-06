@@ -7,7 +7,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         combinator::{Action, Operation, Operator},
-        data::{memory::Arc, Str, CString, Interface},
+        data::{memory::Arc, CString, Interface, Str},
         internal::{
             hash::Map,
             platform::{create_dir_all, Command, Lock},
@@ -170,18 +170,18 @@ impl Wrap for *mut u8 {
 macro_rules! bind {
     ($instance:expr, $store:expr, $translator:expr, $name:expr, $ret:ty $(, $arg:ty)*) => {
         if let Some(pointer) = $instance.symbol($name) {
-            struct UnsafeWrap<T>(T);
-            unsafe impl<T> Send for UnsafeWrap<T> {}
-            unsafe impl<T> Sync for UnsafeWrap<T> {}
-            let safe = UnsafeWrap(instance);
+            struct WrapUnsafe<T>(T);
+            unsafe impl<T> Send for WrapUnsafe<T> {}
+            unsafe impl<T> Sync for WrapUnsafe<T> {}
+            let safe = WrapUnsafe(instance);
 
-            let execute = Arc::new(move |arguments: &[Value]| -> Result<Value, ErrorKind> {
+            let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
                 let instance = &safe.0;
                 let mut index = 0;
                 let function: extern "C" fn($($arg),*) -> $ret = unsafe { std::mem::transmute(pointer) };
                 let result = function($(
                     {
-                        let value = <$arg as Cast>::cast(arguments.get(index))?;
+                        let value = <$arg as Cast>::cast(inputs.get(index))?;
                         index += 1;
                         value
                     }
@@ -230,14 +230,14 @@ pub enum Opcode {
     Greater,
     LessEqual,
     GreaterEqual,
-    LogicalAnd,
-    LogicalOr,
-    LogicalNot,
-    LogicalXor,
-    BitwiseAnd,
-    BitwiseOr,
-    BitwiseNot,
-    BitwiseXor,
+    LogicAnd,
+    LogicOr,
+    LogicNot,
+    LogicXor,
+    BitAnd,
+    BitOr,
+    BitNot,
+    BitXor,
     ShiftLeft,
     ShiftRight,
     Jump(usize),
@@ -246,7 +246,7 @@ pub enum Opcode {
     Load(usize),
     Store(usize),
     Call(usize),
-    ForeignCall(usize, usize),
+    CallForeign(usize, usize),
     Return,
     Halt,
     MakeSequence(usize),
@@ -266,22 +266,38 @@ pub struct Instruction<'error> {
     pub span: Span<'error>,
 }
 
+#[derive(Clone, Debug)]
+pub enum Entity {
+    Foreign(usize),
+    Function(Option<usize>),
+    Structure(Vec<String>),
+    Union(Vec<String>),
+    Module,
+}
+
 pub struct Machine<'error> {
     stack: Vec<Value>,
     frames: Vec<usize>,
     memory: Vec<Value>,
     code: Vec<Instruction<'error>>,
     foreign: Vec<Foreign<'error>>,
+    bindings: Map<String, usize>,
+    entities: Map<String, Entity>,
+    pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
+    pub current_module: Str<'error>,
+    calls: Vec<(usize, String, String)>,
+    loops: Vec<(usize, Vec<usize>)>,
+    memory_top: usize,
     pointer: usize,
     running: bool,
 }
 
-pub fn print<'error>(arguments: &[Value], _span: Span<'error>) -> Result<Value, InterpretError<'error>> {
-    for (index, argument) in arguments.iter().enumerate() {
+pub fn print<'error>(inputs: &[Value], _span: Span<'error>) -> Result<Value, InterpretError<'error>> {
+    for (index, input) in inputs.iter().enumerate() {
         if index > 0 {
             std::print!(" ");
         }
-        match argument {
+        match input {
             Value::Integer(value) => std::print!("{}", value),
             Value::Float(value) => std::print!("{}", value),
             Value::Boolean(value) => std::print!("{}", value),
@@ -299,19 +315,29 @@ pub fn print<'error>(arguments: &[Value], _span: Span<'error>) -> Result<Value, 
 }
 
 impl<'error> Machine<'error> {
-    pub fn new(code: Vec<Instruction<'error>>, capacity: usize, foreign: Vec<Foreign<'error>>) -> Self {
+    pub fn new(capacity: usize, foreign: Vec<Foreign<'error>>) -> Self {
         let mut base = vec![Foreign::Rust(print)];
         base.extend(foreign);
 
-        Self {
+        let mut machine = Self {
             stack: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
-            code,
+            code: Vec::new(),
             foreign: base,
+            bindings: Map::new(),
+            entities: Map::new(),
+            modules: Map::new(),
+            current_module: Str::default(),
+            calls: Vec::new(),
+            loops: Vec::new(),
+            memory_top: 0,
             pointer: 0,
             running: false,
-        }
+        };
+
+        machine.native("print", 0);
+        machine
     }
 
     fn error(&self, kind: ErrorKind, span: Span<'error>) -> InterpretError<'error> {
@@ -349,14 +375,14 @@ impl<'error> Machine<'error> {
             Opcode::Greater => self.greater()?,
             Opcode::LessEqual => self.less_equal()?,
             Opcode::GreaterEqual => self.greater_equal()?,
-            Opcode::LogicalAnd => self.logical_and()?,
-            Opcode::LogicalOr => self.logical_or()?,
-            Opcode::LogicalNot => self.logical_not()?,
-            Opcode::LogicalXor => self.logical_xor()?,
-            Opcode::BitwiseAnd => self.bitwise_and()?,
-            Opcode::BitwiseOr => self.bitwise_or()?,
-            Opcode::BitwiseNot => self.bitwise_not()?,
-            Opcode::BitwiseXor => self.bitwise_xor()?,
+            Opcode::LogicAnd => self.logic_and()?,
+            Opcode::LogicOr => self.logic_or()?,
+            Opcode::LogicNot => self.logic_not()?,
+            Opcode::LogicXor => self.logic_xor()?,
+            Opcode::BitAnd => self.bit_and()?,
+            Opcode::BitOr => self.bit_or()?,
+            Opcode::BitNot => self.bit_not()?,
+            Opcode::BitXor => self.bit_xor()?,
             Opcode::ShiftLeft => self.shift_left()?,
             Opcode::ShiftRight => self.shift_right()?,
             Opcode::Jump(target) => self.jump(target)?,
@@ -365,7 +391,7 @@ impl<'error> Machine<'error> {
             Opcode::Load(address) => self.load(address)?,
             Opcode::Store(address) => self.store(address)?,
             Opcode::Call(target) => self.call(target)?,
-            Opcode::ForeignCall(target, count) => self.foreign_call(target, count)?,
+            Opcode::CallForeign(target, count) => self.call_foreign(target, count)?,
             Opcode::Return => self.finish()?,
             Opcode::Halt => self.running = false,
             Opcode::MakeSequence(size) => self.make_sequence(size)?,
@@ -563,7 +589,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn logical_and(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_and(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -577,7 +603,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn logical_or(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_or(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -591,7 +617,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn logical_not(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_not(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -604,7 +630,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn logical_xor(&mut self) -> Result<(), InterpretError<'error>> {
+    fn logic_xor(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -618,7 +644,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn bitwise_and(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_and(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -632,7 +658,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn bitwise_or(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_or(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -646,7 +672,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn bitwise_not(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_not(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -659,7 +685,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn bitwise_xor(&mut self) -> Result<(), InterpretError<'error>> {
+    fn bit_xor(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -756,7 +782,7 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
-    fn foreign_call(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
+    fn call_foreign(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
 
@@ -765,11 +791,11 @@ impl<'error> Machine<'error> {
         }
 
         let start = self.stack.len() - count;
-        let arguments = &self.stack[start..];
+        let inputs = &self.stack[start..];
 
         let result = match routine {
-            Foreign::Rust(function) => function(arguments, span)?,
-            Foreign::Dynamic(dynamic) => dynamic(arguments).map_err(|kind| self.error(kind, span))?,
+            Foreign::Rust(function) => function(inputs, span)?,
+            Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span))?,
         };
 
         self.stack.truncate(start);
@@ -928,24 +954,22 @@ impl<'source> Action<
         }
         sources.sort();
 
-        let mut translator = translator::Translator::new();
-        let mut all = Vec::new();
+        let mut vm = Machine::new(1024, Vec::new());
 
         for &key in &sources {
             let record = session.records.get(&key).unwrap();
             let location = record.location;
             let stem = Str::from(location.stem().unwrap().to_string());
 
-            translator.current_module = stem;
-
             if let Some(analyses) = record.analyses.clone() {
-                all.extend(analyses);
+                vm.modules.insert(stem, analyses);
             }
         }
 
         let mut dynamic = Vec::new();
+        let modules: Vec<_> = vm.modules.values().flat_map(|items| items.iter()).cloned().collect();
 
-        for analysis in &all {
+        for analysis in &modules {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if matches!(function.interface, Interface::C) {
                     let name = function.target.as_str().unwrap_or_default();
@@ -959,7 +983,7 @@ impl<'source> Action<
                         let arity = function.members.len();
                         let address = pointer as usize;
 
-                        let execute = Arc::new(move |arguments: &[Value]| -> Result<Value, ErrorKind> {
+                        let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
                             unsafe {
                                 match arity {
                                     0 => {
@@ -968,47 +992,47 @@ impl<'source> Action<
                                     }
                                     1 => {
                                         let function: extern "C" fn(i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
+                                        let a = i64::cast(inputs.get(0))?;
                                         Ok(Value::Integer(function(a)))
                                     }
                                     2 => {
                                         let function: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
-                                        let b = i64::cast(arguments.get(1))?;
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
                                         Ok(Value::Integer(function(a, b)))
                                     }
                                     3 => {
                                         let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
-                                        let b = i64::cast(arguments.get(1))?;
-                                        let c = i64::cast(arguments.get(2))?;
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
+                                        let c = i64::cast(inputs.get(2))?;
                                         Ok(Value::Integer(function(a, b, c)))
                                     }
                                     4 => {
                                         let function: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
-                                        let b = i64::cast(arguments.get(1))?;
-                                        let c = i64::cast(arguments.get(2))?;
-                                        let d = i64::cast(arguments.get(3))?;
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
+                                        let c = i64::cast(inputs.get(2))?;
+                                        let d = i64::cast(inputs.get(3))?;
                                         Ok(Value::Integer(function(a, b, c, d)))
                                     }
                                     5 => {
                                         let function: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
-                                        let b = i64::cast(arguments.get(1))?;
-                                        let c = i64::cast(arguments.get(2))?;
-                                        let d = i64::cast(arguments.get(3))?;
-                                        let e = i64::cast(arguments.get(4))?;
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
+                                        let c = i64::cast(inputs.get(2))?;
+                                        let d = i64::cast(inputs.get(3))?;
+                                        let e = i64::cast(inputs.get(4))?;
                                         Ok(Value::Integer(function(a, b, c, d, e)))
                                     }
                                     6 => {
                                         let function: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                        let a = i64::cast(arguments.get(0))?;
-                                        let b = i64::cast(arguments.get(1))?;
-                                        let c = i64::cast(arguments.get(2))?;
-                                        let d = i64::cast(arguments.get(3))?;
-                                        let e = i64::cast(arguments.get(4))?;
-                                        let f = i64::cast(arguments.get(5))?;
+                                        let a = i64::cast(inputs.get(0))?;
+                                        let b = i64::cast(inputs.get(1))?;
+                                        let c = i64::cast(inputs.get(2))?;
+                                        let d = i64::cast(inputs.get(3))?;
+                                        let e = i64::cast(inputs.get(4))?;
+                                        let f = i64::cast(inputs.get(5))?;
                                         Ok(Value::Integer(function(a, b, c, d, e, f)))
                                     }
                                     _ => Err(ErrorKind::TypeMismatch),
@@ -1017,7 +1041,8 @@ impl<'source> Action<
                         });
 
                         dynamic.push(Foreign::Dynamic(execute));
-                        translator.native(name, dynamic.len());
+                        vm.foreign.push(dynamic.last().unwrap().clone());
+                        vm.native(name, vm.foreign.len() - 1);
                     } else {
                         panic!("Could not resolve C function symbol: {}. Please ensure C libraries are dynamically loaded/linked into the interpreter executable.", name);
                     }
@@ -1025,19 +1050,17 @@ impl<'source> Action<
             }
         }
 
-        let code = translator.compile(all);
-        let entry = translator.address("main");
-
-        let mut machine = Machine::new(code, 1024, dynamic);
+        vm.compile();
+        let entry = vm.address("main");
 
         if session.errors.is_empty() {
             if let Some(main_ptr) = entry {
-                machine.pointer = main_ptr;
+                vm.pointer = main_ptr;
             }
 
-            machine.frames.clear();
+            vm.frames.clear();
 
-            if let Err(error) = machine.run() {
+            if let Err(error) = vm.run() {
                 if !matches!(error.kind, ErrorKind::InvalidFrame) {
                     session.errors.push(CompileError::Interpret(error.clone()));
                 }
