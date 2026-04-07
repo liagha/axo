@@ -1,32 +1,24 @@
-use {
-    crate::{
-        analyzer::{Analysis, AnalysisKind},
-        data::Str,
-        interpreter::{Entity, Instruction, Machine, Opcode, Value},
-        tracker::Span,
-    },
+use crate::{
+    analyzer::{Analysis, AnalysisKind},
+    data::Str,
+    interpreter::{Entity, Instruction, Machine, Opcode, Value},
+    tracker::Span,
 };
 
 impl<'error> Machine<'error> {
-    pub fn native(&mut self, identifier: &str, index: usize) {
-        self.entities
-            .insert(identifier.to_string(), Entity::Foreign(index));
-
-        if let Some((prefix, suffix)) = identifier.split_once('_') {
-            self.entities
-                .insert(format!("{}.{}", prefix, suffix), Entity::Foreign(index));
-            self.entities.insert(
-                format!("{}.{}", prefix, identifier),
-                Entity::Foreign(index),
-            );
+    pub fn native(&mut self, name: &str, index: usize) {
+        self.entities.insert(name.to_string(), Entity::Foreign(index));
+        if let Some((prefix, suffix)) = name.split_once('_') {
+            self.entities.insert(format!("{}.{}", prefix, suffix), Entity::Foreign(index));
+            self.entities.insert(format!("{}.{}", prefix, name), Entity::Foreign(index));
         }
     }
 
-    pub fn address(&self, identifier: &str) -> Option<usize> {
-        match self.entities.get(identifier) {
+    pub fn address(&self, name: &str) -> Option<usize> {
+        match self.entities.get(name) {
             Some(Entity::Function(Some(address))) => Some(*address),
-            _ if !identifier.contains('.') => self.entities.iter().find_map(|(name, entity)| {
-                if name.ends_with(&format!(".{}", identifier)) {
+            _ if !name.contains('.') => self.entities.iter().find_map(|(key, entity)| {
+                if key.ends_with(&format!(".{}", name)) {
                     match entity {
                         Entity::Function(Some(address)) => Some(*address),
                         _ => None,
@@ -43,8 +35,8 @@ impl<'error> Machine<'error> {
         self.code.push(Instruction { opcode, span });
     }
 
-    fn patch(&mut self, position: usize, opcode: Opcode) {
-        self.code[position].opcode = opcode;
+    fn patch(&mut self, index: usize, opcode: Opcode) {
+        self.code[index].opcode = opcode;
     }
 
     fn namespace(&self, target: &str) -> String {
@@ -61,7 +53,7 @@ impl<'error> Machine<'error> {
         }
     }
 
-    fn scoped_module(
+    fn scope(
         &mut self,
         stem: Str<'error>,
         action: fn(&mut Self, Vec<Analysis<'error>>),
@@ -78,8 +70,7 @@ impl<'error> Machine<'error> {
         modules.sort();
 
         for module in &modules {
-            self.entities
-                .insert(module.to_string(), Entity::Module);
+            self.entities.insert(module.to_string(), Entity::Module);
         }
 
         for module in &modules {
@@ -99,11 +90,11 @@ impl<'error> Machine<'error> {
         }
 
         let calls = std::mem::take(&mut self.calls);
-        for (position, identifier, target) in calls {
-            if let Some(address) = self.address(&identifier).or_else(|| self.address(&target)) {
-                self.patch(position, Opcode::Call(address));
+        for (index, name, target) in calls {
+            if let Some(address) = self.address(&name).or_else(|| self.address(&target)) {
+                self.patch(index, Opcode::Call(address));
             } else {
-                self.patch(position, Opcode::Trap);
+                self.patch(index, Opcode::Trap);
             }
         }
     }
@@ -112,31 +103,25 @@ impl<'error> Machine<'error> {
         for analysis in analyses {
             match analysis.kind {
                 AnalysisKind::Structure(structure) => {
-                    let identifier = self.namespace(&structure.target.to_string());
-                    let members = Self::member_names(structure.members);
-                    self.entities.insert(
-                        identifier,
-                        Entity::Structure(analysis.typing.identity, members),
-                    );
+                    let name = self.namespace(&structure.target.to_string());
+                    let items = Self::members(structure.members);
+                    self.entities.insert(name, Entity::Structure(analysis.typing.identity, items));
                 }
                 AnalysisKind::Union(union) => {
-                    let identifier = self.namespace(&union.target.to_string());
-                    let members = Self::member_names(union.members);
-                    self.entities.insert(
-                        identifier,
-                        Entity::Structure(analysis.typing.identity, members),
-                    );
+                    let name = self.namespace(&union.target.to_string());
+                    let items = Self::members(union.members);
+                    self.entities.insert(name, Entity::Union(analysis.typing.identity, items));
                 }
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
-                        let identifier = self.namespace(&function.target.to_string());
-                        self.entities.insert(identifier, Entity::Function(None));
+                        let name = self.namespace(&function.target.to_string());
+                        self.entities.insert(name, Entity::Function(None));
                     }
                 }
-                AnalysisKind::Module(stem, analyses) => {
-                    let identifier = self.namespace(&stem.to_string());
-                    self.entities.insert(identifier, Entity::Module);
-                    self.scoped_module(stem.clone(), Self::declare, analyses);
+                AnalysisKind::Module(stem, inner) => {
+                    let name = self.namespace(&stem.to_string());
+                    self.entities.insert(name, Entity::Module);
+                    self.scope(stem.clone(), Self::declare, inner);
                 }
                 _ => {}
             }
@@ -152,10 +137,10 @@ impl<'error> Machine<'error> {
                     entry = Some((function.clone(), analysis.span.clone()));
                 }
                 AnalysisKind::Function(function) => {
-                    self.define_function(function.clone(), analysis.span.clone());
+                    self.define(function.clone(), analysis.span.clone());
                 }
                 AnalysisKind::Module(stem, inner) => {
-                    self.scoped_module(stem.clone(), Self::generate, inner.clone());
+                    self.scope(stem.clone(), Self::generate, inner.clone());
                 }
                 AnalysisKind::Binding(_) => self.walk(analysis),
                 _ => {}
@@ -163,11 +148,11 @@ impl<'error> Machine<'error> {
         }
 
         if let Some((function, span)) = entry {
-            self.define_function(function, span);
+            self.define(function, span);
         }
     }
 
-    fn define_function(
+    fn define(
         &mut self,
         function: crate::data::Function<
             Str<'error>,
@@ -181,12 +166,11 @@ impl<'error> Machine<'error> {
         self.emit(Opcode::Jump(0), span.clone());
 
         let address = self.code.len();
-        let identifier = self.namespace(&function.target.to_string());
-        self.entities
-            .insert(identifier, Entity::Function(Some(address)));
+        let name = self.namespace(&function.target.to_string());
+        self.entities.insert(name, Entity::Function(Some(address)));
 
-        let saved_bindings = self.bindings.clone();
-        let saved_memory = self.memory_top;
+        let bindings = self.bindings.clone();
+        let memory = self.memory_top;
 
         let mut members = function.members.clone();
         members.reverse();
@@ -216,27 +200,36 @@ impl<'error> Machine<'error> {
         }
 
         self.emit(Opcode::Return, span.clone());
-        self.bindings = saved_bindings;
-        self.memory_top = saved_memory;
+        self.bindings = bindings;
+        self.memory_top = memory;
         self.patch(bypass, Opcode::Jump(self.code.len()));
+    }
+
+    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<usize> {
+        let mut current = typing;
+        while let crate::resolver::TypeKind::Pointer { target } = &current.kind {
+            current = target;
+        }
+
+        for entity in self.entities.values() {
+            if let Entity::Structure(id, members) | Entity::Union(id, members) = entity {
+                if *id == current.identity {
+                    return members.iter().position(|item| item == field);
+                }
+            }
+        }
+
+        None
     }
 
     fn walk(&mut self, node: Analysis<'error>) {
         let span = node.span;
         match node.kind {
-            AnalysisKind::Integer { value, .. } => {
-                self.emit(Opcode::Push(Value::Integer(value as i64)), span)
-            }
-            AnalysisKind::Float { value, .. } => {
-                self.emit(Opcode::Push(Value::Float(f64::from(value))), span)
-            }
+            AnalysisKind::Integer { value, .. } => self.emit(Opcode::Push(Value::Integer(value as i64)), span),
+            AnalysisKind::Float { value, .. } => self.emit(Opcode::Push(Value::Float(f64::from(value))), span),
             AnalysisKind::Boolean { value } => self.emit(Opcode::Push(Value::Boolean(value)), span),
-            AnalysisKind::Character { value } => {
-                self.emit(Opcode::Push(Value::Character(value as char)), span)
-            }
-            AnalysisKind::String { value } => {
-                self.emit(Opcode::Push(Value::Text(value.to_string())), span)
-            }
+            AnalysisKind::Character { value } => self.emit(Opcode::Push(Value::Character(value as char)), span),
+            AnalysisKind::String { value } => self.emit(Opcode::Push(Value::Text(value.to_string())), span),
             AnalysisKind::Array(elements) => {
                 let size = elements.len();
                 for element in elements {
@@ -372,23 +365,19 @@ impl<'error> Machine<'error> {
                 }
 
                 let target = invoke.target.to_string();
-                let identifier = self.namespace(&target);
+                let name = self.namespace(&target);
 
                 match self
                     .entities
-                    .get(&identifier)
+                    .get(&name)
                     .or_else(|| self.entities.get(&target))
                 {
-                    Some(Entity::Foreign(position)) => {
-                        self.emit(Opcode::CallForeign(*position, count), span);
-                    }
-                    Some(Entity::Function(Some(address))) => {
-                        self.emit(Opcode::Call(*address), span);
-                    }
+                    Some(Entity::Foreign(index)) => self.emit(Opcode::CallForeign(*index, count), span),
+                    Some(Entity::Function(Some(address))) => self.emit(Opcode::Call(*address), span),
                     Some(Entity::Function(None)) | None => {
-                        let position = self.code.len();
+                        let place = self.code.len();
                         self.emit(Opcode::Call(0), span);
-                        self.calls.push((position, identifier, target));
+                        self.calls.push((place, name, target));
                     }
                     _ => self.emit(Opcode::Trap, span),
                 }
@@ -428,8 +417,8 @@ impl<'error> Machine<'error> {
                     let end = self.code.len();
                     self.patch(check, Opcode::JumpFalse(end));
 
-                    for position in breaks {
-                        self.patch(position, Opcode::Jump(end));
+                    for index in breaks {
+                        self.patch(index, Opcode::Jump(end));
                     }
                 } else {
                     self.emit(Opcode::Trap, span);
@@ -439,62 +428,57 @@ impl<'error> Machine<'error> {
                 if let Some(value) = operand {
                     self.walk(*value);
                 }
-                let position = self.code.len();
+                let place = self.code.len();
                 if self.loops.is_empty() {
                     self.emit(Opcode::Trap, span);
                 } else {
                     self.emit(Opcode::Jump(0), span);
                     if let Some(state) = self.loops.last_mut() {
-                        state.1.push(position);
+                        state.1.push(place);
                     }
                 }
             }
             AnalysisKind::Continue(_) => {
-                let target = self.loops.last().map(|state| state.0);
-                if let Some(position) = target {
-                    self.emit(Opcode::Jump(position), span);
+                if let Some(state) = self.loops.last() {
+                    self.emit(Opcode::Jump(state.0), span);
                 } else {
                     self.emit(Opcode::Trap, span);
                 }
             }
             AnalysisKind::Binding(binding) => {
-                if let Some(value) = binding.value {
-                    if let AnalysisKind::Usage(target) = binding.target.kind {
-                        self.walk(*value);
-                        let address = self.memory_top;
-                        self.memory_top += 1;
-                        self.bindings.insert(target.to_string(), address);
-                        self.emit(Opcode::Store(address), span);
-                    }
+                if let (Some(value), AnalysisKind::Usage(target)) = (binding.value, binding.target.kind) {
+                    self.walk(*value);
+                    let address = self.memory_top;
+                    self.memory_top += 1;
+                    self.bindings.insert(target.to_string(), address);
+                    self.emit(Opcode::Store(address), span);
                 }
             }
-            AnalysisKind::Usage(identifier) => {
-                let target = identifier.to_string();
+            AnalysisKind::Usage(name) => {
+                let target = name.to_string();
                 if let Some(&address) = self.bindings.get(&target) {
                     self.emit(Opcode::Load(address), span);
                 } else {
                     self.emit(Opcode::Trap, span);
                 }
             }
-            AnalysisKind::Assign(identifier, value) => {
+            AnalysisKind::Assign(name, value) => {
                 self.walk(*value);
-                let target = identifier.to_string();
+                let target = name.to_string();
                 if let Some(&address) = self.bindings.get(&target) {
                     self.emit(Opcode::Store(address), span);
                 } else {
                     self.emit(Opcode::Trap, span);
                 }
             }
-            AnalysisKind::Function(function) => self.define_function(function, span),
+            AnalysisKind::Function(function) => self.define(function, span),
             AnalysisKind::Return(operand) => {
                 if let Some(value) = operand {
                     self.walk(*value);
                 }
                 self.emit(Opcode::Return, span);
             }
-            AnalysisKind::Module(stem, analyses) => {
-                self.scoped_module(stem.clone(), Self::generate, analyses);
-            }
+            AnalysisKind::Module(stem, analyses) => self.scope(stem.clone(), Self::generate, analyses),
             AnalysisKind::Access(left, right) => {
                 if let AnalysisKind::Invoke(invoke) = right.kind {
                     let count = invoke.members.len();
@@ -504,24 +488,20 @@ impl<'error> Machine<'error> {
 
                     if let AnalysisKind::Usage(name) = left.kind {
                         let target = format!("{}.{}", name, invoke.target);
-                        let identifier = self.namespace(&target);
+                        let full = self.namespace(&target);
 
                         match self
                             .entities
-                            .get(&identifier)
+                            .get(&full)
                             .or_else(|| self.entities.get(&target))
                             .or_else(|| self.entities.get(&invoke.target.to_string()))
                         {
-                            Some(Entity::Foreign(position)) => {
-                                self.emit(Opcode::CallForeign(*position, count), span);
-                            }
-                            Some(Entity::Function(Some(address))) => {
-                                self.emit(Opcode::Call(*address), span);
-                            }
+                            Some(Entity::Foreign(index)) => self.emit(Opcode::CallForeign(*index, count), span),
+                            Some(Entity::Function(Some(address))) => self.emit(Opcode::Call(*address), span),
                             Some(Entity::Function(None)) | None => {
-                                let position = self.code.len();
+                                let place = self.code.len();
                                 self.emit(Opcode::Call(0), span);
-                                self.calls.push((position, identifier, target));
+                                self.calls.push((place, full, target));
                             }
                             _ => self.emit(Opcode::Trap, span),
                         }
@@ -530,29 +510,12 @@ impl<'error> Machine<'error> {
                     }
                 } else if let AnalysisKind::Usage(name) = right.kind {
                     let field = name.to_string();
-                    let mut typing = &left.typing;
-
-                    while let crate::resolver::TypeKind::Pointer { target } = &typing.kind {
-                        typing = target;
-                    }
-
-                    let identity = typing.identity;
+                    let index = self.position(&left.typing, &field);
 
                     self.walk(*left);
 
-                    let mut found = None;
-
-                    for entity in self.entities.values() {
-                        if let Entity::Structure(id, members) = entity {
-                            if *id == identity {
-                                found = members.iter().position(|member| member == &field);
-                                break;
-                            }
-                        }
-                    }
-
-                    if let Some(index) = found {
-                        self.emit(Opcode::ExtractField(index), span);
+                    if let Some(place) = index {
+                        self.emit(Opcode::ExtractField(place), span);
                     } else {
                         self.emit(Opcode::Trap, span);
                     }
@@ -562,42 +525,22 @@ impl<'error> Machine<'error> {
                 }
             }
             AnalysisKind::Store(target, value) => {
-                let mut handled = false;
+                let mut valid = false;
+
                 if let AnalysisKind::Access(left, right) = &target.kind {
-                    if let AnalysisKind::Usage(field) = &right.kind {
-                        if let AnalysisKind::Usage(variable) = &left.kind {
-                            let name = variable.to_string();
+                    if let (AnalysisKind::Usage(variable), AnalysisKind::Usage(field)) = (&left.kind, &right.kind) {
+                        let name = variable.to_string();
+                        let member = field.to_string();
 
-                            if let Some(&address) = self.bindings.get(&name) {
-                                let member = field.to_string();
-                                let mut typing = &left.typing;
-
-                                while let crate::resolver::TypeKind::Pointer { target } = &typing.kind {
-                                    typing = target;
-                                }
-
-                                let identity = typing.identity;
-                                let mut found = None;
-
-                                for entity in self.entities.values() {
-                                    if let Entity::Structure(id, members) = entity {
-                                        if *id == identity {
-                                            found = members.iter().position(|item| item == &member);
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if let Some(index) = found {
-                                    self.walk(*value);
-                                    self.emit(Opcode::StoreField(address, index), span.clone());
-                                    handled = true;
-                                }
-                            }
+                        if let (Some(&address), Some(index)) = (self.bindings.get(&name), self.position(&left.typing, &member)) {
+                            self.walk(*value);
+                            self.emit(Opcode::StoreField(address, index), span.clone());
+                            valid = true;
                         }
                     }
                 }
-                if !handled {
+
+                if !valid {
                     self.emit(Opcode::Trap, span);
                 }
             }
@@ -628,10 +571,7 @@ impl Machine<'_> {
         }
     }
 
-    fn member_names(analyses: Vec<Analysis<'_>>) -> Vec<String> {
-        analyses
-            .iter()
-            .filter_map(|analysis| Self::extract_name(analysis))
-            .collect()
+    fn members(analyses: Vec<Analysis<'_>>) -> Vec<String> {
+        analyses.iter().filter_map(Self::extract_name).collect()
     }
 }
