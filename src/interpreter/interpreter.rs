@@ -756,7 +756,9 @@ impl<'error> Machine<'error> {
             Value::Variant(active, value) if active == tag => {
                 self.stack.push(*value);
             }
-            Value::Variant(..) => return Err(self.error(ErrorKind::TypeMismatch, span)),
+            Value::Variant(..) => {
+                self.stack.push(Value::Empty);
+            }
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         }
         Ok(())
