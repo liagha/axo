@@ -1,4 +1,3 @@
-// src/interpreter/mod.rs
 #![allow(unused)]
 
 mod error;
@@ -64,6 +63,11 @@ impl Library {
     }
 }
 
+// Thread-local storage to safely hold CStrings for the exact duration of an FFI call.
+thread_local! {
+    static FFI_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
+}
+
 pub trait Cast: Sized {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind>;
 }
@@ -77,7 +81,12 @@ impl Cast for i64 {
         match value {
             Some(Value::Integer(value)) => Ok(*value),
             Some(Value::Pointer(value)) => Ok(*value as i64),
-            Some(Value::Text(value)) => Ok(value.as_ptr() as i64),
+            Some(Value::Text(value)) => {
+                let c_str = CString::new(value.clone()).map_err(|_| ErrorKind::TypeMismatch)?;
+                let ptr = c_str.as_ptr() as i64;
+                FFI_STRINGS.with(|strings| strings.borrow_mut().push(c_str));
+                Ok(ptr)
+            }
             Some(Value::Boolean(value)) => Ok(if *value { 1 } else { 0 }),
             Some(Value::Character(value)) => Ok(*value as u32 as i64),
             Some(Value::Float(value)) => Ok(value.to_bits() as i64),
@@ -137,6 +146,12 @@ impl Cast for *mut u8 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Pointer(value)) => Ok(*value as *mut u8),
+            Some(Value::Text(value)) => {
+                let c_str = CString::new(value.clone()).map_err(|_| ErrorKind::TypeMismatch)?;
+                let ptr = c_str.as_ptr() as *mut u8;
+                FFI_STRINGS.with(|strings| strings.borrow_mut().push(c_str));
+                Ok(ptr)
+            }
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -366,6 +381,10 @@ impl<'error> Machine<'error> {
     fn step(&mut self) -> Result<(), InterpretError<'error>> {
         let instruction = self.code[self.pointer].clone();
         self.pointer += 1;
+
+        println!("DEBUG: IP: {:04} | Opcode: {:?} | Stack depth: {} | Stack: {:?}",
+                 self.pointer, instruction.opcode, self.stack.len(), self.stack);
+
 
         match instruction.opcode {
             Opcode::Push(value) => self.stack.push(value),
@@ -801,9 +820,15 @@ impl<'error> Machine<'error> {
         let inputs = &self.stack[start..];
 
         let result = match routine {
-            Foreign::Rust(function) => function(inputs, span)?,
-            Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span))?,
+            Foreign::Rust(function) => function(inputs, span),
+            Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span)),
         };
+
+        // Ensures CStrings allocated during Cast live long enough for the FFI call,
+        // and are cleared securely immediately after to prevent memory leaks.
+        FFI_STRINGS.with(|strings| strings.borrow_mut().clear());
+
+        let result = result?;
 
         self.stack.truncate(start);
         self.stack.push(result);
@@ -1017,7 +1042,7 @@ impl<'source> Action<
                                         let function: extern "C" fn(i64, i64) -> u8 = std::mem::transmute(address);
                                         let a = i64::cast(inputs.get(0))?;
                                         let b = i64::cast(inputs.get(1))?;
-                                        return Ok(Value::Integer(function(a, b) as i64));
+                                        return Ok(Value::Character(function(a, b) as char));
                                     }
                                     if name_str == "integer_uint8" || name_str == "character_uint8" {
                                         let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
@@ -1027,7 +1052,7 @@ impl<'source> Action<
                                     if name_str == "uint8_character" {
                                         let function: extern "C" fn(i64) -> i32 = std::mem::transmute(address);
                                         let a = i64::cast(inputs.get(0))?;
-                                        return Ok(Value::Integer(function(a) as i64));
+                                        return Ok(Value::Character(std::char::from_u32(function(a) as u32).unwrap_or('\0')));
                                     }
 
                                     match arity {
