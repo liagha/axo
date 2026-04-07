@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod error;
 mod translator;
 
@@ -10,7 +8,7 @@ use {
         data::{memory::Arc, CString, Interface, Str},
         internal::{
             hash::Map,
-            platform::{create_dir_all, Command, Lock},
+            platform::Lock,
             time::Duration,
             CompileError, InputKind, Session,
         },
@@ -27,22 +25,6 @@ pub type Native<'error> = fn(&[Value], Span<'error>) -> Result<Value, InterpretE
 #[cfg(unix)]
 mod sys {
     pub use libc::{c_void, dlopen, dlsym, RTLD_LAZY};
-}
-
-#[cfg(windows)]
-mod sys {
-    pub type c_void = std::ffi::c_void;
-    pub type Module = *mut c_void;
-    pub type Pointer = *mut c_void;
-    pub const RTLD_LAZY: i32 = 0;
-
-    extern "system" {
-        pub fn LoadLibraryA(path: *const i8) -> Module;
-        pub fn GetProcAddress(module: Module, name: *const i8) -> Pointer;
-    }
-
-    pub unsafe fn dlopen(path: *const i8, _mode: i32) -> Module { LoadLibraryA(path) }
-    pub unsafe fn dlsym(handle: Module, symbol: *const i8) -> Pointer { GetProcAddress(handle, symbol) }
 }
 
 pub struct Library {
@@ -65,159 +47,6 @@ impl Library {
 
 thread_local! {
     static FFI_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
-}
-
-pub trait Cast: Sized {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind>;
-}
-
-pub trait Wrap {
-    fn wrap(self) -> Value;
-}
-
-impl Cast for i64 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Integer(value)) => Ok(*value),
-            Some(Value::Float(value)) => Ok(*value as i64),
-            Some(Value::Pointer(value)) => Ok(*value as i64),
-            Some(Value::Text(value)) => {
-                let c_str = CString::new(value.clone()).map_err(|_| ErrorKind::TypeMismatch)?;
-                let ptr = c_str.as_ptr() as i64;
-                FFI_STRINGS.with(|strings| strings.borrow_mut().push(c_str));
-                Ok(ptr)
-            }
-            Some(Value::Boolean(value)) => Ok(if *value { 1 } else { 0 }),
-            Some(Value::Character(value)) => Ok(*value as u32 as i64),
-            Some(Value::Empty) => Ok(0),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for i32 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Integer(value)) => Ok(*value as i32),
-            Some(Value::Float(value)) => Ok(*value as i32),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for u64 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Integer(value)) => Ok(*value as u64),
-            Some(Value::Float(value)) => Ok(*value as u64),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for u8 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Integer(value)) => Ok(*value as u8),
-            Some(Value::Float(value)) => Ok(*value as u8),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for f64 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Float(value)) => Ok(*value),
-            Some(Value::Integer(value)) => Ok(*value as f64),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for bool {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Boolean(value)) => Ok(*value),
-            Some(Value::Integer(value)) => Ok(*value != 0),
-            Some(Value::Float(value)) => Ok(*value != 0.0),
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Cast for *mut u8 {
-    fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
-        match value {
-            Some(Value::Pointer(value)) => Ok(*value as *mut u8),
-            Some(Value::Text(value)) => {
-                let c_str = CString::new(value.clone()).map_err(|_| ErrorKind::TypeMismatch)?;
-                let ptr = c_str.as_ptr() as *mut u8;
-                FFI_STRINGS.with(|strings| strings.borrow_mut().push(c_str));
-                Ok(ptr)
-            }
-            _ => Err(ErrorKind::TypeMismatch),
-        }
-    }
-}
-
-impl Wrap for () {
-    fn wrap(self) -> Value { Value::Empty }
-}
-
-impl Wrap for i64 {
-    fn wrap(self) -> Value { Value::Integer(self) }
-}
-
-impl Wrap for i32 {
-    fn wrap(self) -> Value { Value::Integer(self as i64) }
-}
-
-impl Wrap for u64 {
-    fn wrap(self) -> Value { Value::Integer(self as i64) }
-}
-
-impl Wrap for u8 {
-    fn wrap(self) -> Value { Value::Integer(self as i64) }
-}
-
-impl Wrap for f64 {
-    fn wrap(self) -> Value { Value::Float(self) }
-}
-
-impl Wrap for bool {
-    fn wrap(self) -> Value { Value::Boolean(self) }
-}
-
-impl Wrap for *mut u8 {
-    fn wrap(self) -> Value { Value::Pointer(self as usize) }
-}
-
-macro_rules! bind {
-    ($instance:expr, $store:expr, $translator:expr, $name:expr, $ret:ty $(, $arg:ty)*) => {
-        if let Some(pointer) = $instance.symbol($name) {
-            struct WrapUnsafe<T>(T);
-            unsafe impl<T> Send for WrapUnsafe<T> {}
-            unsafe impl<T> Sync for WrapUnsafe<T> {}
-            let safe = WrapUnsafe(instance);
-
-            let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
-                let instance = &safe.0;
-                let mut index = 0;
-                let function: extern "C" fn($($arg),*) -> $ret = unsafe { std::mem::transmute(pointer) };
-                let result = function($(
-                    {
-                        let value = <$arg as Cast>::cast(inputs.get(index))?;
-                        index += 1;
-                        value
-                    }
-                ),*);
-                Ok(result.wrap())
-            });
-            $store.push(Foreign::Dynamic(execute));
-            $translator.native($name, $store.len() - 1);
-        }
-    };
 }
 
 #[derive(Clone)]
@@ -297,8 +126,8 @@ pub struct Instruction<'error> {
 pub enum Entity {
     Foreign(usize),
     Function(Option<usize>),
-    Structure(Vec<String>),
-    Union(Vec<String>),
+    Structure(usize, Vec<String>),
+    Union(usize, Vec<String>),    
     Module,
 }
 
@@ -319,39 +148,14 @@ pub struct Machine<'error> {
     running: bool,
 }
 
-pub fn print<'error>(inputs: &[Value], _span: Span<'error>) -> Result<Value, InterpretError<'error>> {
-    for (index, input) in inputs.iter().enumerate() {
-        if index > 0 {
-            std::print!(" ");
-        }
-        match input {
-            Value::Integer(value) => std::print!("{}", value),
-            Value::Float(value) => std::print!("{}", value),
-            Value::Boolean(value) => std::print!("{}", value),
-            Value::Character(value) => std::print!("{}", value),
-            Value::Text(value) => std::print!("{}", value),
-            Value::Sequence(value) => std::print!("{:?}", value),
-            Value::Structure(value) => std::print!("{:?}", value),
-            Value::Variant(tag, value) => std::print!("{}: {:?}", tag, value),
-            Value::Pointer(value) => std::print!("{:#x}", value),
-            Value::Empty => std::print!("empty"),
-        }
-    }
-    println!();
-    Ok(Value::Empty)
-}
-
 impl<'error> Machine<'error> {
     pub fn new(capacity: usize, foreign: Vec<Foreign<'error>>) -> Self {
-        let mut base = vec![Foreign::Rust(print)];
-        base.extend(foreign);
-
         let mut machine = Self {
             stack: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
             code: Vec::new(),
-            foreign: base,
+            foreign: Vec::new(),
             bindings: Map::new(),
             entities: Map::new(),
             modules: Map::new(),
@@ -1013,6 +817,117 @@ impl<'error> Machine<'error> {
 
 pub struct InterpretAction;
 
+#[repr(C)]
+pub struct FfiType {
+    pub size: usize,
+    pub alignment: u16,
+    pub type_: u16,
+    pub elements: *mut *mut FfiType,
+}
+
+#[repr(C)]
+pub struct FfiCif {
+    pub abi: u32,
+    pub nargs: u32,
+    pub arg_types: *mut *mut FfiType,
+    pub rtype: *mut FfiType,
+    pub bytes: u32,
+    pub flags: u32,
+}
+
+#[cfg(all(unix, target_arch = "x86_64"))]
+const FFI_DEFAULT_ABI: u32 = 2;
+#[cfg(all(unix, target_arch = "aarch64"))]
+const FFI_DEFAULT_ABI: u32 = 1;
+#[cfg(windows)]
+const FFI_DEFAULT_ABI: u32 = 1;
+#[cfg(not(any(all(unix, target_arch = "x86_64"), all(unix, target_arch = "aarch64"), windows)))]
+const FFI_DEFAULT_ABI: u32 = 2;
+
+struct LibFfi {
+    prep_cif: extern "C" fn(*mut FfiCif, u32, u32, *mut FfiType, *mut *mut FfiType) -> i32,
+    prep_cif_var: Option<extern "C" fn(*mut FfiCif, u32, u32, u32, *mut FfiType, *mut *mut FfiType) -> i32>,
+    call: extern "C" fn(*mut FfiCif, extern "C" fn(), *mut sys::c_void, *mut *mut sys::c_void),
+    type_sint64: *mut FfiType,
+    type_double: *mut FfiType,
+    type_pointer: *mut FfiType,
+    type_uint8: *mut FfiType,
+    type_uint32: *mut FfiType,
+    type_void: *mut FfiType,
+}
+
+unsafe impl Send for LibFfi {}
+unsafe impl Sync for LibFfi {}
+
+enum FfiArg {
+    Sint64(i64),
+    Double(f64),
+    Pointer(*mut sys::c_void),
+    Uint8(u8),
+    Uint32(u32),
+}
+
+impl InterpretAction {
+    fn extract_c_signatures() -> std::collections::HashMap<String, (String, bool, usize)> {
+        let mut map = std::collections::HashMap::new();
+        let mut dirs = vec![std::path::PathBuf::from(".")];
+        while let Some(dir) = dirs.pop() {
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+                        if dir_name != ".git" && dir_name != "target" {
+                            dirs.push(path);
+                        }
+                    } else if path.extension().and_then(|s| s.to_str()) == Some("axo") {
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            for line in content.lines() {
+                                let trimmed = line.trim();
+                                if trimmed.starts_with("func ") {
+                                    let after_func = &trimmed[5..];
+                                    if let Some(paren_idx) = after_func.find('(') {
+                                        let name = after_func[..paren_idx].trim().to_string();
+
+                                        let mut is_var = false;
+                                        let mut fixed_args = 0;
+
+                                        if let Some(paren_end) = after_func.find(')') {
+                                            let args_str = &after_func[paren_idx + 1..paren_end];
+                                            if args_str.contains("...") {
+                                                is_var = true;
+                                                let before_dots = args_str.split("...").next().unwrap_or("");
+                                                fixed_args = before_dots.split(',').filter(|s| !s.trim().is_empty()).count();
+                                            }
+                                        }
+
+                                        let mut ret_type = "Empty".to_string();
+                                        if let Some(colon_idx) = after_func.rfind(':') {
+                                            if colon_idx > paren_idx {
+                                                let type_str = after_func[colon_idx + 1..].trim();
+                                                let type_str = type_str.split_whitespace().next().unwrap_or("Empty");
+                                                ret_type = type_str.replace('{', "").replace(';', "");
+                                            }
+                                        } else if let Some(arrow_idx) = after_func.find("->") {
+                                            if arrow_idx > paren_idx {
+                                                let type_str = after_func[arrow_idx + 2..].trim();
+                                                let type_str = type_str.split_whitespace().next().unwrap_or("Empty");
+                                                ret_type = type_str.replace('{', "").replace(';', "");
+                                            }
+                                        }
+                                        map.insert(name, (ret_type, is_var, fixed_args));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        map
+    }
+}
+
 impl<'source> Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
@@ -1041,6 +956,29 @@ impl<'source> Action<
 
         let mut vm = Machine::new(1024, Vec::new());
 
+        let libffi_opt = Library::load("libffi.so")
+            .or_else(|| Library::load("libffi.so.8"))
+            .or_else(|| Library::load("libffi.so.7"))
+            .or_else(|| Library::load("libffi.dylib"))
+            .or_else(|| Library::load("ffi.dll"));
+
+        let ffi = libffi_opt.and_then(|lib| {
+            unsafe {
+                let prep_cif_var_ptr = lib.symbol("ffi_prep_cif_var");
+                Some(Arc::new(LibFfi {
+                    prep_cif: std::mem::transmute(lib.symbol("ffi_prep_cif")?),
+                    prep_cif_var: prep_cif_var_ptr.map(|p| std::mem::transmute(p)),
+                    call: std::mem::transmute(lib.symbol("ffi_call")?),
+                    type_sint64: lib.symbol("ffi_type_sint64")? as *mut FfiType,
+                    type_double: lib.symbol("ffi_type_double")? as *mut FfiType,
+                    type_pointer: lib.symbol("ffi_type_pointer")? as *mut FfiType,
+                    type_uint8: lib.symbol("ffi_type_uint8")? as *mut FfiType,
+                    type_uint32: lib.symbol("ffi_type_uint32")? as *mut FfiType,
+                    type_void: lib.symbol("ffi_type_void")? as *mut FfiType,
+                }))
+            }
+        });
+
         for &key in &sources {
             if let Some(record) = session.records.get(&key) {
                 let location = record.location;
@@ -1054,6 +992,7 @@ impl<'source> Action<
         }
 
         let modules: Vec<_> = vm.modules.values().flat_map(|items| items.iter()).cloned().collect();
+        let signatures = Self::extract_c_signatures();
 
         for analysis in &modules {
             if let AnalysisKind::Function(function) = &analysis.kind {
@@ -1065,101 +1004,147 @@ impl<'source> Action<
                             libc::dlsym(libc::RTLD_DEFAULT, string.as_ptr())
                         };
 
-                        if !pointer.is_null() {
-                            let arity = function.members.len();
+                        if !pointer.is_null() && ffi.is_some() {
+                            let ffi_clone = ffi.clone().unwrap();
                             let address = pointer as usize;
                             let name_str = name.to_string();
+                            let (ret_type, is_var, fixed_args) = signatures.get(&name_str).cloned().unwrap_or_else(|| ("Integer".to_string(), false, 0));
 
                             let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
+                                let mut ffi_args = Vec::with_capacity(inputs.len());
+                                let mut arg_types = Vec::with_capacity(inputs.len());
+                                let mut c_strings = Vec::new();
+
+                                for input in inputs {
+                                    match input {
+                                        Value::Integer(v) => {
+                                            arg_types.push(ffi_clone.type_sint64);
+                                            ffi_args.push(FfiArg::Sint64(*v));
+                                        }
+                                        Value::Float(v) => {
+                                            arg_types.push(ffi_clone.type_double);
+                                            ffi_args.push(FfiArg::Double(*v));
+                                        }
+                                        Value::Boolean(v) => {
+                                            arg_types.push(ffi_clone.type_uint8);
+                                            ffi_args.push(FfiArg::Uint8(if *v { 1 } else { 0 }));
+                                        }
+                                        Value::Character(v) => {
+                                            arg_types.push(ffi_clone.type_uint32);
+                                            ffi_args.push(FfiArg::Uint32(*v as u32));
+                                        }
+                                        Value::Text(v) => {
+                                            arg_types.push(ffi_clone.type_pointer);
+                                            if let Ok(c_str) = CString::new(v.clone()) {
+                                                c_strings.push(c_str);
+                                                ffi_args.push(FfiArg::Pointer(c_strings.last().unwrap().as_ptr() as *mut sys::c_void));
+                                            } else {
+                                                ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                            }
+                                        }
+                                        Value::Pointer(v) => {
+                                            arg_types.push(ffi_clone.type_pointer);
+                                            ffi_args.push(FfiArg::Pointer(*v as *mut sys::c_void));
+                                        }
+                                        Value::Structure(fields) => {
+                                            if let Some(Value::Float(f)) = fields.get(0) {
+                                                arg_types.push(ffi_clone.type_double);
+                                                ffi_args.push(FfiArg::Double(*f));
+                                            } else {
+                                                arg_types.push(ffi_clone.type_pointer);
+                                                ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                            }
+                                        }
+                                        _ => {
+                                            arg_types.push(ffi_clone.type_pointer);
+                                            ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                        }
+                                    }
+                                }
+
+                                let mut arg_values = Vec::with_capacity(ffi_args.len());
+                                for arg in &mut ffi_args {
+                                    let ptr = match arg {
+                                        FfiArg::Sint64(v) => v as *mut _ as *mut sys::c_void,
+                                        FfiArg::Double(v) => v as *mut _ as *mut sys::c_void,
+                                        FfiArg::Pointer(v) => v as *mut _ as *mut sys::c_void,
+                                        FfiArg::Uint8(v) => v as *mut _ as *mut sys::c_void,
+                                        FfiArg::Uint32(v) => v as *mut _ as *mut sys::c_void,
+                                    };
+                                    arg_values.push(ptr);
+                                }
+
+                                let mut cif: FfiCif = unsafe { std::mem::zeroed() };
+                                let rtype = match ret_type.as_str() {
+                                    "Float" => ffi_clone.type_double,
+                                    "Boolean" => ffi_clone.type_uint8,
+                                    "UInt8" => ffi_clone.type_uint8,
+                                    "String" => ffi_clone.type_pointer,
+                                    "Empty" => ffi_clone.type_void,
+                                    "Character" => ffi_clone.type_uint32,
+                                    _ => ffi_clone.type_sint64,
+                                };
+
                                 unsafe {
-                                    if name_str == "parse_float" {
-                                        let function: extern "C" fn(i64) -> f64 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        return Ok(Value::Float(function(a)));
-                                    }
-                                    if name_str == "print_float" {
-                                        let function: extern "C" fn(f64) -> i64 = std::mem::transmute(address);
-                                        let a = match inputs.get(0) {
-                                            Some(Value::Float(v)) => *v,
-                                            Some(Value::Integer(v)) => *v as f64,
-                                            _ => return Err(ErrorKind::TypeMismatch),
-                                        };
-                                        function(a);
-                                        return Ok(Value::Integer(0));
-                                    }
-                                    if name_str == "is_whitespace" || name_str == "is_digit" {
-                                        let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        return Ok(Value::Boolean(function(a) != 0));
-                                    }
-                                    if name_str == "character_at" {
-                                        let function: extern "C" fn(i64, i64) -> u8 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        let b = i64::cast(inputs.get(1))?;
-                                        return Ok(Value::Character(function(a, b) as char));
-                                    }
-                                    if name_str == "integer_uint8" || name_str == "character_uint8" {
-                                        let function: extern "C" fn(i64) -> u8 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        return Ok(Value::Integer(function(a) as i64));
-                                    }
-                                    if name_str == "uint8_character" {
-                                        let function: extern "C" fn(i64) -> i32 = std::mem::transmute(address);
-                                        let a = i64::cast(inputs.get(0))?;
-                                        return Ok(Value::Character(std::char::from_u32(function(a) as u32).unwrap_or('\0')));
+                                    let status = if is_var && ffi_clone.prep_cif_var.is_some() {
+                                        let nfixed = std::cmp::min(fixed_args as u32, arg_types.len() as u32);
+                                        (ffi_clone.prep_cif_var.unwrap())(
+                                            &mut cif,
+                                            FFI_DEFAULT_ABI,
+                                            nfixed,
+                                            arg_types.len() as u32,
+                                            rtype,
+                                            arg_types.as_mut_ptr(),
+                                        )
+                                    } else {
+                                        (ffi_clone.prep_cif)(
+                                            &mut cif,
+                                            FFI_DEFAULT_ABI,
+                                            arg_types.len() as u32,
+                                            rtype,
+                                            arg_types.as_mut_ptr(),
+                                        )
+                                    };
+
+                                    if status != 0 {
+                                        return Err(ErrorKind::TypeMismatch);
                                     }
 
-                                    match arity {
-                                        0 => {
-                                            let function: extern "C" fn() -> i64 = std::mem::transmute(address);
-                                            Ok(Value::Integer(function()))
+                                    let func: extern "C" fn() = std::mem::transmute(address);
+
+                                    if ret_type == "Float" {
+                                        let mut ret: f64 = 0.0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Float(ret))
+                                    } else if ret_type == "Boolean" {
+                                        let mut ret: u8 = 0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Boolean(ret != 0))
+                                    } else if ret_type == "UInt8" {
+                                        let mut ret: u8 = 0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Integer(ret as i64))
+                                    } else if ret_type == "String" {
+                                        let mut ret: *mut sys::c_void = std::ptr::null_mut();
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        if ret.is_null() {
+                                            Ok(Value::Text(String::new()))
+                                        } else {
+                                            let c_str = std::ffi::CStr::from_ptr(ret as *const i8);
+                                            Ok(Value::Text(c_str.to_string_lossy().into_owned()))
                                         }
-                                        1 => {
-                                            let function: extern "C" fn(i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            Ok(Value::Integer(function(a)))
-                                        }
-                                        2 => {
-                                            let function: extern "C" fn(i64, i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            let b = i64::cast(inputs.get(1))?;
-                                            Ok(Value::Integer(function(a, b)))
-                                        }
-                                        3 => {
-                                            let function: extern "C" fn(i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            let b = i64::cast(inputs.get(1))?;
-                                            let c = i64::cast(inputs.get(2))?;
-                                            Ok(Value::Integer(function(a, b, c)))
-                                        }
-                                        4 => {
-                                            let function: extern "C" fn(i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            let b = i64::cast(inputs.get(1))?;
-                                            let c = i64::cast(inputs.get(2))?;
-                                            let d = i64::cast(inputs.get(3))?;
-                                            Ok(Value::Integer(function(a, b, c, d)))
-                                        }
-                                        5 => {
-                                            let function: extern "C" fn(i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            let b = i64::cast(inputs.get(1))?;
-                                            let c = i64::cast(inputs.get(2))?;
-                                            let d = i64::cast(inputs.get(3))?;
-                                            let e = i64::cast(inputs.get(4))?;
-                                            Ok(Value::Integer(function(a, b, c, d, e)))
-                                        }
-                                        6 => {
-                                            let function: extern "C" fn(i64, i64, i64, i64, i64, i64) -> i64 = std::mem::transmute(address);
-                                            let a = i64::cast(inputs.get(0))?;
-                                            let b = i64::cast(inputs.get(1))?;
-                                            let c = i64::cast(inputs.get(2))?;
-                                            let d = i64::cast(inputs.get(3))?;
-                                            let e = i64::cast(inputs.get(4))?;
-                                            let f = i64::cast(inputs.get(5))?;
-                                            Ok(Value::Integer(function(a, b, c, d, e, f)))
-                                        }
-                                        _ => Err(ErrorKind::TypeMismatch),
+                                    } else if ret_type == "Character" {
+                                        let mut ret: u32 = 0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Character(std::char::from_u32(ret).unwrap_or('\0')))
+                                    } else if ret_type == "Empty" {
+                                        let mut ret: i64 = 0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Empty)
+                                    } else {
+                                        let mut ret: i64 = 0;
+                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
+                                        Ok(Value::Integer(ret))
                                     }
                                 }
                             });

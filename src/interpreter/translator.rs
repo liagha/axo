@@ -114,12 +114,18 @@ impl<'error> Machine<'error> {
                 AnalysisKind::Structure(structure) => {
                     let identifier = self.namespace(&structure.target.to_string());
                     let members = Self::member_names(structure.members);
-                    self.entities.insert(identifier, Entity::Structure(members));
+                    self.entities.insert(
+                        identifier,
+                        Entity::Structure(analysis.typing.identity, members),
+                    );
                 }
                 AnalysisKind::Union(union) => {
                     let identifier = self.namespace(&union.target.to_string());
                     let members = Self::member_names(union.members);
-                    self.entities.insert(identifier, Entity::Union(members));
+                    self.entities.insert(
+                        identifier,
+                        Entity::Structure(analysis.typing.identity, members),
+                    );
                 }
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
@@ -522,27 +528,30 @@ impl<'error> Machine<'error> {
                     } else {
                         self.emit(Opcode::Trap, span);
                     }
-                } else if let AnalysisKind::Usage(field_name) = right.kind {
+                } else if let AnalysisKind::Usage(name) = right.kind {
+                    let field = name.to_string();
+                    let mut typing = &left.typing;
+
+                    while let crate::resolver::TypeKind::Pointer { target } = &typing.kind {
+                        typing = target;
+                    }
+
+                    let identity = typing.identity;
+
                     self.walk(*left);
 
-                    let target_field = field_name.to_string();
-                    let mut found_index = None;
+                    let mut found = None;
 
-                    let mut possible_indices = Vec::new();
                     for entity in self.entities.values() {
-                        if let Entity::Structure(members) = entity {
-                            if let Some(index) = members.iter().position(|m| m == &target_field) {
-                                possible_indices.push(index);
+                        if let Entity::Structure(id, members) = entity {
+                            if *id == identity {
+                                found = members.iter().position(|member| member == &field);
+                                break;
                             }
                         }
                     }
 
-                    if !possible_indices.is_empty() {
-                        possible_indices.sort();
-                        found_index = Some(possible_indices[0]);
-                    }
-
-                    if let Some(index) = found_index {
+                    if let Some(index) = found {
                         self.emit(Opcode::ExtractField(index), span);
                     } else {
                         self.emit(Opcode::Trap, span);
@@ -555,25 +564,33 @@ impl<'error> Machine<'error> {
             AnalysisKind::Store(target, value) => {
                 let mut handled = false;
                 if let AnalysisKind::Access(left, right) = &target.kind {
-                    if let AnalysisKind::Usage(field_name) = &right.kind {
-                        if let AnalysisKind::Usage(var_name) = &left.kind {
-                            let var_str = var_name.to_string();
-                            let field_str = field_name.to_string();
+                    if let AnalysisKind::Usage(field) = &right.kind {
+                        if let AnalysisKind::Usage(variable) = &left.kind {
+                            let name = variable.to_string();
 
-                            if let Some(&address) = self.bindings.get(&var_str) {
-                                let mut possible_indices = Vec::new();
+                            if let Some(&address) = self.bindings.get(&name) {
+                                let member = field.to_string();
+                                let mut typing = &left.typing;
+
+                                while let crate::resolver::TypeKind::Pointer { target } = &typing.kind {
+                                    typing = target;
+                                }
+
+                                let identity = typing.identity;
+                                let mut found = None;
+
                                 for entity in self.entities.values() {
-                                    if let Entity::Structure(members) = entity {
-                                        if let Some(index) = members.iter().position(|m| m == &field_str) {
-                                            possible_indices.push(index);
+                                    if let Entity::Structure(id, members) = entity {
+                                        if *id == identity {
+                                            found = members.iter().position(|item| item == &member);
+                                            break;
                                         }
                                     }
                                 }
 
-                                if !possible_indices.is_empty() {
-                                    possible_indices.sort();
+                                if let Some(index) = found {
                                     self.walk(*value);
-                                    self.emit(Opcode::StoreField(address, possible_indices[0]), span.clone());
+                                    self.emit(Opcode::StoreField(address, index), span.clone());
                                     handled = true;
                                 }
                             }
@@ -600,8 +617,6 @@ impl<'error> Machine<'error> {
         }
     }
 }
-
-use crate::format::{Show, Stencil};
 
 impl Machine<'_> {
     fn extract_name(analysis: &Analysis<'_>) -> Option<String> {

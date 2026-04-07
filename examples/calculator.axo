@@ -46,41 +46,49 @@ func next_token(var lexer: Lexer): Token {
 
         if(current_char == cast.character_uint8('+'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: PLUS\n")
             return(Token { kind = "PLUS", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('-'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: MINUS\n")
             return(Token { kind = "MINUS", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('*'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: MULTIPLY\n")
             return(Token { kind = "MULTIPLY", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('/'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: DIVIDE\n")
             return(Token { kind = "DIVIDE", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('%'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: MODULO\n")
             return(Token { kind = "MODULO", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('^'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: POWER\n")
             return(Token { kind = "POWER", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8('('), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: LPAREN\n")
             return(Token { kind = "LPAREN", value = 0.0, next_position = lexer.position })
         })
 
         if(current_char == cast.character_uint8(')'), {
             lexer.position = lexer.position + cast.integer_uint64(1)
+            print.print_string("Lexed: RPAREN\n")
             return(Token { kind = "RPAREN", value = 0.0, next_position = lexer.position })
         })
 
@@ -92,14 +100,21 @@ func next_token(var lexer: Lexer): Token {
             })
 
             const num_str = string.string_substring(lexer.source, start, lexer.position)
+            const parsed_val = string.parse_float(num_str)
 
-            return(Token { kind = "NUMBER", value = string.parse_float(num_str), next_position = lexer.position })
+            print.print_string("Lexed: NUMBER (")
+            print.print_float(parsed_val)
+            print.print_string(")\n")
+
+            return(Token { kind = "NUMBER", value = parsed_val, next_position = lexer.position })
         })
 
+        print.print_string("Lexed: ILLEGAL\n")
         lexer.position = lexer.position + cast.integer_uint64(1)
         return(Token { kind = "ILLEGAL", value = 0.0, next_position = lexer.position })
     })
 
+    print.print_string("Lexed: EOF\n")
     return(Token { kind = "EOF", value = 0.0, next_position = lexer.position })
 }
 
@@ -110,6 +125,9 @@ func parse_factor(var lexer: Lexer): ParseResult {
     lexer.position = tok.next_position
 
     if(tok.kind == "NUMBER", {
+        print.print_string("parse_factor parsed NUMBER: ")
+        print.print_float(tok.value)
+        print.print_newline()
         return(ParseResult { value = tok.value, next_position = lexer.position })
     }, {
         if(tok.kind == "LPAREN", {
@@ -124,6 +142,7 @@ func parse_factor(var lexer: Lexer): ParseResult {
                 return(ParseResult { value = inner_res.value, next_position = lexer.position })
             })
         }, {
+            print.print_string("parse_factor failed, unexpected token\n")
             return(ParseResult { value = 0.0, next_position = lexer.position })
         })
     })
@@ -148,6 +167,11 @@ func parse_power(var lexer: Lexer): ParseResult {
             0.0
         })
     })
+
+    print.print_string("parse_power returning: ")
+    print.print_float(current_value)
+    print.print_newline()
+
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
@@ -184,6 +208,11 @@ func parse_term(var lexer: Lexer): ParseResult {
             })
         })
     })
+
+    print.print_string("parse_term returning: ")
+    print.print_float(current_value)
+    print.print_newline()
+
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
@@ -214,6 +243,10 @@ func parse_expression(var lexer: Lexer): ParseResult {
         })
     })
 
+    print.print_string("parse_expression returning: ")
+    print.print_float(current_value)
+    print.print_newline()
+
     return(ParseResult { value = current_value, next_position = lexer.position })
 }
 
@@ -222,7 +255,7 @@ func main(): Integer {
     var lexer = Lexer { source = input_text, position = cast.integer_uint64(0) }
     var result = parse_expression(lexer)
 
-    print.print_string("Result: ")
+    print.print_string("Final Result: ")
     print.print_float(result.value)
     print.print_newline()
 
