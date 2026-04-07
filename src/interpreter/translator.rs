@@ -1,4 +1,3 @@
-// src/interpreter/translator.rs
 use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
@@ -187,11 +186,22 @@ impl<'error> Machine<'error> {
         members.reverse();
 
         for member in members {
-            if let AnalysisKind::Usage(target) = member.kind {
-                let address = self.memory_top;
-                self.memory_top += 1;
-                self.bindings.insert(target.to_string(), address);
-                self.emit(Opcode::Store(address), span.clone());
+            match &member.kind {
+                AnalysisKind::Usage(target) => {
+                    let address = self.memory_top;
+                    self.memory_top += 1;
+                    self.bindings.insert(target.to_string(), address);
+                    self.emit(Opcode::Store(address), span.clone());
+                }
+                AnalysisKind::Binding(binding) => {
+                    if let AnalysisKind::Usage(target) = &binding.target.kind {
+                        let address = self.memory_top;
+                        self.memory_top += 1;
+                        self.bindings.insert(target.to_string(), address);
+                        self.emit(Opcode::Store(address), span.clone());
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -543,8 +553,36 @@ impl<'error> Machine<'error> {
                 }
             }
             AnalysisKind::Store(target, value) => {
-                self.walk(*value);
-                self.walk(*target);
+                let mut handled = false;
+                if let AnalysisKind::Access(left, right) = &target.kind {
+                    if let AnalysisKind::Usage(field_name) = &right.kind {
+                        if let AnalysisKind::Usage(var_name) = &left.kind {
+                            let var_str = var_name.to_string();
+                            let field_str = field_name.to_string();
+
+                            if let Some(&address) = self.bindings.get(&var_str) {
+                                let mut possible_indices = Vec::new();
+                                for entity in self.entities.values() {
+                                    if let Entity::Structure(members) = entity {
+                                        if let Some(index) = members.iter().position(|m| m == &field_str) {
+                                            possible_indices.push(index);
+                                        }
+                                    }
+                                }
+
+                                if !possible_indices.is_empty() {
+                                    possible_indices.sort();
+                                    self.walk(*value);
+                                    self.emit(Opcode::StoreField(address, possible_indices[0]), span.clone());
+                                    handled = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if !handled {
+                    self.emit(Opcode::Trap, span);
+                }
             }
             AnalysisKind::Structure(_) | AnalysisKind::Union(_) => {}
             AnalysisKind::Constructor(aggregate) => {

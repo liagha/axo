@@ -63,7 +63,6 @@ impl Library {
     }
 }
 
-// Thread-local storage to safely hold CStrings for the exact duration of an FFI call.
 thread_local! {
     static FFI_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
 }
@@ -80,6 +79,7 @@ impl Cast for i64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Integer(value)) => Ok(*value),
+            Some(Value::Float(value)) => Ok(*value as i64),
             Some(Value::Pointer(value)) => Ok(*value as i64),
             Some(Value::Text(value)) => {
                 let c_str = CString::new(value.clone()).map_err(|_| ErrorKind::TypeMismatch)?;
@@ -89,7 +89,6 @@ impl Cast for i64 {
             }
             Some(Value::Boolean(value)) => Ok(if *value { 1 } else { 0 }),
             Some(Value::Character(value)) => Ok(*value as u32 as i64),
-            Some(Value::Float(value)) => Ok(value.to_bits() as i64),
             Some(Value::Empty) => Ok(0),
             _ => Err(ErrorKind::TypeMismatch),
         }
@@ -100,6 +99,7 @@ impl Cast for i32 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Integer(value)) => Ok(*value as i32),
+            Some(Value::Float(value)) => Ok(*value as i32),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -109,6 +109,7 @@ impl Cast for u64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Integer(value)) => Ok(*value as u64),
+            Some(Value::Float(value)) => Ok(*value as u64),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -118,6 +119,7 @@ impl Cast for u8 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Integer(value)) => Ok(*value as u8),
+            Some(Value::Float(value)) => Ok(*value as u8),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -127,6 +129,7 @@ impl Cast for f64 {
     fn cast(value: Option<&Value>) -> Result<Self, ErrorKind> {
         match value {
             Some(Value::Float(value)) => Ok(*value),
+            Some(Value::Integer(value)) => Ok(*value as f64),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -137,6 +140,7 @@ impl Cast for bool {
         match value {
             Some(Value::Boolean(value)) => Ok(*value),
             Some(Value::Integer(value)) => Ok(*value != 0),
+            Some(Value::Float(value)) => Ok(*value != 0.0),
             _ => Err(ErrorKind::TypeMismatch),
         }
     }
@@ -267,6 +271,7 @@ pub enum Opcode {
     JumpFalse(usize),
     Load(usize),
     Store(usize),
+    StoreField(usize, usize),
     Call(usize),
     CallForeign(usize, usize),
     Return,
@@ -382,10 +387,6 @@ impl<'error> Machine<'error> {
         let instruction = self.code[self.pointer].clone();
         self.pointer += 1;
 
-        println!("DEBUG: IP: {:04} | Opcode: {:?} | Stack depth: {} | Stack: {:?}",
-                 self.pointer, instruction.opcode, self.stack.len(), self.stack);
-
-
         match instruction.opcode {
             Opcode::Push(value) => self.stack.push(value),
             Opcode::Pop => self.pop()?,
@@ -416,6 +417,7 @@ impl<'error> Machine<'error> {
             Opcode::JumpFalse(target) => self.jump_false(target)?,
             Opcode::Load(address) => self.load(address)?,
             Opcode::Store(address) => self.store(address)?,
+            Opcode::StoreField(address, index) => self.store_field(address, index)?,
             Opcode::Call(target) => self.call(target)?,
             Opcode::CallForeign(target, count) => self.call_foreign(target, count)?,
             Opcode::Return => self.finish()?,
@@ -448,6 +450,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left + right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 + right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -463,6 +467,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left - right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -478,6 +484,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left * right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(left * right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 * right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -498,6 +506,8 @@ impl<'error> Machine<'error> {
                 Value::Integer(left / right)
             }
             (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -518,6 +528,8 @@ impl<'error> Machine<'error> {
                 Value::Integer(left % right)
             }
             (Value::Float(left), Value::Float(right)) => Value::Float(left % right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(left % right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 % right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -543,7 +555,16 @@ impl<'error> Machine<'error> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        self.stack.push(Value::Boolean(left == right));
+
+        let is_equal = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => left == right,
+            (Value::Float(left), Value::Float(right)) => left == right,
+            (Value::Float(left), Value::Integer(right)) => left == (right as f64),
+            (Value::Integer(left), Value::Float(right)) => (left as f64) == right,
+            (left, right) => left == right,
+        };
+
+        self.stack.push(Value::Boolean(is_equal));
         Ok(())
     }
 
@@ -551,7 +572,16 @@ impl<'error> Machine<'error> {
         let span = self.current();
         let right = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         let left = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        self.stack.push(Value::Boolean(left != right));
+
+        let is_not_equal = match (left, right) {
+            (Value::Integer(left), Value::Integer(right)) => left != right,
+            (Value::Float(left), Value::Float(right)) => left != right,
+            (Value::Float(left), Value::Integer(right)) => left != (right as f64),
+            (Value::Integer(left), Value::Float(right)) => (left as f64) != right,
+            (left, right) => left != right,
+        };
+
+        self.stack.push(Value::Boolean(is_not_equal));
         Ok(())
     }
 
@@ -563,6 +593,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left < right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) < right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -578,6 +610,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left > right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left > right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left > right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) > right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -593,6 +627,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left <= right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) <= right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -608,6 +644,8 @@ impl<'error> Machine<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left >= right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left >= right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left >= right as f64),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) >= right),
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         };
 
@@ -808,6 +846,23 @@ impl<'error> Machine<'error> {
         Ok(())
     }
 
+    fn store_field(&mut self, address: usize, index: usize) -> Result<(), InterpretError<'error>> {
+        let span = self.current();
+        if address >= self.memory.len() {
+            return Err(self.error(ErrorKind::MemoryAccessViolation, span));
+        }
+        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
+        if let Value::Structure(fields) = &mut self.memory[address] {
+            if index >= fields.len() {
+                return Err(self.error(ErrorKind::OutOfBounds, span));
+            }
+            fields[index] = value;
+        } else {
+            return Err(self.error(ErrorKind::TypeMismatch, span));
+        }
+        Ok(())
+    }
+
     fn call_foreign(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
@@ -824,8 +879,6 @@ impl<'error> Machine<'error> {
             Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span)),
         };
 
-        // Ensures CStrings allocated during Cast live long enough for the FFI call,
-        // and are cleared securely immediately after to prevent memory leaks.
         FFI_STRINGS.with(|strings| strings.borrow_mut().clear());
 
         let result = result?;
@@ -1028,6 +1081,7 @@ impl<'source> Action<
                                         let function: extern "C" fn(f64) -> i64 = std::mem::transmute(address);
                                         let a = match inputs.get(0) {
                                             Some(Value::Float(v)) => *v,
+                                            Some(Value::Integer(v)) => *v as f64,
                                             _ => return Err(ErrorKind::TypeMismatch),
                                         };
                                         function(a);
