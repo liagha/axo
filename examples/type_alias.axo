@@ -1,0 +1,11 @@
+func main(): Integer {
+    const print_alias = print.print_string
+    print_alias("hey")
+    print.print_newline()
+
+    const module_alias = print
+    module_alias.print_string("yo")
+    module_alias.print_newline()
+
+    0
+}

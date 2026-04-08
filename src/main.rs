@@ -3,7 +3,10 @@ use axo::{
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
-        platform::read_dir,
+        platform::{
+            read_dir, stdin, stdout,
+            Write,
+        },
         time::DefaultTimer,
         CompileError, InputKind, Record, Session,
     },
@@ -12,7 +15,6 @@ use axo::{
     scanner::{Token, TokenKind},
     tracker::{self, Location, Span, TrackError},
 };
-use std::io::{stdin, stdout, Write};
 
 pub const BASE: &[&str] = &[
     "./base/cast.axo",
@@ -60,10 +62,8 @@ fn main() {
 }
 
 fn repl(bare: bool, directives: Vec<Symbol>) {
-    let mut count = 0;
     let mut session = create(bare, directives.clone(), Vec::new());
-
-    let engine = axo::data::memory::Arc::new(axo::internal::platform::Lock::new(axo::interpreter::Interpreter::new(1024)));
+    let mut identity = None;
 
     loop {
         print!("> ");
@@ -74,10 +74,28 @@ fn repl(bare: bool, directives: Vec<Symbol>) {
             continue;
         }
 
-        let name: &'static str = Box::leak(Box::new(format!("repl_{}", count)));
-        count += 1;
+        if let Some(id) = identity {
+            let record = session.records.get_mut(&id).unwrap();
+            let content = record.content.as_mut().unwrap();
+            content.push_str(&input); // Append to preserve previous scope
 
-        session.add_string(&name, input);
+            record.dirty = true;
+            record.tokens = None;
+            record.elements = None;
+            record.analyses = None;
+        } else {
+            let location = Location::Entry(Str::from("repl"));
+            let mut record = Record::new(InputKind::Source, location);
+            record.content = Some(input);
+            let id = session.records.len() | 0x40000000;
+            session.records.insert(id, record);
+            identity = Some(id);
+        }
+
+        session.errors.clear();
+        session.cache.clear();
+
+        let engine = Arc::new(axo::internal::platform::Lock::new(axo::interpreter::Interpreter::new(1024)));
 
         use axo::combinator::Operation;
         use axo::data::memory::Arc;
