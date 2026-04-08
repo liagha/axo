@@ -16,6 +16,13 @@ use {
 };
 
 pub type Native<'error> = fn(&[Value], Span<'error>) -> Result<Value, InterpretError<'error>>;
+pub type Address = usize;
+pub type Offset = usize;
+pub type Index = usize;
+pub type Count = usize;
+pub type Size = usize;
+pub type Tag = usize;
+pub type Identity = usize;
 
 #[cfg(unix)]
 pub mod sys {
@@ -41,7 +48,7 @@ impl Library {
 }
 
 thread_local! {
-    static FFI_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
+    static FOREIGN_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
 }
 
 #[derive(Clone)]
@@ -59,8 +66,8 @@ pub enum Value {
     Text(String),
     Sequence(Vec<Value>),
     Structure(Vec<Value>),
-    Variant(usize, Box<Value>),
-    Pointer(usize),
+    Variant(Tag, Box<Value>),
+    Pointer(Address),
     Empty,
 }
 
@@ -90,21 +97,21 @@ pub enum Opcode {
     BitXor,
     ShiftLeft,
     ShiftRight,
-    Jump(usize),
-    JumpTrue(usize),
-    JumpFalse(usize),
-    Load(usize),
-    Store(usize),
-    StoreField(usize, usize),
-    Call(usize),
-    CallForeign(usize, usize),
+    Jump(Address),
+    JumpTrue(Address),
+    JumpFalse(Address),
+    Load(Address),
+    Store(Address),
+    StoreField(Address, Index),
+    Call(Address),
+    CallForeign(Index, Count),
     Return,
     Halt,
-    MakeSequence(usize),
-    MakeStructure(usize),
-    MakeVariant(usize),
-    ExtractField(usize),
-    ExtractVariant(usize),
+    MakeSequence(Size),
+    MakeStructure(Size),
+    MakeVariant(Tag),
+    ExtractField(Index),
+    ExtractVariant(Tag),
     Index,
     Trap,
     CastInteger,
@@ -120,17 +127,17 @@ pub struct Instruction<'error> {
 #[derive(Clone, Debug)]
 pub enum Entity<'error> {
     Variable {
-        address: usize,
+        address: Address,
         typing: Type<'error>,
     },
-    Foreign(usize),
-    Function(Option<usize>),
+    Foreign(Index),
+    Function(Option<Address>),
     Structure {
-        identity: usize,
+        identity: Identity,
         members: Vec<Str<'error>>,
     },
     Union {
-        identity: usize,
+        identity: Identity,
         members: Vec<Str<'error>>,
     },
     Module,
@@ -138,8 +145,8 @@ pub enum Entity<'error> {
 
 #[derive(Clone, Debug)]
 pub struct Frame {
-    pub pointer: usize,
-    pub start: usize,
+    pub pointer: Address,
+    pub start: Address,
     pub locals: Vec<Value>,
 }
 
@@ -150,18 +157,18 @@ pub struct Interpreter<'error> {
     pub code: Vec<Instruction<'error>>,
     pub foreign: Vec<Foreign<'error>>,
     pub entities: Map<Str<'error>, Entity<'error>>,
-    pub function_frames: Map<usize, (usize, usize)>,
+    pub function_frames: Map<Address, (Address, Size)>,
     pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
     pub current_module: Str<'error>,
-    pub calls: Vec<(usize, Str<'error>)>,
-    pub loops: Vec<(usize, Vec<usize>)>,
-    pub memory_top: usize,
-    pub pointer: usize,
+    pub calls: Vec<(Address, Str<'error>)>,
+    pub loops: Vec<(Address, Vec<Address>)>,
+    pub memory_top: Address,
+    pub pointer: Address,
     pub running: bool,
 }
 
 impl<'error> Interpreter<'error> {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: Size) -> Self {
         let mut interpreter = Self {
             stack: Vec::new(),
             frames: Vec::new(),
@@ -628,7 +635,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump(&mut self, target: usize) -> Result<(), InterpretError<'error>> {
+    fn jump(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if target >= self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
@@ -637,7 +644,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump_true(&mut self, target: usize) -> Result<(), InterpretError<'error>> {
+    fn jump_true(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let condition = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -650,7 +657,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn jump_false(&mut self, target: usize) -> Result<(), InterpretError<'error>> {
+    fn jump_false(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let condition = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -663,7 +670,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn load(&mut self, address: usize) -> Result<(), InterpretError<'error>> {
+    fn load(&mut self, address: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -673,7 +680,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn store(&mut self, address: usize) -> Result<(), InterpretError<'error>> {
+    fn store(&mut self, address: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -683,7 +690,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn store_field(&mut self, address: usize, index: usize) -> Result<(), InterpretError<'error>> {
+    fn store_field(&mut self, address: Address, index: Index) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if address >= self.memory.len() {
             return Err(self.error(ErrorKind::MemoryAccessViolation, span));
@@ -700,7 +707,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn call_foreign(&mut self, target: usize, count: usize) -> Result<(), InterpretError<'error>> {
+    fn call_foreign(&mut self, target: Index, count: Count) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
 
@@ -716,7 +723,7 @@ impl<'error> Interpreter<'error> {
             Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span)),
         };
 
-        FFI_STRINGS.with(|strings| strings.borrow_mut().clear());
+        FOREIGN_STRINGS.with(|strings| strings.borrow_mut().clear());
 
         let result = result?;
 
@@ -726,7 +733,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn call(&mut self, target: usize) -> Result<(), InterpretError<'error>> {
+    fn call(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if target >= self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
@@ -761,7 +768,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_sequence(&mut self, size: usize) -> Result<(), InterpretError<'error>> {
+    fn make_sequence(&mut self, size: Size) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -772,7 +779,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_structure(&mut self, size: usize) -> Result<(), InterpretError<'error>> {
+    fn make_structure(&mut self, size: Size) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -783,14 +790,14 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_variant(&mut self, tag: usize) -> Result<(), InterpretError<'error>> {
+    fn make_variant(&mut self, tag: Tag) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
         self.stack.push(Value::Variant(tag, Box::new(value)));
         Ok(())
     }
 
-    fn extract_field(&mut self, index: usize) -> Result<(), InterpretError<'error>> {
+    fn extract_field(&mut self, index: Index) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -804,7 +811,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn extract_variant(&mut self, tag: usize) -> Result<(), InterpretError<'error>> {
+    fn extract_variant(&mut self, tag: Tag) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
 
@@ -827,7 +834,7 @@ impl<'error> Interpreter<'error> {
 
         match (target, position) {
             (Value::Sequence(sequence), Value::Integer(index)) => {
-                let index = index as usize;
+                let index = index as Index;
                 if index >= sequence.len() {
                     return Err(self.error(ErrorKind::OutOfBounds, span));
                 }

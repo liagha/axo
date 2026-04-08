@@ -1,16 +1,16 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind},
     data::{Invoke, Str},
-    interpreter::{Entity, Instruction, Interpreter, Opcode, Value},
+    interpreter::{Address, Entity, Index, Instruction, Interpreter, Opcode, Value},
     tracker::Span,
 };
 
 impl<'error> Interpreter<'error> {
-    pub fn native(&mut self, name: &str, index: usize) {
+    pub fn native(&mut self, name: &str, index: Index) {
         self.insert_entity(Str::from(name.to_string()), Entity::Foreign(index));
     }
 
-    pub fn address(&self, name: &Str<'error>) -> Option<usize> {
+    pub fn address(&self, name: &Str<'error>) -> Option<Address> {
         match self.get_entity(name) {
             Some(Entity::Function(Some(address))) => Some(*address),
             _ => None,
@@ -21,7 +21,7 @@ impl<'error> Interpreter<'error> {
         self.code.push(Instruction { opcode, span });
     }
 
-    fn patch(&mut self, index: usize, opcode: Opcode) {
+    fn patch(&mut self, index: Address, opcode: Opcode) {
         self.code[index].opcode = opcode;
     }
 
@@ -197,7 +197,7 @@ impl<'error> Interpreter<'error> {
         None
     }
 
-    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<usize> {
+    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<Index> {
         match self.aggregate(typing) {
             Some(Entity::Structure { members, .. }) | Some(Entity::Union { members, .. }) => {
                 members.iter().position(|item| item == field)
@@ -218,11 +218,11 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn field(&self, target: &Analysis<'error>, field: &Str<'error>) -> Option<usize> {
+    fn field(&self, target: &Analysis<'error>, field: &Str<'error>) -> Option<Index> {
         self.position(&target.typing, field.as_str().unwrap_or_default())
     }
 
-    fn variable(&self, name: &Str<'error>) -> Option<(usize, &crate::resolver::Type<'error>)> {
+    fn variable(&self, name: &Str<'error>) -> Option<(Address, &crate::resolver::Type<'error>)> {
         match self.get_entity(name) {
             Some(Entity::Variable { address, typing }) => Some((*address, typing)),
             _ => None,

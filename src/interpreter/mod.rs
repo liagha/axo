@@ -23,48 +23,48 @@ use {
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
 
 #[repr(C)]
-pub struct FfiType {
+pub struct ForeignType {
     pub size: usize,
     pub alignment: u16,
     pub type_: u16,
-    pub elements: *mut *mut FfiType,
+    pub elements: *mut *mut ForeignType,
 }
 
 #[repr(C)]
-pub struct FfiCif {
+pub struct ForeignCall {
     pub abi: u32,
     pub nargs: u32,
-    pub arg_types: *mut *mut FfiType,
-    pub rtype: *mut FfiType,
+    pub arg_types: *mut *mut ForeignType,
+    pub rtype: *mut ForeignType,
     pub bytes: u32,
     pub flags: u32,
 }
 
 #[cfg(all(unix, target_arch = "x86_64"))]
-const FFI_DEFAULT_ABI: u32 = 2;
+const DEFAULT_ABI: u32 = 2;
 #[cfg(all(unix, target_arch = "aarch64"))]
-const FFI_DEFAULT_ABI: u32 = 1;
+const DEFAULT_ABI: u32 = 1;
 #[cfg(windows)]
-const FFI_DEFAULT_ABI: u32 = 1;
+const DEFAULT_ABI: u32 = 1;
 #[cfg(not(any(all(unix, target_arch = "x86_64"), all(unix, target_arch = "aarch64"), windows)))]
-const FFI_DEFAULT_ABI: u32 = 2;
+const DEFAULT_ABI: u32 = 2;
 
-struct LibFfi {
-    prep_cif: extern "C" fn(*mut FfiCif, u32, u32, *mut FfiType, *mut *mut FfiType) -> i32,
-    prep_cif_var: Option<extern "C" fn(*mut FfiCif, u32, u32, u32, *mut FfiType, *mut *mut FfiType) -> i32>,
-    call: extern "C" fn(*mut FfiCif, extern "C" fn(), *mut sys::c_void, *mut *mut sys::c_void),
-    type_sint64: *mut FfiType,
-    type_double: *mut FfiType,
-    type_pointer: *mut FfiType,
-    type_uint8: *mut FfiType,
-    type_uint32: *mut FfiType,
-    type_void: *mut FfiType,
+struct ForeignApi {
+    prep_call: extern "C" fn(*mut ForeignCall, u32, u32, *mut ForeignType, *mut *mut ForeignType) -> i32,
+    prep_var: Option<extern "C" fn(*mut ForeignCall, u32, u32, u32, *mut ForeignType, *mut *mut ForeignType) -> i32>,
+    call: extern "C" fn(*mut ForeignCall, extern "C" fn(), *mut sys::c_void, *mut *mut sys::c_void),
+    sint64: *mut ForeignType,
+    double: *mut ForeignType,
+    pointer: *mut ForeignType,
+    uint8: *mut ForeignType,
+    uint32: *mut ForeignType,
+    void: *mut ForeignType,
 }
 
-unsafe impl Send for LibFfi {}
-unsafe impl Sync for LibFfi {}
+unsafe impl Send for ForeignApi {}
+unsafe impl Sync for ForeignApi {}
 
-enum FfiArg {
+enum ForeignValue {
     Sint64(i64),
     Double(f64),
     Pointer(*mut sys::c_void),
@@ -170,16 +170,16 @@ impl<'source> Action<
         let ffi = libffi_opt.and_then(|lib| {
             unsafe {
                 let prep_cif_var_ptr = lib.symbol("ffi_prep_cif_var");
-                Some(Arc::new(LibFfi {
-                    prep_cif: std::mem::transmute(lib.symbol("ffi_prep_cif")?),
-                    prep_cif_var: prep_cif_var_ptr.map(|p| std::mem::transmute(p)),
+                Some(Arc::new(ForeignApi {
+                    prep_call: std::mem::transmute(lib.symbol("ffi_prep_cif")?),
+                    prep_var: prep_cif_var_ptr.map(|p| std::mem::transmute(p)),
                     call: std::mem::transmute(lib.symbol("ffi_call")?),
-                    type_sint64: lib.symbol("ffi_type_sint64")? as *mut FfiType,
-                    type_double: lib.symbol("ffi_type_double")? as *mut FfiType,
-                    type_pointer: lib.symbol("ffi_type_pointer")? as *mut FfiType,
-                    type_uint8: lib.symbol("ffi_type_uint8")? as *mut FfiType,
-                    type_uint32: lib.symbol("ffi_type_uint32")? as *mut FfiType,
-                    type_void: lib.symbol("ffi_type_void")? as *mut FfiType,
+                    sint64: lib.symbol("ffi_type_sint64")? as *mut ForeignType,
+                    double: lib.symbol("ffi_type_double")? as *mut ForeignType,
+                    pointer: lib.symbol("ffi_type_pointer")? as *mut ForeignType,
+                    uint8: lib.symbol("ffi_type_uint8")? as *mut ForeignType,
+                    uint32: lib.symbol("ffi_type_uint32")? as *mut ForeignType,
+                    void: lib.symbol("ffi_type_void")? as *mut ForeignType,
                 }))
             }
         });
@@ -223,46 +223,46 @@ impl<'source> Action<
                                 for input in inputs {
                                     match input {
                                         Value::Integer(v) => {
-                                            arg_types.push(ffi_clone.type_sint64);
-                                            ffi_args.push(FfiArg::Sint64(*v));
+                                            arg_types.push(ffi_clone.sint64);
+                                            ffi_args.push(ForeignValue::Sint64(*v));
                                         }
                                         Value::Float(v) => {
-                                            arg_types.push(ffi_clone.type_double);
-                                            ffi_args.push(FfiArg::Double(*v));
+                                            arg_types.push(ffi_clone.double);
+                                            ffi_args.push(ForeignValue::Double(*v));
                                         }
                                         Value::Boolean(v) => {
-                                            arg_types.push(ffi_clone.type_uint8);
-                                            ffi_args.push(FfiArg::Uint8(if *v { 1 } else { 0 }));
+                                            arg_types.push(ffi_clone.uint8);
+                                            ffi_args.push(ForeignValue::Uint8(if *v { 1 } else { 0 }));
                                         }
                                         Value::Character(v) => {
-                                            arg_types.push(ffi_clone.type_uint32);
-                                            ffi_args.push(FfiArg::Uint32(*v as u32));
+                                            arg_types.push(ffi_clone.uint32);
+                                            ffi_args.push(ForeignValue::Uint32(*v as u32));
                                         }
                                         Value::Text(v) => {
-                                            arg_types.push(ffi_clone.type_pointer);
+                                            arg_types.push(ffi_clone.pointer);
                                             if let Ok(c_str) = CString::new(v.clone()) {
                                                 c_strings.push(c_str);
-                                                ffi_args.push(FfiArg::Pointer(c_strings.last().unwrap().as_ptr() as *mut sys::c_void));
+                                                ffi_args.push(ForeignValue::Pointer(c_strings.last().unwrap().as_ptr() as *mut sys::c_void));
                                             } else {
-                                                ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                                ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
                                             }
                                         }
                                         Value::Pointer(v) => {
-                                            arg_types.push(ffi_clone.type_pointer);
-                                            ffi_args.push(FfiArg::Pointer(*v as *mut sys::c_void));
+                                            arg_types.push(ffi_clone.pointer);
+                                            ffi_args.push(ForeignValue::Pointer(*v as *mut sys::c_void));
                                         }
                                         Value::Structure(fields) => {
                                             if let Some(Value::Float(f)) = fields.get(0) {
-                                                arg_types.push(ffi_clone.type_double);
-                                                ffi_args.push(FfiArg::Double(*f));
+                                                arg_types.push(ffi_clone.double);
+                                                ffi_args.push(ForeignValue::Double(*f));
                                             } else {
-                                                arg_types.push(ffi_clone.type_pointer);
-                                                ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                                arg_types.push(ffi_clone.pointer);
+                                                ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
                                             }
                                         }
                                         _ => {
-                                            arg_types.push(ffi_clone.type_pointer);
-                                            ffi_args.push(FfiArg::Pointer(std::ptr::null_mut()));
+                                            arg_types.push(ffi_clone.pointer);
+                                            ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
                                         }
                                     }
                                 }
@@ -270,41 +270,41 @@ impl<'source> Action<
                                 let mut arg_values = Vec::with_capacity(ffi_args.len());
                                 for arg in &mut ffi_args {
                                     let ptr = match arg {
-                                        FfiArg::Sint64(v) => v as *mut _ as *mut sys::c_void,
-                                        FfiArg::Double(v) => v as *mut _ as *mut sys::c_void,
-                                        FfiArg::Pointer(v) => v as *mut _ as *mut sys::c_void,
-                                        FfiArg::Uint8(v) => v as *mut _ as *mut sys::c_void,
-                                        FfiArg::Uint32(v) => v as *mut _ as *mut sys::c_void,
+                                        ForeignValue::Sint64(v) => v as *mut _ as *mut sys::c_void,
+                                        ForeignValue::Double(v) => v as *mut _ as *mut sys::c_void,
+                                        ForeignValue::Pointer(v) => v as *mut _ as *mut sys::c_void,
+                                        ForeignValue::Uint8(v) => v as *mut _ as *mut sys::c_void,
+                                        ForeignValue::Uint32(v) => v as *mut _ as *mut sys::c_void,
                                     };
                                     arg_values.push(ptr);
                                 }
 
-                                let mut cif: FfiCif = unsafe { std::mem::zeroed() };
+                                let mut cif: ForeignCall = unsafe { std::mem::zeroed() };
                                 let rtype = match ret_type.as_str() {
-                                    "Float" => ffi_clone.type_double,
-                                    "Boolean" => ffi_clone.type_uint8,
-                                    "UInt8" => ffi_clone.type_uint8,
-                                    "String" => ffi_clone.type_pointer,
-                                    "Empty" => ffi_clone.type_void,
-                                    "Character" => ffi_clone.type_uint32,
-                                    _ => ffi_clone.type_sint64,
+                                    "Float" => ffi_clone.double,
+                                    "Boolean" => ffi_clone.uint8,
+                                    "UInt8" => ffi_clone.uint8,
+                                    "String" => ffi_clone.pointer,
+                                    "Empty" => ffi_clone.void,
+                                    "Character" => ffi_clone.uint32,
+                                    _ => ffi_clone.sint64,
                                 };
 
                                 unsafe {
-                                    let status = if is_var && ffi_clone.prep_cif_var.is_some() {
+                                    let status = if is_var && ffi_clone.prep_var.is_some() {
                                         let nfixed = std::cmp::min(fixed_args as u32, arg_types.len() as u32);
-                                        ffi_clone.prep_cif_var.unwrap()(
+                                        ffi_clone.prep_var.unwrap()(
                                             &mut cif,
-                                            FFI_DEFAULT_ABI,
+                                            DEFAULT_ABI,
                                             nfixed,
                                             arg_types.len() as u32,
                                             rtype,
                                             arg_types.as_mut_ptr(),
                                         )
                                     } else {
-                                        (ffi_clone.prep_cif)(
+                                        (ffi_clone.prep_call)(
                                             &mut cif,
-                                            FFI_DEFAULT_ABI,
+                                            DEFAULT_ABI,
                                             arg_types.len() as u32,
                                             rtype,
                                             arg_types.as_mut_ptr(),
