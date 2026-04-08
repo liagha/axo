@@ -73,7 +73,7 @@ Action<
                 }
 
                 let stem = Str::from(record.location.stem().unwrap().to_string());
-                let span = Span::file(Str::from(record.location.to_string())).unwrap();
+                let span = Span::file(Str::from(record.location.to_string())).unwrap_or_else(|_| Span::void());
 
                 let head = Element::new(
                     ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),

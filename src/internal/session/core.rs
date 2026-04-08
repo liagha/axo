@@ -1,11 +1,9 @@
 use {
     crate::{
-        analyzer::{Analysis},
-        data::{
-            *,
-        },
+        analyzer::Analysis,
+        data::*,
         format::{Display, Show, Stencil},
-        initializer::{Initializer},
+        initializer::Initializer,
         internal::{
             hash::Map,
             platform::PathBuf,
@@ -14,7 +12,7 @@ use {
         },
         parser::{Element, ElementKind, SymbolKind},
         reporter::Error,
-        resolver::{Resolver},
+        resolver::Resolver,
         scanner::{Token, TokenKind},
         tracker::{Location, Span},
     },
@@ -58,6 +56,7 @@ pub struct Record<'session> {
     pub kind: InputKind,
     pub location: Location<'session>,
     pub module: Option<Identity>,
+    pub content: Option<String>,
     pub tokens: Option<Vec<Token<'session>>>,
     pub elements: Option<Vec<Element<'session>>>,
     pub analyses: Option<Vec<Analysis<'session>>>,
@@ -73,6 +72,7 @@ impl<'session> Record<'session> {
             kind,
             location,
             module: None,
+            content: None,
             tokens: None,
             elements: None,
             analyses: None,

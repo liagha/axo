@@ -12,6 +12,7 @@ use axo::{
     scanner::{Token, TokenKind},
     tracker::{self, Location, Span, TrackError},
 };
+use std::io::{stdin, stdout, Write};
 
 pub const BASE: &[&str] = &[
     "./base/cast.axo",
@@ -31,16 +32,7 @@ pub const BASE: &[&str] = &[
 ];
 
 fn main() {
-    let mut timer = DefaultTimer::new_default();
-    _ = timer.start();
-
     let mut initializer = Initializer::new(Location::Flag);
-    let mut resolver = Resolver::new();
-
-    let mut records = Map::new();
-    let mut errors = Vec::new();
-    let cache = Map::new();
-
     let targets = initializer.initialize();
 
     let bare = initializer.output.iter().any(|symbol| {
@@ -53,6 +45,82 @@ fn main() {
         }
         false
     });
+
+    let failures: Vec<CompileError> = initializer
+        .errors
+        .into_iter()
+        .map(CompileError::Initialize)
+        .collect();
+
+    if targets.is_empty() {
+        repl(bare, initializer.output);
+    } else {
+        build(targets, bare, initializer.output, failures);
+    }
+}
+
+fn repl(bare: bool, directives: Vec<Symbol>) {
+    let mut count = 0;
+
+    loop {
+        print!("> ");
+        _ = stdout().flush();
+
+        let mut input = String::new();
+        if stdin().read_line(&mut input).is_err() || input.trim().is_empty() {
+            continue;
+        }
+
+        let name = format!("repl_{}", count);
+        count += 1;
+
+        let mut session = create(bare, directives.clone(), Vec::new());
+        session.add_string(&name, input);
+        session.compile();
+    }
+}
+
+fn build(
+    targets: Vec<(Location<'static>, Span<'static>)>,
+    bare: bool,
+    directives: Vec<Symbol>,
+    failures: Vec<CompileError<'static>>,
+) {
+    let mut session = create(bare, directives, failures);
+
+    targets.iter().for_each(|(target, span)| {
+        if !traverse(target, &mut session.records) {
+            let string = target.to_string();
+
+            if let Some(kind) = InputKind::from_path(&string) {
+                let mut hasher = DefaultHasher::new();
+                Hash::hash(&string, &mut hasher);
+
+                let identity = (hasher.finish() as Identity) | 0x40000000;
+                session.records.insert(identity, Record::new(kind, target.clone()));
+            } else {
+                session.errors.push(CompileError::Track(TrackError::new(
+                    tracker::error::ErrorKind::UnSupportedInput(target.clone()),
+                    span.clone(),
+                )));
+            }
+        }
+    });
+
+    session.compile();
+}
+
+fn create<'a>(
+    bare: bool,
+    directives: Vec<Symbol<'a>>,
+    failures: Vec<CompileError<'a>>,
+) -> Session<'a> {
+    let mut timer = DefaultTimer::new_default();
+    _ = timer.start();
+
+    let mut resolver = Resolver::new();
+    let mut records = Map::new();
+    let cache = Map::new();
 
     if !bare {
         for path in BASE {
@@ -69,33 +137,7 @@ fn main() {
         }
     }
 
-    targets.iter().for_each(|(target, span)| {
-        if !traverse(target, &mut records) {
-            let string = target.to_string();
-
-            if let Some(kind) = InputKind::from_path(&string) {
-                let mut hasher = DefaultHasher::new();
-                Hash::hash(&string, &mut hasher);
-
-                let identity = (hasher.finish() as Identity) | 0x40000000;
-                records.insert(identity, Record::new(kind, target.clone()));
-            } else {
-                errors.push(CompileError::Track(TrackError::new(
-                    tracker::error::ErrorKind::UnSupportedInput(target.clone()),
-                    span.clone(),
-                )));
-            }
-        }
-    });
-
-    errors.extend(
-        initializer
-            .errors
-            .iter()
-            .map(|error| CompileError::Initialize(error.clone())),
-    );
-
-    for symbol in initializer.output.clone() {
+    for symbol in directives.clone() {
         resolver.registry.insert(symbol.identity, symbol);
     }
 
@@ -110,21 +152,24 @@ fn main() {
         Span::void(),
         Visibility::Public,
     )
-        .with_members(initializer.output.clone());
+        .with_members(directives);
 
     resolver.insert(directive);
 
     _ = timer.lap();
 
-    let compiler = Session { timer, records, initializer, resolver, errors, target: None, cache };
-
-    compiler.compile();
+    Session {
+        timer,
+        records,
+        initializer: Initializer::new(Location::Flag),
+        resolver,
+        errors: failures,
+        target: None,
+        cache,
+    }
 }
 
-pub fn traverse<'a>(
-    target: &Location<'a>,
-    records: &mut Map<Identity, Record<'a>>,
-) -> bool {
+pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a>>) -> bool {
     let Ok(path) = target.to_path() else {
         return false;
     };

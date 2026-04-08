@@ -3,25 +3,18 @@ mod core;
 pub use core::*;
 
 use crate::{
+    analyzer::Analyzer,
     combinator::{Action, Operation, Operator},
-    data::{
-        memory::Arc,
-        Str,
-    },
+    data::{memory::Arc, Str},
     internal::{
         cache::{Decode, Encode},
         platform::{create_dir_all, read, write, Lock},
         time::Duration,
         CompileError,
     },
-    scanner::{
-        Scanner,
-    },
-    parser::{
-        Parser
-    },
+    parser::Parser,
     resolver::Resolver,
-    analyzer::Analyzer,
+    scanner::Scanner,
 };
 
 #[cfg(not(feature = "generator"))]
@@ -61,8 +54,7 @@ Action<
                 let data: &'static [u8] = Box::leak(data.into_boxed_slice());
                 let mut cursor = 0;
 
-                if let Some(cache) =
-                    Option::<Map<Location<'source>, u64>>::decode(data, &mut cursor)
+                if let Some(cache) = Option::<Map<Location<'source>, u64>>::decode(data, &mut cursor)
                 {
                     session.cache = cache;
                 }
@@ -79,7 +71,16 @@ Action<
                 let location = record.location;
                 let path = location.to_string();
 
-                if let Ok(content) = read_to_string(&path) {
+                let mut hash_content = None;
+
+                if let Some(content) = &record.content {
+                    hash_content = Some(content.clone());
+                } else if let Ok(content) = read_to_string(&path) {
+                    record.content = Some(content.clone());
+                    hash_content = Some(content);
+                }
+
+                if let Some(content) = hash_content {
                     let mut hasher = DefaultHasher::new();
                     content.hash(&mut hasher);
                     let hash = hasher.finish();
@@ -186,6 +187,24 @@ impl<'session> Session<'session> {
         } else {
             None
         }
+    }
+
+    pub fn add_path(&mut self, path: &'session str) {
+        use crate::tracker::Location;
+        let location = Location::Entry(Str::from(path));
+        let kind = InputKind::from_path(path).unwrap_or(InputKind::Source);
+        let record = Record::new(kind, location);
+        let id = self.records.len() | 0x40000000;
+        self.records.insert(id, record);
+    }
+
+    pub fn add_string(&mut self, name: &'session str, content: String) {
+        use crate::tracker::Location;
+        let location = Location::Entry(Str::from(name));
+        let mut record = Record::new(InputKind::Source, location);
+        record.content = Some(content);
+        let id = self.records.len() | 0x40000000;
+        self.records.insert(id, record);
     }
 
     pub fn compile(self) {

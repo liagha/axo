@@ -115,8 +115,7 @@ impl<'error> Interpreter<'error> {
                 AnalysisKind::Module(stem, inner) => {
                     self.scope(stem.clone(), Self::generate, inner.clone());
                 }
-                AnalysisKind::Binding(_) => self.walk(analysis),
-                _ => {}
+                _ => self.walk(analysis),
             }
         }
 

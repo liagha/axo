@@ -45,13 +45,14 @@ Action<
         keys.sort();
 
         for key in keys {
-            let (kind, hash, dirty, location) = {
+            let (kind, hash, dirty, location, inline_content) = {
                 let record = session.records.get(&key).unwrap();
                 (
                     record.kind.clone(),
                     record.hash,
                     record.dirty,
                     record.location,
+                    record.content.clone(),
                 )
             };
 
@@ -66,14 +67,18 @@ Action<
                 }
             }
 
-            let content = match location.get_value() {
-                Ok(content) => content,
-                Err(error) => {
-                    let kind = ErrorKind::Tracking(error.clone());
-                    let error = ScanError::new(kind, error.span);
+            let content = if let Some(content) = inline_content {
+                crate::data::Str::from(content)
+            } else {
+                match location.get_value() {
+                    Ok(content) => content,
+                    Err(error) => {
+                        let kind = ErrorKind::Tracking(error.clone());
+                        let error = ScanError::new(kind, error.span);
 
-                    session.errors.push(CompileError::Scan(error));
-                    continue;
+                        session.errors.push(CompileError::Scan(error));
+                        continue;
+                    }
                 }
             };
 

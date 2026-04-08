@@ -375,13 +375,17 @@ impl<'source> Action<
         }
 
         vm.compile();
-        let entry = vm.address(&Str::from("main"));
+
+        let entry = vm.entities.get(&Str::from("main")).and_then(|entity| {
+            if let Entity::Function(Some(addr)) = entity {
+                Some(*addr)
+            } else {
+                None
+            }
+        });
 
         if session.errors.is_empty() {
-            if let Some(address) = entry {
-                vm.pointer = address;
-            }
-
+            vm.pointer = entry.unwrap_or(0);
             vm.frames.clear();
 
             if let Err(error) = vm.run() {
