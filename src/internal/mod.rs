@@ -4,6 +4,7 @@ pub use {
     session::{
         InputKind,
         Session,
+        Record,
     }
 };
 
