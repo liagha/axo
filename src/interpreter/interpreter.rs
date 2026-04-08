@@ -112,13 +112,9 @@ pub enum Opcode {
     Halt,
     MakeSequence(Scale),
     MakeStructure(Scale),
-    MakeVariant(Tag),
     ExtractField(Index),
-    ExtractVariant(Tag),
     Index,
     Trap,
-    CastInteger,
-    CastFloat,
 }
 
 #[derive(Clone, Debug)]
@@ -271,13 +267,9 @@ impl<'error> Interpreter<'error> {
             Opcode::Halt => self.running = false,
             Opcode::MakeSequence(size) => self.make_sequence(size)?,
             Opcode::MakeStructure(size) => self.make_structure(size)?,
-            Opcode::MakeVariant(tag) => self.make_variant(tag)?,
             Opcode::ExtractField(index) => self.extract_field(index)?,
-            Opcode::ExtractVariant(tag) => self.extract_variant(tag)?,
             Opcode::Index => self.index()?,
             Opcode::Trap => return Err(self.error(ErrorKind::OutOfBounds, instruction.span)),
-            Opcode::CastInteger => self.cast_integer()?,
-            Opcode::CastFloat => self.cast_float()?,
         }
 
         Ok(())
@@ -793,13 +785,6 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_variant(&mut self, tag: Tag) -> Result<(), InterpretError<'error>> {
-        let span = self.current();
-        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        self.stack.push(Value::Variant(tag, Box::new(value)));
-        Ok(())
-    }
-
     fn extract_field(&mut self, index: Index) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
@@ -808,22 +793,6 @@ impl<'error> Interpreter<'error> {
             Value::Structure(fields) => {
                 let value = fields.get(index).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
                 self.stack.push(value);
-            }
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
-        }
-        Ok(())
-    }
-
-    fn extract_variant(&mut self, tag: Tag) -> Result<(), InterpretError<'error>> {
-        let span = self.current();
-        let target = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-
-        match target {
-            Value::Variant(active, value) if active == tag => {
-                self.stack.push(*value);
-            }
-            Value::Variant(..) => {
-                self.stack.push(Value::Empty);
             }
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         }
@@ -845,32 +814,6 @@ impl<'error> Interpreter<'error> {
             }
             _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
         }
-        Ok(())
-    }
-
-    fn cast_integer(&mut self) -> Result<(), InterpretError<'error>> {
-        let span = self.current();
-        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        let result = match value {
-            Value::Float(v) => Value::Integer(v as i64),
-            Value::Boolean(v) => Value::Integer(v as i64),
-            Value::Character(v) => Value::Integer(v as i64),
-            v @ Value::Integer(_) => v,
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
-        };
-        self.stack.push(result);
-        Ok(())
-    }
-
-    fn cast_float(&mut self) -> Result<(), InterpretError<'error>> {
-        let span = self.current();
-        let value = self.stack.pop().ok_or_else(|| self.error(ErrorKind::StackUnderflow, span))?;
-        let result = match value {
-            Value::Integer(v) => Value::Float(v as f64),
-            v @ Value::Float(_) => v,
-            _ => return Err(self.error(ErrorKind::TypeMismatch, span)),
-        };
-        self.stack.push(result);
         Ok(())
     }
 

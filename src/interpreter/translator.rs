@@ -561,7 +561,7 @@ impl Interpreter<'_> {
         }
     }
 
-    fn members<'error>(analyses: Vec<Analysis<'error>>) -> Vec<Str<'error>> {
+    fn members(analyses: Vec<Analysis>) -> Vec<Str> {
         analyses.iter().filter_map(Self::extract_name).collect()
     }
 }
