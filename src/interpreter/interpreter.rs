@@ -117,11 +117,11 @@ pub struct Instruction<'error> {
 }
 
 #[derive(Clone, Debug)]
-pub enum Entity {
+pub enum Entity<'error> {
     Foreign(usize),
     Function(Option<usize>),
-    Structure(usize, Vec<String>),
-    Union(usize, Vec<String>),
+    Structure(usize, Vec<Str<'error>>),
+    Union(usize, Vec<Str<'error>>),
     Module,
 }
 
@@ -132,27 +132,27 @@ pub struct Frame {
     pub locals: Vec<Value>,
 }
 
-pub struct Machine<'error> {
+pub struct Interpreter<'error> {
     pub stack: Vec<Value>,
     pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
     pub code: Vec<Instruction<'error>>,
     pub foreign: Vec<Foreign<'error>>,
-    pub bindings: Map<String, usize>,
-    pub entities: Map<String, Entity>,
+    pub bindings: Map<Str<'error>, usize>,
+    pub entities: Map<Str<'error>, Entity<'error>>,
     pub function_frames: Map<usize, (usize, usize)>,
     pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
     pub current_module: Str<'error>,
-    pub calls: Vec<(usize, String, String)>,
+    pub calls: Vec<(usize, Str<'error>)>,
     pub loops: Vec<(usize, Vec<usize>)>,
     pub memory_top: usize,
     pub pointer: usize,
     pub running: bool,
 }
 
-impl<'error> Machine<'error> {
+impl<'error> Interpreter<'error> {
     pub fn new(capacity: usize) -> Self {
-        let mut machine = Self {
+        let mut interpreter = Self {
             stack: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
@@ -170,8 +170,8 @@ impl<'error> Machine<'error> {
             running: false,
         };
 
-        machine.native("print", 0);
-        machine
+        interpreter.native("print", 0);
+        interpreter
     }
 
     fn error(&self, kind: ErrorKind, span: Span<'error>) -> InterpretError<'error> {
@@ -180,6 +180,27 @@ impl<'error> Machine<'error> {
 
     fn current(&self) -> Span<'error> {
         self.code[self.pointer.saturating_sub(1)].span
+    }
+
+    pub fn get_entity(&self, name: &Str<'error>) -> Option<&Entity<'error>> {
+        self.entities.get(name)
+    }
+
+    pub fn insert_entity(&mut self, name: Str<'error>, entity: Entity<'error>) {
+        self.entities.insert(name, entity);
+    }
+
+    pub fn update_entity(&mut self, name: &Str<'error>, entity: Entity<'error>) -> bool {
+        if self.entities.contains_key(name) {
+            self.entities.insert(*name, entity);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_module(&self, name: &Str<'error>) -> bool {
+        self.modules.contains_key(name)
     }
 
     pub fn run(&mut self) -> Result<(), InterpretError<'error>> {

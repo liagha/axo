@@ -161,7 +161,7 @@ impl<'source> Action<
         }
         sources.sort();
 
-        let mut vm = Machine::new(1024);
+        let mut vm = Interpreter::new(1024);
 
         let libffi_opt = Library::load("libffi.so")
             .or_else(|| Library::load("libffi.so.8"))
@@ -377,7 +377,7 @@ impl<'source> Action<
         }
 
         vm.compile();
-        let entry = vm.address("main");
+        let entry = vm.address(&Str::from("main"));
 
         if session.errors.is_empty() {
             if let Some(address) = entry {
