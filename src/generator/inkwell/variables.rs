@@ -17,6 +17,15 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    fn alias(&mut self, target: Str<'backend>, value: &Analysis<'backend>) -> bool {
+        if let Some(entity) = self.entity(value) {
+            self.insert_entity(target, entity);
+            true
+        } else {
+            false
+        }
+    }
+
     fn pointee(&self, analysis: &Analysis<'backend>) -> Option<BasicTypeEnum<'backend>> {
         match &analysis.kind {
             AnalysisKind::Usage(identifier) => match self.get_entity(identifier) {
@@ -324,7 +333,7 @@ impl<'backend> Generator<'backend> {
         if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
                 Entity::Function(function) => Ok(BasicValueEnum::from(
-                    function.as_global_value().as_pointer_value(),
+                    self.linked(identifier, *function).as_global_value().as_pointer_value(),
                 )),
                 Entity::Variable { pointer, typing } => {
                     let kind = self.to_basic_type(typing, span)?;
@@ -462,6 +471,10 @@ impl<'backend> Generator<'backend> {
                         )
                     })?;
 
+                    if self.alias(target.clone(), &expression) {
+                        return Ok(self.context.i64_type().const_zero().into());
+                    }
+
                     let result = self.analysis(*expression)?;
 
                     let declared = result.get_type();
@@ -488,6 +501,10 @@ impl<'backend> Generator<'backend> {
                             span,
                         )
                     })?;
+
+                    if self.alias(target.clone(), &expression) {
+                        return Ok(self.context.i64_type().const_zero().into());
+                    }
 
                     let typing = binding.annotation.clone();
                     let global = self.builder.get_insert_block().is_none();

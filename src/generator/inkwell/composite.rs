@@ -417,26 +417,16 @@ impl<'backend> Generator<'backend> {
         member: Box<Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        if let AnalysisKind::Usage(identifier) = &target.kind {
-            let namespace = self.has_module(identifier)
-                || matches!(
-                    self.get_entity(identifier),
-                    Some(Entity::Structure { .. } | Entity::Union { .. })
-                );
-
-            if namespace {
-                return match &member.kind {
-                    AnalysisKind::Usage(name) => self.usage(name.clone(), span),
-                    AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
-                    AnalysisKind::Constructor(constructor) => {
-                        self.constructor(constructor.clone(), span)
-                    }
-                    _ => Err(GenerateError::new(
-                        ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess),
-                        span,
-                    )),
-                };
-            }
+        if self.namespace(&target) {
+            return match &member.kind {
+                AnalysisKind::Usage(name) => self.usage(name.clone(), span),
+                AnalysisKind::Invoke(invoke) => self.invoke(invoke.clone(), span),
+                AnalysisKind::Constructor(constructor) => self.constructor(constructor.clone(), span),
+                _ => Err(GenerateError::new(
+                    ErrorKind::DataStructure(DataStructureError::InvalidModuleAccess),
+                    span,
+                )),
+            };
         }
 
         let field = match &member.kind {

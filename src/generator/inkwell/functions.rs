@@ -22,6 +22,17 @@ use {
 };
 
 impl<'backend> Generator<'backend> {
+    pub(crate) fn linked(&self, name: Str<'backend>, function: FunctionValue<'backend>) -> FunctionValue<'backend> {
+        let module = self.current_module();
+        let symbol = function.get_name().to_str().unwrap_or(name.as_str().unwrap_or_default());
+
+        if let Some(existing) = module.get_function(symbol) {
+            existing
+        } else {
+            module.add_function(symbol, function.get_type(), Some(Linkage::External))
+        }
+    }
+
     pub fn align(&self, layout: BasicTypeEnum<'backend>) -> u32 {
         if layout.is_pointer_type() || layout.is_struct_type() || layout.is_array_type() {
             return 8;
@@ -466,20 +477,9 @@ impl<'backend> Generator<'backend> {
             _ => Str::default(),
         };
 
-        let text = name.as_str().unwrap_or_default();
-
         let entity = self.get_entity(&name).and_then(|item| {
             if let Entity::Function(function) = item {
-                let module = self.current_module();
-                let identifier = function.get_name().to_str().unwrap_or(text);
-
-                if let Some(existing) = module.get_function(identifier) {
-                    Some(existing)
-                } else {
-                    let layout = function.get_type();
-                    let external = module.add_function(identifier, layout, Some(Linkage::External));
-                    Some(external)
-                }
+                Some(self.linked(name, *function))
             } else {
                 None
             }

@@ -37,6 +37,7 @@ pub enum Entity<'backend> {
         pointer: PointerValue<'backend>,
         typing: Type<'backend>,
     },
+    Module,
     Structure {
         shape: StructType<'backend>,
         members: Vec<Str<'backend>>,
@@ -130,6 +131,37 @@ impl<'backend> Generator<'backend> {
 
     pub fn has_module(&self, name: &Str<'backend>) -> bool {
         self.modules.contains_key(name)
+    }
+
+    pub fn raw_entity(&self, name: &Str<'backend>) -> Option<Entity<'backend>> {
+        self.get_entity(name)
+            .cloned()
+            .or_else(|| self.has_module(name).then_some(Entity::Module))
+    }
+
+    pub fn symbol(&self, analysis: &Analysis<'backend>) -> Option<Str<'backend>> {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => Some(*name),
+            AnalysisKind::Access(target, member) if self.namespace(target) => match &member.kind {
+                AnalysisKind::Usage(name) => Some(*name),
+                AnalysisKind::Access(_, _) => self.symbol(member),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    pub fn entity(&self, analysis: &Analysis<'backend>) -> Option<Entity<'backend>> {
+        self.symbol(analysis)
+            .and_then(|name| self.raw_entity(&name))
+            .filter(|entity| !matches!(entity, Entity::Variable { .. }))
+    }
+
+    pub fn namespace(&self, analysis: &Analysis<'backend>) -> bool {
+        matches!(
+            self.entity(analysis),
+            Some(Entity::Module | Entity::Structure { .. } | Entity::Union { .. })
+        )
     }
 
     pub fn to_basic_type(
