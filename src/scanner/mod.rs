@@ -12,7 +12,10 @@ use std::time::Duration;
 use broccli::Color;
 pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*};
 
-use {crate::reporter::Error, error::*};
+use {
+    crate::reporter::Error,
+    error::*
+};
 use crate::combinator::{Action, Operation};
 use crate::format::Show;
 use crate::internal::platform::Lock;
@@ -63,8 +66,20 @@ Action<
                 }
             }
 
-            let mut scanner = Scanner::new(location);
-            scanner.prepare();
+            let content = match location.get_value() {
+                Ok(content) => content,
+                Err(error) => {
+                    let kind = ErrorKind::Tracking(error.clone());
+                    let error = ScanError::new(kind, error.span);
+
+                    session.errors.push(CompileError::Scan(error));
+                    continue;
+                }
+            };
+
+            let position = crate::tracker::Position::new(location);
+            let mut scanner = Scanner::new(position, content);
+
             scanner.scan();
 
             if let Some(stencil) = session.get_stencil() {
@@ -100,6 +115,9 @@ Action<
 
 impl<'source> Default for Scanner<'source> {
     fn default() -> Self {
-        Scanner::new(crate::tracker::Location::Entry(crate::data::Str::from(file!())))
+        let location = crate::tracker::Location::Entry(crate::data::Str::from(file!()));
+        let position = crate::tracker::Position::new(location);
+
+        Scanner::new(position, crate::data::Str::from(""))
     }
 }

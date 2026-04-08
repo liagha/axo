@@ -110,10 +110,11 @@ impl<'a> Initializer<'a> {
 
     pub fn initialize(&mut self) -> Vec<(Location<'a>, Span<'a>)> {
         let location = Location::Flag;
-        let mut scanner = Scanner::new(location);
+        let content = location.get_value().unwrap();
 
-        scanner.set_location(location);
-        scanner.prepare();
+        let position = Position::new(location);
+        let mut scanner = Scanner::new(position, content);
+
         scanner.scan();
 
         self.input = scanner.output;

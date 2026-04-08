@@ -1,8 +1,8 @@
 use crate::{
     combinator::{Form, Former},
     data::{Offset, Scale, Str},
-    scanner::{Character, ErrorKind, ScanError, Token},
-    tracker::{Location, Peekable, Position},
+    scanner::{Character, ScanError, Token},
+    tracker::{Peekable, Position},
 };
 
 pub struct Scanner<'scanner> {
@@ -70,35 +70,19 @@ impl<'scanner> Peekable<'scanner, Character<'scanner>> for Scanner<'scanner> {
 }
 
 impl<'scanner> Scanner<'scanner> {
-    pub fn new(location: Location<'scanner>) -> Scanner<'scanner> {
-        let position = Position::new(location);
-
-        Scanner {
+    pub fn new(position: Position<'scanner>, content: Str<'scanner>) -> Scanner<'scanner> {
+        let mut scanner = Scanner {
             index: 0,
             position,
             input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
-        }
-    }
+        };
 
-    pub fn prepare(&mut self) {
-        let location = self.position.location;
+        let characters = Scanner::inspect(position, content.chars().collect::<Vec<_>>());
+        scanner.set_input(characters);
 
-        match location.get_value() {
-            Ok(content) => {
-                let characters =
-                    Scanner::inspect(Position::new(location), content.chars().collect::<Vec<_>>());
-                self.set_input(characters);
-            }
-
-            Err(error) => {
-                let kind = ErrorKind::Tracking(error.clone());
-                let error = ScanError::new(kind, error.span);
-
-                self.errors.push(error);
-            }
-        }
+        scanner
     }
 
     pub fn scan(&mut self) {
@@ -119,27 +103,6 @@ impl<'scanner> Scanner<'scanner> {
 
                 _ => {}
             }
-        }
-    }
-
-    #[inline]
-    pub fn scan_string(
-        string: Str<'scanner>,
-    ) -> Result<Vec<Token<'scanner>>, Vec<ScanError<'scanner>>> {
-        let location = Location::Entry(Str::from(file!()));
-        let mut scanner = Scanner::new(location);
-
-        let characters =
-            Scanner::inspect(Position::new(location), string.chars().collect::<Vec<_>>());
-
-        scanner.set_input(characters);
-
-        scanner.scan();
-
-        if scanner.errors.is_empty() {
-            Ok(scanner.output)
-        } else {
-            Err(scanner.errors)
         }
     }
 }
