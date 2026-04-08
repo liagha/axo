@@ -1,0 +1,2 @@
+print.print_string("hey")
+print.print_newline()

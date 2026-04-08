@@ -218,6 +218,14 @@ impl<'error> Interpreter<'error> {
     }
 
     pub fn run(&mut self) -> Result<(), InterpretError<'error>> {
+        if self.frames.is_empty() {
+            self.frames.push(Frame {
+                pointer: self.code.len(),
+                start: 0,
+                locals: Vec::new(),
+            });
+        }
+
         self.running = true;
         while self.running && self.pointer < self.code.len() {
             self.step()?;

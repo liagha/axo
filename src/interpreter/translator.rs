@@ -53,6 +53,16 @@ impl<'error> Interpreter<'error> {
             self.generate(analyses);
         }
 
+        let entry = Str::from("main".to_string());
+
+        if self.address(&entry).is_some() {
+            if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
+                let place = self.code.len();
+                self.emit(Opcode::Call(0), span);
+                self.calls.push((place, entry));
+            }
+        }
+
         if let Some(span) = self.code.last().map(|instruction| instruction.span.clone()) {
             self.emit(Opcode::Halt, span);
         }
@@ -102,25 +112,18 @@ impl<'error> Interpreter<'error> {
     }
 
     fn generate(&mut self, analyses: Vec<Analysis<'error>>) {
-        let mut entry = None;
-
         for analysis in analyses {
             match &analysis.kind {
-                AnalysisKind::Function(function) if function.entry => {
-                    entry = Some((function.clone(), analysis.span.clone()));
-                }
                 AnalysisKind::Function(function) => {
-                    self.define(function.clone(), analysis.span.clone());
+                    if !matches!(function.interface, crate::data::Interface::C) {
+                        self.define(function.clone(), analysis.span.clone());
+                    }
                 }
                 AnalysisKind::Module(stem, inner) => {
                     self.scope(stem.clone(), Self::generate, inner.clone());
                 }
                 _ => self.walk(analysis),
             }
-        }
-
-        if let Some((function, span)) = entry {
-            self.define(function, span);
         }
     }
 

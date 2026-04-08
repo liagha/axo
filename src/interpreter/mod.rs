@@ -376,24 +376,15 @@ impl<'source> Action<
 
         vm.compile();
 
-        let entry = vm.entities.get(&Str::from("main")).and_then(|entity| {
-            if let Entity::Function(Some(addr)) = entity {
-                Some(*addr)
-            } else {
-                None
-            }
-        });
-
         if session.errors.is_empty() {
-            vm.pointer = entry.unwrap_or(0);
+            vm.pointer = 0;
             vm.frames.clear();
 
             if let Err(error) = vm.run() {
-                if !matches!(error.kind, ErrorKind::InvalidFrame) {
-                    session.errors.push(CompileError::Interpret(error.clone()));
-                }
+                session.errors.push(CompileError::Interpret(error));
             }
         }
+
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
         session.report_finish("interpreting", duration, session.errors.len() - initial);
