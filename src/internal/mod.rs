@@ -3,6 +3,7 @@ mod session;
 pub use {
     session::{
         InputKind,
+        PrepareAction,
         Session,
         Record,
     }
