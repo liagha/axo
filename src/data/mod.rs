@@ -12,7 +12,6 @@ pub use {
 pub type Identity = usize;
 pub type Char = char;
 pub type Boolean = bool;
-pub type Pointer = *const u8;
 pub type Offset = usize;
 pub type Scale = usize;
 pub type Integer = i128;

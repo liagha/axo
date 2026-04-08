@@ -1,7 +1,14 @@
 use {
     crate::{
         analyzer::{Analysis},
-        data::{memory::Arc, CString, Str},
+        data::{
+            memory::Arc,
+            CString,
+            Str,
+            Identity,
+            Offset,
+            Scale,
+        },
         internal::{
             hash::Map,
         },
@@ -17,12 +24,8 @@ use {
 
 pub type Native<'error> = fn(&[Value], Span<'error>) -> Result<Value, InterpretError<'error>>;
 pub type Address = usize;
-pub type Offset = usize;
 pub type Index = usize;
-pub type Count = usize;
-pub type Size = usize;
 pub type Tag = usize;
-pub type Identity = usize;
 
 #[cfg(unix)]
 pub mod sys {
@@ -104,11 +107,11 @@ pub enum Opcode {
     Store(Address),
     StoreField(Address, Index),
     Call(Address),
-    CallForeign(Index, Count),
+    CallForeign(Index, Scale),
     Return,
     Halt,
-    MakeSequence(Size),
-    MakeStructure(Size),
+    MakeSequence(Scale),
+    MakeStructure(Scale),
     MakeVariant(Tag),
     ExtractField(Index),
     ExtractVariant(Tag),
@@ -157,7 +160,7 @@ pub struct Interpreter<'error> {
     pub code: Vec<Instruction<'error>>,
     pub foreign: Vec<Foreign<'error>>,
     pub entities: Map<Str<'error>, Entity<'error>>,
-    pub function_frames: Map<Address, (Address, Size)>,
+    pub function_frames: Map<Address, (Address, Scale)>,
     pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
     pub current_module: Str<'error>,
     pub calls: Vec<(Address, Str<'error>)>,
@@ -168,7 +171,7 @@ pub struct Interpreter<'error> {
 }
 
 impl<'error> Interpreter<'error> {
-    pub fn new(capacity: Size) -> Self {
+    pub fn new(capacity: Scale) -> Self {
         let mut interpreter = Self {
             stack: Vec::new(),
             frames: Vec::new(),
@@ -707,7 +710,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn call_foreign(&mut self, target: Index, count: Count) -> Result<(), InterpretError<'error>> {
+    fn call_foreign(&mut self, target: Index, count: Scale) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         let routine = self.foreign.get(target).ok_or_else(|| self.error(ErrorKind::OutOfBounds, span))?.clone();
 
@@ -768,7 +771,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_sequence(&mut self, size: Size) -> Result<(), InterpretError<'error>> {
+    fn make_sequence(&mut self, size: Scale) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
@@ -779,7 +782,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    fn make_structure(&mut self, size: Size) -> Result<(), InterpretError<'error>> {
+    fn make_structure(&mut self, size: Scale) -> Result<(), InterpretError<'error>> {
         let span = self.current();
         if self.stack.len() < size {
             return Err(self.error(ErrorKind::StackUnderflow, span));
