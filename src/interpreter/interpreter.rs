@@ -185,7 +185,6 @@ impl<'error> Interpreter<'error> {
             running: false,
         };
 
-        interpreter.native("print", 0);
         interpreter
     }
 
