@@ -206,7 +206,23 @@ impl<'source> Action<
 
                     if let Ok(string) = CString::new(name) {
                         let pointer = unsafe {
-                            libc::dlsym(libc::RTLD_DEFAULT, string.as_ptr())
+                            let base = session.base();
+                            let build = base.join("build");
+
+                            let library = CString::new(
+                                build.join("lib_axo.so")
+                                    .to_str()
+                                    .expect("Invalid UTF-8 in path")
+                            ).unwrap();
+
+
+                            let handle = libc::dlopen(library.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL);
+
+                            if handle.is_null() {
+                                std::ptr::null_mut()
+                            } else {
+                                libc::dlsym(handle, string.as_ptr())
+                            }
                         };
 
                         if !pointer.is_null() && ffi.is_some() {
