@@ -29,4 +29,4 @@ pub mod tracker;
 pub mod data;
 
 pub mod analyzer;
-mod interpreter;
+pub mod interpreter;

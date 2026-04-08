@@ -207,7 +207,10 @@ impl<'session> Session<'session> {
         self.records.insert(id, record);
     }
 
-    pub fn compile(self) {
+    pub fn run(
+        self,
+        mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>,
+    ) {
         if !self.errors.is_empty() {
             for error in &self.errors {
                 match error {
@@ -227,22 +230,6 @@ impl<'session> Session<'session> {
 
         let store = Arc::new(Lock::new(self));
         let mut operator = Operator::new(store.clone());
-
-        let mut pipeline = Operation::sequence([
-            Operation::new(Arc::new(PrepareAction)),
-            Operation::new(Arc::new(Scanner::default())),
-            Operation::new(Arc::new(Parser::default())),
-            Operation::new(Arc::new(Resolver::default())),
-            Operation::new(Arc::new(Analyzer::default())),
-            #[cfg(not(feature = "generator"))]
-            Operation::new(Arc::new(Interpreter::default())),
-            #[cfg(feature = "generator")]
-            Operation::new(Arc::new(GenerateAction)),
-            #[cfg(feature = "generator")]
-            Operation::new(Arc::new(EmitAction)),
-            #[cfg(feature = "generator")]
-            Operation::new(Arc::new(RunAction)),
-        ]);
 
         operator.execute(&mut pipeline);
 
@@ -270,5 +257,23 @@ impl<'session> Session<'session> {
                 CompileError::Track(error) => session.report_error(error),
             }
         }
+    }
+
+    pub fn compile(self) {
+        self.run(Operation::sequence([
+            Operation::new(Arc::new(PrepareAction)),
+            Operation::new(Arc::new(Scanner::default())),
+            Operation::new(Arc::new(Parser::default())),
+            Operation::new(Arc::new(Resolver::default())),
+            Operation::new(Arc::new(Analyzer::default())),
+            #[cfg(not(feature = "generator"))]
+            Operation::new(Arc::new(Interpreter::default())),
+            #[cfg(feature = "generator")]
+            Operation::new(Arc::new(GenerateAction)),
+            #[cfg(feature = "generator")]
+            Operation::new(Arc::new(EmitAction)),
+            #[cfg(feature = "generator")]
+            Operation::new(Arc::new(RunAction)),
+        ]));
     }
 }
