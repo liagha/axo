@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use {
     crate::{
         analyzer::{Analysis},
@@ -127,14 +125,22 @@ pub enum Entity {
     Module,
 }
 
+#[derive(Clone, Debug)]
+pub struct Frame {
+    pub pointer: usize,
+    pub start: usize,
+    pub locals: Vec<Value>,
+}
+
 pub struct Machine<'error> {
     pub stack: Vec<Value>,
-    pub frames: Vec<usize>,
+    pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
     pub code: Vec<Instruction<'error>>,
     pub foreign: Vec<Foreign<'error>>,
     pub bindings: Map<String, usize>,
     pub entities: Map<String, Entity>,
+    pub function_frames: Map<usize, (usize, usize)>,
     pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
     pub current_module: Str<'error>,
     pub calls: Vec<(usize, String, String)>,
@@ -154,6 +160,7 @@ impl<'error> Machine<'error> {
             foreign: Vec::new(),
             bindings: Map::new(),
             entities: Map::new(),
+            function_frames: Map::new(),
             modules: Map::new(),
             current_module: Str::default(),
             calls: Vec::new(),
@@ -694,14 +701,33 @@ impl<'error> Machine<'error> {
         if target >= self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
         }
-        self.frames.push(self.pointer);
+        let (start, size) = self.function_frames.get(&target).copied().unwrap_or((0, 0));
+        let end = start + size;
+
+        if end > self.memory.len() {
+            self.memory.resize(end, Value::Empty);
+        }
+
+        let locals = self.memory[start..end].to_vec();
+        for slot in &mut self.memory[start..end] {
+            *slot = Value::Empty;
+        }
+
+        self.frames.push(Frame {
+            pointer: self.pointer,
+            start,
+            locals,
+        });
         self.pointer = target;
         Ok(())
     }
 
     fn finish(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
-        self.pointer = self.frames.pop().ok_or_else(|| self.error(ErrorKind::InvalidFrame, span))?;
+        let frame = self.frames.pop().ok_or_else(|| self.error(ErrorKind::InvalidFrame, span))?;
+        let end = frame.start + frame.locals.len();
+        self.memory[frame.start..end].clone_from_slice(&frame.locals);
+        self.pointer = frame.pointer;
         Ok(())
     }
 

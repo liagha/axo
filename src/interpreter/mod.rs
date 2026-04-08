@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 mod error;
 mod translator;
 mod interpreter;

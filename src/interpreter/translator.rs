@@ -199,6 +199,8 @@ impl<'error> Machine<'error> {
             self.walk(*body);
         }
 
+        self.function_frames
+            .insert(address, (memory, self.memory_top - memory));
         self.emit(Opcode::Return, span.clone());
         self.bindings = bindings;
         self.memory_top = memory;
