@@ -72,6 +72,16 @@ enum ForeignValue {
     Uint32(u32),
 }
 
+pub struct InterpretAction<'source> {
+    pub core: Arc<Lock<Interpreter<'source>>>,
+}
+
+impl<'source> InterpretAction<'source> {
+    pub fn new(core: Arc<Lock<Interpreter<'source>>>) -> Self {
+        Self { core }
+    }
+}
+
 impl<'error> Interpreter<'error> {
     fn extract_c_signatures() -> std::collections::HashMap<String, (String, bool, usize)> {
         let mut map = std::collections::HashMap::new();
@@ -137,7 +147,7 @@ impl<'source> Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for Interpreter<'source>
+> for InterpretAction<'source>
 {
     fn action(
         &self,
@@ -146,6 +156,8 @@ impl<'source> Action<
     ) -> () {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
+
+        let mut interpreter = self.core.write().unwrap();
 
         let initial = session.errors.len();
         session.report_start("interpreting");
@@ -158,8 +170,6 @@ impl<'source> Action<
             }
         }
         sources.sort();
-
-        let mut interpreter = Interpreter::new(1024);
 
         let libffi_opt = Library::load("libffi.so")
             .or_else(|| Library::load("libffi.so.8"))
@@ -197,7 +207,7 @@ impl<'source> Action<
         }
 
         let modules: Vec<_> = interpreter.modules.values().flat_map(|items| items.iter()).cloned().collect();
-        let signatures = Self::extract_c_signatures();
+        let signatures = Interpreter::extract_c_signatures();
 
         for analysis in &modules {
             if let AnalysisKind::Function(function) = &analysis.kind {
@@ -371,20 +381,23 @@ impl<'source> Action<
                             });
 
                             interpreter.foreign.push(Foreign::Dynamic(execute));
-                            interpreter.native(name, interpreter.foreign.len() - 1);
+                            let index = interpreter.foreign.len() - 1;
+                            interpreter.native(name, index);
                         } else {
                             let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
                                 Err(ErrorKind::OutOfBounds)
                             });
                             interpreter.foreign.push(Foreign::Dynamic(execute));
-                            interpreter.native(name, interpreter.foreign.len() - 1);
+                            let index = interpreter.foreign.len() - 1;
+                            interpreter.native(name, index);
                         }
                     } else {
                         let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
                             Err(ErrorKind::OutOfBounds)
                         });
                         interpreter.foreign.push(Foreign::Dynamic(execute));
-                        interpreter.native(name, interpreter.foreign.len() - 1);
+                        let index = interpreter.foreign.len() - 1;
+                        interpreter.native(name, index);
                     }
                 }
             }

@@ -68,7 +68,7 @@ Action<
             .filter_map(|&identity| {
                 let record = session.records.get_mut(&identity).unwrap();
 
-                if record.kind != InputKind::Source {
+                if record.kind != InputKind::Source || record.module.is_some() {
                     return None;
                 }
 
@@ -102,7 +102,7 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
+                if record.kind == InputKind::Source && record.module.is_some() && record.dirty {
                     Some(key)
                 } else {
                     None

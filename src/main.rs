@@ -61,6 +61,9 @@ fn main() {
 
 fn repl(bare: bool, directives: Vec<Symbol>) {
     let mut count = 0;
+    let mut session = create(bare, directives.clone(), Vec::new());
+
+    let engine = axo::data::memory::Arc::new(axo::internal::platform::Lock::new(axo::interpreter::Interpreter::new(1024)));
 
     loop {
         print!("> ");
@@ -71,12 +74,28 @@ fn repl(bare: bool, directives: Vec<Symbol>) {
             continue;
         }
 
-        let name = format!("repl_{}", count);
+        let name: &'static str = Box::leak(Box::new(format!("repl_{}", count)));
         count += 1;
 
-        let mut session = create(bare, directives.clone(), Vec::new());
         session.add_string(&name, input);
-        session.compile();
+
+        use axo::combinator::Operation;
+        use axo::data::memory::Arc;
+        use axo::internal::PrepareAction;
+        use axo::scanner::Scanner;
+        use axo::parser::Parser;
+        use axo::resolver::Resolver;
+        use axo::analyzer::Analyzer;
+        use axo::interpreter::InterpretAction;
+
+        session = session.run(Operation::sequence([
+            Operation::new(Arc::new(PrepareAction)),
+            Operation::new(Arc::new(Scanner::default())),
+            Operation::new(Arc::new(Parser::default())),
+            Operation::new(Arc::new(Resolver::default())),
+            Operation::new(Arc::new(Analyzer::default())),
+            Operation::new(Arc::new(InterpretAction::new(engine.clone()))),
+        ]));
     }
 }
 
@@ -107,7 +126,7 @@ fn build(
         }
     });
 
-    session.compile();
+    let _session = session.compile();
 }
 
 fn create<'a>(

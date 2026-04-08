@@ -18,7 +18,7 @@ use crate::{
 };
 
 #[cfg(not(feature = "generator"))]
-use crate::interpreter::Interpreter;
+use crate::interpreter::{InterpretAction, Interpreter};
 
 #[cfg(feature = "generator")]
 use crate::generator::{EmitAction, GenerateAction, RunAction};
@@ -162,7 +162,7 @@ impl<'session> Session<'session> {
             let mut cursor = 0;
             T::decode(bytes, &mut cursor)
         }))
-        .ok()
+            .ok()
     }
 
     pub fn cache<T: Decode<'session> + Encode + Clone>(
@@ -211,9 +211,12 @@ impl<'session> Session<'session> {
     }
 
     pub fn run(
-        self,
+        mut self,
         mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>,
-    ) {
+    ) -> Self {
+        // Restart the timer so that subsequent loops in the REPL don't fail
+        _ = self.timer.start();
+
         if !self.errors.is_empty() {
             for error in &self.errors {
                 match error {
@@ -228,7 +231,7 @@ impl<'session> Session<'session> {
                     CompileError::Track(error) => self.report_error(error),
                 }
             }
-            return;
+            return self;
         }
 
         let store = Arc::new(Lock::new(self));
@@ -260,9 +263,20 @@ impl<'session> Session<'session> {
                 CompileError::Track(error) => session.report_error(error),
             }
         }
+
+        drop(session);
+        drop(operator);
+
+        Arc::try_unwrap(store)
+            .unwrap_or_else(|_| panic!())
+            .into_inner()
+            .unwrap()
     }
 
-    pub fn compile(self) {
+    pub fn compile(self) -> Self {
+        #[cfg(not(feature = "generator"))]
+        let engine = Arc::new(Lock::new(Interpreter::new(1024)));
+
         self.run(Operation::sequence([
             Operation::new(Arc::new(PrepareAction)),
             Operation::new(Arc::new(Scanner::default())),
@@ -270,13 +284,13 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(Resolver::default())),
             Operation::new(Arc::new(Analyzer::default())),
             #[cfg(not(feature = "generator"))]
-            Operation::new(Arc::new(Interpreter::default())),
+            Operation::new(Arc::new(InterpretAction::new(engine))),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(EmitAction)),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(RunAction)),
-        ]));
+        ]))
     }
 }
