@@ -15,16 +15,13 @@ use crate::{
         CompileError,
     },
     scanner::{
-        Token,
         Scanner,
     },
     parser::{
-        Element,
         Parser
     },
     resolver::Resolver,
     analyzer::Analyzer,
-    tracker::Span,
 };
 
 #[cfg(not(feature = "generator"))]
@@ -34,7 +31,6 @@ use crate::interpreter::Interpreter;
 use crate::generator::{EmitAction, GenerateAction, RunAction};
 
 pub struct PrepareAction;
-
 
 impl<'source>
 Action<
@@ -162,73 +158,6 @@ Action<
     }
 }
 
-pub struct PopulateAction;
-impl<'source>
-Action<
-    'static,
-    Operator<Arc<Lock<Session<'source>>>>,
-    Operation<'source, Arc<Lock<Session<'source>>>>,
-> for PopulateAction
-{
-    fn action(
-        &self,
-        operator: &mut Operator<Arc<Lock<Session<'source>>>>,
-        operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
-        let mut session = operator.store.write().unwrap();
-        use crate::{
-            data::Module,
-            parser::{ElementKind, Symbol, SymbolKind, Visibility},
-            scanner::TokenKind,
-        };
-
-        let mut keys: Vec<_> = session.records.keys().copied().collect();
-        keys.sort();
-
-        let modules: Vec<_> = keys
-            .into_iter()
-            .filter_map(|identity| {
-                let record = session.records.get_mut(&identity).unwrap();
-
-                if record.kind != InputKind::Source {
-                    return None;
-                }
-
-                let stem = Str::from(record.location.stem().unwrap().to_string());
-                let span = Span::file(Str::from(record.location.to_string())).unwrap();
-
-                let head = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
-                    span,
-                )
-                    .into();
-
-                let mut symbol = Symbol::new(
-                    SymbolKind::Module(Module::new(head)),
-                    span,
-                    Visibility::Public,
-                );
-
-                symbol.identity = identity;
-
-                record.module = Some(symbol.identity);
-                Some(symbol)
-            })
-            .collect();
-
-        for module in modules {
-            session.resolver.insert(module);
-        }
-
-        if session.errors.is_empty() {
-            operation.set_resolve(Vec::new());
-        } else {
-            operation.set_reject();
-        }
-        ()
-    }
-}
-
 impl<'session> Session<'session> {
     pub fn cache<T: Decode<'session> + Encode + Clone>(
         &self,
@@ -284,7 +213,6 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(PrepareAction)),
             Operation::new(Arc::new(Scanner::default())),
             Operation::new(Arc::new(Parser::default())),
-            Operation::new(Arc::new(PopulateAction)),
             Operation::new(Arc::new(Resolver::default())),
             Operation::new(Arc::new(Analyzer::default())),
             #[cfg(not(feature = "generator"))]

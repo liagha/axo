@@ -17,8 +17,11 @@ pub(super) use {error::*, typing::*};
 use crate::{
     data::{
         sync::{AtomicUsize, Ordering},
-        Identity,
+        Identity, Module, Str,
     },
+    parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
+    scanner::{Token, TokenKind},
+    tracker::Span,
     reporter::Error,
 };
 use crate::combinator::{Action, Operation, Operator};
@@ -57,7 +60,45 @@ Action<
         let initial = session.errors.len();
         session.report_start("resolving");
 
-        let mut keys: Vec<_> = session
+        let mut keys: Vec<_> = session.records.keys().copied().collect();
+        keys.sort();
+
+        let modules: Vec<_> = keys
+            .iter()
+            .filter_map(|&identity| {
+                let record = session.records.get_mut(&identity).unwrap();
+
+                if record.kind != InputKind::Source {
+                    return None;
+                }
+
+                let stem = Str::from(record.location.stem().unwrap().to_string());
+                let span = Span::file(Str::from(record.location.to_string())).unwrap();
+
+                let head = Element::new(
+                    ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
+                    span,
+                )
+                    .into();
+
+                let mut symbol = Symbol::new(
+                    SymbolKind::Module(Module::new(head)),
+                    span,
+                    Visibility::Public,
+                );
+
+                symbol.identity = identity;
+
+                record.module = Some(symbol.identity);
+                Some(symbol)
+            })
+            .collect();
+
+        for module in modules {
+            session.resolver.insert(module);
+        }
+
+        let mut source: Vec<_> = session
             .records
             .iter()
             .filter_map(|(&key, record)| {
@@ -68,9 +109,9 @@ Action<
                 }
             })
             .collect();
-        keys.sort();
+        source.sort();
 
-        for &key in &keys {
+        for &key in &source {
             let target = session.records.get(&key).unwrap().module.unwrap();
             let mut module = session.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -125,7 +166,7 @@ Action<
             )
         }
 
-        for &key in &keys {
+        for &key in &source {
             let target = session.records.get(&key).unwrap().module.unwrap();
             let mut module = session.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
@@ -151,7 +192,7 @@ Action<
             session.resolver.insert(module);
         }
 
-        for &key in &keys {
+        for &key in &source {
             let target = session.records.get(&key).unwrap().module.unwrap();
             let mut module = session.resolver.get_symbol(target).unwrap().clone();
             let scope = replace(&mut module.scope, Scope::new(None));
