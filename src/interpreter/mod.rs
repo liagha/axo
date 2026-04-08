@@ -4,6 +4,7 @@ mod error;
 mod translator;
 mod interpreter;
 
+pub use error::ErrorKind;
 pub use interpreter::*;
 use {
     crate::{
@@ -15,7 +16,6 @@ use {
             time::Duration,
             CompileError, InputKind, Session,
         },
-        interpreter::error::ErrorKind,
         reporter::Error,
     },
 };
