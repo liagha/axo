@@ -69,7 +69,7 @@ pub enum AnalysisKind<'analysis> {
     GreaterOrEqual(Box<Analysis<'analysis>>, Box<Analysis<'analysis>>),
 
     Index(Index<Box<Analysis<'analysis>>, Analysis<'analysis>>),
-    Invoke(Invoke<Str<'analysis>, Analysis<'analysis>>),
+    Invoke(Invoke<Box<Analysis<'analysis>>, Analysis<'analysis>>),
 
     Block(Vec<Analysis<'analysis>>),
     Conditional(

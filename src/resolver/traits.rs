@@ -22,47 +22,51 @@ impl<'typing> Decode<'typing> for Type<'typing> {
 impl<'typing> Encode for TypeKind<'typing> {
     fn encode(&self, buffer: &mut Vec<u8>) {
         match self {
-            TypeKind::Integer { size, signed } => {
+            TypeKind::Module(name) => {
                 buffer.push(0);
+                name.encode(buffer);
+            }
+            TypeKind::Integer { size, signed } => {
+                buffer.push(1);
                 size.encode(buffer);
                 signed.encode(buffer);
             }
             TypeKind::Float { size } => {
-                buffer.push(1);
+                buffer.push(2);
                 size.encode(buffer);
             }
-            TypeKind::Boolean => buffer.push(2),
-            TypeKind::String => buffer.push(3),
-            TypeKind::Character => buffer.push(4),
+            TypeKind::Boolean => buffer.push(3),
+            TypeKind::String => buffer.push(4),
+            TypeKind::Character => buffer.push(5),
             TypeKind::Pointer { target } => {
-                buffer.push(5);
+                buffer.push(6);
                 target.encode(buffer);
             }
             TypeKind::Array { member, size } => {
-                buffer.push(6);
+                buffer.push(7);
                 member.encode(buffer);
                 size.encode(buffer);
             }
             TypeKind::Tuple { members } => {
-                buffer.push(7);
+                buffer.push(8);
                 members.encode(buffer);
             }
-            TypeKind::Void => buffer.push(8),
+            TypeKind::Void => buffer.push(9),
             TypeKind::Variable(v) => {
-                buffer.push(9);
+                buffer.push(10);
                 v.encode(buffer);
             }
-            TypeKind::Unknown => buffer.push(10),
+            TypeKind::Unknown => buffer.push(11),
             TypeKind::Structure(v) => {
-                buffer.push(11);
-                v.encode(buffer);
-            }
-            TypeKind::Union(v) => {
                 buffer.push(12);
                 v.encode(buffer);
             }
-            TypeKind::Function(name, args, output) => {
+            TypeKind::Union(v) => {
                 buffer.push(13);
+                v.encode(buffer);
+            }
+            TypeKind::Function(name, args, output) => {
+                buffer.push(14);
                 name.encode(buffer);
                 args.encode(buffer);
                 output.encode(buffer);
@@ -76,32 +80,33 @@ impl<'typing> Decode<'typing> for TypeKind<'typing> {
         let tag = buffer[*cursor];
         *cursor += 1;
         match tag {
-            0 => TypeKind::Integer {
+            0 => TypeKind::Module(Str::decode(buffer, cursor)),
+            1 => TypeKind::Integer {
                 size: Scale::decode(buffer, cursor),
                 signed: Boolean::decode(buffer, cursor),
             },
-            1 => TypeKind::Float {
+            2 => TypeKind::Float {
                 size: Scale::decode(buffer, cursor),
             },
-            2 => TypeKind::Boolean,
-            3 => TypeKind::String,
-            4 => TypeKind::Character,
-            5 => TypeKind::Pointer {
+            3 => TypeKind::Boolean,
+            4 => TypeKind::String,
+            5 => TypeKind::Character,
+            6 => TypeKind::Pointer {
                 target: Box::decode(buffer, cursor),
             },
-            6 => TypeKind::Array {
+            7 => TypeKind::Array {
                 member: Box::decode(buffer, cursor),
                 size: Scale::decode(buffer, cursor),
             },
-            7 => TypeKind::Tuple {
+            8 => TypeKind::Tuple {
                 members: Vec::decode(buffer, cursor),
             },
-            8 => TypeKind::Void,
-            9 => TypeKind::Variable(Identity::decode(buffer, cursor)),
-            10 => TypeKind::Unknown,
-            11 => TypeKind::Structure(Aggregate::decode(buffer, cursor)),
-            12 => TypeKind::Union(Aggregate::decode(buffer, cursor)),
-            13 => TypeKind::Function(
+            9 => TypeKind::Void,
+            10 => TypeKind::Variable(Identity::decode(buffer, cursor)),
+            11 => TypeKind::Unknown,
+            12 => TypeKind::Structure(Aggregate::decode(buffer, cursor)),
+            13 => TypeKind::Union(Aggregate::decode(buffer, cursor)),
+            14 => TypeKind::Function(
                 Str::decode(buffer, cursor),
                 Vec::decode(buffer, cursor),
                 Option::decode(buffer, cursor),

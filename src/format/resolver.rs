@@ -16,6 +16,9 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
     fn format(&self, config: Stencil) -> Stencil {
         let base = config.clone().new("TypeKind");
         match self {
+            TypeKind::Module(name) => base
+                .variant("Module")
+                .field("name", name.format(config.clone())),
             TypeKind::Integer { size, signed } => base
                 .variant("Integer")
                 .field("size", size.to_string())

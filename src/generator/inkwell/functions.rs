@@ -454,15 +454,24 @@ impl<'backend> Generator<'backend> {
 
     pub fn invoke(
         &mut self,
-        call: Invoke<Str<'backend>, Analysis<'backend>>,
+        call: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
         span: Span<'backend>,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
-        let name = call.target.as_str().unwrap_or_default();
+        let name = match &call.target.kind {
+            AnalysisKind::Usage(name) => *name,
+            AnalysisKind::Access(_, member) => match &member.kind {
+                AnalysisKind::Usage(name) => *name,
+                _ => Str::default(),
+            },
+            _ => Str::default(),
+        };
 
-        let entity = self.get_entity(&call.target).and_then(|item| {
+        let text = name.as_str().unwrap_or_default();
+
+        let entity = self.get_entity(&name).and_then(|item| {
             if let Entity::Function(function) = item {
                 let module = self.current_module();
-                let identifier = function.get_name().to_str().unwrap_or(name);
+                let identifier = function.get_name().to_str().unwrap_or(text);
 
                 if let Some(existing) = module.get_function(identifier) {
                     Some(existing)
@@ -520,7 +529,7 @@ impl<'backend> Generator<'backend> {
 
         Err(GenerateError::new(
             ErrorKind::Function(FunctionError::Undefined {
-                name: call.target.to_string(),
+                name: name.to_string(),
             }),
             span,
         ))

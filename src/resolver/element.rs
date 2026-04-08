@@ -64,21 +64,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
             ElementKind::Literal(Token {
                 kind: TokenKind::Identifier(_),
                 ..
-            }) | ElementKind::Construct(_)
-                | ElementKind::Invoke(_)
+            })
         ) {
             match resolver.lookup(self) {
                 Ok(symbol) => {
                     self.reference = Some(symbol.identity);
-                    match &mut self.kind {
-                        ElementKind::Construct(construct) => {
-                            construct.target.reference = Some(symbol.identity)
-                        }
-                        ElementKind::Invoke(invoke) => {
-                            invoke.target.reference = Some(symbol.identity)
-                        }
-                        _ => {}
-                    }
                 }
                 Err(errors) => resolver.errors.extend(errors),
             }
@@ -535,6 +525,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
             ElementKind::Invoke(invoke) => {
                 invoke.target.resolve(resolver);
+                self.reference = invoke.target.reference;
 
                 let target = invoke.target.target().and_then(|name| name.as_str());
 
@@ -642,11 +633,12 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
             ElementKind::Construct(construct) => {
                 construct.target.resolve(resolver);
+                self.reference = construct.target.reference;
 
                 let mut layout = Vec::new();
                 let mut typing = None;
 
-                if let Some(reference) = self.reference {
+                if let Some(reference) = construct.target.reference {
                     if let Some(symbol) = resolver.get_symbol(reference).cloned() {
                         match symbol.kind {
                             SymbolKind::Structure(mut structure) => {
@@ -706,7 +698,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                 let aggregate = Aggregate::new(head, layout);
 
                 Type::new(
-                    self.reference.unwrap(),
+                    construct.target.reference.unwrap(),
                     typing.unwrap_or(TypeKind::Structure(aggregate)),
                 )
             }

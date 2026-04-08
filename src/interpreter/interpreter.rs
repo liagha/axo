@@ -114,7 +114,7 @@ pub enum Opcode {
     MakeStructure(Scale),
     ExtractField(Index),
     Index,
-    Trap,
+    Trap(ErrorKind),
 }
 
 #[derive(Clone, Debug)]
@@ -276,7 +276,7 @@ impl<'error> Interpreter<'error> {
             Opcode::MakeStructure(size) => self.make_structure(size)?,
             Opcode::ExtractField(index) => self.extract_field(index)?,
             Opcode::Index => self.index()?,
-            Opcode::Trap => return Err(self.error(ErrorKind::OutOfBounds, instruction.span)),
+            Opcode::Trap(kind) => return Err(self.error(kind, instruction.span)),
         }
 
         Ok(())
@@ -347,7 +347,7 @@ impl<'error> Interpreter<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 if right == 0 {
-                    return Err(self.error(ErrorKind::OutOfBounds, span));
+                    return Err(self.error(ErrorKind::DivisionByZero, span));
                 }
                 Value::Integer(left / right)
             }
@@ -369,7 +369,7 @@ impl<'error> Interpreter<'error> {
         let result = match (left, right) {
             (Value::Integer(left), Value::Integer(right)) => {
                 if right == 0 {
-                    return Err(self.error(ErrorKind::OutOfBounds, span));
+                    return Err(self.error(ErrorKind::DivisionByZero, span));
                 }
                 Value::Integer(left % right)
             }

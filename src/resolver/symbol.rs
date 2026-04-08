@@ -86,7 +86,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     TypeKind::Union(Aggregate::new(head.into(), Vec::new())),
                 )
             }
-            SymbolKind::Module(_) => unimplemented!("module declaration not implemented!"),
+            SymbolKind::Module(module) => {
+                let head = module.target.target().unwrap();
+                Type::new(self.identity, TypeKind::Module(head.into()))
+            }
         };
 
         resolver.insert(self.clone());
@@ -225,7 +228,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 )
             }
 
-            SymbolKind::Module(_) => Type::from(TypeKind::Void),
+            SymbolKind::Module(module) => {
+                let head = module.target.target().unwrap();
+                Type::new(self.identity, TypeKind::Module(head.into()))
+            }
         };
 
         let unified = resolver.unify(self.span, &expected, &typing);
@@ -286,7 +292,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     body.reify(resolver);
                 }
             }
-            SymbolKind::Module(_) => {}
+            SymbolKind::Module(module) => {
+                let head = module.target.target().unwrap();
+                self.typing = Type::new(self.identity, TypeKind::Module(head.into()));
+            }
         }
 
         resolver.insert(self.clone());

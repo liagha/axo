@@ -539,22 +539,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         AnalysisKind::Return(value)
                     }
                     _ => {
-                        let target = if let ElementKind::Literal(literal) = &invoke.target.kind {
-                            if let TokenKind::Identifier(name) = literal.kind {
-                                name
-                            } else {
-                                return Err(AnalyzeError::new(
-                                    ErrorKind::InvalidTarget,
-                                    literal.span,
-                                ));
-                            }
-                        } else {
-                            return Err(AnalyzeError::new(
-                                ErrorKind::InvalidTarget,
-                                invoke.target.span,
-                            ));
-                        };
-
+                        let target = invoke.target.analyze(resolver)?;
                         let arguments: Result<Vec<Analysis<'element>>, AnalyzeError<'element>> =
                             invoke
                                 .members
@@ -562,7 +547,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                 .map(|member| member.analyze(resolver))
                                 .collect();
 
-                        AnalysisKind::Invoke(Invoke::new(target, arguments?))
+                        AnalysisKind::Invoke(Invoke::new(Box::new(target), arguments?))
                     }
                 };
 

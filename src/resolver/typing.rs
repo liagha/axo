@@ -26,6 +26,7 @@ impl<'typing> From<TypeKind<'typing>> for Type<'typing> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind<'typing> {
+    Module(Str<'typing>),
     Integer {
         size: Scale,
         signed: Boolean,
@@ -137,6 +138,7 @@ impl<'resolver> Resolver<'resolver> {
                 left
             }
 
+            (TypeKind::Module(_), TypeKind::Module(_)) if left.identity == right.identity => left,
             (
                 TypeKind::Array {
                     member: left_item,

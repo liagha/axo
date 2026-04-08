@@ -1,7 +1,7 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind},
     data::{Invoke, Str},
-    interpreter::{Address, Entity, Index, Instruction, Interpreter, Opcode, Value},
+    interpreter::{error::ErrorKind, Address, Entity, Index, Instruction, Interpreter, Opcode, Value},
     tracker::Span,
 };
 
@@ -11,8 +11,8 @@ impl<'error> Interpreter<'error> {
     }
 
     pub fn address(&self, name: &Str<'error>) -> Option<Address> {
-        match self.get_entity(name) {
-            Some(Entity::Function(Some(address))) => Some(*address),
+        match self.raw_entity(name) {
+            Some(Entity::Function(Some(address))) => Some(address),
             _ => None,
         }
     }
@@ -72,7 +72,7 @@ impl<'error> Interpreter<'error> {
             if let Some(address) = self.address(&target) {
                 self.patch(index, Opcode::Call(address));
             } else {
-                self.patch(index, Opcode::Trap);
+                self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol));
             }
         }
     }
@@ -208,16 +208,35 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn namespace(&self, analysis: &Analysis<'error>) -> bool {
-        if let AnalysisKind::Usage(name) = &analysis.kind {
-            self.has_module(name)
-                || matches!(
-                    self.get_entity(name),
-                    Some(Entity::Structure { .. } | Entity::Union { .. })
-                )
-        } else {
-            false
+    fn raw_entity(&self, name: &Str<'error>) -> Option<Entity<'error>> {
+        self.get_entity(name)
+            .cloned()
+            .or_else(|| self.has_module(name).then_some(Entity::Module))
+    }
+
+    fn symbol(&self, analysis: &Analysis<'error>) -> Option<Str<'error>> {
+        match &analysis.kind {
+            AnalysisKind::Usage(name) => Some(*name),
+            AnalysisKind::Access(target, member) if self.namespace(target) => match &member.kind {
+                AnalysisKind::Usage(name) => Some(*name),
+                AnalysisKind::Access(_, _) => self.symbol(member),
+                _ => None,
+            },
+            _ => None,
         }
+    }
+
+    fn entity(&self, analysis: &Analysis<'error>) -> Option<Entity<'error>> {
+        self.symbol(analysis)
+            .and_then(|name| self.raw_entity(&name))
+            .filter(|entity| !matches!(entity, Entity::Variable { .. }))
+    }
+
+    fn namespace(&self, analysis: &Analysis<'error>) -> bool {
+        matches!(
+            self.entity(analysis),
+            Some(Entity::Module | Entity::Structure { .. } | Entity::Union { .. })
+        )
     }
 
     fn field(&self, target: &Analysis<'error>, field: &Str<'error>) -> Option<Index> {
@@ -231,21 +250,35 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn invoke(&mut self, invoke: Invoke<Str<'error>, Analysis<'error>>, span: Span<'error>) {
+    fn alias(&mut self, target: Str<'error>, value: &Analysis<'error>) -> bool {
+        if let Some(entity) = self.entity(value) {
+            self.insert_entity(target, entity);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn invoke(&mut self, invoke: Invoke<Box<Analysis<'error>>, Analysis<'error>>, span: Span<'error>) {
         let count = invoke.members.len();
         for member in invoke.members {
             self.walk(member);
         }
 
-        match self.get_entity(&invoke.target) {
-            Some(Entity::Foreign(index)) => self.emit(Opcode::CallForeign(*index, count), span),
-            Some(Entity::Function(Some(address))) => self.emit(Opcode::Call(*address), span),
-            Some(Entity::Function(None)) | None => {
+        match self.entity(invoke.target.as_ref()) {
+            Some(Entity::Foreign(index)) => self.emit(Opcode::CallForeign(index, count), span),
+            Some(Entity::Function(Some(address))) => self.emit(Opcode::Call(address), span),
+            Some(Entity::Function(None)) => {
                 let place = self.code.len();
                 self.emit(Opcode::Call(0), span);
-                self.calls.push((place, invoke.target));
+                if let Some(target) = self.symbol(invoke.target.as_ref()) {
+                    self.calls.push((place, target));
+                } else {
+                    self.patch(place, Opcode::Trap(ErrorKind::MissingSymbol));
+                }
             }
-            _ => self.emit(Opcode::Trap, span),
+            None => self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span),
+            _ => self.emit(Opcode::Trap(ErrorKind::InvalidCall), span),
         }
     }
 
@@ -261,11 +294,11 @@ impl<'error> Interpreter<'error> {
                     if let Some((address, _)) = self.variable(&name) {
                         self.emit(Opcode::Load(address), span);
                     } else {
-                        self.emit(Opcode::Trap, span);
+                        self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
                     }
                 }
                 AnalysisKind::Invoke(invoke) => self.invoke(invoke, span),
-                _ => self.emit(Opcode::Trap, span),
+                _ => self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span),
             }
             return;
         }
@@ -278,11 +311,11 @@ impl<'error> Interpreter<'error> {
             if let Some(index) = index {
                 self.emit(Opcode::ExtractField(index), span);
             } else {
-                self.emit(Opcode::Trap, span);
+                self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
             }
         } else {
             self.walk(*target);
-            self.emit(Opcode::Trap, span);
+            self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span);
         }
     }
 
@@ -462,7 +495,7 @@ impl<'error> Interpreter<'error> {
                         self.patch(index, Opcode::Jump(end));
                     }
                 } else {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::InvalidControl), span);
                 }
             }
             AnalysisKind::Break(operand) => {
@@ -471,7 +504,7 @@ impl<'error> Interpreter<'error> {
                 }
                 let place = self.code.len();
                 if self.loops.is_empty() {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::InvalidControl), span);
                 } else {
                     self.emit(Opcode::Jump(0), span);
                     if let Some(state) = self.loops.last_mut() {
@@ -483,23 +516,25 @@ impl<'error> Interpreter<'error> {
                 if let Some(state) = self.loops.last() {
                     self.emit(Opcode::Jump(state.0), span);
                 } else {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::InvalidControl), span);
                 }
             }
             AnalysisKind::Binding(binding) => {
                 if let (Some(value), AnalysisKind::Usage(target)) = (binding.value, binding.target.kind) {
-                    self.walk(*value);
-                    let address = self.memory_top;
-                    self.memory_top += 1;
-                    self.insert_entity(target, Entity::Variable { address, typing: binding.annotation });
-                    self.emit(Opcode::Store(address), span);
+                    if !self.alias(target, &value) {
+                        self.walk(*value);
+                        let address = self.memory_top;
+                        self.memory_top += 1;
+                        self.insert_entity(target, Entity::Variable { address, typing: binding.annotation });
+                        self.emit(Opcode::Store(address), span);
+                    }
                 }
             }
             AnalysisKind::Usage(name) => {
                 if let Some((address, _)) = self.variable(&name) {
                     self.emit(Opcode::Load(address), span);
                 } else {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::MissingSymbol), span);
                 }
             }
             AnalysisKind::Assign(name, value) => {
@@ -507,7 +542,7 @@ impl<'error> Interpreter<'error> {
                 if let Some((address, _)) = self.variable(&name) {
                     self.emit(Opcode::Store(address), span);
                 } else {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::InvalidStore), span);
                 }
             }
             AnalysisKind::Function(function) => self.define(function, span),
@@ -533,7 +568,7 @@ impl<'error> Interpreter<'error> {
                 }
 
                 if !valid {
-                    self.emit(Opcode::Trap, span);
+                    self.emit(Opcode::Trap(ErrorKind::InvalidStore), span);
                 }
             }
             AnalysisKind::Structure(_) | AnalysisKind::Union(_) => {}
@@ -548,7 +583,7 @@ impl<'error> Interpreter<'error> {
                 }
                 self.emit(Opcode::MakeStructure(size), span);
             }
-            _ => self.emit(Opcode::Trap, span),
+            _ => self.emit(Opcode::Trap(ErrorKind::InvalidAccess), span),
         }
     }
 }

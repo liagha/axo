@@ -51,11 +51,7 @@ Action<
         let manifest = session.manifest();
         if session.cache.is_empty() && session.get_directive(Str::from("Discard")).is_none() {
             if let Ok(data) = read(&manifest) {
-                let data: &'static [u8] = Box::leak(data.into_boxed_slice());
-                let mut cursor = 0;
-
-                if let Some(cache) = Option::<Map<Location<'source>, u64>>::decode(data, &mut cursor)
-                {
+                if let Some(cache) = Session::decode::<Option<Map<Location<'source>, u64>>>(data).flatten() {
                     session.cache = cache;
                 }
             }
@@ -160,6 +156,15 @@ Action<
 }
 
 impl<'session> Session<'session> {
+    fn decode<T: Decode<'session>>(bytes: Vec<u8>) -> Option<T> {
+        let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut cursor = 0;
+            T::decode(bytes, &mut cursor)
+        }))
+        .ok()
+    }
+
     pub fn cache<T: Decode<'session> + Encode + Clone>(
         &self,
         name: &str,
@@ -181,9 +186,7 @@ impl<'session> Session<'session> {
             _ = write(path, buffer);
             Some(value)
         } else if let Ok(bytes) = read(&path) {
-            let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
-            let mut cursor = 0;
-            Option::<T>::decode(bytes, &mut cursor)
+            Self::decode(bytes).flatten()
         } else {
             None
         }
