@@ -10,6 +10,7 @@ use {
             error::ErrorKind
         },
         reporter::Error,
+        resolver::Type,
         tracker::Span,
     },
 };
@@ -118,6 +119,10 @@ pub struct Instruction<'error> {
 
 #[derive(Clone, Debug)]
 pub enum Entity<'error> {
+    Variable {
+        address: usize,
+        typing: Type<'error>,
+    },
     Foreign(usize),
     Function(Option<usize>),
     Structure(usize, Vec<Str<'error>>),
@@ -138,7 +143,6 @@ pub struct Interpreter<'error> {
     pub memory: Vec<Value>,
     pub code: Vec<Instruction<'error>>,
     pub foreign: Vec<Foreign<'error>>,
-    pub bindings: Map<Str<'error>, usize>,
     pub entities: Map<Str<'error>, Entity<'error>>,
     pub function_frames: Map<usize, (usize, usize)>,
     pub modules: Map<Str<'error>, Vec<Analysis<'error>>>,
@@ -158,7 +162,6 @@ impl<'error> Interpreter<'error> {
             memory: vec![Value::Empty; capacity],
             code: Vec::new(),
             foreign: Vec::new(),
-            bindings: Map::new(),
             entities: Map::new(),
             function_frames: Map::new(),
             modules: Map::new(),

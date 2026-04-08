@@ -129,7 +129,7 @@ impl<'error> Interpreter<'error> {
         let address = self.code.len();
         self.insert_entity(function.target, Entity::Function(Some(address)));
 
-        let bindings = self.bindings.clone();
+        let entities = self.entities.clone();
         let memory = self.memory_top;
 
         let mut members = function.members.clone();
@@ -140,14 +140,14 @@ impl<'error> Interpreter<'error> {
                 AnalysisKind::Usage(target) => {
                     let address = self.memory_top;
                     self.memory_top += 1;
-                    self.bindings.insert(*target, address);
+                    self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
                     self.emit(Opcode::Store(address), span.clone());
                 }
                 AnalysisKind::Binding(binding) => {
                     if let AnalysisKind::Usage(target) = &binding.target.kind {
                         let address = self.memory_top;
                         self.memory_top += 1;
-                        self.bindings.insert(*target, address);
+                        self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
                         self.emit(Opcode::Store(address), span.clone());
                     }
                 }
@@ -162,7 +162,7 @@ impl<'error> Interpreter<'error> {
         self.function_frames
             .insert(address, (memory, self.memory_top - memory));
         self.emit(Opcode::Return, span.clone());
-        self.bindings = bindings;
+        self.entities = entities;
         self.memory_top = memory;
         self.patch(bypass, Opcode::Jump(self.code.len()));
     }
@@ -200,6 +200,13 @@ impl<'error> Interpreter<'error> {
         self.position(&target.typing, field.as_str().unwrap_or_default())
     }
 
+    fn variable(&self, name: &Str<'error>) -> Option<(usize, &crate::resolver::Type<'error>)> {
+        match self.get_entity(name) {
+            Some(Entity::Variable { address, typing }) => Some((*address, typing)),
+            _ => None,
+        }
+    }
+
     fn invoke(&mut self, invoke: Invoke<Str<'error>, Analysis<'error>>, span: Span<'error>) {
         let count = invoke.members.len();
         for member in invoke.members {
@@ -227,7 +234,7 @@ impl<'error> Interpreter<'error> {
         if self.namespace(&target) {
             match member.kind {
                 AnalysisKind::Usage(name) => {
-                    if let Some(&address) = self.bindings.get(&name) {
+                    if let Some((address, _)) = self.variable(&name) {
                         self.emit(Opcode::Load(address), span);
                     } else {
                         self.emit(Opcode::Trap, span);
@@ -460,12 +467,12 @@ impl<'error> Interpreter<'error> {
                     self.walk(*value);
                     let address = self.memory_top;
                     self.memory_top += 1;
-                    self.bindings.insert(target, address);
+                    self.insert_entity(target, Entity::Variable { address, typing: binding.annotation });
                     self.emit(Opcode::Store(address), span);
                 }
             }
             AnalysisKind::Usage(name) => {
-                if let Some(&address) = self.bindings.get(&name) {
+                if let Some((address, _)) = self.variable(&name) {
                     self.emit(Opcode::Load(address), span);
                 } else {
                     self.emit(Opcode::Trap, span);
@@ -473,7 +480,7 @@ impl<'error> Interpreter<'error> {
             }
             AnalysisKind::Assign(name, value) => {
                 self.walk(*value);
-                if let Some(&address) = self.bindings.get(&name) {
+                if let Some((address, _)) = self.variable(&name) {
                     self.emit(Opcode::Store(address), span);
                 } else {
                     self.emit(Opcode::Trap, span);
@@ -493,7 +500,7 @@ impl<'error> Interpreter<'error> {
 
                 if let AnalysisKind::Access(left, right) = &target.kind {
                     if let (AnalysisKind::Usage(variable), AnalysisKind::Usage(field)) = (&left.kind, &right.kind) {
-                        if let (Some(&address), Some(index)) = (self.bindings.get(variable), self.position(&left.typing, field.as_str().unwrap_or_default())) {
+                        if let (Some((address, _)), Some(index)) = (self.variable(variable), self.position(&left.typing, field.as_str().unwrap_or_default())) {
                             self.walk(*value);
                             self.emit(Opcode::StoreField(address, index), span.clone());
                             valid = true;
