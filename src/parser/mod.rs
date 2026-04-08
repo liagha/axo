@@ -23,13 +23,12 @@ use crate::tracker::Peekable;
 
 pub type ParseError<'error> = Error<'error, ErrorKind<'error>>;
 
-pub struct ParseAction;
 impl<'source>
 Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for ParseAction
+> for Parser<'source>
 {
     fn action(
         &self,
@@ -103,3 +102,8 @@ Action<
     }
 }
 
+impl<'source> Default for Parser<'source> {
+    fn default() -> Self {
+        Parser::new(crate::tracker::Location::Entry(crate::data::Str::from(file!())))
+    }
+}

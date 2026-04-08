@@ -125,8 +125,14 @@ pub enum Entity<'error> {
     },
     Foreign(usize),
     Function(Option<usize>),
-    Structure(usize, Vec<Str<'error>>),
-    Union(usize, Vec<Str<'error>>),
+    Structure {
+        identity: usize,
+        members: Vec<Str<'error>>,
+    },
+    Union {
+        identity: usize,
+        members: Vec<Str<'error>>,
+    },
     Module,
 }
 
@@ -860,5 +866,11 @@ impl<'error> Interpreter<'error> {
 
     pub fn extract(mut self) -> Option<Value> {
         self.stack.pop()
+    }
+}
+
+impl<'error> Default for Interpreter<'error> {
+    fn default() -> Self {
+        Interpreter::new(1024)
     }
 }

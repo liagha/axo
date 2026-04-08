@@ -16,19 +16,19 @@ use crate::{
     },
     scanner::{
         Token,
-        ScanAction,
+        Scanner,
     },
     parser::{
         Element,
-        ParseAction
+        Parser
     },
-    resolver::ResolveAction,
-    analyzer::AnalyzeAction,
+    resolver::Resolver,
+    analyzer::Analyzer,
     tracker::Span,
 };
 
 #[cfg(not(feature = "generator"))]
-use crate::interpreter::InterpretAction;
+use crate::interpreter::Interpreter;
 
 #[cfg(feature = "generator")]
 use crate::generator::{EmitAction, GenerateAction, RunAction};
@@ -282,13 +282,13 @@ impl<'session> Session<'session> {
 
         let mut pipeline = Operation::sequence([
             Operation::new(Arc::new(PrepareAction)),
-            Operation::new(Arc::new(ScanAction)),
-            Operation::new(Arc::new(ParseAction)),
+            Operation::new(Arc::new(Scanner::default())),
+            Operation::new(Arc::new(Parser::default())),
             Operation::new(Arc::new(PopulateAction)),
-            Operation::new(Arc::new(ResolveAction)),
-            Operation::new(Arc::new(AnalyzeAction)),
+            Operation::new(Arc::new(Resolver::default())),
+            Operation::new(Arc::new(Analyzer::default())),
             #[cfg(not(feature = "generator"))]
-            Operation::new(Arc::new(InterpretAction)),
+            Operation::new(Arc::new(Interpreter::default())),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),
             #[cfg(feature = "generator")]

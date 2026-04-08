@@ -18,13 +18,12 @@ use crate::reporter::Error;
 
 pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
 
-pub struct AnalyzeAction;
 impl<'source>
 Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for AnalyzeAction
+> for Analyzer<'source>
 {
     fn action(
         &self,
@@ -98,3 +97,8 @@ Action<
     }
 }
 
+impl<'source> Default for Analyzer<'source> {
+    fn default() -> Self {
+        Analyzer::new(Vec::new())
+    }
+}

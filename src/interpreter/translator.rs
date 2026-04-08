@@ -72,11 +72,23 @@ impl<'error> Interpreter<'error> {
             match analysis.kind {
                 AnalysisKind::Structure(structure) => {
                     let items = Self::members(structure.members);
-                    self.insert_entity(structure.target, Entity::Structure(analysis.typing.identity, items));
+                    self.insert_entity(
+                        structure.target,
+                        Entity::Structure {
+                            identity: analysis.typing.identity,
+                            members: items,
+                        },
+                    );
                 }
                 AnalysisKind::Union(union) => {
                     let items = Self::members(union.members);
-                    self.insert_entity(union.target, Entity::Union(analysis.typing.identity, items));
+                    self.insert_entity(
+                        union.target,
+                        Entity::Union {
+                            identity: analysis.typing.identity,
+                            members: items,
+                        },
+                    );
                 }
                 AnalysisKind::Function(function) => {
                     if !matches!(function.interface, crate::data::Interface::C) {
@@ -167,21 +179,31 @@ impl<'error> Interpreter<'error> {
         self.patch(bypass, Opcode::Jump(self.code.len()));
     }
 
-    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<usize> {
+    fn aggregate(&self, typing: &crate::resolver::Type<'error>) -> Option<&Entity<'error>> {
         let mut current = typing;
         while let crate::resolver::TypeKind::Pointer { target } = &current.kind {
             current = target;
         }
 
         for entity in self.entities.values() {
-            if let Entity::Structure(id, members) | Entity::Union(id, members) = entity {
-                if *id == current.identity {
-                    return members.iter().position(|item| item == field);
+            match entity {
+                Entity::Structure { identity, .. } | Entity::Union { identity, .. } if *identity == current.identity => {
+                    return Some(entity);
                 }
+                _ => {}
             }
         }
 
         None
+    }
+
+    fn position(&self, typing: &crate::resolver::Type<'error>, field: &str) -> Option<usize> {
+        match self.aggregate(typing) {
+            Some(Entity::Structure { members, .. }) | Some(Entity::Union { members, .. }) => {
+                members.iter().position(|item| item == field)
+            }
+            _ => None,
+        }
     }
 
     fn namespace(&self, analysis: &Analysis<'error>) -> bool {
@@ -189,7 +211,7 @@ impl<'error> Interpreter<'error> {
             self.has_module(name)
                 || matches!(
                     self.get_entity(name),
-                    Some(Entity::Structure(..) | Entity::Union(..))
+                    Some(Entity::Structure { .. } | Entity::Union { .. })
                 )
         } else {
             false

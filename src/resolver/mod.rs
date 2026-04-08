@@ -34,13 +34,12 @@ pub fn next_identity() -> Identity {
 
 pub type ResolveError<'error> = Error<'error, ErrorKind<'error>>;
 
-pub struct ResolveAction;
 impl<'source>
 Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for ResolveAction
+> for Resolver<'source>
 {
     fn action(
         &self,
@@ -191,5 +190,11 @@ Action<
             operation.set_reject();
         }
         ()
+    }
+}
+
+impl<'source> Default for Resolver<'source> {
+    fn default() -> Self {
+        Resolver::new()
     }
 }

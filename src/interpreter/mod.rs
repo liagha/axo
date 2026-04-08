@@ -4,7 +4,7 @@ mod error;
 mod translator;
 mod interpreter;
 
-use interpreter::*;
+pub use interpreter::*;
 use {
     crate::{
         analyzer::{AnalysisKind},
@@ -21,8 +21,6 @@ use {
 };
 
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
-
-pub struct InterpretAction;
 
 #[repr(C)]
 pub struct FfiType {
@@ -74,7 +72,7 @@ enum FfiArg {
     Uint32(u32),
 }
 
-impl InterpretAction {
+impl<'error> Interpreter<'error> {
     fn extract_c_signatures() -> std::collections::HashMap<String, (String, bool, usize)> {
         let mut map = std::collections::HashMap::new();
         let mut dirs = vec![std::path::PathBuf::from(".")];
@@ -139,7 +137,7 @@ impl<'source> Action<
     'static,
     Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for InterpretAction
+> for Interpreter<'source>
 {
     fn action(
         &self,

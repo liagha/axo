@@ -20,13 +20,12 @@ use crate::internal::{CompileError, InputKind, Session};
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
-pub struct ScanAction;
 impl<'source>
 Action<
     'static,
     crate::combinator::Operator<Arc<Lock<Session<'source>>>>,
     Operation<'source, Arc<Lock<Session<'source>>>>,
-> for ScanAction
+> for Scanner<'source>
 {
     fn action(
         &self,
@@ -99,3 +98,8 @@ Action<
     }
 }
 
+impl<'source> Default for Scanner<'source> {
+    fn default() -> Self {
+        Scanner::new(crate::tracker::Location::Entry(crate::data::Str::from(file!())))
+    }
+}
