@@ -1,6 +1,6 @@
 use crate::format::{Display, Formatter, Result};
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ErrorKind {
     StackUnderflow,
     MemoryAccessViolation,

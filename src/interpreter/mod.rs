@@ -159,7 +159,7 @@ impl<'source> Action<
         }
         sources.sort();
 
-        let mut vm = Interpreter::new(1024);
+        let mut interpreter = Interpreter::new(1024);
 
         let libffi_opt = Library::load("libffi.so")
             .or_else(|| Library::load("libffi.so.8"))
@@ -190,13 +190,13 @@ impl<'source> Action<
                 if let Some(stem) = location.stem() {
                     let text = Str::from(stem.to_string());
                     if let Some(analyses) = record.analyses.clone() {
-                        vm.modules.insert(text, analyses);
+                        interpreter.modules.insert(text, analyses);
                     }
                 }
             }
         }
 
-        let modules: Vec<_> = vm.modules.values().flat_map(|items| items.iter()).cloned().collect();
+        let modules: Vec<_> = interpreter.modules.values().flat_map(|items| items.iter()).cloned().collect();
         let signatures = Self::extract_c_signatures();
 
         for analysis in &modules {
@@ -219,7 +219,7 @@ impl<'source> Action<
                             let handle = libc::dlopen(library.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL);
 
                             if handle.is_null() {
-                                std::ptr::null_mut()
+                                core::ptr::null_mut()
                             } else {
                                 libc::dlsym(handle, string.as_ptr())
                             }
@@ -370,33 +370,33 @@ impl<'source> Action<
                                 }
                             });
 
-                            vm.foreign.push(Foreign::Dynamic(execute));
-                            vm.native(name, vm.foreign.len() - 1);
+                            interpreter.foreign.push(Foreign::Dynamic(execute));
+                            interpreter.native(name, interpreter.foreign.len() - 1);
                         } else {
                             let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
                                 Err(ErrorKind::OutOfBounds)
                             });
-                            vm.foreign.push(Foreign::Dynamic(execute));
-                            vm.native(name, vm.foreign.len() - 1);
+                            interpreter.foreign.push(Foreign::Dynamic(execute));
+                            interpreter.native(name, interpreter.foreign.len() - 1);
                         }
                     } else {
                         let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
                             Err(ErrorKind::OutOfBounds)
                         });
-                        vm.foreign.push(Foreign::Dynamic(execute));
-                        vm.native(name, vm.foreign.len() - 1);
+                        interpreter.foreign.push(Foreign::Dynamic(execute));
+                        interpreter.native(name, interpreter.foreign.len() - 1);
                     }
                 }
             }
         }
 
-        vm.compile();
+        interpreter.compile();
 
         if session.errors.is_empty() {
-            vm.pointer = 0;
-            vm.frames.clear();
+            interpreter.pointer = 0;
+            interpreter.frames.clear();
 
-            if let Err(error) = vm.run() {
+            if let Err(error) = interpreter.run() {
                 session.errors.push(CompileError::Interpret(error));
             }
         }

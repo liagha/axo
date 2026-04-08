@@ -31,9 +31,9 @@ impl<'backend> Generator<'backend> {
     ) -> Result<(), GenerateError<'backend>> {
         let module = self.current_module();
 
-        let function = module.get_function("llvm.trap").unwrap_or_else(|| {
+        let function = module.get_function("llinterpreter.trap").unwrap_or_else(|| {
             let shape = self.context.void_type().fn_type(&[], false);
-            module.add_function("llvm.trap", shape, None)
+            module.add_function("llinterpreter.trap", shape, None)
         });
 
         match condition {
