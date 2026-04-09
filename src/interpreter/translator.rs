@@ -161,13 +161,7 @@ impl<'error> Interpreter<'error> {
                     if let AnalysisKind::Usage(target) = &binding.target.kind {
                         let address = self.memory_top;
                         self.memory_top += 1;
-                        self.insert_entity(
-                            *target,
-                            Entity::Variable {
-                                address,
-                                typing: binding.annotation.clone(),
-                            },
-                        );
+                        self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
                         self.emit(Opcode::Store(address), span.clone());
                     }
                 }
