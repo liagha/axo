@@ -7,7 +7,7 @@ use {
         data::{memory::take, Identity, Scale},
         internal::{
             time::SystemTime,
-            platform::{Write, Stdio, Command as Terminal},
+            platform::{metadata, Write, Stdio, Command as Terminal},
         },
     },
 };
@@ -65,8 +65,8 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
                 }
             }
             Condition::Outdated(source, target) => {
-                let source_meta = std::fs::metadata(source).and_then(|m| m.modified());
-                let target_meta = std::fs::metadata(target).and_then(|m| m.modified());
+                let source_meta = metadata(source).and_then(|m| m.modified());
+                let target_meta = metadata(target).and_then(|m| m.modified());
 
                 match (source_meta, target_meta) {
                     (Ok(s), Ok(t)) if s > t => {}
@@ -82,7 +82,7 @@ impl<'source, Store: Clone + Send + Sync + 'source> Action<'static, Operator<Sto
                 }
             }
             Condition::Missing(path) => {
-                if std::fs::metadata(path).is_ok() {
+                if metadata(path).is_ok() {
                     operation.set_resolve(Vec::new());
                     return;
                 }

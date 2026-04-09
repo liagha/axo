@@ -3,6 +3,7 @@ mod session;
 pub use {
     session::{
         InputKind,
+        prepare,
         PrepareAction,
         Session,
         Record,
@@ -37,7 +38,7 @@ pub mod platform {
         alloc::{alloc, dealloc, realloc, Layout},
         env::{args, current_dir, current_exe, var},
         ffi::{OsStr, OsString},
-        fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, File},
+        fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, metadata, File},
         io::{
             stderr, stdin, stdout, BufRead, Error, ErrorKind, Result, Stdin, StdinLock, Stdout,
             StdoutLock, Write,
@@ -49,6 +50,7 @@ pub mod platform {
         ptr::{null, NonNull},
         thread::{sleep, scope},
         sync::{RwLock as Lock},
+        panic::{catch_unwind, AssertUnwindSafe},
     };
 }
 

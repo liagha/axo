@@ -7,21 +7,94 @@ mod scanner;
 mod token;
 mod traits;
 
-use std::sync::Arc;
-use std::time::Duration;
-use broccli::Color;
 pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*};
 
-use {
-    crate::reporter::Error,
-    error::*
-};
-use crate::combinator::{Action, Operation};
-use crate::format::Show;
-use crate::internal::platform::Lock;
-use crate::internal::{CompileError, InputKind, Session};
-
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
+
+use {
+    broccli::Color,
+    error::*,
+    crate::{
+        combinator::{Action, Operation},
+        data::{
+            Identity,
+            memory::Arc,
+        },
+        format::Show,
+        internal::{
+            platform::Lock,
+            time::Duration,
+            CompileError, InputKind, Session,
+        },
+        reporter::Error,
+    },
+};
+
+pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
+    use crate::scanner::Scanner;
+
+    for &key in keys {
+        let (kind, hash, dirty, location, content) = {
+            let record = session.records.get(&key).unwrap();
+            (
+                record.kind.clone(),
+                record.hash,
+                record.dirty,
+                record.location,
+                record.content.clone(),
+            )
+        };
+
+        if kind != InputKind::Source {
+            continue;
+        }
+
+        if !dirty {
+            if let Some(tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
+                session.records.get_mut(&key).unwrap().tokens = Some(tokens);
+                continue;
+            }
+        }
+
+        let content = if let Some(content) = content {
+            crate::data::Str::from(content)
+        } else {
+            match location.get_value() {
+                Ok(content) => content,
+                Err(error) => {
+                    let kind = ErrorKind::Tracking(error.clone());
+                    let error = ScanError::new(kind, error.span);
+
+                    session.errors.push(CompileError::Scan(error));
+                    continue;
+                }
+            }
+        };
+
+        let position = crate::tracker::Position::new(location);
+        let mut scanner = Scanner::new(position, content);
+
+        scanner.scan();
+
+        if let Some(stencil) = session.get_stencil() {
+            session.report_section(
+                "Tokens",
+                Color::Cyan,
+                scanner.output.format(stencil).to_string(),
+            );
+        }
+
+        session.errors.extend(
+            scanner
+                .errors
+                .iter()
+                .map(|error| CompileError::Scan(error.clone())),
+        );
+
+        session.records.get_mut(&key).unwrap().tokens =
+            session.cache("tokens", hash, Some(scanner.output));
+    }
+}
 
 impl<'source>
 Action<
@@ -36,75 +109,13 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
-        use crate::scanner::Scanner;
 
         let initial = session.errors.len();
         session.report_start("scanning");
 
         let mut keys: Vec<_> = session.records.keys().copied().collect();
         keys.sort();
-
-        for key in keys {
-            let (kind, hash, dirty, location, inline_content) = {
-                let record = session.records.get(&key).unwrap();
-                (
-                    record.kind.clone(),
-                    record.hash,
-                    record.dirty,
-                    record.location,
-                    record.content.clone(),
-                )
-            };
-
-            if kind != InputKind::Source {
-                continue;
-            }
-
-            if !dirty {
-                if let Some(tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
-                    session.records.get_mut(&key).unwrap().tokens = Some(tokens);
-                    continue;
-                }
-            }
-
-            let content = if let Some(content) = inline_content {
-                crate::data::Str::from(content)
-            } else {
-                match location.get_value() {
-                    Ok(content) => content,
-                    Err(error) => {
-                        let kind = ErrorKind::Tracking(error.clone());
-                        let error = ScanError::new(kind, error.span);
-
-                        session.errors.push(CompileError::Scan(error));
-                        continue;
-                    }
-                }
-            };
-
-            let position = crate::tracker::Position::new(location);
-            let mut scanner = Scanner::new(position, content);
-
-            scanner.scan();
-
-            if let Some(stencil) = session.get_stencil() {
-                session.report_section(
-                    "Tokens",
-                    Color::Cyan,
-                    scanner.output.format(stencil).to_string(),
-                );
-            }
-
-            session.errors.extend(
-                scanner
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Scan(error.clone())),
-            );
-
-            session.records.get_mut(&key).unwrap().tokens =
-                session.cache("tokens", hash, Some(scanner.output));
-        }
+        scan(&mut session, &keys);
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap());
         session.report_finish("scanning", duration, session.errors.len() - initial);

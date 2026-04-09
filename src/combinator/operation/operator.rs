@@ -2,7 +2,7 @@ use {
     crate::{
         combinator::{Operation, Status},
         data::Identity,
-        internal::{hash::Map, platform::sleep, time::Duration},
+        internal::{hash::Map, platform::{sleep, metadata}, time::Duration},
     },
 };
 
@@ -74,7 +74,7 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
     {
         let mut last: Vec<_> = paths
             .iter()
-            .map(|path| std::fs::metadata(path).and_then(|m| m.modified()).ok())
+            .map(|path| metadata(path).and_then(|m| m.modified()).ok())
             .collect();
 
         loop {
@@ -87,7 +87,7 @@ impl<Store: Clone + Send + Sync> Operator<Store> {
 
                 let current: Vec<_> = paths
                     .iter()
-                    .map(|path| std::fs::metadata(path).and_then(|m| m.modified()).ok())
+                    .map(|path| metadata(path).and_then(|m| m.modified()).ok())
                     .collect();
 
                 if current != last {

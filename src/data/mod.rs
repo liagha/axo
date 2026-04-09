@@ -61,12 +61,16 @@ pub mod character {
 
 pub mod memory {
     pub use core::{
+        ptr::{null_mut},
         borrow::Borrow,
         iter::Copied,
         marker::PhantomData,
-        mem::{discriminant, replace, swap, take},
+        mem::{discriminant, replace, swap, take, transmute, zeroed},
     };
-    pub use std::sync::{Arc, Mutex};
+    pub use std::{
+        sync::{Arc, Mutex},
+        cell::RefCell,
+    };
 }
 
 pub mod slice {

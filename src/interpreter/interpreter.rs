@@ -2,7 +2,9 @@ use {
     crate::{
         analyzer::{Analysis},
         data::{
-            memory::Arc,
+            memory::{
+                Arc, RefCell,
+            },
             CString,
             Str,
             Identity,
@@ -51,7 +53,7 @@ impl Library {
 }
 
 thread_local! {
-    static FOREIGN_STRINGS: std::cell::RefCell<Vec<CString>> = std::cell::RefCell::new(Vec::new());
+    static FOREIGN_STRINGS: RefCell<Vec<CString>> = RefCell::new(Vec::new());
 }
 
 #[derive(Clone)]

@@ -4,19 +4,68 @@ mod element;
 mod error;
 mod traits;
 
-use std::sync::Arc;
-use std::time::Duration;
-use broccli::Color;
+use {
+    broccli::Color,
+    crate::{
+        format::Show,
+        reporter::Error,
+        internal::{
+            time::Duration,
+            platform::Lock,
+            CompileError, InputKind, Session,
+        },
+        data::{
+            Identity,
+            memory::Arc,
+        },
+        combinator::{Action, Operation, Operator},
+    },
+};
+
 pub use {analysis::*, analyzer::*};
 
 pub(crate) use error::*;
-use crate::combinator::{Action, Operation, Operator};
-use crate::format::Show;
-use crate::internal::platform::Lock;
-use crate::internal::{CompileError, InputKind, Session};
-use crate::reporter::Error;
 
 pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
+
+pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
+    use crate::analyzer::{Analysis, Analyzer};
+
+    for &key in keys {
+        let (hash, dirty, elements) = {
+            let record = session.records.get(&key).unwrap();
+            (record.hash, record.dirty, record.elements.clone())
+        };
+
+        if !dirty {
+            if let Some(analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
+                session.records.get_mut(&key).unwrap().analyses = Some(analyses);
+                continue;
+            }
+        }
+
+        let mut analyzer = Analyzer::new(elements.unwrap());
+        analyzer.analyze(&mut session.resolver);
+
+        if let Some(stencil) = session.get_stencil() {
+            session.report_section(
+                "Analysis",
+                Color::Blue,
+                analyzer.output.format(stencil).to_string(),
+            );
+        }
+
+        session.errors.extend(
+            analyzer
+                .errors
+                .iter()
+                .map(|error| CompileError::Analyze(error.clone())),
+        );
+
+        session.records.get_mut(&key).unwrap().analyses =
+            session.cache("analyses", hash, Some(analyzer.output));
+    }
+}
 
 impl<'source>
 Action<
@@ -31,7 +80,6 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
-        use crate::analyzer::{Analysis, Analyzer};
 
         let initial = session.errors.len();
 
@@ -49,41 +97,7 @@ Action<
             })
             .collect();
         keys.sort();
-
-        for &key in &keys {
-            let (hash, dirty, elements) = {
-                let record = session.records.get(&key).unwrap();
-                (record.hash, record.dirty, record.elements.clone())
-            };
-
-            if !dirty {
-                if let Some(analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
-                    session.records.get_mut(&key).unwrap().analyses = Some(analyses);
-                    continue;
-                }
-            }
-
-            let mut analyzer = Analyzer::new(elements.unwrap());
-            analyzer.analyze(&mut session.resolver);
-
-            if let Some(stencil) = session.get_stencil() {
-                session.report_section(
-                    "Analysis",
-                    Color::Blue,
-                    analyzer.output.format(stencil).to_string(),
-                );
-            }
-
-            session.errors.extend(
-                analyzer
-                    .errors
-                    .iter()
-                    .map(|error| CompileError::Analyze(error.clone())),
-            );
-
-            session.records.get_mut(&key).unwrap().analyses =
-                session.cache("analyses", hash, Some(analyzer.output));
-        }
+        analyze(&mut session, &keys);
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap());
         session.report_finish("analyzing", duration, session.errors.len() - initial);

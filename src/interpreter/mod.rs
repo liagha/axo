@@ -4,29 +4,48 @@ mod error;
 mod translator;
 mod interpreter;
 
-pub use error::ErrorKind;
-pub use interpreter::*;
+pub use {
+    error::ErrorKind,
+    interpreter::*,
+};
+
 use {
     crate::{
-        analyzer::{AnalysisKind},
+        analyzer::{Analysis, AnalysisKind},
         combinator::{Action, Operation, Operator},
-        data::{memory::Arc, CString, Interface, Str},
+        data::{
+            memory::{
+                Arc, transmute, zeroed,
+                null_mut,
+            },
+            Function, CString, Interface, Str
+        },
         internal::{
-            platform::Lock,
+            platform::{
+                Lock,
+                read_dir, read_to_string,
+            },
             time::Duration,
             CompileError, InputKind, Session,
         },
+        resolver::Type,
         reporter::Error,
+    },
+    std::{
+        collections::HashMap,
+        ffi::{c_void, CStr},
+        path::PathBuf,
     },
 };
 
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
+pub type DynamicFunction = Arc<dyn Fn(&[Value]) -> Result<Value, ErrorKind> + Send + Sync>;
 
 #[repr(C)]
 pub struct ForeignType {
     pub size: usize,
     pub alignment: u16,
-    pub type_: u16,
+    pub kind: u16,
     pub elements: *mut *mut ForeignType,
 }
 
@@ -49,10 +68,10 @@ const DEFAULT_ABI: u32 = 1;
 #[cfg(not(any(all(unix, target_arch = "x86_64"), all(unix, target_arch = "aarch64"), windows)))]
 const DEFAULT_ABI: u32 = 2;
 
-struct ForeignApi {
+struct Api {
     prep_call: extern "C" fn(*mut ForeignCall, u32, u32, *mut ForeignType, *mut *mut ForeignType) -> i32,
     prep_var: Option<extern "C" fn(*mut ForeignCall, u32, u32, u32, *mut ForeignType, *mut *mut ForeignType) -> i32>,
-    call: extern "C" fn(*mut ForeignCall, extern "C" fn(), *mut sys::c_void, *mut *mut sys::c_void),
+    call: extern "C" fn(*mut ForeignCall, extern "C" fn(), *mut c_void, *mut *mut c_void),
     sint64: *mut ForeignType,
     double: *mut ForeignType,
     pointer: *mut ForeignType,
@@ -61,15 +80,32 @@ struct ForeignApi {
     void: *mut ForeignType,
 }
 
-unsafe impl Send for ForeignApi {}
-unsafe impl Sync for ForeignApi {}
+unsafe impl Send for Api {}
+unsafe impl Sync for Api {}
 
 enum ForeignValue {
     Sint64(i64),
     Double(f64),
-    Pointer(*mut sys::c_void),
+    Pointer(*mut c_void),
     Uint8(u8),
     Uint32(u32),
+}
+
+#[derive(Clone)]
+pub struct Signature {
+    pub returns: String,
+    pub variadic: bool,
+    pub fixed: usize,
+}
+
+impl Default for Signature {
+    fn default() -> Self {
+        Self {
+            returns: String::from("Integer"),
+            variadic: false,
+            fixed: 0,
+        }
+    }
 }
 
 pub struct InterpretAction<'source> {
@@ -83,64 +119,295 @@ impl<'source> InterpretAction<'source> {
 }
 
 impl<'error> Interpreter<'error> {
-    fn extract_c_signatures() -> std::collections::HashMap<String, (String, bool, usize)> {
-        let mut map = std::collections::HashMap::new();
-        let mut dirs = vec![std::path::PathBuf::from(".")];
+    fn extract_signatures() -> HashMap<String, Signature> {
+        let mut map = HashMap::new();
+        let mut dirs = vec![PathBuf::from(".")];
+
         while let Some(dir) = dirs.pop() {
-            if let Ok(entries) = std::fs::read_dir(&dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        if dir_name != ".git" && dir_name != "target" {
-                            dirs.push(path);
-                        }
-                    } else if path.extension().and_then(|s| s.to_str()) == Some("axo") {
-                        if let Ok(content) = std::fs::read_to_string(&path) {
-                            for line in content.lines() {
-                                let trimmed = line.trim();
-                                if trimmed.starts_with("func ") {
-                                    let after_func = &trimmed[5..];
-                                    if let Some(paren_idx) = after_func.find('(') {
-                                        let name = after_func[..paren_idx].trim().to_string();
+            let Ok(entries) = read_dir(&dir) else { continue };
 
-                                        let mut is_var = false;
-                                        let mut fixed_args = 0;
-
-                                        if let Some(paren_end) = after_func.find(')') {
-                                            let args_str = &after_func[paren_idx + 1..paren_end];
-                                            if args_str.contains("...") {
-                                                is_var = true;
-                                                let before_dots = args_str.split("...").next().unwrap_or("");
-                                                fixed_args = before_dots.split(',').filter(|s| !s.trim().is_empty()).count();
-                                            }
-                                        }
-
-                                        let mut ret_type = "Empty".to_string();
-                                        if let Some(colon_idx) = after_func.rfind(':') {
-                                            if colon_idx > paren_idx {
-                                                let type_str = after_func[colon_idx + 1..].trim();
-                                                let type_str = type_str.split_whitespace().next().unwrap_or("Empty");
-                                                ret_type = type_str.replace('{', "").replace(';', "");
-                                            }
-                                        } else if let Some(arrow_idx) = after_func.find("->") {
-                                            if arrow_idx > paren_idx {
-                                                let type_str = after_func[arrow_idx + 2..].trim();
-                                                let type_str = type_str.split_whitespace().next().unwrap_or("Empty");
-                                                ret_type = type_str.replace('{', "").replace(';', "");
-                                            }
-                                        }
-                                        map.insert(name, (ret_type, is_var, fixed_args));
-                                    }
-                                }
-                            }
-                        }
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = path.file_name().unwrap_or_default().to_string_lossy();
+                    if name != ".git" && name != "target" {
+                        dirs.push(path);
                     }
+                } else if path.extension().and_then(|s| s.to_str()) == Some("axo") {
+                    Self::parse_file(&path, &mut map);
                 }
             }
         }
         map
     }
+
+    fn parse_file(path: &PathBuf, map: &mut HashMap<String, Signature>) {
+        let Ok(content) = read_to_string(path) else { return };
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("func ") {
+                Self::parse_function(trimmed, map);
+            }
+        }
+    }
+
+    fn parse_function(line: &str, map: &mut HashMap<String, Signature>) {
+        let after = &line[5..];
+        let Some(paren) = after.find('(') else { return };
+        let name = after[..paren].trim().to_string();
+
+        let mut variadic = false;
+        let mut fixed = 0;
+
+        if let Some(end) = after.find(')') {
+            let args = &after[paren + 1..end];
+            if args.contains("...") {
+                variadic = true;
+                let before = args.split("...").next().unwrap_or("");
+                fixed = before.split(',').filter(|s| !s.trim().is_empty()).count();
+            }
+        }
+
+        let mut returns = String::from("Empty");
+        if let Some(colon) = after.rfind(':') {
+            if colon > paren {
+                returns = Self::parse_type(&after[colon + 1..]);
+            }
+        } else if let Some(arrow) = after.find("->") {
+            if arrow > paren {
+                returns = Self::parse_type(&after[arrow + 2..]);
+            }
+        }
+
+        map.insert(name, Signature { returns, variadic, fixed });
+    }
+
+    fn parse_type(text: &str) -> String {
+        let text = text.trim();
+        let text = text.split_whitespace().next().unwrap_or("Empty");
+        text.replace('{', "").replace(';', "")
+    }
+}
+
+fn load_library(names: &[&str]) -> Option<Library> {
+    for name in names {
+        if let Some(lib) = Library::load(name) {
+            return Some(lib);
+        }
+    }
+    None
+}
+
+fn load_api() -> Option<Arc<Api>> {
+    let names = ["libffi.so", "libffi.so.8", "libffi.so.7", "libffi.dylib", "ffi.dll"];
+    let lib = load_library(&names)?;
+
+    unsafe {
+        Some(Arc::new(Api {
+            prep_call: transmute(lib.symbol("ffi_prep_cif")?),
+            prep_var: lib.symbol("ffi_prep_cif_var").map(|p| transmute(p)),
+            call: transmute(lib.symbol("ffi_call")?),
+            sint64: lib.symbol("ffi_type_sint64")? as *mut ForeignType,
+            double: lib.symbol("ffi_type_double")? as *mut ForeignType,
+            pointer: lib.symbol("ffi_type_pointer")? as *mut ForeignType,
+            uint8: lib.symbol("ffi_type_uint8")? as *mut ForeignType,
+            uint32: lib.symbol("ffi_type_uint32")? as *mut ForeignType,
+            void: lib.symbol("ffi_type_void")? as *mut ForeignType,
+        }))
+    }
+}
+
+fn load_shared(session: &Session) -> *mut c_void {
+    let base = session.base();
+    let build = base.join("build");
+    let library = build.join("lib_axo.so");
+    let path = library.to_str().unwrap_or_default();
+    let string = CString::new(path).unwrap_or_default();
+
+    unsafe { libc::dlopen(string.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL) }
+}
+
+fn bind_function(
+    core: &mut Interpreter,
+    function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
+    handle: *mut c_void,
+    api: &Option<Arc<Api>>,
+    signatures: &HashMap<String, Signature>,
+) {
+    let name = function.target.as_str().unwrap_or_default();
+    let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
+
+    let closure = if let Ok(string) = CString::new(name) {
+        let pointer = unsafe {
+            if handle.is_null() {
+                null_mut()
+            } else {
+                libc::dlsym(handle, string.as_ptr())
+            }
+        };
+
+        if !pointer.is_null() && api.is_some() {
+            let address = pointer as usize;
+            let signature = signatures.get(name).cloned().unwrap_or_default();
+            build_closure(api.as_ref().unwrap().clone(), address, signature)
+        } else {
+            fallback()
+        }
+    } else {
+        fallback()
+    };
+
+    core.foreign.push(Foreign::Dynamic(closure));
+    let index = core.foreign.len() - 1;
+    core.native(name, index);
+}
+
+fn build_closure(api: Arc<Api>, address: usize, signature: Signature) -> DynamicFunction {
+    Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
+        let mut args = Vec::with_capacity(inputs.len());
+        let mut types = Vec::with_capacity(inputs.len());
+        let mut strings = Vec::new();
+
+        for input in inputs {
+            match input {
+                Value::Integer(v) => {
+                    types.push(api.sint64);
+                    args.push(ForeignValue::Sint64(*v));
+                }
+                Value::Float(v) => {
+                    types.push(api.double);
+                    args.push(ForeignValue::Double(*v));
+                }
+                Value::Boolean(v) => {
+                    types.push(api.uint8);
+                    args.push(ForeignValue::Uint8(if *v { 1 } else { 0 }));
+                }
+                Value::Character(v) => {
+                    types.push(api.uint32);
+                    args.push(ForeignValue::Uint32(*v as u32));
+                }
+                Value::Text(v) => {
+                    types.push(api.pointer);
+                    if let Ok(string) = CString::new(v.clone()) {
+                        strings.push(string);
+                        args.push(ForeignValue::Pointer(strings.last().unwrap().as_ptr() as *mut c_void));
+                    } else {
+                        args.push(ForeignValue::Pointer(null_mut()));
+                    }
+                }
+                Value::Pointer(v) => {
+                    types.push(api.pointer);
+                    args.push(ForeignValue::Pointer(*v as *mut c_void));
+                }
+                Value::Structure(fields) => {
+                    if let Some(Value::Float(f)) = fields.first() {
+                        types.push(api.double);
+                        args.push(ForeignValue::Double(*f));
+                    } else {
+                        types.push(api.pointer);
+                        args.push(ForeignValue::Pointer(null_mut()));
+                    }
+                }
+                _ => {
+                    types.push(api.pointer);
+                    args.push(ForeignValue::Pointer(null_mut()));
+                }
+            }
+        }
+
+        let mut values = Vec::with_capacity(args.len());
+        for arg in &mut args {
+            let pointer = match arg {
+                ForeignValue::Sint64(v) => v as *mut _ as *mut c_void,
+                ForeignValue::Double(v) => v as *mut _ as *mut c_void,
+                ForeignValue::Pointer(v) => v as *mut _ as *mut c_void,
+                ForeignValue::Uint8(v) => v as *mut _ as *mut c_void,
+                ForeignValue::Uint32(v) => v as *mut _ as *mut c_void,
+            };
+            values.push(pointer);
+        }
+
+        let mut call: ForeignCall = unsafe { zeroed() };
+        let rtype = match signature.returns.as_str() {
+            "Float" => api.double,
+            "Boolean" | "UInt8" => api.uint8,
+            "String" => api.pointer,
+            "Empty" => api.void,
+            "Character" => api.uint32,
+            _ => api.sint64,
+        };
+
+        unsafe {
+            let status = if signature.variadic && api.prep_var.is_some() {
+                let fixed = u32::min(signature.fixed as u32, types.len() as u32);
+                api.prep_var.unwrap()(
+                    &mut call,
+                    DEFAULT_ABI,
+                    fixed,
+                    types.len() as u32,
+                    rtype,
+                    types.as_mut_ptr(),
+                )
+            } else {
+                (api.prep_call)(
+                    &mut call,
+                    DEFAULT_ABI,
+                    types.len() as u32,
+                    rtype,
+                    types.as_mut_ptr(),
+                )
+            };
+
+            if status != 0 {
+                return Err(ErrorKind::TypeMismatch);
+            }
+
+            let function: extern "C" fn() = transmute(address);
+
+            match signature.returns.as_str() {
+                "Float" => {
+                    let mut ret: f64 = 0.0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Float(ret))
+                }
+                "Boolean" => {
+                    let mut ret: u8 = 0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Boolean(ret != 0))
+                }
+                "UInt8" => {
+                    let mut ret: u8 = 0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Integer(ret as i64))
+                }
+                "String" => {
+                    let mut ret: *mut c_void = null_mut();
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    if ret.is_null() {
+                        Ok(Value::Text(String::new()))
+                    } else {
+                        let text = CStr::from_ptr(ret as *const i8);
+                        Ok(Value::Text(text.to_string_lossy().into_owned()))
+                    }
+                }
+                "Character" => {
+                    let mut ret: u32 = 0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Character(char::from_u32(ret).unwrap_or('\0')))
+                }
+                "Empty" => {
+                    let mut ret: i64 = 0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Empty)
+                }
+                _ => {
+                    let mut ret: i64 = 0;
+                    (api.call)(&mut call, function, &mut ret as *mut _ as *mut c_void, values.as_mut_ptr());
+                    Ok(Value::Integer(ret))
+                }
+            }
+        }
+    })
 }
 
 impl<'source> Action<
@@ -153,267 +420,54 @@ impl<'source> Action<
         &self,
         operator: &mut Operator<Arc<Lock<Session<'source>>>>,
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
-    ) -> () {
+    ) {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
-
-        let mut interpreter = self.core.write().unwrap();
+        let mut core = self.core.write().unwrap();
 
         let initial = session.errors.len();
         session.report_start("interpreting");
 
-        let mut sources = Vec::new();
-
-        for (&key, record) in session.records.iter() {
-            if record.kind == InputKind::Source && record.module.is_some() {
-                sources.push(key);
-            }
-        }
+        let mut sources: Vec<_> = session
+            .records
+            .iter()
+            .filter(|(_, r)| r.kind == InputKind::Source && r.module.is_some())
+            .map(|(&k, _)| k)
+            .collect();
         sources.sort();
 
-        let libffi_opt = Library::load("libffi.so")
-            .or_else(|| Library::load("libffi.so.8"))
-            .or_else(|| Library::load("libffi.so.7"))
-            .or_else(|| Library::load("libffi.dylib"))
-            .or_else(|| Library::load("ffi.dll"));
+        let api = load_api();
 
-        let ffi = libffi_opt.and_then(|lib| {
-            unsafe {
-                let prep_cif_var_ptr = lib.symbol("ffi_prep_cif_var");
-                Some(Arc::new(ForeignApi {
-                    prep_call: std::mem::transmute(lib.symbol("ffi_prep_cif")?),
-                    prep_var: prep_cif_var_ptr.map(|p| std::mem::transmute(p)),
-                    call: std::mem::transmute(lib.symbol("ffi_call")?),
-                    sint64: lib.symbol("ffi_type_sint64")? as *mut ForeignType,
-                    double: lib.symbol("ffi_type_double")? as *mut ForeignType,
-                    pointer: lib.symbol("ffi_type_pointer")? as *mut ForeignType,
-                    uint8: lib.symbol("ffi_type_uint8")? as *mut ForeignType,
-                    uint32: lib.symbol("ffi_type_uint32")? as *mut ForeignType,
-                    void: lib.symbol("ffi_type_void")? as *mut ForeignType,
-                }))
-            }
-        });
-
-        for &key in &sources {
-            if let Some(record) = session.records.get(&key) {
-                let location = record.location;
-                if let Some(stem) = location.stem() {
-                    let text = Str::from(stem.to_string());
-                    if let Some(analyses) = record.analyses.clone() {
-                        interpreter.modules.insert(text, analyses);
-                    }
+        for key in &sources {
+            if let Some(record) = session.records.get(key) {
+                if let (Some(stem), Some(analyses)) = (record.location.stem(), &record.analyses) {
+                    core.modules.insert(Str::from(stem.to_string()), analyses.clone());
                 }
             }
         }
 
-        let modules: Vec<_> = interpreter.modules.values().flat_map(|items| items.iter()).cloned().collect();
-        let signatures = Interpreter::extract_c_signatures();
+        let modules: Vec<_> = core.modules.values().flat_map(|items| items.iter()).cloned().collect();
+        let signatures = Interpreter::extract_signatures();
+        let handle = load_shared(session);
 
         for analysis in &modules {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if matches!(function.interface, Interface::C) {
-                    let name = function.target.as_str().unwrap_or_default();
-
-                    if let Ok(string) = CString::new(name) {
-                        let pointer = unsafe {
-                            let base = session.base();
-                            let build = base.join("build");
-
-                            let library = CString::new(
-                                build.join("lib_axo.so")
-                                    .to_str()
-                                    .expect("Invalid UTF-8 in path")
-                            ).unwrap();
-
-
-                            let handle = libc::dlopen(library.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL);
-
-                            if handle.is_null() {
-                                core::ptr::null_mut()
-                            } else {
-                                libc::dlsym(handle, string.as_ptr())
-                            }
-                        };
-
-                        if !pointer.is_null() && ffi.is_some() {
-                            let ffi_clone = ffi.clone().unwrap();
-                            let address = pointer as usize;
-                            let name_str = name.to_string();
-                            let (ret_type, is_var, fixed_args) = signatures.get(&name_str).cloned().unwrap_or_else(|| ("Integer".to_string(), false, 0));
-
-                            let execute = Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
-                                let mut ffi_args = Vec::with_capacity(inputs.len());
-                                let mut arg_types = Vec::with_capacity(inputs.len());
-                                let mut c_strings = Vec::new();
-
-                                for input in inputs {
-                                    match input {
-                                        Value::Integer(v) => {
-                                            arg_types.push(ffi_clone.sint64);
-                                            ffi_args.push(ForeignValue::Sint64(*v));
-                                        }
-                                        Value::Float(v) => {
-                                            arg_types.push(ffi_clone.double);
-                                            ffi_args.push(ForeignValue::Double(*v));
-                                        }
-                                        Value::Boolean(v) => {
-                                            arg_types.push(ffi_clone.uint8);
-                                            ffi_args.push(ForeignValue::Uint8(if *v { 1 } else { 0 }));
-                                        }
-                                        Value::Character(v) => {
-                                            arg_types.push(ffi_clone.uint32);
-                                            ffi_args.push(ForeignValue::Uint32(*v as u32));
-                                        }
-                                        Value::Text(v) => {
-                                            arg_types.push(ffi_clone.pointer);
-                                            if let Ok(c_str) = CString::new(v.clone()) {
-                                                c_strings.push(c_str);
-                                                ffi_args.push(ForeignValue::Pointer(c_strings.last().unwrap().as_ptr() as *mut sys::c_void));
-                                            } else {
-                                                ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
-                                            }
-                                        }
-                                        Value::Pointer(v) => {
-                                            arg_types.push(ffi_clone.pointer);
-                                            ffi_args.push(ForeignValue::Pointer(*v as *mut sys::c_void));
-                                        }
-                                        Value::Structure(fields) => {
-                                            if let Some(Value::Float(f)) = fields.get(0) {
-                                                arg_types.push(ffi_clone.double);
-                                                ffi_args.push(ForeignValue::Double(*f));
-                                            } else {
-                                                arg_types.push(ffi_clone.pointer);
-                                                ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
-                                            }
-                                        }
-                                        _ => {
-                                            arg_types.push(ffi_clone.pointer);
-                                            ffi_args.push(ForeignValue::Pointer(std::ptr::null_mut()));
-                                        }
-                                    }
-                                }
-
-                                let mut arg_values = Vec::with_capacity(ffi_args.len());
-                                for arg in &mut ffi_args {
-                                    let ptr = match arg {
-                                        ForeignValue::Sint64(v) => v as *mut _ as *mut sys::c_void,
-                                        ForeignValue::Double(v) => v as *mut _ as *mut sys::c_void,
-                                        ForeignValue::Pointer(v) => v as *mut _ as *mut sys::c_void,
-                                        ForeignValue::Uint8(v) => v as *mut _ as *mut sys::c_void,
-                                        ForeignValue::Uint32(v) => v as *mut _ as *mut sys::c_void,
-                                    };
-                                    arg_values.push(ptr);
-                                }
-
-                                let mut cif: ForeignCall = unsafe { std::mem::zeroed() };
-                                let rtype = match ret_type.as_str() {
-                                    "Float" => ffi_clone.double,
-                                    "Boolean" => ffi_clone.uint8,
-                                    "UInt8" => ffi_clone.uint8,
-                                    "String" => ffi_clone.pointer,
-                                    "Empty" => ffi_clone.void,
-                                    "Character" => ffi_clone.uint32,
-                                    _ => ffi_clone.sint64,
-                                };
-
-                                unsafe {
-                                    let status = if is_var && ffi_clone.prep_var.is_some() {
-                                        let nfixed = std::cmp::min(fixed_args as u32, arg_types.len() as u32);
-                                        ffi_clone.prep_var.unwrap()(
-                                            &mut cif,
-                                            DEFAULT_ABI,
-                                            nfixed,
-                                            arg_types.len() as u32,
-                                            rtype,
-                                            arg_types.as_mut_ptr(),
-                                        )
-                                    } else {
-                                        (ffi_clone.prep_call)(
-                                            &mut cif,
-                                            DEFAULT_ABI,
-                                            arg_types.len() as u32,
-                                            rtype,
-                                            arg_types.as_mut_ptr(),
-                                        )
-                                    };
-
-                                    if status != 0 {
-                                        return Err(ErrorKind::TypeMismatch);
-                                    }
-
-                                    let func: extern "C" fn() = std::mem::transmute(address);
-
-                                    if ret_type == "Float" {
-                                        let mut ret: f64 = 0.0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Float(ret))
-                                    } else if ret_type == "Boolean" {
-                                        let mut ret: u8 = 0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Boolean(ret != 0))
-                                    } else if ret_type == "UInt8" {
-                                        let mut ret: u8 = 0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Integer(ret as i64))
-                                    } else if ret_type == "String" {
-                                        let mut ret: *mut sys::c_void = std::ptr::null_mut();
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        if ret.is_null() {
-                                            Ok(Value::Text(String::new()))
-                                        } else {
-                                            let c_str = std::ffi::CStr::from_ptr(ret as *const i8);
-                                            Ok(Value::Text(c_str.to_string_lossy().into_owned()))
-                                        }
-                                    } else if ret_type == "Character" {
-                                        let mut ret: u32 = 0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Character(std::char::from_u32(ret).unwrap_or('\0')))
-                                    } else if ret_type == "Empty" {
-                                        let mut ret: i64 = 0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Empty)
-                                    } else {
-                                        let mut ret: i64 = 0;
-                                        (ffi_clone.call)(&mut cif, func, &mut ret as *mut _ as *mut sys::c_void, arg_values.as_mut_ptr());
-                                        Ok(Value::Integer(ret))
-                                    }
-                                }
-                            });
-
-                            interpreter.foreign.push(Foreign::Dynamic(execute));
-                            let index = interpreter.foreign.len() - 1;
-                            interpreter.native(name, index);
-                        } else {
-                            let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
-                                Err(ErrorKind::OutOfBounds)
-                            });
-                            interpreter.foreign.push(Foreign::Dynamic(execute));
-                            let index = interpreter.foreign.len() - 1;
-                            interpreter.native(name, index);
-                        }
-                    } else {
-                        let execute = Arc::new(move |_: &[Value]| -> Result<Value, ErrorKind> {
-                            Err(ErrorKind::OutOfBounds)
-                        });
-                        interpreter.foreign.push(Foreign::Dynamic(execute));
-                        let index = interpreter.foreign.len() - 1;
-                        interpreter.native(name, index);
-                    }
+                    bind_function(&mut core, function, handle, &api, &signatures);
                 }
             }
         }
 
-        interpreter.compile();
+        core.compile();
 
         if session.errors.is_empty() {
-            interpreter.pointer = 0;
-            interpreter.frames.clear();
+            core.pointer = 0;
+            core.frames.clear();
 
-            if let Err(error) = interpreter.run() {
+            if let Err(error) = core.run() {
                 session.errors.push(CompileError::Interpret(error));
             }
         }
-
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
         session.report_finish("interpreting", duration, session.errors.len() - initial);

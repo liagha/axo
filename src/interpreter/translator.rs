@@ -1,6 +1,9 @@
 use crate::{
     analyzer::{Analysis, AnalysisKind},
-    data::{Invoke, Str},
+    data::{
+        Invoke, Str,
+        memory::take,
+    },
     interpreter::{error::ErrorKind, Address, Entity, Index, Instruction, Interpreter, Opcode, Value},
     tracker::Span,
 };
@@ -67,7 +70,7 @@ impl<'error> Interpreter<'error> {
             self.emit(Opcode::Halt, span);
         }
 
-        let calls = std::mem::take(&mut self.calls);
+        let calls = take(&mut self.calls);
         for (index, target) in calls {
             if let Some(address) = self.address(&target) {
                 self.patch(index, Opcode::Call(address));
