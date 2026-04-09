@@ -161,7 +161,13 @@ impl<'error> Interpreter<'error> {
                     if let AnalysisKind::Usage(target) = &binding.target.kind {
                         let address = self.memory_top;
                         self.memory_top += 1;
-                        self.insert_entity(*target, Entity::Variable { address, typing: member.typing.clone() });
+                        self.insert_entity(
+                            *target,
+                            Entity::Variable {
+                                address,
+                                typing: binding.annotation.clone(),
+                            },
+                        );
                         self.emit(Opcode::Store(address), span.clone());
                     }
                 }
@@ -187,9 +193,21 @@ impl<'error> Interpreter<'error> {
             current = target;
         }
 
-        for entity in self.entities.values() {
+        if let crate::resolver::TypeKind::Structure(aggregate)
+        | crate::resolver::TypeKind::Union(aggregate) = &current.kind
+        {
+            if let Some(entity @ (Entity::Structure { .. } | Entity::Union { .. })) =
+                self.get_entity(&aggregate.target)
+            {
+                return Some(entity);
+            }
+        }
+
+        for (name, entity) in &self.entities {
             match entity {
-                Entity::Structure { identity, .. } | Entity::Union { identity, .. } if *identity == current.identity => {
+                Entity::Structure { identity, .. } | Entity::Union { identity, .. }
+                    if *identity == current.identity =>
+                {
                     return Some(entity);
                 }
                 _ => {}
@@ -240,7 +258,15 @@ impl<'error> Interpreter<'error> {
     }
 
     fn field(&self, target: &Analysis<'error>, field: &Str<'error>) -> Option<Index> {
-        self.position(&target.typing, field.as_str().unwrap_or_default())
+        let typing = match &target.kind {
+            AnalysisKind::Usage(name) => self
+                .variable(name)
+                .map(|(_, typing)| typing)
+                .unwrap_or(&target.typing),
+            _ => &target.typing,
+        };
+
+        self.position(typing, field.as_str().unwrap_or_default())
     }
 
     fn variable(&self, name: &Str<'error>) -> Option<(Address, &crate::resolver::Type<'error>)> {

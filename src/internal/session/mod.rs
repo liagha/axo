@@ -214,7 +214,6 @@ impl<'session> Session<'session> {
         mut self,
         mut pipeline: Operation<'session, Arc<Lock<Session<'session>>>>,
     ) -> Self {
-        // Restart the timer so that subsequent loops in the REPL don't fail
         _ = self.timer.start();
 
         if !self.errors.is_empty() {

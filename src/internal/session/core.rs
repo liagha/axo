@@ -129,7 +129,6 @@ impl<'session> Session<'session> {
                      ..
                  }) => Some(Stencil::default()),
             _ => {
-                //Some(Stencil::default())
                 None
             },
         }
