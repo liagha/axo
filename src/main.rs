@@ -1,18 +1,17 @@
+mod dialog;
+
 use axo::{
     analyzer,
     data::{Identity, Module, Str},
-    interpreter,
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
+        platform::read_dir,
         prepare,
-        platform::{
-            read_dir, stdin, stdout,
-            Write,
-        },
         time::DefaultTimer,
         CompileError, InputKind, Record, Session,
     },
+    interpreter,
     parser,
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     resolver::Resolver,
@@ -60,54 +59,17 @@ fn main() {
         .collect();
 
     if targets.is_empty() {
-        repl(bare, initializer.output);
+        dialog::start(bare, initializer.output);
     } else {
         build(targets, bare, initializer.output, failures);
     }
 }
 
-fn repl(bare: bool, directives: Vec<Symbol>) {
-    let mut session = create(bare, directives, Vec::new());
-    let mut core = interpreter::Interpreter::new(1024);
-
-    let mut keys: Vec<_> = session
-        .records
-        .iter()
-        .filter_map(|(&key, record)| (record.kind == InputKind::Source).then_some(key))
-        .collect();
-    keys.sort();
-
-    run(&mut session, &mut core, &keys);
-
-    loop {
-        print!("> ");
-        _ = stdout().flush();
-
-        let mut input = String::new();
-        let Ok(size) = stdin().read_line(&mut input) else {
-            break;
-        };
-
-        if size == 0 {
-            break;
-        }
-
-        if input.trim().is_empty() {
-            continue;
-        }
-
-        let location = Location::Entry(Str::from("repl"));
-        let mut record = Record::new(InputKind::Source, location);
-        record.content = Some(input);
-
-        let id = session.records.len() | 0x40000000;
-        session.records.insert(id, record);
-
-        run(&mut session, &mut core, &[id]);
-    }
-}
-
-fn run<'a>(session: &mut Session<'a>, core: &mut interpreter::Interpreter<'a>, keys: &[Identity]) {
+pub(crate) fn run<'a>(
+    session: &mut Session<'a>,
+    core: &mut interpreter::Interpreter<'a>,
+    keys: &[Identity],
+) {
     session.errors.clear();
 
     if !prepare(session) {
@@ -170,7 +132,7 @@ fn build(
     let _session = session.compile();
 }
 
-fn create<'a>(
+pub(crate) fn create<'a>(
     bare: bool,
     directives: Vec<Symbol<'a>>,
     failures: Vec<CompileError<'a>>,
