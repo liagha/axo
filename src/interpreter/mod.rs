@@ -13,6 +13,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         combinator::{Action, Operation, Operator},
+        data::Identity,
         data::{
             memory::{
                 Arc, transmute, zeroed,
@@ -115,6 +116,65 @@ pub struct InterpretAction<'source> {
 impl<'source> InterpretAction<'source> {
     pub fn new(core: Arc<Lock<Interpreter<'source>>>) -> Self {
         Self { core }
+    }
+}
+
+pub fn interpret<'source>(
+    session: &mut Session<'source>,
+    core: &mut Interpreter<'source>,
+    keys: &[Identity],
+) {
+    let mut sources: Vec<_> = keys
+        .iter()
+        .copied()
+        .filter(|key| {
+            session
+                .records
+                .get(key)
+                .map(|record| {
+                    record.kind == InputKind::Source
+                        && record.module.is_some()
+                        && record.analyses.is_some()
+                })
+                .unwrap_or(false)
+        })
+        .collect();
+    sources.sort();
+
+    let api = load_api();
+    let signatures = Interpreter::extract_signatures();
+    let handle = load_shared(session);
+    let start = core.code.len();
+
+    for key in &sources {
+        let Some(record) = session.records.get(key) else {
+            continue;
+        };
+        let (Some(stem), Some(analyses)) = (record.location.stem(), record.analyses.clone()) else {
+            continue;
+        };
+
+        for analysis in &analyses {
+            if let AnalysisKind::Function(function) = &analysis.kind {
+                if matches!(function.interface, Interface::C) {
+                    bind_function(core, function, handle, &api, &signatures);
+                }
+            }
+        }
+
+        let stem = Str::from(stem.to_string());
+        core.modules.insert(stem, analyses.clone());
+        core.extend(stem, analyses);
+    }
+
+    if session.errors.is_empty() && core.code.len() > start {
+        core.pointer = start;
+        core.frames.clear();
+        core.stack.clear();
+
+        if let Err(error) = core.run() {
+            session.errors.push(CompileError::Interpret(error));
+        }
     }
 }
 
@@ -435,39 +495,7 @@ impl<'source> Action<
             .map(|(&k, _)| k)
             .collect();
         sources.sort();
-
-        let api = load_api();
-
-        for key in &sources {
-            if let Some(record) = session.records.get(key) {
-                if let (Some(stem), Some(analyses)) = (record.location.stem(), &record.analyses) {
-                    core.modules.insert(Str::from(stem.to_string()), analyses.clone());
-                }
-            }
-        }
-
-        let modules: Vec<_> = core.modules.values().flat_map(|items| items.iter()).cloned().collect();
-        let signatures = Interpreter::extract_signatures();
-        let handle = load_shared(session);
-
-        for analysis in &modules {
-            if let AnalysisKind::Function(function) = &analysis.kind {
-                if matches!(function.interface, Interface::C) {
-                    bind_function(&mut core, function, handle, &api, &signatures);
-                }
-            }
-        }
-
-        core.compile();
-
-        if session.errors.is_empty() {
-            core.pointer = 0;
-            core.frames.clear();
-
-            if let Err(error) = core.run() {
-                session.errors.push(CompileError::Interpret(error));
-            }
-        }
+        interpret(session, &mut core, &sources);
 
         let duration = Duration::from_nanos(session.timer.lap().unwrap_or_default());
         session.report_finish("interpreting", duration, session.errors.len() - initial);

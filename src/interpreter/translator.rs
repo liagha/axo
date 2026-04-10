@@ -80,6 +80,27 @@ impl<'error> Interpreter<'error> {
         }
     }
 
+    pub fn extend(&mut self, module: Str<'error>, analyses: Vec<Analysis<'error>>) -> Address {
+        let start = self.code.len();
+        let previous = self.current_module;
+
+        self.current_module = module;
+        self.declare(analyses.clone());
+        self.generate(analyses);
+        self.current_module = previous;
+
+        let calls = take(&mut self.calls);
+        for (index, target) in calls {
+            if let Some(address) = self.address(&target) {
+                self.patch(index, Opcode::Call(address));
+            } else {
+                self.patch(index, Opcode::Trap(ErrorKind::MissingSymbol));
+            }
+        }
+
+        start
+    }
+
     fn declare(&mut self, analyses: Vec<Analysis<'error>>) {
         for analysis in analyses {
             match analysis.kind {

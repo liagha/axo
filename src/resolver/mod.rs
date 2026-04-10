@@ -65,8 +65,22 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         .iter()
         .filter_map(|&identity| {
             let record = session.records.get_mut(&identity).unwrap();
-
             let stem = Str::from(record.location.stem().unwrap().to_string());
+
+            if let Some(module) = session
+                .resolver
+                .registry
+                .values()
+                .find(|symbol| {
+                    matches!(symbol.kind, SymbolKind::Module(_))
+                        && symbol.target() == Some(stem)
+                })
+                .cloned()
+            {
+                record.module = Some(module.identity);
+                return None;
+            }
+
             let span = Span::file(Str::from(record.location.to_string())).unwrap_or_else(|_| Span::void());
 
             let head = Element::new(

@@ -1,8 +1,11 @@
 use axo::{
+    analyzer,
     data::{Identity, Module, Str},
+    interpreter,
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
+        prepare,
         platform::{
             read_dir, stdin, stdout,
             Write,
@@ -10,8 +13,10 @@ use axo::{
         time::DefaultTimer,
         CompileError, InputKind, Record, Session,
     },
+    parser,
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     resolver::Resolver,
+    scanner,
     scanner::{Token, TokenKind},
     tracker::{self, Location, Span, TrackError},
 };
@@ -62,58 +67,76 @@ fn main() {
 }
 
 fn repl(bare: bool, directives: Vec<Symbol>) {
-    let mut session = create(bare, directives.clone(), Vec::new());
-    let mut identity = None;
+    let mut session = create(bare, directives, Vec::new());
+    let mut core = interpreter::Interpreter::new(1024);
+
+    let mut keys: Vec<_> = session
+        .records
+        .iter()
+        .filter_map(|(&key, record)| (record.kind == InputKind::Source).then_some(key))
+        .collect();
+    keys.sort();
+
+    run(&mut session, &mut core, &keys);
 
     loop {
         print!("> ");
         _ = stdout().flush();
 
         let mut input = String::new();
-        if stdin().read_line(&mut input).is_err() || input.trim().is_empty() {
+        let Ok(size) = stdin().read_line(&mut input) else {
+            break;
+        };
+
+        if size == 0 {
+            break;
+        }
+
+        if input.trim().is_empty() {
             continue;
         }
 
-        if let Some(id) = identity {
-            let record = session.records.get_mut(&id).unwrap();
-            let content = record.content.as_mut().unwrap();
-            content.push_str(&input); // Append to preserve previous scope
+        let location = Location::Entry(Str::from("repl"));
+        let mut record = Record::new(InputKind::Source, location);
+        record.content = Some(input);
 
-            record.dirty = true;
-            record.tokens = None;
-            record.elements = None;
-            record.analyses = None;
-        } else {
-            let location = Location::Entry(Str::from("repl"));
-            let mut record = Record::new(InputKind::Source, location);
-            record.content = Some(input);
-            let id = session.records.len() | 0x40000000;
-            session.records.insert(id, record);
-            identity = Some(id);
+        let id = session.records.len() | 0x40000000;
+        session.records.insert(id, record);
+
+        run(&mut session, &mut core, &[id]);
+    }
+}
+
+fn run<'a>(session: &mut Session<'a>, core: &mut interpreter::Interpreter<'a>, keys: &[Identity]) {
+    session.errors.clear();
+
+    if !prepare(session) {
+        show(session);
+        return;
+    }
+
+    scanner::scan(session, keys);
+    parser::parse(session, keys);
+    axo::resolver::resolve(session, keys);
+    analyzer::analyze(session, keys);
+    interpreter::interpret(session, core, keys);
+
+    show(session);
+}
+
+fn show(session: &Session) {
+    for error in &session.errors {
+        match error {
+            CompileError::Initialize(error) => session.report_error(error),
+            CompileError::Scan(error) => session.report_error(error),
+            CompileError::Parse(error) => session.report_error(error),
+            CompileError::Resolve(error) => session.report_error(error),
+            CompileError::Analyze(error) => session.report_error(error),
+            CompileError::Interpret(error) => session.report_error(error),
+            CompileError::Track(error) => session.report_error(error),
+            #[cfg(feature = "generator")]
+            CompileError::Generate(error) => session.report_error(error),
         }
-
-        session.errors.clear();
-        session.cache.clear();
-
-        let engine = Arc::new(axo::internal::platform::Lock::new(axo::interpreter::Interpreter::new(1024)));
-
-        use axo::combinator::Operation;
-        use axo::data::memory::Arc;
-        use axo::internal::PrepareAction;
-        use axo::scanner::Scanner;
-        use axo::parser::Parser;
-        use axo::resolver::Resolver;
-        use axo::analyzer::Analyzer;
-        use axo::interpreter::InterpretAction;
-
-        session = session.run(Operation::sequence([
-            Operation::new(Arc::new(PrepareAction)),
-            Operation::new(Arc::new(Scanner::default())),
-            Operation::new(Arc::new(Parser::default())),
-            Operation::new(Arc::new(Resolver::default())),
-            Operation::new(Arc::new(Analyzer::default())),
-            Operation::new(Arc::new(InterpretAction::new(engine.clone()))),
-        ]));
     }
 }
 
