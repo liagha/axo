@@ -1,3 +1,4 @@
+use orbyte::Orbyte;
 use crate::resolver::{ErrorKind, ResolveError};
 use crate::{
     data::Identity,
@@ -7,7 +8,7 @@ use crate::{
     scanner::{Token, TokenKind},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Orbyte)]
 pub struct Scope {
     pub symbols: Set<Identity>,
     pub parent: Option<Identity>,

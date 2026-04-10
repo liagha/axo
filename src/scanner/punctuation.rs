@@ -1,9 +1,10 @@
+use orbyte::Orbyte;
 use crate::{
     format::{self, Debug, Display, Formatter},
     scanner::Character,
 };
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
 pub enum PunctuationKind {
     Space,
     Indentation(usize),
@@ -125,53 +126,5 @@ impl Display for PunctuationKind {
         };
 
         write!(f, "{}", punctuation)
-    }
-}
-
-use crate::internal::cache::{Decode, Encode};
-
-impl Encode for PunctuationKind {
-    fn encode(&self, buffer: &mut Vec<u8>) {
-        match self {
-            PunctuationKind::Space => buffer.push(0),
-            PunctuationKind::Indentation(size) => {
-                buffer.push(1);
-                size.encode(buffer);
-            }
-            PunctuationKind::Tab => buffer.push(2),
-            PunctuationKind::Newline => buffer.push(3),
-            PunctuationKind::Return => buffer.push(4),
-            PunctuationKind::Comma => buffer.push(5),
-            PunctuationKind::Semicolon => buffer.push(6),
-            PunctuationKind::LeftParenthesis => buffer.push(7),
-            PunctuationKind::RightParenthesis => buffer.push(8),
-            PunctuationKind::LeftBracket => buffer.push(9),
-            PunctuationKind::RightBracket => buffer.push(10),
-            PunctuationKind::LeftBrace => buffer.push(11),
-            PunctuationKind::RightBrace => buffer.push(12),
-        }
-    }
-}
-
-impl<'a> Decode<'a> for PunctuationKind {
-    fn decode(buffer: &'a [u8], cursor: &mut usize) -> Self {
-        let tag = buffer[*cursor];
-        *cursor += 1;
-        match tag {
-            0 => PunctuationKind::Space,
-            1 => PunctuationKind::Indentation(usize::decode(buffer, cursor)),
-            2 => PunctuationKind::Tab,
-            3 => PunctuationKind::Newline,
-            4 => PunctuationKind::Return,
-            5 => PunctuationKind::Comma,
-            6 => PunctuationKind::Semicolon,
-            7 => PunctuationKind::LeftParenthesis,
-            8 => PunctuationKind::RightParenthesis,
-            9 => PunctuationKind::LeftBracket,
-            10 => PunctuationKind::RightBracket,
-            11 => PunctuationKind::LeftBrace,
-            12 => PunctuationKind::RightBrace,
-            _ => panic!(),
-        }
     }
 }

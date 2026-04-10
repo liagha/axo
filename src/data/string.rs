@@ -13,8 +13,9 @@ use crate::{
 };
 
 pub use core::str::{from_utf8, FromStr, Utf8Error};
+use orbyte::Orbyte;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Orbyte, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Str<'string>(pub &'string [u8]);
 
 impl<'string> Str<'string> {
@@ -475,23 +476,5 @@ impl<'string> TryFrom<Vec<u8>> for Str<'string> {
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         from_utf8(&bytes)?;
         Ok(Str(bytes.leak()))
-    }
-}
-
-use crate::internal::cache::{Decode, Encode};
-
-impl<'string> Encode for Str<'string> {
-    fn encode(&self, buffer: &mut Vec<u8>) {
-        self.0.len().encode(buffer);
-        buffer.extend_from_slice(self.0);
-    }
-}
-
-impl<'string> Decode<'string> for Str<'string> {
-    fn decode(buffer: &'string [u8], cursor: &mut usize) -> Self {
-        let len = usize::decode(buffer, cursor);
-        let slice = &buffer[*cursor..*cursor + len];
-        *cursor += len;
-        Str(slice)
     }
 }

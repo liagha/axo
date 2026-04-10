@@ -1,10 +1,11 @@
+use orbyte::Orbyte;
 use crate::{
     data::{Boolean, Offset, Str},
     internal::{hash::Hash, operation::Ordering},
     tracker::{Location, Position, Spanned, TrackError},
 };
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Orbyte, PartialEq)]
 pub struct Span<'span> {
     pub start: Position<'span>,
     pub end: Position<'span>,
@@ -118,23 +119,5 @@ impl<'span> Span<'span> {
         };
 
         Span::new(start, end)
-    }
-}
-
-use crate::internal::cache::{Decode, Encode};
-
-impl<'span> Encode for Span<'span> {
-    fn encode(&self, buffer: &mut Vec<u8>) {
-        self.start.encode(buffer);
-        self.end.encode(buffer);
-    }
-}
-
-impl<'span> Decode<'span> for Span<'span> {
-    fn decode(buffer: &'span [u8], cursor: &mut usize) -> Self {
-        Span {
-            start: Position::decode(buffer, cursor),
-            end: Position::decode(buffer, cursor),
-        }
     }
 }

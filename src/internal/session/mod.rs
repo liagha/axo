@@ -2,24 +2,26 @@ mod core;
 
 pub use core::*;
 
-use crate::{
-    analyzer::Analyzer,
-    combinator::{Action, Operation, Operator},
-    data::{memory::Arc, Str},
-    internal::{
-        cache::{Decode, Encode},
-        platform::{
-            create_dir_all,
-            read, write,
-            catch_unwind, AssertUnwindSafe,
-            Lock,
+use {
+    orbyte::{Serialize, Deserialize},
+    crate::{
+        analyzer::Analyzer,
+        combinator::{Action, Operation, Operator},
+        data::{memory::Arc, Str},
+        internal::{
+            platform::{
+                create_dir_all,
+                read, write,
+                catch_unwind, AssertUnwindSafe,
+                Lock,
+            },
+            time::Duration,
+            CompileError,
         },
-        time::Duration,
-        CompileError,
-    },
-    parser::Parser,
-    resolver::Resolver,
-    scanner::Scanner,
+        parser::Parser,
+        resolver::Resolver,
+        scanner::Scanner,
+    }
 };
 
 #[cfg(not(feature = "generator"))]
@@ -135,8 +137,9 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         if let Some(parent) = manifest.parent() {
             _ = create_dir_all(parent);
         }
-        let mut buffer = Vec::new();
-        Some(session.cache.clone()).encode(&mut buffer);
+
+        let buffer = Some(session.cache.clone()).serialize();
+
         _ = write(manifest, buffer);
     }
 
@@ -168,17 +171,15 @@ Action<
 }
 
 impl<'session> Session<'session> {
-    fn decode<T: Decode<'session>>(bytes: Vec<u8>) -> Option<T> {
+    fn decode<T: Deserialize>(bytes: Vec<u8>) -> Option<T> {
         let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
-        
-        catch_unwind(AssertUnwindSafe(|| {
-            let mut cursor = 0;
-            T::decode(bytes, &mut cursor)
-        }))
+
+        catch_unwind(AssertUnwindSafe(|| T::deserialize(bytes).ok()))
             .ok()
+            .flatten()
     }
 
-    pub fn cache<T: Decode<'session> + Encode + Clone>(
+    pub fn cache<T: Deserialize + Serialize + Clone>(
         &self,
         name: &str,
         hash: u64,
@@ -194,8 +195,7 @@ impl<'session> Session<'session> {
         let path = cache.join(format!("{:016x}", hash));
 
         if let Some(value) = data {
-            let mut buffer = Vec::new();
-            Some(value.clone()).encode(&mut buffer);
+            let buffer = Some(value.clone()).serialize();
             _ = write(path, buffer);
             Some(value)
         } else if let Ok(bytes) = read(&path) {

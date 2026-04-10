@@ -10,7 +10,6 @@ pub use {
     }
 };
 
-pub mod cache;
 pub mod time;
 
 pub mod hash {

@@ -1,3 +1,4 @@
+use orbyte::Orbyte;
 use crate::{
     data::{Offset, Str},
     internal::{
@@ -7,7 +8,7 @@ use crate::{
     tracker::{ErrorKind, Span, TrackError},
 };
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Orbyte, PartialEq)]
 pub enum Location<'location> {
     Entry(Str<'location>),
     Void,
@@ -105,7 +106,7 @@ impl<'location> Location<'location> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
 pub struct Position<'position> {
     pub line: Offset,
     pub column: Offset,
@@ -230,52 +231,5 @@ impl<'a> PartialOrd for Position<'a> {
 impl<'a> Ord for Position<'a> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.cmp(other)
-    }
-}
-
-use crate::internal::cache::{Decode, Encode};
-
-impl<'location> Encode for Location<'location> {
-    fn encode(&self, buffer: &mut Vec<u8>) {
-        match self {
-            Location::Entry(path) => {
-                buffer.push(0);
-                path.encode(buffer);
-            }
-            Location::Void => buffer.push(1),
-            Location::Flag => buffer.push(2),
-        }
-    }
-}
-
-impl<'location> Decode<'location> for Location<'location> {
-    fn decode(buffer: &'location [u8], cursor: &mut usize) -> Self {
-        let tag = buffer[*cursor];
-        *cursor += 1;
-
-        match tag {
-            0 => Location::Entry(Str::decode(buffer, cursor)),
-            1 => Location::Void,
-            2 => Location::Flag,
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'position> Encode for Position<'position> {
-    fn encode(&self, buffer: &mut Vec<u8>) {
-        self.line.encode(buffer);
-        self.column.encode(buffer);
-        self.location.encode(buffer);
-    }
-}
-
-impl<'position> Decode<'position> for Position<'position> {
-    fn decode(buffer: &'position [u8], cursor: &mut usize) -> Self {
-        Position {
-            line: Offset::decode(buffer, cursor),
-            column: Offset::decode(buffer, cursor),
-            location: Location::decode(buffer, cursor),
-        }
     }
 }

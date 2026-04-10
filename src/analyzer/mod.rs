@@ -2,7 +2,6 @@ mod analysis;
 mod analyzer;
 mod element;
 mod error;
-mod traits;
 
 use {
     broccli::Color,
