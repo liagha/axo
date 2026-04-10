@@ -191,6 +191,11 @@ impl<'error> Interpreter<'error> {
     }
 
     fn error(&self, kind: ErrorKind, span: Span<'error>) -> InterpretError<'error> {
+        if matches!(kind, ErrorKind::OutOfBounds) {
+            let faulty_instruction = &self.code[self.pointer.saturating_sub(1)];
+            println!("[DEBUG] OutOfBounds triggered by opcode: {:?}", faulty_instruction.opcode);
+        }
+
         Error::new(kind, span)
     }
 
@@ -641,7 +646,7 @@ impl<'error> Interpreter<'error> {
 
     fn jump(&mut self, target: Address) -> Result<(), InterpretError<'error>> {
         let span = self.current();
-        if target >= self.code.len() {
+        if target > self.code.len() {
             return Err(self.error(ErrorKind::OutOfBounds, span));
         }
         self.pointer = target;
@@ -765,6 +770,13 @@ impl<'error> Interpreter<'error> {
 
     fn finish(&mut self) -> Result<(), InterpretError<'error>> {
         let span = self.current();
+
+        if self.frames.len() == 1 {
+            self.frames.pop();
+            self.running = false;
+            return Ok(());
+        }
+
         let frame = self.frames.pop().ok_or_else(|| self.error(ErrorKind::InvalidFrame, span))?;
         let end = frame.start + frame.locals.len();
         self.memory[frame.start..end].clone_from_slice(&frame.locals);

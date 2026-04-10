@@ -164,8 +164,9 @@ pub fn interpret<'source>(
 
         let stem = Str::from(stem.to_string());
         core.modules.insert(stem, analyses.clone());
-        core.extend(stem, analyses);
     }
+
+    core.compile();
 
     if session.errors.is_empty() && core.code.len() > start {
         core.pointer = start;
