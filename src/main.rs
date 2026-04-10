@@ -9,7 +9,7 @@ use axo::{
         platform::read_dir,
         prepare,
         time::DefaultTimer,
-        CompileError, InputKind, Record, Session,
+        CompileError, RecordKind, Record, Session,
     },
     interpreter,
     parser,
@@ -20,21 +20,21 @@ use axo::{
     tracker::{self, Location, Span, TrackError},
 };
 
-pub const BASE: &[&str] = &[
-    "./base/cast.axo",
-    "./base/cast.c",
-    "./base/file.axo",
-    "./base/file.c",
-    "./base/memory.axo",
-    "./base/memory.c",
-    "./base/print.axo",
-    "./base/print.c",
-    "./base/process.axo",
-    "./base/process.c",
-    "./base/string.axo",
-    "./base/string.c",
-    "./base/input.axo",
-    "./base/input.c",
+pub const BASE: &[(&str, &str)] = &[
+    ("./base/cast.axo", include_str!("../base/cast.axo")),
+    ("./base/cast.c", include_str!("../base/cast.c")),
+    ("./base/file.axo", include_str!("../base/file.axo")),
+    ("./base/file.c", include_str!("../base/file.c")),
+    ("./base/memory.axo", include_str!("../base/memory.axo")),
+    ("./base/memory.c", include_str!("../base/memory.c")),
+    ("./base/print.axo", include_str!("../base/print.axo")),
+    ("./base/print.c", include_str!("../base/print.c")),
+    ("./base/process.axo", include_str!("../base/process.axo")),
+    ("./base/process.c", include_str!("../base/process.c")),
+    ("./base/string.axo", include_str!("../base/string.axo")),
+    ("./base/string.c", include_str!("../base/string.c")),
+    ("./base/input.axo", include_str!("../base/input.axo")),
+    ("./base/input.c", include_str!("../base/input.c")),
 ];
 
 fn main() {
@@ -114,7 +114,7 @@ fn build(
         if !traverse(target, &mut session.records) {
             let string = target.to_string();
 
-            if let Some(kind) = InputKind::from_path(&string) {
+            if let Some(kind) = RecordKind::from_path(&string) {
                 let mut hasher = DefaultHasher::new();
                 Hash::hash(&string, &mut hasher);
 
@@ -145,8 +145,8 @@ pub(crate) fn create<'a>(
     let cache = Map::new();
 
     if !bare {
-        for path in BASE {
-            if let Some(kind) = InputKind::from_path(path) {
+        for &(path, content) in BASE {
+            if let Some(kind) = RecordKind::from_path(path) {
                 let string = path.to_string();
                 let location = Location::Entry(Str::from(string.clone()));
 
@@ -154,7 +154,10 @@ pub(crate) fn create<'a>(
                 Hash::hash(&string, &mut hasher);
 
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
-                records.insert(identity, Record::new(kind, location));
+                let mut record = Record::new(kind, location);
+
+                record.content = Some(content.to_string());
+                records.insert(identity, record);
             }
         }
     }
@@ -211,7 +214,7 @@ pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a
                 } else {
                     let string = child.to_string_lossy().into_owned();
 
-                    if let Some(kind) = InputKind::from_path(&string) {
+                    if let Some(kind) = RecordKind::from_path(&string) {
                         let location = Location::Entry(Str::from(string.clone()));
                         let mut hasher = DefaultHasher::new();
                         Hash::hash(&string, &mut hasher);

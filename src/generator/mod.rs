@@ -11,7 +11,7 @@ use {
                 Command,
             },
             time::Duration,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         data::{
             Str,
@@ -64,7 +64,7 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
+                if record.kind == RecordKind::Source && record.module.is_some() {
                     Some(key)
                 } else {
                     None
@@ -188,9 +188,29 @@ Action<
             let record = session.records.get_mut(&key).unwrap();
 
             let target = match record.kind {
-                InputKind::Source => record.output,
-                InputKind::Schema | InputKind::C => Some(record.location),
-                InputKind::Object => {
+                RecordKind::Source => record.output.map(|loc| loc.to_string()),
+                RecordKind::Schema => Some(record.location.to_string()),
+                RecordKind::C => {
+                    if let Some(content) = &record.content {
+                        let path = record.location.to_path().unwrap();
+                        let name = path.file_name().unwrap();
+                        let build = base.join("build").join("base");
+
+                        _ = create_dir_all(&build);
+                        let build_path = build.join(name);
+
+                        if !build_path.exists() {
+                            if let Ok(mut file) = crate::internal::platform::File::create(&build_path) {
+                                use crate::internal::platform::Write;
+                                _ = file.write_all(content.as_bytes());
+                            }
+                        }
+                        Some(build_path.to_string_lossy().into_owned())
+                    } else {
+                        Some(record.location.to_string())
+                    }
+                }
+                RecordKind::Object => {
                     direct.push(record.location);
                     None
                 }
@@ -207,23 +227,23 @@ Action<
                     continue;
                 }
 
-                let mut command = Command::new("clang");
+                let mut command = Command::new("cc");
 
                 command
                     .arg("-c")
-                    .arg(path.to_string())
+                    .arg(path.clone())
                     .arg("-o")
                     .arg(object.to_string());
 
                 let status = command.status().expect("failed");
 
                 if !status.success() {
-                    panic!("failed {}", path);
+                    panic!("failed compiling: {}", path);
                 }
             }
         }
 
-        let mut link = Command::new("clang");
+        let mut link = Command::new("cc");
 
         for &key in &keys {
             if let Some(object) = session.records.get(&key).unwrap().object {

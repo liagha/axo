@@ -23,7 +23,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         combinator::{Action, Operation, Operator},
         format::Show,
@@ -55,7 +55,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             session
                 .records
                 .get(key)
-                .map(|record| record.kind == InputKind::Source)
+                .map(|record| record.kind == RecordKind::Source)
                 .unwrap_or(false)
         })
         .collect();

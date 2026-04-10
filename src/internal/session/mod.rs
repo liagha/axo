@@ -56,7 +56,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
     for key in &keys {
         let record = session.records.get_mut(key).unwrap();
 
-        if record.kind == InputKind::Source {
+        if record.kind == RecordKind::Source {
             let location = record.location;
             let path = location.to_string();
 
@@ -97,18 +97,31 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         };
 
         let mut sources = Vec::new();
+        let build = session.base().join("build");
+
         for key in &keys {
             let record = session.records.get(key).unwrap();
-            if record.kind == InputKind::C {
+            if record.kind == RecordKind::C {
                 if let Ok(path) = record.location.to_path() {
+                    if let Some(content) = &record.content {
+                        _ = create_dir_all(&build);
+                        if let Some(filename) = path.file_name() {
+                            let build_path = build.join(filename);
+                            if !build_path.exists() {
+                                _ = write(build_path.clone(), content.as_bytes().to_vec());
+                            }
+                            sources.push(build_path);
+                            continue;
+                        }
+                    }
+
                     sources.push(path);
                 }
             }
         }
 
         if !sources.is_empty() {
-            let base = session.base();
-            let build = base.join("build");
+            let build = session.base().join("build");
             _ = create_dir_all(&build);
 
             let library = build.join("lib_axo.so");
@@ -208,7 +221,7 @@ impl<'session> Session<'session> {
     pub fn add_path(&mut self, path: &'session str) {
         use crate::tracker::Location;
         let location = Location::Entry(Str::from(path));
-        let kind = InputKind::from_path(path).unwrap_or(InputKind::Source);
+        let kind = RecordKind::from_path(path).unwrap_or(RecordKind::Source);
         let record = Record::new(kind, location);
         let id = self.records.len() | 0x40000000;
         self.records.insert(id, record);
@@ -217,7 +230,7 @@ impl<'session> Session<'session> {
     pub fn add_string(&mut self, name: &'session str, content: String) {
         use crate::tracker::Location;
         let location = Location::Entry(Str::from(name));
-        let mut record = Record::new(InputKind::Source, location);
+        let mut record = Record::new(RecordKind::Source, location);
         record.content = Some(content);
         let id = self.records.len() | 0x40000000;
         self.records.insert(id, record);

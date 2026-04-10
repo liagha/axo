@@ -26,7 +26,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         tracker::Peekable,
     },
@@ -49,7 +49,7 @@ pub fn parse<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             )
         };
 
-        if kind != InputKind::Source {
+        if kind != RecordKind::Source {
             continue;
         }
 

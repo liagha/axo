@@ -2,8 +2,8 @@ mod session;
 
 pub use {
     session::{
-        InputKind,
         prepare,
+        RecordKind,
         PrepareAction,
         Session,
         Record,

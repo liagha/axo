@@ -11,7 +11,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         data::{
             Identity,
@@ -88,7 +88,7 @@ Action<
             .records
             .iter()
             .filter_map(|(&key, record)| {
-                if record.kind == InputKind::Source && record.module.is_some() {
+                if record.kind == RecordKind::Source && record.module.is_some() {
                     Some(key)
                 } else {
                     None

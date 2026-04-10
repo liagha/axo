@@ -27,7 +27,7 @@ use {
                 read_dir, read_to_string,
             },
             time::Duration,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         resolver::Type,
         reporter::Error,
@@ -132,7 +132,7 @@ pub fn interpret<'source>(
                 .records
                 .get(key)
                 .map(|record| {
-                    record.kind == InputKind::Source
+                    record.kind == RecordKind::Source
                         && record.module.is_some()
                         && record.analyses.is_some()
                 })
@@ -492,7 +492,7 @@ impl<'source> Action<
         let mut sources: Vec<_> = session
             .records
             .iter()
-            .filter(|(_, r)| r.kind == InputKind::Source && r.module.is_some())
+            .filter(|(_, r)| r.kind == RecordKind::Source && r.module.is_some())
             .map(|(&k, _)| k)
             .collect();
         sources.sort();

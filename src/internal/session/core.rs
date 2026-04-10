@@ -20,23 +20,23 @@ use {
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum InputKind {
+pub enum RecordKind {
     Source,
     Schema,
     Object,
     C,
 }
 
-impl InputKind {
+impl RecordKind {
     pub fn from_path(string: &str) -> Option<Self> {
         if string.ends_with(".axo") {
-            Some(InputKind::Source)
+            Some(RecordKind::Source)
         } else if string.ends_with(".ll") {
-            Some(InputKind::Schema)
+            Some(RecordKind::Schema)
         } else if string.ends_with(".o") {
-            Some(InputKind::Object)
+            Some(RecordKind::Object)
         } else if string.ends_with(".c") {
-            Some(InputKind::C)
+            Some(RecordKind::C)
         } else {
             None
         }
@@ -44,16 +44,16 @@ impl InputKind {
 
     pub fn extension(&self) -> &'static str {
         match self {
-            InputKind::Source => "axo",
-            InputKind::Schema => "ll",
-            InputKind::Object => "o",
-            InputKind::C => "c",
+            RecordKind::Source => "axo",
+            RecordKind::Schema => "ll",
+            RecordKind::Object => "o",
+            RecordKind::C => "c",
         }
     }
 }
 
 pub struct Record<'session> {
-    pub kind: InputKind,
+    pub kind: RecordKind,
     pub location: Location<'session>,
     pub module: Option<Identity>,
     pub content: Option<String>,
@@ -67,7 +67,7 @@ pub struct Record<'session> {
 }
 
 impl<'session> Record<'session> {
-    pub fn new(kind: InputKind, location: Location<'session>) -> Self {
+    pub fn new(kind: RecordKind, location: Location<'session>) -> Self {
         Self {
             kind,
             location,
@@ -264,7 +264,7 @@ impl<'session> Session<'session> {
     pub fn object(
         base: &PathBuf,
         location: Location<'session>,
-        kind: &InputKind,
+        kind: &RecordKind,
         custom: Option<Str<'session>>,
     ) -> Location<'session> {
         let target = if let Some(path) = custom {

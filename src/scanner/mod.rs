@@ -24,7 +24,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            CompileError, InputKind, Session,
+            CompileError, RecordKind, Session,
         },
         reporter::Error,
     },
@@ -45,7 +45,7 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             )
         };
 
-        if kind != InputKind::Source {
+        if kind != RecordKind::Source {
             continue;
         }
 

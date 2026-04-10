@@ -1,4 +1,4 @@
-use axo::{data::{Str}, internal::{InputKind, Record}, interpreter, interpreter::Interpreter, parser::Symbol, tracker::Location};
+use axo::{data::{Str}, internal::{RecordKind, Record}, interpreter, interpreter::Interpreter, parser::Symbol, tracker::Location};
 use std::{
     env::set_current_dir,
     fs::read_dir,
@@ -149,7 +149,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>) {
     let mut keys: Vec<_> = session
         .records
         .iter()
-        .filter_map(|(&key, record)| (record.kind == InputKind::Source).then_some(key))
+        .filter_map(|(&key, record)| (record.kind == RecordKind::Source).then_some(key))
         .collect();
     keys.sort();
 
@@ -196,7 +196,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>) {
         }
 
         let location = Location::Entry(Str::from("dialog"));
-        let mut record = Record::new(InputKind::Source, location);
+        let mut record = Record::new(RecordKind::Source, location);
         record.content = Some(input);
 
         let identity = session.records.len() | 0x40000000;
