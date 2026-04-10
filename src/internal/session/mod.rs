@@ -124,7 +124,8 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
             let build = session.base().join("build");
             _ = create_dir_all(&build);
 
-            let library = build.join("lib_axo.so");
+            let extention = std::env::consts::DLL_EXTENSION;
+            let library = build.join(format!("lib_axo.{}", extention));
             let mut command = Command::new("cc");
 
             command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
@@ -136,12 +137,12 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
                 let string = library.to_str().unwrap();
                 let path = CString::new(string).unwrap();
                 unsafe {
-                    if libc::dlopen(path.as_ptr(), 258).is_null() {
-                        panic!();
+                    if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
+                        panic!("dlopen failed to load library");
                     }
                 }
             } else {
-                panic!();
+                panic!("failed to compile dynamic library");
             }
         }
     }

@@ -281,7 +281,10 @@ fn load_api() -> Option<Arc<Api>> {
 fn load_shared(session: &Session) -> *mut c_void {
     let base = session.base();
     let build = base.join("build");
-    let library = build.join("lib_axo.so");
+
+    let extension = std::env::consts::DLL_EXTENSION;
+    let library = build.join(format!("lib_axo.{}", extension));
+
     let path = library.to_str().unwrap_or_default();
     let string = CString::new(path).unwrap_or_default();
 
