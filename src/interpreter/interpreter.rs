@@ -838,7 +838,7 @@ impl<'error> Interpreter<'error> {
         Ok(())
     }
 
-    pub fn extract(mut self) -> Option<Value> {
+    pub fn extract(&mut self) -> Option<Value> {
         self.stack.pop()
     }
 }

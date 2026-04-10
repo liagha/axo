@@ -1,10 +1,4 @@
-use axo::{
-    data::{Str},
-    internal::{InputKind, Record},
-    interpreter::Interpreter,
-    parser::Symbol,
-    tracker::Location,
-};
+use axo::{data::{Str}, internal::{InputKind, Record}, interpreter, interpreter::Interpreter, parser::Symbol, tracker::Location};
 use std::{
     env::set_current_dir,
     fs::read_dir,
@@ -209,5 +203,13 @@ pub fn start(bare: bool, directives: Vec<Symbol>) {
         session.records.insert(identity, record);
 
         crate::run(&mut session, &mut core, &[identity]);
+
+        if session.errors.is_empty() {
+            if let Some(result) = core.extract() {
+                if !matches!(result, interpreter::Value::Empty) {
+                    println!("{:?}", result);
+                }
+            }
+        }
     }
 }
