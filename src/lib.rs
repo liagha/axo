@@ -4,29 +4,23 @@ pub mod combinator;
 pub mod generator;
 #[cfg(feature = "initial")]
 pub mod initializer;
-#[cfg(feature = "internal")]
-pub mod internal;
 #[cfg(feature = "parser")]
 pub mod parser;
 #[cfg(feature = "resolver")]
 pub mod resolver;
 #[cfg(feature = "scanner")]
 pub mod scanner;
+#[cfg(feature = "analyzer")]
+pub mod analyzer;
+#[cfg(feature = "interpreter")]
+pub mod interpreter;
 
-#[cfg(feature = "internal")]
-mod format;
-
-#[cfg(feature = "internal")]
+pub mod internal;
 pub mod reporter;
 
-#[cfg(feature = "internal")]
 pub mod text;
 
-#[cfg(feature = "internal")]
 pub mod tracker;
 
-#[cfg(feature = "internal")]
 pub mod data;
-
-pub mod analyzer;
-pub mod interpreter;
+mod format;

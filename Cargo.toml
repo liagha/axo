@@ -5,22 +5,18 @@ edition = "2021"
 
 [features]
 default = [
-    "internal",
     "combinator",
     "initial", "scanner",
-    "parser", "resolver",
+    "parser", "resolver", "analyzer"
 ]
 combinator = []
-internal = [
-    "combinator",
-    "initial", "scanner",
-    "parser", "resolver",
-]
 initial = ["combinator", "scanner", "parser"]
 scanner = ["combinator"]
 parser = ["combinator", "scanner"]
-resolver = ["scanner", "parser"]
-generator = ["resolver", "inkwell"]
+resolver = ["combinator", "scanner", "parser"]
+analyzer = ["combinator", "parser", "resolver"]
+interpreter = ["combinator", "analyzer", "resolver"]
+generator = ["combinator", "analyzer", "resolver", "inkwell"]
 
 [dependencies]
 broccli = { version = "0.0.22" }

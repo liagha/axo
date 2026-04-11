@@ -11,7 +11,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         data::{
             Identity,
@@ -58,7 +58,7 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             analyzer
                 .errors
                 .iter()
-                .map(|error| CompileError::Analyze(error.clone())),
+                .map(|error| SessionError::Analyze(error.clone())),
         );
 
         session.records.get_mut(&key).unwrap().analyses =

@@ -1,24 +1,23 @@
+#[cfg(feature = "interpreter")]
 mod dialog;
 
 use axo::{
-    analyzer,
     data::{Identity, Module, Str},
     initializer::Initializer,
     internal::{
         hash::{DefaultHasher, Hash, Hasher, Map},
         platform::read_dir,
-        prepare,
         time::DefaultTimer,
-        CompileError, RecordKind, Record, Session,
+        SessionError, RecordKind, Record, Session,
     },
-    interpreter,
-    parser,
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
-    resolver::Resolver,
-    scanner,
+    resolver::{Resolver},
     scanner::{Token, TokenKind},
     tracker::{self, Location, Span, TrackError},
 };
+
+#[cfg(feature = "interpreter")]
+use axo::interpreter::{Interpreter, interpret};
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../base/cast.axo")),
@@ -52,61 +51,55 @@ fn main() {
         false
     });
 
-    let failures: Vec<CompileError> = initializer
+    let failures: Vec<SessionError> = initializer
         .errors
         .into_iter()
-        .map(CompileError::Initialize)
+        .map(SessionError::Initialize)
         .collect();
 
     if targets.is_empty() {
+        #[cfg(feature = "interpreter")]
         dialog::start(bare, initializer.output);
     } else {
         build(targets, bare, initializer.output, failures);
     }
 }
 
-pub(crate) fn run<'a>(
+#[cfg(feature = "interpreter")]
+pub fn run<'a>(
     session: &mut Session<'a>,
-    core: &mut interpreter::Interpreter<'a>,
+    core: &mut Interpreter<'a>,
     keys: &[Identity],
 ) {
+    use axo::{
+        internal::prepare,
+        scanner::scan,
+        parser::parse,
+        resolver::resolve,
+        analyzer::analyze,
+    };
+
     session.errors.clear();
 
     if !prepare(session) {
-        show(session);
+        session.report_all();
         return;
     }
 
-    scanner::scan(session, keys);
-    parser::parse(session, keys);
-    axo::resolver::resolve(session, keys);
-    analyzer::analyze(session, keys);
-    interpreter::interpret(session, core, keys);
+    scan(session, keys);
+    parse(session, keys);
+    resolve(session, keys);
+    analyze(session, keys);
+    interpret(session, core, keys);
 
-    show(session);
-}
-
-fn show(session: &Session) {
-    for error in &session.errors {
-        match error {
-            CompileError::Initialize(error) => session.report_error(error),
-            CompileError::Scan(error) => session.report_error(error),
-            CompileError::Parse(error) => session.report_error(error),
-            CompileError::Resolve(error) => session.report_error(error),
-            CompileError::Analyze(error) => session.report_error(error),
-            CompileError::Interpret(error) => session.report_error(error),
-            CompileError::Track(error) => session.report_error(error),
-            #[cfg(feature = "generator")]
-            CompileError::Generate(error) => session.report_error(error),
-        }
-    }
+    session.report_all();
 }
 
 fn build(
     targets: Vec<(Location<'static>, Span<'static>)>,
     bare: bool,
     directives: Vec<Symbol>,
-    failures: Vec<CompileError<'static>>,
+    failures: Vec<SessionError<'static>>,
 ) {
     let mut session = create(bare, directives, failures);
 
@@ -121,7 +114,7 @@ fn build(
                 let identity = (hasher.finish() as Identity) | 0x40000000;
                 session.records.insert(identity, Record::new(kind, target.clone()));
             } else {
-                session.errors.push(CompileError::Track(TrackError::new(
+                session.errors.push(SessionError::Track(TrackError::new(
                     tracker::error::ErrorKind::UnSupportedInput(target.clone()),
                     span.clone(),
                 )));
@@ -132,10 +125,10 @@ fn build(
     let _session = session.compile();
 }
 
-pub(crate) fn create<'a>(
+pub fn create<'a>(
     bare: bool,
     directives: Vec<Symbol<'a>>,
-    failures: Vec<CompileError<'a>>,
+    failures: Vec<SessionError<'a>>,
 ) -> Session<'a> {
     let mut timer = DefaultTimer::new_default();
     _ = timer.start();

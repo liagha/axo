@@ -58,17 +58,19 @@ use crate::scanner::ScanError;
 use crate::parser::ParseError;
 use crate::resolver::ResolveError;
 use crate::analyzer::AnalyzeError;
+#[cfg(feature = "interpreter")]
 use crate::interpreter::InterpretError;
 #[cfg(feature = "generator")]
 use crate::generator::GenerateError;
 use crate::tracker::TrackError;
 
-pub enum CompileError<'error> {
+pub enum SessionError<'error> {
     Initialize(InitializeError<'error>),
     Scan(ScanError<'error>),
     Parse(ParseError<'error>),
     Resolve(ResolveError<'error>),
     Analyze(AnalyzeError<'error>),
+    #[cfg(feature = "interpreter")]
     Interpret(InterpretError<'error>),
     #[cfg(feature = "generator")]
     Generate(GenerateError<'error>),

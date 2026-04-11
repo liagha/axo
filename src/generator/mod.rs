@@ -11,7 +11,7 @@ use {
                 Command,
             },
             time::Duration,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         data::{
             Str,
@@ -116,7 +116,7 @@ Action<
                                 if let Err(error) = file.write_all(string.as_bytes()) {
                                     let kind = TrackErrorKind::from_io(error, schema);
                                     let track = TrackError::new(kind, Span::void());
-                                    session.errors.push(CompileError::Track(track));
+                                    session.errors.push(SessionError::Track(track));
                                     operation.set_reject();
                                     return ();
                                 }
@@ -125,11 +125,11 @@ Action<
                             Err(error) => {
                                 let kind = TrackErrorKind::from_io(error, schema);
                                 let track = TrackError::new(kind, Span::void());
-                                session.errors.push(CompileError::Track(track));
+                                session.errors.push(SessionError::Track(track));
                             }
                         }
                     }
-                    Err(error) => session.errors.push(CompileError::Track(error)),
+                    Err(error) => session.errors.push(SessionError::Track(error)),
                 }
             }
         }
@@ -140,7 +140,7 @@ Action<
         session.errors.extend(generator
                                   .errors
                                   .iter()
-                                  .map(|error| CompileError::Generate(error.clone())),
+                                  .map(|error| SessionError::Generate(error.clone())),
         );
 
         if session.errors.is_empty() {
@@ -227,7 +227,7 @@ Action<
                     continue;
                 }
 
-                let mut command = Command::new("cc");
+                let mut command = Command::new("clang");
 
                 command
                     .arg("-c")

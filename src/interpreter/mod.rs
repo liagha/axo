@@ -27,14 +27,14 @@ use {
                 read_dir, read_to_string,
             },
             time::Duration,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         resolver::Type,
         reporter::Error,
     },
     std::{
         collections::HashMap,
-        ffi::{c_void, CStr},
+        ffi::{c_void, c_char, CStr},
         path::PathBuf,
     },
 };
@@ -174,7 +174,7 @@ pub fn interpret<'source>(
         core.stack.clear();
 
         if let Err(error) = core.run() {
-            session.errors.push(CompileError::Interpret(error));
+            session.errors.push(SessionError::Interpret(error));
         }
     }
 }
@@ -450,7 +450,7 @@ fn build_closure(api: Arc<Api>, address: usize, signature: Signature) -> Dynamic
                     if ret.is_null() {
                         Ok(Value::Text(String::new()))
                     } else {
-                        let text = CStr::from_ptr(ret as *const u8);
+                        let text = CStr::from_ptr(ret as *const c_char);
                         Ok(Value::Text(text.to_string_lossy().into_owned()))
                     }
                 }

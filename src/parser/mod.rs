@@ -26,7 +26,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         tracker::Peekable,
     },
@@ -76,7 +76,7 @@ pub fn parse<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             parser
                 .errors
                 .iter()
-                .map(|error| CompileError::Parse(error.clone())),
+                .map(|error| SessionError::Parse(error.clone())),
         );
 
         session.records.get_mut(&key).unwrap().elements =

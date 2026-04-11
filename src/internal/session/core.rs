@@ -8,7 +8,7 @@ use {
             hash::Map,
             platform::PathBuf,
             time::{DefaultTimer, Duration},
-            CompileError,
+            SessionError,
         },
         parser::{Element, ElementKind, SymbolKind},
         reporter::Error,
@@ -89,7 +89,7 @@ pub struct Session<'session> {
     pub records: Map<Identity, Record<'session>>,
     pub initializer: Initializer<'session>,
     pub resolver: Resolver<'session>,
-    pub errors: Vec<CompileError<'session>>,
+    pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
     pub cache: Map<Location<'session>, u64>,
 }
@@ -206,6 +206,23 @@ impl<'session> Session<'session> {
     {
         xprintln!("{}", error);
         xprintln!();
+    }
+    
+    pub fn report_all(&self) {
+        for error in &self.errors {
+            match error {
+                SessionError::Initialize(error) => self.report_error(error),
+                SessionError::Scan(error) => self.report_error(error),
+                SessionError::Parse(error) => self.report_error(error),
+                SessionError::Resolve(error) => self.report_error(error),
+                SessionError::Analyze(error) => self.report_error(error),
+                #[cfg(feature = "interpreter")]
+                SessionError::Interpret(error) => self.report_error(error),
+                SessionError::Track(error) => self.report_error(error),
+                #[cfg(feature = "generator")]
+                SessionError::Generate(error) => self.report_error(error),
+            }
+        } 
     }
 
     pub fn base(&self) -> PathBuf {

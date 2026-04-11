@@ -24,7 +24,7 @@ use {
         internal::{
             platform::Lock,
             time::Duration,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         reporter::Error,
     },
@@ -65,7 +65,7 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                     let kind = ErrorKind::Tracking(error.clone());
                     let error = ScanError::new(kind, error.span);
 
-                    session.errors.push(CompileError::Scan(error));
+                    session.errors.push(SessionError::Scan(error));
                     continue;
                 }
             }
@@ -88,7 +88,7 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             scanner
                 .errors
                 .iter()
-                .map(|error| CompileError::Scan(error.clone())),
+                .map(|error| SessionError::Scan(error.clone())),
         );
 
         session.records.get_mut(&key).unwrap().tokens =

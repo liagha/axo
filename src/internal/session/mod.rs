@@ -16,7 +16,7 @@ use {
                 Lock,
             },
             time::Duration,
-            CompileError,
+            SessionError,
         },
         parser::Parser,
         resolver::Resolver,
@@ -24,7 +24,7 @@ use {
     }
 };
 
-#[cfg(not(feature = "generator"))]
+#[cfg(feature = "interpreter")]
 use crate::interpreter::{InterpretAction, Interpreter};
 
 #[cfg(feature = "generator")]
@@ -260,15 +260,16 @@ impl<'session> Session<'session> {
         if !self.errors.is_empty() {
             for error in &self.errors {
                 match error {
-                    CompileError::Initialize(error) => self.report_error(error),
-                    CompileError::Scan(error) => self.report_error(error),
-                    CompileError::Parse(error) => self.report_error(error),
-                    CompileError::Resolve(error) => self.report_error(error),
-                    CompileError::Analyze(error) => self.report_error(error),
-                    CompileError::Interpret(error) => self.report_error(error),
+                    SessionError::Initialize(error) => self.report_error(error),
+                    SessionError::Scan(error) => self.report_error(error),
+                    SessionError::Parse(error) => self.report_error(error),
+                    SessionError::Resolve(error) => self.report_error(error),
+                    SessionError::Analyze(error) => self.report_error(error),
+                    #[cfg(feature = "interpreter")]
+                    SessionError::Interpret(error) => self.report_error(error),
                     #[cfg(feature = "generator")]
-                    CompileError::Generate(error) => self.report_error(error),
-                    CompileError::Track(error) => self.report_error(error),
+                    SessionError::Generate(error) => self.report_error(error),
+                    SessionError::Track(error) => self.report_error(error),
                 }
             }
             return self;
@@ -292,15 +293,16 @@ impl<'session> Session<'session> {
 
         for error in &session.errors {
             match error {
-                CompileError::Initialize(error) => session.report_error(error),
-                CompileError::Scan(error) => session.report_error(error),
-                CompileError::Parse(error) => session.report_error(error),
-                CompileError::Resolve(error) => session.report_error(error),
-                CompileError::Analyze(error) => session.report_error(error),
-                CompileError::Interpret(error) => session.report_error(error),
+                SessionError::Initialize(error) => session.report_error(error),
+                SessionError::Scan(error) => session.report_error(error),
+                SessionError::Parse(error) => session.report_error(error),
+                SessionError::Resolve(error) => session.report_error(error),
+                SessionError::Analyze(error) => session.report_error(error),
+                #[cfg(feature = "interpreter")]
+                SessionError::Interpret(error) => session.report_error(error),
                 #[cfg(feature = "generator")]
-                CompileError::Generate(error) => session.report_error(error),
-                CompileError::Track(error) => session.report_error(error),
+                SessionError::Generate(error) => session.report_error(error),
+                SessionError::Track(error) => session.report_error(error),
             }
         }
 
@@ -314,7 +316,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn compile(self) -> Self {
-        #[cfg(not(feature = "generator"))]
+        #[cfg(feature = "interpreter")]
         let engine = Arc::new(Lock::new(Interpreter::new(1024)));
 
         self.run(Operation::sequence([
@@ -323,7 +325,7 @@ impl<'session> Session<'session> {
             Operation::new(Arc::new(Parser::default())),
             Operation::new(Arc::new(Resolver::default())),
             Operation::new(Arc::new(Analyzer::default())),
-            #[cfg(not(feature = "generator"))]
+            #[cfg(feature = "interpreter")]
             Operation::new(Arc::new(InterpretAction::new(engine))),
             #[cfg(feature = "generator")]
             Operation::new(Arc::new(GenerateAction)),

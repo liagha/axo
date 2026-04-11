@@ -23,7 +23,7 @@ use {
         internal::{
             time::Duration,
             platform::Lock,
-            CompileError, RecordKind, Session,
+            SessionError, RecordKind, Session,
         },
         combinator::{Action, Operation, Operator},
         format::Show,
@@ -215,7 +215,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
     session
         .errors
-        .extend(session.resolver.errors.drain(..).map(CompileError::Resolve));
+        .extend(session.resolver.errors.drain(..).map(SessionError::Resolve));
 }
 
 impl<'source>
