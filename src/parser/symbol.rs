@@ -17,7 +17,7 @@ pub struct Symbol<'symbol> {
     pub span: Span<'symbol>,
     pub scope: Scope,
     pub visibility: Visibility,
-    pub typing: Type<'symbol>,
+    pub typing: Box<Type<'symbol>>,
 }
 
 #[derive(Clone, Hash, Orbyte, PartialEq)]
@@ -44,7 +44,7 @@ impl<'symbol> Symbol<'symbol> {
             span,
             scope: Scope::new(None),
             visibility,
-            typing: Type::from(TypeKind::Unknown),
+            typing: Box::from(Type::from(TypeKind::Unknown)),
         }
     }
 

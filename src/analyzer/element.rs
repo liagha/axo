@@ -30,7 +30,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
         &self,
         resolver: &mut Resolver<'element>,
     ) -> Result<Analysis<'element>, AnalyzeError<'element>> {
-        let typing = self.typing.clone();
+        let typing = *self.typing.clone();
 
         match &self.kind {
             ElementKind::Literal(literal) => {

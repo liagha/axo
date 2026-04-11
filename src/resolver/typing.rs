@@ -57,6 +57,333 @@ pub enum TypeKind<'typing> {
     Function(Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>),
 }
 
+impl<'typing> TypeKind<'typing> {
+    #[inline(always)]
+    pub fn is_module(&self) -> bool {
+        matches!(self, Self::Module(_))
+    }
+
+    #[inline(always)]
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Self::Integer { .. })
+    }
+
+    #[inline(always)]
+    pub fn is_float(&self) -> bool {
+        matches!(self, Self::Float { .. })
+    }
+
+    #[inline(always)]
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, Self::Boolean)
+    }
+
+    #[inline(always)]
+    pub fn is_string(&self) -> bool {
+        matches!(self, Self::String)
+    }
+
+    #[inline(always)]
+    pub fn is_character(&self) -> bool {
+        matches!(self, Self::Character)
+    }
+
+    #[inline(always)]
+    pub fn is_pointer(&self) -> bool {
+        matches!(self, Self::Pointer { .. })
+    }
+
+    #[inline(always)]
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array { .. })
+    }
+
+    #[inline(always)]
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Self::Tuple { .. })
+    }
+
+    #[inline(always)]
+    pub fn is_void(&self) -> bool {
+        matches!(self, Self::Void)
+    }
+
+    #[inline(always)]
+    pub fn is_variable(&self) -> bool {
+        matches!(self, Self::Variable(_))
+    }
+
+    #[inline(always)]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+
+    #[inline(always)]
+    pub fn is_structure(&self) -> bool {
+        matches!(self, Self::Structure(_))
+    }
+
+    #[inline(always)]
+    pub fn is_union(&self) -> bool {
+        matches!(self, Self::Union(_))
+    }
+
+    #[inline(always)]
+    pub fn is_function(&self) -> bool {
+        matches!(self, Self::Function(_))
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_module(self) -> Str<'typing> {
+        match self {
+            Self::Module(module) => module,
+            _ => panic!("expected module"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_integer(self) -> (Scale, Boolean) {
+        match self {
+            Self::Integer { size, signed } => (size, signed),
+            _ => panic!("expected integer"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_float(self) -> Scale {
+        match self {
+            Self::Float { size } => size,
+            _ => panic!("expected float"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_pointer(self) -> Box<Type<'typing>> {
+        match self {
+            Self::Pointer { target } => target,
+            _ => panic!("expected pointer"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_array(self) -> (Box<Type<'typing>>, Scale) {
+        match self {
+            Self::Array { member, size } => (member, size),
+            _ => panic!("expected array"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_tuple(self) -> Box<Vec<Type<'typing>>> {
+        match self {
+            Self::Tuple { members } => members,
+            _ => panic!("expected tuple"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_variable(self) -> Identity {
+        match self {
+            Self::Variable(identity) => identity,
+            _ => panic!("expected variable"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_structure(self) -> Box<Aggregate<Str<'typing>, Type<'typing>>> {
+        match self {
+            Self::Structure(structure) => structure,
+            _ => panic!("expected structure"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_union(self) -> Box<Aggregate<Str<'typing>, Type<'typing>>> {
+        match self {
+            Self::Union(union) => union,
+            _ => panic!("expected union"),
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn unwrap_function(self) -> Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>> {
+        match self {
+            Self::Function(function) => function,
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_module(&self) -> Option<&Str<'typing>> {
+        match self {
+            Self::Module(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_integer(&self) -> Option<(&Scale, &Boolean)> {
+        match self {
+            Self::Integer { size, signed } => Some((size, signed)),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_float(&self) -> Option<&Scale> {
+        match self {
+            Self::Float { size } => Some(size),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_pointer(&self) -> Option<&Box<Type<'typing>>> {
+        match self {
+            Self::Pointer { target } => Some(target),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_array(&self) -> Option<(&Box<Type<'typing>>, &Scale)> {
+        match self {
+            Self::Array { member, size } => Some((member, size)),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_tuple(&self) -> Option<&Box<Vec<Type<'typing>>>> {
+        match self {
+            Self::Tuple { members } => Some(members),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_variable(&self) -> Option<&Identity> {
+        match self {
+            Self::Variable(identity) => Some(identity),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_structure(&self) -> Option<&Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+        match self {
+            Self::Structure(structure) => Some(structure),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_union(&self) -> Option<&Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+        match self {
+            Self::Union(union) => Some(union),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_function(&self) -> Option<&Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>> {
+        match self {
+            Self::Function(function) => Some(function),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_module_mut(&mut self) -> Option<&mut Str<'typing>> {
+        match self {
+            Self::Module(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_integer_mut(&mut self) -> Option<(&mut Scale, &mut Boolean)> {
+        match self {
+            Self::Integer { size, signed } => Some((size, signed)),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_float_mut(&mut self) -> Option<&mut Scale> {
+        match self {
+            Self::Float { size } => Some(size),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_pointer_mut(&mut self) -> Option<&mut Box<Type<'typing>>> {
+        match self {
+            Self::Pointer { target } => Some(target),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_array_mut(&mut self) -> Option<(&mut Box<Type<'typing>>, &mut Scale)> {
+        match self {
+            Self::Array { member, size } => Some((member, size)),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_tuple_mut(&mut self) -> Option<&mut Box<Vec<Type<'typing>>>> {
+        match self {
+            Self::Tuple { members } => Some(members),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_variable_mut(&mut self) -> Option<&mut Identity> {
+        match self {
+            Self::Variable(identity) => Some(identity),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_structure_mut(&mut self) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+        match self {
+            Self::Structure(structure) => Some(structure),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_union_mut(&mut self) -> Option<&mut Box<Aggregate<Str<'typing>, Type<'typing>>>> {
+        match self {
+            Self::Union(union) => Some(union),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Box<Function<Str<'typing>, Type<'typing>, Type<'typing>, Option<Box<Type<'typing>>>>>> {
+        match self {
+            Self::Function(function) => Some(function),
+            _ => None,
+        }
+    }
+}
+
 impl<'typing> PartialEq for Type<'typing> {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
@@ -213,16 +540,16 @@ impl<'resolver> Resolver<'resolver> {
                 }
 
             (
-                TypeKind::Function(left_func),
-                TypeKind::Function(right_func),
-            ) if left_func.members.len() == right_func.members.len() => {
-                let mut unified = Vec::with_capacity(left_func.members.len());
+                TypeKind::Function(left_function),
+                TypeKind::Function(right_function),
+            ) if left_function.members.len() == right_function.members.len() => {
+                let mut unified = Vec::with_capacity(left_function.members.len());
 
-                for (first, second) in left_func.members.iter().zip(right_func.members.iter()) {
+                for (first, second) in left_function.members.iter().zip(right_function.members.iter()) {
                     unified.push(self.unify(span, first, second));
                 }
 
-                let output = match (left_func.output, right_func.output) {
+                let output = match (left_function.output, right_function.output) {
                     (Some(first), Some(second)) => {
                         Some(Box::new(self.unify(span, &first, &second)))
                     }
@@ -231,13 +558,13 @@ impl<'resolver> Resolver<'resolver> {
                     (None, None) => None,
                 };
 
-                let name = if left_func.target.is_empty() {
-                    right_func.target.clone()
+                let name = if left_function.target.is_empty() {
+                    right_function.target.clone()
                 } else {
-                    left_func.target.clone()
+                    left_function.target.clone()
                 };
 
-                let body = self.unify(span, &left_func.body, &right_func.body);
+                let body = self.unify(span, &left_function.body, &right_function.body);
 
                 Type::new(left.identity, TypeKind::Function(Box::new(Function::new(name, unified, body, output, Interface::Axo, false, false))))
             }
@@ -273,14 +600,14 @@ impl<'resolver> Resolver<'resolver> {
                 let items = members.iter().map(|item| self.reify(item)).collect();
                 Type::from(TypeKind::Tuple { members: Box::new(items) })
             }
-            TypeKind::Function(func) => {
-                let members = func.members.iter().map(|item| self.reify(item)).collect();
-                let returnable = func.output.as_ref().map(|kind| Box::new(self.reify(kind)));
-                let body = self.reify(&func.body);
+            TypeKind::Function(function) => {
+                let members = function.members.iter().map(|item| self.reify(item)).collect();
+                let returnable = function.output.as_ref().map(|kind| Box::new(self.reify(kind)));
+                let body = self.reify(&function.body);
 
                 Type::new(
                     typing.identity,
-                    TypeKind::Function(Box::new(Function::new(func.target, members, body, returnable, Interface::Axo, false, false))),
+                    TypeKind::Function(Box::new(Function::new(function.target, members, body, returnable, Interface::Axo, false, false))),
                 )
             }
             _ => typing.clone(),
@@ -376,7 +703,7 @@ impl<'resolver> Resolver<'resolver> {
                         "Void" => TypeKind::Void,
                         _ => {
                             return if let Ok(symbol) = self.lookup(element) {
-                                Ok(symbol.typing)
+                                Ok(*symbol.typing)
                             } else {
                                 Err(ResolveError::new(
                                     ErrorKind::InvalidAnnotation(element.clone()),

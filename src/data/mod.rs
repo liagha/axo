@@ -14,7 +14,7 @@ pub type Char = char;
 pub type Boolean = bool;
 pub type Offset = usize;
 pub type Scale = usize;
-pub type Integer = i128;
+pub type Integer = isize;
 
 pub mod any {
     pub use core::any::Any;

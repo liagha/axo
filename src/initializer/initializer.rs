@@ -223,7 +223,6 @@ fn is_ignored(token: &Token) -> bool {
         TokenKind::Punctuation(PunctuationKind::Newline)
             | TokenKind::Punctuation(PunctuationKind::Tab)
             | TokenKind::Punctuation(PunctuationKind::Space)
-            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
             | TokenKind::Punctuation(PunctuationKind::Semicolon)
             | TokenKind::Comment(_)
     )

@@ -47,7 +47,7 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 
         None
     }
-    
+
     fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }
@@ -95,7 +95,6 @@ impl<'a: 'source, 'source> Parser<'a> {
                         TokenKind::Punctuation(PunctuationKind::Newline)
                             | TokenKind::Punctuation(PunctuationKind::Tab)
                             | TokenKind::Punctuation(PunctuationKind::Space)
-                            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                             | TokenKind::Comment(_)
                     )
                 })
@@ -106,7 +105,6 @@ impl<'a: 'source, 'source> Parser<'a> {
                         TokenKind::Punctuation(PunctuationKind::Newline)
                             | TokenKind::Punctuation(PunctuationKind::Tab)
                             | TokenKind::Punctuation(PunctuationKind::Space)
-                            | TokenKind::Punctuation(PunctuationKind::Indentation(_))
                             | TokenKind::Comment(_)
                     )
                 }),

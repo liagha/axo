@@ -62,7 +62,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let analyzed = Binding::new(
                     Box::new(head),
                     value.map(Box::new),
-                    self.typing.clone(),
+                    *self.typing.clone(),
                     binding.kind,
                 );
 
@@ -115,7 +115,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                     .map(|body| body.analyze(resolver).ok().map(Box::new))
                     .flatten();
 
-                let output = function.output.clone().map(|output| output.typing);
+                let output = function.output.clone().map(|output| *output.typing);
 
                 let analyzed = Function::new(
                     Str::from(function.target.target().unwrap().format(Stencil::default())),
@@ -134,6 +134,6 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
             }
         };
 
-        Ok(Analysis::new(kind, self.span, self.typing.clone()))
+        Ok(Analysis::new(kind, self.span, *self.typing.clone()))
     }
 }

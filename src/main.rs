@@ -18,6 +18,7 @@ use axo::{
 
 #[cfg(feature = "interpreter")]
 use axo::interpreter::{Interpreter, interpret};
+use axo::tracker::Position;
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../base/cast.axo")),
@@ -36,13 +37,47 @@ pub const BASE: &[(&str, &str)] = &[
     ("./base/input.c", include_str!("../base/input.c")),
 ];
 
+macro_rules! inspect_type {
+    ($t:ty) => {
+        println!(
+            "{:.<50} Size: {:>3} bytes | Align: {:>2} bytes",
+            stringify!($t),
+            std::mem::size_of::<$t>(),
+            std::mem::align_of::<$t>()
+        );
+    };
+}
+
+pub fn memory_inspection() {
+    println!("{:-^75}", " TRACKER ");
+    inspect_type!(Location);
+    inspect_type!(Position);
+    inspect_type!(Span);
+
+    println!("\n{:-^75}", " SCANNER ");
+    inspect_type!(axo::data::Float);
+    inspect_type!(axo::data::Integer);
+    inspect_type!(axo::data::Str);
+    inspect_type!(axo::scanner::OperatorKind);
+    inspect_type!(axo::scanner::PunctuationKind);
+    inspect_type!(axo::scanner::TokenKind);
+    inspect_type!(axo::scanner::Token);
+
+    println!("\n{:-^75}", " RESOLVER ");
+    inspect_type!(axo::resolver::TypeKind);
+    inspect_type!(axo::resolver::Type);
+    inspect_type!(axo::resolver::Scope);
+
+    println!("\n{:-^75}", " PARSER (If accessible here) ");
+    inspect_type!(axo::parser::ElementKind);
+    inspect_type!(axo::parser::Element);
+    inspect_type!(axo::parser::SymbolKind);
+    inspect_type!(axo::parser::Symbol);
+}
+
 fn main() {
-    println!("SymbolKind: {}", size_of::<SymbolKind>());
-    println!("ElementKind: {}", size_of::<ElementKind>());
-    println!("Type: {}", size_of::<axo::resolver::Type>());
-    println!("Token: {}", size_of::<Token>());
-    println!("Scope: {}", size_of::<axo::resolver::scope::Scope>());
-    println!("Span: {}", size_of::<Span>());
+    memory_inspection();
+    
     let mut initializer = Initializer::new(Location::Flag);
     let targets = initializer.initialize();
 

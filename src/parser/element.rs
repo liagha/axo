@@ -13,7 +13,7 @@ pub struct Element<'element> {
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
-    pub typing: Type<'element>,
+    pub typing: Box<Type<'element>>,
 }
 
 #[derive(Orbyte)]
@@ -35,7 +35,7 @@ impl<'element> Element<'element> {
             kind,
             span,
             reference: None,
-            typing: Type::from(TypeKind::Unknown),
+            typing: Box::from(Type::from(TypeKind::Unknown)),
         }
     }
 }

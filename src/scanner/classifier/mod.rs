@@ -161,23 +161,13 @@ impl<'a> Scanner<'a> {
     fn whitespace<'source>(
     ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
-            Classifier::persistence(
-                Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
-                1,
-                None,
-            ),
+            Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
-                let inputs = form.collect_inputs();
-                let span = inputs.span().clone();
-                let content = inputs.into_iter().collect::<Str>();
+                let input = form.unwrap_input();
+                let span = input.span().clone();
 
-                let kind = match content.len() {
-                    1 => TokenKind::Punctuation(PunctuationKind::Space),
-                    len => TokenKind::Punctuation(PunctuationKind::Indentation(len)),
-                };
-
-                *form = Form::output(Token::new(kind, span));
+                *form = Form::output(Token::new(TokenKind::Punctuation(PunctuationKind::Space), span));
 
                 Ok(())
             },

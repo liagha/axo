@@ -1,6 +1,6 @@
 use crate::{
     combinator::{Classifier, Form},
-    data::{Float, Str},
+    data::{Float, Integer, Str},
     scanner::{Character, ErrorKind, ScanError, Scanner, Token, TokenKind},
     text::parser,
     tracker::Spanned,
@@ -36,7 +36,7 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<i128>();
+                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
@@ -70,7 +70,7 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<i128>();
+                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
@@ -104,7 +104,7 @@ impl<'a> Scanner<'a> {
                 let form = former.forms.get_mut(classifier.form).unwrap();
                 let inputs = form.collect_inputs();
                 let span = inputs.span().clone();
-                let parser = parser::<i128>();
+                let parser = parser::<Integer>();
                 let number: Str = inputs.into_iter().collect();
 
                 match parser.parse(&number) {
@@ -169,7 +169,7 @@ impl<'a> Scanner<'a> {
                         Err(error) => Err(ScanError::new(ErrorKind::NumberParse(error), span)),
                     }
                 } else {
-                    let parser = parser::<i128>();
+                    let parser = parser::<Integer>();
 
                     match parser.parse(&number) {
                         Ok(number) => {

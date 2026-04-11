@@ -7,7 +7,6 @@ use crate::{
 #[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
 pub enum PunctuationKind {
     Space,
-    Indentation(usize),
     Tab,
     Newline,
     Return,
@@ -111,7 +110,6 @@ impl Display for PunctuationKind {
     fn fmt(&self, f: &mut Formatter) -> format::Result {
         let punctuation = match self {
             PunctuationKind::Space => " ",
-            PunctuationKind::Indentation(size) => &*" ".repeat(size.clone()),
             PunctuationKind::Tab => "\t",
             PunctuationKind::Newline => "\n",
             PunctuationKind::Return => "\r",
