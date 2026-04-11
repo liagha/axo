@@ -104,7 +104,7 @@ impl<'session> Session<'session> {
             .clone();
 
         let identifier = Element::new(
-            ElementKind::Literal(Token::new(TokenKind::Identifier(key), Span::void())),
+            ElementKind::literal(Token::new(TokenKind::identifier(key), Span::void())),
             Span::void(),
         );
 
@@ -114,7 +114,7 @@ impl<'session> Session<'session> {
         if let SymbolKind::Binding(binding) = result.kind {
             if let Some(value) = binding.value {
                 if let ElementKind::Literal(literal) = value.kind {
-                    return Some(literal);
+                    return Some(*literal);
                 }
             }
         }

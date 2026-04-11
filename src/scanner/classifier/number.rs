@@ -41,7 +41,7 @@ impl<'a> Scanner<'a> {
 
                 match parser.parse(&number) {
                     Ok(number) => {
-                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
@@ -75,7 +75,7 @@ impl<'a> Scanner<'a> {
 
                 match parser.parse(&number) {
                     Ok(number) => {
-                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
@@ -109,7 +109,7 @@ impl<'a> Scanner<'a> {
 
                 match parser.parse(&number) {
                     Ok(number) => {
-                        *form = Form::output(Token::new(TokenKind::Integer(number), span));
+                        *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                         Ok(())
                     }
@@ -159,7 +159,7 @@ impl<'a> Scanner<'a> {
                     match parser.parse(&number) {
                         Ok(number) => {
                             *form = Form::output(Token::new(
-                                TokenKind::Float(Float::from(number)),
+                                TokenKind::float(Float::from(number)),
                                 span,
                             ));
 
@@ -173,7 +173,7 @@ impl<'a> Scanner<'a> {
 
                     match parser.parse(&number) {
                         Ok(number) => {
-                            *form = Form::output(Token::new(TokenKind::Integer(number), span));
+                            *form = Form::output(Token::new(TokenKind::integer(number), span));
 
                             Ok(())
                         }

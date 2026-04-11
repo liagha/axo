@@ -32,60 +32,43 @@ impl Display for Position<'_> {
 impl Debug for Span<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if f.alternate() {
-            if self.start.location != self.end.location {
-                write!(
-                    f,
-                    "{}:{} - {}:{}",
-                    self.start.line, self.start.column, self.end.line, self.end.column
-                )
-            } else if self.start.line == self.end.line && self.start.column == self.end.column {
-                write!(f, "{}:{}", self.start.line, self.start.column)
-            } else if self.start.line == self.end.line {
+            if self.start_line == self.end_line && self.start_column == self.end_column {
+                write!(f, "{}:{}", self.start_line, self.start_column)
+            } else if self.start_line == self.end_line {
                 write!(
                     f,
                     "{}:{}-{}",
-                    self.start.line, self.start.column, self.end.column
+                    self.start_line, self.start_column, self.end_column
                 )
             } else {
                 write!(
                     f,
                     "{}:{}-{}:{}",
-                    self.start.line, self.start.column, self.end.line, self.end.column
+                    self.start_line, self.start_column, self.end_line, self.end_column
                 )
             }
         } else {
-            if self.start.location != self.end.location {
-                write!(
-                    f,
-                    "{}:{}:{} - {}:{}:{}",
-                    self.start.location,
-                    self.start.line,
-                    self.start.column,
-                    self.end.location,
-                    self.end.line,
-                    self.end.column
-                )
-            } else if self.start.line == self.end.line && self.start.column == self.end.column {
+            if self.start_line == self.end_line && self.start_column == self.end_column {
                 write!(
                     f,
                     "{}:{}:{}",
-                    self.start.location, self.start.line, self.start.column
+                    self.location, self.start_line, self.start_column
                 )
-            } else if self.start.line == self.end.line {
+            } else if self.start_line == self.end_line {
                 write!(
                     f,
                     "{}:{}:{}-{}",
-                    self.start.location, self.start.line, self.start.column, self.end.column
+                    self.location, self.start_line, self.start_column, self.end_column
                 )
             } else {
                 write!(
                     f,
                     "{}:{}:{}-{}:{}",
-                    self.start.location,
-                    self.start.line,
-                    self.start.column,
-                    self.end.line,
-                    self.end.column
+                    self.location,
+                    self.start_line,
+                    self.start_column,
+                    self.end_line,
+                    self.end_column
                 )
             }
         }
@@ -94,38 +77,27 @@ impl Debug for Span<'_> {
 
 impl Display for Span<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if self.start.location != self.end.location {
-            write!(
-                f,
-                "{}:{}:{} - {}:{}:{}",
-                self.start.location,
-                self.start.line,
-                self.start.column,
-                self.end.location,
-                self.end.line,
-                self.end.column
-            )
-        } else if self.start.line == self.end.line && self.start.column == self.end.column {
+        if self.start_line == self.end_line && self.start_column == self.end_column {
             write!(
                 f,
                 "{}:{}:{}",
-                self.start.location, self.start.line, self.start.column
+                self.location, self.start_line, self.start_column
             )
-        } else if self.start.line == self.end.line {
+        } else if self.start_line == self.end_line {
             write!(
                 f,
                 "{}:{}:{}-{}",
-                self.start.location, self.start.line, self.start.column, self.end.column
+                self.location, self.start_line, self.start_column, self.end_column
             )
         } else {
             write!(
                 f,
                 "{}:{}:{}-{}:{}",
-                self.start.location,
-                self.start.line,
-                self.start.column,
-                self.end.line,
-                self.end.column
+                self.location,
+                self.start_line,
+                self.start_column,
+                self.end_line,
+                self.end_column
             )
         }
     }

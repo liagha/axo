@@ -52,12 +52,18 @@ impl Scope {
     pub fn fits<'a>(query: &Element<'a>, symbol: &Symbol<'a>) -> bool {
         match (&query.kind, &symbol.kind) {
             (
-                ElementKind::Literal(Token {
+                ElementKind::Literal(token),
+                _,
+            ) => {
+                if let Token {
                     kind: TokenKind::Identifier(_),
                     ..
-                }),
-                _,
-            ) => true,
+                } = **token {
+                    true
+                } else {
+                    false
+                }
+            },
             (ElementKind::Invoke(invoke), SymbolKind::Function(function)) => {
                 invoke.members.len() == function.members.len()
             }

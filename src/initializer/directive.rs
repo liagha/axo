@@ -84,7 +84,7 @@ impl<'a> Initializer<'a> {
                         let identifier = form.collect_inputs()[0].clone();
                         let span = identifier.span();
 
-                        *form = Form::Input(Token::new(TokenKind::Identifier(name.clone()), span));
+                        *form = Form::Input(Token::new(TokenKind::identifier(name.clone()), span));
 
                         Ok(())
                     }),
@@ -97,23 +97,23 @@ impl<'a> Initializer<'a> {
                 let path = forms[1].collect_inputs();
 
                 let target = Element::new(
-                    ElementKind::Literal(Token::new(
-                        TokenKind::Identifier(name),
+                    ElementKind::literal(Token::new(
+                        TokenKind::identifier(name),
                         identifier.span().clone(),
                     )),
                     identifier.span(),
                 );
 
                 let value = Element::new(
-                    ElementKind::Literal(Token::new(
-                        TokenKind::Identifier(Str::from(Self::path_string(path.clone()))),
+                    ElementKind::literal(Token::new(
+                        TokenKind::identifier(Str::from(Self::path_string(path.clone()))),
                         path.clone().span(),
                     )),
                     path.span(),
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::Binding(Binding::new(
+                    SymbolKind::binding(Binding::new(
                         Box::from(target),
                         Some(Box::new(value)),
                         None,
@@ -162,17 +162,17 @@ impl<'a> Initializer<'a> {
                 let span = identifier.span;
 
                 let target = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(name.clone()), span)),
+                    ElementKind::literal(Token::new(TokenKind::identifier(name.clone()), span)),
                     span,
                 );
 
                 let value = Element::new(
-                    ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from("true")), span)),
+                    ElementKind::literal(Token::new(TokenKind::identifier(Str::from("true")), span)),
                     span,
                 );
 
                 let symbol = Symbol::new(
-                    SymbolKind::Binding(Binding::new(
+                    SymbolKind::binding(Binding::new(
                         Box::from(target),
                         Some(Box::new(value)),
                         None,
@@ -201,7 +201,7 @@ impl<'a> Initializer<'a> {
                 .with_ignore(),
             Classifier::predicate(|token: &Token| {
                 if let TokenKind::Identifier(identifier) = &token.kind {
-                    identifier == "v" || identifier == "verbosity"
+                    **identifier == "v" || **identifier == "verbosity"
                 } else {
                     false
                 }
@@ -212,7 +212,7 @@ impl<'a> Initializer<'a> {
                     let span = identifier.span();
 
                     *form = Form::Input(Token::new(
-                        TokenKind::Identifier(Str::from("Verbosity")),
+                        TokenKind::identifier(Str::from("Verbosity")),
                         span,
                     ));
 
@@ -226,11 +226,11 @@ impl<'a> Initializer<'a> {
                 let value = form.collect_inputs()[1].clone();
                 let span = identifier.span.merge(&value.span);
 
-                let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
-                let value = Element::new(ElementKind::Literal(value.clone()), value.span);
+                let target = Element::new(ElementKind::literal(identifier.clone()), identifier.span);
+                let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
                 let symbol = Symbol::new(
-                    SymbolKind::Binding(Binding::new(
+                    SymbolKind::binding(Binding::new(
                         Box::from(target),
                         Some(Box::new(value)),
                         None,
@@ -287,17 +287,17 @@ impl<'a> Initializer<'a> {
 
             let span = inputs[0].clone().span();
             let value = Token::new(
-                TokenKind::Identifier(Str::from(Self::path_string(inputs))),
+                TokenKind::identifier(Str::from(Self::path_string(inputs))),
                 span,
             );
 
-            let identifier = Token::new(TokenKind::Identifier(Str::from("Input")), span);
+            let identifier = Token::new(TokenKind::identifier(Str::from("Input")), span);
 
-            let target = Element::new(ElementKind::Literal(identifier.clone()), identifier.span);
-            let value = Element::new(ElementKind::Literal(value.clone()), value.span);
+            let target = Element::new(ElementKind::literal(identifier.clone()), identifier.span);
+            let value = Element::new(ElementKind::literal(value.clone()), value.span);
 
             let symbol = Symbol::new(
-                SymbolKind::Binding(Binding::new(
+                SymbolKind::binding(Binding::new(
                     Box::from(target),
                     Some(Box::new(value)),
                     None,

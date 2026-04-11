@@ -31,7 +31,7 @@ impl<'a> Scanner<'a> {
             let span = inputs.span().clone();
             let content = inputs.into_iter().collect::<Str>();
 
-            *form = Form::output(Token::new(TokenKind::String(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
             Ok(())
         })
@@ -57,7 +57,7 @@ impl<'a> Scanner<'a> {
             let span = inputs.span().clone();
             let content = inputs.into_iter().collect::<Str>();
 
-            *form = Form::output(Token::new(TokenKind::String(content), span));
+            *form = Form::output(Token::new(TokenKind::string(content), span));
 
             Ok(())
         })
@@ -79,7 +79,7 @@ impl<'a> Scanner<'a> {
             let character = inputs[1];
 
             *form = Form::output(Token::new(
-                TokenKind::Character(character.value),
+                TokenKind::character(character.value),
                 character.span,
             ));
 
@@ -107,7 +107,7 @@ impl<'a> Scanner<'a> {
                 let token = match content.unwrap_str() {
                     "true" => TokenKind::Boolean(true),
                     "false" => TokenKind::Boolean(false),
-                    _ => TokenKind::Identifier(content),
+                    _ => TokenKind::identifier(content),
                 };
 
                 *form = Form::output(Token::new(token, span));
@@ -215,7 +215,7 @@ impl<'a> Scanner<'a> {
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(TokenKind::Comment(content), span));
+                *form = Form::output(Token::new(TokenKind::comment(content), span));
 
                 Ok(())
             },

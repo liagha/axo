@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
                 if let Some(token) = suffix.get_input() {
                     let span = Span::merge(&unary.span(), &token.span());
                     unary =
-                        Element::new(ElementKind::Unary(Unary::new(token, Box::new(unary))), span);
+                        Element::new(ElementKind::unary(Unary::new(token, Box::new(unary))), span);
                 } else if let Some(element) = suffix.get_output() {
                     let span = Span::merge(&unary.span(), &element.span());
                     unary = Self::apply_suffix(unary, element, span);
@@ -252,12 +252,10 @@ impl<'a> Parser<'a> {
                 current = new_current;
             }
 
-            let start_pos = left.span().start;
-            let end_pos = right.span().end;
-            let span = Span::new(start_pos, end_pos);
+            let span = left.span().merge(&right.span());
 
             left = Element::new(
-                ElementKind::Binary(Binary::new(Box::new(left), op_token, Box::new(right))),
+                ElementKind::binary(Binary::new(Box::new(left), op_token, Box::new(right))),
                 span,
             );
         }

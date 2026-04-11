@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
             let sequence = form.as_forms();
             let keyword = sequence[0].unwrap_input();
 
-            let kind = if let TokenKind::Identifier(identifier) = keyword.kind {
+            let kind = if let TokenKind::Identifier(identifier) = &keyword.kind {
                 match identifier.as_str().unwrap() {
                     "static" => BindingKind::Static,
                     "const" => BindingKind::Constant,
@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
                                 let merged_span =
                                     Span::merge(&assigned.right.span(), &binary.right.span());
                                 let merged_value = Element::new(
-                                    ElementKind::Binary(Binary::new(
+                                    ElementKind::binary(Binary::new(
                                         assigned.right.clone(),
                                         binary.operator.clone(),
                                         binary.right.clone(),
@@ -144,7 +144,7 @@ impl<'a> Parser<'a> {
 
             *form = Form::output(Element::new(
                 ElementKind::Symbolize(Box::from(Symbol::new(
-                    SymbolKind::Binding(Binding::new(Box::new(body), value, annotation, kind)),
+                    SymbolKind::binding(Binding::new(Box::new(body), value, annotation, kind)),
                     span,
                     Visibility::Private,
                 ))),
@@ -204,20 +204,22 @@ impl<'a> Parser<'a> {
                 .into_iter()
                 .filter_map(|element| match element.kind {
                     ElementKind::Symbolize(symbol) => Some(*symbol),
-                    ElementKind::Literal(Token {
-                        kind: TokenKind::Identifier(identifier),
-                        ..
-                    }) => {
-                        match identifier.as_str().unwrap().to_lowercase().as_str() {
-                            "public" => {
-                                visibility = Visibility::Public;
-                            }
+                    ElementKind::Literal(token) => {
+                        if let Token {
+                            kind: TokenKind::Identifier(identifier),
+                            ..
+                        } = *token {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
 
-                            "private" => {
-                                visibility = Visibility::Private;
-                            }
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
 
-                            _ => {}
+                                _ => {}
+                            }
                         }
 
                         None
@@ -230,7 +232,7 @@ impl<'a> Parser<'a> {
 
             *form = Form::output(Element::new(
                 ElementKind::Symbolize(Box::new(Symbol::new(
-                    SymbolKind::Structure(Aggregate::new(Box::new(name), members)),
+                    SymbolKind::structure(Aggregate::new(Box::new(name), members)),
                     span,
                     visibility,
                 ))),
@@ -290,20 +292,22 @@ impl<'a> Parser<'a> {
                 .into_iter()
                 .filter_map(|element| match element.kind {
                     ElementKind::Symbolize(symbol) => Some(*symbol),
-                    ElementKind::Literal(Token {
-                        kind: TokenKind::Identifier(identifier),
-                        ..
-                    }) => {
-                        match identifier.as_str().unwrap().to_lowercase().as_str() {
-                            "public" => {
-                                visibility = Visibility::Public;
-                            }
+                    ElementKind::Literal(token) => {
+                        if let Token {
+                            kind: TokenKind::Identifier(identifier),
+                            ..
+                        } = *token {
+                            match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                "public" => {
+                                    visibility = Visibility::Public;
+                                }
 
-                            "private" => {
-                                visibility = Visibility::Private;
-                            }
+                                "private" => {
+                                    visibility = Visibility::Private;
+                                }
 
-                            _ => {}
+                                _ => {}
+                            }
                         }
 
                         None
@@ -316,7 +320,7 @@ impl<'a> Parser<'a> {
 
             *form = Form::output(Element::new(
                 ElementKind::Symbolize(Box::from(Symbol::new(
-                    SymbolKind::Union(Aggregate::new(Box::new(name), members)),
+                    SymbolKind::union(Aggregate::new(Box::new(name), members)),
                     span,
                     visibility,
                 ))),
@@ -332,7 +336,7 @@ impl<'a> Parser<'a> {
         Classifier::alternative([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("func"))
+                    token.kind == TokenKind::identifier(Str::from("func"))
                 }),
                 Classifier::deferred(Self::literal).with_panic(|former, classifier| {
                     let consumed = classifier
@@ -360,7 +364,7 @@ impl<'a> Parser<'a> {
                         *form = Form::output(Element::new(
                             ElementKind::literal(
                                 Token::new(
-                                    TokenKind::Identifier(Str::from("Variadic")),
+                                    TokenKind::identifier(Str::from("Variadic")),
                                     span
                                 )
                             ),
@@ -441,7 +445,7 @@ impl<'a> Parser<'a> {
 
                 let entry = if let ElementKind::Literal(token) = &name.kind {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == &Str::from("main")
+                        **identifier == Str::from("main")
                     } else {
                         false
                     }
@@ -457,19 +461,22 @@ impl<'a> Parser<'a> {
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(Token {
-                            kind: TokenKind::Identifier(identifier),
-                            ..
-                        }) => {
-                            match identifier.as_str().unwrap() {
-                                "public" => visibility = Visibility::Public,
-                                "private" => visibility = Visibility::Private,
-                                "C" => interface = Interface::C,
-                                "Axo" => interface = Interface::Axo,
-                                "Compiler" => interface = Interface::Compiler,
-                                "Variadic" => variadic = true,
-                                _ => {}
+                        ElementKind::Literal(token) => {
+                            if let Token {
+                                kind: TokenKind::Identifier(identifier),
+                                ..
+                            } = *token {
+                                match identifier.as_str().unwrap() {
+                                    "public" => visibility = Visibility::Public,
+                                    "private" => visibility = Visibility::Private,
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
+                                    "Variadic" => variadic = true,
+                                    _ => {}
+                                }
                             }
+                            
                             None
                         }
                         _ => None,
@@ -484,7 +491,7 @@ impl<'a> Parser<'a> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::Function(Function::new(
+                        SymbolKind::function(Function::new(
                             Box::new(name),
                             members,
                             body,
@@ -502,7 +509,7 @@ impl<'a> Parser<'a> {
             }),
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::Identifier(Str::from("func"))
+                    token.kind == TokenKind::identifier(Str::from("func"))
                 }),
                 Classifier::deferred(Self::literal),
                 Self::group(Classifier::alternative([
@@ -521,7 +528,7 @@ impl<'a> Parser<'a> {
                         *form = Form::output(Element::new(
                             ElementKind::literal(
                                 Token::new(
-                                    TokenKind::Identifier(Str::from("Variadic")),
+                                    TokenKind::identifier(Str::from("Variadic")),
                                     span
                                 )
                             ),
@@ -562,7 +569,7 @@ impl<'a> Parser<'a> {
 
                 let entry = if let ElementKind::Literal(token) = &name.kind {
                     if let TokenKind::Identifier(identifier) = &token.kind {
-                        identifier == &Str::from("main")
+                        **identifier == Str::from("main")
                     } else {
                         false
                     }
@@ -578,19 +585,22 @@ impl<'a> Parser<'a> {
                     .into_iter()
                     .filter_map(|element| match element.kind {
                         ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(Token {
-                            kind: TokenKind::Identifier(identifier),
-                            ..
-                        }) => {
-                            match identifier.as_str().unwrap() {
-                                "public" => visibility = Visibility::Public,
-                                "private" => visibility = Visibility::Private,
-                                "C" => interface = Interface::C,
-                                "Axo" => interface = Interface::Axo,
-                                "Compiler" => interface = Interface::Compiler,
-                                "Variadic" => variadic = true,
-                                _ => {}
+                        ElementKind::Literal(token) => {
+                            if let Token {
+                                kind: TokenKind::Identifier(identifier),
+                                ..
+                            } = *token {
+                                match identifier.as_str().unwrap() {
+                                    "public" => visibility = Visibility::Public,
+                                    "private" => visibility = Visibility::Private,
+                                    "C" => interface = Interface::C,
+                                    "Axo" => interface = Interface::Axo,
+                                    "Compiler" => interface = Interface::Compiler,
+                                    "Variadic" => variadic = true,
+                                    _ => {}
+                                }
                             }
+
                             None
                         }
                         _ => None,
@@ -605,7 +615,7 @@ impl<'a> Parser<'a> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::Function(Function::new(
+                        SymbolKind::function(Function::new(
                             Box::new(name),
                             members,
                             body,

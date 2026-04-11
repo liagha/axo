@@ -3,6 +3,7 @@ use crate::{
     parser::{Symbol, SymbolKind},
     resolver::{scope::Scope, Resolvable, Resolver, Type, TypeKind},
 };
+use crate::data::{Function, Interface};
 
 impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
     fn declare(&mut self, resolver: &mut Resolver<'symbol>) {
@@ -40,6 +41,14 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     resolver.fresh()
                 };
 
+                let body = if let Some(body) = &mut function.body {
+                    body.resolve(resolver);
+
+                    body.typing.clone()
+                } else {
+                    Type::from(TypeKind::Void)
+                };
+
                 let active = resolver.active;
                 resolver.exit();
                 self.scope = resolver.scopes.remove(&active).unwrap();
@@ -47,7 +56,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(
                     self.identity,
-                    TypeKind::Function(head.into(), members, Some(Box::new(output))),
+                    TypeKind::Function(Box::new(Function::new(head.into(), members, body, Some(Box::new(output)), Interface::Axo, false, false))),
                 )
             }
             SymbolKind::Structure(structure) => {
@@ -65,7 +74,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(
                     self.identity,
-                    TypeKind::Structure(Aggregate::new(head.into(), Vec::new())),
+                    TypeKind::Structure(Box::new(Aggregate::new(head.into(), Vec::new()))),
                 )
             }
             SymbolKind::Union(union) => {
@@ -83,7 +92,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(
                     self.identity,
-                    TypeKind::Union(Aggregate::new(head.into(), Vec::new())),
+                    TypeKind::Union(Box::new(Aggregate::new(head.into(), Vec::new()))),
                 )
             }
             SymbolKind::Module(module) => {
@@ -149,7 +158,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(
                     self.identity,
-                    TypeKind::Structure(Aggregate::new(head.into(), members)),
+                    TypeKind::Structure(Box::new(Aggregate::new(head.into(), members))),
                 )
             }
 
@@ -174,7 +183,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 Type::new(
                     self.identity,
-                    TypeKind::Union(Aggregate::new(head.into(), members)),
+                    TypeKind::Union(Box::new(Aggregate::new(head.into(), members))),
                 )
             }
 
@@ -209,10 +218,14 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let expectation = output.clone().unwrap_or_else(|| resolver.fresh());
                 resolver.returns.push(expectation.clone());
 
-                if let Some(body) = &mut function.body {
+                let body = if let Some(body) = &mut function.body {
                     body.resolve(resolver);
                     resolver.unify(self.span, &expectation, &body.typing);
-                }
+                    
+                    body.typing.clone()
+                } else { 
+                    Type::from(TypeKind::Void)
+                };
 
                 resolver.returns.pop();
 
@@ -224,7 +237,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let inferred = Some(Box::new(resolver.reify(&expectation)));
                 Type::new(
                     self.identity,
-                    TypeKind::Function(head.into(), members, inferred),
+                    TypeKind::Function(Box::new(Function::new(head.into(), members, body, inferred, Interface::Axo, false, false))),
                 )
             }
 
@@ -265,7 +278,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let head = structure.target.target().unwrap().into();
                 self.typing = Type::new(
                     self.identity,
-                    TypeKind::Structure(Aggregate::new(head, layout)),
+                    TypeKind::Structure(Box::new(Aggregate::new(head, layout))),
                 );
             }
             SymbolKind::Union(union) => {
@@ -279,7 +292,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     .collect();
                 let head = union.target.target().unwrap().into();
                 self.typing =
-                    Type::new(self.identity, TypeKind::Union(Aggregate::new(head, layout)));
+                    Type::new(self.identity, TypeKind::Union(Box::new(Aggregate::new(head, layout))));
             }
             SymbolKind::Function(function) => {
                 for member in &mut function.members {

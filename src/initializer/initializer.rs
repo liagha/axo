@@ -34,13 +34,20 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
 
     fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
         if let Some(token) = self.get(*index) {
-            *position = token.span.end;
+            *position = Position {
+                line: token.span.end_line,
+                column: token.span.end_column,
+                location: token.span.location,
+            };
+
             *index += 1;
+
             return Some(token.clone());
         }
+
         None
     }
-
+    
     fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }
@@ -226,7 +233,7 @@ fn target_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
     if let SymbolKind::Binding(binding) = &symbol.kind {
         if let ElementKind::Literal(token) = &binding.target.kind {
             if let TokenKind::Identifier(name) = &token.kind {
-                return Some(name.clone());
+                return Some(*name.clone());
             }
         }
     }
@@ -238,7 +245,7 @@ fn value_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
         if let Some(value) = &binding.value {
             if let ElementKind::Literal(token) = &value.kind {
                 if let TokenKind::Identifier(name) = &token.kind {
-                    return Some(name.clone());
+                    return Some(*name.clone());
                 }
             }
         }
@@ -251,7 +258,7 @@ fn rename_target(symbol: &mut Symbol, name: String) {
         if let ElementKind::Literal(token) = &binding.target.kind {
             let span = token.span;
             binding.target = Box::new(Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Identifier(Str::from(name)), span)),
+                ElementKind::literal(Token::new(TokenKind::identifier(Str::from(name)), span)),
                 span,
             ));
         }

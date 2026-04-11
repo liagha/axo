@@ -37,11 +37,13 @@ impl<'typing> Show<'typing> for TypeKind<'typing> {
             TypeKind::Tuple { members } => base
                 .variant("Tuple")
                 .field("members", members.format(config.clone())),
-            TypeKind::Function(name, members, output) => base
-                .variant("Function")
-                .field("name", name.format(config.clone()))
-                .field("members", members.format(config.clone()))
-                .field("output", output.format(config.clone())),
+            TypeKind::Function(function) => {
+                base
+                    .variant("Function")
+                    .field("name", function.target.format(config.clone()))
+                    .field("members", function.members.format(config.clone()))
+                    .field("output", function.output.format(config.clone()))
+            },
             TypeKind::Variable(variable) => {
                 base.variant("Variable").field("id", variable.to_string())
             }

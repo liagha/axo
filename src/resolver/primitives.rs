@@ -68,8 +68,8 @@ impl<'resolver> Resolver<'resolver> {
 
     fn statement(name: &'static str) -> Symbol<'resolver> {
         let target = Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from(name)),
+            ElementKind::literal(Token::new(
+                TokenKind::string(Str::from(name)),
                 Span::void(),
             )),
             Span::void(),
@@ -92,7 +92,7 @@ impl<'resolver> Resolver<'resolver> {
         );
 
         Symbol::new(
-            SymbolKind::Function(Function::new(
+            SymbolKind::function(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Some(Box::new(body)),
@@ -108,16 +108,16 @@ impl<'resolver> Resolver<'resolver> {
 
     fn function(name: &'static str, output: &'static str) -> Symbol<'resolver> {
         let target = Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from(name)),
+            ElementKind::literal(Token::new(
+                TokenKind::identifier(Str::from(name)),
                 Span::void(),
             )),
             Span::void(),
         );
 
         let output_annotation = Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from(output)),
+            ElementKind::literal(Token::new(
+                TokenKind::string(Str::from(output)),
                 Span::void(),
             )),
             Span::void(),
@@ -125,23 +125,23 @@ impl<'resolver> Resolver<'resolver> {
 
         let body = match output {
             "Integer" => Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Integer(0), Span::void())),
+                ElementKind::literal(Token::new(TokenKind::integer(0), Span::void())),
                 Span::void(),
             ),
             "Float" => Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Integer(0), Span::void())),
+                ElementKind::literal(Token::new(TokenKind::integer(0), Span::void())),
                 Span::void(),
             ),
             "Boolean" => Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Boolean(false), Span::void())),
+                ElementKind::literal(Token::new(TokenKind::Boolean(false), Span::void())),
                 Span::void(),
             ),
             "Character" => Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Character('a'), Span::void())),
+                ElementKind::literal(Token::new(TokenKind::character('a'), Span::void())),
                 Span::void(),
             ),
             "String" => Element::new(
-                ElementKind::Literal(Token::new(TokenKind::String(Str::from("")), Span::void())),
+                ElementKind::literal(Token::new(TokenKind::string(Str::from("")), Span::void())),
                 Span::void(),
             ),
             "Unit" => Element::new(
@@ -177,7 +177,7 @@ impl<'resolver> Resolver<'resolver> {
         };
 
         Symbol::new(
-            SymbolKind::Function(Function::new(
+            SymbolKind::function(Function::new(
                 Box::new(target),
                 Vec::new(),
                 Some(Box::new(body)),

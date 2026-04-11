@@ -1,6 +1,6 @@
 use crate::{
     combinator::{
-        formation::former::{outcome::Outcome, Former, Memo},
+        formation::former::{outcome::Outcome, Former, Memo, Record},
         next_identity, Action, Alternative, Deferred, Fail, Form, Formable, Ignore, Literal,
         Multiple, Optional, Panic, Predicate, Repetition, Sequence, Skip, Transform,
     },
@@ -480,15 +480,15 @@ where
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
 
-                let value = peek.clone();
-                let identity = former.consumed.len();
-                former.consumed.push(value.clone());
-                classifier.consumed.push(identity);
+                let identity_c = former.consumed.len();
+                let identity_f = former.forms.len();
 
-                let identity = former.forms.len();
-                former.forms.push(Form::input(value));
-                classifier.form = identity;
-                classifier.stack.push(identity);
+                former.consumed.push(peek.clone());
+                former.forms.push(Form::input(peek.clone()));
+
+                classifier.consumed.push(identity_c);
+                classifier.form = identity_f;
+                classifier.stack.push(identity_f);
             } else {
                 classifier.set_empty();
             }
@@ -518,21 +518,20 @@ where
     ) {
         if let Some(peek) = former.source.get(classifier.marker) {
             if (self.function)(peek) {
-                let value = peek.clone();
                 classifier.set_align();
-
                 former
                     .source
                     .next(&mut classifier.marker, &mut classifier.position);
 
-                let identity = former.consumed.len();
-                former.consumed.push(value.clone());
-                classifier.consumed.push(identity);
+                let identity_c = former.consumed.len();
+                let identity_f = former.forms.len();
 
-                let identity = former.forms.len();
-                former.forms.push(Form::input(value));
-                classifier.form = identity;
-                classifier.stack.push(identity);
+                former.consumed.push(peek.clone());
+                former.forms.push(Form::input(peek.clone()));
+
+                classifier.consumed.push(identity_c);
+                classifier.form = identity_f;
+                classifier.stack.push(identity_f);
             } else {
                 classifier.set_empty();
             }
@@ -567,7 +566,7 @@ where
         let mut stack = take(&mut classifier.stack);
         let base = (consumed.len(), stack.len());
 
-        for pattern in &self.states {
+        for (idx, pattern) in self.states.iter().enumerate() {
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 classifier.marker,
@@ -596,29 +595,35 @@ where
             };
 
             if better {
-                if let Some(champion) = best.take() {
-                    (consumed, stack) = (champion.consumed, champion.stack);
-                    consumed.truncate(base.0);
-                    stack.truncate(base.1);
+                let halted = (self.halt)(&child);
+                let last = idx == self.states.len() - 1;
+
+                if !last && !halted {
+                    if let Some(champion) = best.take() {
+                        (consumed, stack) = (champion.consumed, champion.stack);
+                        consumed.truncate(base.0);
+                        stack.truncate(base.1);
+                    } else {
+                        consumed = child.consumed[..base.0].to_vec();
+                        stack = child.stack[..base.1].to_vec();
+                    }
                 } else {
-                    consumed = child.consumed[..base.0].to_vec();
-                    stack = child.stack[..base.1].to_vec();
+                    consumed = Vec::new();
+                    stack = Vec::new();
                 }
 
                 snapshot = (former.consumed.len(), former.forms.len());
                 best = Some(child);
+
+                if halted {
+                    break;
+                }
             } else {
                 (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
                 consumed.truncate(base.0);
                 stack.truncate(base.1);
                 former.consumed.truncate(snapshot.0);
                 former.forms.truncate(snapshot.1);
-            }
-
-            if let Some(ref champion) = best {
-                if (self.halt)(champion) {
-                    break;
-                }
             }
         }
 
@@ -676,45 +681,43 @@ where
         let identifier = self.factory as usize;
         let memory = (identifier, classifier.marker);
 
-        if let Some(entry) = former.memo.get(&memory) {
-            let offset = (
-                former.forms.len() as isize - entry.form_base as isize,
-                former.consumed.len() as isize - entry.input_base as isize,
-            );
+        if let Some(memo) = former.memo.get(&memory) {
+            if let Some(record) = &memo.record {
+                let offset = (
+                    former.forms.len() as isize - record.form_base as isize,
+                    former.consumed.len() as isize - record.input_base as isize,
+                );
 
-            former.forms.extend(entry.forms.iter().cloned());
-            former.consumed.extend(entry.inputs.iter().cloned());
+                former.forms.extend(record.forms.iter().cloned());
+                former.consumed.extend(record.inputs.iter().cloned());
 
-            classifier.consumed.extend(
-                entry
-                    .consumed
-                    .iter()
-                    .map(|&i| (i as isize + offset.1) as Identity),
-            );
+                classifier.consumed.extend(
+                    record
+                        .consumed
+                        .iter()
+                        .map(|&i| (i as isize + offset.1) as Identity),
+                );
 
-            classifier.stack.extend(entry.stack.iter().map(|&i| {
-                if i == 0 {
+                classifier.stack.extend(record.stack.iter().map(|&i| {
+                    if i == 0 {
+                        0
+                    } else {
+                        (i as isize + offset.0) as Identity
+                    }
+                }));
+
+                classifier.form = if record.form == 0 {
                     0
                 } else {
-                    (i as isize + offset.0) as Identity
-                }
-            }));
+                    (record.form as isize + offset.0) as Identity
+                };
+            } else {
+                classifier.form = 0;
+            }
 
-            (
-                classifier.marker,
-                classifier.position,
-                classifier.outcome,
-                classifier.form,
-            ) = (
-                classifier.marker + entry.advance,
-                entry.position,
-                entry.outcome,
-                if entry.form == 0 {
-                    0
-                } else {
-                    (entry.form as isize + offset.0) as Identity
-                },
-            );
+            classifier.marker = classifier.marker + memo.advance;
+            classifier.position = memo.position;
+            classifier.outcome = memo.outcome;
 
             return;
         }
@@ -752,19 +755,33 @@ where
 
         former.build(&mut child);
 
+        let has_data = !former.forms[origin.2..].is_empty()
+            || !former.consumed[origin.3..].is_empty()
+            || !child.consumed[origin.0..].is_empty()
+            || !child.stack[origin.1..].is_empty()
+            || child.form != 0;
+
+        let record = if has_data {
+            Some(Box::new(Record {
+                forms: former.forms[origin.2..].to_vec().into_boxed_slice(),
+                inputs: former.consumed[origin.3..].to_vec().into_boxed_slice(),
+                consumed: child.consumed[origin.0..].to_vec().into_boxed_slice(),
+                stack: child.stack[origin.1..].to_vec().into_boxed_slice(),
+                form: child.form,
+                form_base: origin.2,
+                input_base: origin.3,
+            }))
+        } else {
+            None
+        };
+
         former.memo.insert(
             memory,
             Memo {
                 outcome: child.outcome,
                 advance: child.marker - origin.4,
                 position: child.position,
-                forms: former.forms[origin.2..].to_vec(),
-                inputs: former.consumed[origin.3..].to_vec(),
-                consumed: child.consumed[origin.0..].to_vec(),
-                stack: child.stack[origin.1..].to_vec(),
-                form: child.form,
-                form_base: origin.2,
-                input_base: origin.3,
+                record,
             },
         );
 

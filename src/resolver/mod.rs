@@ -7,9 +7,9 @@ mod symbol;
 mod traits;
 mod typing;
 
-pub use {resolver::*, scope::*};
+pub use {resolver::*, scope::*, typing::*};
 
-pub(super) use {error::*, typing::*};
+pub(super) use {error::*};
 
 use {
     broccli::Color,
@@ -84,13 +84,13 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             let span = Span::file(Str::from(record.location.to_string())).unwrap_or_else(|_| Span::void());
 
             let head = Element::new(
-                ElementKind::Literal(Token::new(TokenKind::Identifier(stem), span)),
+                ElementKind::literal(Token::new(TokenKind::identifier(stem), span)),
                 span,
             )
                 .into();
 
             let mut symbol = Symbol::new(
-                SymbolKind::Module(Module::new(head)),
+                SymbolKind::module(Module::new(head)),
                 span,
                 Visibility::Public,
             );

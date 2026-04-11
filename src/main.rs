@@ -37,6 +37,12 @@ pub const BASE: &[(&str, &str)] = &[
 ];
 
 fn main() {
+    println!("SymbolKind: {}", size_of::<SymbolKind>());
+    println!("ElementKind: {}", size_of::<ElementKind>());
+    println!("Type: {}", size_of::<axo::resolver::Type>());
+    println!("Token: {}", size_of::<Token>());
+    println!("Scope: {}", size_of::<axo::resolver::scope::Scope>());
+    println!("Span: {}", size_of::<Span>());
     let mut initializer = Initializer::new(Location::Flag);
     let targets = initializer.initialize();
 
@@ -44,7 +50,7 @@ fn main() {
         if let SymbolKind::Binding(binding) = &symbol.kind {
             if let ElementKind::Literal(token) = &binding.target.kind {
                 if let TokenKind::Identifier(name) = &token.kind {
-                    return name == "Bare";
+                    return **name == "Bare";
                 }
             }
         }
@@ -160,9 +166,9 @@ pub fn create<'a>(
     }
 
     let directive = Symbol::new(
-        SymbolKind::Module(Module::new(Box::from(Element::new(
-            ElementKind::Literal(Token::new(
-                TokenKind::Identifier(Str::from("directive")),
+        SymbolKind::module(Module::new(Box::from(Element::new(
+            ElementKind::literal(Token::new(
+                TokenKind::identifier(Str::from("directive")),
                 Span::void(),
             )),
             Span::void(),

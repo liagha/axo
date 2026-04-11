@@ -45,16 +45,18 @@ where
 
         messages.push_str(&self.kind.to_string());
 
-        match self.span.start.location.get_value() {
+        match self.span.location.get_value() {
             Ok(content) => {
                 let lines: Vec<Str> = content.lines();
 
-                let start = self.span.start;
-                let end = self.span.end;
+                let start_line = self.span.start_line;
+                let end_line = self.span.end_line;
+                let start_column = self.span.start_column;
+                let end_column = self.span.end_column;
                 let surround = 3;
 
-                let beginning = start.line.saturating_sub(surround);
-                let finish = end.line.saturating_add(surround);
+                let beginning = start_line.saturating_sub(surround);
+                let finish = end_line.saturating_add(surround);
 
                 let max = (lines.len().digit_count() + 2) as usize;
 
@@ -69,11 +71,11 @@ where
 
                         let highlighter = "^".colorize(Color::Red);
 
-                        if start.line == end.line {
-                            if index == start.line {
-                                if start.column == end.column {
+                        if start_line == end_line {
+                            if index == start_line {
+                                if start_column == end_column {
                                     let highlight =
-                                        format!("{}{}", " ".repeat(start.column - 1), highlighter);
+                                        format!("{}{}", " ".repeat(start_column - 1), highlighter);
                                     details.push_str(&format!(
                                         "{}|  {}\n",
                                         " ".repeat(max),
@@ -82,8 +84,8 @@ where
                                 } else {
                                     let highlight = format!(
                                         "{}{}",
-                                        " ".repeat(start.column - 1),
-                                        highlighter.repeat(end.column - start.column)
+                                        " ".repeat(start_column - 1),
+                                        highlighter.repeat(end_column - start_column)
                                     );
                                     details.push_str(&format!(
                                         "{}|  {}\n",
@@ -95,16 +97,16 @@ where
                         } else {
                             let terminus = line.len();
 
-                            let highlight = if index == start.line {
+                            let highlight = if index == start_line {
                                 format!(
                                     "{}{}",
-                                    " ".repeat(start.column - 1),
-                                    highlighter.repeat(terminus.saturating_sub(start.column) + 1)
+                                    " ".repeat(start_column - 1),
+                                    highlighter.repeat(terminus.saturating_sub(start_column) + 1)
                                 )
-                            } else if start.line < index && index < end.line {
+                            } else if start_line < index && index < end_line {
                                 format!("{}", highlighter.repeat(terminus))
-                            } else if index == end.line {
-                                format!("{}", highlighter.repeat(end.column - 1))
+                            } else if index == end_line {
+                                format!("{}", highlighter.repeat(end_column - 1))
                             } else {
                                 "".to_string()
                             };

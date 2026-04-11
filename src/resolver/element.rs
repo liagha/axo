@@ -5,6 +5,7 @@ use crate::{
     scanner::{OperatorKind, PunctuationKind, Token, TokenKind},
     tracker::Spanned,
 };
+use crate::data::{Function, Interface};
 
 fn assignable(element: &Element) -> bool {
     match &element.kind {
@@ -59,18 +60,17 @@ impl<'element> Resolvable<'element> for Element<'element> {
     }
 
     fn resolve(&mut self, resolver: &mut Resolver<'element>) {
-        if matches!(
-            &self.kind,
-            ElementKind::Literal(Token {
+        if let ElementKind::Literal(token) = &self.kind {
+            if let Token {
                 kind: TokenKind::Identifier(_),
                 ..
-            })
-        ) {
-            match resolver.lookup(self) {
-                Ok(symbol) => {
-                    self.reference = Some(symbol.identity);
+            } = **token {
+                match resolver.lookup(self) {
+                    Ok(symbol) => {
+                        self.reference = Some(symbol.identity);
+                    }
+                    Err(errors) => resolver.errors.extend(errors),
                 }
-                Err(errors) => resolver.errors.extend(errors),
             }
         }
 
@@ -115,7 +115,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             members.push(member.typing.clone());
                         }
 
-                        Type::from(TypeKind::Tuple { members })
+                        Type::from(TypeKind::Tuple { members: Box::new(members) })
                     }
                 }
 
@@ -480,12 +480,16 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
                         TypeKind::Array { member, .. } => *member,
                         TypeKind::Tuple { members } => {
-                            let value = if let ElementKind::Literal(Token {
-                                kind: TokenKind::Integer(literal),
-                                ..
-                            }) = index.members[0].kind
+                            let value = if let ElementKind::Literal(token) = &index.members[0].kind
                             {
-                                usize::try_from(literal).unwrap()
+                                if let Token {
+                                    kind: TokenKind::Integer(literal),
+                                    ..
+                                } = &**token {
+                                    usize::try_from(**literal).unwrap()
+                                } else {
+                                    unreachable!()
+                                }
                             } else {
                                 unreachable!()
                             };
@@ -615,16 +619,31 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         members.extend(invoke.members.iter().map(|member| member.typing.clone()));
 
-                        let mut function = Type::from(TypeKind::Function(
-                            Str::default(),
-                            members,
-                            Some(Box::new(output.clone())),
-                        ));
+                        let mut function = Type::from(
+                            TypeKind::Function(
+                                Box::new(
+                                    Function::new(
+                                        Str::default(),
+                                        members,
+                                        Type::from(TypeKind::Void),
+                                        Some(Box::new(output.clone())),
+                                        Interface::Axo,
+                                        false,
+                                        false
+                                    ) 
+                                )
+                            )
+                        );
                         function = resolver.unify(self.span, &invoke.target.typing, &function);
 
                         match function.kind {
-                            TypeKind::Function(_, _, Some(kind)) => *kind,
-                            TypeKind::Function(_, _, None) => Type::from(TypeKind::Void),
+                            TypeKind::Function(function) => {
+                                if let Some(kind) = function.output {
+                                    *kind
+                                } else {
+                                    Type::from(TypeKind::Void)
+                                }
+                            },
                             _ => output,
                         }
                     }
@@ -660,10 +679,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
 
                                 resolver.exit();
-                                typing = Some(TypeKind::Structure(Aggregate::new(
+                                typing = Some(TypeKind::Structure(Box::from(Aggregate::new(
                                     construct.target.target().unwrap(),
                                     layout.clone(),
-                                )));
+                                ))));
                             }
                             SymbolKind::Union(mut structure) => {
                                 resolver.enter_scope(symbol.scope.clone());
@@ -684,10 +703,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 }
 
                                 resolver.exit();
-                                typing = Some(TypeKind::Union(Aggregate::new(
+                                typing = Some(TypeKind::Union(Box::from(Aggregate::new(
                                     construct.target.target().unwrap(),
                                     layout.clone(),
-                                )));
+                                ))));
                             }
                             _ => {}
                         }
@@ -699,7 +718,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                 Type::new(
                     construct.target.reference.unwrap(),
-                    typing.unwrap_or(TypeKind::Structure(aggregate)),
+                    typing.unwrap_or(TypeKind::Structure(Box::from(aggregate))),
                 )
             }
 

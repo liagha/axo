@@ -103,24 +103,28 @@ pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
     Arc<
         dyn Action<
-                'a,
-                Former<'a, 'source, Source, Input, Output, Failure>,
-                Classifier<'a, 'source, Source, Input, Output, Failure>,
-            > + Send + Sync + 'source,
+            'a,
+            Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        > + Send + Sync + 'source,
     >,
 )>;
+
+pub struct Record<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+    pub forms: Box<[Form<'a, Input, Output, Failure>]>,
+    pub inputs: Box<[Input]>,
+    pub consumed: Box<[Identity]>,
+    pub stack: Box<[Identity]>,
+    pub form: Identity,
+    pub form_base: Offset,
+    pub input_base: Offset,
+}
 
 pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
     pub outcome: Outcome,
     pub advance: Offset,
     pub position: Position<'a>,
-    pub forms: Vec<Form<'a, Input, Output, Failure>>,
-    pub inputs: Vec<Input>,
-    pub consumed: Vec<Identity>,
-    pub stack: Vec<Identity>,
-    pub form: Identity,
-    pub form_base: Offset,
-    pub input_base: Offset,
+    pub record: Option<Box<Record<'a, Input, Output, Failure>>>,
 }
 
 pub struct Former<'a, 'source, Source, Input, Output, Failure>
@@ -138,7 +142,7 @@ where
 }
 
 impl<'a, 'source, Source, Input, Output, Failure>
-    Former<'a, 'source, Source, Input, Output, Failure>
+Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
     Input: Formable<'a>,

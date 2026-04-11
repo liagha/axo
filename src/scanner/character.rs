@@ -83,10 +83,7 @@ impl<'scanner> Scanner<'scanner> {
 
                     Character {
                         value: char,
-                        span: Span {
-                            start,
-                            end: position,
-                        },
+                        span: Span::new(start, position),
                     }
                 }
                 char => {
@@ -95,10 +92,7 @@ impl<'scanner> Scanner<'scanner> {
 
                     Character {
                         value: char,
-                        span: Span {
-                            start,
-                            end: position,
-                        },
+                        span: Span::new(start, position),
                     }
                 }
             };

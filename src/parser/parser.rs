@@ -34,7 +34,11 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 
     fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
         if let Some(token) = self.get(*index) {
-            *position = token.span.end;
+            *position = Position {
+                line: token.span.end_line,
+                column: token.span.end_column,
+                location: token.span.location,
+            };
 
             *index += 1;
 
@@ -43,7 +47,7 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 
         None
     }
-
+    
     fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }

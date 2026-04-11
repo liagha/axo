@@ -202,8 +202,8 @@ impl<'backend> Generator<'backend> {
             }
             TypeKind::Tuple { members } => {
                 let mut typings = Vec::with_capacity(members.len());
-                for member in members {
-                    typings.push(self.to_basic_type(member, span.clone())?);
+                for member in &**members {
+                    typings.push(self.to_basic_type(&member, span.clone())?);
                 }
                 self.context.struct_type(&typings, false).into()
             }
