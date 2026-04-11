@@ -450,7 +450,7 @@ fn build_closure(api: Arc<Api>, address: usize, signature: Signature) -> Dynamic
                     if ret.is_null() {
                         Ok(Value::Text(String::new()))
                     } else {
-                        let text = CStr::from_ptr(ret as *const i8);
+                        let text = CStr::from_ptr(ret as *const u8);
                         Ok(Value::Text(text.to_string_lossy().into_owned()))
                     }
                 }

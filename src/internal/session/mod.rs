@@ -98,6 +98,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
 
         let mut sources = Vec::new();
         let build = session.base().join("build");
+        let mut dirty = false;
 
         for key in &keys {
             let record = session.records.get(key).unwrap();
@@ -116,6 +117,10 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
                     }
 
                     sources.push(path);
+
+                    if record.dirty {
+                        dirty = true;
+                    }
                 }
             }
         }
@@ -126,23 +131,32 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
 
             let extention = std::env::consts::DLL_EXTENSION;
             let library = build.join(format!("lib_axo.{}", extention));
-            let mut command = Command::new("cc");
 
-            command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
-            for source in sources {
-                command.arg(source);
+            if !library.exists() {
+                dirty = true;
             }
 
-            if command.status().unwrap().success() {
-                let string = library.to_str().unwrap();
-                let path = CString::new(string).unwrap();
-                unsafe {
-                    if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
-                        panic!("dlopen failed to load library");
-                    }
+            if dirty {
+                let mut command = Command::new("cc");
+
+                command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
+
+                for source in sources {
+                    command.arg(source);
                 }
-            } else {
-                panic!("failed to compile dynamic library");
+
+
+                if !command.status().unwrap().success() {
+                    panic!("failed to compile dynamic library");
+                }
+            }
+
+            let string = library.to_str().unwrap();
+            let path = CString::new(string).unwrap();
+            unsafe {
+                if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
+                    panic!("dlopen failed to load library");
+                }
             }
         }
     }
