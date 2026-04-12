@@ -112,8 +112,7 @@ impl<'symbol> Analyzable<'symbol> for Symbol<'symbol> {
                 let body = function
                     .body
                     .clone()
-                    .map(|body| body.analyze(resolver).ok().map(Box::new))
-                    .flatten();
+                    .and_then(|body| body.analyze(resolver).ok().map(Box::new));
 
                 let output = function.output.clone().map(|output| output.typing);
 

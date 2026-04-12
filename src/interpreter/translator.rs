@@ -224,10 +224,10 @@ impl<'error> Interpreter<'error> {
         for (name, entity) in &self.entities {
             match entity {
                 Entity::Structure { identity, .. } | Entity::Union { identity, .. }
-                    if *identity == current.identity =>
-                {
-                    return Some(entity);
-                }
+                if *identity == current.identity =>
+                    {
+                        return Some(entity);
+                    }
                 _ => {}
             }
         }
@@ -564,12 +564,30 @@ impl<'error> Interpreter<'error> {
                 }
             }
             AnalysisKind::Binding(binding) => {
-                if let (Some(value), AnalysisKind::Usage(target)) = (binding.value, binding.target.kind) {
-                    if !self.alias(target, &value) {
+                if let AnalysisKind::Usage(target) = binding.target.kind {
+                    let mut init = false;
+
+                    if let Some(value) = binding.value {
+                        if self.alias(target, &value) {
+                            return;
+                        }
+
                         self.walk(*value);
-                        let address = self.memory_top;
-                        self.memory_top += 1;
-                        self.insert_entity(target, Entity::Variable { address, typing: binding.annotation });
+                        init = true;
+                    }
+
+                    let address = self.memory_top;
+                    self.memory_top += 1;
+
+                    self.insert_entity(
+                        target,
+                        Entity::Variable {
+                            address,
+                            typing: binding.annotation,
+                        },
+                    );
+
+                    if init {
                         self.emit(Opcode::Store(address), span);
                     }
                 }

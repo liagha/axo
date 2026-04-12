@@ -10,9 +10,10 @@ use crate::{
 pub enum ErrorKind<'error> {
     Mismatch(Type<'error>, Type<'error>),
     EmptyIndex,
-    IndexOutOfBounds(usize, usize),
-    UnIndexable,
-    InvalidOperation(Token<'error>),
+    IndexBounds(usize, usize),
+    Unindexable,
+    InvalidUnary(Token<'error>, Type<'error>),
+    InvalidBinary(Token<'error>, Type<'error>, Type<'error>),
     InvalidAnnotation(Element<'error>),
     UndefinedSymbol {
         query: Str<'error>,
@@ -29,7 +30,7 @@ pub enum ErrorKind<'error> {
         target: Str<'error>,
         member: Str<'error>,
     },
-    ExcessiveUnionMembers {
+    ExcessiveMembers {
         target: Str<'error>,
         members: Vec<Str<'error>>,
     },
@@ -44,69 +45,64 @@ impl<'error> Display for ErrorKind<'error> {
                 left.format(Stencil::default()),
                 right.format(Stencil::default())
             )
-            .into(),
-            ErrorKind::EmptyIndex => {
-                write!(f, "the index was empty.")
+                .into(),
+            ErrorKind::EmptyIndex => write!(f, "empty index.").into(),
+            ErrorKind::IndexBounds(index, len) => {
+                write!(f, "index `{}` out of bounds for length `{}`.", index, len).into()
             }
-            ErrorKind::IndexOutOfBounds(index, len) => {
-                write!(f, "index `{}` out of bounds of `{}`.", index, len).into()
-            }
-            ErrorKind::UnIndexable => {
-                write!(f, "unindexable indexing target.")
-            }
-            ErrorKind::InvalidOperation(token) => write!(
+            ErrorKind::Unindexable => write!(f, "target is not indexable.").into(),
+            ErrorKind::InvalidUnary(operator, operand) => write!(
                 f,
-                "invalid operation for operand types: `{}`.",
-                token.format(Stencil::default())
+                "cannot apply `{}` to `{}`.",
+                operator.format(Stencil::default()),
+                operand.format(Stencil::default())
             )
-            .into(),
+                .into(),
+            ErrorKind::InvalidBinary(operator, left, right) => write!(
+                f,
+                "cannot apply `{}` to `{}` and `{}`.",
+                operator.format(Stencil::default()),
+                left.format(Stencil::default()),
+                right.format(Stencil::default())
+            )
+                .into(),
             ErrorKind::InvalidAnnotation(element) => write!(
                 f,
-                "invalid type annotation: `{}`.",
+                "invalid type annotation `{}`.",
                 element.format(Stencil::default())
             )
-            .into(),
+                .into(),
             ErrorKind::UndefinedSymbol { query } => {
-                write!(
-                    f,
-                    "undefined symbol: `{}`.",
-                    query.format(Stencil::default())
-                )
+                write!(f, "undefined symbol `{}`.", query.format(Stencil::default())).into()
             }
-
-            ErrorKind::MissingMember { target, member } => {
-                write!(
-                    f,
-                    "the member `{}` is missing from `{}`.",
-                    member.format(Stencil::default()),
-                    target.format(Stencil::default())
-                )
-            }
-
-            ErrorKind::UndefinedMember { target, member } => {
-                write!(
-                    f,
-                    "the member `{}` doesn't exist in `{}`.",
-                    member.format(Stencil::default()),
-                    target.format(Stencil::default())
-                )
-            }
-
-            ErrorKind::DefinedMember { target, member } => {
-                write!(
-                    f,
-                    "the member `{}` is already defined in `{}`.",
-                    member.format(Stencil::default()),
-                    target.format(Stencil::default())
-                )
-            }
-            ErrorKind::ExcessiveUnionMembers { target, members } => write!(
+            ErrorKind::MissingMember { target, member } => write!(
                 f,
-                "union `{}` can only have one member initialized, but {} were provided.",
+                "member `{}` missing from `{}`.",
+                member.format(Stencil::default()),
+                target.format(Stencil::default())
+            )
+                .into(),
+            ErrorKind::UndefinedMember { target, member } => write!(
+                f,
+                "member `{}` undefined in `{}`.",
+                member.format(Stencil::default()),
+                target.format(Stencil::default())
+            )
+                .into(),
+            ErrorKind::DefinedMember { target, member } => write!(
+                f,
+                "member `{}` already defined in `{}`.",
+                member.format(Stencil::default()),
+                target.format(Stencil::default())
+            )
+                .into(),
+            ErrorKind::ExcessiveMembers { target, members } => write!(
+                f,
+                "union `{}` requires 1 initialized member but {} were provided.",
                 target.format(Stencil::default()),
                 members.len()
             )
-            .into(),
+                .into(),
         }
     }
 }

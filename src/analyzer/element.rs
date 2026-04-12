@@ -19,7 +19,11 @@ fn mutate<'element>(
             Ok(AnalysisKind::Store(Box::new(target), Box::new(value)))
         }
         _ => Err(AnalyzeError::new(
-            ErrorKind::InvalidOperation(operator.clone()),
+            ErrorKind::InvalidMutation(
+                operator.clone(),
+                target.typing.clone(),
+                value.typing.clone(),
+            ),
             operator.span,
         )),
     }
@@ -180,7 +184,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                         }
                         _ => {
                             return Err(AnalyzeError::new(
-                                ErrorKind::InvalidOperation(unary.operator.clone()),
+                                ErrorKind::InvalidUnary(
+                                    unary.operator.clone(),
+                                    unary.operand.typing.clone(),
+                                ),
                                 unary.operator.span,
                             ))
                         }
@@ -190,7 +197,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                 }
 
                 Err(AnalyzeError::new(
-                    ErrorKind::InvalidOperation(unary.operator.clone()),
+                    ErrorKind::InvalidUnary(unary.operator.clone(), unary.operand.typing.clone()),
                     unary.operator.span,
                 ))
             }
@@ -200,7 +207,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                     operator
                 } else {
                     return Err(AnalyzeError::new(
-                        ErrorKind::InvalidOperation(binary.operator.clone()),
+                        ErrorKind::InvalidBinary(
+                            binary.operator.clone(),
+                            binary.left.typing.clone(),
+                            binary.right.typing.clone(),
+                        ),
                         binary.operator.span,
                     ));
                 };
@@ -388,8 +399,10 @@ impl<'element> Analyzable<'element> for Element<'element> {
                                             )
                                         } else {
                                             return Err(AnalyzeError::new(
-                                                ErrorKind::InvalidOperation(
+                                                ErrorKind::InvalidBinary(
                                                     binary.operator.clone(),
+                                                    left.typing.clone(),
+                                                    right.typing.clone(),
                                                 ),
                                                 binary.operator.span,
                                             ));
@@ -466,7 +479,11 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             }
                             _ => {
                                 return Err(AnalyzeError::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    ErrorKind::InvalidBinary(
+                                        binary.operator.clone(),
+                                        binary.left.typing.clone(),
+                                        binary.right.typing.clone(),
+                                    ),
                                     binary.operator.span,
                                 ))
                             }

@@ -183,7 +183,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                             if !expect.kind.is_integer() && !expect.kind.is_variable() {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(unary.operator.clone()),
+                                    ErrorKind::InvalidUnary(
+                                        unary.operator.clone(),
+                                        expect.clone(),
+                                    ),
                                     unary.operator.span,
                                 ));
                             }
@@ -203,7 +206,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 )
                             } else {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(unary.operator.clone()),
+                                    ErrorKind::InvalidUnary(
+                                        unary.operator.clone(),
+                                        unary.operand.typing.clone(),
+                                    ),
                                     unary.operator.span,
                                 ));
                                 resolver.fresh()
@@ -224,7 +230,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                         }
                         _ => {
                             resolver.errors.push(Error::new(
-                                ErrorKind::InvalidOperation(unary.operator.clone()),
+                                ErrorKind::InvalidUnary(
+                                    unary.operator.clone(),
+                                    unary.operand.typing.clone(),
+                                ),
                                 unary.operator.span,
                             ));
                             resolver.fresh()
@@ -232,7 +241,10 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     },
                     _ => {
                         resolver.errors.push(Error::new(
-                            ErrorKind::InvalidOperation(unary.operator.clone()),
+                            ErrorKind::InvalidUnary(
+                                unary.operator.clone(),
+                                unary.operand.typing.clone(),
+                            ),
                             unary.operator.span,
                         ));
                         resolver.fresh()
@@ -276,9 +288,15 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 self.reference = binary.right.reference;
                                 binary.right.typing.clone()
                             } else {
+                                binary.right.resolve(resolver);
+
                                 if !left.kind.is_unknown() {
                                     resolver.errors.push(Error::new(
-                                        ErrorKind::InvalidOperation(binary.operator.clone()),
+                                        ErrorKind::InvalidBinary(
+                                            binary.operator.clone(),
+                                            left.clone(),
+                                            binary.right.typing.clone(),
+                                        ),
                                         binary.operator.span,
                                     ));
                                 }
@@ -317,7 +335,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 resolver.unify(binary.right.span, &left, &right)
                             } else {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    ErrorKind::InvalidBinary(
+                                        binary.operator.clone(),
+                                        left.clone(),
+                                        right.clone(),
+                                    ),
                                     binary.right.span,
                                 ));
                                 resolver.fresh()
@@ -338,7 +360,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 resolver.unify(binary.right.span, &left, &right)
                             } else {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    ErrorKind::InvalidBinary(
+                                        binary.operator.clone(),
+                                        left.clone(),
+                                        right.clone(),
+                                    ),
                                     binary.right.span,
                                 ));
                                 resolver.fresh()
@@ -367,7 +393,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 )
                             } else {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    ErrorKind::InvalidBinary(
+                                        binary.operator.clone(),
+                                        left.clone(),
+                                        right.clone(),
+                                    ),
                                     binary.right.span,
                                 ));
                                 resolver.fresh()
@@ -410,7 +440,11 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                             if !valid {
                                 resolver.errors.push(Error::new(
-                                    ErrorKind::InvalidOperation(binary.operator.clone()),
+                                    ErrorKind::InvalidBinary(
+                                        binary.operator.clone(),
+                                        binary.left.typing.clone(),
+                                        binary.right.typing.clone(),
+                                    ),
                                     binary.right.span,
                                 ));
                             }
@@ -421,15 +455,25 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             binary.right.resolve(resolver);
 
                             resolver.errors.push(Error::new(
-                                ErrorKind::InvalidOperation(binary.operator.clone()),
+                                ErrorKind::InvalidBinary(
+                                    binary.operator.clone(),
+                                    binary.left.typing.clone(),
+                                    binary.right.typing.clone(),
+                                ),
                                 binary.operator.span,
                             ));
                             resolver.fresh()
                         }
                     },
                     _ => {
+                        binary.right.resolve(resolver);
+
                         resolver.errors.push(Error::new(
-                            ErrorKind::InvalidOperation(binary.operator.clone()),
+                            ErrorKind::InvalidBinary(
+                                binary.operator.clone(),
+                                binary.left.typing.clone(),
+                                binary.right.typing.clone(),
+                            ),
                             binary.operator.span,
                         ));
                         resolver.fresh()
@@ -439,9 +483,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
             ElementKind::Index(index) => {
                 if index.members.is_empty() {
-                    resolver
-                        .errors
-                        .push(Error::new(ErrorKind::EmptyIndex, self.span));
+                    resolver.errors.push(Error::new(ErrorKind::EmptyIndex, self.span));
 
                     resolver.fresh()
                 } else {
@@ -481,7 +523,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             members[value].clone()
                         } else {
                             resolver.errors.push(Error::new(
-                                ErrorKind::IndexOutOfBounds(value, members.len()),
+                                ErrorKind::IndexBounds(value, members.len()),
                                 index.members.span(),
                             ));
                             resolver.fresh()
@@ -499,9 +541,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
 
                         element
                     } else {
-                        resolver
-                            .errors
-                            .push(Error::new(ErrorKind::UnIndexable, index.target.span));
+                        resolver.errors.push(Error::new(ErrorKind::Unindexable, index.target.span));
                         resolver.fresh()
                     }
                 }
