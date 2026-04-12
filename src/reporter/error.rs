@@ -63,7 +63,7 @@ where
                 details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
 
                 for index in beginning..=finish {
-                    if let Some(line) = lines.get(index) {
+                    if let Some(line) = lines.get(index as usize) {
                         let index = index + 1;
                         let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
 
@@ -75,7 +75,7 @@ where
                             if index == start_line {
                                 if start_column == end_column {
                                     let highlight =
-                                        format!("{}{}", " ".repeat(start_column - 1), highlighter);
+                                        format!("{}{}", " ".repeat((start_column - 1) as usize), highlighter);
                                     details.push_str(&format!(
                                         "{}|  {}\n",
                                         " ".repeat(max),
@@ -84,8 +84,8 @@ where
                                 } else {
                                     let highlight = format!(
                                         "{}{}",
-                                        " ".repeat(start_column - 1),
-                                        highlighter.repeat(end_column - start_column)
+                                        " ".repeat((start_column - 1) as usize),
+                                        highlighter.repeat((end_column - start_column) as usize)
                                     );
                                     details.push_str(&format!(
                                         "{}|  {}\n",
@@ -100,13 +100,13 @@ where
                             let highlight = if index == start_line {
                                 format!(
                                     "{}{}",
-                                    " ".repeat(start_column - 1),
-                                    highlighter.repeat(terminus.saturating_sub(start_column) + 1)
+                                    " ".repeat((start_column - 1) as usize),
+                                    highlighter.repeat(terminus.saturating_sub(start_column as usize) + 1)
                                 )
                             } else if start_line < index && index < end_line {
                                 format!("{}", highlighter.repeat(terminus))
                             } else if index == end_line {
-                                format!("{}", highlighter.repeat(end_column - 1))
+                                format!("{}", highlighter.repeat((end_column - 1) as usize))
                             } else {
                                 "".to_string()
                             };

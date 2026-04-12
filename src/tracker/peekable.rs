@@ -12,7 +12,7 @@ pub struct Peeker<'peeker, Input> {
 pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn length(&self) -> Scale;
     fn remaining(&self) -> Scale {
-        self.length() - self.index()
+        self.length() - self.index() as Scale
     }
 
     fn peek_ahead(&self, n: Offset) -> Option<&Item>;
@@ -42,19 +42,19 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn next(&self, index: &mut Offset, position: &mut Position<'peekable>) -> Option<Item>;
 
     fn get(&self, index: Offset) -> Option<&Item> {
-        self.input().get(index)
+        self.input().get(index as usize)
     }
 
     fn get_mut(&mut self, index: Offset) -> Option<&mut Item> {
-        self.input_mut().get_mut(index)
+        self.input_mut().get_mut(index as usize)
     }
 
     fn insert(&mut self, index: Offset, item: Item) {
-        self.input_mut().insert(index, item);
+        self.input_mut().insert(index as usize, item);
     }
 
     fn remove(&mut self, index: Offset) -> Option<Item> {
-        Some(self.input_mut().remove(index))
+        Some(self.input_mut().remove(index as usize))
     }
 
     fn input(&self) -> &Vec<Item>;

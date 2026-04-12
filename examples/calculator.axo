@@ -6,7 +6,7 @@ struct Token {
 
 struct Lexer {
     const source: String,
-    var position: UInt64
+    var position: UInt6
 }
 
 struct ParseResult {

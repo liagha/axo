@@ -12,7 +12,7 @@ pub use {
 pub type Identity = usize;
 pub type Char = char;
 pub type Boolean = bool;
-pub type Offset = usize;
+pub type Offset = u32;
 pub type Scale = usize;
 pub type Integer = isize;
 

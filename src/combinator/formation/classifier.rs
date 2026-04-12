@@ -737,8 +737,8 @@ where
         let origin = (
             consumed.len(),
             stack.len(),
-            former.forms.len(),
-            former.consumed.len(),
+            former.forms.len() as Offset,
+            former.consumed.len() as Offset,
             classifier.marker,
         );
 
@@ -755,16 +755,16 @@ where
 
         former.build(&mut child);
 
-        let has_data = !former.forms[origin.2..].is_empty()
-            || !former.consumed[origin.3..].is_empty()
+        let has_data = !former.forms[origin.2 as usize..].is_empty()
+            || !former.consumed[origin.3 as usize..].is_empty()
             || !child.consumed[origin.0..].is_empty()
             || !child.stack[origin.1..].is_empty()
             || child.form != 0;
 
         let record = if has_data {
             Some(Box::new(Record {
-                forms: former.forms[origin.2..].to_vec().into_boxed_slice(),
-                inputs: former.consumed[origin.3..].to_vec().into_boxed_slice(),
+                forms: former.forms[origin.2 as usize..].to_vec().into_boxed_slice(),
+                inputs: former.consumed[origin.3 as usize..].to_vec().into_boxed_slice(),
                 consumed: child.consumed[origin.0..].to_vec().into_boxed_slice(),
                 stack: child.stack[origin.1..].to_vec().into_boxed_slice(),
                 form: child.form,
