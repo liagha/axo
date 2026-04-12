@@ -617,7 +617,7 @@ impl<'resolver> Resolver<'resolver> {
     pub fn evaluate(&self, element: &Element<'resolver>) -> Result<Scale, ResolveError<'resolver>> {
         match &element.kind {
             ElementKind::Literal(token) => match &token.kind {
-                TokenKind::Integer(value) => Ok(**value as Scale),
+                TokenKind::Integer(value) => Ok(*value as Scale),
                 _ => Err(ResolveError::new(
                     ErrorKind::InvalidAnnotation(element.clone()),
                     element.span,
@@ -774,7 +774,7 @@ impl<'resolver> Resolver<'resolver> {
             },
 
             ElementKind::Unary(unary) => {
-                if matches!(unary.operator.kind, TokenKind::Operator(OperatorKind::Star)) {
+                if matches!(&unary.operator.kind, TokenKind::Operator(operator) if **operator == OperatorKind::Star) {
                     let item = self.annotation(&unary.operand)?;
                     Ok(Type::new(
                         item.identity,

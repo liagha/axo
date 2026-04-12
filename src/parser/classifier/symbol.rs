@@ -21,7 +21,7 @@ impl<'a> Parser<'a> {
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
-                if let TokenKind::Identifier(id) = &token.kind {
+                if let Some(id) = token.kind.try_unwrap_identifier() {
                     matches!(id.as_str().unwrap(), "static" | "var" | "const" | "meta")
                 } else {
                     false
@@ -38,82 +38,47 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
-            let sequence = form.as_forms();
-            let keyword = sequence[0].unwrap_input();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
+                let keyword = sequence[0].unwrap_input();
 
-            let kind = if let TokenKind::Identifier(identifier) = &keyword.kind {
-                match identifier.as_str().unwrap() {
-                    "static" => BindingKind::Static,
-                    "const" => BindingKind::Constant,
-                    "var" => BindingKind::Variable,
-                    "meta" => BindingKind::Meta,
-                    _ => BindingKind::Constant,
-                }
-            } else {
-                BindingKind::Constant
-            };
+                let kind = if let Some(identifier) = keyword.kind.try_unwrap_identifier() {
+                    match identifier.as_str().unwrap() {
+                        "static" => BindingKind::Static,
+                        "const" => BindingKind::Constant,
+                        "var" => BindingKind::Variable,
+                        "meta" => BindingKind::Meta,
+                        _ => BindingKind::Constant,
+                    }
+                } else {
+                    BindingKind::Constant
+                };
 
-            let mut body = sequence[1].unwrap_output().clone();
-            let span = Span::merge(&keyword.span(), &body.span());
+                let mut body = sequence[1].unwrap_output().clone();
+                let span = Span::merge(&keyword.span(), &body.span());
 
-            let mut value = None;
-            let mut annotation = None;
+                let mut value = None;
+                let mut annotation = None;
 
-            if let ElementKind::Binary(binary) = &body.kind.clone() {
-                match (&*binary.left, &binary.operator, &*binary.right) {
-                    (
-                        Element {
-                            kind: ElementKind::Binary(binary),
-                            ..
-                        },
-                        Token {
-                            kind: TokenKind::Operator(OperatorKind::Equal),
-                            ..
-                        },
-                        right,
-                    ) => {
-                        value = Some(Box::new(right.clone()));
-
-                        if matches!(
-                            binary.operator.kind,
-                            TokenKind::Operator(OperatorKind::Colon)
-                        ) {
-                            body = *binary.left.clone();
-                            annotation = Some(binary.right.clone());
+                if let ElementKind::Binary(binary) = &body.kind.clone() {
+                    if let Some(OperatorKind::Equal) = binary.operator.kind.try_unwrap_operator() {
+                        if let ElementKind::Binary(inner_binary) = &binary.left.kind {
+                            value = Some(Box::new((*binary.right).clone()));
+                            if let Some(OperatorKind::Colon) = inner_binary.operator.kind.try_unwrap_operator() {
+                                body = *inner_binary.left.clone();
+                                annotation = Some(inner_binary.right.clone());
+                            }
+                        } else {
+                            body = (*binary.left).clone();
+                            value = Some(Box::new((*binary.right).clone()));
                         }
-                    }
-
-                    (
-                        left,
-                        Token {
-                            kind: TokenKind::Operator(OperatorKind::Equal),
-                            ..
-                        },
-                        right,
-                    ) => {
-                        body = left.clone();
-                        value = Some(Box::new(right.clone()));
-                    }
-                    (
-                        left,
-                        Token {
-                            kind: TokenKind::Operator(OperatorKind::Colon),
-                            ..
-                        },
-                        right,
-                    ) => {
-                        body = left.clone();
-                        annotation = Some(Box::new(right.clone()));
-                    }
-
-                    _ => {
+                    } else if let Some(OperatorKind::Colon) = binary.operator.kind.try_unwrap_operator() {
+                        body = (*binary.left).clone();
+                        annotation = Some(Box::new((*binary.right).clone()));
+                    } else {
                         if let ElementKind::Binary(assigned) = &binary.left.kind {
-                            if matches!(
-                                assigned.operator.kind,
-                                TokenKind::Operator(OperatorKind::Equal)
-                            ) {
+                            if let Some(OperatorKind::Equal) = assigned.operator.kind.try_unwrap_operator() {
                                 let merged_span =
                                     Span::merge(&assigned.right.span(), &binary.right.span());
                                 let merged_value = Element::new(
@@ -128,10 +93,7 @@ impl<'a> Parser<'a> {
 
                                 body = *assigned.left.clone();
                                 if let ElementKind::Binary(annotation_pair) = &body.kind.clone() {
-                                    if matches!(
-                                        annotation_pair.operator.kind,
-                                        TokenKind::Operator(OperatorKind::Colon)
-                                    ) {
+                                    if let Some(OperatorKind::Colon) = annotation_pair.operator.kind.try_unwrap_operator() {
                                         body = *annotation_pair.left.clone();
                                         annotation = Some(annotation_pair.right.clone());
                                     }
@@ -140,19 +102,18 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-            }
 
-            *form = Form::output(Element::new(
-                ElementKind::Symbolize(Box::from(Symbol::new(
-                    SymbolKind::binding(Binding::new(Box::new(body), value, annotation, kind)),
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
+                        SymbolKind::binding(Binding::new(Box::new(body), value, annotation, kind)),
+                        span,
+                        Visibility::Private,
+                    ))),
                     span,
-                    Visibility::Private,
-                ))),
-                span,
-            ));
+                ));
 
-            Ok(())
-        })
+                Ok(())
+            })
     }
 
     pub fn structure<'source>(
@@ -160,7 +121,7 @@ impl<'a> Parser<'a> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(id) = &token.kind {
+                    if let Some(id) = token.kind.try_unwrap_identifier() {
                         id.as_str() == Some("struct")
                     } else {
                         false
@@ -188,59 +149,56 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
-            let sequence = form.as_forms();
-            let head = sequence[0].as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
+                let head = sequence[0].as_forms();
 
-            let keyword = head[0].unwrap_input();
-            let name = head[1].unwrap_output().clone();
+                let keyword = head[0].unwrap_input();
+                let name = head[1].unwrap_output().clone();
 
-            let body = sequence[1].unwrap_output().clone();
+                let body = sequence[1].unwrap_output().clone();
 
-            let mut visibility = Visibility::Public;
+                let mut visibility = Visibility::Public;
 
-            let members: Vec<_> = Self::get_body(body.clone())
-                .into_iter()
-                .filter_map(|element| match element.kind {
-                    ElementKind::Symbolize(symbol) => Some(*symbol),
-                    ElementKind::Literal(token) => {
-                        if let Token {
-                            kind: TokenKind::Identifier(identifier),
-                            ..
-                        } = *token {
-                            match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                "public" => {
-                                    visibility = Visibility::Public;
+                let members: Vec<_> = Self::get_body(body.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
+                        ElementKind::Literal(token) => {
+                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                    "public" => {
+                                        visibility = Visibility::Public;
+                                    }
+
+                                    "private" => {
+                                        visibility = Visibility::Private;
+                                    }
+
+                                    _ => {}
                                 }
-
-                                "private" => {
-                                    visibility = Visibility::Private;
-                                }
-
-                                _ => {}
                             }
+
+                            None
                         }
+                        _ => None,
+                    })
+                    .collect();
 
-                        None
-                    }
-                    _ => None,
-                })
-                .collect();
+                let span = Span::merge(&keyword.span(), &body.span());
 
-            let span = Span::merge(&keyword.span(), &body.span());
-
-            *form = Form::output(Element::new(
-                ElementKind::Symbolize(Box::new(Symbol::new(
-                    SymbolKind::structure(Aggregate::new(Box::new(name), members)),
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Box::new(Symbol::new(
+                        SymbolKind::structure(Aggregate::new(Box::new(name), members)),
+                        span,
+                        visibility,
+                    ))),
                     span,
-                    visibility,
-                ))),
-                span,
-            ));
+                ));
 
-            Ok(())
-        })
+                Ok(())
+            })
     }
 
     pub fn union<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
@@ -248,7 +206,7 @@ impl<'a> Parser<'a> {
         Classifier::sequence([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    if let TokenKind::Identifier(id) = &token.kind {
+                    if let Some(id) = token.kind.try_unwrap_identifier() {
                         id.as_str() == Some("union")
                     } else {
                         false
@@ -276,59 +234,56 @@ impl<'a> Parser<'a> {
                 ParseError::new(ErrorKind::ExpectedBody, span)
             }),
         ])
-        .with_transform(|former, classifier| {
-            let form = former.forms.get_mut(classifier.form).unwrap();
-            let sequence = form.as_forms();
-            let head = sequence[0].as_forms();
+            .with_transform(|former, classifier| {
+                let form = former.forms.get_mut(classifier.form).unwrap();
+                let sequence = form.as_forms();
+                let head = sequence[0].as_forms();
 
-            let keyword = head[0].unwrap_input();
-            let name = head[1].unwrap_output().clone();
+                let keyword = head[0].unwrap_input();
+                let name = head[1].unwrap_output().clone();
 
-            let body = sequence[1].unwrap_output().clone();
+                let body = sequence[1].unwrap_output().clone();
 
-            let mut visibility = Visibility::Public;
+                let mut visibility = Visibility::Public;
 
-            let members: Vec<_> = Self::get_body(body.clone())
-                .into_iter()
-                .filter_map(|element| match element.kind {
-                    ElementKind::Symbolize(symbol) => Some(*symbol),
-                    ElementKind::Literal(token) => {
-                        if let Token {
-                            kind: TokenKind::Identifier(identifier),
-                            ..
-                        } = *token {
-                            match identifier.as_str().unwrap().to_lowercase().as_str() {
-                                "public" => {
-                                    visibility = Visibility::Public;
+                let members: Vec<_> = Self::get_body(body.clone())
+                    .into_iter()
+                    .filter_map(|element| match element.kind {
+                        ElementKind::Symbolize(symbol) => Some(*symbol),
+                        ElementKind::Literal(token) => {
+                            if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                match identifier.as_str().unwrap().to_lowercase().as_str() {
+                                    "public" => {
+                                        visibility = Visibility::Public;
+                                    }
+
+                                    "private" => {
+                                        visibility = Visibility::Private;
+                                    }
+
+                                    _ => {}
                                 }
-
-                                "private" => {
-                                    visibility = Visibility::Private;
-                                }
-
-                                _ => {}
                             }
+
+                            None
                         }
+                        _ => None,
+                    })
+                    .collect();
 
-                        None
-                    }
-                    _ => None,
-                })
-                .collect();
+                let span = Span::merge(&keyword.span(), &body.span());
 
-            let span = Span::merge(&keyword.span(), &body.span());
-
-            *form = Form::output(Element::new(
-                ElementKind::Symbolize(Box::from(Symbol::new(
-                    SymbolKind::union(Aggregate::new(Box::new(name), members)),
+                *form = Form::output(Element::new(
+                    ElementKind::Symbolize(Box::from(Symbol::new(
+                        SymbolKind::union(Aggregate::new(Box::new(name), members)),
+                        span,
+                        visibility,
+                    ))),
                     span,
-                    visibility,
-                ))),
-                span,
-            ));
+                ));
 
-            Ok(())
-        })
+                Ok(())
+            })
     }
 
     pub fn function<'source>(
@@ -336,7 +291,11 @@ impl<'a> Parser<'a> {
         Classifier::alternative([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::identifier(Str::from("func"))
+                    if let Some(id) = token.kind.try_unwrap_identifier() {
+                        *id == Str::from("func")
+                    } else {
+                        false
+                    }
                 }),
                 Classifier::deferred(Self::literal).with_panic(|former, classifier| {
                     let consumed = classifier
@@ -351,16 +310,15 @@ impl<'a> Parser<'a> {
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
-                        matches!(
-                            token.kind, 
-                            TokenKind::Operator(
-                                OperatorKind::Composite(ref operator)
-                            ) if operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
-                        )
+                        if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
+                            operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        } else {
+                            false
+                        }
                     }).with_transform(|former, classifier| {
                         let form = former.forms.get_mut(classifier.form).unwrap();
                         let span = form.unwrap_input().span();
-                        
+
                         *form = Form::output(Element::new(
                             ElementKind::literal(
                                 Token::new(
@@ -370,45 +328,20 @@ impl<'a> Parser<'a> {
                             ),
                             span,
                         ));
-                        
-                        Ok(())
-                    }),
-                    Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Identifier(_))
-                    })
-                    .with_transform(|former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
-                        let input = form.unwrap_input();
-                        *form = Form::output(Element::new(
-                            ElementKind::literal(input.clone()),
-                            input.span,
-                        ));
-                        Ok(())
-                    }),
-                ]))
-                .with_panic(|former, classifier| {
-                    let stack = classifier
-                        .stack
-                        .iter()
-                        .map(|index| former.forms.get(*index).unwrap().clone())
-                        .collect::<Vec<_>>();
-                    let span = stack.span();
 
-                    ParseError::new(ErrorKind::ExpectedHead, span)
-                }),
-                Classifier::sequence([
-                    Classifier::predicate(|token: &Token| {
-                        if let TokenKind::Operator(operator) = &token.kind {
-                            matches!(operator, OperatorKind::Colon)
-                        } else {
-                            false
-                        }
-                    })
-                    .with_ignore(),
-                    Classifier::alternative([
-                        Classifier::deferred(Self::prefixed),
-                        Classifier::deferred(Self::primary),
-                    ])
+                        Ok(())
+                    }),
+                    Classifier::predicate(|token: &Token| token.kind.is_identifier())
+                        .with_transform(|former, classifier| {
+                            let form = former.forms.get_mut(classifier.form).unwrap();
+                            let input = form.unwrap_input();
+                            *form = Form::output(Element::new(
+                                ElementKind::literal(input.clone()),
+                                input.span,
+                            ));
+                            Ok(())
+                        }),
+                ]))
                     .with_panic(|former, classifier| {
                         let stack = classifier
                             .stack
@@ -417,110 +350,133 @@ impl<'a> Parser<'a> {
                             .collect::<Vec<_>>();
                         let span = stack.span();
 
-                        ParseError::new(ErrorKind::ExpectedAnnotation, span)
+                        ParseError::new(ErrorKind::ExpectedHead, span)
                     }),
-                ])
-                .with_transform(|former, classifier| {
-                    let form = former.forms.get_mut(classifier.form).unwrap();
-                    let output = form.as_forms();
-                    *form = output[0].clone();
+                Classifier::sequence([
+                    Classifier::predicate(|token: &Token| {
+                        if let Some(OperatorKind::Colon) = token.kind.try_unwrap_operator() {
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                        .with_ignore(),
+                    Classifier::alternative([
+                        Classifier::deferred(Self::prefixed),
+                        Classifier::deferred(Self::primary),
+                    ])
+                        .with_panic(|former, classifier| {
+                            let stack = classifier
+                                .stack
+                                .iter()
+                                .map(|index| former.forms.get(*index).unwrap().clone())
+                                .collect::<Vec<_>>();
+                            let span = stack.span();
 
-                    Ok(())
-                }),
+                            ParseError::new(ErrorKind::ExpectedAnnotation, span)
+                        }),
+                ])
+                    .with_transform(|former, classifier| {
+                        let form = former.forms.get_mut(classifier.form).unwrap();
+                        let output = form.as_forms();
+                        *form = output[0].clone();
+
+                        Ok(())
+                    }),
                 Classifier::deferred(Self::expression).into_optional(),
             ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input().clone();
-                let name = sequence[1].unwrap_output().clone();
-                let invoke = sequence[2].unwrap_output().clone();
-                let output = sequence[3].unwrap_output().clone();
+                .with_transform(|former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let sequence = form.as_forms();
+                    let keyword = sequence[0].unwrap_input().clone();
+                    let name = sequence[1].unwrap_output().clone();
+                    let invoke = sequence[2].unwrap_output().clone();
+                    let output = sequence[3].unwrap_output().clone();
 
-                let body = if sequence.len() > 4 {
-                    Some(Box::new(sequence[4].unwrap_output().clone()))
-                } else {
-                    None
-                };
+                    let body = if sequence.len() > 4 {
+                        Some(Box::new(sequence[4].unwrap_output().clone()))
+                    } else {
+                        None
+                    };
 
-                let entry = if let ElementKind::Literal(token) = &name.kind {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        **identifier == Str::from("main")
+                    let entry = if let ElementKind::Literal(token) = &name.kind {
+                        if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                            *identifier == Str::from("main")
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    let mut visibility = Visibility::Private;
+                    let mut interface = Interface::Axo;
+                    let mut variadic = false;
+
+                    let members: Vec<_> = Self::get_body(invoke.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(*symbol),
+                            ElementKind::Literal(token) => {
+                                if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                    match identifier.as_str().unwrap() {
+                                        "public" => visibility = Visibility::Public,
+                                        "private" => visibility = Visibility::Private,
+                                        "C" => interface = Interface::C,
+                                        "Axo" => interface = Interface::Axo,
+                                        "Compiler" => interface = Interface::Compiler,
+                                        "Variadic" => variadic = true,
+                                        _ => {}
+                                    }
+                                }
+
+                                None
+                            }
+                            _ => None,
+                        })
+                        .collect();
+
+                    let span = if let Some(ref b) = body {
+                        Span::merge(&keyword.span(), &b.span())
+                    } else {
+                        Span::merge(&keyword.span(), &output.span())
+                    };
+
+                    *form = Form::output(Element::new(
+                        ElementKind::Symbolize(Box::from(Symbol::new(
+                            SymbolKind::function(Function::new(
+                                Box::new(name),
+                                members,
+                                body,
+                                Some(Box::new(output)),
+                                interface,
+                                entry,
+                                variadic,
+                            )),
+                            span,
+                            visibility,
+                        ))),
+                        span,
+                    ));
+                    Ok(())
+                }),
+            Classifier::sequence([
+                Classifier::predicate(|token: &Token| {
+                    if let Some(id) = token.kind.try_unwrap_identifier() {
+                        *id == Str::from("func")
                     } else {
                         false
                     }
-                } else {
-                    false
-                };
-
-                let mut visibility = Visibility::Private;
-                let mut interface = Interface::Axo;
-                let mut variadic = false;
-
-                let members: Vec<_> = Self::get_body(invoke.clone())
-                    .into_iter()
-                    .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(token) => {
-                            if let Token {
-                                kind: TokenKind::Identifier(identifier),
-                                ..
-                            } = *token {
-                                match identifier.as_str().unwrap() {
-                                    "public" => visibility = Visibility::Public,
-                                    "private" => visibility = Visibility::Private,
-                                    "C" => interface = Interface::C,
-                                    "Axo" => interface = Interface::Axo,
-                                    "Compiler" => interface = Interface::Compiler,
-                                    "Variadic" => variadic = true,
-                                    _ => {}
-                                }
-                            }
-                            
-                            None
-                        }
-                        _ => None,
-                    })
-                    .collect();
-
-                let span = if let Some(ref b) = body {
-                    Span::merge(&keyword.span(), &b.span())
-                } else {
-                    Span::merge(&keyword.span(), &output.span())
-                };
-
-                *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::function(Function::new(
-                            Box::new(name),
-                            members,
-                            body,
-                            Some(Box::new(output)),
-                            interface,
-                            entry,
-                            variadic,
-                        )),
-                        span,
-                        visibility,
-                    ))),
-                    span,
-                ));
-                Ok(())
-            }),
-            Classifier::sequence([
-                Classifier::predicate(|token: &Token| {
-                    token.kind == TokenKind::identifier(Str::from("func"))
                 }),
                 Classifier::deferred(Self::literal),
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
-                        matches!(
-                            token.kind, 
-                            TokenKind::Operator(
-                                OperatorKind::Composite(ref operator)
-                            ) if operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
-                        )
+                        if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
+                            operator.as_slice() == [OperatorKind::Dot, OperatorKind::Dot, OperatorKind::Dot]
+                        } else {
+                            false
+                        }
                     }).with_transform(|former, classifier| {
                         let form = former.forms.get_mut(classifier.form).unwrap();
                         let span = form.unwrap_input().span();
@@ -537,100 +493,95 @@ impl<'a> Parser<'a> {
 
                         Ok(())
                     }),
-                    Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Identifier(_))
-                    })
-                    .with_transform(|former, classifier| {
-                        let form = former.forms.get_mut(classifier.form).unwrap();
-                        let input = form.unwrap_input();
+                    Classifier::predicate(|token: &Token| token.kind.is_identifier())
+                        .with_transform(|former, classifier| {
+                            let form = former.forms.get_mut(classifier.form).unwrap();
+                            let input = form.unwrap_input();
 
-                        *form = Form::output(Element::new(
-                            ElementKind::literal(input.clone()),
-                            input.span,
-                        ));
+                            *form = Form::output(Element::new(
+                                ElementKind::literal(input.clone()),
+                                input.span,
+                            ));
 
-                        Ok(())
-                    }),
+                            Ok(())
+                        }),
                 ])),
                 Classifier::deferred(Self::expression).into_optional(),
             ])
-            .with_transform(|former, classifier| {
-                let form = former.forms.get_mut(classifier.form).unwrap();
-                let sequence = form.as_forms();
-                let keyword = sequence[0].unwrap_input().clone();
-                let name = sequence[1].unwrap_output().clone();
-                let invoke = sequence[2].unwrap_output().clone();
+                .with_transform(|former, classifier| {
+                    let form = former.forms.get_mut(classifier.form).unwrap();
+                    let sequence = form.as_forms();
+                    let keyword = sequence[0].unwrap_input().clone();
+                    let name = sequence[1].unwrap_output().clone();
+                    let invoke = sequence[2].unwrap_output().clone();
 
-                let body = if sequence.len() > 3 {
-                    Some(Box::new(sequence[3].unwrap_output().clone()))
-                } else {
-                    None
-                };
+                    let body = if sequence.len() > 3 {
+                        Some(Box::new(sequence[3].unwrap_output().clone()))
+                    } else {
+                        None
+                    };
 
-                let entry = if let ElementKind::Literal(token) = &name.kind {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
-                        **identifier == Str::from("main")
+                    let entry = if let ElementKind::Literal(token) = &name.kind {
+                        if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                            *identifier == Str::from("main")
+                        } else {
+                            false
+                        }
                     } else {
                         false
-                    }
-                } else {
-                    false
-                };
+                    };
 
-                let mut visibility = Visibility::Private;
-                let mut interface = Interface::Axo;
-                let mut variadic = false;
+                    let mut visibility = Visibility::Private;
+                    let mut interface = Interface::Axo;
+                    let mut variadic = false;
 
-                let members: Vec<_> = Self::get_body(invoke.clone())
-                    .into_iter()
-                    .filter_map(|element| match element.kind {
-                        ElementKind::Symbolize(symbol) => Some(*symbol),
-                        ElementKind::Literal(token) => {
-                            if let Token {
-                                kind: TokenKind::Identifier(identifier),
-                                ..
-                            } = *token {
-                                match identifier.as_str().unwrap() {
-                                    "public" => visibility = Visibility::Public,
-                                    "private" => visibility = Visibility::Private,
-                                    "C" => interface = Interface::C,
-                                    "Axo" => interface = Interface::Axo,
-                                    "Compiler" => interface = Interface::Compiler,
-                                    "Variadic" => variadic = true,
-                                    _ => {}
+                    let members: Vec<_> = Self::get_body(invoke.clone())
+                        .into_iter()
+                        .filter_map(|element| match element.kind {
+                            ElementKind::Symbolize(symbol) => Some(*symbol),
+                            ElementKind::Literal(token) => {
+                                if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                                    match identifier.as_str().unwrap() {
+                                        "public" => visibility = Visibility::Public,
+                                        "private" => visibility = Visibility::Private,
+                                        "C" => interface = Interface::C,
+                                        "Axo" => interface = Interface::Axo,
+                                        "Compiler" => interface = Interface::Compiler,
+                                        "Variadic" => variadic = true,
+                                        _ => {}
+                                    }
                                 }
+
+                                None
                             }
+                            _ => None,
+                        })
+                        .collect();
 
-                            None
-                        }
-                        _ => None,
-                    })
-                    .collect();
+                    let span = if let Some(ref b) = body {
+                        Span::merge(&keyword.span(), &b.span())
+                    } else {
+                        Span::merge(&keyword.span(), &invoke.span())
+                    };
 
-                let span = if let Some(ref b) = body {
-                    Span::merge(&keyword.span(), &b.span())
-                } else {
-                    Span::merge(&keyword.span(), &invoke.span())
-                };
-
-                *form = Form::output(Element::new(
-                    ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::function(Function::new(
-                            Box::new(name),
-                            members,
-                            body,
-                            None::<Box<Element<'a>>>,
-                            interface,
-                            entry,
-                            variadic,
-                        )),
+                    *form = Form::output(Element::new(
+                        ElementKind::Symbolize(Box::from(Symbol::new(
+                            SymbolKind::function(Function::new(
+                                Box::new(name),
+                                members,
+                                body,
+                                None::<Box<Element<'a>>>,
+                                interface,
+                                entry,
+                                variadic,
+                            )),
+                            span,
+                            visibility,
+                        ))),
                         span,
-                        visibility,
-                    ))),
-                    span,
-                ));
-                Ok(())
-            }),
+                    ));
+                    Ok(())
+                }),
         ])
     }
 }

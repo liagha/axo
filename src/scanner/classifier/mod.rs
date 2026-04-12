@@ -131,7 +131,7 @@ impl<'a> Scanner<'a> {
                 let span = inputs.span().clone();
                 let content = inputs.into_iter().collect::<Str>();
 
-                *form = Form::output(Token::new(TokenKind::Operator(content.to_operator()), span));
+                *form = Form::output(Token::new(TokenKind::operator(content.to_operator()), span));
 
                 Ok(())
             },

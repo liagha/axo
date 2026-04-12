@@ -11,15 +11,20 @@ impl<'a> Initializer<'a> {
     fn path_string(tokens: Vec<Token<'a>>) -> String {
         let mut result = String::new();
         for input in tokens {
-            match input.kind {
-                TokenKind::Identifier(identifier) => result.push_str(&identifier),
-                TokenKind::String(value) => result.push_str(value.as_str().unwrap_or("")),
-                TokenKind::Integer(value) => result.push_str(&value.to_string()),
-                TokenKind::Operator(OperatorKind::Slash) => result.push('/'),
-                TokenKind::Operator(OperatorKind::Dot) => result.push('.'),
-                TokenKind::Operator(OperatorKind::Backslash) => result.push('\\'),
-                TokenKind::Operator(OperatorKind::Colon) => result.push(':'),
-                _ => {}
+            if let Some(identifier) = input.kind.try_unwrap_identifier() {
+                result.push_str(identifier);
+            } else if let Some(value) = input.kind.try_unwrap_string() {
+                result.push_str(value.as_str().unwrap_or(""));
+            } else if let Some(value) = input.kind.try_unwrap_integer() {
+                result.push_str(&value.to_string());
+            } else if let Some(operator) = input.kind.try_unwrap_operator() {
+                match operator {
+                    OperatorKind::Slash => result.push('/'),
+                    OperatorKind::Dot => result.push('.'),
+                    OperatorKind::Backslash => result.push('\\'),
+                    OperatorKind::Colon => result.push(':'),
+                    _ => {}
+                }
             }
         }
         result
@@ -29,28 +34,28 @@ impl<'a> Initializer<'a> {
     ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::sequence([
             Classifier::predicate(|token: &Token| {
-                matches!(
-                    token.kind,
-                    TokenKind::Identifier(_)
-                        | TokenKind::String(_)
-                        | TokenKind::Integer(_)
-                        | TokenKind::Operator(OperatorKind::Slash)
-                        | TokenKind::Operator(OperatorKind::Backslash)
-                        | TokenKind::Operator(OperatorKind::Dot)
-                )
+                token.kind.is_identifier()
+                    || token.kind.is_string()
+                    || token.kind.is_integer()
+                    || matches!(
+                        token.kind.try_unwrap_operator(),
+                        Some(OperatorKind::Slash | OperatorKind::Backslash | OperatorKind::Dot)
+                    )
             }),
             Classifier::repetition(
                 Classifier::predicate(|token: &Token| {
-                    matches!(
-                        token.kind,
-                        TokenKind::Identifier(_)
-                            | TokenKind::String(_)
-                            | TokenKind::Integer(_)
-                            | TokenKind::Operator(OperatorKind::Slash)
-                            | TokenKind::Operator(OperatorKind::Backslash)
-                            | TokenKind::Operator(OperatorKind::Dot)
-                            | TokenKind::Operator(OperatorKind::Colon)
-                    )
+                    token.kind.is_identifier()
+                        || token.kind.is_string()
+                        || token.kind.is_integer()
+                        || matches!(
+                            token.kind.try_unwrap_operator(),
+                            Some(
+                                OperatorKind::Slash
+                                    | OperatorKind::Backslash
+                                    | OperatorKind::Dot
+                                    | OperatorKind::Colon
+                            )
+                        )
                 }),
                 0,
                 None,
@@ -66,14 +71,14 @@ impl<'a> Initializer<'a> {
             Classifier::sequence([
                 Classifier::repetition(
                     Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                        matches!(token.kind.try_unwrap_operator(), Some(OperatorKind::Minus))
                     }),
                     1,
                     Some(2),
                 )
                     .with_ignore(),
                 Classifier::predicate(move |token: &Token| {
-                    if let TokenKind::Identifier(identifier) = &token.kind {
+                    if let Some(identifier) = token.kind.try_unwrap_identifier() {
                         matcher(identifier)
                     } else {
                         false
@@ -138,18 +143,21 @@ impl<'a> Initializer<'a> {
             Classifier::alternative([
                 Classifier::repetition(
                     Classifier::predicate(|token: &Token| {
-                        matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                        matches!(token.kind.try_unwrap_operator(), Some(OperatorKind::Minus))
                     }),
                     1,
                     Some(2),
                 )
                     .with_ignore(),
                 Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(ref operator) if operator.as_slice() == [OperatorKind::Minus, OperatorKind::Minus])
+                    matches!(
+                        token.kind.try_unwrap_operator(),
+                        Some(operator) if operator.as_slice() == [OperatorKind::Minus, OperatorKind::Minus]
+                    )
                 }).with_ignore(),
             ]),
             Classifier::predicate(move |token: &Token| {
-                if let TokenKind::Identifier(identifier) = &token.kind {
+                if let Some(identifier) = token.kind.try_unwrap_identifier() {
                     matcher(identifier)
                 } else {
                     false
@@ -193,15 +201,15 @@ impl<'a> Initializer<'a> {
         Classifier::sequence([
             Classifier::repetition(
                 Classifier::predicate(|token: &Token| {
-                    matches!(token.kind, TokenKind::Operator(OperatorKind::Minus))
+                    matches!(token.kind.try_unwrap_operator(), Some(OperatorKind::Minus))
                 }),
                 1,
                 Some(2),
             )
                 .with_ignore(),
             Classifier::predicate(|token: &Token| {
-                if let TokenKind::Identifier(identifier) = &token.kind {
-                    **identifier == "v" || **identifier == "verbosity"
+                if let Some(identifier) = token.kind.try_unwrap_identifier() {
+                    *identifier == "v" || *identifier == "verbosity"
                 } else {
                     false
                 }
@@ -218,7 +226,7 @@ impl<'a> Initializer<'a> {
 
                     Ok(())
                 }),
-            Classifier::predicate(|token: &Token| matches!(token.kind, TokenKind::Integer(_))),
+            Classifier::predicate(|token: &Token| token.kind.is_integer()),
         ])
             .with_transform(|former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();

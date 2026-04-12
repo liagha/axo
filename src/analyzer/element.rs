@@ -41,7 +41,7 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             _ => (64, true),
                         };
                         AnalysisKind::Integer {
-                            value: **value,
+                            value: *value,
                             size,
                             signed,
                         }
@@ -52,13 +52,13 @@ impl<'element> Analyzable<'element> for Element<'element> {
                             _ => 64,
                         };
                         AnalysisKind::Float {
-                            value: **value,
+                            value: *value,
                             size,
                         }
                     }
                     TokenKind::Boolean(value) => AnalysisKind::Boolean { value: *value },
                     TokenKind::String(value) => AnalysisKind::String { value: **value },
-                    TokenKind::Character(value) => AnalysisKind::Character { value: **value },
+                    TokenKind::Character(value) => AnalysisKind::Character { value: *value },
                     TokenKind::Identifier(identifier) => AnalysisKind::Usage(*identifier.clone()),
                     _ => {
                         unreachable!("unreachable token kind.");

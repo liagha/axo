@@ -12,10 +12,9 @@ use crate::{
 #[derive(Orbyte)]
 pub struct Symbol<'symbol> {
     pub identity: Identity,
-    pub usages: Set<Identity>,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
-    pub scope: Scope,
+    pub scope: Box<Scope>,
     pub visibility: Visibility,
     pub typing: Box<Type<'symbol>>,
 }
@@ -39,10 +38,9 @@ impl<'symbol> Symbol<'symbol> {
     pub fn new(kind: SymbolKind<'symbol>, span: Span<'symbol>, visibility: Visibility) -> Self {
         Self {
             identity: next_identity(),
-            usages: Default::default(),
             kind,
             span,
-            scope: Scope::new(None),
+            scope: Box::from(Scope::new(None)),
             visibility,
             typing: Box::from(Type::from(TypeKind::Unknown)),
         }
@@ -50,10 +48,10 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
-            scope: Scope {
+            scope: Box::from(Scope {
                 symbols: Set::from_iter(members.into_iter().map(|member| member.identity)),
                 parent: None,
-            },
+            }),
             identity: self.identity,
             ..self
         }
@@ -65,14 +63,14 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn with_scope(self, scope: Scope) -> Self {
         Self {
-            scope,
+            scope: Box::new(scope),
             identity: self.identity,
             ..self
         }
     }
 
     pub fn set_scope(&mut self, scope: Scope) {
-        self.scope = scope;
+        self.scope = Box::from(scope);
     }
 
     pub fn target(&self) -> Option<Str<'symbol>> {
@@ -274,15 +272,18 @@ impl<'symbol> Element<'symbol> {
             ElementKind::Index(index) => index.target.target(),
             ElementKind::Invoke(invoke) => invoke.target.target(),
             ElementKind::Symbolize(symbol) => symbol.target(),
-            ElementKind::Binary(binary) => match binary.operator.kind {
-                TokenKind::Operator(OperatorKind::Colon) => binary.left.target(),
-                TokenKind::Operator(OperatorKind::Composite(ref operators))
-                if operators.as_slice() == [OperatorKind::Colon, OperatorKind::Colon] =>
-                    {
+            ElementKind::Binary(binary) => match &binary.operator.kind {
+                TokenKind::Operator(operator) => {
+                    if **operator == OperatorKind::Colon {
+                        binary.left.target()
+                    } else if **operator == OperatorKind::Equal {
+                        binary.left.target()
+                    } else if **operator == OperatorKind::Dot {
                         binary.right.target()
+                    } else { 
+                        None
                     }
-                TokenKind::Operator(OperatorKind::Equal) => binary.left.target(),
-                TokenKind::Operator(OperatorKind::Dot) => binary.right.target(),
+                },
                 _ => None,
             },
             _ => None,

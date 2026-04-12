@@ -13,12 +13,12 @@ pub struct Token<'token> {
 
 #[derive(Clone, Eq, Hash, Orbyte, PartialEq)]
 pub enum TokenKind<'token> {
-    Float(Box<Float>),
-    Integer(Box<Integer>),
+    Float(Float),
+    Integer(Integer),
     Boolean(Boolean),
     String(Box<Str<'token>>),
-    Character(Box<Char>),
-    Operator(OperatorKind),
+    Character(Char),
+    Operator(Box<OperatorKind>),
     Identifier(Box<Str<'token>>),
     Punctuation(PunctuationKind),
     Comment(Box<Str<'token>>),
@@ -33,12 +33,12 @@ impl<'token> Token<'token> {
 impl<'token> TokenKind<'token> {
     #[inline]
     pub fn float(value: Float) -> Self {
-        TokenKind::Float(Box::new(value))
+        TokenKind::Float(value)
     }
 
     #[inline]
     pub fn integer(value: Integer) -> Self {
-        TokenKind::Integer(Box::new(value))
+        TokenKind::Integer(value)
     }
 
     #[inline]
@@ -53,12 +53,12 @@ impl<'token> TokenKind<'token> {
 
     #[inline]
     pub fn character(value: Char) -> Self {
-        TokenKind::Character(Box::new(value))
+        TokenKind::Character(value)
     }
 
     #[inline]
     pub fn operator(value: OperatorKind) -> Self {
-        TokenKind::Operator(value)
+        TokenKind::Operator(Box::from(value))
     }
 
     #[inline]
@@ -125,7 +125,7 @@ impl<'token> TokenKind<'token> {
     #[track_caller]
     pub fn unwrap_float(self) -> Float {
         match self {
-            TokenKind::Float(value) => *value,
+            TokenKind::Float(value) => value,
             _ => panic!("called `unwrap_float` on non-Float variant."),
         }
     }
@@ -134,7 +134,7 @@ impl<'token> TokenKind<'token> {
     #[track_caller]
     pub fn unwrap_integer(self) -> Integer {
         match self {
-            TokenKind::Integer(value) => *value,
+            TokenKind::Integer(value) => value,
             _ => panic!("called `unwrap_integer` on non-Integer variant."),
         }
     }
@@ -161,7 +161,7 @@ impl<'token> TokenKind<'token> {
     #[track_caller]
     pub fn unwrap_character(self) -> Char {
         match self {
-            TokenKind::Character(value) => *value,
+            TokenKind::Character(value) => value,
             _ => panic!("called `unwrap_character` on non-Character variant."),
         }
     }
@@ -170,7 +170,7 @@ impl<'token> TokenKind<'token> {
     #[track_caller]
     pub fn unwrap_operator(self) -> OperatorKind {
         match self {
-            TokenKind::Operator(value) => value,
+            TokenKind::Operator(value) => *value,
             _ => panic!("called `unwrap_operator` on non-Operator variant."),
         }
     }
@@ -205,7 +205,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_float(&self) -> Option<&Float> {
         match self {
-            TokenKind::Float(value) => Some(value.as_ref()),
+            TokenKind::Float(value) => Some(value),
             _ => None,
         }
     }
@@ -213,7 +213,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_integer(&self) -> Option<&Integer> {
         match self {
-            TokenKind::Integer(value) => Some(value.as_ref()),
+            TokenKind::Integer(value) => Some(value),
             _ => None,
         }
     }
@@ -237,7 +237,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_character(&self) -> Option<&Char> {
         match self {
-            TokenKind::Character(value) => Some(value.as_ref()),
+            TokenKind::Character(value) => Some(value),
             _ => None,
         }
     }
@@ -277,7 +277,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_float_mut(&mut self) -> Option<&mut Float> {
         match self {
-            TokenKind::Float(value) => Some(value.as_mut()),
+            TokenKind::Float(value) => Some(value),
             _ => None,
         }
     }
@@ -285,7 +285,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_integer_mut(&mut self) -> Option<&mut Integer> {
         match self {
-            TokenKind::Integer(value) => Some(value.as_mut()),
+            TokenKind::Integer(value) => Some(value),
             _ => None,
         }
     }
@@ -309,7 +309,7 @@ impl<'token> TokenKind<'token> {
     #[inline(always)]
     pub fn try_unwrap_character_mut(&mut self) -> Option<&mut Char> {
         match self {
-            TokenKind::Character(value) => Some(value.as_mut()),
+            TokenKind::Character(value) => Some(value),
             _ => None,
         }
     }

@@ -138,7 +138,6 @@ impl<'symbol> Clone for Symbol<'symbol> {
     fn clone(&self) -> Self {
         Self {
             identity: self.identity,
-            usages: self.usages.clone(),
             kind: self.kind.clone(),
             span: self.span.clone(),
             scope: self.scope.clone(),
