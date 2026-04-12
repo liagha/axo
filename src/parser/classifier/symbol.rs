@@ -64,18 +64,18 @@ impl<'a> Parser<'a> {
                 if let ElementKind::Binary(binary) = &body.kind.clone() {
                     if let Some(OperatorKind::Equal) = binary.operator.kind.try_unwrap_operator() {
                         if let ElementKind::Binary(inner_binary) = &binary.left.kind {
-                            value = Some(Box::new((*binary.right).clone()));
+                            value = Some(binary.right.clone());
                             if let Some(OperatorKind::Colon) = inner_binary.operator.kind.try_unwrap_operator() {
-                                body = *inner_binary.left.clone();
+                                body = inner_binary.left.clone();
                                 annotation = Some(inner_binary.right.clone());
                             }
                         } else {
-                            body = (*binary.left).clone();
-                            value = Some(Box::new((*binary.right).clone()));
+                            body = binary.left.clone();
+                            value = Some(binary.right.clone());
                         }
                     } else if let Some(OperatorKind::Colon) = binary.operator.kind.try_unwrap_operator() {
-                        body = (*binary.left).clone();
-                        annotation = Some(Box::new((*binary.right).clone()));
+                        body = binary.left.clone();
+                        annotation = Some(binary.right.clone());
                     } else {
                         if let ElementKind::Binary(assigned) = &binary.left.kind {
                             if let Some(OperatorKind::Equal) = assigned.operator.kind.try_unwrap_operator() {
@@ -89,12 +89,12 @@ impl<'a> Parser<'a> {
                                     )),
                                     merged_span,
                                 );
-                                value = Some(Box::new(merged_value));
+                                value = Some(merged_value);
 
-                                body = *assigned.left.clone();
+                                body = assigned.left.clone();
                                 if let ElementKind::Binary(annotation_pair) = &body.kind.clone() {
                                     if let Some(OperatorKind::Colon) = annotation_pair.operator.kind.try_unwrap_operator() {
-                                        body = *annotation_pair.left.clone();
+                                        body = annotation_pair.left.clone();
                                         annotation = Some(annotation_pair.right.clone());
                                     }
                                 }
@@ -105,7 +105,7 @@ impl<'a> Parser<'a> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::binding(Binding::new(Box::new(body), value, annotation, kind)),
+                        SymbolKind::binding(Binding::new(body, value, annotation, kind)),
                         span,
                         Visibility::Private,
                     ))),
@@ -190,7 +190,7 @@ impl<'a> Parser<'a> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::new(Symbol::new(
-                        SymbolKind::structure(Aggregate::new(Box::new(name), members)),
+                        SymbolKind::structure(Aggregate::new(name, members)),
                         span,
                         visibility,
                     ))),
@@ -275,7 +275,7 @@ impl<'a> Parser<'a> {
 
                 *form = Form::output(Element::new(
                     ElementKind::Symbolize(Box::from(Symbol::new(
-                        SymbolKind::union(Aggregate::new(Box::new(name), members)),
+                        SymbolKind::union(Aggregate::new(name, members)),
                         span,
                         visibility,
                     ))),
@@ -394,7 +394,7 @@ impl<'a> Parser<'a> {
                     let output = sequence[3].unwrap_output().clone();
 
                     let body = if sequence.len() > 4 {
-                        Some(Box::new(sequence[4].unwrap_output().clone()))
+                        Some(sequence[4].unwrap_output().clone())
                     } else {
                         None
                     };
@@ -445,10 +445,10 @@ impl<'a> Parser<'a> {
                     *form = Form::output(Element::new(
                         ElementKind::Symbolize(Box::from(Symbol::new(
                             SymbolKind::function(Function::new(
-                                Box::new(name),
+                                name,
                                 members,
                                 body,
-                                Some(Box::new(output)),
+                                Some(output),
                                 interface,
                                 entry,
                                 variadic,
@@ -516,7 +516,7 @@ impl<'a> Parser<'a> {
                     let invoke = sequence[2].unwrap_output().clone();
 
                     let body = if sequence.len() > 3 {
-                        Some(Box::new(sequence[3].unwrap_output().clone()))
+                        Some(sequence[3].unwrap_output().clone())
                     } else {
                         None
                     };
@@ -567,10 +567,10 @@ impl<'a> Parser<'a> {
                     *form = Form::output(Element::new(
                         ElementKind::Symbolize(Box::from(Symbol::new(
                             SymbolKind::function(Function::new(
-                                Box::new(name),
+                                name,
                                 members,
                                 body,
-                                None::<Box<Element<'a>>>,
+                                None,
                                 interface,
                                 entry,
                                 variadic,

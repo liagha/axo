@@ -256,10 +256,10 @@ fn rename_target(symbol: &mut Symbol, name: String) {
     if let SymbolKind::Binding(binding) = &mut symbol.kind {
         if let ElementKind::Literal(token) = &binding.target.kind {
             let span = token.span;
-            binding.target = Box::new(Element::new(
+            binding.target = Element::new(
                 ElementKind::literal(Token::new(TokenKind::identifier(Str::from(name)), span)),
                 span,
-            ));
+            );
         }
     }
 }

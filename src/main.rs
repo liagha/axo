@@ -57,22 +57,22 @@ pub fn memory_inspection() {
     println!("\n{:-^75}", " SCANNER ");
     inspect_type!(axo::data::Float);
     inspect_type!(axo::data::Integer);
-    inspect_type!(axo::data::Str);
+    inspect_type!(Str);
     inspect_type!(axo::scanner::OperatorKind);
     inspect_type!(axo::scanner::PunctuationKind);
-    inspect_type!(axo::scanner::TokenKind);
-    inspect_type!(axo::scanner::Token);
+    inspect_type!(TokenKind);
+    inspect_type!(Token);
 
     println!("\n{:-^75}", " RESOLVER ");
     inspect_type!(axo::resolver::TypeKind);
     inspect_type!(axo::resolver::Type);
     inspect_type!(axo::resolver::Scope);
 
-    println!("\n{:-^75}", " PARSER (If accessible here) ");
-    inspect_type!(axo::parser::ElementKind);
-    inspect_type!(axo::parser::Element);
-    inspect_type!(axo::parser::SymbolKind);
-    inspect_type!(axo::parser::Symbol);
+    println!("\n{:-^75}", " PARSER");
+    inspect_type!(ElementKind);
+    inspect_type!(Element);
+    inspect_type!(SymbolKind);
+    inspect_type!(Symbol);
 }
 
 fn main() {
@@ -201,13 +201,13 @@ pub fn create<'a>(
     }
 
     let directive = Symbol::new(
-        SymbolKind::module(Module::new(Box::from(Element::new(
+        SymbolKind::module(Module::new(Element::new(
             ElementKind::literal(Token::new(
                 TokenKind::identifier(Str::from("directive")),
                 Span::void(),
             )),
             Span::void(),
-        )))),
+        ))),
         Span::void(),
         Visibility::Public,
     )

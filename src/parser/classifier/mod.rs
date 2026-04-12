@@ -72,7 +72,7 @@ impl<'a> Parser<'a> {
             for prefix in prefixes {
                 let span = Span::merge(&prefix.span(), &unary.span());
                 unary = Element::new(
-                    ElementKind::unary(Unary::new(prefix, Box::new(unary))),
+                    ElementKind::unary(Unary::new(prefix, unary)),
                     span,
                 );
             }
@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
                 if let Some(token) = suffix.get_input() {
                     let span = Span::merge(&unary.span(), &token.span());
                     unary =
-                        Element::new(ElementKind::unary(Unary::new(token, Box::new(unary))), span);
+                        Element::new(ElementKind::unary(Unary::new(token, unary)), span);
                 } else if let Some(element) = suffix.get_output() {
                     let span = Span::merge(&unary.span(), &element.span());
                     unary = Self::apply_suffix(unary, element, span);
@@ -141,7 +141,7 @@ impl<'a> Parser<'a> {
                 None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                 TokenKind::Punctuation(PunctuationKind::RightParenthesis),
             ) => Element::new(
-                ElementKind::invoke(Invoke::new(Box::new(target), delimited.members)),
+                ElementKind::invoke(Invoke::new(target, delimited.members)),
                 span,
             ),
 
@@ -150,7 +150,7 @@ impl<'a> Parser<'a> {
                 None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                 TokenKind::Punctuation(PunctuationKind::RightBracket),
             ) => Element::new(
-                ElementKind::index(Index::new(Box::new(target), delimited.members)),
+                ElementKind::index(Index::new(target, delimited.members)),
                 span,
             ),
 
@@ -159,7 +159,7 @@ impl<'a> Parser<'a> {
                 None | Some(TokenKind::Punctuation(PunctuationKind::Comma)),
                 TokenKind::Punctuation(PunctuationKind::RightBrace),
             ) => Element::new(
-                ElementKind::construct(Aggregate::new(Box::new(target), delimited.members)),
+                ElementKind::construct(Aggregate::new(target, delimited.members)),
                 span,
             ),
 
@@ -255,7 +255,7 @@ impl<'a> Parser<'a> {
             let span = left.span().merge(&right.span());
 
             left = Element::new(
-                ElementKind::binary(Binary::new(Box::new(left), op_token, Box::new(right))),
+                ElementKind::binary(Binary::new(left, op_token, right)),
                 span,
             );
         }

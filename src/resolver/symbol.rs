@@ -15,11 +15,11 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     annotation.resolve(resolver);
 
                     match resolver.annotation(annotation) {
-                        Ok(typing) => Box::from(typing),
-                        Err(_) => Box::from(resolver.fresh()),
+                        Ok(typing) => typing,
+                        Err(_) => resolver.fresh(),
                     }
                 } else {
-                    Box::from(resolver.fresh())
+                    resolver.fresh()
                 }
             }
             SymbolKind::Function(function) => {
@@ -30,7 +30,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     member.declare(resolver);
                 }
 
-                let members = function.members.iter().map(|m| *m.typing.clone()).collect();
+                let members = function.members.iter().map(|m| m.typing.clone()).collect();
 
                 let output = if let Some(annotation) = &mut function.output {
                     annotation.resolve(resolver);
@@ -44,20 +44,20 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let body = if let Some(body) = &mut function.body {
                     body.resolve(resolver);
 
-                    *body.typing.clone()
+                    body.typing.clone()
                 } else {
                     Type::from(TypeKind::Void)
                 };
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
-                Box::from(Type::new(
+                Type::new(
                     self.identity,
                     TypeKind::Function(Box::new(Function::new(head.into(), members, body, Some(Box::new(output)), Interface::Axo, false, false))),
-                ))
+                )
             }
             SymbolKind::Structure(structure) => {
                 let head = structure.target.target().unwrap();
@@ -69,13 +69,13 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
-                Box::from(Type::new(
+                Type::new(
                     self.identity,
                     TypeKind::Structure(Box::new(Aggregate::new(head.into(), Vec::new()))),
-                ))
+                )
             }
             SymbolKind::Union(union) => {
                 let head = union.target.target().unwrap();
@@ -87,17 +87,17 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
-                Box::from(Type::new(
+                Type::new(
                     self.identity,
                     TypeKind::Union(Box::new(Aggregate::new(head.into(), Vec::new()))),
-                ))
+                )
             }
             SymbolKind::Module(module) => {
                 let head = module.target.target().unwrap();
-                Box::from(Type::new(self.identity, TypeKind::Module(head.into())))
+                Type::new(self.identity, TypeKind::Module(head.into()))
             }
         };
 
@@ -129,7 +129,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let typing = match (annotation, inferred) {
                     (Some(source), Some(target)) => resolver.unify(self.span, &source, &target),
                     (Some(source), None) => source,
-                    (None, Some(target)) => *target,
+                    (None, Some(target)) => target,
                     (None, None) => resolver.fresh(),
                 };
 
@@ -139,21 +139,21 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Structure(structure) => {
                 let head = structure.target.target().unwrap();
-                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
-                resolver.enter_scope(*scope);
+                let scope = replace(&mut self.scope, Scope::new(None));
+                resolver.enter_scope(scope);
 
                 let members = structure
                     .members
                     .iter_mut()
                     .map(|member| {
                         member.resolve(resolver);
-                        *member.typing.clone()
+                        member.typing.clone()
                     })
                     .collect();
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
                 Type::new(
@@ -164,21 +164,21 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Union(union) => {
                 let head = union.target.target().unwrap();
-                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
-                resolver.enter_scope(*scope);
+                let scope = replace(&mut self.scope, Scope::new(None));
+                resolver.enter_scope(scope);
 
                 let members = union
                     .members
                     .iter_mut()
                     .map(|member| {
                         member.resolve(resolver);
-                        *member.typing.clone()
+                        member.typing.clone()
                     })
                     .collect();
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
                 Type::new(
@@ -189,15 +189,15 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Function(function) => {
                 let head = function.target.target().unwrap();
-                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
-                resolver.enter_scope(*scope);
+                let scope = replace(&mut self.scope, Scope::new(None));
+                resolver.enter_scope(scope);
 
                 let members: Vec<_> = function
                     .members
                     .iter_mut()
                     .map(|member| {
                         member.resolve(resolver);
-                        *member.typing.clone()
+                        member.typing.clone()
                     })
                     .collect();
 
@@ -205,7 +205,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     output.resolve(resolver);
                     match resolver.annotation(output) {
                         Ok(typing) => {
-                            output.typing = Box::from(typing.clone());
+                            output.typing = typing.clone();
                             typing
                         }
                         Err(error) => {
@@ -224,20 +224,20 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                     
                     body.typing.clone()
                 } else {
-                    Box::from(Type::from(TypeKind::Void))
+                    Type::from(TypeKind::Void)
                 };
 
                 resolver.returns.pop();
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
+                self.scope = resolver.scopes.remove(&active).unwrap();
                 self.scope.parent = None;
 
                 let inferred = Some(Box::new(resolver.reify(&expectation)));
                 Type::new(
                     self.identity,
-                    TypeKind::Function(Box::new(Function::new(head.into(), members, *body, inferred, Interface::Axo, false, false))),
+                    TypeKind::Function(Box::new(Function::new(head.into(), members, body, inferred, Interface::Axo, false, false))),
                 )
             }
 
@@ -248,13 +248,13 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
         };
 
         let unified = resolver.unify(self.span, &expected, &typing);
-        self.typing = Box::from(unified);
+        self.typing = unified;
 
         resolver.insert(self.clone());
     }
 
     fn reify(&mut self, resolver: &mut Resolver<'symbol>) {
-        self.typing = Box::from(resolver.reify(&self.typing));
+        self.typing = resolver.reify(&self.typing);
 
         match &mut self.kind {
             SymbolKind::Binding(binding) => {
@@ -273,13 +273,13 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let layout = structure
                     .members
                     .iter()
-                    .map(|member| *member.typing.clone())
+                    .map(|member| member.typing.clone())
                     .collect();
                 let head = structure.target.target().unwrap().into();
-                self.typing = Box::from(Type::new(
+                self.typing = Type::new(
                     self.identity,
                     TypeKind::Structure(Box::new(Aggregate::new(head, layout))),
-                ));
+                );
             }
             SymbolKind::Union(union) => {
                 for member in &mut union.members {
@@ -288,11 +288,10 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
                 let layout = union
                     .members
                     .iter()
-                    .map(|member| *member.typing.clone())
+                    .map(|member| member.typing.clone())
                     .collect();
                 let head = union.target.target().unwrap().into();
-                self.typing =
-                    Box::from(Type::new(self.identity, TypeKind::Union(Box::new(Aggregate::new(head, layout)))));
+                self.typing = Type::new(self.identity, TypeKind::Union(Box::new(Aggregate::new(head, layout))));
             }
             SymbolKind::Function(function) => {
                 for member in &mut function.members {
@@ -307,7 +306,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
             }
             SymbolKind::Module(module) => {
                 let head = module.target.target().unwrap();
-                self.typing = Box::from(Type::new(self.identity, TypeKind::Module(head.into())));
+                self.typing = Type::new(self.identity, TypeKind::Module(head.into()));
             }
         }
 

@@ -703,7 +703,7 @@ impl<'resolver> Resolver<'resolver> {
                         "Void" => TypeKind::Void,
                         _ => {
                             return if let Ok(symbol) = self.lookup(element) {
-                                Ok(*symbol.typing)
+                                Ok(symbol.typing)
                             } else {
                                 Err(ResolveError::new(
                                     ErrorKind::InvalidAnnotation(element.clone()),

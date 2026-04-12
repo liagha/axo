@@ -14,18 +14,18 @@ pub struct Symbol<'symbol> {
     pub identity: Identity,
     pub kind: SymbolKind<'symbol>,
     pub span: Span<'symbol>,
-    pub scope: Box<Scope>,
+    pub scope: Scope,
     pub visibility: Visibility,
-    pub typing: Box<Type<'symbol>>,
+    pub typing: Type<'symbol>,
 }
 
 #[derive(Clone, Hash, Orbyte, PartialEq)]
 pub enum SymbolKind<'symbol> {
-    Binding(Box<Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>>),
-    Structure(Box<Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>>),
-    Union(Box<Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>>),
-    Function(Box<Function<Box<Element<'symbol>>, Symbol<'symbol>, Option<Box<Element<'symbol>>>, Option<Box<Element<'symbol>>>>>),
-    Module(Box<Module<Box<Element<'symbol>>>>),
+    Binding(Box<Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>>),
+    Structure(Box<Aggregate<Element<'symbol>, Symbol<'symbol>>>),
+    Union(Box<Aggregate<Element<'symbol>, Symbol<'symbol>>>),
+    Function(Box<Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>>),
+    Module(Box<Module<Element<'symbol>>>),
 }
 
 #[derive(Clone, Copy, Debug, Orbyte)]
@@ -40,18 +40,18 @@ impl<'symbol> Symbol<'symbol> {
             identity: next_identity(),
             kind,
             span,
-            scope: Box::from(Scope::new(None)),
+            scope: Scope::new(None),
             visibility,
-            typing: Box::from(Type::from(TypeKind::Unknown)),
+            typing: Type::from(TypeKind::Unknown),
         }
     }
 
     pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
-            scope: Box::from(Scope {
+            scope: Scope {
                 symbols: Set::from_iter(members.into_iter().map(|member| member.identity)),
                 parent: None,
-            }),
+            },
             identity: self.identity,
             ..self
         }
@@ -63,14 +63,14 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn with_scope(self, scope: Scope) -> Self {
         Self {
-            scope: Box::new(scope),
+            scope,
             identity: self.identity,
             ..self
         }
     }
 
     pub fn set_scope(&mut self, scope: Scope) {
-        self.scope = Box::from(scope);
+        self.scope = scope;
     }
 
     pub fn target(&self) -> Option<Str<'symbol>> {
@@ -86,27 +86,27 @@ impl<'symbol> Symbol<'symbol> {
 
 impl<'symbol> SymbolKind<'symbol> {
     #[inline]
-    pub fn binding(binding: Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>) -> Self {
+    pub fn binding(binding: Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>) -> Self {
         Self::Binding(Box::new(binding))
     }
 
     #[inline]
-    pub fn structure(structure: Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>) -> Self {
+    pub fn structure(structure: Aggregate<Element<'symbol>, Symbol<'symbol>>) -> Self {
         Self::Structure(Box::new(structure))
     }
 
     #[inline]
-    pub fn union(union: Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>) -> Self {
+    pub fn union(union: Aggregate<Element<'symbol>, Symbol<'symbol>>) -> Self {
         Self::Union(Box::new(union))
     }
 
     #[inline]
-    pub fn function(function: Function<Box<Element<'symbol>>, Symbol<'symbol>, Option<Box<Element<'symbol>>>, Option<Box<Element<'symbol>>>>) -> Self {
+    pub fn function(function: Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>) -> Self {
         Self::Function(Box::new(function))
     }
 
     #[inline]
-    pub fn module(module: Module<Box<Element<'symbol>>>) -> Self {
+    pub fn module(module: Module<Element<'symbol>>) -> Self {
         Self::Module(Box::new(module))
     }
 
@@ -137,7 +137,7 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_binding(self) -> Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>> {
+    pub fn unwrap_binding(self) -> Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>> {
         match self {
             Self::Binding(binding) => *binding,
             _ => panic!("expected binding"),
@@ -146,7 +146,7 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_structure(self) -> Aggregate<Box<Element<'symbol>>, Symbol<'symbol>> {
+    pub fn unwrap_structure(self) -> Aggregate<Element<'symbol>, Symbol<'symbol>> {
         match self {
             Self::Structure(structure) => *structure,
             _ => panic!("expected structure"),
@@ -155,7 +155,7 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_union(self) -> Aggregate<Box<Element<'symbol>>, Symbol<'symbol>> {
+    pub fn unwrap_union(self) -> Aggregate<Element<'symbol>, Symbol<'symbol>> {
         match self {
             Self::Union(union) => *union,
             _ => panic!("expected union"),
@@ -164,7 +164,7 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_function(self) -> Function<Box<Element<'symbol>>, Symbol<'symbol>, Option<Box<Element<'symbol>>>, Option<Box<Element<'symbol>>>> {
+    pub fn unwrap_function(self) -> Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>> {
         match self {
             Self::Function(function) => *function,
             _ => panic!("expected function"),
@@ -173,7 +173,7 @@ impl<'symbol> SymbolKind<'symbol> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_module(self) -> Module<Box<Element<'symbol>>> {
+    pub fn unwrap_module(self) -> Module<Element<'symbol>> {
         match self {
             Self::Module(module) => *module,
             _ => panic!("expected module"),
@@ -181,7 +181,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binding(&self) -> Option<&Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>> {
+    pub fn try_unwrap_binding(&self) -> Option<&Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
         match self {
             Self::Binding(binding) => Some(binding),
             _ => None,
@@ -189,7 +189,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_structure(&self) -> Option<&Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>> {
+    pub fn try_unwrap_structure(&self) -> Option<&Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Structure(structure) => Some(structure),
             _ => None,
@@ -197,7 +197,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_union(&self) -> Option<&Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>> {
+    pub fn try_unwrap_union(&self) -> Option<&Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Union(union) => Some(union),
             _ => None,
@@ -205,7 +205,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function(&self) -> Option<&Function<Box<Element<'symbol>>, Symbol<'symbol>, Option<Box<Element<'symbol>>>, Option<Box<Element<'symbol>>>>> {
+    pub fn try_unwrap_function(&self) -> Option<&Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>> {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -213,7 +213,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_module(&self) -> Option<&Module<Box<Element<'symbol>>>> {
+    pub fn try_unwrap_module(&self) -> Option<&Module<Element<'symbol>>> {
         match self {
             Self::Module(module) => Some(module),
             _ => None,
@@ -221,7 +221,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binding_mut(&mut self) -> Option<&mut Binding<Box<Element<'symbol>>, Box<Element<'symbol>>, Option<Box<Element<'symbol>>>>> {
+    pub fn try_unwrap_binding_mut(&mut self) -> Option<&mut Binding<Element<'symbol>, Element<'symbol>, Option<Element<'symbol>>>> {
         match self {
             Self::Binding(binding) => Some(binding),
             _ => None,
@@ -229,7 +229,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_structure_mut(&mut self) -> Option<&mut Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>> {
+    pub fn try_unwrap_structure_mut(&mut self) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Structure(structure) => Some(structure),
             _ => None,
@@ -237,7 +237,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_union_mut(&mut self) -> Option<&mut Aggregate<Box<Element<'symbol>>, Symbol<'symbol>>> {
+    pub fn try_unwrap_union_mut(&mut self) -> Option<&mut Aggregate<Element<'symbol>, Symbol<'symbol>>> {
         match self {
             Self::Union(union) => Some(union),
             _ => None,
@@ -245,7 +245,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Function<Box<Element<'symbol>>, Symbol<'symbol>, Option<Box<Element<'symbol>>>, Option<Box<Element<'symbol>>>>> {
+    pub fn try_unwrap_function_mut(&mut self) -> Option<&mut Function<Element<'symbol>, Symbol<'symbol>, Option<Element<'symbol>>, Option<Element<'symbol>>>> {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
@@ -253,7 +253,7 @@ impl<'symbol> SymbolKind<'symbol> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_module_mut(&mut self) -> Option<&mut Module<Box<Element<'symbol>>>> {
+    pub fn try_unwrap_module_mut(&mut self) -> Option<&mut Module<Element<'symbol>>> {
         match self {
             Self::Module(module) => Some(module),
             _ => None,
@@ -280,7 +280,7 @@ impl<'symbol> Element<'symbol> {
                         binary.left.target()
                     } else if **operator == OperatorKind::Dot {
                         binary.right.target()
-                    } else { 
+                    } else {
                         None
                     }
                 },

@@ -13,18 +13,18 @@ pub struct Element<'element> {
     pub kind: ElementKind<'element>,
     pub span: Span<'element>,
     pub reference: Option<Identity>,
-    pub typing: Box<Type<'element>>,
+    pub typing: Type<'element>,
 }
 
 #[derive(Orbyte)]
 pub enum ElementKind<'element> {
     Literal(Box<Token<'element>>),
     Delimited(Box<Delimited<Token<'element>, Element<'element>>>),
-    Unary(Box<Unary<Token<'element>, Box<Element<'element>>>>),
-    Binary(Box<Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>>),
-    Index(Box<Index<Box<Element<'element>>, Element<'element>>>),
-    Invoke(Box<Invoke<Box<Element<'element>>, Element<'element>>>),
-    Construct(Box<Aggregate<Box<Element<'element>>, Element<'element>>>),
+    Unary(Box<Unary<Token<'element>, Element<'element>>>),
+    Binary(Box<Binary<Element<'element>, Token<'element>, Element<'element>>>),
+    Index(Box<Index<Element<'element>, Element<'element>>>),
+    Invoke(Box<Invoke<Element<'element>, Element<'element>>>),
+    Construct(Box<Aggregate<Element<'element>, Element<'element>>>),
     Symbolize(Box<Symbol<'element>>),
 }
 
@@ -35,7 +35,7 @@ impl<'element> Element<'element> {
             kind,
             span,
             reference: None,
-            typing: Box::from(Type::from(TypeKind::Unknown)),
+            typing: Type::from(TypeKind::Unknown),
         }
     }
 }
@@ -52,27 +52,27 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline]
-    pub fn unary(unary: Unary<Token<'element>, Box<Element<'element>>>) -> Self {
+    pub fn unary(unary: Unary<Token<'element>, Element<'element>>) -> Self {
         Self::Unary(Box::new(unary))
     }
 
     #[inline]
-    pub fn binary(binary: Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>) -> Self {
+    pub fn binary(binary: Binary<Element<'element>, Token<'element>, Element<'element>>) -> Self {
         Self::Binary(Box::new(binary))
     }
 
     #[inline]
-    pub fn index(index: Index<Box<Element<'element>>, Element<'element>>) -> Self {
+    pub fn index(index: Index<Element<'element>, Element<'element>>) -> Self {
         Self::Index(Box::new(index))
     }
 
     #[inline]
-    pub fn invoke(invoke: Invoke<Box<Element<'element>>, Element<'element>>) -> Self {
+    pub fn invoke(invoke: Invoke<Element<'element>, Element<'element>>) -> Self {
         Self::Invoke(Box::new(invoke))
     }
 
     #[inline]
-    pub fn construct(construct: Aggregate<Box<Element<'element>>, Element<'element>>) -> Self {
+    pub fn construct(construct: Aggregate<Element<'element>, Element<'element>>) -> Self {
         Self::Construct(Box::new(construct))
     }
 
@@ -141,7 +141,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_unary(self) -> Unary<Token<'element>, Box<Element<'element>>> {
+    pub fn unwrap_unary(self) -> Unary<Token<'element>, Element<'element>> {
         match self {
             Self::Unary(unary) => *unary,
             _ => panic!("expected unary"),
@@ -150,7 +150,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_binary(self) -> Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>> {
+    pub fn unwrap_binary(self) -> Binary<Element<'element>, Token<'element>, Element<'element>> {
         match self {
             Self::Binary(binary) => *binary,
             _ => panic!("expected binary"),
@@ -159,7 +159,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_index(self) -> Index<Box<Element<'element>>, Element<'element>> {
+    pub fn unwrap_index(self) -> Index<Element<'element>, Element<'element>> {
         match self {
             Self::Index(index) => *index,
             _ => panic!("expected index"),
@@ -168,7 +168,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_invoke(self) -> Invoke<Box<Element<'element>>, Element<'element>> {
+    pub fn unwrap_invoke(self) -> Invoke<Element<'element>, Element<'element>> {
         match self {
             Self::Invoke(invoke) => *invoke,
             _ => panic!("expected invoke"),
@@ -177,7 +177,7 @@ impl<'element> ElementKind<'element> {
 
     #[inline]
     #[track_caller]
-    pub fn unwrap_construct(self) -> Aggregate<Box<Element<'element>>, Element<'element>> {
+    pub fn unwrap_construct(self) -> Aggregate<Element<'element>, Element<'element>> {
         match self {
             Self::Construct(construct) => *construct,
             _ => panic!("expected construct"),
@@ -210,7 +210,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_unary(&self) -> Option<&Unary<Token<'element>, Box<Element<'element>>>> {
+    pub fn try_unwrap_unary(&self) -> Option<&Unary<Token<'element>, Element<'element>>> {
         match self {
             Self::Unary(unary) => Some(unary),
             _ => None,
@@ -218,7 +218,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binary(&self) -> Option<&Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>> {
+    pub fn try_unwrap_binary(&self) -> Option<&Binary<Element<'element>, Token<'element>, Element<'element>>> {
         match self {
             Self::Binary(binary) => Some(binary),
             _ => None,
@@ -226,7 +226,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_index(&self) -> Option<&Index<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_index(&self) -> Option<&Index<Element<'element>, Element<'element>>> {
         match self {
             Self::Index(index) => Some(index),
             _ => None,
@@ -234,7 +234,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_invoke(&self) -> Option<&Invoke<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_invoke(&self) -> Option<&Invoke<Element<'element>, Element<'element>>> {
         match self {
             Self::Invoke(invoke) => Some(invoke),
             _ => None,
@@ -242,7 +242,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_construct(&self) -> Option<&Aggregate<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_construct(&self) -> Option<&Aggregate<Element<'element>, Element<'element>>> {
         match self {
             Self::Construct(construct) => Some(construct),
             _ => None,
@@ -274,7 +274,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_unary_mut(&mut self) -> Option<&mut Unary<Token<'element>, Box<Element<'element>>>> {
+    pub fn try_unwrap_unary_mut(&mut self) -> Option<&mut Unary<Token<'element>, Element<'element>>> {
         match self {
             Self::Unary(unary) => Some(unary),
             _ => None,
@@ -282,7 +282,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_binary_mut(&mut self) -> Option<&mut Binary<Box<Element<'element>>, Token<'element>, Box<Element<'element>>>> {
+    pub fn try_unwrap_binary_mut(&mut self) -> Option<&mut Binary<Element<'element>, Token<'element>, Element<'element>>> {
         match self {
             Self::Binary(binary) => Some(binary),
             _ => None,
@@ -290,7 +290,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_index_mut(&mut self) -> Option<&mut Index<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_index_mut(&mut self) -> Option<&mut Index<Element<'element>, Element<'element>>> {
         match self {
             Self::Index(index) => Some(index),
             _ => None,
@@ -298,7 +298,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_invoke_mut(&mut self) -> Option<&mut Invoke<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_invoke_mut(&mut self) -> Option<&mut Invoke<Element<'element>, Element<'element>>> {
         match self {
             Self::Invoke(invoke) => Some(invoke),
             _ => None,
@@ -306,7 +306,7 @@ impl<'element> ElementKind<'element> {
     }
 
     #[inline(always)]
-    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Aggregate<Box<Element<'element>>, Element<'element>>> {
+    pub fn try_unwrap_construct_mut(&mut self) -> Option<&mut Aggregate<Element<'element>, Element<'element>>> {
         match self {
             Self::Construct(construct) => Some(construct),
             _ => None,

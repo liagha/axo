@@ -119,8 +119,8 @@ impl<'a> Initializer<'a> {
 
                 let symbol = Symbol::new(
                     SymbolKind::binding(Binding::new(
-                        Box::from(target),
-                        Some(Box::new(value)),
+                        target,
+                        Some(value),
                         None,
                         BindingKind::Meta,
                     )),
@@ -181,8 +181,8 @@ impl<'a> Initializer<'a> {
 
                 let symbol = Symbol::new(
                     SymbolKind::binding(Binding::new(
-                        Box::from(target),
-                        Some(Box::new(value)),
+                        target,
+                        Some(value),
                         None,
                         BindingKind::Meta,
                     )),
@@ -239,8 +239,8 @@ impl<'a> Initializer<'a> {
 
                 let symbol = Symbol::new(
                     SymbolKind::binding(Binding::new(
-                        Box::from(target),
-                        Some(Box::new(value)),
+                        target,
+                        Some(value),
                         None,
                         BindingKind::Meta,
                     )),
@@ -306,8 +306,8 @@ impl<'a> Initializer<'a> {
 
             let symbol = Symbol::new(
                 SymbolKind::binding(Binding::new(
-                    Box::from(target),
-                    Some(Box::new(value)),
+                    target,
+                    Some(value),
                     None,
                     BindingKind::Meta,
                 )),
