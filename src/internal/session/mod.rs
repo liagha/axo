@@ -16,7 +16,6 @@ use {
                 Lock,
             },
             time::Duration,
-            SessionError,
         },
         parser::Parser,
         resolver::Resolver,
@@ -44,7 +43,11 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
     let manifest = session.manifest();
     if session.cache.is_empty() && session.get_directive(Str::from("Discard")).is_none() {
         if let Ok(data) = read(&manifest) {
-            if let Some(cache) = Session::decode::<Option<Map<Location<'source>, u64>>>(data).flatten() {
+            session.buffers.push(data);
+            let raw = session.buffers.last().unwrap().as_slice();
+            let extended: &'source [u8] = unsafe { std::mem::transmute(raw) };
+
+            if let Some(cache) = Session::decode::<Option<Map<Location<'source>, u64>>>(extended).flatten() {
                 session.cache = cache;
             }
         }
@@ -56,10 +59,9 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
     for key in &keys {
         let record = session.records.get_mut(key).unwrap();
 
-        if record.kind == RecordKind::Source {
+        if record.kind == RecordKind::Source || record.kind == RecordKind::C {
             let location = record.location;
             let path = location.to_string();
-
             let mut content = None;
 
             if let Some(value) = &record.content {
@@ -87,14 +89,9 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         }
     }
 
-    #[cfg(not(feature = "generator"))]
+    #[cfg(feature = "interpreter")]
     {
-        use {
-            crate::{
-                data::CString,
-                internal::platform::Command,
-            },
-        };
+        use crate::{data::CString, internal::platform::Command};
 
         let mut sources = Vec::new();
         let build = session.base().join("build");
@@ -106,17 +103,16 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
                 if let Ok(path) = record.location.to_path() {
                     if let Some(content) = &record.content {
                         _ = create_dir_all(&build);
-                        if let Some(filename) = path.file_name() {
-                            let build_path = build.join(filename);
-                            if !build_path.exists() {
+                        if let Some(name) = path.file_name() {
+                            let build_path = build.join(name);
+                            if !build_path.exists() || record.dirty {
                                 _ = write(build_path.clone(), content.as_bytes().to_vec());
                             }
                             sources.push(build_path);
-                            continue;
                         }
+                    } else {
+                        sources.push(path);
                     }
-
-                    sources.push(path);
 
                     if record.dirty {
                         dirty = true;
@@ -126,36 +122,30 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         }
 
         if !sources.is_empty() {
-            let build = session.base().join("build");
-            _ = create_dir_all(&build);
+            let extension = std::env::consts::DLL_EXTENSION;
+            let library = build.join(format!("lib_axo.{}", extension));
+            let recompile = dirty || !library.exists();
 
-            let extention = std::env::consts::DLL_EXTENSION;
-            let library = build.join(format!("lib_axo.{}", extention));
-
-            if !library.exists() {
-                dirty = true;
-            }
-
-            if dirty {
+            if recompile {
                 let mut command = Command::new("cc");
-
                 command.arg("-shared").arg("-fPIC").arg("-o").arg(&library);
 
                 for source in sources {
                     command.arg(source);
                 }
 
-
-                if !command.status().unwrap().success() {
+                if !command.status().expect("cc not found").success() {
                     panic!("failed to compile dynamic library");
                 }
             }
 
-            let string = library.to_str().unwrap();
-            let path = CString::new(string).unwrap();
-            unsafe {
-                if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
-                    panic!("dlopen failed to load library");
+            if library.exists() {
+                let string = library.to_str().unwrap();
+                let path = CString::new(string).unwrap();
+                unsafe {
+                    if libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL).is_null() {
+                        panic!("dlopen failed: {}", string);
+                    }
                 }
             }
         }
@@ -165,9 +155,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         if let Some(parent) = manifest.parent() {
             _ = create_dir_all(parent);
         }
-
         let buffer = Some(session.cache.clone()).serialize();
-
         _ = write(manifest, buffer);
     }
 
@@ -193,22 +181,18 @@ Action<
         } else {
             operation.set_reject();
         }
-
-        ()
     }
 }
 
 impl<'session> Session<'session> {
-    fn decode<T: Deserialize>(bytes: Vec<u8>) -> Option<T> {
-        let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
-
+    fn decode<T: Deserialize>(bytes: &'session [u8]) -> Option<T> {
         catch_unwind(AssertUnwindSafe(|| T::deserialize(bytes).ok()))
             .ok()
             .flatten()
     }
 
     pub fn cache<T: Deserialize + Serialize + Clone>(
-        &self,
+        &mut self,
         name: &str,
         hash: u64,
         data: Option<T>,
@@ -227,7 +211,10 @@ impl<'session> Session<'session> {
             _ = write(path, buffer);
             Some(value)
         } else if let Ok(bytes) = read(&path) {
-            Self::decode(bytes).flatten()
+            self.buffers.push(bytes);
+            let raw = self.buffers.last().unwrap().as_slice();
+            let extended: &'session [u8] = unsafe { std::mem::transmute(raw) };
+            Self::decode(extended).flatten()
         } else {
             None
         }
@@ -258,53 +245,24 @@ impl<'session> Session<'session> {
         _ = self.timer.start();
 
         if !self.errors.is_empty() {
-            for error in &self.errors {
-                match error {
-                    SessionError::Initialize(error) => self.report_error(error),
-                    SessionError::Scan(error) => self.report_error(error),
-                    SessionError::Parse(error) => self.report_error(error),
-                    SessionError::Resolve(error) => self.report_error(error),
-                    SessionError::Analyze(error) => self.report_error(error),
-                    #[cfg(feature = "interpreter")]
-                    SessionError::Interpret(error) => self.report_error(error),
-                    #[cfg(feature = "generator")]
-                    SessionError::Generate(error) => self.report_error(error),
-                    SessionError::Track(error) => self.report_error(error),
-                }
-            }
+            self.report_all();
             return self;
         }
 
         let store = Arc::new(Lock::new(self));
         let mut operator = Operator::new(store.clone());
-
         operator.execute(&mut pipeline);
 
         let mut session = store.write().unwrap();
-
         _ = session.timer.lap();
         let sum = session.timer.laps().iter().copied().sum::<u64>();
         let internal = Duration::from_nanos(sum);
 
         session.report_finish("pipeline", internal, session.errors.len());
-
         let total = Duration::from_nanos(session.timer.stop().unwrap());
         session.report_finish("compilation", total, session.errors.len());
 
-        for error in &session.errors {
-            match error {
-                SessionError::Initialize(error) => session.report_error(error),
-                SessionError::Scan(error) => session.report_error(error),
-                SessionError::Parse(error) => session.report_error(error),
-                SessionError::Resolve(error) => session.report_error(error),
-                SessionError::Analyze(error) => session.report_error(error),
-                #[cfg(feature = "interpreter")]
-                SessionError::Interpret(error) => session.report_error(error),
-                #[cfg(feature = "generator")]
-                SessionError::Generate(error) => session.report_error(error),
-                SessionError::Track(error) => session.report_error(error),
-            }
-        }
+        session.report_all();
 
         drop(session);
         drop(operator);

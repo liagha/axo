@@ -18,16 +18,12 @@ use {
             memory::Arc,
         },
         combinator::{Action, Operation, Operator},
-        generator::inkwell::error::*,
         reporter::Error,
         tracker::{Span, error::ErrorKind as TrackErrorKind, TrackError},
     },
-    inkwell::{
-        Context, ContextRef, TargetMachine,
-    },
 };
 
-pub use {backend::Backend, inkwell::Generator};
+pub use {backend::Backend, inkwell::*};
 
 pub type GenerateError<'error> = Error<'error, ErrorKind<'error>>;
 

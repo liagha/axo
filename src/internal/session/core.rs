@@ -28,14 +28,14 @@ pub enum RecordKind {
 }
 
 impl RecordKind {
-    pub fn from_path(string: &str) -> Option<Self> {
-        if string.ends_with(".axo") {
+    pub fn from_path(path: &str) -> Option<Self> {
+        if path.ends_with(".axo") {
             Some(RecordKind::Source)
-        } else if string.ends_with(".ll") {
+        } else if path.ends_with(".ll") {
             Some(RecordKind::Schema)
-        } else if string.ends_with(".o") {
+        } else if path.ends_with(".o") {
             Some(RecordKind::Object)
-        } else if string.ends_with(".c") {
+        } else if path.ends_with(".c") {
             Some(RecordKind::C)
         } else {
             None
@@ -92,6 +92,7 @@ pub struct Session<'session> {
     pub errors: Vec<SessionError<'session>>,
     pub target: Option<Location<'session>>,
     pub cache: Map<Location<'session>, u64>,
+    pub buffers: Vec<Vec<u8>>,
 }
 
 impl<'session> Session<'session> {
@@ -128,9 +129,7 @@ impl<'session> Session<'session> {
                      kind: TokenKind::Integer(_),
                      ..
                  }) => Some(Stencil::default()),
-            _ => {
-                None
-            },
+            _ => None,
         }
     }
 
@@ -207,7 +206,7 @@ impl<'session> Session<'session> {
         xprintln!("{}", error);
         xprintln!();
     }
-    
+
     pub fn report_all(&self) {
         for error in &self.errors {
             match error {
@@ -222,7 +221,7 @@ impl<'session> Session<'session> {
                 #[cfg(feature = "generator")]
                 SessionError::Generate(error) => self.report_error(error),
             }
-        } 
+        }
     }
 
     pub fn base(&self) -> PathBuf {
@@ -242,7 +241,6 @@ impl<'session> Session<'session> {
         for path in &paths[1..] {
             let parent = path.parent().unwrap_or(path);
             let mut current = PathBuf::new();
-
             let mut left = base.components();
             let mut right = parent.components();
 
@@ -253,7 +251,6 @@ impl<'session> Session<'session> {
                     break;
                 }
             }
-
             base = current;
         }
 
@@ -265,8 +262,7 @@ impl<'session> Session<'session> {
     }
 
     pub fn manifest(&self) -> PathBuf {
-        let base = self.base();
-        base.join("build").join("records").join("manifest")
+        self.base().join("build").join("records").join("manifest")
     }
 
     pub fn schema(base: &PathBuf, location: Location<'session>) -> Location<'session> {

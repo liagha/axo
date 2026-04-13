@@ -63,7 +63,6 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 Err(error) => {
                     let kind = ErrorKind::Tracking(error.clone());
                     let error = ScanError::new(kind, error.span);
-
                     session.errors.push(SessionError::Scan(error));
                     continue;
                 }
@@ -72,7 +71,6 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
         let position = crate::tracker::Position::new(location);
         let mut scanner = Scanner::new(position, content);
-
         scanner.scan();
 
         if let Some(stencil) = session.get_stencil() {
@@ -108,7 +106,6 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
-
         let initial = session.errors.len();
         session.report_start("scanning");
 
@@ -124,7 +121,6 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
 
@@ -132,7 +128,6 @@ impl<'source> Default for Scanner<'source> {
     fn default() -> Self {
         let location = crate::tracker::Location::Entry(crate::data::Str::from(file!()));
         let position = crate::tracker::Position::new(location);
-
         Scanner::new(position, crate::data::Str::from(""))
     }
 }

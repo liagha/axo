@@ -13,7 +13,7 @@ use axo::{
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     resolver::{Resolver},
     scanner::{Token, TokenKind},
-    tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError, Position},
+    tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError},
 };
 
 #[cfg(feature = "interpreter")]
@@ -36,47 +36,7 @@ pub const BASE: &[(&str, &str)] = &[
     ("./base/input.c", include_str!("../base/input.c")),
 ];
 
-macro_rules! inspect_type {
-    ($t:ty) => {
-        println!(
-            "{:.<50} Size: {:>3} bytes | Align: {:>2} bytes",
-            stringify!($t),
-            std::mem::size_of::<$t>(),
-            std::mem::align_of::<$t>()
-        );
-    };
-}
-
-pub fn memory_inspection() {
-    println!("{:-^75}", " TRACKER ");
-    inspect_type!(Location);
-    inspect_type!(Position);
-    inspect_type!(Span);
-
-    println!("\n{:-^75}", " SCANNER ");
-    inspect_type!(axo::data::Float);
-    inspect_type!(axo::data::Integer);
-    inspect_type!(Str);
-    inspect_type!(axo::scanner::OperatorKind);
-    inspect_type!(axo::scanner::PunctuationKind);
-    inspect_type!(TokenKind);
-    inspect_type!(Token);
-
-    println!("\n{:-^75}", " RESOLVER ");
-    inspect_type!(axo::resolver::TypeKind);
-    inspect_type!(axo::resolver::Type);
-    inspect_type!(axo::resolver::Scope);
-
-    println!("\n{:-^75}", " PARSER");
-    inspect_type!(ElementKind);
-    inspect_type!(Element);
-    inspect_type!(SymbolKind);
-    inspect_type!(Symbol);
-}
-
 fn main() {
-    //memory_inspection();
-    
     let mut initializer = Initializer::new(Location::Flag);
     let targets = initializer.initialize();
 
@@ -182,13 +142,10 @@ pub fn create<'a>(
             if let Some(kind) = RecordKind::from_path(path) {
                 let string = path.to_string();
                 let location = Location::Entry(Str::from(string.clone()));
-
                 let mut hasher = DefaultHasher::new();
                 Hash::hash(&string, &mut hasher);
-
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
                 let mut record = Record::new(kind, location);
-
                 record.content = Some(content.to_string());
                 records.insert(identity, record);
             }
@@ -213,7 +170,6 @@ pub fn create<'a>(
         .with_members(directives);
 
     resolver.insert(directive);
-
     _ = timer.lap();
 
     Session {
@@ -224,6 +180,7 @@ pub fn create<'a>(
         errors: failures,
         target: None,
         cache,
+        buffers: Vec::new(),
     }
 }
 
@@ -246,12 +203,10 @@ pub fn traverse<'a>(target: &Location<'a>, records: &mut Map<Identity, Record<'a
                     stack.push(child);
                 } else {
                     let string = child.to_string_lossy().into_owned();
-
                     if let Some(kind) = RecordKind::from_path(&string) {
                         let location = Location::Entry(Str::from(string.clone()));
                         let mut hasher = DefaultHasher::new();
                         Hash::hash(&string, &mut hasher);
-
                         let identity = (hasher.finish() as Identity) | 0x40000000;
                         records.insert(identity, Record::new(kind, location));
                     }

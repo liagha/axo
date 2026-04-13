@@ -9,9 +9,7 @@ mod primitives;
 mod variables;
 
 pub use {
-    crate::{
-        error::*,  
-    },
+    error::*,
     inkwell::{
         context::{Context, ContextRef},
         targets::TargetMachine,
@@ -22,7 +20,7 @@ use {
     crate::{
         analyzer::{Analysis, AnalysisKind},
         data::Str,
-        generator::{Backend, ErrorKind, GenerateError},
+        generator::{Backend, GenerateError},
         internal::hash::Map,
         resolver::{Type, TypeKind},
         tracker::Span,

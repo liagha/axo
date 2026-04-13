@@ -14,7 +14,6 @@ pub use {
 
 use {
     broccli::Color,
-    
     crate::{
         reporter::Error,
         combinator::{Action, Operation, Operator},
@@ -97,7 +96,6 @@ Action<
         operation: &mut Operation<'source, Arc<Lock<Session<'source>>>>,
     ) -> () {
         let mut session = operator.store.write().unwrap();
-
         let initial = session.errors.len();
         session.report_start("parsing");
 
@@ -113,7 +111,6 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
 

@@ -11,7 +11,6 @@ pub use {resolver::*, scope::*, typing::*, error::*};
 
 use {
     broccli::Color,
-    
     crate::{
         data::{
             memory::Arc,
@@ -50,11 +49,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         .iter()
         .copied()
         .filter(|key| {
-            session
-                .records
-                .get(key)
-                .map(|record| record.kind == RecordKind::Source)
-                .unwrap_or(false)
+            session.records.get(key).map_or(false, |r| r.kind == RecordKind::Source)
         })
         .collect();
     source.sort();
@@ -63,29 +58,26 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         .iter()
         .filter_map(|&identity| {
             let record = session.records.get_mut(&identity).unwrap();
-            let stem = Str::from(record.location.stem().unwrap().to_string());
+            let name = Str::from(record.location.stem().unwrap().to_string());
 
-            if let Some(module) = session
-                .resolver
-                .registry
-                .values()
-                .find(|symbol| {
-                    matches!(symbol.kind, SymbolKind::Module(_))
-                        && symbol.target() == Some(stem)
-                })
-                .cloned()
-            {
-                record.module = Some(module.identity);
+            let existing = session.resolver.registry.iter().find_map(|(&id, symbol)| {
+                if matches!(symbol.kind, SymbolKind::Module(_)) && symbol.target() == Some(name.clone()) {
+                    Some(id)
+                } else {
+                    None
+                }
+            });
+
+            if let Some(target) = existing {
+                record.module = Some(target);
                 return None;
             }
 
             let span = Span::file(Str::from(record.location.to_string())).unwrap_or_else(|_| Span::void());
-
             let head = Element::new(
-                ElementKind::literal(Token::new(TokenKind::identifier(stem), span)),
+                ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
                 span,
-            )
-                .into();
+            ).into();
 
             let mut symbol = Symbol::new(
                 SymbolKind::module(Module::new(head)),
@@ -94,7 +86,6 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             );
 
             symbol.identity = identity;
-
             record.module = Some(symbol.identity);
             Some(symbol)
         })
@@ -106,26 +97,17 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
-        let mut module = session.resolver.get_symbol(target).unwrap().clone();
+        let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Scope::new(None));
-
         session.resolver.enter_scope(scope);
 
-        let elements = session
-            .records
-            .get_mut(&key)
-            .unwrap()
-            .elements
-            .as_mut()
-            .unwrap();
-
+        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
             element.declare(&mut session.resolver);
         }
 
         let active = session.resolver.active;
         session.resolver.exit();
-
         module.set_scope(session.resolver.scopes.remove(&active).unwrap());
         session.resolver.insert(module);
     }
@@ -161,52 +143,34 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
-        let mut module = session.resolver.get_symbol(target).unwrap().clone();
+        let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Scope::new(None));
-
         session.resolver.enter_scope(scope);
 
-        let elements = session
-            .records
-            .get_mut(&key)
-            .unwrap()
-            .elements
-            .as_mut()
-            .unwrap();
-
+        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
             element.resolve(&mut session.resolver);
         }
 
         let active = session.resolver.active;
         session.resolver.exit();
-
         module.scope = session.resolver.scopes.remove(&active).unwrap();
         session.resolver.insert(module);
     }
 
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
-        let mut module = session.resolver.get_symbol(target).unwrap().clone();
+        let mut module = session.resolver.registry.remove(&target).unwrap();
         let scope = replace(&mut module.scope, Scope::new(None));
-
         session.resolver.enter_scope(scope);
 
-        let elements = session
-            .records
-            .get_mut(&key)
-            .unwrap()
-            .elements
-            .as_mut()
-            .unwrap();
-
+        let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
             element.reify(&mut session.resolver);
         }
 
         let active = session.resolver.active;
         session.resolver.exit();
-
         module.scope = session.resolver.scopes.remove(&active).unwrap();
         session.resolver.insert(module);
     }
@@ -230,7 +194,6 @@ Action<
     ) -> () {
         let mut guard = operator.store.write().unwrap();
         let session = &mut *guard;
-
         let initial = session.errors.len();
         session.report_start("resolving");
 
@@ -246,7 +209,6 @@ Action<
         } else {
             operation.set_reject();
         }
-        ()
     }
 }
 
