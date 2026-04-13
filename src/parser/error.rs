@@ -5,10 +5,12 @@ use crate::{
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
+    Expected(&'static str),
     ExpectedName,
     ExpectedHead,
     ExpectedBody,
     ExpectedAnnotation,
+    ExpectedToken(TokenKind<'error>),
     MissingSeparator(TokenKind<'error>),
     UnclosedDelimiter(TokenKind<'error>),
     UnexpectedToken(TokenKind<'error>),
@@ -17,6 +19,9 @@ pub enum ErrorKind<'error> {
 impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
+            ErrorKind::Expected(label) => {
+                write!(f, "expected {}.", label)
+            }
             ErrorKind::ExpectedName => {
                 write!(f, "expected a name.")
             }
@@ -28,6 +33,13 @@ impl<'error> Display for ErrorKind<'error> {
             }
             ErrorKind::ExpectedAnnotation => {
                 write!(f, "expected an annotation.")
+            }
+            ErrorKind::ExpectedToken(kind) => {
+                write!(
+                    f,
+                    "expected `{}`.",
+                    kind.format(Stencil::default())
+                )
             }
             ErrorKind::MissingSeparator(kind) => {
                 write!(

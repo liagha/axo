@@ -6,10 +6,83 @@ use crate::{
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
-    tracker::{Span, Spanned},
+    tracker::{Peekable, Span, Spanned},
 };
 
 impl<'a> Parser<'a> {
+    fn consumed<'source>(
+        former: &crate::combinator::Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        classifier: &crate::combinator::Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Vec<Token<'a>> {
+        classifier
+            .consumed
+            .iter()
+            .filter_map(|index| former.consumed.get(*index).cloned())
+            .collect()
+    }
+
+    fn span<'source>(
+        former: &crate::combinator::Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        classifier: &crate::combinator::Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> Span {
+        let consumed = Self::consumed(former, classifier);
+        if consumed.is_empty() {
+            if let Some(next) = former.source.get(classifier.marker) {
+                next.span
+            } else {
+                Span::point(classifier.state)
+            }
+        } else {
+            consumed.span()
+        }
+    }
+
+    fn expected<'source>(
+        label: &'static str,
+        former: &crate::combinator::Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        classifier: &crate::combinator::Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> ParseError<'a> {
+        ParseError::new(ErrorKind::Expected(label), Self::span(former, classifier))
+    }
+
+    fn closing(kind: &TokenKind<'a>) -> bool {
+        matches!(
+            kind,
+            TokenKind::Punctuation(
+                PunctuationKind::RightParenthesis
+                    | PunctuationKind::RightBracket
+                    | PunctuationKind::RightBrace
+            )
+        )
+    }
+
+    fn delimiter<'source>(
+        open: PunctuationKind,
+        close: PunctuationKind,
+        separator: PunctuationKind,
+        former: &crate::combinator::Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        classifier: &crate::combinator::Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> ParseError<'a> {
+        if let Some(token) = former.source.get(classifier.marker) {
+            if Self::closing(&token.kind) {
+                return ParseError::new(
+                    ErrorKind::ExpectedToken(TokenKind::Punctuation(close)),
+                    token.span,
+                );
+            }
+
+            return ParseError::new(
+                ErrorKind::MissingSeparator(TokenKind::Punctuation(separator)),
+                token.span,
+            );
+        }
+
+        ParseError::new(
+            ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(open)),
+            Self::span(former, classifier),
+        )
+    }
+
     pub fn get_body(element: Element<'a>) -> Vec<Element<'a>> {
         match element.kind {
             ElementKind::Delimited(delimited) => delimited.members,

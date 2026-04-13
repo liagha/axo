@@ -1,7 +1,7 @@
 use crate::{
     combinator::{Classifier, Form},
     data::*,
-    parser::{Element, ElementKind, ErrorKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
+    parser::{Element, ElementKind, ParseError, Parser, Symbol, SymbolKind, Visibility},
     scanner::{OperatorKind, Token, TokenKind},
     tracker::{Span, Spanned},
 };
@@ -28,14 +28,7 @@ impl<'a> Parser<'a> {
                 }
             }),
             Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
-                    .consumed
-                    .iter()
-                    .map(|index| former.consumed.get(*index).unwrap().clone())
-                    .collect::<Vec<_>>();
-                let span = consumed.span();
-
-                ParseError::new(ErrorKind::ExpectedBody, span)
+                Self::expected("a binding body", former, &classifier)
             }),
         ])
             .with_transform(|former, classifier| {
@@ -128,25 +121,11 @@ impl<'a> Parser<'a> {
                     }
                 }),
                 Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
-                        .consumed
-                        .iter()
-                        .map(|index| former.consumed.get(*index).unwrap().clone())
-                        .collect::<Vec<_>>();
-                    let span = consumed.span();
-
-                    ParseError::new(ErrorKind::ExpectedHead, span)
+                    Self::expected("a struct name", former, &classifier)
                 }),
             ]),
             Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
-                    .consumed
-                    .iter()
-                    .map(|index| former.consumed.get(*index).unwrap().clone())
-                    .collect::<Vec<_>>();
-                let span = consumed.span();
-
-                ParseError::new(ErrorKind::ExpectedBody, span)
+                Self::expected("a struct body", former, &classifier)
             }),
         ])
             .with_transform(|former, classifier| {
@@ -213,25 +192,11 @@ impl<'a> Parser<'a> {
                     }
                 }),
                 Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
-                        .consumed
-                        .iter()
-                        .map(|index| former.consumed.get(*index).unwrap().clone())
-                        .collect::<Vec<_>>();
-                    let span = consumed.span();
-
-                    ParseError::new(ErrorKind::ExpectedHead, span)
+                    Self::expected("a union name", former, &classifier)
                 }),
             ]),
             Classifier::deferred(Self::expression).with_panic(|former, classifier| {
-                let consumed = classifier
-                    .consumed
-                    .iter()
-                    .map(|index| former.consumed.get(*index).unwrap().clone())
-                    .collect::<Vec<_>>();
-                let span = consumed.span();
-
-                ParseError::new(ErrorKind::ExpectedBody, span)
+                Self::expected("a union body", former, &classifier)
             }),
         ])
             .with_transform(|former, classifier| {
@@ -298,14 +263,7 @@ impl<'a> Parser<'a> {
                     }
                 }),
                 Classifier::deferred(Self::literal).with_panic(|former, classifier| {
-                    let consumed = classifier
-                        .consumed
-                        .iter()
-                        .map(|index| former.consumed.get(*index).unwrap().clone())
-                        .collect::<Vec<_>>();
-                    let span = consumed.span();
-
-                    ParseError::new(ErrorKind::ExpectedName, span)
+                    Self::expected("a function name", former, &classifier)
                 }),
                 Self::group(Classifier::alternative([
                     Classifier::deferred(Self::symbolization),
@@ -343,14 +301,7 @@ impl<'a> Parser<'a> {
                         }),
                 ]))
                     .with_panic(|former, classifier| {
-                        let stack = classifier
-                            .stack
-                            .iter()
-                            .map(|index| former.forms.get(*index).unwrap().clone())
-                            .collect::<Vec<_>>();
-                        let span = stack.span();
-
-                        ParseError::new(ErrorKind::ExpectedHead, span)
+                        Self::expected("a function head", former, &classifier)
                     }),
                 Classifier::sequence([
                     Classifier::predicate(|token: &Token| {
@@ -366,14 +317,7 @@ impl<'a> Parser<'a> {
                         Classifier::deferred(Self::primary),
                     ])
                         .with_panic(|former, classifier| {
-                            let stack = classifier
-                                .stack
-                                .iter()
-                                .map(|index| former.forms.get(*index).unwrap().clone())
-                                .collect::<Vec<_>>();
-                            let span = stack.span();
-
-                            ParseError::new(ErrorKind::ExpectedAnnotation, span)
+                            Self::expected("a function return type", former, &classifier)
                         }),
                 ])
                     .with_transform(|former, classifier| {
