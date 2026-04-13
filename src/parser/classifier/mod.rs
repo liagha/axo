@@ -126,7 +126,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn apply_suffix(target: Element<'a>, suffix: Element<'a>, span: Span<'a>) -> Element<'a> {
+    fn apply_suffix(target: Element<'a>, suffix: Element<'a>, span: Span) -> Element<'a> {
         let ElementKind::Delimited(delimited) = suffix.kind else {
             return target;
         };

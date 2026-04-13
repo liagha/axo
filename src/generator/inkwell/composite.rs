@@ -27,7 +27,7 @@ impl<'backend> Generator<'backend> {
     pub fn trap(
         &self,
         condition: Option<IntValue<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<(), GenerateError<'backend>> {
         let module = self.current_module();
 
@@ -100,7 +100,7 @@ impl<'backend> Generator<'backend> {
     pub fn declare_structure(
         &mut self,
         structure: Aggregate<Str<'backend>, Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<(), GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
@@ -124,7 +124,7 @@ impl<'backend> Generator<'backend> {
     pub fn define_structure(
         &mut self,
         structure: Aggregate<Str<'backend>, Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = structure.target.clone();
         let name = identifier.as_str().unwrap_or("structure");
@@ -159,7 +159,7 @@ impl<'backend> Generator<'backend> {
     pub fn declare_union(
         &mut self,
         union: Aggregate<Str<'backend>, Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<(), GenerateError<'backend>> {
         let identifier = union.target.clone();
         let name = identifier.as_str().unwrap_or("union");
@@ -183,7 +183,7 @@ impl<'backend> Generator<'backend> {
     pub fn define_union(
         &mut self,
         union: Aggregate<Str<'backend>, Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = union.target.clone();
         let name = identifier.as_str().unwrap_or("union");
@@ -230,7 +230,7 @@ impl<'backend> Generator<'backend> {
     pub fn constructor(
         &mut self,
         constructor: Aggregate<Str<'backend>, Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let identifier = constructor.target.clone();
         let target = identifier.as_str().unwrap_or("").to_string();
@@ -415,7 +415,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         target: Box<Analysis<'backend>>,
         member: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if self.namespace(&target) {
             return match &member.kind {
@@ -596,7 +596,7 @@ impl<'backend> Generator<'backend> {
     pub fn array(
         &mut self,
         items: Vec<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if items.is_empty() {
             return Err(GenerateError::new(
@@ -659,7 +659,7 @@ impl<'backend> Generator<'backend> {
     pub fn tuple(
         &mut self,
         items: Vec<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut values = Vec::with_capacity(items.len());
 
@@ -685,7 +685,7 @@ impl<'backend> Generator<'backend> {
     pub fn index(
         &mut self,
         data: Index<Box<Analysis<'backend>>, Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if data.members.is_empty() {
             return Err(GenerateError::new(

@@ -12,7 +12,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -39,7 +39,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -65,7 +65,7 @@ impl<'backend> Generator<'backend> {
     pub fn bitwise_not(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*operand)?;
 
@@ -89,7 +89,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -116,7 +116,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -156,7 +156,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let first = self.infer_signedness(&left).unwrap_or(true);
         let second = self.infer_signedness(&right).unwrap_or(true);

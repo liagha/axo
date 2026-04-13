@@ -12,7 +12,7 @@ use crate::{
 };
 
 impl<'a> Scanner<'a> {
-    fn string<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn string<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::sequence([
             Classifier::literal('"').with_ignore(),
             Classifier::repetition(
@@ -37,7 +37,7 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    fn backtick<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn backtick<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::sequence([
             Classifier::literal('`').with_ignore(),
@@ -63,7 +63,7 @@ impl<'a> Scanner<'a> {
         })
     }
 
-    fn character<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn character<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::sequence([
             Classifier::literal('\''),
@@ -88,7 +88,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::predicate(|c: &Character| c.is_alphabetic() || *c == '_'),
@@ -117,7 +117,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn operator<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn operator<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::with_transform(
             Classifier::persistence(
@@ -139,7 +139,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn punctuation<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_punctuation()),
             |former, classifier| {
@@ -159,7 +159,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn whitespace<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::predicate(|c: &Character| c.is_whitespace() && *c != '\n'),
             |former, classifier| {
@@ -174,7 +174,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn comment<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn comment<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::with_transform(
             Classifier::sequence([Classifier::alternative([
@@ -212,7 +212,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn fallback<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn fallback<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::with_action(
             Classifier::anything(),
@@ -229,7 +229,7 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn classifier<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::persistence(
             Classifier::alternative([
                 Self::whitespace(),

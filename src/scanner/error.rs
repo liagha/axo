@@ -8,14 +8,14 @@ use crate::{
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
     Tracking(TrackError<'error>),
-    InvalidCharacter(CharacterError<'error>),
+    InvalidCharacter(CharacterError),
     InvalidEscape(EscapeError),
     NumberParse(ParseNumberError),
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]
-pub enum CharacterError<'error> {
-    Unexpected(Character<'error>),
+pub enum CharacterError {
+    Unexpected(Character),
     OutOfRange,
     Surrogate,
 }

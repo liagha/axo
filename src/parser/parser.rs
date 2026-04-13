@@ -8,44 +8,36 @@ use crate::{
 
 pub struct Parser<'a> {
     pub index: Offset,
-    pub position: Position<'a>,
+    pub state: Position,
     pub input: Vec<Token<'a>>,
     pub output: Vec<Element<'a>>,
     pub errors: Vec<ParseError<'a>>,
 }
 
 impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
-    #[inline]
+    type State = Position;
+
     fn length(&self) -> Scale {
         self.input.len()
     }
 
     fn peek_ahead(&self, n: Offset) -> Option<&Token<'a>> {
-        let current = self.index + n;
-
-        self.get(current)
+        self.get(self.index + n)
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
-        self.index
-            .checked_sub(n)
-            .and_then(|current| self.get(current))
+        self.index.checked_sub(n).and_then(|current| self.get(current))
     }
 
-    fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
-        if let Some(token) = self.get(*index) {
-            *position = Position {
-                line: token.span.end_line,
-                column: token.span.end_column,
-                location: token.span.location,
-            };
+    fn origin(&self) -> Self::State {
+        Position::new(self.state.identity)
+    }
 
-            *index += 1;
-
-            return Some(token.clone());
-        }
-
-        None
+    fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Token<'a>> {
+        let token = self.get(*index)?;
+        *state = Position { identity: token.span.identity, offset: token.span.end };
+        *index += 1;
+        Some(token.clone())
     }
 
     fn input(&self) -> &Vec<Token<'a>> {
@@ -56,12 +48,12 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
         &mut self.input
     }
 
-    fn position(&self) -> Position<'a> {
-        self.position.clone()
+    fn state(&self) -> Self::State {
+        self.state
     }
 
-    fn position_mut(&mut self) -> &mut Position<'a> {
-        &mut self.position
+    fn state_mut(&mut self) -> &mut Self::State {
+        &mut self.state
     }
 
     fn index(&self) -> Offset {
@@ -74,19 +66,17 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 }
 
 impl<'a: 'source, 'source> Parser<'a> {
-    pub fn new(location: Location<'a>) -> Self {
+    pub fn new(_: Location<'a>) -> Self {
         Parser {
             index: 0,
-            position: Position::new(location),
+            state: Position::new(0),
             input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
         }
     }
 
-    pub fn filter(
-        length: Scale,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn filter(length: Scale) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(|token: &Token| {
@@ -132,14 +122,8 @@ impl<'a: 'source, 'source> Parser<'a> {
 
         for form in forms {
             match form {
-                Form::Output(output) => {
-                    self.output.push(output);
-                }
-
-                Form::Failure(failure) => {
-                    self.errors.push(failure);
-                }
-
+                Form::Output(output) => self.output.push(output),
+                Form::Failure(failure) => self.errors.push(failure),
                 _ => {}
             }
         }

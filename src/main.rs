@@ -96,7 +96,7 @@ pub fn run<'a>(
 }
 
 fn build(
-    targets: Vec<(Location<'static>, Span<'static>)>,
+    targets: Vec<(Location<'static>, Span)>,
     bare: bool,
     directives: Vec<Symbol>,
     failures: Vec<SessionError<'static>>,
@@ -146,7 +146,7 @@ pub fn create<'a>(
                 Hash::hash(&string, &mut hasher);
                 let identity = (hasher.finish() as Identity) & 0x3FFFFFFF;
                 let mut record = Record::new(kind, location);
-                record.content = Some(content.to_string());
+                record.set_content(content.to_string());
                 records.insert(identity, record);
             }
         }

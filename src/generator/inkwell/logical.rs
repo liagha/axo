@@ -11,7 +11,7 @@ impl<'backend> Generator<'backend> {
     fn check_boolean(
         &self,
         value: BasicValueEnum<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<IntValue<'backend>, GenerateError<'backend>> {
         if !value.is_int_value() || value.into_int_value().get_type().get_bit_width() != 1 {
             return Err(GenerateError::new(ErrorKind::Boolean, span));
@@ -24,7 +24,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let primary = self.check_boolean(alpha, span)?;
@@ -70,7 +70,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let primary = self.check_boolean(alpha, span)?;
@@ -115,7 +115,7 @@ impl<'backend> Generator<'backend> {
     pub fn logical_not(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*operand)?;
 
@@ -132,7 +132,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;

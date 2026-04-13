@@ -8,7 +8,7 @@ use crate::{
 #[derive(Clone, Hash, Orbyte)]
 pub struct Token<'token> {
     pub kind: TokenKind<'token>,
-    pub span: Span<'token>,
+    pub span: Span,
 }
 
 #[derive(Clone, Eq, Hash, Orbyte, PartialEq)]
@@ -25,7 +25,7 @@ pub enum TokenKind<'token> {
 }
 
 impl<'token> Token<'token> {
-    pub fn new(kind: TokenKind<'token>, span: Span<'token>) -> Self {
+    pub fn new(kind: TokenKind<'token>, span: Span) -> Self {
         Self { kind, span }
     }
 }

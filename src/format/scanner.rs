@@ -3,7 +3,7 @@ use crate::{
     scanner::{Character, Token, TokenKind},
 };
 
-impl<'character> Show<'character> for Character<'character> {
+impl<'character> Show<'character> for Character {
     fn format(&self, config: Stencil) -> Stencil {
         config
             .clone()

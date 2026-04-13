@@ -143,6 +143,7 @@ impl Scope {
                 },
                 span: target.span.clone(),
                 hints: Vec::new(),
+                phantom: Default::default(),
             }])
         }
     }

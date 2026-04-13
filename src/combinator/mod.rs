@@ -16,11 +16,11 @@ pub(super) fn next_identity() -> Identity {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-use crate::{data::memory::PhantomData, format::Show, internal::hash::Hash, tracker::Spanned};
+use crate::{data::memory::PhantomData, format::Show, internal::hash::Hash};
 
-pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
+pub trait Formable<'a>: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
-impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + Spanned<'a> + 'a {}
+impl<'a, T> Formable<'a> for T where T: Clone + Eq + Hash + PartialEq + Show<'a> + 'a {}
 
 pub trait Action<'a, Host, State>: Send + Sync {
     fn action(&self, host: &mut Host, state: &mut State);
@@ -78,7 +78,7 @@ pub struct Optional<State> {
 pub struct Alternative<State, const SIZE: Scale> {
     pub states: [State; SIZE],
     pub halt: fn(&State) -> bool,
-    pub compare: fn(new: &State, old: &State) -> bool,
+    pub compare: fn(&State, &State) -> bool,
 }
 
 pub struct Sequence<State, const SIZE: Scale> {

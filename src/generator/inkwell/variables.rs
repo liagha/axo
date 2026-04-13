@@ -283,7 +283,7 @@ impl<'backend> Generator<'backend> {
     pub fn address_of(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some((pointer, _)) = self.lvalue(&operand)? {
             Ok(pointer.into())
@@ -298,7 +298,7 @@ impl<'backend> Generator<'backend> {
     pub fn dereference(
         &mut self,
         operand: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let pointee = self.pointee(&operand);
         let value = self.analysis(*operand.clone())?;
@@ -328,7 +328,7 @@ impl<'backend> Generator<'backend> {
     pub fn usage(
         &self,
         identifier: Str<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(entity) = self.get_entity(&identifier) {
             return match entity {
@@ -416,7 +416,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         target: Str<'backend>,
         value: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let result = self.analysis(*value)?;
 
@@ -457,7 +457,7 @@ impl<'backend> Generator<'backend> {
     pub fn binding(
         &mut self,
         binding: Binding<Box<Analysis<'backend>>, Box<Analysis<'backend>>, Type<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         match binding.target.kind {
             AnalysisKind::Usage(target) => match binding.kind {
@@ -576,7 +576,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         target: Box<Analysis<'backend>>,
         value: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let result = self.analysis(*value.clone())?;
 

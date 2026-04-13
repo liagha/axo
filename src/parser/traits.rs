@@ -16,14 +16,14 @@ impl<'element> Hash for Element<'element> {
 
 impl<'element> Spanned<'element> for Element<'element> {
     #[track_caller]
-    fn span(&self) -> Span<'element> {
+    fn span(&self) -> Span {
         self.span
     }
 }
 
 impl<'symbol> Spanned<'symbol> for Symbol<'symbol> {
     #[track_caller]
-    fn span(&self) -> Span<'symbol> {
+    fn span(&self) -> Span {
         self.span
     }
 }

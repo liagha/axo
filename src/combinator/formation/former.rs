@@ -88,6 +88,7 @@ pub mod outcome {
     }
 }
 
+use crate::combinator::outcome::Outcome;
 use crate::{
     combinator::{Action, Classifier, Form, Formable},
     data::{
@@ -95,9 +96,8 @@ use crate::{
         Identity, Offset,
     },
     internal::hash::Map,
-    tracker::{Peekable, Position},
+    tracker::Peekable,
 };
-use crate::combinator::outcome::Outcome;
 
 pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
     usize,
@@ -106,7 +106,9 @@ pub type Stash<'a, 'source, Source, Input, Output, Failure> = Vec<(
             'a,
             Former<'a, 'source, Source, Input, Output, Failure>,
             Classifier<'a, 'source, Source, Input, Output, Failure>,
-        > + Send + Sync + 'source,
+        > + Send
+            + Sync
+            + 'source,
     >,
 )>;
 
@@ -120,16 +122,24 @@ pub struct Record<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formab
     pub input_base: Offset,
 }
 
-pub struct Memo<'a, Input: Formable<'a>, Output: Formable<'a>, Failure: Formable<'a>> {
+pub struct Memo<'a, Source, Input, Output, Failure>
+where
+    Source: Peekable<'a, Input>,
+    Source::State: Default,
+    Input: Formable<'a>,
+    Output: Formable<'a>,
+    Failure: Formable<'a>,
+{
     pub outcome: Outcome,
     pub advance: Offset,
-    pub position: Position<'a>,
+    pub state: Source::State,
     pub record: Option<Box<Record<'a, Input, Output, Failure>>>,
 }
 
 pub struct Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -138,13 +148,13 @@ where
     pub consumed: Vec<Input>,
     pub forms: Vec<Form<'a, Input, Output, Failure>>,
     pub stash: Stash<'a, 'source, Source, Input, Output, Failure>,
-    pub memo: Map<(usize, Offset), Memo<'a, Input, Output, Failure>>,
+    pub memo: Map<(usize, Offset), Memo<'a, Source, Input, Output, Failure>>,
 }
 
-impl<'a, 'source, Source, Input, Output, Failure>
-Former<'a, 'source, Source, Input, Output, Failure>
+impl<'a, 'source, Source, Input, Output, Failure> Former<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -161,10 +171,7 @@ where
     }
 
     #[inline(always)]
-    pub fn build(
-        &mut self,
-        classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>,
-    ) {
+    pub fn build(&mut self, classifier: &mut Classifier<'a, 'source, Source, Input, Output, Failure>) {
         let action = classifier.action.clone();
         action.action(self, classifier);
     }
@@ -174,14 +181,12 @@ where
         &mut self,
         classifier: Classifier<'a, 'source, Source, Input, Output, Failure>,
     ) -> Form<'a, Input, Output, Failure> {
-        let initial = self.source.position();
-        let mut active = Classifier::new(classifier.action.clone(), 0, initial);
-
+        let mut active = Classifier::new(classifier.action.clone(), 0, self.source.origin());
         self.build(&mut active);
 
         if matches!(active.outcome, Outcome::Aligned | Outcome::Failed) {
             self.source.set_index(active.marker);
-            self.source.set_position(active.position);
+            self.source.set_state(active.state);
         }
 
         replace(&mut self.forms[active.form], Form::Blank)

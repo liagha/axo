@@ -4,14 +4,14 @@ use crate::{data::*, resolver::Type, tracker::Span};
 #[derive(Clone, Debug, Orbyte)]
 pub struct Analysis<'analysis> {
     pub kind: AnalysisKind<'analysis>,
-    pub span: Span<'analysis>,
+    pub span: Span,
     pub typing: Type<'analysis>,
 }
 
 impl<'analysis> Analysis<'analysis> {
     pub fn new(
         kind: AnalysisKind<'analysis>,
-        span: Span<'analysis>,
+        span: Span,
         typing: Type<'analysis>,
     ) -> Self {
         Self { kind, span, typing }

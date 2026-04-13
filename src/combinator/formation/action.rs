@@ -17,6 +17,7 @@ for Multiple<
 >
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -41,6 +42,7 @@ Action<
 > for Ignore
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -66,6 +68,7 @@ Action<
 > for Skip
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -98,6 +101,7 @@ for Transform<
 >
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -135,6 +139,7 @@ for Fail<
 >
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -172,6 +177,7 @@ for Panic<
 >
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,

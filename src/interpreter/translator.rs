@@ -20,7 +20,7 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn emit(&mut self, opcode: Opcode, span: Span<'error>) {
+    fn emit(&mut self, opcode: Opcode, span: Span) {
         self.code.push(Instruction { opcode, span });
     }
 
@@ -159,7 +159,7 @@ impl<'error> Interpreter<'error> {
             Option<Box<Analysis<'error>>>,
             Option<crate::resolver::Type<'error>>,
         >,
-        span: Span<'error>,
+        span: Span,
     ) {
         let bypass = self.code.len();
         self.emit(Opcode::Jump(0), span.clone());
@@ -303,7 +303,7 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn invoke(&mut self, invoke: Invoke<Box<Analysis<'error>>, Analysis<'error>>, span: Span<'error>) {
+    fn invoke(&mut self, invoke: Invoke<Box<Analysis<'error>>, Analysis<'error>>, span: Span) {
         let count = invoke.members.len();
         for member in invoke.members {
             self.walk(member);
@@ -330,7 +330,7 @@ impl<'error> Interpreter<'error> {
         &mut self,
         target: Box<Analysis<'error>>,
         member: Box<Analysis<'error>>,
-        span: Span<'error>,
+        span: Span,
     ) {
         if self.namespace(&target) {
             match member.kind {

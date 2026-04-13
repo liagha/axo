@@ -36,7 +36,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBrace,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -120,7 +120,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -143,7 +143,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBrace,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -204,7 +204,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -227,7 +227,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftParenthesis,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -288,7 +288,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftParenthesis,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -372,7 +372,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -395,7 +395,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBracket,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {
@@ -456,7 +456,7 @@ impl<'a> Parser<'a> {
                     .collect();
 
                 let span = if consumed.is_empty() {
-                    Span::point(classifier.position)
+                    Span::point(classifier.state)
                 } else {
                     consumed.span()
                 };
@@ -479,7 +479,7 @@ impl<'a> Parser<'a> {
                     ErrorKind::UnclosedDelimiter(TokenKind::Punctuation(
                         PunctuationKind::LeftBracket,
                     )),
-                    Span::point(classifier.position),
+                    Span::point(classifier.state),
                 ));
             };
             let Some(end) = delimiters.last() else {

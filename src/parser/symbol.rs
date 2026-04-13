@@ -13,7 +13,7 @@ use crate::{
 pub struct Symbol<'symbol> {
     pub identity: Identity,
     pub kind: SymbolKind<'symbol>,
-    pub span: Span<'symbol>,
+    pub span: Span,
     pub scope: Scope,
     pub visibility: Visibility,
     pub typing: Type<'symbol>,
@@ -35,7 +35,7 @@ pub enum Visibility {
 }
 
 impl<'symbol> Symbol<'symbol> {
-    pub fn new(kind: SymbolKind<'symbol>, span: Span<'symbol>, visibility: Visibility) -> Self {
+    pub fn new(kind: SymbolKind<'symbol>, span: Span, visibility: Visibility) -> Self {
         Self {
             identity: next_identity(),
             kind,

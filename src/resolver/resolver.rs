@@ -155,6 +155,7 @@ impl<'a> Resolver<'a> {
                 },
                 span: target.span.clone(),
                 hints: Vec::new(),
+                phantom: Default::default(),
             }])
         }
     }

@@ -1,10 +1,7 @@
 use orbyte::Orbyte;
 use crate::{
-    data::{Offset, Str},
-    internal::{
-        operation::Ordering,
-        platform::{args, read_to_string, Path, PathBuf},
-    },
+    data::{Identity, Str, Offset},
+    internal::platform::{args, read_to_string, Path, PathBuf},
     tracker::{ErrorKind, Span, TrackError},
 };
 
@@ -18,31 +15,15 @@ pub enum Location<'location> {
 impl<'location> Location<'location> {
     pub fn as_path(&self) -> Result<PathBuf, TrackError<'location>> {
         match self {
-            Location::Entry(path) => {
-                let path = PathBuf::from(path);
-
-                Ok(path.clone())
-            }
-            _ => {
-                let kind = ErrorKind::NotAnEntry(*self);
-
-                Err(TrackError::new(kind, Span::void()))
-            }
+            Location::Entry(path) => Ok(PathBuf::from(path).clone()),
+            _ => Err(TrackError::new(ErrorKind::NotAnEntry(*self), Span::void())),
         }
     }
 
     pub fn to_path(&self) -> Result<PathBuf, TrackError<'location>> {
         match self {
-            Location::Entry(path) => {
-                let path = PathBuf::from(path);
-
-                Ok(path.clone())
-            }
-            _ => {
-                let kind = ErrorKind::NotAnEntry(*self);
-
-                Err(TrackError::new(kind, Span::void()))
-            }
+            Location::Entry(path) => Ok(PathBuf::from(path).clone()),
+            _ => Err(TrackError::new(ErrorKind::NotAnEntry(*self), Span::void())),
         }
     }
 
@@ -54,11 +35,7 @@ impl<'location> Location<'location> {
 
                 match read_to_string(&path) {
                     Ok(content) => Ok(content.into()),
-                    Err(error) => {
-                        let kind = ErrorKind::from_io(error, *self);
-
-                        Err(TrackError::new(kind, Span::void()))
-                    }
+                    Err(error) => Err(TrackError::new(ErrorKind::from_io(error, *self), Span::void())),
                 }
             }
             Location::Flag => Ok(args()
@@ -79,20 +56,14 @@ impl<'location> Location<'location> {
 
     pub fn stem(&self) -> Option<&str> {
         match self {
-            Location::Entry(path) => {
-                let path = Path::new(path);
-                path.file_stem()?.to_str()
-            }
+            Location::Entry(path) => Path::new(path).file_stem()?.to_str(),
             _ => None,
         }
     }
 
     pub fn extension(&self) -> Option<&str> {
         match self {
-            Location::Entry(path) => {
-                let path = Path::new(path);
-                path.extension()?.to_str()
-            }
+            Location::Entry(path) => Path::new(path).extension()?.to_str(),
             _ => None,
         }
     }
@@ -106,130 +77,50 @@ impl<'location> Location<'location> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Orbyte, PartialEq)]
-pub struct Position<'position> {
-    pub line: Offset,
-    pub column: Offset,
-    pub location: Location<'position>,
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct Position {
+    pub identity: Identity,
+    pub offset: Offset,
 }
 
-impl<'a> Position<'a> {
+impl Position {
     #[inline]
-    pub fn new(location: Location<'a>) -> Self {
-        Self {
-            line: 1,
-            column: 1,
-            location,
-        }
+    pub fn new(identity: Identity) -> Self {
+        Self { identity, offset: 0 }
     }
 
     #[inline]
-    pub fn default(location: Location<'a>) -> Self {
-        Self {
-            line: 1,
-            column: 1,
-            location,
-        }
+    pub fn default(identity: Identity) -> Self {
+        Self { identity, offset: 0 }
     }
 
     #[inline]
-    pub fn path(line: Offset, column: Offset, path: Str<'a>) -> Self {
-        Self {
-            line,
-            column,
-            location: Location::Entry(path),
-        }
+    pub fn set_identity(&mut self, identity: Identity) {
+        self.identity = identity;
     }
 
     #[inline]
-    pub fn set_line(&mut self, line: Offset) {
-        self.line = line;
+    pub fn set_offset(&mut self, offset: Offset) {
+        self.offset = offset;
     }
 
     #[inline]
-    pub fn set_column(&mut self, column: Offset) {
-        self.column = column;
+    pub fn swap_identity(&self, identity: Identity) -> Self {
+        Self { identity, ..*self }
     }
 
     #[inline]
-    pub fn set_path(&mut self, path: Str<'a>) {
-        self.location = Location::Entry(path);
+    pub fn swap_offset(&self, offset: Offset) -> Self {
+        Self { offset, ..*self }
     }
 
     #[inline]
-    pub fn set_location(&mut self, location: Location<'a>) {
-        self.location = location;
+    pub fn advance(&self, amount: Offset) -> Self {
+        Self { offset: self.offset + amount, ..*self }
     }
 
     #[inline]
-    pub fn swap_line(&self, line: Offset) -> Self {
-        Self { line, ..*self }
-    }
-
-    #[inline]
-    pub fn swap_column(&self, column: Offset) -> Self {
-        Self { column, ..*self }
-    }
-
-    #[inline]
-    pub fn swap_path(&self, path: Str<'a>) -> Self {
-        Self {
-            location: Location::Entry(path),
-            ..*self
-        }
-    }
-
-    #[inline]
-    pub fn swap_location(&self, location: Location<'a>) -> Self {
-        Self { location, ..*self }
-    }
-
-    #[inline]
-    pub fn advance_line(&self, amount: Offset) -> Self {
-        Self {
-            line: self.line + amount,
-            ..*self
-        }
-    }
-
-    #[inline]
-    pub fn join_column(&self, amount: Offset) -> Self {
-        Self {
-            column: self.column + amount,
-            ..*self
-        }
-    }
-
-    #[inline]
-    pub fn add_line(&mut self, amount: Offset) {
-        self.line += amount;
-    }
-
-    #[inline]
-    pub fn add_column(&mut self, amount: Offset) {
-        self.column += amount;
-    }
-
-    pub fn cmp(&self, other: &Self) -> Ordering {
-        if self.location != other.location {
-            return Ordering::Less;
-        }
-
-        match self.line.cmp(&other.line) {
-            Ordering::Equal => self.column.cmp(&other.column),
-            other => other,
-        }
-    }
-}
-
-impl<'a> PartialOrd for Position<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<'a> Ord for Position<'a> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.cmp(other)
+    pub fn add(&mut self, amount: Offset) {
+        self.offset += amount;
     }
 }

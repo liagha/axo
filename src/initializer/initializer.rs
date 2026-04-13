@@ -9,45 +9,38 @@ use crate::{
 
 pub struct Initializer<'a> {
     pub index: Offset,
-    pub position: Position<'a>,
+    pub state: Position,
     pub input: Vec<Token<'a>>,
     pub output: Vec<Symbol<'a>>,
     pub errors: Vec<InitializeError<'a>>,
 }
 
 impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
-    #[inline]
+    type State = Position;
+
     fn length(&self) -> Scale {
         self.input.len()
     }
 
     fn peek_ahead(&self, n: Offset) -> Option<&Token<'a>> {
-        let current = self.index + n;
-        self.get(current)
+        self.get(self.index + n)
     }
 
     fn peek_behind(&self, n: Offset) -> Option<&Token<'a>> {
-        self.index
-            .checked_sub(n)
-            .and_then(|current| self.get(current))
+        self.index.checked_sub(n).and_then(|current| self.get(current))
     }
 
-    fn next(&self, index: &mut Offset, position: &mut Position<'a>) -> Option<Token<'a>> {
-        if let Some(token) = self.get(*index) {
-            *position = Position {
-                line: token.span.end_line,
-                column: token.span.end_column,
-                location: token.span.location,
-            };
-
-            *index += 1;
-
-            return Some(token.clone());
-        }
-
-        None
+    fn origin(&self) -> Self::State {
+        Position::new(self.state.identity)
     }
-    
+
+    fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Token<'a>> {
+        let token = self.get(*index)?;
+        *state = Position { identity: token.span.identity, offset: token.span.end };
+        *index += 1;
+        Some(token.clone())
+    }
+
     fn input(&self) -> &Vec<Token<'a>> {
         &self.input
     }
@@ -56,12 +49,12 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
         &mut self.input
     }
 
-    fn position(&self) -> Position<'a> {
-        self.position.clone()
+    fn state(&self) -> Self::State {
+        self.state
     }
 
-    fn position_mut(&mut self) -> &mut Position<'a> {
-        &mut self.position
+    fn state_mut(&mut self) -> &mut Self::State {
+        &mut self.state
     }
 
     fn index(&self) -> Offset {
@@ -74,19 +67,17 @@ impl<'a> Peekable<'a, Token<'a>> for Initializer<'a> {
 }
 
 impl<'a> Initializer<'a> {
-    pub fn new(location: Location<'a>) -> Self {
+    pub fn new(_: Location<'a>) -> Self {
         Initializer {
             index: 0,
-            position: Position::new(location),
+            state: Position::new(0),
             input: Vec::new(),
             output: Vec::new(),
             errors: Vec::new(),
         }
     }
 
-    pub fn filter<'source>(
-        length: Scale,
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+    pub fn filter<'source>(length: Scale) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         Classifier::repetition(
             Classifier::alternative([
                 Classifier::predicate(is_ignored).with_ignore(),
@@ -97,8 +88,7 @@ impl<'a> Initializer<'a> {
         )
     }
 
-    pub fn directive<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn directive<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::alternative([
             Self::verbosity(),
             Self::input(),
@@ -110,18 +100,14 @@ impl<'a> Initializer<'a> {
         ])
     }
 
-    pub fn classifier<'source>(
-    ) -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
+    pub fn classifier<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Symbol<'a>, InitializeError<'a>> {
         Classifier::repetition(Self::directive(), 0, None)
     }
 
-    pub fn initialize(&mut self) -> Vec<(Location<'a>, Span<'a>)> {
+    pub fn initialize(&mut self) -> Vec<(Location<'a>, Span)> {
         let location = Location::Flag;
         let content = location.get_value().unwrap();
-
-        let position = Position::new(location);
-        let mut scanner = Scanner::new(position, content);
-
+        let mut scanner = Scanner::new(Position::new(0), content);
         scanner.scan();
 
         self.input = scanner.output;
@@ -169,50 +155,9 @@ impl<'a> Initializer<'a> {
                     None
                 }
             })
-            .collect::<Vec<_>>();
-
-        let inputs = directives
-            .iter()
-            .enumerate()
-            .filter_map(|(index, symbol)| {
-                if target_name(symbol)? == Str::from("Input") {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if inputs.len() > 1 {
-            for (count, index) in inputs.into_iter().enumerate() {
-                if let Some(symbol) = directives.get_mut(index) {
-                    rename_target(symbol, format!("Input({})", count));
-                }
-            }
-        }
-
-        let indexes = directives
-            .iter()
-            .enumerate()
-            .filter_map(|(index, symbol)| {
-                if target_name(symbol)? == Str::from("Output") {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if indexes.len() > 1 {
-            for (count, index) in indexes.into_iter().enumerate() {
-                if let Some(symbol) = directives.get_mut(index) {
-                    rename_target(symbol, format!("{}({})", "Output", count));
-                }
-            }
-        }
+            .collect();
 
         self.output = directives;
-
         targets
     }
 }
@@ -223,43 +168,36 @@ fn is_ignored(token: &Token) -> bool {
         TokenKind::Punctuation(PunctuationKind::Newline)
             | TokenKind::Punctuation(PunctuationKind::Tab)
             | TokenKind::Punctuation(PunctuationKind::Space)
-            | TokenKind::Punctuation(PunctuationKind::Semicolon)
             | TokenKind::Comment(_)
     )
 }
 
 fn target_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
-    if let SymbolKind::Binding(binding) = &symbol.kind {
-        if let ElementKind::Literal(token) = &binding.target.kind {
-            if let TokenKind::Identifier(name) = &token.kind {
-                return Some(*name.clone());
-            }
-        }
+    match &symbol.kind {
+        SymbolKind::Binding(binding) => match &binding.target.kind {
+            ElementKind::Literal(token) => match &token.kind {
+                TokenKind::Identifier(name) => Some(**name),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
     }
-    None
 }
 
 fn value_name<'a>(symbol: &Symbol<'a>) -> Option<Str<'a>> {
-    if let SymbolKind::Binding(binding) = &symbol.kind {
-        if let Some(value) = &binding.value {
-            if let ElementKind::Literal(token) = &value.kind {
-                if let TokenKind::Identifier(name) = &token.kind {
-                    return Some(*name.clone());
-                }
+    match &symbol.kind {
+        SymbolKind::Binding(binding) => {
+            let value = binding.value.as_ref()?;
+            match &value.kind {
+                ElementKind::Literal(token) => match &token.kind {
+                    TokenKind::String(value) => Some(**value),
+                    TokenKind::Identifier(value) => Some(**value),
+                    _ => None,
+                },
+                _ => None,
             }
         }
-    }
-    None
-}
-
-fn rename_target(symbol: &mut Symbol, name: String) {
-    if let SymbolKind::Binding(binding) = &mut symbol.kind {
-        if let ElementKind::Literal(token) = &binding.target.kind {
-            let span = token.span;
-            binding.target = Element::new(
-                ElementKind::literal(Token::new(TokenKind::identifier(Str::from(name)), span)),
-                span,
-            );
-        }
+        _ => None,
     }
 }

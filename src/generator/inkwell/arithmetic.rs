@@ -12,7 +12,7 @@ impl<'backend> Generator<'backend> {
         &self,
         left: BasicValueEnum<'backend>,
         right: BasicValueEnum<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<(BasicValueEnum<'backend>, BasicValueEnum<'backend>, bool), GenerateError<'backend>>
     {
         if left.get_type() != right.get_type() {
@@ -50,7 +50,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
@@ -82,7 +82,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
@@ -118,7 +118,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left_value = self.analysis(*left)?;
         let right_value = self.analysis(*right)?;
@@ -154,7 +154,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left_sign = self.infer_signedness(&left).unwrap_or(true);
         let right_sign = self.infer_signedness(&right).unwrap_or(true);
@@ -241,7 +241,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let left_sign = self.infer_signedness(&left).unwrap_or(true);
         let right_sign = self.infer_signedness(&right).unwrap_or(true);

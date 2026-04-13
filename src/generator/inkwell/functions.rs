@@ -56,7 +56,7 @@ impl<'backend> Generator<'backend> {
     fn truth(
         &mut self,
         value: BasicValueEnum<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<IntValue<'backend>, GenerateError<'backend>> {
         match value {
             BasicValueEnum::IntValue(integer) => {
@@ -96,7 +96,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         target: Str<'backend>,
         analyses: Vec<Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let name = target.as_str().unwrap_or("module");
         self.modules
@@ -132,7 +132,7 @@ impl<'backend> Generator<'backend> {
             Option<Box<Analysis<'backend>>>,
             Option<Type<'backend>>,
         >,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<(), GenerateError<'backend>> {
         let mut parameters = vec![];
 
@@ -198,7 +198,7 @@ impl<'backend> Generator<'backend> {
             Option<Box<Analysis<'backend>>>,
             Option<Type<'backend>>,
         >,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if matches!(function.interface, Interface::C) {
             return Ok(self.context.i64_type().const_zero().into());
@@ -278,7 +278,7 @@ impl<'backend> Generator<'backend> {
     pub fn block(
         &mut self,
         analyses: Vec<Analysis<'backend>>,
-        _span: Span<'backend>,
+        _span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let mut value = self.context.i64_type().const_zero().into();
 
@@ -297,7 +297,7 @@ impl<'backend> Generator<'backend> {
         condition: Analysis<'backend>,
         truth: Analysis<'backend>,
         fall: Option<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
         needed: bool,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let check = self.analysis(condition)?;
@@ -403,7 +403,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         condition: Box<Analysis<'backend>>,
         body: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
@@ -466,7 +466,7 @@ impl<'backend> Generator<'backend> {
     pub fn invoke(
         &mut self,
         call: Invoke<Box<Analysis<'backend>>, Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let name = match &call.target.kind {
             AnalysisKind::Usage(name) => *name,
@@ -538,7 +538,7 @@ impl<'backend> Generator<'backend> {
     pub fn r#return(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if self.terminated() {
             return Ok(self.context.i64_type().const_zero().into());
@@ -579,7 +579,7 @@ impl<'backend> Generator<'backend> {
     pub fn r#break(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let check = self.analysis(*item)?;
@@ -618,7 +618,7 @@ impl<'backend> Generator<'backend> {
     pub fn r#continue(
         &mut self,
         value: Option<Box<Analysis<'backend>>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if let Some(item) = value {
             let check = self.analysis(*item)?;
@@ -656,7 +656,7 @@ impl<'backend> Generator<'backend> {
 
     pub fn parent(
         &self,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<FunctionValue<'backend>, GenerateError<'backend>> {
         self.builder
             .get_insert_block()
@@ -672,7 +672,7 @@ impl<'backend> Generator<'backend> {
     pub fn negate(
         &mut self,
         value: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let check = self.analysis(*value)?;
 
@@ -696,7 +696,7 @@ impl<'backend> Generator<'backend> {
     pub fn size_of(
         &mut self,
         layout: Type<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let target = self.to_basic_type(&layout, span)?;
 

@@ -1,7 +1,9 @@
 use {
     crate::{
+        data::memory::PhantomData,
         data::{Number, Str},
         format::Display,
+        internal::Record,
         reporter::{Failure, Hint},
         tracker::Span,
     },
@@ -15,8 +17,9 @@ where
     H: Clone + Display,
 {
     pub kind: K,
-    pub span: Span<'error>,
+    pub span: Span,
     pub hints: Vec<Hint<H>>,
+    pub phantom: PhantomData<&'error ()>,
 }
 
 impl<'error, K, H> Failure for Error<'error, K, H>
@@ -31,103 +34,122 @@ where
     K: Clone + Display,
     H: Clone + Display,
 {
-    pub fn new(kind: K, span: Span<'error>) -> Self {
+    pub fn new(kind: K, span: Span) -> Self {
         Self {
             kind,
             span,
             hints: Vec::new(),
+            phantom: PhantomData,
         }
     }
 
     pub fn handle(&self) -> (Str<'error>, Str<'error>) {
         let mut messages = String::new();
-        let mut details = String::new();
-
         messages.push_str(&self.kind.to_string());
-
-        match self.span.location.get_value() {
-            Ok(content) => {
-                let lines: Vec<Str> = content.lines();
-
-                let start_line = self.span.start_line;
-                let end_line = self.span.end_line;
-                let start_column = self.span.start_column;
-                let end_column = self.span.end_column;
-                let surround = 3;
-
-                let beginning = start_line.saturating_sub(surround);
-                let finish = end_line.saturating_add(surround);
-
-                let max = (lines.len().digit_count() + 2) as usize;
-
-                details.push_str(&format!(" --> {}\n", self.span).colorize(Color::Blue));
-
-                for index in beginning..=finish {
-                    if let Some(line) = lines.get(index as usize) {
-                        let index = index + 1;
-                        let identifier = format!("{: ^max$}", index).colorize(Color::Blue);
-
-                        details.push_str(&format!("{}|  {}\n", identifier, line));
-
-                        let highlighter = "^".colorize(Color::Red);
-
-                        if start_line == end_line {
-                            if index == start_line {
-                                if start_column == end_column {
-                                    let highlight =
-                                        format!("{}{}", " ".repeat((start_column - 1) as usize), highlighter);
-                                    details.push_str(&format!(
-                                        "{}|  {}\n",
-                                        " ".repeat(max),
-                                        highlight
-                                    ));
-                                } else {
-                                    let highlight = format!(
-                                        "{}{}",
-                                        " ".repeat((start_column - 1) as usize),
-                                        highlighter.repeat((end_column - start_column) as usize)
-                                    );
-                                    details.push_str(&format!(
-                                        "{}|  {}\n",
-                                        " ".repeat(max),
-                                        highlight
-                                    ));
-                                }
-                            }
-                        } else {
-                            let terminus = line.len();
-
-                            let highlight = if index == start_line {
-                                format!(
-                                    "{}{}",
-                                    " ".repeat((start_column - 1) as usize),
-                                    highlighter.repeat(terminus.saturating_sub(start_column as usize) + 1)
-                                )
-                            } else if start_line < index && index < end_line {
-                                format!("{}", highlighter.repeat(terminus))
-                            } else if index == end_line {
-                                format!("{}", highlighter.repeat((end_column - 1) as usize))
-                            } else {
-                                "".to_string()
-                            };
-
-                            if !highlight.is_empty() {
-                                details.push_str(&format!("{}|  {}\n", " ".repeat(max), highlight));
-                            }
-                        }
-                    }
-                }
-
-                for hint in &self.hints {
-                    details.push_str(
-                        format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str(),
-                    );
-                }
-
-                (Str::from(messages), Str::from(details))
-            }
-
-            Err(_error) => (Str::from(messages), Str::from("")),
-        }
+        (Str::from(messages), Str::from(""))
     }
+
+    pub fn handle_record(&self, record: Option<&Record<'error>>) -> (Str<'error>, Str<'error>) {
+        let (message, _) = self.handle();
+        let Some(record) = record else {
+            return (message, Str::from(""));
+        };
+        let Some(content) = record.content.as_ref() else {
+            return (message, Str::from(""));
+        };
+        let Some(rows) = record.rows.as_ref() else {
+            return (message, Str::from(""));
+        };
+
+        let mut details = String::new();
+        let start = self.span.start.min(content.len() as u32) as usize;
+        let end = self.span.end.min(content.len() as u32) as usize;
+        let (start_line, start_column, _, _) = locate(content, rows, start);
+        let (end_line, end_column, _, _) = locate(content, rows, end);
+        let surround = 3usize;
+        let first = start_line.saturating_sub(surround).max(1);
+        let last = (end_line + surround).min(rows.len());
+        let max = (rows.len().digit_count() + 2) as usize;
+
+        details.push_str(
+            &format!(
+                " --> {}:{}:{}\n",
+                record.location, start_line, start_column
+            )
+            .colorize(Color::Blue),
+        );
+
+        for number in first..=last {
+            let line = line_text(content, rows, number);
+            let label = format!("{: ^max$}", number).colorize(Color::Blue);
+            details.push_str(&format!("{}|  {}\n", label, line));
+
+            let mark = highlight(line, number, start_line, start_column, end_line, end_column);
+            if !mark.is_empty() {
+                details.push_str(&format!("{}|  {}\n", " ".repeat(max), mark.colorize(Color::Red)));
+            }
+        }
+
+        for hint in &self.hints {
+            details.push_str(format!("{}: {}", "hint".colorize(Color::Blue), hint.message).as_str());
+        }
+
+        (message, Str::from(details))
+    }
+}
+
+fn locate(content: &str, rows: &[u32], offset: usize) -> (usize, usize, usize, usize) {
+    let line = rows.partition_point(|value| *value as usize <= offset).saturating_sub(1);
+    let start = rows[line] as usize;
+    let end = if line + 1 < rows.len() {
+        rows[line + 1] as usize - 1
+    } else {
+        content.len()
+    };
+    let slice = &content[start..offset.min(end)];
+    (line + 1, slice.chars().count() + 1, start, end)
+}
+
+fn line_text<'a>(content: &'a str, rows: &[u32], number: usize) -> &'a str {
+    let start = rows[number - 1] as usize;
+    let end = if number < rows.len() {
+        rows[number] as usize - 1
+    } else {
+        content.len()
+    };
+    &content[start..end]
+}
+
+fn highlight(
+    line: &str,
+    number: usize,
+    start_line: usize,
+    start_column: usize,
+    end_line: usize,
+    end_column: usize,
+) -> String {
+    if number < start_line || number > end_line {
+        return String::new();
+    }
+
+    let width = line.chars().count().max(1);
+
+    if start_line == end_line {
+        let count = (end_column.saturating_sub(start_column)).max(1);
+        return format!("{}{}", " ".repeat(start_column.saturating_sub(1)), "^".repeat(count));
+    }
+
+    if number == start_line {
+        return format!(
+            "{}{}",
+            " ".repeat(start_column.saturating_sub(1)),
+            "^".repeat(width.saturating_sub(start_column.saturating_sub(1)).max(1))
+        );
+    }
+
+    if number == end_line {
+        return "^".repeat(end_column.saturating_sub(1).max(1));
+    }
+
+    "^".repeat(width)
 }

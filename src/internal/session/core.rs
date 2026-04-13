@@ -16,7 +16,7 @@ use {
         scanner::{Token, TokenKind},
         tracker::{Location, Span},
     },
-    broccli::{xprintln, Color},
+    broccli::{xprintln, Color, TextStyle},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,6 +57,7 @@ pub struct Record<'session> {
     pub location: Location<'session>,
     pub module: Option<Identity>,
     pub content: Option<String>,
+    pub rows: Option<Vec<Offset>>,
     pub tokens: Option<Vec<Token<'session>>>,
     pub elements: Option<Vec<Element<'session>>>,
     pub analyses: Option<Vec<Analysis<'session>>>,
@@ -73,6 +74,7 @@ impl<'session> Record<'session> {
             location,
             module: None,
             content: None,
+            rows: None,
             tokens: None,
             elements: None,
             analyses: None,
@@ -81,6 +83,36 @@ impl<'session> Record<'session> {
             hash: 0,
             dirty: true,
         }
+    }
+
+    pub fn set_content(&mut self, content: String) {
+        self.rows = Some(Self::rows(&content));
+        self.content = Some(content);
+    }
+
+    pub fn rows(content: &str) -> Vec<Offset> {
+        let mut rows = vec![0];
+
+        for (index, byte) in content.bytes().enumerate() {
+            if byte == b'\n' {
+                rows.push(index as Offset + 1);
+            }
+        }
+
+        rows
+    }
+
+    pub fn sync_rows(&mut self) {
+        if self.rows.is_none() {
+            if let Some(content) = &self.content {
+                self.rows = Some(Self::rows(content));
+            }
+        }
+    }
+
+    pub fn span(&self, identity: Identity) -> Span {
+        let end = self.content.as_ref().map(|value| value.len() as Offset).unwrap_or(0);
+        Span::range(identity, 0, end)
     }
 }
 
@@ -203,7 +235,13 @@ impl<'session> Session<'session> {
         K: Clone + Display,
         H: Clone + Display,
     {
-        xprintln!("{}", error);
+        let (message, details) = error.handle_record(self.records.get(&error.span.identity));
+        xprintln!(
+            "{}{}\n{}",
+            "error: ".colorize(Color::Crimson).bold(),
+            message,
+            details
+        );
         xprintln!();
     }
 

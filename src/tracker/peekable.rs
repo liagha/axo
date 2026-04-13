@@ -1,16 +1,16 @@
-use crate::{
-    data::{Offset, Scale, Str},
-    tracker::{Location, Position},
-};
+use crate::data::{Offset, Scale};
 
-pub struct Peeker<'peeker, Input> {
+pub struct Peeker<State, Input> {
     pub index: Offset,
-    pub position: Position<'peeker>,
+    pub state: State,
     pub input: Input,
 }
 
 pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
+    type State: Copy + Default + Send + Sync;
+
     fn length(&self) -> Scale;
+
     fn remaining(&self) -> Scale {
         self.length() - self.index() as Scale
     }
@@ -18,28 +18,27 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
     fn peek_ahead(&self, n: Offset) -> Option<&Item>;
     fn peek_behind(&self, n: Offset) -> Option<&Item>;
 
+    fn origin(&self) -> Self::State;
+
     fn reset(&mut self) {
         self.set_index(0);
-
-        self.set_position(Position::new(self.position().location));
+        self.set_state(self.origin());
     }
 
     fn advance(&mut self) -> Option<Item> {
-        let mut position = self.position();
         let mut index = self.index();
-
-        let result = self.next(&mut index, &mut position);
+        let mut state = self.state();
+        let result = self.next(&mut index, &mut state);
 
         if result.is_some() {
             self.set_index(index);
-
-            self.set_position(position);
+            self.set_state(state);
         }
 
         result
     }
 
-    fn next(&self, index: &mut Offset, position: &mut Position<'peekable>) -> Option<Item>;
+    fn next(&self, index: &mut Offset, state: &mut Self::State) -> Option<Item>;
 
     fn get(&self, index: Offset) -> Option<&Item> {
         self.input().get(index as usize)
@@ -59,9 +58,8 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
 
     fn input(&self) -> &Vec<Item>;
     fn input_mut(&mut self) -> &mut Vec<Item>;
-
-    fn position(&self) -> Position<'peekable>;
-    fn position_mut(&mut self) -> &mut Position<'peekable>;
+    fn state(&self) -> Self::State;
+    fn state_mut(&mut self) -> &mut Self::State;
     fn index(&self) -> Offset;
     fn index_mut(&mut self) -> &mut Offset;
 
@@ -77,28 +75,12 @@ pub trait Peekable<'peekable, Item: PartialEq + 'peekable> {
         *self.index_mut() = index;
     }
 
-    fn set_position(&mut self, position: Position<'peekable>) {
-        *self.position_mut() = position;
+    fn set_state(&mut self, state: Self::State) {
+        *self.state_mut() = state;
     }
 
     fn set_input(&mut self, input: Vec<Item>) {
         *self.input_mut() = input;
-    }
-
-    fn set_line(&mut self, line: Offset) {
-        self.position_mut().line = line;
-    }
-
-    fn set_column(&mut self, line: Offset) {
-        self.position_mut().column = line;
-    }
-
-    fn set_path(&mut self, path: Str<'peekable>) {
-        self.position_mut().location = Location::Entry(path);
-    }
-
-    fn set_location(&mut self, location: Location<'peekable>) {
-        self.position_mut().location = location;
     }
 
     fn skip(&mut self, count: Offset) {

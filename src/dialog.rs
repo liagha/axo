@@ -197,7 +197,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>) {
 
         let location = Location::Entry(Str::from("dialog"));
         let mut record = Record::new(RecordKind::Source, location);
-        record.content = Some(input);
+        record.set_content(input);
 
         let identity = session.records.len() | 0x40000000;
         session.records.insert(identity, record);

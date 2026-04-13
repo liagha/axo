@@ -52,7 +52,7 @@ impl Punctuation for str {
     }
 }
 
-impl<'character> Punctuation for Character<'character> {
+impl<'character> Punctuation for Character {
     fn is_punctuation(&self) -> bool {
         matches!(
             self.value,

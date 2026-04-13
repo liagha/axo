@@ -11,16 +11,16 @@ impl<'token> PartialEq for Token<'token> {
 
 impl<'token> Eq for Token<'token> {}
 
-impl<'character> Spanned<'character> for Character<'character> {
+impl<'character> Spanned<'character> for Character {
     #[track_caller]
-    fn span(&self) -> Span<'character> {
+    fn span(&self) -> Span {
         self.span
     }
 }
 
 impl<'token> Spanned<'token> for Token<'token> {
     #[track_caller]
-    fn span(&self) -> Span<'token> {
+    fn span(&self) -> Span {
         self.span
     }
 }

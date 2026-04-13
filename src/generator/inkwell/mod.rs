@@ -170,7 +170,7 @@ impl<'backend> Generator<'backend> {
     pub fn to_basic_type(
         &self,
         typing: &Type<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicTypeEnum<'backend>, GenerateError<'backend>> {
         let typing = match &typing.kind {
             TypeKind::Integer { size: bits, .. } => match bits {

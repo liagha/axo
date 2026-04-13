@@ -8,7 +8,7 @@ use crate::{
 
 impl<'a> Scanner<'a> {
     pub fn number<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::alternative([
             Self::hexadecimal(),
             Self::binary(),
@@ -18,7 +18,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn hexadecimal<'source>(
-    ) -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    ) -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -52,7 +52,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn binary<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn binary<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -86,7 +86,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn octal<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>> {
+    fn octal<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>> {
         Classifier::with_transform(
             Classifier::sequence([
                 Classifier::literal('0'),
@@ -120,7 +120,7 @@ impl<'a> Scanner<'a> {
         )
     }
 
-    fn decimal<'source>() -> Classifier<'a, 'source, Self, Character<'a>, Token<'a>, ScanError<'a>>
+    fn decimal<'source>() -> Classifier<'a, 'source, Self, Character, Token<'a>, ScanError<'a>>
     {
         Classifier::with_transform(
             Classifier::sequence([

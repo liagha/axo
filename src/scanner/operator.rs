@@ -200,7 +200,7 @@ pub trait Operator {
     fn to_operator(&self) -> OperatorKind;
 }
 
-impl<'character> Operator for Character<'character> {
+impl<'character> Operator for Character {
     fn is_operator(&self) -> bool {
         matches!(
             self.value,

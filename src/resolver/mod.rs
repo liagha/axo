@@ -73,7 +73,8 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 return None;
             }
 
-            let span = Span::file(Str::from(record.location.to_string())).unwrap_or_else(|_| Span::void());
+            let end = record.content.as_ref().map(|value| value.len() as u32).unwrap_or(0);
+            let span = Span::range(identity, 0, end);
             let head = Element::new(
                 ElementKind::literal(Token::new(TokenKind::identifier(name), span)),
                 span,

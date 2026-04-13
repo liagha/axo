@@ -11,7 +11,7 @@ use crate::{
 pub struct Element<'element> {
     pub identity: Identity,
     pub kind: ElementKind<'element>,
-    pub span: Span<'element>,
+    pub span: Span,
     pub reference: Option<Identity>,
     pub typing: Type<'element>,
 }
@@ -29,7 +29,7 @@ pub enum ElementKind<'element> {
 }
 
 impl<'element> Element<'element> {
-    pub fn new(kind: ElementKind<'element>, span: Span<'element>) -> Self {
+    pub fn new(kind: ElementKind<'element>, span: Span) -> Self {
         Self {
             identity: next_identity(),
             kind,

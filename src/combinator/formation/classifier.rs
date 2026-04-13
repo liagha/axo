@@ -8,12 +8,13 @@ use crate::{
         memory::{replace, take, Arc},
         Identity, Offset, Scale,
     },
-    tracker::{Location, Peekable, Position},
+    tracker::Peekable,
 };
 
 pub struct Classifier<'a: 'source, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -22,7 +23,7 @@ where
     pub action:
         Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>,
     pub marker: Offset,
-    pub position: Position<'a>,
+    pub state: Source::State,
     pub consumed: Vec<Identity>,
     pub outcome: Outcome,
     pub form: Identity,
@@ -34,6 +35,7 @@ impl<'a: 'source, 'source, Source, Input, Output, Failure>
 Classifier<'a, 'source, Source, Input, Output, Failure>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -44,13 +46,13 @@ where
             dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
-        position: Position<'a>,
+        state: Source::State,
     ) -> Self {
         Self {
             identity: next_identity(),
             action,
             marker,
-            position,
+            state,
             consumed: Vec::new(),
             outcome: Outcome::Blank,
             form: 0,
@@ -65,7 +67,7 @@ where
             dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source,
         >,
         marker: Offset,
-        position: Position<'a>,
+        state: Source::State,
         consumed: Vec<Identity>,
         outcome: Outcome,
         form: Identity,
@@ -76,7 +78,7 @@ where
             identity: next_identity(),
             action,
             marker,
-            position,
+            state,
             consumed,
             outcome,
             form,
@@ -96,7 +98,7 @@ where
             identity: next_identity(),
             action,
             marker: self.marker,
-            position: self.position,
+            state: self.state,
             consumed: take(&mut self.consumed),
             outcome: Outcome::Blank,
             form: 0,
@@ -183,7 +185,7 @@ where
                 phantom: Default::default(),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -198,7 +200,7 @@ where
                 phantom: Default::default(),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -211,7 +213,7 @@ where
                 compare: |new, old| new.is_aligned() && (old.is_failed() || new.marker > old.marker),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -224,7 +226,7 @@ where
                 keep: |state| state.is_aligned(),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -235,7 +237,7 @@ where
                 state: Box::new(classifier),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -250,7 +252,7 @@ where
                 keep: |state| state.is_effected() || state.is_panicked(),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -265,7 +267,7 @@ where
                 keep: |state| state.is_aligned() || state.is_failed() || state.is_panicked(),
             }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -274,7 +276,7 @@ where
         Self::new(
             Arc::new(Deferred { factory }),
             0,
-            Position::new(Location::Void),
+            Default::default(),
         )
     }
 
@@ -463,6 +465,7 @@ Action<
 > for Literal<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -478,7 +481,7 @@ where
                 classifier.set_align();
                 former
                     .source
-                    .next(&mut classifier.marker, &mut classifier.position);
+.next(&mut classifier.marker, &mut classifier.state);
 
                 let identity_c = former.consumed.len();
                 let identity_f = former.forms.len();
@@ -506,6 +509,7 @@ Action<
 > for Predicate<'a, 'source, Input>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -521,7 +525,7 @@ where
                 classifier.set_align();
                 former
                     .source
-                    .next(&mut classifier.marker, &mut classifier.position);
+.next(&mut classifier.marker, &mut classifier.state);
 
                 let identity_c = former.consumed.len();
                 let identity_f = former.forms.len();
@@ -549,6 +553,7 @@ Action<
 > for Alternative<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -570,7 +575,7 @@ where
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 classifier.marker,
-                classifier.position,
+                classifier.state,
                 consumed,
                 Outcome::Blank,
                 0,
@@ -631,7 +636,7 @@ where
             Some(mut champion) => {
                 classifier.outcome = champion.outcome;
                 classifier.marker = champion.marker;
-                classifier.position = champion.position;
+                classifier.state = champion.state;
                 classifier.consumed = take(&mut champion.consumed);
                 classifier.form = champion.form;
                 classifier.stack = take(&mut champion.stack);
@@ -649,6 +654,7 @@ impl<'a, 'source, Source, Input, Output, Failure> Clone
 for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -668,6 +674,7 @@ Action<
 > for Deferred<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -716,7 +723,7 @@ where
             }
 
             classifier.marker = classifier.marker + memo.advance;
-            classifier.position = memo.position;
+            classifier.state = memo.state;
             classifier.outcome = memo.outcome;
 
             return;
@@ -745,7 +752,7 @@ where
         let mut child = Classifier::create(
             stashed,
             classifier.marker,
-            classifier.position,
+            classifier.state,
             consumed,
             Outcome::Blank,
             0,
@@ -780,17 +787,12 @@ where
             Memo {
                 outcome: child.outcome,
                 advance: child.marker - origin.4,
-                position: child.position,
+                state: child.state,
                 record,
             },
         );
 
-        (
-            classifier.marker,
-            classifier.position,
-            classifier.outcome,
-            classifier.form,
-        ) = (child.marker, child.position, child.outcome, child.form);
+        (classifier.marker, classifier.state, classifier.outcome, classifier.form) = (child.marker, child.state, child.outcome, child.form);
 
         (classifier.consumed, classifier.stack) = (child.consumed, child.stack);
     }
@@ -804,6 +806,7 @@ Action<
 > for Optional<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -830,8 +833,7 @@ where
         classifier.stack = child.stack;
 
         if effected {
-            (classifier.marker, classifier.position, classifier.form) =
-                (child.marker, child.position, child.form);
+            (classifier.marker, classifier.state, classifier.form) = (child.marker, child.state, child.form);
             classifier.set_align();
         } else {
             former.consumed.truncate(base.0);
@@ -851,6 +853,7 @@ Action<
 > for Sequence<Classifier<'a, 'source, Source, Input, Output, Failure>, SIZE>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -866,7 +869,7 @@ where
 
         let origin = (
             classifier.marker,
-            classifier.position,
+            classifier.state,
             former.consumed.len(),
             former.forms.len(),
             consumed.len(),
@@ -880,7 +883,7 @@ where
             let mut child = Classifier::create(
                 pattern.action.clone(),
                 classifier.marker,
-                classifier.position,
+                classifier.state,
                 consumed,
                 Outcome::Blank,
                 0,
@@ -905,14 +908,16 @@ where
                 forms.push(child.form);
             }
 
-            (classifier.marker, classifier.position) = (child.marker, child.position);
+            classifier.marker = child.marker;
+            classifier.state = child.state;
         }
 
         classifier.consumed = consumed;
         classifier.stack = stack;
 
         if broke {
-            (classifier.marker, classifier.position) = (origin.0, origin.1);
+            classifier.marker = origin.0;
+            classifier.state = origin.1;
             former.consumed.truncate(origin.2);
             former.forms.truncate(origin.3);
             classifier.consumed.truncate(origin.4);
@@ -942,6 +947,7 @@ Action<
 > for Repetition<Classifier<'a, 'source, Source, Input, Output, Failure>>
 where
     Source: Peekable<'a, Input>,
+    Source::State: Default,
     Input: Formable<'a>,
     Output: Formable<'a>,
     Failure: Formable<'a>,
@@ -957,7 +963,7 @@ where
 
         let origin = (
             classifier.marker,
-            classifier.position,
+            classifier.state,
             former.consumed.len(),
             former.forms.len(),
             consumed.len(),
@@ -977,7 +983,7 @@ where
             let mut child = Classifier::create(
                 self.state.action.clone(),
                 classifier.marker,
-                classifier.position,
+                classifier.state,
                 consumed,
                 Outcome::Blank,
                 0,
@@ -1003,8 +1009,7 @@ where
             (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
             if halted {
-                (classifier.outcome, classifier.marker, classifier.position) =
-                    (child.outcome, child.marker, child.position);
+                (classifier.outcome, classifier.marker, classifier.state) = (child.outcome, child.marker, child.state);
 
                 if kept {
                     forms.push(child.form);
@@ -1018,8 +1023,7 @@ where
             }
 
             if kept {
-                (classifier.outcome, classifier.marker, classifier.position) =
-                    (child.outcome, child.marker, child.position);
+                (classifier.outcome, classifier.marker, classifier.state) = (child.outcome, child.marker, child.state);
 
                 forms.push(child.form);
             } else {
@@ -1028,7 +1032,8 @@ where
                 consumed.truncate(step.2);
                 stack.truncate(step.3);
 
-                (classifier.marker, classifier.position) = (child.marker, child.position);
+                classifier.marker = child.marker;
+                classifier.state = child.state;
             }
 
             if let Some(maximum) = self.maximum {
@@ -1057,7 +1062,8 @@ where
             former.forms.push(group);
             classifier.form = identity;
         } else {
-            (classifier.marker, classifier.position) = (origin.0, origin.1);
+            classifier.marker = origin.0;
+            classifier.state = origin.1;
 
             former.consumed.truncate(origin.2);
             former.forms.truncate(origin.3);

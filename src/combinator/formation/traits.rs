@@ -5,20 +5,18 @@ use crate::{
 
 impl<'a, Input, Output, Failure> Spanned<'a> for Form<'a, Input, Output, Failure>
 where
-    Input: Formable<'a>,
-    Output: Formable<'a>,
-    Failure: Formable<'a>,
+    Input: Formable<'a> + Spanned<'a>,
+    Output: Formable<'a> + Spanned<'a>,
+    Failure: Formable<'a> + Spanned<'a>,
 {
-    fn span(&self) -> Span<'a> {
+    fn span(&self) -> Span {
         match self {
             Form::Blank => Span::void(),
             Form::Input(input) => input.span(),
             Form::Output(output) => output.span(),
             Form::Multiple(multiple) => multiple.span(),
             Form::Failure(failure) => failure.span(),
-            Form::_Phantom(_) => {
-                unreachable!()
-            }
+            Form::_Phantom(_) => unreachable!(),
         }
     }
 }
@@ -35,8 +33,8 @@ where
         Self {
             identity: self.identity,
             action: self.action.clone(),
-            marker: self.marker.clone(),
-            position: self.position.clone(),
+            marker: self.marker,
+            state: self.state,
             consumed: self.consumed.clone(),
             outcome: self.outcome.clone(),
             form: self.form.clone(),

@@ -24,7 +24,7 @@ use {
     },
 };
 
-pub type Native<'error> = fn(&[Value], Span<'error>) -> Result<Value, InterpretError<'error>>;
+pub type Native<'error> = fn(&[Value], Span) -> Result<Value, InterpretError<'error>>;
 pub type Address = usize;
 pub type Index = usize;
 pub type Tag = usize;
@@ -120,9 +120,9 @@ pub enum Opcode {
 }
 
 #[derive(Clone, Debug)]
-pub struct Instruction<'error> {
+pub struct Instruction {
     pub opcode: Opcode,
-    pub span: Span<'error>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug)]
@@ -155,7 +155,7 @@ pub struct Interpreter<'error> {
     pub stack: Vec<Value>,
     pub frames: Vec<Frame>,
     pub memory: Vec<Value>,
-    pub code: Vec<Instruction<'error>>,
+    pub code: Vec<Instruction>,
     pub foreign: Vec<Foreign<'error>>,
     pub entities: Map<Str<'error>, Entity<'error>>,
     pub function_frames: Map<Address, (Address, Scale)>,
@@ -190,7 +190,7 @@ impl<'error> Interpreter<'error> {
         interpreter
     }
 
-    fn error(&self, kind: ErrorKind, span: Span<'error>) -> InterpretError<'error> {
+    fn error(&self, kind: ErrorKind, span: Span) -> InterpretError<'error> {
         if matches!(kind, ErrorKind::OutOfBounds) {
             let faulty_instruction = &self.code[self.pointer.saturating_sub(1)];
             println!("[DEBUG] OutOfBounds triggered by opcode: {:?}", faulty_instruction.opcode);
@@ -199,7 +199,7 @@ impl<'error> Interpreter<'error> {
         Error::new(kind, span)
     }
 
-    fn current(&self) -> Span<'error> {
+    fn current(&self) -> Span {
         self.code[self.pointer.saturating_sub(1)].span
     }
 

@@ -64,10 +64,11 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
             let path = location.to_string();
             let mut content = None;
 
+            record.sync_rows();
             if let Some(value) = &record.content {
                 content = Some(value.clone());
             } else if let Ok(value) = read_to_string(&path) {
-                record.content = Some(value.clone());
+                record.set_content(value.clone());
                 content = Some(value);
             }
 
@@ -233,7 +234,7 @@ impl<'session> Session<'session> {
         use crate::tracker::Location;
         let location = Location::Entry(Str::from(name));
         let mut record = Record::new(RecordKind::Source, location);
-        record.content = Some(content);
+        record.set_content(content);
         let id = self.records.len() | 0x40000000;
         self.records.insert(id, record);
     }

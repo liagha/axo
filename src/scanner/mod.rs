@@ -69,7 +69,7 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             }
         };
 
-        let position = crate::tracker::Position::new(location);
+        let position = crate::tracker::Position::new(key);
         let mut scanner = Scanner::new(position, content);
         scanner.scan();
 
@@ -126,8 +126,7 @@ Action<
 
 impl<'source> Default for Scanner<'source> {
     fn default() -> Self {
-        let location = crate::tracker::Location::Entry(crate::data::Str::from(file!()));
-        let position = crate::tracker::Position::new(location);
+        let position = crate::tracker::Position::new(0);
         Scanner::new(position, crate::data::Str::from(""))
     }
 }

@@ -11,7 +11,7 @@ impl<'backend> Generator<'backend> {
     pub fn tag(
         &self,
         value: BasicValueEnum<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         if value.is_struct_value() {
             let shape = value.into_struct_value();
@@ -30,7 +30,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -70,7 +70,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let alpha = self.analysis(*left)?;
         let beta = self.analysis(*right)?;
@@ -110,7 +110,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let first = self.infer_signedness(&left).unwrap_or(true);
         let second = self.infer_signedness(&right).unwrap_or(true);
@@ -159,7 +159,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let first = self.infer_signedness(&left).unwrap_or(true);
         let second = self.infer_signedness(&right).unwrap_or(true);
@@ -208,7 +208,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let first = self.infer_signedness(&left).unwrap_or(true);
         let second = self.infer_signedness(&right).unwrap_or(true);
@@ -257,7 +257,7 @@ impl<'backend> Generator<'backend> {
         &mut self,
         left: Box<Analysis<'backend>>,
         right: Box<Analysis<'backend>>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let first = self.infer_signedness(&left).unwrap_or(true);
         let second = self.infer_signedness(&right).unwrap_or(true);

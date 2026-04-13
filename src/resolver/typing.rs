@@ -430,7 +430,7 @@ impl<'resolver> Resolver<'resolver> {
 
     pub fn unify(
         &mut self,
-        span: Span<'resolver>,
+        span: Span,
         left: &Type<'resolver>,
         right: &Type<'resolver>,
     ) -> Type<'resolver> {

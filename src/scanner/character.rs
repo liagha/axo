@@ -6,21 +6,20 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Character<'character> {
+pub struct Character {
     pub value: Char,
-    pub span: Span<'character>,
+    pub span: Span,
 }
 
-impl<'a> FromIterator<Character<'a>> for Str<'a> {
-    fn from_iter<T: IntoIterator<Item = Character<'a>>>(iter: T) -> Self {
+impl<'a> FromIterator<Character> for Str<'a> {
+    fn from_iter<T: IntoIterator<Item = Character>>(iter: T) -> Self {
         let string: Str = iter.into_iter().map(|c| c.value).collect();
-
         string
     }
 }
 
-impl<'character> Character<'character> {
-    pub fn new(value: char, span: Span<'character>) -> Self {
+impl<'character> Character {
+    pub fn new(value: char, span: Span) -> Self {
         Self { value, span }
     }
 
@@ -45,59 +44,42 @@ impl<'character> Character<'character> {
     }
 }
 
-impl<'character> From<Character<'character>> for char {
+impl<'character> From<Character> for char {
     fn from(character: Character) -> Self {
         character.value
     }
 }
 
-impl<'character> PartialEq<char> for Character<'character> {
+impl<'character> PartialEq<char> for Character {
     fn eq(&self, other: &char) -> bool {
         self.value == *other
     }
 }
 
-impl<'character> PartialEq<Character<'character>> for char {
+impl<'character> PartialEq<Character> for char {
     fn eq(&self, other: &Character) -> bool {
         *self == other.value
     }
 }
 
-impl<'character> FromIterator<Character<'character>> for String {
-    fn from_iter<I: IntoIterator<Item = Character<'character>>>(iter: I) -> Self {
+impl<'character> FromIterator<Character> for String {
+    fn from_iter<I: IntoIterator<Item = Character>>(iter: I) -> Self {
         iter.into_iter().map(|character| character.value).collect()
     }
 }
 
 impl<'scanner> Scanner<'scanner> {
     pub fn inspect(start: Position, input: Vec<char>) -> Vec<Character> {
-        let mut position = start;
+        let mut state = start;
         let mut characters = Vec::new();
 
-        for char in input {
-            let character = match char {
-                '\n' => {
-                    let start = position;
-                    position.add_line(1);
-                    position.set_column(1);
-
-                    Character {
-                        value: char,
-                        span: Span::new(start, position),
-                    }
-                }
-                char => {
-                    let start = position;
-                    position.add_column(1);
-
-                    Character {
-                        value: char,
-                        span: Span::new(start, position),
-                    }
-                }
-            };
-
-            characters.push(character);
+        for value in input {
+            let start = state;
+            state.add(value.len_utf8() as u32);
+            characters.push(Character {
+                value,
+                span: Span::new(start, state),
+            });
         }
 
         characters

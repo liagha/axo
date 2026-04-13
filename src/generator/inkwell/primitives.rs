@@ -31,7 +31,7 @@ impl<'backend> Generator<'backend> {
         &self,
         number: Float,
         scale: Scale,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let kind = match scale {
             32 => self.context.f32_type(),
@@ -58,7 +58,7 @@ impl<'backend> Generator<'backend> {
     pub fn string(
         &self,
         value: Str<'backend>,
-        span: Span<'backend>,
+        span: Span,
     ) -> Result<BasicValueEnum<'backend>, GenerateError<'backend>> {
         let raw = value.as_str().unwrap_or("");
         let module = self.current_module();
