@@ -6,10 +6,9 @@ mod span;
 
 use {
     crate::{data::Scale, format::Display, reporter::Error},
-    error::*,
 };
 
-pub use {peekable::*, position::*, span::*};
+pub use {peekable::*, position::*, span::*, error::*};
 
 pub trait Spanned<'spanned> {
     #[track_caller]

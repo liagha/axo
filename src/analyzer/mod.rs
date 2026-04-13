@@ -21,9 +21,7 @@ use {
     },
 };
 
-pub use {analysis::*, analyzer::*};
-
-pub(crate) use error::*;
+pub use {analysis::*, analyzer::*, error::*};
 
 pub type AnalyzeError<'error> = Error<'error, ErrorKind<'error>>;
 

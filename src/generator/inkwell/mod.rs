@@ -2,15 +2,20 @@ mod arithmetic;
 mod bitwise;
 mod comparison;
 mod composite;
-pub mod error;
+mod error;
 mod functions;
 mod logical;
 mod primitives;
 mod variables;
 
-pub use inkwell::{
-    context::{Context, ContextRef},
-    targets::TargetMachine,
+pub use {
+    crate::{
+        error::*,  
+    },
+    inkwell::{
+        context::{Context, ContextRef},
+        targets::TargetMachine,
+    }
 };
 
 use {

@@ -5,7 +5,7 @@ mod translator;
 mod interpreter;
 
 pub use {
-    error::ErrorKind,
+    error::*,
     interpreter::*,
 };
 

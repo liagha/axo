@@ -7,9 +7,7 @@ mod symbol;
 mod traits;
 mod typing;
 
-pub use {resolver::*, scope::*, typing::*};
-
-pub(super) use {error::*};
+pub use {resolver::*, scope::*, typing::*, error::*};
 
 use {
     broccli::Color,

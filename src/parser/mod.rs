@@ -9,6 +9,7 @@ pub use {
     element::{Element, ElementKind},
     parser::Parser,
     symbol::{Symbol, SymbolKind, Visibility},
+    error::*,
 };
 
 use {
@@ -16,7 +17,6 @@ use {
     
     crate::{
         reporter::Error,
-        parser::error::*,
         combinator::{Action, Operation, Operator},
         data::{
             Identity,

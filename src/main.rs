@@ -13,12 +13,11 @@ use axo::{
     parser::{Element, ElementKind, Symbol, SymbolKind, Visibility},
     resolver::{Resolver},
     scanner::{Token, TokenKind},
-    tracker::{self, Location, Span, TrackError},
+    tracker::{ErrorKind as TrackErrorKind, Location, Span, TrackError, Position},
 };
 
 #[cfg(feature = "interpreter")]
 use axo::interpreter::{Interpreter, interpret};
-use axo::tracker::Position;
 
 pub const BASE: &[(&str, &str)] = &[
     ("./base/cast.axo", include_str!("../base/cast.axo")),
@@ -76,7 +75,7 @@ pub fn memory_inspection() {
 }
 
 fn main() {
-    memory_inspection();
+    //memory_inspection();
     
     let mut initializer = Initializer::new(Location::Flag);
     let targets = initializer.initialize();
@@ -156,7 +155,7 @@ fn build(
                 session.records.insert(identity, Record::new(kind, target.clone()));
             } else {
                 session.errors.push(SessionError::Track(TrackError::new(
-                    tracker::error::ErrorKind::UnSupportedInput(target.clone()),
+                    TrackErrorKind::UnSupportedInput(target.clone()),
                     span.clone(),
                 )));
             }

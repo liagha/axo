@@ -7,13 +7,12 @@ mod scanner;
 mod token;
 mod traits;
 
-pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*};
+pub use {character::Character, operator::*, punctuation::*, scanner::Scanner, token::*, error::*};
 
 pub type ScanError<'error> = Error<'error, ErrorKind<'error>>;
 
 use {
     broccli::Color,
-    error::*,
     crate::{
         combinator::{Action, Operation},
         data::{
