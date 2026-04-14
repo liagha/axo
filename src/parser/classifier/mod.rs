@@ -2,11 +2,11 @@ mod delimited;
 mod symbol;
 
 use crate::{
-    combinator::{Classifier, Form},
+    combinator::{Classifier, Form, Former},
     data::*,
     parser::{Element, ElementKind, ErrorKind, ParseError, Parser},
     scanner::{PunctuationKind, Token, TokenKind},
-    tracker::{Span, Spanned},
+    tracker::{Peekable, Span, Spanned},
 };
 
 impl<'a> Parser<'a> {
@@ -29,6 +29,36 @@ impl<'a> Parser<'a> {
                 new.is_aligned() && (old.is_failed() || new.marker > old.marker)
             },
         )
+    }
+
+    #[inline]
+    fn recover_sync(token: &Token<'a>) -> bool {
+        matches!(
+            token.kind,
+            TokenKind::Punctuation(PunctuationKind::Semicolon)
+                | TokenKind::Punctuation(PunctuationKind::Comma)
+                | TokenKind::Punctuation(PunctuationKind::RightParenthesis)
+                | TokenKind::Punctuation(PunctuationKind::RightBracket)
+                | TokenKind::Punctuation(PunctuationKind::RightBrace)
+        )
+    }
+
+    #[inline]
+    fn recover_emit<'source>(
+        former: &mut Former<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+        classifier: Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>,
+    ) -> ParseError<'a> {
+        if let Some(form) = former.forms.get(classifier.form) {
+            if let Some(error) = form.get_failure() {
+                return error.clone();
+            }
+        }
+
+        if let Some(token) = former.source.get(classifier.marker) {
+            return ParseError::new(ErrorKind::UnexpectedToken(token.kind.clone()), token.span);
+        }
+
+        ParseError::new(ErrorKind::ExpectedBody, Span::point(classifier.state))
     }
 
     pub fn get_body(element: Element<'a>) -> Vec<Element<'a>> {
@@ -317,10 +347,10 @@ impl<'a> Parser<'a> {
     pub fn parser<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
         Classifier::repetition(
-            Self::alternative([
-                Classifier::deferred(Self::element),
-                Classifier::deferred(Self::fallback),
-            ]),
+            Self::alternative([Classifier::deferred(Self::element).with_recover(
+                Self::recover_sync,
+                Self::recover_emit,
+            )]),
             0,
             None,
         )
