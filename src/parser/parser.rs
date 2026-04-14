@@ -1,7 +1,7 @@
 use crate::{
     combinator::{Classifier, Form, Former},
     data::{Offset, Scale},
-    parser::{Element, ParseError},
+    parser::{Element, ErrorKind, ParseError},
     scanner::{PunctuationKind, Token, TokenKind},
     tracker::{Location, Peekable, Position},
 };
@@ -66,6 +66,25 @@ impl<'a> Peekable<'a, Token<'a>> for Parser<'a> {
 }
 
 impl<'a: 'source, 'source> Parser<'a> {
+    #[inline]
+    fn error_priority(error: &ParseError<'a>) -> u8 {
+        match &error.kind {
+            ErrorKind::UnclosedDelimiter(_) => 4,
+            ErrorKind::MissingSeparator(_) => 3,
+            ErrorKind::ExpectedBody
+            | ErrorKind::ExpectedHead
+            | ErrorKind::ExpectedName
+            | ErrorKind::ExpectedAnnotation => 2,
+            ErrorKind::UnexpectedToken(_) => 1,
+        }
+    }
+
+    #[inline]
+    fn prefer_error(candidate: &ParseError<'a>, current: &ParseError<'a>) -> bool {
+        (candidate.span.end, candidate.span.start, Self::error_priority(candidate))
+            > (current.span.end, current.span.start, Self::error_priority(current))
+    }
+
     pub fn new(_: Location<'a>) -> Self {
         Parser {
             index: 0,
@@ -120,12 +139,25 @@ impl<'a: 'source, 'source> Parser<'a> {
             former.form(Self::parser()).flatten()
         };
 
+        let mut best_error: Option<ParseError<'a>> = None;
         for form in forms {
             match form {
                 Form::Output(output) => self.output.push(output),
-                Form::Failure(failure) => self.errors.push(failure),
+                Form::Failure(failure) => {
+                    if best_error
+                        .as_ref()
+                        .map(|current| Self::prefer_error(&failure, current))
+                        .unwrap_or(true)
+                    {
+                        best_error = Some(failure);
+                    }
+                }
                 _ => {}
             }
+        }
+
+        if let Some(error) = best_error {
+            self.errors.push(error);
         }
     }
 }
