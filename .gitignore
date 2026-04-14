@@ -12,3 +12,5 @@
 *.elf
 *.wasm
 *.dSYM/
+*/build
+build
