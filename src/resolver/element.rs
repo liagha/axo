@@ -281,7 +281,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                             }
 
                             if let Some(scope) = scope {
-                                resolver.enter_scope(scope);
+                                resolver.enter_scope(*scope);
                                 binary.right.resolve(resolver);
                                 resolver.exit();
 
@@ -675,7 +675,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                     if let Some(symbol) = resolver.get_symbol(reference).cloned() {
                         match symbol.kind {
                             SymbolKind::Structure(mut structure) => {
-                                resolver.enter_scope(symbol.scope.clone());
+                                resolver.enter_scope(*symbol.scope.clone());
 
                                 for member in &mut structure.members {
                                     if member.is_instance() {
@@ -699,7 +699,7 @@ impl<'element> Resolvable<'element> for Element<'element> {
                                 ))));
                             }
                             SymbolKind::Union(mut structure) => {
-                                resolver.enter_scope(symbol.scope.clone());
+                                resolver.enter_scope(*symbol.scope.clone());
 
                                 for member in &mut structure.members {
                                     if member.is_instance() {

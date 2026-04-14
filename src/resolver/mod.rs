@@ -99,8 +99,8 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
         let mut module = session.resolver.registry.remove(&target).unwrap();
-        let scope = replace(&mut module.scope, Scope::new(None));
-        session.resolver.enter_scope(scope);
+        let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+        session.resolver.enter_scope(*scope);
 
         let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
@@ -145,8 +145,8 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
         let mut module = session.resolver.registry.remove(&target).unwrap();
-        let scope = replace(&mut module.scope, Scope::new(None));
-        session.resolver.enter_scope(scope);
+        let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+        session.resolver.enter_scope(*scope);
 
         let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
@@ -155,15 +155,15 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
         let active = session.resolver.active;
         session.resolver.exit();
-        module.scope = session.resolver.scopes.remove(&active).unwrap();
+        module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
         session.resolver.insert(module);
     }
 
     for &key in &source {
         let target = session.records.get(&key).unwrap().module.unwrap();
         let mut module = session.resolver.registry.remove(&target).unwrap();
-        let scope = replace(&mut module.scope, Scope::new(None));
-        session.resolver.enter_scope(scope);
+        let scope = replace(&mut module.scope, Box::from(Scope::new(None)));
+        session.resolver.enter_scope(*scope);
 
         let elements = session.records.get_mut(&key).unwrap().elements.as_mut().unwrap();
         for element in elements.iter_mut() {
@@ -172,7 +172,7 @@ pub fn resolve<'source>(session: &mut Session<'source>, keys: &[Identity]) {
 
         let active = session.resolver.active;
         session.resolver.exit();
-        module.scope = session.resolver.scopes.remove(&active).unwrap();
+        module.scope = Box::from(session.resolver.scopes.remove(&active).unwrap());
         session.resolver.insert(module);
     }
 

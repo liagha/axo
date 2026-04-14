@@ -14,7 +14,7 @@ pub struct Symbol<'symbol> {
     pub identity: Identity,
     pub kind: SymbolKind<'symbol>,
     pub span: Span,
-    pub scope: Scope,
+    pub scope: Box<Scope>,
     pub visibility: Visibility,
     pub typing: Type<'symbol>,
 }
@@ -40,7 +40,7 @@ impl<'symbol> Symbol<'symbol> {
             identity: next_identity(),
             kind,
             span,
-            scope: Scope::new(None),
+            scope: Box::from(Scope::new(None)),
             visibility,
             typing: Type::from(TypeKind::Unknown),
         }
@@ -48,10 +48,10 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn with_members<I: IntoIterator<Item = Symbol<'symbol>>>(self, members: I) -> Self {
         Self {
-            scope: Scope {
+            scope: Box::from(Scope {
                 symbols: Set::from_iter(members.into_iter().map(|member| member.identity)),
                 parent: None,
-            },
+            }),
             identity: self.identity,
             ..self
         }
@@ -63,14 +63,14 @@ impl<'symbol> Symbol<'symbol> {
 
     pub fn with_scope(self, scope: Scope) -> Self {
         Self {
-            scope,
+            scope: Box::from(scope),
             identity: self.identity,
             ..self
         }
     }
 
     pub fn set_scope(&mut self, scope: Scope) {
-        self.scope = scope;
+        self.scope = Box::from(scope);
     }
 
     pub fn target(&self) -> Option<Str<'symbol>> {

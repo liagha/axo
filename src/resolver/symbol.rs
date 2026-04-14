@@ -51,7 +51,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 Type::new(
@@ -69,7 +69,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 Type::new(
@@ -87,7 +87,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 Type::new(
@@ -139,8 +139,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Structure(structure) => {
                 let head = structure.target.target().unwrap();
-                let scope = replace(&mut self.scope, Scope::new(None));
-                resolver.enter_scope(scope);
+                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
+                resolver.enter_scope(*scope);
 
                 let members = structure
                     .members
@@ -153,7 +153,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 Type::new(
@@ -164,8 +164,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Union(union) => {
                 let head = union.target.target().unwrap();
-                let scope = replace(&mut self.scope, Scope::new(None));
-                resolver.enter_scope(scope);
+                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
+                resolver.enter_scope(*scope);
 
                 let members = union
                     .members
@@ -178,7 +178,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 Type::new(
@@ -189,8 +189,8 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
             SymbolKind::Function(function) => {
                 let head = function.target.target().unwrap();
-                let scope = replace(&mut self.scope, Scope::new(None));
-                resolver.enter_scope(scope);
+                let scope = replace(&mut self.scope, Box::from(Scope::new(None)));
+                resolver.enter_scope(*scope);
 
                 let members: Vec<_> = function
                     .members
@@ -231,7 +231,7 @@ impl<'symbol> Resolvable<'symbol> for Symbol<'symbol> {
 
                 let active = resolver.active;
                 resolver.exit();
-                self.scope = resolver.scopes.remove(&active).unwrap();
+                self.scope = Box::from(resolver.scopes.remove(&active).unwrap());
                 self.scope.parent = None;
 
                 let inferred = Some(Box::new(resolver.reify(&expectation)));
