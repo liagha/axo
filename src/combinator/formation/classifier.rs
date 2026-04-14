@@ -2,7 +2,7 @@ use crate::{
     combinator::{
         formation::former::{outcome::Outcome, Former, Memo, Record},
         next_identity, Action, Alternative, Deferred, Fail, Form, Formable, Ignore, Literal,
-        Multiple, Optional, Panic, Predicate, Repetition, Sequence, Skip, Transform,
+        Multiple, Optional, Panic, Predicate, Recover, Repetition, Sequence, Skip, Transform,
     },
     data::{
         memory::{replace, take, Arc},
@@ -362,6 +362,21 @@ where
     }
 
     #[inline]
+    pub fn with_recover<S, F>(self, sync: S, emitter: F) -> Self
+    where
+        S: Fn(&Input) -> bool + Send + Sync + 'source,
+        F: Fn(
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + Send
+        + Sync
+        + 'source,
+    {
+        self.with_action(Self::recover(sync, emitter))
+    }
+
+    #[inline]
     pub fn with_skip(self) -> Self {
         self.with_action(Arc::new(Skip))
     }
@@ -442,6 +457,28 @@ where
         + 'source,
     {
         Arc::new(Panic {
+            emitter: Arc::new(emitter),
+            phantom: Default::default(),
+        })
+    }
+
+    #[inline]
+    pub fn recover<S, E>(
+        sync: S,
+        emitter: E,
+    ) -> Arc<dyn Action<'a, Former<'a, 'source, Source, Input, Output, Failure>, Self> + Send + Sync + 'source>
+    where
+        S: Fn(&Input) -> bool + Send + Sync + 'source,
+        E: Fn(
+            &mut Former<'a, 'source, Source, Input, Output, Failure>,
+            Classifier<'a, 'source, Source, Input, Output, Failure>,
+        ) -> Failure
+        + Send
+        + Sync
+        + 'source,
+    {
+        Arc::new(Recover {
+            sync: Arc::new(sync),
             emitter: Arc::new(emitter),
             phantom: Default::default(),
         })
@@ -795,7 +832,6 @@ where
             None
         };
 
-        // Bound memo growth to avoid large parser residency spikes on complex inputs.
         if former.memo.len() > 2048 {
             former.memo.clear();
         }

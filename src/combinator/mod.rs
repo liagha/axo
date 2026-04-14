@@ -49,6 +49,12 @@ pub struct Panic<'a, 'source, Host, State, Failure> {
     pub phantom: PhantomData<&'a ()>,
 }
 
+pub struct Recover<'a, 'source, Host, State, Input, Failure> {
+    pub sync: Arc<dyn Fn(&Input) -> bool + Send + Sync + 'source>,
+    pub emitter: Arc<dyn Fn(&mut Host, State) -> Failure + Send + Sync + 'source>,
+    pub phantom: PhantomData<&'a ()>,
+}
+
 #[derive(Clone)]
 pub struct Literal<'a, 'source, Input>
 where
