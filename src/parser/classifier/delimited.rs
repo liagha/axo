@@ -515,7 +515,7 @@ impl<'a> Parser<'a> {
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
         let item = Classifier::deferred(Self::element);
 
-        Classifier::alternative([
+        Self::alternative([
             Self::bundle(item.clone()),
             Self::block(item.clone()),
             Self::group(item.clone()),

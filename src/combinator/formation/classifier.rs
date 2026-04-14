@@ -206,11 +206,24 @@ where
 
     #[inline]
     pub fn alternative<const SIZE: Scale>(patterns: [Self; SIZE]) -> Self {
+        Self::alternative_with(
+            patterns,
+            |state| state.is_aligned() || state.is_panicked(),
+            |new, old| new.is_aligned() && (old.is_failed() || new.marker > old.marker),
+        )
+    }
+
+    #[inline]
+    pub fn alternative_with<const SIZE: Scale>(
+        patterns: [Self; SIZE],
+        halt: fn(&Self) -> bool,
+        compare: fn(&Self, &Self) -> bool,
+    ) -> Self {
         Self::new(
             Arc::new(Alternative {
                 states: patterns,
-                halt: |state| state.is_aligned() || state.is_panicked(),
-                compare: |new, old| new.is_aligned() && (old.is_failed() || new.marker > old.marker),
+                halt,
+                compare,
             }),
             0,
             Default::default(),
@@ -832,12 +845,17 @@ where
         let mut child = classifier.create_child(self.state.action.clone());
         former.build(&mut child);
 
-        let effected = child.is_effected();
+        let panicked = child.is_panicked();
+        let aligned = child.is_aligned();
 
         classifier.consumed = child.consumed;
         classifier.stack = child.stack;
 
-        if effected {
+        if panicked {
+            (classifier.marker, classifier.state, classifier.form) =
+                (child.marker, child.state, child.form);
+            classifier.set_panic();
+        } else if aligned {
             (classifier.marker, classifier.state, classifier.form) = (child.marker, child.state, child.form);
             classifier.set_align();
         } else {
@@ -905,6 +923,7 @@ where
 
             if halted {
                 classifier.outcome = child.outcome;
+                classifier.form = child.form;
                 broke = true;
                 break;
             }
@@ -921,12 +940,24 @@ where
         classifier.stack = stack;
 
         if broke {
+            let preserved = if classifier.is_failed() || classifier.is_panicked() {
+                former.forms.get(classifier.form).cloned()
+            } else {
+                None
+            };
+
             classifier.marker = origin.0;
             classifier.state = origin.1;
             former.consumed.truncate(origin.2);
             former.forms.truncate(origin.3);
             classifier.consumed.truncate(origin.4);
             classifier.stack.truncate(origin.5);
+
+            if let Some(failure) = preserved {
+                let identity = former.forms.len();
+                former.forms.push(failure);
+                classifier.form = identity;
+            }
         } else {
             classifier.set_align();
 
@@ -997,8 +1028,10 @@ where
             );
 
             former.build(&mut child);
+            let halted = (self.halt)(&child);
+            let kept = (self.keep)(&child);
 
-            if child.marker == classifier.marker {
+            if child.marker == classifier.marker && !halted {
                 (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 
                 former.consumed.truncate(step.0);
@@ -1007,9 +1040,6 @@ where
                 stack.truncate(step.3);
                 break;
             }
-
-            let halted = (self.halt)(&child);
-            let kept = (self.keep)(&child);
 
             (consumed, stack) = (take(&mut child.consumed), take(&mut child.stack));
 

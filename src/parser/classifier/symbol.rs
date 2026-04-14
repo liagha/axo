@@ -9,7 +9,7 @@ use crate::{
 impl<'a> Parser<'a> {
     pub fn symbolization<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::deferred(Self::binding),
             Classifier::deferred(Self::structure),
             Classifier::deferred(Self::union),
@@ -288,7 +288,7 @@ impl<'a> Parser<'a> {
 
     pub fn function<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::sequence([
                 Classifier::predicate(|token: &Token| {
                     if let Some(id) = token.kind.try_unwrap_identifier() {
@@ -307,7 +307,7 @@ impl<'a> Parser<'a> {
 
                     ParseError::new(ErrorKind::ExpectedName, span)
                 }),
-                Self::group(Classifier::alternative([
+                Self::group(Self::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
                         if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {
@@ -361,7 +361,7 @@ impl<'a> Parser<'a> {
                         }
                     })
                         .with_ignore(),
-                    Classifier::alternative([
+                    Self::alternative([
                         Classifier::deferred(Self::prefixed),
                         Classifier::deferred(Self::primary),
                     ])
@@ -469,7 +469,7 @@ impl<'a> Parser<'a> {
                     }
                 }),
                 Classifier::deferred(Self::literal),
-                Self::group(Classifier::alternative([
+                Self::group(Self::alternative([
                     Classifier::deferred(Self::symbolization),
                     Classifier::predicate(|token: &Token| {
                         if let Some(OperatorKind::Composite(operator)) = token.kind.try_unwrap_operator() {

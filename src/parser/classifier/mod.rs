@@ -10,6 +10,27 @@ use crate::{
 };
 
 impl<'a> Parser<'a> {
+    #[inline]
+    fn alternative<'source, const SIZE: Scale>(
+        patterns: [Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>; SIZE],
+    ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
+        Classifier::alternative_with(
+            patterns,
+            |state| state.is_aligned() || state.is_panicked(),
+            |new, old| {
+                if new.is_panicked() != old.is_panicked() {
+                    return new.is_panicked();
+                }
+
+                if new.is_panicked() {
+                    return new.marker > old.marker;
+                }
+
+                new.is_aligned() && (old.is_failed() || new.marker > old.marker)
+            },
+        )
+    }
+
     pub fn get_body(element: Element<'a>) -> Vec<Element<'a>> {
         match element.kind {
             ElementKind::Delimited(delimited) => delimited.members,
@@ -45,7 +66,7 @@ impl<'a> Parser<'a> {
 
     pub fn primary<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::deferred(Self::delimited),
             Classifier::deferred(Self::literal),
         ])
@@ -87,7 +108,7 @@ impl<'a> Parser<'a> {
         Classifier::sequence([
             Classifier::deferred(Self::primary),
             Classifier::repetition(
-                Classifier::alternative([
+                Self::alternative([
                     Self::group(Classifier::deferred(Self::element)),
                     Self::collection(Classifier::deferred(Self::element)),
                     Self::bundle(Classifier::deferred(Self::element)),
@@ -169,7 +190,7 @@ impl<'a> Parser<'a> {
 
     pub fn unary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::deferred(Self::prefixed),
             Classifier::deferred(Self::suffixed),
             Classifier::deferred(Self::primary),
@@ -178,7 +199,7 @@ impl<'a> Parser<'a> {
 
     pub fn binary<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
-        Classifier::alternative([Classifier::with_transform(
+        Self::alternative([Classifier::with_transform(
             Classifier::sequence([
                 Classifier::deferred(Self::unary),
                 Classifier::repetition(
@@ -265,7 +286,7 @@ impl<'a> Parser<'a> {
 
     pub fn expression<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::deferred(Self::binary),
             Classifier::deferred(Self::unary),
             Classifier::deferred(Self::primary),
@@ -274,7 +295,7 @@ impl<'a> Parser<'a> {
 
     pub fn element<'source>(
     ) -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>> {
-        Classifier::alternative([
+        Self::alternative([
             Classifier::deferred(Self::symbolization),
             Classifier::deferred(Self::expression),
         ])
@@ -296,7 +317,7 @@ impl<'a> Parser<'a> {
     pub fn parser<'source>() -> Classifier<'a, 'source, Self, Token<'a>, Element<'a>, ParseError<'a>>
     {
         Classifier::repetition(
-            Classifier::alternative([
+            Self::alternative([
                 Classifier::deferred(Self::element),
                 Classifier::deferred(Self::fallback),
             ]),
