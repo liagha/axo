@@ -1,27 +1,17 @@
 use {
     crate::{
-        analyzer::{Analysis},
+        analyzer::Analysis,
         data::{
-            memory::{
-                Arc, RefCell,
-            },
-            CString,
-            Str,
-            Identity,
-            Offset,
-            Scale,
+            memory::{Arc, RefCell},
+            CString, Identity, Scale, Str,
         },
-        internal::{
-            hash::Map,
-        },
-        interpreter::{
-            InterpretError,
-            error::ErrorKind
-        },
+        internal::hash::Map,
+        interpreter::{error::ErrorKind, InterpretError},
         reporter::Error,
         resolver::Type,
         tracker::Span,
     },
+    libloading::{Library, Symbol},
 };
 
 pub type Native<'error> = fn(&[Value], Span) -> Result<Value, InterpretError<'error>>;
@@ -29,31 +19,8 @@ pub type Address = usize;
 pub type Index = usize;
 pub type Tag = usize;
 
-#[cfg(unix)]
-pub mod sys {
-    pub use libc::{c_void, dlopen, dlsym, RTLD_LAZY};
-}
-
-pub struct Library {
-    handle: *mut sys::c_void,
-}
-
-impl Library {
-    pub fn load(path: &str) -> Option<Self> {
-        let string = CString::new(path).ok()?;
-        let handle = unsafe { sys::dlopen(string.as_ptr(), sys::RTLD_LAZY) };
-        (!handle.is_null()).then_some(Self { handle })
-    }
-
-    pub fn symbol(&self, name: &str) -> Option<*mut sys::c_void> {
-        let string = CString::new(name).ok()?;
-        let pointer = unsafe { sys::dlsym(self.handle, string.as_ptr()) };
-        (!pointer.is_null()).then_some(pointer)
-    }
-}
-
 thread_local! {
-    static FOREIGN_STRINGS: RefCell<Vec<CString>> = RefCell::new(Vec::new());
+    static FOREIGN_TEXT: RefCell<Vec<CString>> = RefCell::new(Vec::new());
 }
 
 #[derive(Clone)]
@@ -170,7 +137,7 @@ pub struct Interpreter<'error> {
 
 impl<'error> Interpreter<'error> {
     pub fn new(capacity: Scale) -> Self {
-        let mut interpreter = Self {
+        Self {
             stack: Vec::new(),
             frames: Vec::new(),
             memory: vec![Value::Empty; capacity],
@@ -185,17 +152,10 @@ impl<'error> Interpreter<'error> {
             memory_top: 0,
             pointer: 0,
             running: false,
-        };
-
-        interpreter
+        }
     }
 
     fn error(&self, kind: ErrorKind, span: Span) -> InterpretError<'error> {
-        if matches!(kind, ErrorKind::OutOfBounds) {
-            let faulty_instruction = &self.code[self.pointer.saturating_sub(1)];
-            println!("[DEBUG] OutOfBounds triggered by opcode: {:?}", faulty_instruction.opcode);
-        }
-
         Error::new(kind, span)
     }
 
@@ -732,7 +692,7 @@ impl<'error> Interpreter<'error> {
             Foreign::Dynamic(dynamic) => dynamic(inputs).map_err(|kind| self.error(kind, span)),
         };
 
-        FOREIGN_STRINGS.with(|strings| strings.borrow_mut().clear());
+        FOREIGN_TEXT.with(|strings| strings.borrow_mut().clear());
 
         let result = result?;
 

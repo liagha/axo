@@ -23,6 +23,8 @@ broccli = { version = "0.0.22" }
 orbyte = { path = "../orbyte" }
 inkwell = { version = "0.8.0", features = ["llvm19-1-prefer-dynamic"], optional = true }
 libc = "0.2.182"
+libloading = "0.9.0"
+libffi = "5.1.0"
 
 [workspace]
 members = [

@@ -95,7 +95,14 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         use crate::{data::CString, internal::platform::Command};
 
         let mut sources = Vec::new();
-        let build = session.base().join("build");
+        let discard = session.get_directive(Str::from("Discard")).is_some();
+
+        let build = if discard {
+            std::env::temp_dir().join("axo").join("build")
+        } else {
+            session.base().join("build")
+        };
+
         let mut dirty = false;
 
         for key in &keys {

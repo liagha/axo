@@ -375,7 +375,7 @@ impl<'a> Parser<'a> {
 
                             ParseError::new(ErrorKind::ExpectedAnnotation, span)
                         }),
-                ])
+                ]).into_optional()
                     .with_transform(|former, classifier| {
                         let form = former.forms.get_mut(classifier.form).unwrap();
                         let output = form.as_forms();
@@ -391,7 +391,11 @@ impl<'a> Parser<'a> {
                     let keyword = sequence[0].unwrap_input().clone();
                     let name = sequence[1].unwrap_output().clone();
                     let invoke = sequence[2].unwrap_output().clone();
-                    let output = sequence[3].unwrap_output().clone();
+                    let output = if sequence.len() > 3 {
+                        Some(sequence[3].unwrap_output().clone())
+                    } else {
+                        None
+                    };
 
                     let body = if sequence.len() > 4 {
                         Some(sequence[4].unwrap_output().clone())
@@ -438,8 +442,10 @@ impl<'a> Parser<'a> {
 
                     let span = if let Some(ref b) = body {
                         Span::merge(&keyword.span(), &b.span())
-                    } else {
+                    } else if let Some(ref output) = output {
                         Span::merge(&keyword.span(), &output.span())
+                    } else {
+                        keyword.span()
                     };
 
                     *form = Form::output(Element::new(
@@ -448,7 +454,7 @@ impl<'a> Parser<'a> {
                                 name,
                                 members,
                                 body,
-                                Some(output),
+                                output,
                                 interface,
                                 entry,
                                 variadic,
