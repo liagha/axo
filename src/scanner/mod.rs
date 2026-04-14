@@ -49,7 +49,8 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         }
 
         if !dirty {
-            if let Some(tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
+            if let Some(mut tokens) = session.cache::<Vec<Token>>("tokens", hash, None) {
+                tokens.shrink_to_fit();
                 session.records.get_mut(&key).unwrap().tokens = Some(tokens);
                 continue;
             }
@@ -80,6 +81,8 @@ pub fn scan<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 scanner.output.format(stencil).to_string(),
             );
         }
+
+        scanner.output.shrink_to_fit();
 
         session.errors.extend(
             scanner

@@ -35,8 +35,11 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
         };
 
         if !dirty {
-            if let Some(analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
-                session.records.get_mut(&key).unwrap().analyses = Some(analyses);
+            if let Some(mut analyses) = session.cache::<Vec<Analysis>>("analyses", hash, None) {
+                analyses.shrink_to_fit();
+                let record = session.records.get_mut(&key).unwrap();
+                record.analyses = Some(analyses);
+                record.elements = None;
                 continue;
             }
         }
@@ -52,6 +55,8 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
             );
         }
 
+        analyzer.output.shrink_to_fit();
+
         session.errors.extend(
             analyzer
                 .errors
@@ -59,8 +64,10 @@ pub fn analyze<'source>(session: &mut Session<'source>, keys: &[Identity]) {
                 .map(|error| SessionError::Analyze(error.clone())),
         );
 
-        session.records.get_mut(&key).unwrap().analyses =
-            session.cache("analyses", hash, Some(analyzer.output));
+        let analyses = session.cache("analyses", hash, Some(analyzer.output));
+        let record = session.records.get_mut(&key).unwrap();
+        record.analyses = analyses;
+        record.elements = None;
     }
 }
 

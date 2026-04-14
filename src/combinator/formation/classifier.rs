@@ -782,6 +782,11 @@ where
             None
         };
 
+        // Bound memo growth to avoid large parser residency spikes on complex inputs.
+        if former.memo.len() > 2048 {
+            former.memo.clear();
+        }
+
         former.memo.insert(
             memory,
             Memo {
