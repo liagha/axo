@@ -30,7 +30,10 @@ impl<'a> Scanner<'a> {
                     ]),
                     1,
                     None,
-                ),
+                )
+                    .with_panic(|former, classifier| {
+                        Self::expected("at least one hexadecimal digit", former, &classifier)
+                    }),
             ]),
             move |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -64,7 +67,10 @@ impl<'a> Scanner<'a> {
                     ]),
                     1,
                     None,
-                ),
+                )
+                    .with_panic(|former, classifier| {
+                        Self::expected("at least one binary digit", former, &classifier)
+                    }),
             ]),
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -98,7 +104,10 @@ impl<'a> Scanner<'a> {
                     ]),
                     1,
                     None,
-                ),
+                )
+                    .with_panic(|former, classifier| {
+                        Self::expected("at least one octal digit", former, &classifier)
+                    }),
             ]),
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
@@ -134,18 +143,23 @@ impl<'a> Scanner<'a> {
                     0,
                     None,
                 )
-                .into_optional(),
-                Classifier::optional(Classifier::sequence([
-                    Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
-                    Classifier::optional(Classifier::predicate(|c: &Character| {
-                        matches!(c.value, '+' | '-')
-                    })),
-                    Classifier::persistence(
-                        Classifier::predicate(|c: &Character| c.is_numeric()),
-                        1,
-                        None,
-                    ),
-                ])),
+                    .into_optional(),
+                Classifier::optional(
+                    Classifier::sequence([
+                        Classifier::predicate(|c: &Character| matches!(c.value, 'e' | 'E')),
+                        Classifier::optional(Classifier::predicate(|c: &Character| {
+                            matches!(c.value, '+' | '-')
+                        })),
+                        Classifier::persistence(
+                            Classifier::predicate(|c: &Character| c.is_numeric()),
+                            1,
+                            None,
+                        )
+                            .with_panic(|former, classifier| {
+                                Self::expected("at least one exponent digit", former, &classifier)
+                            }),
+                    ]),
+                ),
             ]),
             |former, classifier| {
                 let form = former.forms.get_mut(classifier.form).unwrap();
