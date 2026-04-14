@@ -8,8 +8,6 @@ use crate::{
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum ErrorKind<'error> {
     Tracking(TrackError<'error>),
-    Expected(&'static str),
-    Unterminated(&'static str),
     InvalidCharacter(CharacterError),
     InvalidEscape(EscapeError),
     NumberParse(ParseNumberError),
@@ -35,8 +33,6 @@ impl<'error> Display for ErrorKind<'error> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             ErrorKind::Tracking(tracker) => write!(f, "{}", tracker.handle().0),
-            ErrorKind::Expected(label) => write!(f, "expected {}.", label),
-            ErrorKind::Unterminated(label) => write!(f, "unterminated {}.", label),
             ErrorKind::InvalidCharacter(e) => match e {
                 CharacterError::Unexpected(ch) => write!(f, "unexpected character `{}`.", ch.value),
                 CharacterError::OutOfRange => write!(f, "character code point out of range."),
