@@ -265,4 +265,33 @@ mod tests {
             ErrorKind::UnclosedDelimiter(_) | ErrorKind::ExpectedBody | ErrorKind::UnexpectedToken(_)
         ));
     }
+
+    #[test]
+    fn stress_nested_unclosed() {
+        for n in [8usize, 16, 32, 64, 128] {
+            let mut text = String::new();
+            for _ in 0..n {
+                text.push('(');
+            }
+            text.push('1');
+            let parser = parse(Box::leak(text.into_boxed_str()));
+            assert!(!parser.errors.is_empty());
+            assert!(matches!(
+                kind(&parser),
+                ErrorKind::UnclosedDelimiter(_) | ErrorKind::ExpectedBody | ErrorKind::UnexpectedToken(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn stress_malformed_mix() {
+        for n in [8usize, 16, 32, 64] {
+            let mut text = String::new();
+            for _ in 0..n {
+                text.push_str("( [ { var ");
+            }
+            let parser = parse(Box::leak(text.into_boxed_str()));
+            assert!(!parser.errors.is_empty());
+        }
+    }
 }
