@@ -36,46 +36,7 @@ pub const BASE: &[(&str, &str)] = &[
     ("./base/input.c", include_str!("../base/input.c")),
 ];
 
-macro_rules! inspect_type {
-    ($t:ty) => {
-        println!(
-            "{:.<50} Size: {:>3} bytes | Align: {:>2} bytes",
-            stringify!($t),
-            std::mem::size_of::<$t>(),
-            std::mem::align_of::<$t>()
-        );
-    };
-}
-
-pub fn memory_inspection() {
-    println!("{:-^75}", " TRACKER ");
-    inspect_type!(Location);
-    inspect_type!(axo::tracker::Position);
-    inspect_type!(Span);
-
-    println!("\n{:-^75}", " SCANNER ");
-    inspect_type!(axo::data::Float);
-    inspect_type!(axo::data::Integer);
-    inspect_type!(Str);
-    inspect_type!(axo::scanner::OperatorKind);
-    inspect_type!(axo::scanner::PunctuationKind);
-    inspect_type!(TokenKind);
-    inspect_type!(Token);
-
-    println!("\n{:-^75}", " RESOLVER ");
-    inspect_type!(axo::resolver::TypeKind);
-    inspect_type!(axo::resolver::Type);
-    inspect_type!(axo::resolver::Scope);
-
-    println!("\n{:-^75}", " PARSER");
-    inspect_type!(ElementKind);
-    inspect_type!(Element);
-    inspect_type!(SymbolKind);
-    inspect_type!(Symbol);
-}
-
 fn main() {
-    memory_inspection();
     let mut initializer = Initializer::new(Location::Flag);
     let targets = initializer.initialize();
 
