@@ -15,7 +15,9 @@ use {
             CString, Function, Identity, Interface, Str,
         },
         internal::{
-            platform::{read_dir, read_to_string, Lock},
+            platform::{read_dir, read_to_string, temp_dir, DLL_EXTENSION, Lock, PathBuf},
+            foreign::{CStr, CVoid, CChar},
+            hash::Map,
             time::Duration,
             RecordKind, Session, SessionError,
         },
@@ -24,11 +26,6 @@ use {
     },
     libffi::middle::{Arg, Cif, CodePtr, Type as FfiType},
     libloading::{Library, Symbol},
-    std::{
-        collections::HashMap,
-        ffi::{c_char, c_void, CStr},
-        path::PathBuf,
-    },
 };
 
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
@@ -121,8 +118,8 @@ pub fn interpret<'source>(
 }
 
 impl<'error> Interpreter<'error> {
-    fn extract_signatures() -> HashMap<String, Signature> {
-        let mut map = HashMap::new();
+    fn extract_signatures() -> Map<String, Signature> {
+        let mut map = Map::new();
         let mut dirs = vec![PathBuf::from(".")];
 
         while let Some(dir) = dirs.pop() {
@@ -145,7 +142,7 @@ impl<'error> Interpreter<'error> {
         map
     }
 
-    fn parse_file(path: &PathBuf, map: &mut HashMap<String, Signature>) {
+    fn parse_file(path: &PathBuf, map: &mut Map<String, Signature>) {
         let Ok(content) = read_to_string(path) else {
             return;
         };
@@ -157,7 +154,7 @@ impl<'error> Interpreter<'error> {
         }
     }
 
-    fn parse_function(line: &str, map: &mut HashMap<String, Signature>) {
+    fn parse_function(line: &str, map: &mut Map<String, Signature>) {
         let after = &line[5..];
         let Some(paren) = after.find('(') else {
             return;
@@ -200,13 +197,12 @@ impl<'error> Interpreter<'error> {
 fn load_library(session: &Session) -> Option<Library> {
     let discard = session.get_directive(Str::from("Discard")).is_some();
     let build = if discard {
-        std::env::temp_dir().join("axo").join("build")
+        temp_dir().join("axo").join("build")
     } else {
         session.base().join("build")
     };
 
-    let extension = std::env::consts::DLL_EXTENSION;
-    let path = build.join(format!("lib_axo.{}", extension));
+    let path = build.join(format!("lib_axo.{}", DLL_EXTENSION));
     unsafe { Library::new(path).ok() }
 }
 
@@ -214,14 +210,14 @@ fn bind_function(
     core: &mut Interpreter,
     function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
     library: &Option<Library>,
-    signatures: &HashMap<String, Signature>,
+    signatures: &Map<String, Signature>,
 ) {
     let name = function.target.as_str().unwrap_or_default();
     let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
 
     let closure = if let Some(lib) = library {
         unsafe {
-            if let Ok(symbol) = lib.get::<*mut c_void>(name.as_bytes()) {
+            if let Ok(symbol) = lib.get::<*mut CVoid>(name.as_bytes()) {
                 let pointer = *symbol;
                 let signature = signatures.get(name).cloned().unwrap_or_default();
                 build_closure(CodePtr::from_ptr(pointer), signature)
@@ -244,14 +240,14 @@ enum FfiValue {
     F64(f64),
     U8(u8),
     U32(u32),
-    Ptr(*mut c_void),
+    Ptr(*mut CVoid),
 }
 
 fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
     let addr_usize = address.as_ptr() as usize;
 
     Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
-        let address = CodePtr::from_ptr(addr_usize as *mut c_void);
+        let address = CodePtr::from_ptr(addr_usize as *mut CVoid);
 
         let mut types = Vec::with_capacity(inputs.len());
         let mut values = Vec::with_capacity(inputs.len());
@@ -279,14 +275,14 @@ fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
                     types.push(FfiType::pointer());
                     if let Ok(string) = CString::new(v.clone()) {
                         strings.push(string);
-                        values.push(FfiValue::Ptr(strings.last().unwrap().as_ptr() as *mut c_void));
+                        values.push(FfiValue::Ptr(strings.last().unwrap().as_ptr() as *mut CVoid));
                     } else {
                         values.push(FfiValue::Ptr(null_mut()));
                     }
                 }
                 Value::Pointer(v) => {
                     types.push(FfiType::pointer());
-                    values.push(FfiValue::Ptr(*v as *mut c_void));
+                    values.push(FfiValue::Ptr(*v as *mut CVoid));
                 }
                 Value::Structure(fields) => {
                     if let Some(Value::Float(f)) = fields.first() {
@@ -341,7 +337,7 @@ fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
                     Ok(Value::Integer(ret as i64))
                 }
                 "String" => {
-                    let ret: *mut c_char = cif.call(address, &args);
+                    let ret: *mut CChar = cif.call(address, &args);
                     if ret.is_null() {
                         Ok(Value::Text(String::new()))
                     } else {

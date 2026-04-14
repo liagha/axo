@@ -7,12 +7,15 @@ use {
     crate::{
         analyzer::Analyzer,
         combinator::{Action, Operation, Operator},
-        data::{memory::Arc, Str},
+        data::{memory::{Arc, transmute}, Str},
         internal::{
             platform::{
+                temp_dir,
                 create_dir_all,
                 read, write,
-                catch_unwind, AssertUnwindSafe,
+                catch_unwind,
+                DLL_EXTENSION,
+                AssertUnwindSafe,
                 Lock,
             },
             time::Duration,
@@ -45,7 +48,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         if let Ok(data) = read(&manifest) {
             session.buffers.push(data);
             let raw = session.buffers.last().unwrap().as_slice();
-            let extended: &'source [u8] = unsafe { std::mem::transmute(raw) };
+            let extended: &'source [u8] = unsafe { transmute(raw) };
 
             if let Some(cache) = Session::decode::<Option<Map<Location<'source>, u64>>>(extended).flatten() {
                 session.cache = cache;
@@ -98,7 +101,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         let discard = session.get_directive(Str::from("Discard")).is_some();
 
         let build = if discard {
-            std::env::temp_dir().join("axo").join("build")
+            temp_dir().join("axo").join("build")
         } else {
             session.base().join("build")
         };
@@ -130,8 +133,7 @@ pub fn prepare<'source>(session: &mut Session<'source>) -> bool {
         }
 
         if !sources.is_empty() {
-            let extension = std::env::consts::DLL_EXTENSION;
-            let library = build.join(format!("lib_axo.{}", extension));
+            let library = build.join(format!("lib_axo.{}", DLL_EXTENSION));
             let recompile = dirty || !library.exists();
 
             if recompile {
@@ -221,7 +223,7 @@ impl<'session> Session<'session> {
         } else if let Ok(bytes) = read(&path) {
             self.buffers.push(bytes);
             let raw = self.buffers.last().unwrap().as_slice();
-            let extended: &'session [u8] = unsafe { std::mem::transmute(raw) };
+            let extended: &'session [u8] = unsafe { transmute(raw) };
             Self::decode(extended).flatten()
         } else {
             None

@@ -35,7 +35,7 @@ pub mod operation {
 pub mod platform {
     pub use std::{
         alloc::{alloc, dealloc, realloc, Layout},
-        env::{args, current_dir, current_exe, var},
+        env::{args, temp_dir, current_dir, current_exe, var, consts::DLL_EXTENSION},
         ffi::{OsStr, OsString},
         fs::{canonicalize, create_dir_all, read, read_dir, read_to_string, write, metadata, File},
         io::{
@@ -50,6 +50,12 @@ pub mod platform {
         thread::{sleep, scope},
         sync::{RwLock as Lock},
         panic::{catch_unwind, AssertUnwindSafe},
+    };
+}
+
+pub mod foreign {
+    pub use std::{
+        ffi::{CStr, c_void as CVoid, c_char as CChar}
     };
 }
 
