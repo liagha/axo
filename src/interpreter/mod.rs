@@ -15,14 +15,13 @@ use {
             CString, Function, Identity, Interface, Str,
         },
         internal::{
-            platform::{read_dir, read_to_string, temp_dir, DLL_EXTENSION, Lock, PathBuf},
             foreign::{CStr, CVoid, CChar},
-            hash::Map,
+            platform::{temp_dir, DLL_EXTENSION, Lock},
             time::Duration,
             RecordKind, Session, SessionError,
         },
         reporter::Error,
-        resolver::Type,
+        resolver::{Type, TypeKind},
     },
     libffi::middle::{Arg, Cif, CodePtr, Type as FfiType},
     libloading::{Library, Symbol},
@@ -31,21 +30,16 @@ use {
 pub type InterpretError<'error> = Error<'error, ErrorKind>;
 pub type DynamicFunction = Arc<dyn Fn(&[Value]) -> Result<Value, ErrorKind> + Send + Sync>;
 
-#[derive(Clone)]
-pub struct Signature {
-    pub returns: String,
-    pub variadic: bool,
-    pub fixed: usize,
-}
-
-impl Default for Signature {
-    fn default() -> Self {
-        Self {
-            returns: String::from("Integer"),
-            variadic: false,
-            fixed: 0,
-        }
-    }
+#[derive(Clone, Copy)]
+enum NativeType {
+    Integer,
+    Float,
+    Boolean,
+    Character,
+    String,
+    Pointer,
+    Void,
+    U8,
 }
 
 pub struct InterpretAction<'source> {
@@ -80,7 +74,6 @@ pub fn interpret<'source>(
         .collect();
     sources.sort();
 
-    let signatures = Interpreter::extract_signatures();
     let library = load_library(session);
     let start = core.code.len();
 
@@ -95,7 +88,7 @@ pub fn interpret<'source>(
         for analysis in &analyses {
             if let AnalysisKind::Function(function) = &analysis.kind {
                 if matches!(function.interface, Interface::C) {
-                    bind_function(core, function, &library, &signatures);
+                    bind_function(core, function, &library);
                 }
             }
         }
@@ -117,83 +110,6 @@ pub fn interpret<'source>(
     }
 }
 
-impl<'error> Interpreter<'error> {
-    fn extract_signatures() -> Map<String, Signature> {
-        let mut map = Map::new();
-        let mut dirs = vec![PathBuf::from(".")];
-
-        while let Some(dir) = dirs.pop() {
-            let Ok(entries) = read_dir(&dir) else {
-                continue;
-            };
-
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    if name != ".git" && name != "target" {
-                        dirs.push(path);
-                    }
-                } else if path.extension().and_then(|s| s.to_str()) == Some("axo") {
-                    Self::parse_file(&path, &mut map);
-                }
-            }
-        }
-        map
-    }
-
-    fn parse_file(path: &PathBuf, map: &mut Map<String, Signature>) {
-        let Ok(content) = read_to_string(path) else {
-            return;
-        };
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("func ") {
-                Self::parse_function(trimmed, map);
-            }
-        }
-    }
-
-    fn parse_function(line: &str, map: &mut Map<String, Signature>) {
-        let after = &line[5..];
-        let Some(paren) = after.find('(') else {
-            return;
-        };
-        let name = after[..paren].trim().to_string();
-
-        let mut variadic = false;
-        let mut fixed = 0;
-
-        if let Some(end) = after.find(')') {
-            let args = &after[paren + 1..end];
-            if args.contains("...") {
-                variadic = true;
-                let before = args.split("...").next().unwrap_or("");
-                fixed = before.split(',').filter(|s| !s.trim().is_empty()).count();
-            }
-        }
-
-        let mut returns = String::from("Empty");
-        if let Some(colon) = after.rfind(':') {
-            if colon > paren {
-                returns = Self::parse_type(&after[colon + 1..]);
-            }
-        } else if let Some(arrow) = after.find("->") {
-            if arrow > paren {
-                returns = Self::parse_type(&after[arrow + 2..]);
-            }
-        }
-
-        map.insert(name, Signature { returns, variadic, fixed });
-    }
-
-    fn parse_type(text: &str) -> String {
-        let text = text.trim();
-        let text = text.split_whitespace().next().unwrap_or("Empty");
-        text.replace('{', "").replace(';', "")
-    }
-}
-
 fn load_library(session: &Session) -> Option<Library> {
     let discard = session.get_directive(Str::from("Discard")).is_some();
     let build = if discard {
@@ -210,7 +126,6 @@ fn bind_function(
     core: &mut Interpreter,
     function: &Function<Str, Analysis, Option<Box<Analysis>>, Option<Type>>,
     library: &Option<Library>,
-    signatures: &Map<String, Signature>,
 ) {
     let name = function.target.as_str().unwrap_or_default();
     let fallback = || -> DynamicFunction { Arc::new(|_: &[Value]| Err(ErrorKind::OutOfBounds)) };
@@ -219,8 +134,31 @@ fn bind_function(
         unsafe {
             if let Ok(symbol) = lib.get::<*mut CVoid>(name.as_bytes()) {
                 let pointer = *symbol;
-                let signature = signatures.get(name).cloned().unwrap_or_default();
-                build_closure(CodePtr::from_ptr(pointer), signature)
+                let mut members = Vec::with_capacity(function.members.len());
+
+                for member in &function.members {
+                    members.push(match &member.typing.kind {
+                        TypeKind::Integer { .. } => NativeType::Integer,
+                        TypeKind::Float { .. } => NativeType::Float,
+                        TypeKind::Boolean => NativeType::Boolean,
+                        TypeKind::Character => NativeType::Character,
+                        TypeKind::String => NativeType::String,
+                        TypeKind::Pointer { .. } | TypeKind::Array { .. } | TypeKind::Structure(_) | TypeKind::Union(_) => NativeType::Pointer,
+                        _ => NativeType::Pointer,
+                    });
+                }
+
+                let output = match function.output.as_ref().map(|t| &t.kind) {
+                    Some(TypeKind::Float { .. }) => NativeType::Float,
+                    Some(TypeKind::Boolean) => NativeType::Boolean,
+                    Some(TypeKind::Integer { size: 8, signed: false }) => NativeType::U8,
+                    Some(TypeKind::String) => NativeType::String,
+                    Some(TypeKind::Void) | None => NativeType::Void,
+                    Some(TypeKind::Character) => NativeType::Character,
+                    _ => NativeType::Integer,
+                };
+
+                build_closure(CodePtr::from_ptr(pointer), members, output)
             } else {
                 fallback()
             }
@@ -243,70 +181,86 @@ enum FfiValue {
     Ptr(*mut CVoid),
 }
 
-fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
-    let addr_usize = address.as_ptr() as usize;
+fn build_closure(address: CodePtr, members: Vec<NativeType>, output: NativeType) -> DynamicFunction {
+    let address = address.as_ptr() as usize;
 
     Arc::new(move |inputs: &[Value]| -> Result<Value, ErrorKind> {
-        let address = CodePtr::from_ptr(addr_usize as *mut CVoid);
+        let address = CodePtr::from_ptr(address as *mut CVoid);
 
         let mut types = Vec::with_capacity(inputs.len());
         let mut values = Vec::with_capacity(inputs.len());
         let mut strings = Vec::new();
 
-        for input in inputs {
-            match input {
-                Value::Integer(v) => {
+        for (input, native) in inputs.iter().zip(members.iter()) {
+            match native {
+                NativeType::Integer | NativeType::U8 => {
                     types.push(FfiType::i64());
-                    values.push(FfiValue::I64(*v));
+                    if let Value::Integer(v) = input {
+                        values.push(FfiValue::I64(*v));
+                    } else {
+                        values.push(FfiValue::I64(0));
+                    }
                 }
-                Value::Float(v) => {
+                NativeType::Float => {
                     types.push(FfiType::f64());
-                    values.push(FfiValue::F64(*v));
+                    if let Value::Float(v) = input {
+                        values.push(FfiValue::F64(*v));
+                    } else {
+                        values.push(FfiValue::F64(0.0));
+                    }
                 }
-                Value::Boolean(v) => {
+                NativeType::Boolean => {
                     types.push(FfiType::u8());
-                    values.push(FfiValue::U8(if *v { 1 } else { 0 }));
+                    if let Value::Boolean(v) = input {
+                        values.push(FfiValue::U8(if *v { 1 } else { 0 }));
+                    } else {
+                        values.push(FfiValue::U8(0));
+                    }
                 }
-                Value::Character(v) => {
+                NativeType::Character => {
                     types.push(FfiType::u32());
-                    values.push(FfiValue::U32(*v as u32));
+                    if let Value::Character(v) = input {
+                        values.push(FfiValue::U32(*v as u32));
+                    } else {
+                        values.push(FfiValue::U32(0));
+                    }
                 }
-                Value::Text(v) => {
+                NativeType::String => {
                     types.push(FfiType::pointer());
-                    if let Ok(string) = CString::new(v.clone()) {
-                        strings.push(string);
-                        values.push(FfiValue::Ptr(strings.last().unwrap().as_ptr() as *mut CVoid));
+                    if let Value::Text(v) = input {
+                        if let Ok(string) = CString::new(v.clone()) {
+                            strings.push(string);
+                            values.push(FfiValue::Ptr(strings.last().unwrap().as_ptr() as *mut CVoid));
+                        } else {
+                            values.push(FfiValue::Ptr(null_mut()));
+                        }
                     } else {
                         values.push(FfiValue::Ptr(null_mut()));
                     }
                 }
-                Value::Pointer(v) => {
+                NativeType::Pointer => {
                     types.push(FfiType::pointer());
-                    values.push(FfiValue::Ptr(*v as *mut CVoid));
-                }
-                Value::Structure(fields) => {
-                    if let Some(Value::Float(f)) = fields.first() {
-                        types.push(FfiType::f64());
-                        values.push(FfiValue::F64(*f));
+                    if let Value::Pointer(v) = input {
+                        values.push(FfiValue::Ptr(*v as *mut CVoid));
                     } else {
-                        types.push(FfiType::pointer());
                         values.push(FfiValue::Ptr(null_mut()));
                     }
                 }
-                _ => {
+                NativeType::Void => {
                     types.push(FfiType::pointer());
                     values.push(FfiValue::Ptr(null_mut()));
                 }
             }
         }
 
-        let rtype = match signature.returns.as_str() {
-            "Float" => FfiType::f64(),
-            "Boolean" | "UInt8" => FfiType::u8(),
-            "String" => FfiType::pointer(),
-            "Empty" => FfiType::void(),
-            "Character" => FfiType::u32(),
-            _ => FfiType::i64(),
+        let result = match output {
+            NativeType::Float => FfiType::f64(),
+            NativeType::Boolean => FfiType::u8(),
+            NativeType::U8 => FfiType::u8(),
+            NativeType::String => FfiType::pointer(),
+            NativeType::Void => FfiType::void(),
+            NativeType::Character => FfiType::u32(),
+            NativeType::Integer | NativeType::Pointer => FfiType::i64(),
         };
 
         let args: Vec<Arg> = values
@@ -320,23 +274,23 @@ fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
             })
             .collect();
 
-        let cif = Cif::new(types.into_iter(), rtype);
+        let cif = Cif::new(types.into_iter(), result);
 
         unsafe {
-            match signature.returns.as_str() {
-                "Float" => {
+            match output {
+                NativeType::Float => {
                     let ret: f64 = cif.call(address, &args);
                     Ok(Value::Float(ret))
                 }
-                "Boolean" => {
+                NativeType::Boolean => {
                     let ret: u8 = cif.call(address, &args);
                     Ok(Value::Boolean(ret != 0))
                 }
-                "UInt8" => {
+                NativeType::U8 => {
                     let ret: u8 = cif.call(address, &args);
                     Ok(Value::Integer(ret as i64))
                 }
-                "String" => {
+                NativeType::String => {
                     let ret: *mut CChar = cif.call(address, &args);
                     if ret.is_null() {
                         Ok(Value::Text(String::new()))
@@ -345,15 +299,15 @@ fn build_closure(address: CodePtr, signature: Signature) -> DynamicFunction {
                         Ok(Value::Text(text.to_string_lossy().into_owned()))
                     }
                 }
-                "Character" => {
+                NativeType::Character => {
                     let ret: u32 = cif.call(address, &args);
                     Ok(Value::Character(char::from_u32(ret).unwrap_or('\0')))
                 }
-                "Empty" => {
+                NativeType::Void => {
                     cif.call::<()>(address, &args);
                     Ok(Value::Empty)
                 }
-                _ => {
+                NativeType::Integer | NativeType::Pointer => {
                     let ret: i64 = cif.call(address, &args);
                     Ok(Value::Integer(ret))
                 }

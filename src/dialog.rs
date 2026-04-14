@@ -1,17 +1,28 @@
-use axo::{data::{Str}, internal::{RecordKind, Record}, interpreter, interpreter::Interpreter, parser::Symbol, tracker::Location};
-use std::{
-    env::set_current_dir,
-    fs::read_dir,
-    io::{stdin, stdout, Read, Write},
-    process::Command,
-    str::from_utf8,
+use axo::{
+    data::{
+        Str, from_utf8,
+    },
+    internal::{
+        platform::{
+            set_current_dir,
+            read_dir, stdin, stdout,
+            Read, Write,
+            Command,
+        },
+        RecordKind,
+        Record
+    },
+    interpreter,
+    interpreter::Interpreter,
+    parser::Symbol,
+    tracker::Location
 };
 
-pub struct Terminal {
+pub struct Dialog {
     pub history: Vec<String>,
 }
 
-impl Terminal {
+impl Dialog {
     pub fn new() -> Self {
         Self {
             history: Vec::new(),
@@ -155,7 +166,7 @@ pub fn start(bare: bool, directives: Vec<Symbol>) {
 
     crate::run(&mut session, &mut core, &keys);
 
-    let mut terminal = Terminal::new();
+    let mut terminal = Dialog::new();
 
     loop {
         let Some(input) = terminal.read("> ") else {
